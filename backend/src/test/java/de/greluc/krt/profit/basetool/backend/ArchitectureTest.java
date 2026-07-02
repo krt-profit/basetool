@@ -331,45 +331,6 @@ class ArchitectureTest {
   }
 
   @Test
-  void controllersUsingTheLazyMembershipMapperMustBeTransactional() {
-    // Reasoning: OrgUnitMembershipMapper.toDto reads user.effectiveName through the LAZY user
-    // association. When a controller maps a service-returned entity to its DTO response *after*
-    // the service @Transactional has already committed, the persistence session is gone and the
-    // mapper throws LazyInitializationException — the write succeeds but the response 500s. That is
-    // exactly the /organisation/leitung "assign Kommandoleiter" regression: SquadronRoleController
-    // shipped without the class-level @Transactional that every other mapper-wiring controller
-    // carries. A class-level @Transactional keeps the session open across the mapping, so every
-    // @RestController that depends on this mapper must be transactional.
-    DescribedPredicate<JavaClass> injectTheLazyMembershipMapper =
-        new DescribedPredicate<>("inject OrgUnitMembershipMapper") {
-          @Override
-          public boolean test(JavaClass javaClass) {
-            return javaClass.getFields().stream()
-                .anyMatch(
-                    field ->
-                        field
-                            .getRawType()
-                            .getFullName()
-                            .equals(
-                                "de.greluc.krt.profit.basetool.backend.mapper."
-                                    + "OrgUnitMembershipMapper"));
-          }
-        };
-    classes()
-        .that()
-        .areAnnotatedWith("org.springframework.web.bind.annotation.RestController")
-        .and(injectTheLazyMembershipMapper)
-        .should()
-        .beAnnotatedWith(TRANSACTIONAL)
-        .because(
-            "OrgUnitMembershipMapper.toDto reads user.effectiveName through the LAZY user"
-                + " association; a controller that maps the entity to its DTO response outside a"
-                + " transaction throws LazyInitializationException once the service has committed"
-                + " (the write succeeds but the response 500s).")
-        .check(CLASSES);
-  }
-
-  @Test
   void controllerLayerShouldNotDependOnRepositoryLayer() {
     // Reasoning: CLAUDE.md prescribes a strict controller → service → repository layering.
     // A controller injecting a Spring Data repository directly skips the service layer where

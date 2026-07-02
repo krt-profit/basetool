@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
-import de.greluc.krt.profit.basetool.backend.mapper.OrgUnitMembershipMapper;
 import de.greluc.krt.profit.basetool.backend.model.dto.AssignSquadronRankRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipDto;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipService;
@@ -30,7 +29,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -47,22 +45,19 @@ import org.springframework.web.bind.annotation.RestController;
  * Bereich, while the lower ranks (and their Kommandogruppe binding) are appointed by the squadron's
  * own Staffelleiter — never by the appointee themselves (no self-promotion).
  *
- * <p>Class-level {@link Transactional} keeps the persistence session open across the {@code
- * OrgUnitMembershipMapper#toDto} call that builds each response: the mapper reads {@code
- * user.effectiveName} through the LAZY {@code user} association, which would otherwise throw {@code
- * LazyInitializationException} once the service transaction has already committed (the write would
- * succeed but the response would 500). Every other controller wiring that mapper is transactional
- * for the same reason, pinned by {@code
- * ArchitectureTest#controllersUsingTheLazyMembershipMapperMustBeTransactional}.
+ * <p>The response DTO is projected inside the service transaction ({@link
+ * OrgUnitMembershipService#assignSquadronRankDto}/{@code removeSquadronRankDto}), so this
+ * controller needs no class-level {@code @Transactional}: the lazy {@code user.effectiveName} read
+ * the mapper performs happens while the persistence session is still open (L4, #923). This closes
+ * the {@code /organisation/leitung} "assign Kommandoleiter" 500 regression at its root — the
+ * mapping can no longer run after the transaction has committed.
  */
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/squadrons/{squadronId}/ranks")
-@Transactional
 public class SquadronRoleController {
 
   private final OrgUnitMembershipService membershipService;
-  private final OrgUnitMembershipMapper membershipMapper;
 
   /**
    * Assigns (or changes) a member's squadron leadership rank, optionally bound to a Kommandogruppe.
@@ -84,9 +79,8 @@ public class SquadronRoleController {
       @PathVariable @NotNull UUID squadronId,
       @PathVariable @NotNull UUID userId,
       @RequestBody @Valid AssignSquadronRankRequest request) {
-    return membershipMapper.toDto(
-        membershipService.assignSquadronRank(
-            squadronId, userId, request.role(), request.kommandoGroupId(), request.version()));
+    return membershipService.assignSquadronRankDto(
+        squadronId, userId, request.role(), request.kommandoGroupId(), request.version());
   }
 
   /**
@@ -109,7 +103,6 @@ public class SquadronRoleController {
       @PathVariable @NotNull UUID squadronId,
       @PathVariable @NotNull UUID userId,
       @RequestParam(required = false) Long version) {
-    return membershipMapper.toDto(
-        membershipService.removeSquadronRank(squadronId, userId, version));
+    return membershipService.removeSquadronRankDto(squadronId, userId, version);
   }
 }

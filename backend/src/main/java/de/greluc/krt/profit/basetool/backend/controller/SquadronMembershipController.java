@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
-import de.greluc.krt.profit.basetool.backend.mapper.OrgUnitMembershipMapper;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipDto;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipService;
@@ -32,7 +31,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -67,11 +65,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/squadrons/{id}/members")
 @RequiredArgsConstructor
-@Transactional
 public class SquadronMembershipController {
 
   private final OrgUnitMembershipService membershipService;
-  private final OrgUnitMembershipMapper membershipMapper;
 
   /**
    * Flips the per-membership {@code is_logistician} / {@code is_mission_manager} flags on a single
@@ -108,6 +104,6 @@ public class SquadronMembershipController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID userId,
       @RequestBody @Valid MembershipFlagsPatchRequest request) {
-    return membershipMapper.toDto(membershipService.patchSquadronMemberFlags(id, userId, request));
+    return membershipService.patchSquadronMemberFlagsDto(id, userId, request);
   }
 }
