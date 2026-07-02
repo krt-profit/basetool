@@ -484,6 +484,104 @@ class BankAccountServiceTest {
     verify(bankApprovalLimitService).assemble(account, false);
   }
 
+  @Test
+  void setCartelApprovalTiers_setsCeilingsAndAuditsSet() {
+    // REQ-BANK-047: the Bankleitung sets the KRT ladder thresholds; audited as SET.
+    UUID accountId = UUID.randomUUID();
+    BankAccount cartel = accountWithVersion(accountId, 2L);
+    cartel.setType(BankAccountType.CARTEL);
+    when(accountRepository.findById(accountId)).thenReturn(Optional.of(cartel));
+    when(accountRepository.save(any(BankAccount.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    when(postingRepository.accountBalance(accountId)).thenReturn(BigDecimal.ZERO);
+
+    bankAccountService.setCartelApprovalTiers(
+        accountId, new BigDecimal("1000"), new BigDecimal("5000"), 2L);
+
+    ArgumentCaptor<BankAccount> saved = ArgumentCaptor.forClass(BankAccount.class);
+    verify(accountRepository).save(saved.capture());
+    assertEquals(
+        0, new BigDecimal("1000").compareTo(saved.getValue().getEmployeeApprovalCeiling()));
+    assertEquals(
+        0, new BigDecimal("5000").compareTo(saved.getValue().getAreaLeadApprovalCeiling()));
+    verify(bankAuditService)
+        .record(
+            eq(BankAuditEventType.CARTEL_APPROVAL_TIERS_SET), eq(accountId), any(), any(), any());
+  }
+
+  @Test
+  void setCartelApprovalTiers_bothNullClearsAndAuditsCleared() {
+    // REQ-BANK-047: clearing both thresholds is audited as CLEARED.
+    UUID accountId = UUID.randomUUID();
+    BankAccount cartel = accountWithVersion(accountId, 1L);
+    cartel.setType(BankAccountType.CARTEL);
+    cartel.setEmployeeApprovalCeiling(new BigDecimal("1000"));
+    when(accountRepository.findById(accountId)).thenReturn(Optional.of(cartel));
+    when(accountRepository.save(any(BankAccount.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    when(postingRepository.accountBalance(accountId)).thenReturn(BigDecimal.ZERO);
+
+    bankAccountService.setCartelApprovalTiers(accountId, null, null, 1L);
+
+    ArgumentCaptor<BankAccount> saved = ArgumentCaptor.forClass(BankAccount.class);
+    verify(accountRepository).save(saved.capture());
+    assertEquals(null, saved.getValue().getEmployeeApprovalCeiling());
+    assertEquals(null, saved.getValue().getAreaLeadApprovalCeiling());
+    verify(bankAuditService)
+        .record(
+            eq(BankAuditEventType.CARTEL_APPROVAL_TIERS_CLEARED),
+            eq(accountId),
+            any(),
+            any(),
+            any());
+  }
+
+  @Test
+  void setCartelApprovalTiers_nonCartelAccount_rejectedBeforeSave() {
+    // REQ-BANK-047: only the KRT (CARTEL) account carries thresholds.
+    UUID accountId = UUID.randomUUID();
+    BankAccount special = accountWithVersion(accountId, 1L); // SPECIAL by default
+    when(accountRepository.findById(accountId)).thenReturn(Optional.of(special));
+
+    assertThrows(
+        BadRequestException.class,
+        () ->
+            bankAccountService.setCartelApprovalTiers(
+                accountId, new BigDecimal("1000"), new BigDecimal("5000"), 1L));
+    verify(accountRepository, never()).save(any());
+  }
+
+  @Test
+  void setCartelApprovalTiers_t2BelowT1_rejectedBeforeSave() {
+    // REQ-BANK-047: the area-lead ceiling must be at or above the bank-employee ceiling.
+    UUID accountId = UUID.randomUUID();
+    BankAccount cartel = accountWithVersion(accountId, 1L);
+    cartel.setType(BankAccountType.CARTEL);
+    when(accountRepository.findById(accountId)).thenReturn(Optional.of(cartel));
+
+    assertThrows(
+        BadRequestException.class,
+        () ->
+            bankAccountService.setCartelApprovalTiers(
+                accountId, new BigDecimal("5000"), new BigDecimal("1000"), 1L));
+    verify(accountRepository, never()).save(any());
+  }
+
+  @Test
+  void setCartelApprovalTiers_staleVersionFailsFastWith409() {
+    UUID accountId = UUID.randomUUID();
+    BankAccount cartel = accountWithVersion(accountId, 5L);
+    cartel.setType(BankAccountType.CARTEL);
+    when(accountRepository.findById(accountId)).thenReturn(Optional.of(cartel));
+
+    assertThrows(
+        ObjectOptimisticLockingFailureException.class,
+        () ->
+            bankAccountService.setCartelApprovalTiers(
+                accountId, new BigDecimal("1000"), new BigDecimal("5000"), 4L));
+    verify(accountRepository, never()).save(any());
+  }
+
   /** Creates an account in the management perspective (any type, no auto-grant). */
   private void createAsManagement(CreateBankAccountRequest request) {
     bankAccountService.createAccount(request, true, null);

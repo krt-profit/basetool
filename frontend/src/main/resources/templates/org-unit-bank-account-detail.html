@@ -118,6 +118,36 @@
         <th:block th:if="${settings == null}"
                   th:replace="~{fragments/bank-approval-limits :: limitsDisplay(${detail.detail().approvalLimits()})}"></th:block>
 
+        <!-- KRT-account (CARTEL) amount-tiered approval ladder, read-only to every viewer
+             (REQ-BANK-047): the amount bands and who approves each. Managed only by the Bankleitung in
+             the Verwaltung tab. Shown for the KRT account regardless of settings, so a plain member and
+             the OL both see it. -->
+        <div class="hud-box mt-2" th:if="${acct.type() == 'CARTEL'}"
+             data-testid="org-unit-bank-cartel-ladder"
+             th:with="t1=${acct.employeeApprovalCeiling()},t2=${acct.areaLeadApprovalCeiling()}">
+            <h3 class="sub-h" th:text="#{bank.cartelLadder.title}">Freigabe-Stufen</h3>
+            <p class="text-muted" style="font-size: 0.8rem;" th:text="#{bank.cartelLadder.hint}">
+                Auszahlungen und Transfers vom KRT-Konto werden je nach H&ouml;he des Betrags freigegeben.</p>
+            <div class="vis-row">
+                <span class="v-label" th:text="#{bank.cartelLadder.tier.employee}">Bankmitarbeiter</span>
+                <span class="vis-state bank-amount" th:if="${t1 != null}"
+                      th:text="'&#8804; ' + ${#numbers.formatInteger(@moneyFormat.round(t1), 1, 'POINT')} + ' aUEC'">&#8804; 1.000.000 aUEC</span>
+                <span class="vis-state bank-amount" th:unless="${t1 != null}"
+                      th:text="#{bank.cartelLadder.none}">keine Selbstfreigabe</span>
+            </div>
+            <div class="vis-row">
+                <span class="v-label" th:text="#{bank.cartelLadder.tier.areaLead}">Bereichsleiter Profit</span>
+                <span class="vis-state bank-amount" th:if="${t2 != null}"
+                      th:text="'&#8804; ' + ${#numbers.formatInteger(@moneyFormat.round(t2), 1, 'POINT')} + ' aUEC'">&#8804; 5.000.000 aUEC</span>
+                <span class="vis-state bank-amount" th:unless="${t2 != null}"
+                      th:text="#{bank.cartelLadder.above}">dar&uuml;ber</span>
+            </div>
+            <div class="vis-row">
+                <span class="v-label" th:text="#{bank.cartelLadder.tier.ol}">Organisationsleitung</span>
+                <span class="vis-state bank-amount" th:text="#{bank.cartelLadder.above}">dar&uuml;ber</span>
+            </div>
+        </div>
+
         <!-- VERANTWORTUNG & SICHTBARKEIT tab panel: the responsible holder's settings (balance target,
              configurable visibility, approval limits). Shown ONLY to the responsible holder / manager
              (settings != null, == hasSettingsTab); hidden by default — Buchungshistorie is the
@@ -179,6 +209,24 @@
                                     th:classappend="${settings.allMembersGranted()} ? ' btn-ghost' : ' btn-outline'"
                                     data-testid="org-unit-vis-all-members"
                                     th:text="${settings.allMembersGranted()} ? #{bank.orgUnit.settings.visibility.user.remove} : #{bank.orgUnit.settings.visibility.grant}">Freigeben</button>
+                        </form>
+                    </span>
+                </div>
+
+                <!-- Mitglieder des Bereichs (whole area cascade, AREA accounts only, REQ-BANK-048) -->
+                <div th:if="${settings.areaMembersSupported()}" class="vis-row">
+                    <span class="v-label" th:text="#{bank.orgUnit.settings.visibility.areaMembers}">Mitglieder des Bereichs</span>
+                    <span class="vis-state">
+                        <span th:if="${settings.areaMembersGranted()}" class="chip chip--success"
+                              th:text="#{bank.orgUnit.settings.visibility.granted}">Freigegeben</span>
+                        <form class="bank-ajax-form no-track" data-refresh="orgUnitBankSettings"
+                              th:attr="data-endpoint='/api/proxy/org-units/bank/accounts/{id}/visibility/area-members/' + ${!settings.areaMembersGranted()}"
+                              data-method="PUT" style="display:inline;">
+                            <input type="hidden" name="_id" th:value="${acct.id()}">
+                            <button type="submit" class="btn btn-xs"
+                                    th:classappend="${settings.areaMembersGranted()} ? ' btn-ghost' : ' btn-outline'"
+                                    data-testid="org-unit-vis-area-members"
+                                    th:text="${settings.areaMembersGranted()} ? #{bank.orgUnit.settings.visibility.user.remove} : #{bank.orgUnit.settings.visibility.grant}">Freigeben</button>
                         </form>
                     </span>
                 </div>

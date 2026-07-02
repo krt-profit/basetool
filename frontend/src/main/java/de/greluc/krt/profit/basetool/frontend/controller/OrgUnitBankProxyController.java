@@ -161,6 +161,26 @@ public class OrgUnitBankProxyController {
   }
 
   /**
+   * Forwards toggling the "Mitglieder des Bereichs" cascade view grant of a Bereichskonto
+   * (REQ-BANK-048).
+   *
+   * @param id the account
+   * @param enabled whether the whole area cascade may view the account
+   * @param body unused (path-only)
+   * @return the refreshed settings
+   */
+  @PutMapping("/accounts/{id}/visibility/area-members/{enabled}")
+  @PreAuthorize("isAuthenticated()")
+  public Map<String, Object> setAreaMembersVisibility(
+      @PathVariable @NotNull UUID id,
+      @PathVariable boolean enabled,
+      @RequestBody(required = false) @Nullable Map<String, Object> body) {
+    return putMap(
+        "/api/v1/org-units/bank/accounts/" + id + "/visibility/area-members/" + enabled,
+        emptyIfNull(body));
+  }
+
+  /**
    * Forwards granting an individual user view access to an account (REQ-BANK-035).
    *
    * @param id the account
@@ -248,6 +268,34 @@ public class OrgUnitBankProxyController {
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> clearAllMembersApprovalLimit(@PathVariable @NotNull UUID id) {
     return deleteMap("/api/v1/org-units/bank/accounts/" + id + "/approval-limit/all-members");
+  }
+
+  /**
+   * Forwards setting the "Mitglieder des Bereichs" cascade approval limit on a Bereichskonto
+   * (REQ-BANK-048).
+   *
+   * @param id the account
+   * @param body the limit payload ({@code limit})
+   * @return the refreshed settings
+   */
+  @PutMapping("/accounts/{id}/approval-limit/area-members")
+  @PreAuthorize("isAuthenticated()")
+  public Map<String, Object> setAreaMembersApprovalLimit(
+      @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
+    return putMap("/api/v1/org-units/bank/accounts/" + id + "/approval-limit/area-members", body);
+  }
+
+  /**
+   * Forwards clearing the "Mitglieder des Bereichs" cascade approval limit on a Bereichskonto
+   * (REQ-BANK-048).
+   *
+   * @param id the account
+   * @return the refreshed settings
+   */
+  @DeleteMapping("/accounts/{id}/approval-limit/area-members")
+  @PreAuthorize("isAuthenticated()")
+  public Map<String, Object> clearAreaMembersApprovalLimit(@PathVariable @NotNull UUID id) {
+    return deleteMap("/api/v1/org-units/bank/accounts/" + id + "/approval-limit/area-members");
   }
 
   /**

@@ -261,6 +261,23 @@ public class OrgUnitBankController {
   }
 
   /**
+   * Enables or disables the "Mitglieder des Bereichs" cascade view grant of a Bereichskonto
+   * (REQ-BANK-048): every member of the whole area cascade (Bereichsleitung + child Staffel/SK
+   * members) may view it.
+   *
+   * @param id the account
+   * @param enabled whether the whole area cascade may view the account
+   * @return the refreshed settings
+   */
+  @PutMapping("/accounts/{id}/visibility/area-members/{enabled}")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Toggle the area-members (Mitglieder des Bereichs) view grant")
+  public OrgUnitBankAccountSettingsDto setAreaMembersVisibility(
+      @PathVariable @NotNull UUID id, @PathVariable boolean enabled) {
+    return orgUnitBankAccessService.setAreaMembersVisibility(id, enabled);
+  }
+
+  /**
    * Grants an individual user view access to an account (REQ-BANK-035).
    *
    * @param id the account
@@ -351,6 +368,36 @@ public class OrgUnitBankController {
   public OrgUnitBankAccountSettingsDto clearAllMembersApprovalLimit(
       @PathVariable @NotNull UUID id) {
     return orgUnitBankAccessService.clearAllMembersApprovalLimit(id);
+  }
+
+  /**
+   * Sets or changes the "Mitglieder des Bereichs" cascade approval limit on a Bereichskonto
+   * (REQ-BANK-048).
+   *
+   * @param id the account
+   * @param request the new whole-aUEC limit (>= 0)
+   * @return the refreshed settings
+   */
+  @PutMapping("/accounts/{id}/approval-limit/area-members")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Set the area-members (Mitglieder des Bereichs) approval limit")
+  public OrgUnitBankAccountSettingsDto setAreaMembersApprovalLimit(
+      @PathVariable @NotNull UUID id, @RequestBody @Valid SetBankApprovalLimitRequest request) {
+    return orgUnitBankAccessService.setAreaMembersApprovalLimit(id, request.limit());
+  }
+
+  /**
+   * Clears the "Mitglieder des Bereichs" cascade approval limit on a Bereichskonto (REQ-BANK-048).
+   *
+   * @param id the account
+   * @return the refreshed settings
+   */
+  @DeleteMapping("/accounts/{id}/approval-limit/area-members")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Clear the area-members (Mitglieder des Bereichs) approval limit")
+  public OrgUnitBankAccountSettingsDto clearAreaMembersApprovalLimit(
+      @PathVariable @NotNull UUID id) {
+    return orgUnitBankAccessService.clearAreaMembersApprovalLimit(id);
   }
 
   /**

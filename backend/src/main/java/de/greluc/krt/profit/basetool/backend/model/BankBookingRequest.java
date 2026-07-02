@@ -229,6 +229,21 @@ public class BankBookingRequest extends AbstractEntity<UUID> {
   private BigDecimal applicableLimit;
 
   /**
+   * Snapshot at creation (REQ-BANK-041/-046): which class of approver must approve this request
+   * before a bank employee may confirm it; {@code null} unless {@link #requiresOwnerApproval} is
+   * set. For every request-capable account except the KRT account this is {@link
+   * BankRequestApprover#RESPONSIBLE_HOLDER}; for a KRT (CARTEL) withdrawal/transfer it is the
+   * amount-band approver ({@link BankRequestApprover#AREA_LEAD_PROFIT} / {@link
+   * BankRequestApprover#ORGANISATIONSLEITUNG}). The org-unit-aware seam resolves the band and, on
+   * the "Fremde Anträge" surface, who may act on it; the org-unit-blind confirm path never reads
+   * this. Immutable.
+   */
+  @Nullable
+  @Enumerated(EnumType.STRING)
+  @Column(name = "required_approver", length = 32, updatable = false)
+  private BankRequestApprover requiredApprover;
+
+  /**
    * {@code true} once the account's responsible holder granted approval in-app from the "Fremde
    * Anträge" tab (REQ-BANK-041); pre-fills the bank employee's confirmation checkbox. Meaningful
    * only when {@link #requiresOwnerApproval} is set.

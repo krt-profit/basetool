@@ -118,7 +118,9 @@ public class AdminAuditLogPageController {
               "APPROVAL_LIMIT_CLEARED",
               "BOOKING_REQUEST_OWNER_APPROVAL_GRANTED",
               "BOOKING_REQUEST_OWNER_APPROVAL_REVOKED",
-              "BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED"),
+              "BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED",
+              "CARTEL_APPROVAL_TIERS_SET",
+              "CARTEL_APPROVAL_TIERS_CLEARED"),
           "INVENTORY",
           List.of(
               "INVENTORY_ITEM_CREATED",

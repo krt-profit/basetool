@@ -97,15 +97,41 @@ public class BankApprovalLimitService {
   }
 
   /**
-   * {@code true} iff the account has an all-members limit tier (same set as {@link
-   * #configurable(BankAccountType)}): every member who may view the account may request, so capping
-   * the broad audience is meaningful.
+   * {@code true} iff the account type carries <em>per-audience</em> approval limits (the tiered
+   * editor with role/all-members/area-members/user ceilings): the {@code ORG_UNIT} and {@code AREA}
+   * accounts only. The KRT account ({@code CARTEL}) is request-capable ({@link #configurable}) but
+   * is <em>not</em> per-audience-configurable — it uses the amount-tiered approval ladder managed
+   * in the Verwaltung tab instead (REQ-BANK-047), which replaces the per-audience limits on it.
+   *
+   * @param type the account type
+   * @return whether the per-audience limit editor applies to this type
+   */
+  public static boolean audienceLimitsSupported(@NotNull BankAccountType type) {
+    return type == BankAccountType.ORG_UNIT || type == BankAccountType.AREA;
+  }
+
+  /**
+   * {@code true} iff the account has an all-members limit tier — the per-audience-configurable
+   * types ({@link #audienceLimitsSupported}): every member of the owning org unit who may view the
+   * account may request, so capping that audience is meaningful.
    *
    * @param type the account type
    * @return whether the all-members limit tier applies
    */
   public static boolean allMembersSupported(@NotNull BankAccountType type) {
-    return configurable(type);
+    return audienceLimitsSupported(type);
+  }
+
+  /**
+   * {@code true} iff the account has a "Mitglieder des Bereichs" cascade limit tier — only the
+   * {@code AREA} (Bereichskonto) accounts (REQ-BANK-048). The whole-area audience is meaningless
+   * for a Staffel/SK account (no cascade) and the KRT account (no per-audience limits).
+   *
+   * @param type the account type
+   * @return whether the area-members limit tier applies
+   */
+  public static boolean areaMembersSupported(@NotNull BankAccountType type) {
+    return type == BankAccountType.AREA;
   }
 
   /**
@@ -156,12 +182,14 @@ public class BankApprovalLimitService {
             ? Map.of()
             : userRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(User::getId, User::getEffectiveName));
+    BigDecimal areaMembersLimit = null;
     List<BankApprovalLimitUserDto> userLimits = new java.util.ArrayList<>();
     for (BankAccountApprovalLimit limit : limits) {
       switch (limit.getGranteeKind()) {
         case MEMBERSHIP_ROLE, GLOBAL_ROLE ->
             roleLimits.put(limit.getRoleCode(), limit.getLimitAmount());
         case ALL_MEMBERS -> allMembersLimit = limit.getLimitAmount();
+        case AREA_MEMBERS -> areaMembersLimit = limit.getLimitAmount();
         case USER ->
             userLimits.add(
                 new BankApprovalLimitUserDto(
@@ -176,11 +204,13 @@ public class BankApprovalLimitService {
     }
     return new BankApprovalLimitsDto(
         canEdit,
-        configurable(account.getType()),
+        audienceLimitsSupported(account.getType()),
         allMembersSupported(account.getType()),
+        areaMembersSupported(account.getType()),
         roleBuckets(account),
         roleLimits,
         allMembersLimit,
+        areaMembersLimit,
         List.copyOf(userLimits));
   }
 }

@@ -40,31 +40,42 @@ import org.jetbrains.annotations.Nullable;
  *     surface ever sets this {@code true} (responsible holder / bank management / admin,
  *     REQ-BANK-041); the bank-staff account-detail surface always assembles limits read-only
  *     ({@code false}), so a limit is configured exclusively in the org-unit bank
- * @param configurable whether this account type carries approval limits at all ({@code ORG_UNIT} /
- *     {@code AREA} / {@code CARTEL})
+ * @param configurable whether this account type carries per-audience approval limits at all — the
+ *     per-audience-editable types {@code ORG_UNIT} / {@code AREA}. The KRT account ({@code CARTEL})
+ *     is <em>not</em> per-audience-configurable: it uses the amount-tiered approval ladder managed
+ *     in the Verwaltung tab instead (REQ-BANK-047), so this is {@code false} for it
  * @param allMembersSupported whether the all-members tier applies to this account
+ * @param areaMembersSupported whether the "Mitglieder des Bereichs" cascade tier applies — only for
+ *     {@code AREA} (Bereichskonto) accounts (REQ-BANK-048)
  * @param availableRoleCodes the role buckets that may carry a limit on this account ({@code
  *     MembershipRole} names), in display order; empty for SK / CARTEL accounts
  * @param roleLimits the currently configured role-bucket limits, keyed by role code
  * @param allMembersLimit the configured all-members limit, or {@code null} when none is set
+ * @param areaMembersLimit the configured "Mitglieder des Bereichs" cascade limit, or {@code null}
+ *     when none is set (REQ-BANK-048)
  * @param userLimits the configured individual-user limits, with resolved display names
  */
 public record BankApprovalLimitsDto(
     boolean canEdit,
     boolean configurable,
     boolean allMembersSupported,
+    boolean areaMembersSupported,
     List<String> availableRoleCodes,
     Map<String, BigDecimal> roleLimits,
     @Nullable BigDecimal allMembersLimit,
+    @Nullable BigDecimal areaMembersLimit,
     List<BankApprovalLimitUserDto> userLimits) {
 
   /**
    * Whether any approval limit is configured at all — gates the read-only display block (no block
    * is rendered when an account carries no limits).
    *
-   * @return {@code true} iff at least one role, all-members or user limit is set
+   * @return {@code true} iff at least one role, all-members, area-members or user limit is set
    */
   public boolean hasAny() {
-    return !roleLimits.isEmpty() || allMembersLimit != null || !userLimits.isEmpty();
+    return !roleLimits.isEmpty()
+        || allMembersLimit != null
+        || areaMembersLimit != null
+        || !userLimits.isEmpty();
   }
 }

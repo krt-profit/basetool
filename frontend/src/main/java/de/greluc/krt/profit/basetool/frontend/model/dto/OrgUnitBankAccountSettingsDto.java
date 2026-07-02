@@ -41,10 +41,14 @@ import org.jetbrains.annotations.Nullable;
  * @param canConfigureVisibility whether the caller may add/remove visibility grants
  * @param visibilityConfigurable whether this account type supports configurable visibility at all
  * @param allMembersSupported whether the all-members toggle applies
+ * @param areaMembersSupported whether the "Mitglieder des Bereichs" cascade toggle applies — only
+ *     for AREA (Bereichskonto) accounts (REQ-BANK-048)
  * @param roleBucketsGlobal whether {@code availableRoleCodes} are global role codes (Sonderkonto)
  * @param availableRoleCodes the role buckets the caller may toggle, in display order
  * @param grantedRoleCodes the role buckets currently granted
  * @param allMembersGranted whether the all-members grant is set
+ * @param areaMembersGranted whether the "Mitglieder des Bereichs" cascade grant is set
+ *     (REQ-BANK-048)
  * @param grantedUsers the individually granted users
  * @param canConfigureApprovalLimits whether the caller may set/clear approval limits (REQ-BANK-041)
  * @param approvalLimits the account's per-tier approval limits with the org-unit edit affordance
@@ -61,10 +65,12 @@ public record OrgUnitBankAccountSettingsDto(
     boolean canConfigureVisibility,
     boolean visibilityConfigurable,
     boolean allMembersSupported,
+    boolean areaMembersSupported,
     boolean roleBucketsGlobal,
     List<String> availableRoleCodes,
     List<String> grantedRoleCodes,
     boolean allMembersGranted,
+    boolean areaMembersGranted,
     List<OrgUnitBankViewUserDto> grantedUsers,
     boolean canConfigureApprovalLimits,
     BankApprovalLimitsDto approvalLimits) {}

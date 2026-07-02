@@ -257,6 +257,20 @@ public class OwnerScopeService {
   }
 
   /**
+   * Delegates to {@link RequestScopeResolver#currentUserIsMemberOfAreaCascade(UUID)}: whether the
+   * caller is a member anywhere in the whole area cascade of the given Bereich — the
+   * Bereichsleitung itself or any of its child Staffeln / Spezialkommandos. Used by the org-unit
+   * bank seam to evaluate the {@code AREA_MEMBERS} view grant / approval-limit tier ("Mitglieder
+   * des Bereichs", REQ-BANK-048) on a Bereichskonto.
+   *
+   * @param bereichId the owning Bereich org unit; never {@code null}
+   * @return {@code true} iff the caller has any membership on the Bereich or one of its children
+   */
+  public boolean currentUserIsMemberOfAreaCascade(@NotNull UUID bereichId) {
+    return requestScopeResolver.currentUserIsMemberOfAreaCascade(bereichId);
+  }
+
+  /**
    * Delegates to {@link RequestScopeResolver#currentSquadron()}: the {@link Squadron} entity for
    * the current effective context, loaded from the DB.
    *

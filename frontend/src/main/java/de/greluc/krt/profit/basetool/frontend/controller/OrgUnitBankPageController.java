@@ -121,19 +121,21 @@ public class OrgUnitBankPageController {
     // options and which source-account options carry a debit affordance + approval limit.
     boolean anyCanRequest = safeBalances.stream().anyMatch(OrgUnitBankBalanceDto::canRequest);
     model.addAttribute("anyCanRequest", anyCanRequest);
-    // "Fremde Anträge" tab (REQ-BANK-041): requests on the accounts the caller is responsible for.
-    // The tab is shown whenever the caller manages any account (responsible holder / OL / admin),
-    // even when it currently holds no request.
-    model.addAttribute("foreignRequests", foreignRequestsFuture.join());
+    // "Fremde Anträge" tab (REQ-BANK-041/-046): requests the caller may act on.
+    List<BankBookingRequestDto> foreignRequests = foreignRequestsFuture.join();
+    model.addAttribute("foreignRequests", foreignRequests);
     // Show the tab when the caller manages a REQUEST-CAPABLE account (canManageSettings on an
-    // ORG_UNIT/AREA/CARTEL account == its responsible holder). This matches the backend scope of
-    // /requests/foreign (responsibleAccountIds), so the tab is never shown empty to an
-    // OL/management
-    // user who can only configure a SPECIAL account's visibility (SPECIAL is never
-    // request-capable).
+    // ORG_UNIT/AREA/CARTEL account == its responsible holder) OR when the band-routed list already
+    // carries a request for them — the latter covers the KRT-account middle-band approver
+    // (Bereichsleiter Profit), who is not the account's responsible holder but sees its
+    // AREA_LEAD_PROFIT-band requests (REQ-BANK-047). SPECIAL is never request-capable, so an
+    // OL/management user who can only configure a Sonderkonto's visibility still does not see the
+    // tab
+    // unless a routed request exists.
     model.addAttribute(
         "hasResponsibleAccounts",
-        safeBalances.stream().anyMatch(b -> b.canManageSettings() && b.canRequest()));
+        safeBalances.stream().anyMatch(b -> b.canManageSettings() && b.canRequest())
+            || !foreignRequests.isEmpty());
     // Deposit / transfer-destination source: every active account (REQ-BANK-040/-042), ordered A→Z
     // by name like every other account picker (BankAccountOrder).
     List<BankAccountRefDto> transferTargets =
