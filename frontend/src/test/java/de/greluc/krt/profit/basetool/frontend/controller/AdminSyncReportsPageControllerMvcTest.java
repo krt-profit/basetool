@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -44,7 +44,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -101,8 +100,7 @@ class AdminSyncReportsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void combined_fullPage_rendersSwapWrapperAndTabs() throws Exception {
-    when(backendApiClient.get(
-            contains("/api/v1/sync-reports"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/sync-reports"), anyTypeRef()))
         .thenReturn(twoPages());
 
     mockMvc
@@ -119,8 +117,7 @@ class AdminSyncReportsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void uex_fragmentResults_rendersOnlyInnerFragment_withTabBasePath() throws Exception {
-    when(backendApiClient.get(
-            contains("/api/v1/sync-reports"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/sync-reports"), anyTypeRef()))
         .thenReturn(twoPages());
 
     mockMvc

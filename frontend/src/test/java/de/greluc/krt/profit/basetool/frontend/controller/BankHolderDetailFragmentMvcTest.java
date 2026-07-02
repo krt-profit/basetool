@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -43,7 +43,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -143,7 +142,7 @@ class BankHolderDetailFragmentMvcTest {
         .thenReturn(
             new BankHolderDto(
                 holderId, UUID.randomUUID(), "greluc", true, new BigDecimal("1000000"), false, 0L));
-    when(backendApiClient.get(contains("/transactions"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef()))
         .thenReturn(
             new PageResponse<>(
                 List.of(depositRow(), umbuchungRow(), withdrawalRow()), 0, 20, 3L, 1, List.of()));
@@ -179,7 +178,7 @@ class BankHolderDetailFragmentMvcTest {
   void holderDetail_fragmentHolderBookings_rendersOnlyHistoryFragment() throws Exception {
     UUID holderId = UUID.randomUUID();
     // Two pages so the embedded pager renders.
-    when(backendApiClient.get(contains("/transactions"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(umbuchungRow()), 0, 20, 25L, 2, List.of()));
 
     mockMvc

@@ -79,6 +79,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Unit tests for {@link OrgUnitBankAccessService} (REQ-BANK-021/-027/-028/-034..038). Covers the
@@ -117,6 +118,29 @@ class OrgUnitBankAccessServiceTest {
     when(approvalLimitRepository.findByAccountIdIn(anyCollection())).thenReturn(List.of());
     when(approvalLimitRepository.findByAccountId(any())).thenReturn(List.of());
     when(bankPostingRepository.postingSlicesSince(anyCollection(), any())).thenReturn(List.of());
+    wireDelegates();
+  }
+
+  /**
+   * Wires the L3-split (#922) write-mechanics collaborators into the {@link
+   * OrgUnitBankAccessService} facade under test. Mockito does not inject one {@code @InjectMocks}
+   * target into another, so the facade's two collaborator fields are built here as REAL instances
+   * fed with the same mocks the scenarios stub (view-grant repo, approval-limit repo, user repo,
+   * audit service, and — for the limit row lock — the bank-account repo), then set via {@link
+   * ReflectionTestUtils}. The facade still loads + authorizes + validates and re-reads the settings
+   * snapshot; the collaborators run the actual grant/revoke and upsert/clear against those mocks,
+   * so the existing {@code verify(...)} assertions on save / delete / audit hold unchanged.
+   * Constructor-arg order matches each service's {@code @RequiredArgsConstructor} field-declaration
+   * order.
+   */
+  private void wireDelegates() {
+    OrgUnitBankVisibilityService visibilityService =
+        new OrgUnitBankVisibilityService(viewGrantRepository, userRepository, bankAuditService);
+    OrgUnitBankApprovalLimitService approvalLimitService =
+        new OrgUnitBankApprovalLimitService(
+            bankAccountRepository, approvalLimitRepository, userRepository, bankAuditService);
+    ReflectionTestUtils.setField(service, "orgUnitBankVisibilityService", visibilityService);
+    ReflectionTestUtils.setField(service, "orgUnitBankApprovalLimitService", approvalLimitService);
   }
 
   private static OrgUnit squadron(UUID id, String name, String shorthand) {

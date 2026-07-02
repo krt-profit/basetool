@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyClass;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
@@ -100,7 +100,7 @@ class RefineryOrderStorageCalculationTest {
             0L,
             null);
 
-    when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), any(Class.class)))
+    when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), anyClass()))
         .thenReturn(orderDto);
     when(oidcUser.getSubject()).thenReturn(UUID.randomUUID().toString());
 
@@ -157,11 +157,11 @@ class RefineryOrderStorageCalculationTest {
             0L,
             null);
 
-    when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), any(Class.class)))
+    when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), anyClass()))
         .thenReturn(orderDto);
 
     SystemSettingDto settingDto = new SystemSettingDto("refinery.rounding.mode", "HALF_UP", 0L);
-    when(backendApiClient.get(eq("/api/v1/settings/refinery.rounding.mode"), any(Class.class)))
+    when(backendApiClient.get(eq("/api/v1/settings/refinery.rounding.mode"), anyClass()))
         .thenReturn(settingDto);
     when(oidcUser.getSubject()).thenReturn(UUID.randomUUID().toString());
 
@@ -233,11 +233,11 @@ class RefineryOrderStorageCalculationTest {
             0L,
             null);
 
-    when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), any(Class.class)))
+    when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), anyClass()))
         .thenReturn(orderDto);
 
     SystemSettingDto settingDto = new SystemSettingDto("refinery.rounding.mode", "HALF_UP", 0L);
-    when(backendApiClient.get(eq("/api/v1/settings/refinery.rounding.mode"), any(Class.class)))
+    when(backendApiClient.get(eq("/api/v1/settings/refinery.rounding.mode"), anyClass()))
         .thenReturn(settingDto);
     when(oidcUser.getSubject()).thenReturn(UUID.randomUUID().toString());
 

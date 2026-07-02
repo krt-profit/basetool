@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -35,7 +36,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.core.ParameterizedTypeReference;
 
 /**
  * Pure-unit test for the {@code /personal-inventory/uex-search} typeahead endpoint exposed by
@@ -57,8 +57,7 @@ class PersonalInventoryUexSearchTest {
         new UexLocationDto(
             42, PersonalInventoryLocationType.CITY, "Lorville", "Stanton", "Hurston");
     when(backendApiClient.get(
-            contains("/api/v1/uex/locations/search?q=lor&limit=25"),
-            any(ParameterizedTypeReference.class)))
+            contains("/api/v1/uex/locations/search?q=lor&limit=25"), anyTypeRef()))
         .thenReturn(List.of(dto));
 
     // When
@@ -73,8 +72,7 @@ class PersonalInventoryUexSearchTest {
   @Test
   void uexSearch_clampsLimit_to100() {
     // Given
-    when(backendApiClient.get(contains("limit=100"), any(ParameterizedTypeReference.class)))
-        .thenReturn(List.of());
+    when(backendApiClient.get(contains("limit=100"), anyTypeRef())).thenReturn(List.of());
 
     // When
     List<UexLocationDto> result = controller.uexSearch("x", 9999);
@@ -86,8 +84,7 @@ class PersonalInventoryUexSearchTest {
   @Test
   void uexSearch_returnsEmptyList_whenBackendThrows() {
     // Given: backend throws unexpectedly; the controller must swallow it.
-    when(backendApiClient.get(any(), any(ParameterizedTypeReference.class)))
-        .thenThrow(new RuntimeException("boom"));
+    when(backendApiClient.get(any(), anyTypeRef())).thenThrow(new RuntimeException("boom"));
 
     // When
     List<UexLocationDto> result = controller.uexSearch("anything", 25);

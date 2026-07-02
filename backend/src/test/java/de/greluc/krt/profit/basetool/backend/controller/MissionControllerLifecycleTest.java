@@ -205,7 +205,10 @@ class MissionControllerLifecycleTest {
 
   // ── GET /api/v1/missions (anonymous filtering) ───────────────────────
 
+  // Asserts the deprecated-for-removal MissionService.getAllMissions(Pageable) is never hit;
+  // referencing it in verify(...) triggers an expected, unavoidable [removal] warning.
   @Test
+  @SuppressWarnings("removal")
   void getAllMissions_authenticatedCaller_routesThroughSearchMissionsForSquadronScope() {
     Mission m = new Mission();
     MissionListDto listDto =
@@ -728,7 +731,10 @@ class MissionControllerLifecycleTest {
 
   // ── PUT /api/v1/missions/{id}/owner/{userId} (legacy) ────────────────
 
+  // Deliberately invokes the deprecated-for-removal MissionController.setMissionOwnerLegacy to pin
+  // its no-version behaviour; the [removal] warning is expected and unavoidable here.
   @Test
+  @SuppressWarnings("removal")
   void setMissionOwnerLegacy_doesNotForwardAnyVersion() {
     UUID id = UUID.randomUUID();
     UUID newOwnerId = UUID.randomUUID();

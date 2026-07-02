@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -36,7 +36,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
@@ -174,8 +173,7 @@ class AdminMaterialsPageControllerTest {
         new PageResponse<>(materials, 0, 1000, materials.size(), 1, List.of("name,asc"));
 
     when(backendApiClient.get(
-            eq("/api/v1/materials?size=1000&sort=name,asc&includeHidden=true"),
-            any(ParameterizedTypeReference.class)))
+            eq("/api/v1/materials?size=1000&sort=name,asc&includeHidden=true"), anyTypeRef()))
         .thenReturn(materialsPage);
 
     // Act

@@ -1,4 +1,4 @@
-# ADR-0065 — Bank: KRT-account amount-tiered 3-stage approval ladder, "Mitglieder des Bereichs" audience & members-only ALL_MEMBERS limits
+# ADR-0066 — Bank: KRT-account amount-tiered 3-stage approval ladder, "Mitglieder des Bereichs" audience & members-only ALL_MEMBERS limits
 
 - **Status:** Accepted
 - **Date:** 2026-07-02

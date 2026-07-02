@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
@@ -44,7 +44,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -87,9 +86,7 @@ class AdminPersonalInventoryPageControllerMvcTest {
     PageResponse<UserDto> users = new PageResponse<>(List.of(), 0, 1000, 0, 1, List.of());
     PageResponse<PersonalInventoryItemDto> empty =
         new PageResponse<>(List.of(), 0, 50, 0, 0, List.of());
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(users)
-        .thenReturn(empty);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(users).thenReturn(empty);
 
     // When & Then
     mockMvc
@@ -107,8 +104,7 @@ class AdminPersonalInventoryPageControllerMvcTest {
     String userSub = UUID.randomUUID().toString();
     PageResponse<PersonalInventoryItemDto> items =
         new PageResponse<>(List.of(), 0, 50, 0, 0, List.of());
-    when(backendApiClient.get(
-            contains("/api/v1/admin/personal-inventory/"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/admin/personal-inventory/"), anyTypeRef()))
         .thenReturn(items);
 
     mockMvc
@@ -123,7 +119,6 @@ class AdminPersonalInventoryPageControllerMvcTest {
         .andExpect(content().string(not(containsString("krt-admin-banner"))));
 
     // The fragment path must not query the user list.
-    verify(backendApiClient, never())
-        .get(eq("/api/v1/users?size=1000"), any(ParameterizedTypeReference.class));
+    verify(backendApiClient, never()).get(eq("/api/v1/users?size=1000"), anyTypeRef());
   }
 }

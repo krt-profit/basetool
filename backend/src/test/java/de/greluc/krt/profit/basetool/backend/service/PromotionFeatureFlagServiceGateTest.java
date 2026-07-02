@@ -64,6 +64,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Verifies the per-squadron promotion-feature gate end-to-end through {@link OwnerScopeService} +
@@ -122,6 +123,21 @@ class PromotionFeatureFlagServiceGateTest {
     // The resolver's single-Staffel fast path now does a cheap existsById to drop a dangling row
     // (finding #4). Every Staffel in these scenarios exists, so resolve it to present.
     lenient().when(squadronRepository.existsById(any())).thenReturn(true);
+
+    // #922 L3 split: the promotion-flag methods on the OwnerScopeService facade delegate to
+    // RequestScopeResolver. Wire a real resolver (fed the same mocks) into the facade so the
+    // direct-facade gate tests exercise the real flag resolution. The orgUnitRepository / cascade
+    // deps are never reached on the promotion path, so plain mocks satisfy the constructor.
+    RequestScopeResolver requestScopeResolver =
+        new RequestScopeResolver(
+            authHelper,
+            squadronRepository,
+            orgUnitMembershipRepository,
+            mock(de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository.class),
+            mock(OrgUnitCascadeService.class),
+            staffelMembershipResolver,
+            request);
+    ReflectionTestUtils.setField(ownerScopeService, "requestScopeResolver", requestScopeResolver);
   }
 
   @Test

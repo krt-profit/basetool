@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -34,7 +35,6 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -64,7 +64,7 @@ class InventoryPageControllerTest {
     Model model = new ConcurrentModel();
     PageResponse<AggregatedInventoryDto> page =
         new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
     String view = controller.viewAggregatedInventory(null, null, null, model);
 
@@ -76,7 +76,7 @@ class InventoryPageControllerTest {
   @Test
   void viewAggregatedInventory_shouldHandleException() {
     Model model = new ConcurrentModel();
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenThrow(new RuntimeException("Backend error"));
 
     String view = controller.viewAggregatedInventory(null, null, null, model);
@@ -91,7 +91,7 @@ class InventoryPageControllerTest {
     Model model = new ConcurrentModel();
     PageResponse<AggregatedInventoryDto> page =
         new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
     // When
     String view = controller.viewAggregatedInventory(null, null, "results", model);
@@ -106,7 +106,7 @@ class InventoryPageControllerTest {
     UUID materialId = UUID.randomUUID();
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
     String view = controller.viewMaterialInventory(materialId, model);
 
@@ -120,7 +120,7 @@ class InventoryPageControllerTest {
     Model model = new ConcurrentModel();
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
     String view = controller.viewMyInventory(null, null, null, null, false, false, model);
 
@@ -135,7 +135,7 @@ class InventoryPageControllerTest {
     Model model = new ConcurrentModel();
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
     UUID materialId = UUID.randomUUID();
     UUID jobOrderId = UUID.randomUUID();
 
@@ -152,7 +152,7 @@ class InventoryPageControllerTest {
     org.mockito.ArgumentCaptor<String> urlCaptor =
         org.mockito.ArgumentCaptor.forClass(String.class);
     org.mockito.Mockito.verify(backendApiClient, org.mockito.Mockito.atLeastOnce())
-        .get(urlCaptor.capture(), any(ParameterizedTypeReference.class));
+        .get(urlCaptor.capture(), anyTypeRef());
     String groupedUrl =
         urlCaptor.getAllValues().stream()
             .filter(u -> u.contains("/api/v1/inventory/my-inventory/grouped"))
@@ -169,8 +169,7 @@ class InventoryPageControllerTest {
   void viewMyInventory_personalOnly_forwardsFlagToBackendAndModel() {
     // Given
     Model model = new ConcurrentModel();
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(List.of());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of());
 
     // When
     String view = controller.viewMyInventory(null, null, null, null, true, false, model);
@@ -181,7 +180,7 @@ class InventoryPageControllerTest {
     org.mockito.ArgumentCaptor<String> urlCaptor =
         org.mockito.ArgumentCaptor.forClass(String.class);
     org.mockito.Mockito.verify(backendApiClient, org.mockito.Mockito.atLeastOnce())
-        .get(urlCaptor.capture(), any(ParameterizedTypeReference.class));
+        .get(urlCaptor.capture(), anyTypeRef());
     String groupedUrl =
         urlCaptor.getAllValues().stream()
             .filter(u -> u.contains("/api/v1/inventory/my-inventory/grouped"))
@@ -197,7 +196,7 @@ class InventoryPageControllerTest {
     Model model = new ConcurrentModel();
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
     // When
     String view = controller.viewMyInventory(null, null, null, null, false, true, model);
@@ -211,7 +210,7 @@ class InventoryPageControllerTest {
     Model model = new ConcurrentModel();
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
     String view =
         controller.viewAllInventory(List.of(UUID.randomUUID()), 100, null, null, false, model);

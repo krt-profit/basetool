@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -37,7 +38,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
@@ -61,7 +61,7 @@ class LeitungPageControllerTest {
     LeitungPageController controller = new LeitungPageController(backend);
     LeitungViewDto view = emptyView();
     when(backend.get("/api/v1/leitung/view", LeitungViewDto.class)).thenReturn(view);
-    when(backend.get(eq("/api/v1/users/lookup"), any(ParameterizedTypeReference.class)))
+    when(backend.get(eq("/api/v1/users/lookup"), anyTypeRef()))
         .thenReturn(List.of(Map.of("id", UUID.randomUUID().toString(), "username", "pilot")));
     Model model = new ConcurrentModel();
 
@@ -82,7 +82,7 @@ class LeitungPageControllerTest {
     String result = controller.leitung("leitungSections", model);
 
     assertEquals("organisation/leitung :: leitungSections", result);
-    verify(backend, never()).get(eq("/api/v1/users/lookup"), any(ParameterizedTypeReference.class));
+    verify(backend, never()).get(eq("/api/v1/users/lookup"), anyTypeRef());
   }
 
   @Test

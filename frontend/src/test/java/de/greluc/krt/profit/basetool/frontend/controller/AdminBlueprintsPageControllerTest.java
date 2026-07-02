@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -31,12 +31,10 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
 /** Unit tests for {@link AdminBlueprintsPageController}. */
-@SuppressWarnings("unchecked")
 class AdminBlueprintsPageControllerTest {
 
   @Test
@@ -45,7 +43,7 @@ class AdminBlueprintsPageControllerTest {
     AdminBlueprintsPageController controller = new AdminBlueprintsPageController(backendApiClient);
     PageResponse<BlueprintDto> page =
         new PageResponse<>(List.of(minimalDto()), 0, 25, 1, 1, List.of());
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
     Model model = new ConcurrentModel();
 
     String view = controller.listBlueprints("omni", 0, null, model);
@@ -64,7 +62,7 @@ class AdminBlueprintsPageControllerTest {
     AdminBlueprintsPageController controller = new AdminBlueprintsPageController(backendApiClient);
     PageResponse<BlueprintDto> page =
         new PageResponse<>(List.of(minimalDto()), 0, 25, 1, 1, List.of());
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
     Model model = new ConcurrentModel();
 
     String view = controller.listBlueprints("omni", 0, "results", model);
@@ -77,7 +75,7 @@ class AdminBlueprintsPageControllerTest {
   @Test
   void listBlueprints_backendFailure_setsErrorAndEmptyList() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenThrow(new RuntimeException("backend down"));
     AdminBlueprintsPageController controller = new AdminBlueprintsPageController(backendApiClient);
     Model model = new ConcurrentModel();

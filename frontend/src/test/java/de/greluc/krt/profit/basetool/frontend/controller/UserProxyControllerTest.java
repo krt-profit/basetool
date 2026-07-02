@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -33,9 +33,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
 
-@SuppressWarnings("unchecked")
 class UserProxyControllerTest {
 
   @Test
@@ -46,8 +44,7 @@ class UserProxyControllerTest {
 
     PageResponse<Map<String, Object>> mockPageResponse =
         new PageResponse<>(Collections.emptyList(), 0, 1000, 0, 0, Collections.emptyList());
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(mockPageResponse);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(mockPageResponse);
 
     // Act
     List<Map<String, Object>> result = controller.searchUsers("query");
@@ -55,8 +52,6 @@ class UserProxyControllerTest {
     // Assert
     assertNotNull(result);
     verify(backendApiClient)
-        .get(
-            eq("/api/v1/users/search?query=query&size=1000&sort=username,asc"),
-            any(ParameterizedTypeReference.class));
+        .get(eq("/api/v1/users/search?query=query&size=1000&sort=username,asc"), anyTypeRef());
   }
 }

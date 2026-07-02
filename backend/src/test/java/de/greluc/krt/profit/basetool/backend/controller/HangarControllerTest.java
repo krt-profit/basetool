@@ -391,7 +391,11 @@ class HangarControllerTest {
 
   // ── POST /import/fleetview (deprecated) ──────────────────────────────
 
+  // Deliberately invokes the deprecated-for-removal HangarController.importFleetview to pin its
+  // grace-period routing; the [removal] warning is expected and unavoidable when testing the
+  // deprecated endpoint directly.
   @Test
+  @SuppressWarnings("removal")
   void importFleetview_deprecatedPath_routesToSameService() {
     // The deprecated endpoint MUST end up at the same HangarImportService.importShips so the
     // grace-period clients keep getting the modern import behaviour (UEX-aware ship matching,

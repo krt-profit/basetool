@@ -49,7 +49,9 @@ class DefaultBlueprintKeyServiceTest {
 
   @Test
   void refresh_reloadsTheCachedSet() {
-    when(repository.findAllProductKeys()).thenReturn(Set.of("old key"), Set.of("new key"));
+    when(repository.findAllProductKeys())
+        .thenReturn(Set.of("old key"))
+        .thenReturn(Set.of("new key"));
 
     service.refresh();
     assertTrue(service.isDefault("old key"));

@@ -1143,7 +1143,7 @@ the bank surface stays org-unit-blind (REQ-BANK-008, ADR-0011). Naming note: the
 
 > **Amended by REQ-BANK-047:** for **request approval** the KRT account (`CARTEL`) no longer routes to
 > the OL collegium alone — the amount-tiered ladder inserts the **Bereichsleiter Profit** as the middle
-> band's approver (`AREA_LEAD_PROFIT`) between the bank employee and the OL (ADR-0065). This is an
+> band's approver (`AREA_LEAD_PROFIT`) between the bank employee and the OL (ADR-0066). This is an
 > approval-routing refinement only; the OL stays the KRT account's balance-target/visibility owner. So
 > `resolveResponsibleHolderUserIds(CARTEL)` — used only to *notify* — now returns **all `OL_MEMBER`s ∪
 > the Profit-Bereichsleiter**, so both band approvers are notified about a KRT request (each still sees
@@ -1332,7 +1332,7 @@ confirmable even when the employee cannot see the destination; capability gate o
 > applicable_limit`. (`CARTEL_BANK` and `SPECIAL` stay non-request-capable, so this never reaches
 > them.)
 >
-> **Amended by REQ-BANK-047/-048 (owner-approved, ADR-0065):** two refinements. (1) **"Alle Mitglieder"
+> **Amended by REQ-BANK-047/-048 (owner-approved, ADR-0066):** two refinements. (1) **"Alle Mitglieder"
 > = the owning org unit, for limits too.** The `ALL_MEMBERS` limit tier now applies **only to an actual
 > member of the account's owning org unit** (`currentUserIsMemberOfOrgUnit(owner)`) — the former
 > catch-all-for-every-eligible-requester is retired: an outsider holding only an individual view grant
@@ -1711,7 +1711,7 @@ renders the filter box + `data-filter-name` + filter-empty note) · **Code:** fr
 The **KRT account** (`CARTEL`, **not** the bank's own `CARTEL_BANK`) uses an **amount-tiered approval
 ladder** for money *leaving* it (a withdrawal or account↔account transfer request, and the direct
 bank-staff booking) that **replaces** the per-audience approval limits of REQ-BANK-041 on this account
-(owner decision, ADR-0065). Two thresholds `T1 ≤ T2` on the account row (`bank_account.
+(owner decision, ADR-0066). Two thresholds `T1 ≤ T2` on the account row (`bank_account.
 employee_approval_ceiling` / `area_lead_approval_ceiling`, V203, whole aUEC ≥ 0, shared row `@Version`
 with rename/close/target) define three bands and their **approver class** (`BankRequestApprover`,
 snapshotted per request as `bank_booking_request.required_approver`):
@@ -1778,7 +1778,7 @@ is notified; each still sees only their own band in „Fremde Anträge".
 `resolveResponsibleHolderUserIds` CARTEL union), `service/BankLedgerService#requireCartelDirectBookingAllowed`,
 `controller/BankAccountController#setCartelApprovalTiers`, `db/migration/V203`, frontend
 `templates/bank-manage.html` + `org-unit-bank-account-detail.html` + `static/js/bank.js` ·
-**ADR:** [ADR-0065](../adr/0065-krt-account-amount-tiered-approval-ladder.md) (supersedes the
+**ADR:** [ADR-0066](../adr/0066-krt-account-amount-tiered-approval-ladder.md) (supersedes the
 single-approver assumption of [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md)) ·
 **Issues:** —
 
@@ -1820,7 +1820,7 @@ members), `OrgUnitBankControllerTest`, frontend `OrgUnitBankPageControllerMvcTes
 `model/dto/BankApprovalLimitsDto`, `model/dto/OrgUnitBankAccountSettingsDto`,
 `controller/OrgUnitBankController`, `db/migration/V202`, frontend
 `templates/fragments/bank-approval-limits.html` + `org-unit-bank-account-detail.html` ·
-**ADR:** [ADR-0065](../adr/0065-krt-account-amount-tiered-approval-ladder.md) · **Issues:** —
+**ADR:** [ADR-0066](../adr/0066-krt-account-amount-tiered-approval-ladder.md) · **Issues:** —
 
 ## Out of scope
 

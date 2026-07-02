@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.mock;
@@ -42,7 +42,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
@@ -71,8 +70,7 @@ class MaterialsPageControllerTest {
         new PageResponse<>(List.of(dto), 0, 10000, 1, 1, Collections.emptyList());
 
     when(backendApiClient.get(
-            eq("/api/v1/materials/prices-overview?size=10000&sort=name,asc"),
-            any(ParameterizedTypeReference.class)))
+            eq("/api/v1/materials/prices-overview?size=10000&sort=name,asc"), anyTypeRef()))
         .thenReturn(pageResponse);
 
     // Act
@@ -95,8 +93,7 @@ class MaterialsPageControllerTest {
     Model model = new ConcurrentModel();
 
     when(backendApiClient.get(
-            eq("/api/v1/materials/prices-overview?size=10000&sort=name,asc"),
-            any(ParameterizedTypeReference.class)))
+            eq("/api/v1/materials/prices-overview?size=10000&sort=name,asc"), anyTypeRef()))
         .thenThrow(new RuntimeException("API Error"));
 
     // Act
@@ -154,7 +151,7 @@ class MaterialsPageControllerTest {
 
     when(backendApiClient.get(
             eq("/api/v1/materials/" + id + "/prices?size=1000&sort=terminal.name,asc"),
-            any(ParameterizedTypeReference.class)))
+            anyTypeRef()))
         .thenReturn(pageResponse);
 
     // Act
@@ -199,8 +196,7 @@ class MaterialsPageControllerTest {
     MaterialsPageController controller = new MaterialsPageController(backendApiClient);
     Model model = new ConcurrentModel();
 
-    when(backendApiClient.getCached(
-            eq("/api/v1/materials/matrix?size=100000"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.getCached(eq("/api/v1/materials/matrix?size=100000"), anyTypeRef()))
         .thenReturn(matrixPage());
 
     // Act — the shell endpoint only derives the filter source lists; the grid loads separately.
@@ -223,8 +219,7 @@ class MaterialsPageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MaterialsPageController controller = new MaterialsPageController(backendApiClient);
 
-    when(backendApiClient.getCached(
-            eq("/api/v1/materials/matrix?size=100000"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.getCached(eq("/api/v1/materials/matrix?size=100000"), anyTypeRef()))
         .thenReturn(matrixPage());
 
     // Act
@@ -254,8 +249,7 @@ class MaterialsPageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MaterialsPageController controller = new MaterialsPageController(backendApiClient);
 
-    when(backendApiClient.getCached(
-            startsWith("/api/v1/materials/matrix"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.getCached(startsWith("/api/v1/materials/matrix"), anyTypeRef()))
         .thenThrow(new RuntimeException("backend down"));
 
     // Act
@@ -274,8 +268,7 @@ class MaterialsPageControllerTest {
     MaterialsPageController controller = new MaterialsPageController(backendApiClient);
     Model model = new ConcurrentModel();
 
-    when(backendApiClient.getCached(
-            startsWith("/api/v1/materials/matrix"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.getCached(startsWith("/api/v1/materials/matrix"), anyTypeRef()))
         .thenThrow(new RuntimeException("backend down"));
 
     // Act

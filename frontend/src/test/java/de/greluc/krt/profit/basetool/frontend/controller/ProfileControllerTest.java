@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -106,16 +107,13 @@ class ProfileControllerTest {
             "displayName", "Backend-DN",
             "version", 4L,
             "joinDate", "2024-01-15");
-    when(backendApiClient.<Map<String, Object>>get(
-            eq("/api/v1/users/me"), any(org.springframework.core.ParameterizedTypeReference.class)))
+    when(backendApiClient.<Map<String, Object>>get(eq("/api/v1/users/me"), anyTypeRef()))
         .thenReturn(backendUser);
     when(backendApiClient.<Map<String, Object>>get(
-            eq("/api/v1/users/me/payout-preference"),
-            any(org.springframework.core.ParameterizedTypeReference.class)))
+            eq("/api/v1/users/me/payout-preference"), anyTypeRef()))
         .thenReturn(Map.of("defaultPayoutPreference", "DONATE", "version", 4L));
     when(backendApiClient.<Map<String, Object>>get(
-            eq("/api/v1/users/me/blueprint-sharing"),
-            any(org.springframework.core.ParameterizedTypeReference.class)))
+            eq("/api/v1/users/me/blueprint-sharing"), anyTypeRef()))
         .thenReturn(Map.of("shareBlueprintsGlobally", true, "version", 4L));
 
     Model model = new ConcurrentModel();
@@ -168,16 +166,13 @@ class ProfileControllerTest {
     when(principal.getAttribute("rank")).thenReturn(3);
     when(principal.getAttribute("description")).thenReturn("From-Token");
     when(principal.getAttribute("displayName")).thenReturn("JD");
-    when(backendApiClient.<Map<String, Object>>get(
-            eq("/api/v1/users/me"), any(org.springframework.core.ParameterizedTypeReference.class)))
+    when(backendApiClient.<Map<String, Object>>get(eq("/api/v1/users/me"), anyTypeRef()))
         .thenThrow(new RuntimeException("backend down"));
     when(backendApiClient.<Map<String, Object>>get(
-            eq("/api/v1/users/me/payout-preference"),
-            any(org.springframework.core.ParameterizedTypeReference.class)))
+            eq("/api/v1/users/me/payout-preference"), anyTypeRef()))
         .thenThrow(new RuntimeException("backend down"));
     when(backendApiClient.<Map<String, Object>>get(
-            eq("/api/v1/users/me/blueprint-sharing"),
-            any(org.springframework.core.ParameterizedTypeReference.class)))
+            eq("/api/v1/users/me/blueprint-sharing"), anyTypeRef()))
         .thenThrow(new RuntimeException("backend down"));
 
     Model model = new ConcurrentModel();
@@ -205,8 +200,7 @@ class ProfileControllerTest {
     when(principal.getAttribute("rank")).thenReturn(List.of(5, 6));
     when(principal.getAttribute("description")).thenReturn(List.of("first", "second"));
     when(principal.getAttribute("displayName")).thenReturn(java.util.List.of("DN"));
-    when(backendApiClient.<Map<String, Object>>get(
-            any(String.class), any(org.springframework.core.ParameterizedTypeReference.class)))
+    when(backendApiClient.<Map<String, Object>>get(any(String.class), anyTypeRef()))
         .thenReturn(null);
 
     Model model = new ConcurrentModel();
@@ -225,8 +219,7 @@ class ProfileControllerTest {
     when(principal.getAttribute("rank")).thenReturn(List.of());
     when(principal.getAttribute("description")).thenReturn(null);
     when(principal.getAttribute("displayName")).thenReturn(null);
-    when(backendApiClient.<Map<String, Object>>get(
-            any(String.class), any(org.springframework.core.ParameterizedTypeReference.class)))
+    when(backendApiClient.<Map<String, Object>>get(any(String.class), anyTypeRef()))
         .thenReturn(null);
 
     Model model = new ConcurrentModel();
@@ -241,8 +234,7 @@ class ProfileControllerTest {
     when(principal.getAttribute("rank")).thenReturn(2);
     when(principal.getAttribute("description")).thenReturn("Desc");
     when(principal.getAttribute("displayName")).thenReturn("DN");
-    when(backendApiClient.<Map<String, Object>>get(
-            any(String.class), any(org.springframework.core.ParameterizedTypeReference.class)))
+    when(backendApiClient.<Map<String, Object>>get(any(String.class), anyTypeRef()))
         .thenReturn(null);
 
     Model model = new ConcurrentModel();
@@ -265,8 +257,7 @@ class ProfileControllerTest {
     when(principal.getAttribute("displayName")).thenReturn("Token-DN");
 
     // Backend response missing the description key entirely
-    when(backendApiClient.<Map<String, Object>>get(
-            any(String.class), any(org.springframework.core.ParameterizedTypeReference.class)))
+    when(backendApiClient.<Map<String, Object>>get(any(String.class), anyTypeRef()))
         .thenReturn(Map.of("rank", 4));
 
     Model model = new ConcurrentModel();
@@ -288,8 +279,7 @@ class ProfileControllerTest {
     Map<String, Object> backendUser = new java.util.HashMap<>();
     backendUser.put("rank", 4);
     backendUser.put("joinDate", "not-a-valid-date");
-    when(backendApiClient.<Map<String, Object>>get(
-            any(String.class), any(org.springframework.core.ParameterizedTypeReference.class)))
+    when(backendApiClient.<Map<String, Object>>get(any(String.class), anyTypeRef()))
         .thenReturn(backendUser);
 
     Model model = new ConcurrentModel();
@@ -308,8 +298,7 @@ class ProfileControllerTest {
     when(principal.getAttribute("description")).thenReturn(null);
     when(principal.getAttribute("displayName")).thenReturn(null);
 
-    when(backendApiClient.<Map<String, Object>>get(
-            any(String.class), any(org.springframework.core.ParameterizedTypeReference.class)))
+    when(backendApiClient.<Map<String, Object>>get(any(String.class), anyTypeRef()))
         .thenReturn(Map.of("rank", 1, "version", 7));
 
     Model model = new ConcurrentModel();
@@ -325,8 +314,7 @@ class ProfileControllerTest {
     when(principal.getAttribute("description")).thenReturn(null);
     when(principal.getAttribute("displayName")).thenReturn(null);
 
-    when(backendApiClient.<Map<String, Object>>get(
-            any(String.class), any(org.springframework.core.ParameterizedTypeReference.class)))
+    when(backendApiClient.<Map<String, Object>>get(any(String.class), anyTypeRef()))
         .thenReturn(Map.of("rank", 1, "version", "42"));
 
     Model model = new ConcurrentModel();
@@ -342,8 +330,7 @@ class ProfileControllerTest {
     when(principal.getAttribute("description")).thenReturn(null);
     when(principal.getAttribute("displayName")).thenReturn(null);
 
-    when(backendApiClient.<Map<String, Object>>get(
-            any(String.class), any(org.springframework.core.ParameterizedTypeReference.class)))
+    when(backendApiClient.<Map<String, Object>>get(any(String.class), anyTypeRef()))
         .thenReturn(Map.of("rank", 1, "version", "not-a-number"));
 
     Model model = new ConcurrentModel();
@@ -365,7 +352,7 @@ class ProfileControllerTest {
 
     assertEquals("redirect:/profile", view);
 
-    ArgumentCaptor<Map<String, Object>> bodyCap = ArgumentCaptor.forClass(Map.class);
+    ArgumentCaptor<Map<String, Object>> bodyCap = ArgumentCaptor.captor();
     verify(backendApiClient)
         .put(eq("/api/v1/users/me/description"), bodyCap.capture(), eq(Void.class));
     Map<String, Object> body = bodyCap.getValue();
@@ -386,7 +373,7 @@ class ProfileControllerTest {
     controller.updateDescription(
         form, bindingResult, new ConcurrentModel(), principal, redirectAttributes);
 
-    ArgumentCaptor<Map<String, Object>> bodyCap = ArgumentCaptor.forClass(Map.class);
+    ArgumentCaptor<Map<String, Object>> bodyCap = ArgumentCaptor.captor();
     verify(backendApiClient)
         .put(eq("/api/v1/users/me/description"), bodyCap.capture(), eq(Void.class));
     assertEquals("", bodyCap.getValue().get("description"));
@@ -401,8 +388,7 @@ class ProfileControllerTest {
     when(principal.getAttribute("rank")).thenReturn(1);
     when(principal.getAttribute("description")).thenReturn(null);
     when(principal.getAttribute("displayName")).thenReturn(null);
-    when(backendApiClient.<Map<String, Object>>get(
-            any(String.class), any(org.springframework.core.ParameterizedTypeReference.class)))
+    when(backendApiClient.<Map<String, Object>>get(any(String.class), anyTypeRef()))
         .thenReturn(null);
 
     ProfileDescriptionForm form = new ProfileDescriptionForm("", "", 1L);
@@ -482,8 +468,7 @@ class ProfileControllerTest {
   void updateDescriptionAjax_happyPath_returns200WithRefreshedVersion() {
     when(bindingResult.hasErrors()).thenReturn(false);
     // refreshedUserVersion() re-fetches /me for the bumped row version after the write.
-    when(backendApiClient.<Map<String, Object>>get(
-            eq("/api/v1/users/me"), any(org.springframework.core.ParameterizedTypeReference.class)))
+    when(backendApiClient.<Map<String, Object>>get(eq("/api/v1/users/me"), anyTypeRef()))
         .thenReturn(Map.of("version", 5L));
 
     ProfileDescriptionForm form = new ProfileDescriptionForm("New desc", "New DN", 4L);
@@ -553,7 +538,7 @@ class ProfileControllerTest {
 
     assertEquals("redirect:/profile", view);
 
-    ArgumentCaptor<Map<String, Object>> bodyCap = ArgumentCaptor.forClass(Map.class);
+    ArgumentCaptor<Map<String, Object>> bodyCap = ArgumentCaptor.captor();
     verify(backendApiClient)
         .put(eq("/api/v1/users/me/payout-preference"), bodyCap.capture(), eq(Void.class));
     Map<String, Object> body = bodyCap.getValue();
@@ -608,8 +593,7 @@ class ProfileControllerTest {
     when(principal.getAttribute("rank")).thenReturn(1);
     when(principal.getAttribute("description")).thenReturn(null);
     when(principal.getAttribute("displayName")).thenReturn(null);
-    when(backendApiClient.<Map<String, Object>>get(
-            any(String.class), any(org.springframework.core.ParameterizedTypeReference.class)))
+    when(backendApiClient.<Map<String, Object>>get(any(String.class), anyTypeRef()))
         .thenReturn(null);
 
     ProfilePayoutPreferenceForm form = new ProfilePayoutPreferenceForm(PayoutPreference.PAYOUT, 1L);
@@ -628,8 +612,7 @@ class ProfileControllerTest {
   @Test
   void updatePayoutPreferenceAjax_happyPath_returns200WithRefreshedVersion() {
     when(bindingResult.hasErrors()).thenReturn(false);
-    when(backendApiClient.<Map<String, Object>>get(
-            eq("/api/v1/users/me"), any(org.springframework.core.ParameterizedTypeReference.class)))
+    when(backendApiClient.<Map<String, Object>>get(eq("/api/v1/users/me"), anyTypeRef()))
         .thenReturn(Map.of("version", 7L));
 
     ProfilePayoutPreferenceForm form = new ProfilePayoutPreferenceForm(PayoutPreference.DONATE, 6L);
@@ -642,7 +625,7 @@ class ProfileControllerTest {
     assertEquals(7L, body.get("version"));
     assertEquals("DONATE", body.get("defaultPayoutPreference"));
 
-    ArgumentCaptor<Map<String, Object>> bodyCap = ArgumentCaptor.forClass(Map.class);
+    ArgumentCaptor<Map<String, Object>> bodyCap = ArgumentCaptor.captor();
     verify(backendApiClient)
         .put(eq("/api/v1/users/me/payout-preference"), bodyCap.capture(), eq(Void.class));
     assertEquals("DONATE", bodyCap.getValue().get("preference"));
@@ -701,7 +684,7 @@ class ProfileControllerTest {
 
     assertEquals("redirect:/profile", view);
 
-    ArgumentCaptor<Map<String, Object>> bodyCap = ArgumentCaptor.forClass(Map.class);
+    ArgumentCaptor<Map<String, Object>> bodyCap = ArgumentCaptor.captor();
     verify(backendApiClient)
         .put(eq("/api/v1/users/me/blueprint-sharing"), bodyCap.capture(), eq(Void.class));
     Map<String, Object> body = bodyCap.getValue();
@@ -713,8 +696,7 @@ class ProfileControllerTest {
   @Test
   void updateBlueprintSharingAjax_happyPath_returns200WithRefreshedVersion() {
     when(bindingResult.hasErrors()).thenReturn(false);
-    when(backendApiClient.<Map<String, Object>>get(
-            eq("/api/v1/users/me"), any(org.springframework.core.ParameterizedTypeReference.class)))
+    when(backendApiClient.<Map<String, Object>>get(eq("/api/v1/users/me"), anyTypeRef()))
         .thenReturn(Map.of("version", 9L));
 
     ProfileBlueprintSharingForm form = new ProfileBlueprintSharingForm(true, 8L);
@@ -727,7 +709,7 @@ class ProfileControllerTest {
     assertEquals(9L, body.get("version"));
     assertEquals(true, body.get("shareBlueprintsGlobally"));
 
-    ArgumentCaptor<Map<String, Object>> bodyCap = ArgumentCaptor.forClass(Map.class);
+    ArgumentCaptor<Map<String, Object>> bodyCap = ArgumentCaptor.captor();
     verify(backendApiClient)
         .put(eq("/api/v1/users/me/blueprint-sharing"), bodyCap.capture(), eq(Void.class));
     assertEquals(true, bodyCap.getValue().get("shareBlueprintsGlobally"));

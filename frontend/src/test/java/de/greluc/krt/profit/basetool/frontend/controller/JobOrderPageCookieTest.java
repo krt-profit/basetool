@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static org.mockito.ArgumentMatchers.any;
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -74,7 +74,7 @@ class JobOrderPageCookieTest {
   void viewOrders_WithoutCookie_ShouldUseDefaultAndSetNoNewCookie() throws Exception {
     when(backendApiClient.get(
             eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),
-            any(org.springframework.core.ParameterizedTypeReference.class)))
+            anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 0, 0L, 0, List.of()));
 
     mockMvc
@@ -85,15 +85,14 @@ class JobOrderPageCookieTest {
     verify(backendApiClient)
         .get(
             eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),
-            any(org.springframework.core.ParameterizedTypeReference.class));
+            anyTypeRef());
   }
 
   @Test
   @WithMockUser
   void viewOrders_WithValidCookie_ShouldUseCookie() throws Exception {
     when(backendApiClient.get(
-            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=COMPLETED"),
-            any(org.springframework.core.ParameterizedTypeReference.class)))
+            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=COMPLETED"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 0, 0L, 0, List.of()));
 
     mockMvc
@@ -101,9 +100,7 @@ class JobOrderPageCookieTest {
         .andExpect(status().isOk());
 
     verify(backendApiClient)
-        .get(
-            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=COMPLETED"),
-            any(org.springframework.core.ParameterizedTypeReference.class));
+        .get(eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=COMPLETED"), anyTypeRef());
   }
 
   @Test
@@ -111,7 +108,7 @@ class JobOrderPageCookieTest {
   void viewOrders_WithInvalidOldCookie_ShouldFallbackToDefault() throws Exception {
     when(backendApiClient.get(
             eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),
-            any(org.springframework.core.ParameterizedTypeReference.class)))
+            anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 0, 0L, 0, List.of()));
 
     mockMvc
@@ -121,7 +118,7 @@ class JobOrderPageCookieTest {
     verify(backendApiClient)
         .get(
             eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),
-            any(org.springframework.core.ParameterizedTypeReference.class));
+            anyTypeRef());
   }
 
   @Test
@@ -129,7 +126,7 @@ class JobOrderPageCookieTest {
   void viewOrders_WithNewCookieFormat_ShouldUseCookie() throws Exception {
     when(backendApiClient.get(
             eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),
-            any(org.springframework.core.ParameterizedTypeReference.class)))
+            anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 0, 0L, 0, List.of()));
 
     mockMvc
@@ -139,15 +136,14 @@ class JobOrderPageCookieTest {
     verify(backendApiClient)
         .get(
             eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),
-            any(org.springframework.core.ParameterizedTypeReference.class));
+            anyTypeRef());
   }
 
   @Test
   @WithMockUser
   void viewOrders_WithQueryParam_ShouldSetNewCookie() throws Exception {
     when(backendApiClient.get(
-            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=COMPLETED"),
-            any(org.springframework.core.ParameterizedTypeReference.class)))
+            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=COMPLETED"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 0, 0L, 0, List.of()));
 
     mockMvc
@@ -156,8 +152,6 @@ class JobOrderPageCookieTest {
         .andExpect(cookie().value("orders_filter_status", "COMPLETED"));
 
     verify(backendApiClient)
-        .get(
-            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=COMPLETED"),
-            any(org.springframework.core.ParameterizedTypeReference.class));
+        .get(eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=COMPLETED"), anyTypeRef());
   }
 }

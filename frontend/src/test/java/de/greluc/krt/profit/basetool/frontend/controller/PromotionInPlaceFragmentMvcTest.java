@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -46,7 +46,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -93,14 +92,11 @@ class PromotionInPlaceFragmentMvcTest {
         new PromotionLevelContentDto(
             UUID.randomUUID(), 0L, catId, "Trading", "LEVEL_A", "x", null, null);
 
-    when(backendApiClient.get(
-            eq("/api/v1/promotion/topics/all"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of(topic));
-    when(backendApiClient.get(
-            contains("/categories/by-topic/"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/categories/by-topic/"), anyTypeRef()))
         .thenReturn(List.of(cat));
-    when(backendApiClient.get(
-            contains("/level-contents/by-category/"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/level-contents/by-category/"), anyTypeRef()))
         .thenReturn(List.of(lc));
 
     mockMvc
@@ -127,14 +123,11 @@ class PromotionInPlaceFragmentMvcTest {
         new RankRequirementDto(
             UUID.randomUUID(), 0L, 20, 19, null, null, catId, null, "LEVEL_A", 1, null, null, null);
 
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/rank-requirements"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/rank-requirements"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(req), 0, 1000, 1, 1, List.of()));
-    when(backendApiClient.get(
-            eq("/api/v1/promotion/topics/all"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of());
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/categories?"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/categories?"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of()));
 
     mockMvc
@@ -181,22 +174,16 @@ class PromotionInPlaceFragmentMvcTest {
     PromotionEligibilityDto elig =
         new PromotionEligibilityDto(memberId.toString(), 20, 19, true, true, List.of());
 
-    when(backendApiClient.get(
-            eq("/api/v1/promotion/topics/all"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of(topic));
-    when(backendApiClient.get(
-            contains("/categories/by-topic/"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/categories/by-topic/"), anyTypeRef()))
         .thenReturn(List.of(cat));
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/evaluations/all"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/all"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 10000, 0, 0, List.of()));
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/evaluations/members"),
-            any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/members"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(member), 0, 1000, 1, 1, List.of()));
     when(backendApiClient.get(
-            contains("/api/v1/promotion/eligibility/user/" + memberId),
-            any(ParameterizedTypeReference.class)))
+            contains("/api/v1/promotion/eligibility/user/" + memberId), anyTypeRef()))
         .thenReturn(List.of(elig));
 
     mockMvc
@@ -228,8 +215,7 @@ class PromotionInPlaceFragmentMvcTest {
     // The eligibilityCell branch returns early after a single per-member eligibility fetch —
     // it must not trigger the full matrix build (members / evaluations / topics).
     when(backendApiClient.get(
-            contains("/api/v1/promotion/eligibility/user/" + memberId),
-            any(ParameterizedTypeReference.class)))
+            contains("/api/v1/promotion/eligibility/user/" + memberId), anyTypeRef()))
         .thenReturn(List.of(elig));
 
     mockMvc

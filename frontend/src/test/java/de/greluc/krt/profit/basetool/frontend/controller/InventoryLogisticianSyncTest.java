@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -43,7 +43,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.IdTokenClaimNames;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
@@ -99,10 +98,8 @@ class InventoryLogisticianSyncTest {
             null,
             false);
     when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(userDto);
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(Collections.emptyList());
-    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
 
     Map<String, Object> claims = new HashMap<>();
     claims.put(IdTokenClaimNames.SUB, "test-sub");
@@ -145,10 +142,8 @@ class InventoryLogisticianSyncTest {
             null,
             false);
     when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(userDto);
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(Collections.emptyList());
-    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
 
     Map<String, Object> claims = new HashMap<>();
     claims.put(IdTokenClaimNames.SUB, "test-sub");
@@ -191,10 +186,8 @@ class InventoryLogisticianSyncTest {
             null,
             false);
     when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(userDto);
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(Collections.emptyList());
-    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
 
     Map<String, Object> claims = new HashMap<>();
     claims.put(IdTokenClaimNames.SUB, "test-sub");

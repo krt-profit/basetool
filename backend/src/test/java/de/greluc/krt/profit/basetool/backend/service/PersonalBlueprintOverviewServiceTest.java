@@ -317,7 +317,6 @@ class PersonalBlueprintOverviewServiceTest {
   // overview even when they are not a member of any of the caller's oversight org units; the
   // service unions their sub into the owner-set passed to the blueprint lookup.
   @Test
-  @SuppressWarnings("unchecked")
   void list_globalSharerOutsideOversight_isUnionedIntoOwnerSet() {
     when(ownerScopeService.currentOversightScope())
         .thenReturn(new ScopePredicate(false, ORG_A, Set.of()));
@@ -325,7 +324,7 @@ class PersonalBlueprintOverviewServiceTest {
         .thenReturn(Set.of(USER_1));
     // USER_2 is not a member of ORG_A but opted into global sharing — they must still be counted.
     when(userRepository.findIdsBySharingBlueprintsGlobally()).thenReturn(Set.of(USER_2));
-    ArgumentCaptor<Collection<String>> ownerSubs = ArgumentCaptor.forClass(Collection.class);
+    ArgumentCaptor<Collection<String>> ownerSubs = ArgumentCaptor.captor();
     when(personalBlueprintRepository.findOwnerProductByOwnerSubIn(ownerSubs.capture()))
         .thenReturn(List.of(op("Aurora MR", USER_1), op("Aurora MR", USER_2)));
 
@@ -340,7 +339,6 @@ class PersonalBlueprintOverviewServiceTest {
   // covers REQ-INV-018 — the owner drill-down includes a global sharer who is not an oversight
   // member, so the listed owners stay consistent with the bumped availability count.
   @Test
-  @SuppressWarnings("unchecked")
   void owners_globalSharerOutsideOversight_appearsInDrillDown() {
     when(familyCatalog.familyIndex()).thenReturn(Map.of("aurora mr", Set.of("aurora mr")));
     when(ownerScopeService.currentOversightScope())
@@ -348,7 +346,7 @@ class PersonalBlueprintOverviewServiceTest {
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_A)))
         .thenReturn(Set.of(USER_1));
     when(userRepository.findIdsBySharingBlueprintsGlobally()).thenReturn(Set.of(USER_2));
-    ArgumentCaptor<Collection<String>> ownerSubs = ArgumentCaptor.forClass(Collection.class);
+    ArgumentCaptor<Collection<String>> ownerSubs = ArgumentCaptor.captor();
     when(personalBlueprintRepository.findAllByProductKeyInAndOwnerSubIn(any(), ownerSubs.capture()))
         .thenReturn(
             List.of(bp("aurora mr", "Aurora MR", USER_1), bp("aurora mr", "Aurora MR", USER_2)));

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.*;
@@ -35,7 +36,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -65,12 +65,11 @@ class MissionManagerButtonVisibilityTest {
   @Test
   @WithMockUser(roles = "MISSION_MANAGER")
   void listMissions_AsMissionManager_ShouldShowCreateButton() throws Exception {
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class), anyBoolean()))
+    when(backendApiClient.get(anyString(), anyTypeRef(), anyBoolean()))
         .thenReturn(
             new PageResponse<>(Collections.emptyList(), 0, 10, 0, 0, Collections.emptyList()));
 
-    when(backendApiClient.getCached(
-            anyString(), any(ParameterizedTypeReference.class), anyBoolean()))
+    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -82,12 +81,11 @@ class MissionManagerButtonVisibilityTest {
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void listMissions_AsMember_ShouldShowCreateButton() throws Exception {
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class), anyBoolean()))
+    when(backendApiClient.get(anyString(), anyTypeRef(), anyBoolean()))
         .thenReturn(
             new PageResponse<>(Collections.emptyList(), 0, 10, 0, 0, Collections.emptyList()));
 
-    when(backendApiClient.getCached(
-            anyString(), any(ParameterizedTypeReference.class), anyBoolean()))
+    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -98,12 +96,11 @@ class MissionManagerButtonVisibilityTest {
 
   @Test
   void listMissions_AsAnonymous_ShouldNotShowCreateButton() throws Exception {
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class), anyBoolean()))
+    when(backendApiClient.get(anyString(), anyTypeRef(), anyBoolean()))
         .thenReturn(
             new PageResponse<>(Collections.emptyList(), 0, 10, 0, 0, Collections.emptyList()));
 
-    when(backendApiClient.getCached(
-            anyString(), any(ParameterizedTypeReference.class), anyBoolean()))
+    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
 
     mockMvc

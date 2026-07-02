@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
@@ -39,7 +40,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -97,8 +97,7 @@ class BlueprintOverviewPageControllerMvcTest {
   @Test
   @WithMockUser
   void view_multiPageResult_rendersPaginationAndSizePicker() throws Exception {
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(page(1, 50, 120));
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page(1, 50, 120));
 
     mockMvc
         .perform(get("/blueprint-overview").param("page", "1"))
@@ -116,8 +115,7 @@ class BlueprintOverviewPageControllerMvcTest {
   @Test
   @WithMockUser
   void view_withSearch_keepsSearchInPaginationLinks() throws Exception {
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class), any()))
-        .thenReturn(page(0, 10, 25));
+    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(page(0, 10, 25));
 
     mockMvc
         .perform(get("/blueprint-overview").param("search", "Aurora").param("size", "10"))
@@ -137,8 +135,7 @@ class BlueprintOverviewPageControllerMvcTest {
   @Test
   @WithMockUser
   void view_fragmentResults_rendersOnlyTableFragment() throws Exception {
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(page(0, 50, 120));
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page(0, 50, 120));
 
     mockMvc
         .perform(get("/blueprint-overview").param("fragment", "results"))
@@ -153,8 +150,7 @@ class BlueprintOverviewPageControllerMvcTest {
   @Test
   @WithMockUser
   void view_singleShortPage_rendersNeitherPageNavNorSizePicker() throws Exception {
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(page(0, 50, 5));
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page(0, 50, 5));
 
     mockMvc
         .perform(get("/blueprint-overview"))

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
@@ -210,7 +211,7 @@ class RefineryOrderDurationTest {
     verify(backendApiClient)
         .get(
             org.mockito.ArgumentMatchers.contains("/api/v1/refinery-orders/my-orders"),
-            any(org.springframework.core.ParameterizedTypeReference.class));
+            anyTypeRef());
   }
 
   @Test
@@ -221,9 +222,7 @@ class RefineryOrderDurationTest {
         .andExpect(model().attribute("onlyMine", false));
 
     verify(backendApiClient)
-        .get(
-            org.mockito.ArgumentMatchers.contains("/api/v1/refinery-orders/all"),
-            any(org.springframework.core.ParameterizedTypeReference.class));
+        .get(org.mockito.ArgumentMatchers.contains("/api/v1/refinery-orders/all"), anyTypeRef());
   }
 
   @Test

@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasSize;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
@@ -51,7 +51,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -118,8 +117,7 @@ class RefineryOrderCreateImportRenderTest {
             0L);
     PageResponse<MaterialDto> materials =
         new PageResponse<>(List.of(raw, suggested), 0, 1000, 2, 1, Collections.emptyList());
-    when(backendApiClient.getCached(
-            eq("/api/v1/materials?size=1000"), any(ParameterizedTypeReference.class), eq(true)))
+    when(backendApiClient.getCached(eq("/api/v1/materials?size=1000"), anyTypeRef(), eq(true)))
         .thenReturn(materials);
   }
 
@@ -252,7 +250,7 @@ class RefineryOrderCreateImportRenderTest {
    */
   @Test
   void createPage_WhenOneCatalogFetchFails_StillRendersWithEmptyList() throws Exception {
-    when(backendApiClient.get(eq("/api/v1/users?size=1000"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/users?size=1000"), anyTypeRef()))
         .thenThrow(new RuntimeException("backend down"));
 
     mockMvc

@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static org.mockito.ArgumentMatchers.any;
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
@@ -48,7 +48,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -65,7 +64,6 @@ import org.springframework.web.context.WebApplicationContext;
  * selects refresh with the money region).
  */
 @SpringBootTest
-@SuppressWarnings("unchecked")
 class BankInPlaceFragmentMvcTest {
 
   @Autowired private WebApplicationContext context;
@@ -85,9 +83,8 @@ class BankInPlaceFragmentMvcTest {
   @Test
   @WithMockUser(roles = {"BANK_MANAGEMENT"})
   void manage_fragmentManageBody_rendersPanelWithoutTheCreationModals() throws Exception {
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(null);
-    when(backendApiClient.get(
-            eq("/api/v1/bank/accounts?size=500"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(eq("/api/v1/bank/accounts?size=500"), anyTypeRef()))
         .thenReturn(
             new PageResponse<>(
                 List.of(account(UUID.randomUUID(), "KB-0001", "ACTIVE", "0")),
@@ -116,7 +113,7 @@ class BankInPlaceFragmentMvcTest {
   void grants_fragmentGrantsMatrix_rendersMatrixWithoutTheCreateModal() throws Exception {
     UUID userId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenReturn(List.of(grant(userId, "alpha", accountId)));
 
     mockMvc
@@ -151,20 +148,19 @@ class BankInPlaceFragmentMvcTest {
                 null,
                 null,
                 java.util.List.of()));
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(null);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(
             eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class)))
         .thenReturn(detail);
-    when(backendApiClient.get(contains("/transactions"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef()))
         .thenReturn(
             new PageResponse<BankBookingDto>(List.of(), 0, 20, 0, 0, Collections.emptyList()));
-    when(backendApiClient.get(eq("/api/v1/bank/holders"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/bank/holders"), anyTypeRef()))
         .thenReturn(
             List.of(
                 new BankHolderDto(
                     holderId, UUID.randomUUID(), "alpha", true, BigDecimal.ZERO, false, 0L)));
-    when(backendApiClient.get(
-            eq("/api/v1/bank/accounts?size=500"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/bank/accounts?size=500"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(self), 0, 500, 1, 1, Collections.emptyList()));
 
     mockMvc

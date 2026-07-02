@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -43,7 +44,6 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
@@ -193,7 +193,6 @@ class AdminUexPageControllerTest {
   // ---------------------------------------------------------------------
 
   @Test
-  @SuppressWarnings("unchecked")
   void listData_parsesUexMirrorFields_andComputesLatestSyncAttribute() {
     BackendApiClient client = mock(BackendApiClient.class);
     AdminUexPageController controller = new AdminUexPageController(client);
@@ -229,7 +228,6 @@ class AdminUexPageControllerTest {
   }
 
   @Test
-  @SuppressWarnings("unchecked")
   void listData_latestSyncIsNull_whenNoTerminalHasBeenSyncedYet() {
     BackendApiClient client = mock(BackendApiClient.class);
     AdminUexPageController controller = new AdminUexPageController(client);
@@ -394,17 +392,15 @@ class AdminUexPageControllerTest {
         false);
   }
 
-  @SuppressWarnings("unchecked")
   private static void stubEmptyPage(BackendApiClient client, String uri) {
     PageResponse<Map<String, Object>> empty = new PageResponse<>(List.of(), 0, 10, 0, 0, List.of());
-    when(client.get(eq(uri), any(ParameterizedTypeReference.class))).thenReturn(empty);
+    when(client.get(eq(uri), anyTypeRef())).thenReturn(empty);
   }
 
-  @SuppressWarnings("unchecked")
   @SafeVarargs
   private static void stubPage(BackendApiClient client, String uri, Map<String, Object>... rows) {
     PageResponse<Map<String, Object>> page =
         new PageResponse<>(List.of(rows), 0, 10, rows.length, 1, List.of());
-    when(client.get(eq(uri), any(ParameterizedTypeReference.class))).thenReturn(page);
+    when(client.get(eq(uri), anyTypeRef())).thenReturn(page);
   }
 }

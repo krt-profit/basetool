@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyClass;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
@@ -54,7 +54,7 @@ import org.springframework.http.ResponseEntity;
  * authorization wiring is verified in {@code MissionSecurityRenderingTest} and similar MockMvc
  * tests for the broader stack.
  */
-@SuppressWarnings({"unchecked", "rawtypes"})
+@SuppressWarnings("rawtypes")
 @ExtendWith(MockitoExtension.class)
 class PromotionProxyControllerTest {
 
@@ -93,7 +93,7 @@ class PromotionProxyControllerTest {
   @Test
   void deleteTopic_returnsNoContent_andDelegatesToBackend() {
     UUID id = UUID.randomUUID();
-    when(backendApiClient.delete(anyString(), any(Class.class))).thenReturn(null);
+    when(backendApiClient.delete(anyString(), anyClass())).thenReturn(null);
 
     ResponseEntity<Void> response = controller.deleteTopic(id);
 
@@ -128,7 +128,7 @@ class PromotionProxyControllerTest {
   @Test
   void deleteCategory_returnsNoContent() {
     UUID id = UUID.randomUUID();
-    when(backendApiClient.delete(anyString(), any(Class.class))).thenReturn(null);
+    when(backendApiClient.delete(anyString(), anyClass())).thenReturn(null);
 
     ResponseEntity<Void> response = controller.deleteCategory(id);
 
@@ -162,7 +162,7 @@ class PromotionProxyControllerTest {
   @Test
   void deleteRankRequirement_returnsNoContent() {
     UUID id = UUID.randomUUID();
-    when(backendApiClient.delete(anyString(), any(Class.class))).thenReturn(null);
+    when(backendApiClient.delete(anyString(), anyClass())).thenReturn(null);
 
     ResponseEntity<Void> response = controller.deleteRankRequirement(id);
 
@@ -197,7 +197,7 @@ class PromotionProxyControllerTest {
   @Test
   void deleteLevelContent_returnsNoContent() {
     UUID id = UUID.randomUUID();
-    when(backendApiClient.delete(anyString(), any(Class.class))).thenReturn(null);
+    when(backendApiClient.delete(anyString(), anyClass())).thenReturn(null);
 
     ResponseEntity<Void> response = controller.deleteLevelContent(id);
 

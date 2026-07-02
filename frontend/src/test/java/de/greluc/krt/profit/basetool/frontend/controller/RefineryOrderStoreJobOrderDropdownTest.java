@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static org.mockito.ArgumentMatchers.any;
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -42,7 +42,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -140,7 +139,7 @@ class RefineryOrderStoreJobOrderDropdownTest {
     when(backendApiClient.get(
             eq("/api/v1/settings/refinery.rounding.mode"), eq(SystemSettingDto.class)))
         .thenReturn(new SystemSettingDto("refinery.rounding.mode", "UP", 1L));
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenAnswer(
             inv -> {
               String url = inv.getArgument(0);

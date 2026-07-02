@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -38,7 +38,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -104,8 +103,7 @@ class AdminBlueprintsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_fullPage_rendersSwapWrapper() throws Exception {
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(page(1));
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page(1));
 
     mockMvc
         .perform(get("/admin/blueprints"))
@@ -119,8 +117,7 @@ class AdminBlueprintsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_fragmentResults_rendersOnlyInnerFragment() throws Exception {
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(page(60));
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page(60));
 
     mockMvc
         .perform(get("/admin/blueprints").param("fragment", "results"))

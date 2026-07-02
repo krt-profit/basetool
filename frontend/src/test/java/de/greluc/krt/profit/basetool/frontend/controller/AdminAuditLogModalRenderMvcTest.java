@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -35,7 +35,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -52,7 +51,6 @@ import org.springframework.web.context.WebApplicationContext;
  * export form and is the classic content-projection failure mode.
  */
 @SpringBootTest
-@SuppressWarnings("unchecked")
 class AdminAuditLogModalRenderMvcTest {
 
   private MockMvc mockMvc;
@@ -71,7 +69,7 @@ class AdminAuditLogModalRenderMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void exportModal_rendersViaFragmentShell_andProjectsFormExactlyOnce() throws Exception {
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
     String html =

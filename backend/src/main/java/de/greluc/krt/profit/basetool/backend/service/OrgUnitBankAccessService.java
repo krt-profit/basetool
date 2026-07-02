@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import static de.greluc.krt.profit.basetool.backend.util.BankAmounts.plain;
-
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
@@ -60,7 +58,6 @@ import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BereichRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.util.BankAmounts;
@@ -98,6 +95,16 @@ import org.springframework.transaction.annotation.Transactional;
  * single, deliberately non-{@code Bank*}-named seam that carries that org-unit logic; it authorizes
  * here and then reuses the bank's own org-unit-blind read/PDF code ({@link BankAccountService},
  * {@link BankStatementReportService}), so the bank stays 100% org-unit-blind.
+ *
+ * <p>The org-unit authorization brain (who may view / configure / is responsible for an account)
+ * stays in this bridge, because it couples {@link OwnerScopeService} to the bank-account repository
+ * and only this class may (ADR-0020, {@code orgUnitAwareBankSeamIsContainedToOneClass}). The L3
+ * split (#922) extracted the two write-mechanics slabs it orchestrates — the view-grant
+ * grant/revoke ({@link OrgUnitBankVisibilityService}, incl. the shared {@code createViewGrant}
+ * factory) and the approval-limit upsert/clear ({@link OrgUnitBankApprovalLimitService}) — into
+ * focused collaborators that hold no org-unit scope: each facade settings method still loads +
+ * authorizes + validates here, then delegates the persistence + audit to the collaborator and
+ * re-reads the settings snapshot.
  *
  * <p>It serves four things on the org-unit bank page:
  *
@@ -178,6 +185,8 @@ public class OrgUnitBankAccessService {
   private final BankStatementReportService bankStatementReportService;
   private final BankBookingRequestService bankBookingRequestService;
   private final BankAuditService bankAuditService;
+  private final OrgUnitBankVisibilityService orgUnitBankVisibilityService;
+  private final OrgUnitBankApprovalLimitService orgUnitBankApprovalLimitService;
 
   // ---------------------------------------------------------------------------------------------
   // F1 — card list
@@ -422,20 +431,7 @@ public class OrgUnitBankAccessService {
     BankAccount account = requireAccount(accountId);
     requireCanConfigureVisibility(account);
     BankAccountViewGranteeKind kind = requireValidRoleBucket(account, roleCode);
-    if (!viewGrantRepository.existsByAccountIdAndGranteeKindAndRoleCode(
-        accountId, kind, roleCode)) {
-      BankAccountViewGrant grant = new BankAccountViewGrant();
-      grant.setAccount(account);
-      grant.setGranteeKind(kind);
-      grant.setRoleCode(roleCode);
-      viewGrantRepository.save(grant);
-      bankAuditService.record(
-          BankAuditEventType.BALANCE_VISIBILITY_GRANTED,
-          accountId,
-          null,
-          null,
-          kind.name() + ":" + roleCode);
-    }
+    orgUnitBankVisibilityService.grantRole(account, kind, roleCode);
     return toSettingsDto(account);
   }
 
@@ -456,16 +452,7 @@ public class OrgUnitBankAccessService {
     BankAccount account = requireAccount(accountId);
     requireCanConfigureVisibility(account);
     BankAccountViewGranteeKind kind = requireValidRoleBucket(account, roleCode);
-    long removed =
-        viewGrantRepository.deleteByAccountIdAndGranteeKindAndRoleCode(accountId, kind, roleCode);
-    if (removed > 0) {
-      bankAuditService.record(
-          BankAuditEventType.BALANCE_VISIBILITY_REVOKED,
-          accountId,
-          null,
-          null,
-          kind.name() + ":" + roleCode);
-    }
+    orgUnitBankVisibilityService.revokeRole(account, kind, roleCode);
     return toSettingsDto(account);
   }
 
@@ -489,22 +476,7 @@ public class OrgUnitBankAccessService {
     if (!allMembersSupported(account.getType())) {
       throw new BadRequestException("This account type has no all-members visibility bucket");
     }
-    boolean exists =
-        viewGrantRepository.existsByAccountIdAndGranteeKind(
-            accountId, BankAccountViewGranteeKind.ALL_MEMBERS);
-    if (enabled && !exists) {
-      BankAccountViewGrant grant = new BankAccountViewGrant();
-      grant.setAccount(account);
-      grant.setGranteeKind(BankAccountViewGranteeKind.ALL_MEMBERS);
-      viewGrantRepository.save(grant);
-      bankAuditService.record(
-          BankAuditEventType.BALANCE_VISIBILITY_GRANTED, accountId, null, null, "ALL_MEMBERS");
-    } else if (!enabled && exists) {
-      viewGrantRepository.deleteByAccountIdAndGranteeKind(
-          accountId, BankAccountViewGranteeKind.ALL_MEMBERS);
-      bankAuditService.record(
-          BankAuditEventType.BALANCE_VISIBILITY_REVOKED, accountId, null, null, "ALL_MEMBERS");
-    }
+    orgUnitBankVisibilityService.setAllMembers(account, enabled);
     return toSettingsDto(account);
   }
 
@@ -523,18 +495,7 @@ public class OrgUnitBankAccessService {
       @NotNull UUID accountId, @NotNull UUID userId) {
     BankAccount account = requireAccount(accountId);
     requireCanConfigureVisibility(account);
-    if (!userRepository.existsById(userId)) {
-      throw new NotFoundException("User not found");
-    }
-    if (!viewGrantRepository.existsByAccountIdAndGranteeUserId(accountId, userId)) {
-      BankAccountViewGrant grant = new BankAccountViewGrant();
-      grant.setAccount(account);
-      grant.setGranteeKind(BankAccountViewGranteeKind.USER);
-      grant.setGranteeUserId(userId);
-      viewGrantRepository.save(grant);
-      bankAuditService.record(
-          BankAuditEventType.BALANCE_VISIBILITY_GRANTED, accountId, null, userId, "USER");
-    }
+    orgUnitBankVisibilityService.grantUser(account, userId);
     return toSettingsDto(account);
   }
 
@@ -553,11 +514,7 @@ public class OrgUnitBankAccessService {
       @NotNull UUID accountId, @NotNull UUID userId) {
     BankAccount account = requireAccount(accountId);
     requireCanConfigureVisibility(account);
-    long removed = viewGrantRepository.deleteByAccountIdAndGranteeUserId(accountId, userId);
-    if (removed > 0) {
-      bankAuditService.record(
-          BankAuditEventType.BALANCE_VISIBILITY_REVOKED, accountId, null, userId, "USER");
-    }
+    orgUnitBankVisibilityService.revokeUser(account, userId);
     return toSettingsDto(account);
   }
 
@@ -583,22 +540,7 @@ public class OrgUnitBankAccessService {
     if (!areaMembersSupported(account.getType())) {
       throw new BadRequestException("This account type has no area-members visibility bucket");
     }
-    boolean exists =
-        viewGrantRepository.existsByAccountIdAndGranteeKind(
-            accountId, BankAccountViewGranteeKind.AREA_MEMBERS);
-    if (enabled && !exists) {
-      BankAccountViewGrant grant = new BankAccountViewGrant();
-      grant.setAccount(account);
-      grant.setGranteeKind(BankAccountViewGranteeKind.AREA_MEMBERS);
-      viewGrantRepository.save(grant);
-      bankAuditService.record(
-          BankAuditEventType.BALANCE_VISIBILITY_GRANTED, accountId, null, null, "AREA_MEMBERS");
-    } else if (!enabled && exists) {
-      viewGrantRepository.deleteByAccountIdAndGranteeKind(
-          accountId, BankAccountViewGranteeKind.AREA_MEMBERS);
-      bankAuditService.record(
-          BankAuditEventType.BALANCE_VISIBILITY_REVOKED, accountId, null, null, "AREA_MEMBERS");
-    }
+    orgUnitBankVisibilityService.setAreaMembers(account, enabled);
     return toSettingsDto(account);
   }
 
@@ -626,13 +568,7 @@ public class OrgUnitBankAccessService {
     BankAccount account = requireAccount(accountId);
     requireCanConfigureApprovalLimits(account);
     requireValidLimitRoleBucket(account, roleCode);
-    upsertLimit(account, BankAccountViewGranteeKind.MEMBERSHIP_ROLE, roleCode, null, limit);
-    bankAuditService.record(
-        BankAuditEventType.APPROVAL_LIMIT_SET,
-        accountId,
-        null,
-        null,
-        "MEMBERSHIP_ROLE:" + roleCode + "=" + plain(limit));
+    orgUnitBankApprovalLimitService.setRole(account, roleCode, limit);
     return toSettingsDto(account);
   }
 
@@ -653,17 +589,7 @@ public class OrgUnitBankAccessService {
     BankAccount account = requireAccount(accountId);
     requireCanConfigureApprovalLimits(account);
     requireValidLimitRoleBucket(account, roleCode);
-    long removed =
-        approvalLimitRepository.deleteByAccountIdAndGranteeKindAndRoleCode(
-            accountId, BankAccountViewGranteeKind.MEMBERSHIP_ROLE, roleCode);
-    if (removed > 0) {
-      bankAuditService.record(
-          BankAuditEventType.APPROVAL_LIMIT_CLEARED,
-          accountId,
-          null,
-          null,
-          "MEMBERSHIP_ROLE:" + roleCode);
-    }
+    orgUnitBankApprovalLimitService.clearRole(account, roleCode);
     return toSettingsDto(account);
   }
 
@@ -687,13 +613,7 @@ public class OrgUnitBankAccessService {
     if (!BankApprovalLimitService.allMembersSupported(account.getType())) {
       throw new BadRequestException("This account type has no all-members approval-limit tier");
     }
-    upsertLimit(account, BankAccountViewGranteeKind.ALL_MEMBERS, null, null, limit);
-    bankAuditService.record(
-        BankAuditEventType.APPROVAL_LIMIT_SET,
-        accountId,
-        null,
-        null,
-        AuditDetails.of("ALL_MEMBERS", plain(limit)));
+    orgUnitBankApprovalLimitService.setAllMembers(account, limit);
     return toSettingsDto(account);
   }
 
@@ -710,13 +630,7 @@ public class OrgUnitBankAccessService {
   public OrgUnitBankAccountSettingsDto clearAllMembersApprovalLimit(@NotNull UUID accountId) {
     BankAccount account = requireAccount(accountId);
     requireCanConfigureApprovalLimits(account);
-    long removed =
-        approvalLimitRepository.deleteByAccountIdAndGranteeKind(
-            accountId, BankAccountViewGranteeKind.ALL_MEMBERS);
-    if (removed > 0) {
-      bankAuditService.record(
-          BankAuditEventType.APPROVAL_LIMIT_CLEARED, accountId, null, null, "ALL_MEMBERS");
-    }
+    orgUnitBankApprovalLimitService.clearAllMembers(account);
     return toSettingsDto(account);
   }
 
@@ -741,13 +655,7 @@ public class OrgUnitBankAccessService {
     if (!BankApprovalLimitService.areaMembersSupported(account.getType())) {
       throw new BadRequestException("This account type has no area-members approval-limit tier");
     }
-    upsertLimit(account, BankAccountViewGranteeKind.AREA_MEMBERS, null, null, limit);
-    bankAuditService.record(
-        BankAuditEventType.APPROVAL_LIMIT_SET,
-        accountId,
-        null,
-        null,
-        AuditDetails.of("AREA_MEMBERS", plain(limit)));
+    orgUnitBankApprovalLimitService.setAreaMembers(account, limit);
     return toSettingsDto(account);
   }
 
@@ -765,13 +673,7 @@ public class OrgUnitBankAccessService {
   public OrgUnitBankAccountSettingsDto clearAreaMembersApprovalLimit(@NotNull UUID accountId) {
     BankAccount account = requireAccount(accountId);
     requireCanConfigureApprovalLimits(account);
-    long removed =
-        approvalLimitRepository.deleteByAccountIdAndGranteeKind(
-            accountId, BankAccountViewGranteeKind.AREA_MEMBERS);
-    if (removed > 0) {
-      bankAuditService.record(
-          BankAuditEventType.APPROVAL_LIMIT_CLEARED, accountId, null, null, "AREA_MEMBERS");
-    }
+    orgUnitBankApprovalLimitService.clearAreaMembers(account);
     return toSettingsDto(account);
   }
 
@@ -792,16 +694,7 @@ public class OrgUnitBankAccessService {
       @NotNull UUID accountId, @NotNull UUID userId, @NotNull BigDecimal limit) {
     BankAccount account = requireAccount(accountId);
     requireCanConfigureApprovalLimits(account);
-    if (!userRepository.existsById(userId)) {
-      throw new NotFoundException("User not found");
-    }
-    upsertLimit(account, BankAccountViewGranteeKind.USER, null, userId, limit);
-    bankAuditService.record(
-        BankAuditEventType.APPROVAL_LIMIT_SET,
-        accountId,
-        null,
-        userId,
-        AuditDetails.of("USER", plain(limit)));
+    orgUnitBankApprovalLimitService.setUser(account, userId, limit);
     return toSettingsDto(account);
   }
 
@@ -820,11 +713,7 @@ public class OrgUnitBankAccessService {
       @NotNull UUID accountId, @NotNull UUID userId) {
     BankAccount account = requireAccount(accountId);
     requireCanConfigureApprovalLimits(account);
-    long removed = approvalLimitRepository.deleteByAccountIdAndGranteeUserId(accountId, userId);
-    if (removed > 0) {
-      bankAuditService.record(
-          BankAuditEventType.APPROVAL_LIMIT_CLEARED, accountId, null, userId, "USER");
-    }
+    orgUnitBankApprovalLimitService.clearUser(account, userId);
     return toSettingsDto(account);
   }
 
@@ -1526,52 +1415,6 @@ public class OrgUnitBankAccessService {
       throw new BadRequestException(
           "Unknown approval-limit role bucket for this account: " + roleCode);
     }
-  }
-
-  /**
-   * Idempotent upsert of one approval-limit row: updates the existing tier row's amount in place
-   * (dirty-checking) or inserts a new one. The partial unique indexes guarantee at most one row per
-   * (account, tier).
-   *
-   * @param account the account
-   * @param kind the tier kind
-   * @param roleCode the role code for a role tier, else {@code null}
-   * @param userId the user for a user tier, else {@code null}
-   * @param amount the new ceiling
-   */
-  private void upsertLimit(
-      @NotNull BankAccount account,
-      @NotNull BankAccountViewGranteeKind kind,
-      @Nullable String roleCode,
-      @Nullable UUID userId,
-      @NotNull BigDecimal amount) {
-    // Serialise concurrent set-limit calls for the same account on its row lock (a plain SELECT FOR
-    // UPDATE that does NOT bump the account @Version) so the find-or-insert below cannot race two
-    // inserts into a V193 partial unique index (uq_bank_appr_limit_*). The lock is released at tx
-    // end.
-    bankAccountRepository.findByIdForUpdate(account.getId());
-    Optional<BankAccountApprovalLimit> existing =
-        switch (kind) {
-          case MEMBERSHIP_ROLE, GLOBAL_ROLE ->
-              approvalLimitRepository.findByAccountIdAndGranteeKindAndRoleCode(
-                  account.getId(), kind, roleCode);
-          case USER ->
-              approvalLimitRepository.findByAccountIdAndGranteeUserId(account.getId(), userId);
-          case ALL_MEMBERS, AREA_MEMBERS ->
-              approvalLimitRepository.findByAccountIdAndGranteeKind(account.getId(), kind);
-        };
-    BankAccountApprovalLimit limit =
-        existing.orElseGet(
-            () -> {
-              BankAccountApprovalLimit fresh = new BankAccountApprovalLimit();
-              fresh.setAccount(account);
-              fresh.setGranteeKind(kind);
-              fresh.setRoleCode(roleCode);
-              fresh.setGranteeUserId(userId);
-              return fresh;
-            });
-    limit.setLimitAmount(amount);
-    approvalLimitRepository.save(limit);
   }
 
   /**

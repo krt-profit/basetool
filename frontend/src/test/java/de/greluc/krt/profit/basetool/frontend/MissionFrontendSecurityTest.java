@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
@@ -81,7 +82,7 @@ class MissionFrontendSecurityTest {
     when(webClient.get()).thenReturn(requestHeadersUriSpec);
     when(requestHeadersUriSpec.uri(any(String.class))).thenReturn(requestHeadersSpec);
     when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
-    when(responseSpec.bodyToMono(any(org.springframework.core.ParameterizedTypeReference.class)))
+    when(responseSpec.bodyToMono(anyTypeRef()))
         .thenReturn(
             Mono.just(
                 new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(

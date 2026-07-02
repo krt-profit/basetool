@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
@@ -43,7 +44,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -95,8 +95,7 @@ class AdminSpecialCommandsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_fullPage_rendersSwapWrapper() throws Exception {
-    when(backendApiClient.get(
-            contains("/api/v1/special-commands"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/special-commands"), anyTypeRef()))
         .thenReturn(oneSpecialCommand());
 
     mockMvc
@@ -112,8 +111,7 @@ class AdminSpecialCommandsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_fragmentResults_rendersOnlyInnerFragment() throws Exception {
-    when(backendApiClient.get(
-            contains("/api/v1/special-commands"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/special-commands"), anyTypeRef()))
         .thenReturn(oneSpecialCommand());
 
     mockMvc
@@ -179,12 +177,8 @@ class AdminSpecialCommandsPageControllerMvcTest {
     sc.put("active", true);
     sc.put("isProfitEligible", false);
     sc.put("version", 0);
-    when(backendApiClient.get(
-            eq("/api/v1/special-commands/" + skId), any(ParameterizedTypeReference.class)))
-        .thenReturn(sc);
-    when(backendApiClient.get(
-            eq("/api/v1/special-commands/" + skId + "/members"),
-            any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/special-commands/" + skId), anyTypeRef())).thenReturn(sc);
+    when(backendApiClient.get(eq("/api/v1/special-commands/" + skId + "/members"), anyTypeRef()))
         .thenReturn(List.of());
 
     mockMvc

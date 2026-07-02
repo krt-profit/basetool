@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -39,7 +39,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -75,8 +74,7 @@ class PersonalInventoryPageControllerMvcTest {
     // Given
     PageResponse<PersonalInventoryItemDto> empty =
         new PageResponse<>(List.of(), 0, 50, 0, 0, List.of());
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(empty);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(empty);
 
     // When & Then
     mockMvc
@@ -95,8 +93,7 @@ class PersonalInventoryPageControllerMvcTest {
   void view_fragmentResults_rendersOnlyResultsFragment() throws Exception {
     PageResponse<PersonalInventoryItemDto> empty =
         new PageResponse<>(List.of(), 0, 50, 0, 0, List.of());
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(empty);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(empty);
 
     mockMvc
         .perform(get("/personal-inventory").param("fragment", "results"))

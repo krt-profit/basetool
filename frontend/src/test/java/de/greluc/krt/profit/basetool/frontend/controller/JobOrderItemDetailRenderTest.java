@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -58,7 +58,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.IdTokenClaimNames;
@@ -773,7 +772,6 @@ class JobOrderItemDetailRenderTest {
   // old serial addOwnerPickerOptions(model) in place on top of the parallel fetch would double the
   // owner-picker round-trip and trip times(1) here.
   @Test
-  @SuppressWarnings("unchecked")
   void detailRender_logistician_fetchesEachFanOutLookupExactlyOnce() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
@@ -782,8 +780,7 @@ class JobOrderItemDetailRenderTest {
     // The authenticated requesting picker sources the all-kinds catalog; return one option so the
     // fetch path runs end to end (the apply step derives the responsible subset from it) and the
     // picker never falls back to the /active catalog.
-    when(backendApiClient.get(
-            eq("/api/v1/org-units/active-all-kinds"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/org-units/active-all-kinds"), anyTypeRef()))
         .thenReturn(
             List.of(
                 new OrgUnitMembershipOptionDto(
@@ -795,17 +792,11 @@ class JobOrderItemDetailRenderTest {
 
     // Each of the four independent logistician lookups fires exactly once — the parallel fan-out
     // does not duplicate any round-trip.
+    verify(backendApiClient, times(1)).get(eq("/api/v1/org-units/active-all-kinds"), anyTypeRef());
+    verify(backendApiClient, times(1)).get(eq("/api/v1/users?size=1000"), anyTypeRef());
     verify(backendApiClient, times(1))
-        .get(eq("/api/v1/org-units/active-all-kinds"), any(ParameterizedTypeReference.class));
+        .getCached(eq("/api/v1/materials/job-order"), anyTypeRef(), eq(true));
     verify(backendApiClient, times(1))
-        .get(eq("/api/v1/users?size=1000"), any(ParameterizedTypeReference.class));
-    verify(backendApiClient, times(1))
-        .getCached(
-            eq("/api/v1/materials/job-order"), any(ParameterizedTypeReference.class), eq(true));
-    verify(backendApiClient, times(1))
-        .getCached(
-            eq("/api/v1/squadrons?size=1000&sort=name,asc"),
-            any(ParameterizedTypeReference.class),
-            eq(true));
+        .getCached(eq("/api/v1/squadrons?size=1000&sort=name,asc"), anyTypeRef(), eq(true));
   }
 }

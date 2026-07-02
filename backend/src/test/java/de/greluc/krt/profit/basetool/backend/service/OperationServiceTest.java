@@ -265,7 +265,7 @@ class OperationServiceTest {
       PageRequest pageable = PageRequest.of(0, 20);
       when(ownerScopeService.currentScopePredicate())
           .thenReturn(new ScopePredicate(true, null, Set.of()));
-      ArgumentCaptor<List<String>> statusCaptor = ArgumentCaptor.forClass(List.class);
+      ArgumentCaptor<List<String>> statusCaptor = ArgumentCaptor.captor();
       when(operationRepository.searchOperations(
               any(),
               any(),
@@ -295,7 +295,7 @@ class OperationServiceTest {
       PageRequest pageable = PageRequest.of(0, 20);
       when(ownerScopeService.currentScopePredicate())
           .thenReturn(new ScopePredicate(true, null, Set.of()));
-      ArgumentCaptor<List<String>> statusCaptor = ArgumentCaptor.forClass(List.class);
+      ArgumentCaptor<List<String>> statusCaptor = ArgumentCaptor.captor();
       when(operationRepository.searchOperations(
               any(),
               any(),

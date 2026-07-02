@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -48,7 +49,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
@@ -143,8 +143,7 @@ class PromotionPageControllerTest {
     // Backend down for every call → all attributes default to empty/null. The
     // page must still resolve to the overview template so the user sees the
     // empty state instead of a 500.
-    when(backendApiClient.get(any(String.class), any(ParameterizedTypeReference.class)))
-        .thenReturn(null);
+    when(backendApiClient.get(any(String.class), anyTypeRef())).thenReturn(null);
     Model model = new ConcurrentModel();
 
     String view = controller.overview(true, model);
@@ -169,13 +168,11 @@ class PromotionPageControllerTest {
     RankRequirementDto r2 = requirement(20, 19, catB, "LEVEL_B", 2);
     RankRequirementDto r3 = requirement(19, 18, catA, "LEVEL_C", 1);
 
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/topics/all"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of());
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/rank-requirements"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/rank-requirements"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(r1, r2, r3), 0, 1000, 3, 1, List.of()));
-    when(backendApiClient.get(eq("/api/v1/users/me"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/users/me"), anyTypeRef()))
         .thenReturn(member(UUID.randomUUID(), "officer", 19));
     Model model = new ConcurrentModel();
 
@@ -195,9 +192,8 @@ class PromotionPageControllerTest {
 
   @Test
   void overview_currentUserRankPropagatedFromMeEndpoint() {
-    when(backendApiClient.get(any(String.class), any(ParameterizedTypeReference.class)))
-        .thenReturn(null);
-    when(backendApiClient.get(eq("/api/v1/users/me"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(any(String.class), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(eq("/api/v1/users/me"), anyTypeRef()))
         .thenReturn(member(UUID.randomUUID(), "alice", 12));
     Model model = new ConcurrentModel();
 
@@ -211,9 +207,8 @@ class PromotionPageControllerTest {
     // The /me call is wrapped in a try/catch so the page degrades cleanly
     // when the backend is unreachable. We piggy-back this on the empty-state
     // setup to also assert that no other call is needed to land at null.
-    when(backendApiClient.get(any(String.class), any(ParameterizedTypeReference.class)))
-        .thenReturn(null);
-    when(backendApiClient.get(eq("/api/v1/users/me"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(any(String.class), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(eq("/api/v1/users/me"), anyTypeRef()))
         .thenThrow(new RuntimeException("backend down"));
     Model model = new ConcurrentModel();
 
@@ -234,23 +229,17 @@ class PromotionPageControllerTest {
     PromotionCategoryDto c = category(catId, topicId, "Combat", "Anwesenheit");
     MemberEvaluationDto eval = evaluation("user-1", catId, "LEVEL_B", Instant.now());
 
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/topics/all"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of(t));
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/categories/by-topic/"),
-            any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/categories/by-topic/"), anyTypeRef()))
         .thenReturn(List.of(c));
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/evaluations/my"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/my"), anyTypeRef()))
         .thenReturn(List.of(eval));
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/rank-requirements"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/rank-requirements"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of()));
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/eligibility/my"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/eligibility/my"), anyTypeRef()))
         .thenReturn(List.of());
-    when(backendApiClient.get(eq("/api/v1/users/me"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/users/me"), anyTypeRef()))
         .thenReturn(member(UUID.randomUUID(), "self", 20));
     Model model = new ConcurrentModel();
 
@@ -274,20 +263,15 @@ class PromotionPageControllerTest {
     RankRequirementDto r2 = requirement(19, 18, catId, "LEVEL_C", 1);
     RankRequirementDto r3 = requirement(18, 17, catId, "LEVEL_B", 1);
 
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/topics/all"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of());
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/evaluations/my"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/my"), anyTypeRef()))
         .thenReturn(List.of());
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/rank-requirements"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/rank-requirements"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(r1, r2, r3), 0, 1000, 3, 1, List.of()));
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/eligibility/my"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/eligibility/my"), anyTypeRef()))
         .thenReturn(List.of());
-    when(backendApiClient.get(eq("/api/v1/users/me"), any(ParameterizedTypeReference.class)))
-        .thenReturn(null);
+    when(backendApiClient.get(eq("/api/v1/users/me"), anyTypeRef())).thenReturn(null);
     Model model = new ConcurrentModel();
 
     controller.myEvaluations(true, model);
@@ -307,20 +291,15 @@ class PromotionPageControllerTest {
     RankRequirementDto specific = requirement(20, 19, catId, "LEVEL_B", 1);
     RankRequirementDto topicWide = requirement(20, 19, null, "LEVEL_C", 1);
 
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/topics/all"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of());
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/evaluations/my"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/my"), anyTypeRef()))
         .thenReturn(List.of());
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/rank-requirements"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/rank-requirements"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(specific, topicWide), 0, 1000, 2, 1, List.of()));
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/eligibility/my"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/eligibility/my"), anyTypeRef()))
         .thenReturn(List.of());
-    when(backendApiClient.get(eq("/api/v1/users/me"), any(ParameterizedTypeReference.class)))
-        .thenReturn(null);
+    when(backendApiClient.get(eq("/api/v1/users/me"), anyTypeRef())).thenReturn(null);
     Model model = new ConcurrentModel();
 
     controller.myEvaluations(true, model);
@@ -343,21 +322,15 @@ class PromotionPageControllerTest {
     PromotionCategoryDto c1b = category(UUID.randomUUID(), topic1, "T1", "C1b");
     PromotionCategoryDto c2a = category(UUID.randomUUID(), topic2, "T2", "C2a");
 
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/topics/all"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of(topic(topic1, "T1", 0), topic(topic2, "T2", 1)));
-    when(backendApiClient.get(
-            contains("/categories/by-topic/" + topic1 + "/all"),
-            any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/categories/by-topic/" + topic1 + "/all"), anyTypeRef()))
         .thenReturn(List.of(c1a, c1b));
-    when(backendApiClient.get(
-            contains("/categories/by-topic/" + topic2 + "/all"),
-            any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/categories/by-topic/" + topic2 + "/all"), anyTypeRef()))
         .thenReturn(List.of(c2a));
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/evaluations/all"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/all"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 10000, 0, 0, List.of()));
-    when(backendApiClient.get(contains("/api/v1/users?"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/users?"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of()));
     Model model = new ConcurrentModel();
 
@@ -376,13 +349,11 @@ class PromotionPageControllerTest {
     UUID catId = UUID.randomUUID();
     MemberEvaluationDto e1 = evaluation("u1", catId, "LEVEL_A", Instant.now());
 
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/topics/all"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of());
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/evaluations/all"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/all"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(e1), 0, 10000, 1, 1, List.of()));
-    when(backendApiClient.get(contains("/api/v1/users?"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/users?"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of()));
     Model model = new ConcurrentModel();
 
@@ -409,13 +380,11 @@ class PromotionPageControllerTest {
     MemberEvaluationDto newB = evaluation("u1", catB, "LEVEL_B", t3);
     MemberEvaluationDto midA = evaluation("u1", catA, "LEVEL_C", t2);
 
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/topics/all"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of());
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/evaluations/all"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/all"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(oldA, newB, midA), 0, 10000, 3, 1, List.of()));
-    when(backendApiClient.get(contains("/api/v1/users?"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/users?"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of()));
     Model model = new ConcurrentModel();
 
@@ -441,15 +410,11 @@ class PromotionPageControllerTest {
     // crashing with NullPointerException when stringifying the id.
     UserDto nullIdMember = member(null, "phantom", null);
 
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/topics/all"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of());
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/evaluations/all"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/all"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 10000, 0, 0, List.of()));
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/evaluations/members"),
-            any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/members"), anyTypeRef()))
         .thenReturn(
             new PageResponse<>(
                 List.of(member(id1, "a", 20), member(id2, "b", 19), nullIdMember),
@@ -458,13 +423,9 @@ class PromotionPageControllerTest {
                 3,
                 1,
                 List.of()));
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/eligibility/user/" + id1),
-            any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/eligibility/user/" + id1), anyTypeRef()))
         .thenReturn(List.of(elig1));
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/eligibility/user/" + id2),
-            any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/eligibility/user/" + id2), anyTypeRef()))
         .thenReturn(List.of(elig2));
     Model model = new ConcurrentModel();
 
@@ -478,20 +439,16 @@ class PromotionPageControllerTest {
     // Verify there is no eligibility call for the null-id member: we only
     // expect two per-user eligibility GETs in total.
     verify(backendApiClient, times(2))
-        .get(
-            contains("/api/v1/promotion/eligibility/user/"), any(ParameterizedTypeReference.class));
+        .get(contains("/api/v1/promotion/eligibility/user/"), anyTypeRef());
   }
 
   @Test
   void manage_emptyMembers_yieldsEmptyEligibilityMap() {
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/topics/all"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of());
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/evaluations/all"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/all"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 10000, 0, 0, List.of()));
-    when(backendApiClient.get(contains("/api/v1/users?"), any(ParameterizedTypeReference.class)))
-        .thenReturn(null);
+    when(backendApiClient.get(contains("/api/v1/users?"), anyTypeRef())).thenReturn(null);
     Model model = new ConcurrentModel();
 
     controller.manage(true, null, null, model);
@@ -517,14 +474,11 @@ class PromotionPageControllerTest {
         new PromotionLevelContentDto(
             UUID.randomUUID(), 0L, catId, "C", "LEVEL_A", "desc", null, null);
 
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/topics/all"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of(t));
-    when(backendApiClient.get(
-            contains("/categories/by-topic/"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/categories/by-topic/"), anyTypeRef()))
         .thenReturn(List.of(c));
-    when(backendApiClient.get(
-            contains("/level-contents/by-category/"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/level-contents/by-category/"), anyTypeRef()))
         .thenReturn(List.of(lc));
     Model model = new ConcurrentModel();
 
@@ -552,18 +506,13 @@ class PromotionPageControllerTest {
     RankRequirementDto r1 = requirement(20, 19, catId, "LEVEL_A", 1);
     RankRequirementDto r2 = requirement(20, 19, catId, "LEVEL_B", 2);
 
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/rank-requirements"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/rank-requirements"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(r1, r2), 0, 1000, 2, 1, List.of()));
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/topics/all"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of(t));
-    when(backendApiClient.get(
-            contains("/categories/by-topic/" + topicId + "/all"),
-            any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/categories/by-topic/" + topicId + "/all"), anyTypeRef()))
         .thenReturn(List.of(c));
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/categories?"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/categories?"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(c), 0, 1000, 1, 1, List.of()));
     Model model = new ConcurrentModel();
 
@@ -588,7 +537,7 @@ class PromotionPageControllerTest {
     // The page must never propagate an exception from the backend. A 500
     // would be worse UX than rendering an empty page with the corner badges
     // and toolbar still in place — the user has a path forward (retry).
-    when(backendApiClient.get(any(String.class), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(any(String.class), anyTypeRef()))
         .thenThrow(new RuntimeException("backend explosion"));
     Model model = new ConcurrentModel();
 

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -39,7 +40,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
@@ -98,16 +98,12 @@ class BankManagePageControllerTest {
     BankHolderDto holder =
         new BankHolderDto(
             UUID.randomUUID(), UUID.randomUUID(), "greluc", true, BigDecimal.ZERO, false, 0L);
-    when(backendApiClient.get(
-            eq("/api/v1/bank/accounts?size=500"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/bank/accounts?size=500"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(account), 0, 500, 1, 1, Collections.emptyList()));
-    when(backendApiClient.get(eq("/api/v1/bank/holders"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/bank/holders"), anyTypeRef()))
         .thenReturn(List.of(holder));
-    when(backendApiClient.get(
-            eq("/api/v1/org-units/active"), any(ParameterizedTypeReference.class)))
-        .thenReturn(List.of());
-    when(backendApiClient.get(eq("/api/v1/users/lookup"), any(ParameterizedTypeReference.class)))
-        .thenReturn(List.of());
+    when(backendApiClient.get(eq("/api/v1/org-units/active"), anyTypeRef())).thenReturn(List.of());
+    when(backendApiClient.get(eq("/api/v1/users/lookup"), anyTypeRef())).thenReturn(List.of());
 
     // When
     String view =
@@ -134,8 +130,7 @@ class BankManagePageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankManagePageController controller = new BankManagePageController(backendApiClient);
     Model model = new ConcurrentModel();
-    when(backendApiClient.get(any(String.class), any(ParameterizedTypeReference.class)))
-        .thenReturn(null);
+    when(backendApiClient.get(any(String.class), anyTypeRef())).thenReturn(null);
 
     // When: an explicit ?tab=konten opens the accounts tab (the non-default branch).
     controller.manage("konten", null, management(), oidcUser(UUID.randomUUID().toString()), model);
@@ -150,8 +145,7 @@ class BankManagePageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankManagePageController controller = new BankManagePageController(backendApiClient);
     Model model = new ConcurrentModel();
-    when(backendApiClient.get(any(String.class), any(ParameterizedTypeReference.class)))
-        .thenReturn(null);
+    when(backendApiClient.get(any(String.class), anyTypeRef())).thenReturn(null);
 
     // When
     String view =
@@ -176,11 +170,9 @@ class BankManagePageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankManagePageController controller = new BankManagePageController(backendApiClient);
     Model model = new ConcurrentModel();
-    when(backendApiClient.get(
-            eq("/api/v1/bank/accounts?size=500"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/bank/accounts?size=500"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 500, 0, 0, Collections.emptyList()));
-    when(backendApiClient.get(eq("/api/v1/bank/holders"), any(ParameterizedTypeReference.class)))
-        .thenReturn(List.of());
+    when(backendApiClient.get(eq("/api/v1/bank/holders"), anyTypeRef())).thenReturn(List.of());
 
     // When
     String view =
@@ -193,10 +185,8 @@ class BankManagePageControllerTest {
     assertNotNull(model.getAttribute("accounts"));
     assertNotNull(model.getAttribute("holders"));
     // The fragment path must not load the creation-modal lookups.
-    verify(backendApiClient, never())
-        .get(eq("/api/v1/org-units/active"), any(ParameterizedTypeReference.class));
-    verify(backendApiClient, never())
-        .get(eq("/api/v1/users/lookup"), any(ParameterizedTypeReference.class));
+    verify(backendApiClient, never()).get(eq("/api/v1/org-units/active"), anyTypeRef());
+    verify(backendApiClient, never()).get(eq("/api/v1/users/lookup"), anyTypeRef());
   }
 
   // Regression for the holder self-link bug (#876 follow-up): a plain bank employee never saw the
@@ -214,10 +204,9 @@ class BankManagePageControllerTest {
     BankHolderDto ownHolder =
         new BankHolderDto(
             UUID.randomUUID(), UUID.fromString(sub), "emp", true, BigDecimal.ZERO, false, 0L);
-    when(backendApiClient.get(
-            eq("/api/v1/bank/accounts?size=500"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/bank/accounts?size=500"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 500, 0, 0, Collections.emptyList()));
-    when(backendApiClient.get(eq("/api/v1/bank/holders"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/bank/holders"), anyTypeRef()))
         .thenReturn(List.of(ownHolder));
 
     // When — the employee's principal carries the sub; getName() ("emp") deliberately differs.

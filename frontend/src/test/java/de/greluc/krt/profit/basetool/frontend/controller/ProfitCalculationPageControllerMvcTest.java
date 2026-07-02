@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static org.mockito.ArgumentMatchers.any;
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -36,7 +36,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -72,12 +71,9 @@ class ProfitCalculationPageControllerMvcTest {
     PageResponse<Map<String, Object>> terminals =
         new PageResponse<>(List.of(Map.of("starSystemName", "Stanton")), 0, 10, 1, 1, List.of());
 
-    when(backendApiClient.getCached(
-            eq("/api/v1/ship-types?size=1000&sort=name,asc"),
-            any(ParameterizedTypeReference.class)))
+    when(backendApiClient.getCached(eq("/api/v1/ship-types?size=1000&sort=name,asc"), anyTypeRef()))
         .thenReturn(shipTypes);
-    when(backendApiClient.getCached(
-            eq("/api/v1/terminals?size=10000"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.getCached(eq("/api/v1/terminals?size=10000"), anyTypeRef()))
         .thenReturn(terminals);
 
     // When & Then
@@ -102,12 +98,9 @@ class ProfitCalculationPageControllerMvcTest {
     PageResponse<Map<String, Object>> terminals =
         new PageResponse<>(List.of(), 0, 10, 0, 1, List.of());
 
-    when(backendApiClient.getCached(
-            eq("/api/v1/ship-types?size=1000&sort=name,asc"),
-            any(ParameterizedTypeReference.class)))
+    when(backendApiClient.getCached(eq("/api/v1/ship-types?size=1000&sort=name,asc"), anyTypeRef()))
         .thenReturn(shipTypes);
-    when(backendApiClient.getCached(
-            eq("/api/v1/terminals?size=10000"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.getCached(eq("/api/v1/terminals?size=10000"), anyTypeRef()))
         .thenReturn(terminals);
 
     // When & Then
@@ -134,12 +127,9 @@ class ProfitCalculationPageControllerMvcTest {
     PageResponse<Map<String, Object>> terminals =
         new PageResponse<>(List.of(), 0, 10, 0, 1, List.of());
 
-    when(backendApiClient.getCached(
-            eq("/api/v1/ship-types?size=1000&sort=name,asc"),
-            any(ParameterizedTypeReference.class)))
+    when(backendApiClient.getCached(eq("/api/v1/ship-types?size=1000&sort=name,asc"), anyTypeRef()))
         .thenReturn(shipTypes);
-    when(backendApiClient.getCached(
-            eq("/api/v1/terminals?size=10000"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.getCached(eq("/api/v1/terminals?size=10000"), anyTypeRef()))
         .thenReturn(terminals);
 
     // When & Then

@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -43,7 +43,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -136,23 +135,17 @@ class PromotionManagePageControllerMvcTest {
     PromotionEligibilityDto elig =
         new PromotionEligibilityDto(memberId.toString(), 20, 19, true, true, List.of());
 
-    when(backendApiClient.get(
-            eq("/api/v1/promotion/topics/all"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of(topic));
     when(backendApiClient.get(
-            contains("/api/v1/promotion/categories/by-topic/" + topicId + "/all"),
-            any(ParameterizedTypeReference.class)))
+            contains("/api/v1/promotion/categories/by-topic/" + topicId + "/all"), anyTypeRef()))
         .thenReturn(List.of(cat1, cat2));
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/evaluations/all"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/all"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(eval), 0, 10000, 1, 1, List.of()));
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/evaluations/members"),
-            any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/members"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(member), 0, 1000, 1, 1, List.of()));
     when(backendApiClient.get(
-            contains("/api/v1/promotion/eligibility/user/" + memberId),
-            any(ParameterizedTypeReference.class)))
+            contains("/api/v1/promotion/eligibility/user/" + memberId), anyTypeRef()))
         .thenReturn(List.of(elig));
 
     // Pin a squadron: the management matrix only renders for a single active squadron context.

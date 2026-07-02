@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -40,7 +40,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -84,8 +83,7 @@ class HangarPaginationMvcTest {
   @Test
   @WithMockUser
   void multiPageResult_rendersPaginationAndSizePicker() throws Exception {
-    when(backendApiClient.get(
-            contains("/api/v1/hangar/my-ships"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/hangar/my-ships"), anyTypeRef()))
         .thenReturn(page(1, 50, 300));
 
     mockMvc
@@ -104,8 +102,7 @@ class HangarPaginationMvcTest {
   @Test
   @WithMockUser
   void withSearch_keepsSearchInPaginationLinksAndOffersClear() throws Exception {
-    when(backendApiClient.get(
-            contains("/api/v1/hangar/my-ships"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/hangar/my-ships"), anyTypeRef()))
         .thenReturn(page(1, 50, 300));
 
     mockMvc
@@ -124,8 +121,7 @@ class HangarPaginationMvcTest {
   @Test
   @WithMockUser
   void singleShortPage_rendersNeitherPageNavNorSizePicker() throws Exception {
-    when(backendApiClient.get(
-            contains("/api/v1/hangar/my-ships"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/hangar/my-ships"), anyTypeRef()))
         .thenReturn(page(0, 50, 3));
 
     mockMvc
@@ -138,28 +134,24 @@ class HangarPaginationMvcTest {
   @Test
   @WithMockUser
   void unsupportedSize_snapsToDefaultBeforeReachingBackend() throws Exception {
-    when(backendApiClient.get(
-            contains("/api/v1/hangar/my-ships"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/hangar/my-ships"), anyTypeRef()))
         .thenReturn(page(0, 50, 0));
 
     mockMvc.perform(get("/hangar").param("size", "5000")).andExpect(status().isOk());
 
     // A crafted ?size= outside 10/50/100 must never reach the backend as an unbounded page.
-    verify(backendApiClient)
-        .get(eq("/api/v1/hangar/my-ships?page=0&size=50"), any(ParameterizedTypeReference.class));
+    verify(backendApiClient).get(eq("/api/v1/hangar/my-ships?page=0&size=50"), anyTypeRef());
   }
 
   @Test
   @WithMockUser
   void negativePage_clampsToZeroBeforeReachingBackend() throws Exception {
-    when(backendApiClient.get(
-            contains("/api/v1/hangar/my-ships"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/hangar/my-ships"), anyTypeRef()))
         .thenReturn(page(0, 50, 0));
 
     mockMvc.perform(get("/hangar").param("page", "-1")).andExpect(status().isOk());
 
-    verify(backendApiClient)
-        .get(eq("/api/v1/hangar/my-ships?page=0&size=50"), any(ParameterizedTypeReference.class));
+    verify(backendApiClient).get(eq("/api/v1/hangar/my-ships?page=0&size=50"), anyTypeRef());
   }
 
   @Test
@@ -167,8 +159,7 @@ class HangarPaginationMvcTest {
   void fragmentResults_rendersPaginationInsideTheSwapFragment() throws Exception {
     // The pagination controls live INSIDE the hangarResults fragment so an in-place filter/page
     // change re-renders them (REQ-HANGAR-002).
-    when(backendApiClient.get(
-            contains("/api/v1/hangar/my-ships"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/hangar/my-ships"), anyTypeRef()))
         .thenReturn(page(1, 50, 300));
 
     mockMvc

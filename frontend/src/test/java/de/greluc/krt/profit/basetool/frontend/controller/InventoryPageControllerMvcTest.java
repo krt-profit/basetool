@@ -19,11 +19,11 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -49,7 +49,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -81,9 +80,8 @@ class InventoryPageControllerMvcTest {
   void viewAggregatedInventory_AsMember_ShouldShowPage() throws Exception {
     PageResponse<AggregatedInventoryDto> page =
         new PageResponse<>(List.of(), 0, 10, 0, 1, Collections.emptyList());
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(page);
-    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
 
     mockMvc
         .perform(get("/inventory"))
@@ -95,10 +93,8 @@ class InventoryPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void viewAllInventory_AsMember_ShouldShowPage() throws Exception {
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(Collections.emptyList());
-    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
 
     mockMvc
         .perform(get("/inventory/all"))
@@ -110,10 +106,8 @@ class InventoryPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "LOGISTICIAN")
   void viewAllInventory_AsLogistician_ShouldShowActions() throws Exception {
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(Collections.emptyList());
-    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
 
     mockMvc
         .perform(get("/inventory/all"))
@@ -125,10 +119,8 @@ class InventoryPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void viewAllInventory_AsMember_ShouldNotShowActions() throws Exception {
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(Collections.emptyList());
-    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
 
     mockMvc
         .perform(get("/inventory/all"))
@@ -139,10 +131,8 @@ class InventoryPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void viewAllInventory_ShouldRenderBookOutAndUmbuchenControls() throws Exception {
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(Collections.emptyList());
-    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
 
     // REQ-INV-007 consolidation: the TRANSFER (Umbuchung) mode moved out of the Ausbuchen dialog
     // into the dedicated Umbuchen modal, so the book-out button only carries discard/sell labels
@@ -164,10 +154,8 @@ class InventoryPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void viewAllInventory_ShouldRenderScuDecimalAmountFieldsAndHelper() throws Exception {
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(Collections.emptyList());
-    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
 
     mockMvc
         .perform(get("/inventory/all"))
@@ -189,10 +177,8 @@ class InventoryPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "KRT_MEMBER", username = "test-user-123")
   void viewAllInventory_ShouldRenderLocalStorageAttributes() throws Exception {
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(Collections.emptyList());
-    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
 
     mockMvc
         .perform(get("/inventory/all"))
@@ -204,10 +190,8 @@ class InventoryPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "KRT_MEMBER", username = "test-user-123")
   void viewMyInventory_ShouldRenderLocalStorageAttributes() throws Exception {
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(Collections.emptyList());
-    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
 
     mockMvc
         .perform(get("/inventory/my"))
@@ -256,7 +240,7 @@ class InventoryPageControllerMvcTest {
             1L,
             Instant.parse("2026-02-03T10:15:30Z"));
 
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenAnswer(
             inv -> {
               String url = inv.getArgument(0);
@@ -265,8 +249,7 @@ class InventoryPageControllerMvcTest {
               }
               return Collections.emptyList();
             });
-    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
 
     mockMvc
         .perform(
@@ -328,7 +311,7 @@ class InventoryPageControllerMvcTest {
         new JobOrderReferenceDto(
             unrelatedOrderId, 99, "h2", "IN_PROGRESS", null, List.of(), List.of(UUID.randomUUID()));
 
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenAnswer(
             inv -> {
               String url = inv.getArgument(0);
@@ -340,8 +323,7 @@ class InventoryPageControllerMvcTest {
               }
               return Collections.emptyList();
             });
-    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
 
     mockMvc
         .perform(
@@ -390,7 +372,7 @@ class InventoryPageControllerMvcTest {
             1L,
             Instant.parse("2026-01-01T00:00:00Z"));
 
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenAnswer(
             inv -> {
               String url = inv.getArgument(0);
@@ -399,8 +381,7 @@ class InventoryPageControllerMvcTest {
               }
               return Collections.emptyList();
             });
-    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
 
     mockMvc
         .perform(
@@ -458,7 +439,7 @@ class InventoryPageControllerMvcTest {
             95,
             List.of(stack));
 
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenAnswer(
             inv -> {
               String url = inv.getArgument(0);
@@ -467,8 +448,7 @@ class InventoryPageControllerMvcTest {
               }
               return Collections.emptyList();
             });
-    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
 
     mockMvc
         .perform(get("/inventory/my"))
@@ -520,7 +500,7 @@ class InventoryPageControllerMvcTest {
         new GroupedInventoryDto(
             new MaterialReferenceDto(materialId, "Laranite", "SCU"), 7.0, 80.0, 80, List.of(stack));
 
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenAnswer(
             inv -> {
               String url = inv.getArgument(0);
@@ -529,8 +509,7 @@ class InventoryPageControllerMvcTest {
               }
               return Collections.emptyList();
             });
-    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
 
     mockMvc
         .perform(get("/inventory/all"))
@@ -554,10 +533,9 @@ class InventoryPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void viewInputPage_WhenOneCatalogFetchFails_StillRendersWithEmptyList() throws Exception {
-    when(backendApiClient.getCached(
-            eq("/api/v1/materials/lookup"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.getCached(eq("/api/v1/materials/lookup"), anyTypeRef()))
         .thenReturn(List.of(new MaterialReferenceDto(UUID.randomUUID(), "Laranite", "SCU")));
-    when(backendApiClient.get(eq("/api/v1/missions/lookup"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/missions/lookup"), anyTypeRef()))
         .thenThrow(new RuntimeException("backend down"));
 
     mockMvc

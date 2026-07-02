@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.config;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyClass;
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -39,7 +41,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
-import org.springframework.core.ParameterizedTypeReference;
 
 /**
  * Unit tests for {@link SquadronContextAdvice}. Two groups: (1) the per-principal capability gates
@@ -69,7 +70,7 @@ class SquadronContextAdviceTest {
 
     assertFalse(caps.canSeeBlueprintOverview());
     assertFalse(caps.canViewJobOrders());
-    verify(backendApiClient, never()).get(any(String.class), any(Class.class));
+    verify(backendApiClient, never()).get(any(String.class), anyClass());
   }
 
   @Test
@@ -81,7 +82,7 @@ class SquadronContextAdviceTest {
 
     assertTrue(caps.canSeeBlueprintOverview());
     assertTrue(caps.canViewJobOrders());
-    verify(backendApiClient, never()).get(any(String.class), any(Class.class));
+    verify(backendApiClient, never()).get(any(String.class), anyClass());
   }
 
   @Test
@@ -135,11 +136,9 @@ class SquadronContextAdviceTest {
     advice().availableSquadrons();
 
     verify(backendApiClient)
-        .getCached(
-            eq("/api/v1/squadrons?size=1000&sort=name,asc"), any(ParameterizedTypeReference.class));
+        .getCached(eq("/api/v1/squadrons?size=1000&sort=name,asc"), anyTypeRef());
     verify(backendApiClient, never())
-        .get(
-            eq("/api/v1/squadrons?size=1000&sort=name,asc"), any(ParameterizedTypeReference.class));
+        .get(eq("/api/v1/squadrons?size=1000&sort=name,asc"), anyTypeRef());
   }
 
   @Test
@@ -155,11 +154,9 @@ class SquadronContextAdviceTest {
     advice().availableOrgUnits();
 
     verify(backendApiClient)
-        .getCached(
-            eq("/api/v1/squadrons?size=1000&sort=name,asc"), any(ParameterizedTypeReference.class));
+        .getCached(eq("/api/v1/squadrons?size=1000&sort=name,asc"), anyTypeRef());
     verify(backendApiClient, never())
-        .get(
-            eq("/api/v1/squadrons?size=1000&sort=name,asc"), any(ParameterizedTypeReference.class));
+        .get(eq("/api/v1/squadrons?size=1000&sort=name,asc"), anyTypeRef());
   }
 
   @Test

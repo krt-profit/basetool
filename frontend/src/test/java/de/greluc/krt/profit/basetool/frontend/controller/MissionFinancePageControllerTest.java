@@ -123,8 +123,7 @@ class MissionFinancePageControllerTest {
 
       assertEquals("redirect:/missions/" + MISSION_ID, view);
       // POST body shape: missionId + participantId + note + type + amount.
-      @SuppressWarnings("unchecked")
-      ArgumentCaptor<Map<String, Object>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+      ArgumentCaptor<Map<String, Object>> bodyCaptor = ArgumentCaptor.captor();
       verify(backendApiClient)
           .post(
               eq("/api/v1/finance-entries"),
@@ -221,8 +220,7 @@ class MissionFinancePageControllerTest {
       assertEquals("redirect:/missions/" + MISSION_ID, view);
       // PUT body: note + type + amount + version. NO missionId/participantId
       // (immutable after creation).
-      @SuppressWarnings("unchecked")
-      ArgumentCaptor<Map<String, Object>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+      ArgumentCaptor<Map<String, Object>> bodyCaptor = ArgumentCaptor.captor();
       verify(backendApiClient)
           .put(
               eq("/api/v1/finance-entries/" + ENTRY_ID),

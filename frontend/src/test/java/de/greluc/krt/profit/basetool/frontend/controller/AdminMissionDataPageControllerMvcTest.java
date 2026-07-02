@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
@@ -43,7 +44,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -147,12 +147,9 @@ class AdminMissionDataPageControllerMvcTest {
             1L,
             1,
             List.of());
-    when(backendApiClient.get(contains("/api/v1/squadrons"), any(ParameterizedTypeReference.class)))
-        .thenReturn(squadrons);
-    when(backendApiClient.get(contains("/api/v1/job-types"), any(ParameterizedTypeReference.class)))
-        .thenReturn(jobTypes);
-    when(backendApiClient.get(
-            contains("/api/v1/frequency-types"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/squadrons"), anyTypeRef())).thenReturn(squadrons);
+    when(backendApiClient.get(contains("/api/v1/job-types"), anyTypeRef())).thenReturn(jobTypes);
+    when(backendApiClient.get(contains("/api/v1/frequency-types"), anyTypeRef()))
         .thenReturn(freqTypes);
   }
 

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
@@ -36,7 +37,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -75,8 +75,7 @@ class AdminAnnouncementPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void updateAjax_withHeader_returns200AndEchoesVersion() throws Exception {
     when(backendApiClient.put(eq("/api/v1/announcement"), any(), eq(Void.class))).thenReturn(null);
-    when(backendApiClient.get(
-            contains("/announcement/admin"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/announcement/admin"), anyTypeRef()))
         .thenReturn(Map.of("content", "x", "version", 7));
 
     mockMvc

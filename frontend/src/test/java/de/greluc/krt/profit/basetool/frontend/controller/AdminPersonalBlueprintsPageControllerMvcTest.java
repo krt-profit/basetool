@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -43,7 +43,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -76,8 +75,7 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void view_rendersForAdmin_withUserPicker() throws Exception {
     PageResponse<UserDto> users = new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of());
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(users);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(users);
 
     mockMvc
         .perform(get("/admin/personal-blueprints"))
@@ -92,8 +90,7 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void view_rendersIdPlaceholderToken_inPerRowEndpoints() throws Exception {
     PageResponse<UserDto> empty = new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of());
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(empty);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(empty);
 
     // With a user selected, the inline-JS endpoint map renders. The per-row updateNote/remove
     // URLs must keep the literal ID_PLACEHOLDER token verbatim; a double-underscore __ID__ would
@@ -128,7 +125,7 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
     // fetchOwned — the single stub returns this blueprint page for it.
     PageResponse<PersonalBlueprintDto> page =
         new PageResponse<>(List.of(bp), 0, 200, 1L, 1, List.of());
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
     mockMvc
         .perform(
@@ -174,8 +171,7 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
     // so
     // a single stub safely seeds the picker options without leaking into the blueprint table.
     PageResponse<UserDto> users = new PageResponse<>(List.of(user), 0, 1000, 1L, 1, List.of());
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(users);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(users);
 
     mockMvc
         .perform(get("/admin/personal-blueprints"))
@@ -192,8 +188,7 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void view_rendersGlobalPurgeDangerZone() throws Exception {
     PageResponse<UserDto> users = new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of());
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(users);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(users);
 
     mockMvc
         .perform(get("/admin/personal-blueprints"))

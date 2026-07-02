@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.websocket;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -33,7 +34,6 @@ import java.util.HashMap;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.http.server.ServletServerHttpRequest;
@@ -65,8 +65,7 @@ class MissionPresenceHandshakeAuthInterceptorTest {
   @Test
   void allowsHandshake_whenBackendAuthorizesTheMissionRead() {
     UUID missionId = UUID.randomUUID();
-    when(backendApiClient.get(eq(URI_TEMPLATE), any(ParameterizedTypeReference.class), any()))
-        .thenReturn(null);
+    when(backendApiClient.get(eq(URI_TEMPLATE), anyTypeRef(), any())).thenReturn(null);
     MockHttpServletResponse servletResponse = new MockHttpServletResponse();
 
     boolean allowed = invoke(missionId.toString(), servletResponse);
@@ -77,7 +76,7 @@ class MissionPresenceHandshakeAuthInterceptorTest {
   @Test
   void refusesHandshake_whenBackendDeniesAccess() {
     UUID missionId = UUID.randomUUID();
-    when(backendApiClient.get(eq(URI_TEMPLATE), any(ParameterizedTypeReference.class), any()))
+    when(backendApiClient.get(eq(URI_TEMPLATE), anyTypeRef(), any()))
         .thenThrow(new BackendServiceException("forbidden", null, 403));
     MockHttpServletResponse servletResponse = new MockHttpServletResponse();
 
@@ -90,7 +89,7 @@ class MissionPresenceHandshakeAuthInterceptorTest {
   @Test
   void refusesHandshake_whenMissionNotFound() {
     UUID missionId = UUID.randomUUID();
-    when(backendApiClient.get(eq(URI_TEMPLATE), any(ParameterizedTypeReference.class), any()))
+    when(backendApiClient.get(eq(URI_TEMPLATE), anyTypeRef(), any()))
         .thenThrow(new BackendServiceException("not found", null, 404));
     MockHttpServletResponse servletResponse = new MockHttpServletResponse();
 
@@ -103,7 +102,7 @@ class MissionPresenceHandshakeAuthInterceptorTest {
   @Test
   void allowsHandshake_whenBackendIsTransientlyUnavailable() {
     UUID missionId = UUID.randomUUID();
-    when(backendApiClient.get(eq(URI_TEMPLATE), any(ParameterizedTypeReference.class), any()))
+    when(backendApiClient.get(eq(URI_TEMPLATE), anyTypeRef(), any()))
         .thenThrow(new BackendServiceException("unavailable", null, 503));
     MockHttpServletResponse servletResponse = new MockHttpServletResponse();
 
@@ -124,8 +123,7 @@ class MissionPresenceHandshakeAuthInterceptorTest {
 
     assertThat(allowed).isFalse();
     assertThat(servletResponse.getStatus()).isEqualTo(400);
-    verify(backendApiClient, never())
-        .get(any(String.class), any(ParameterizedTypeReference.class), any());
+    verify(backendApiClient, never()).get(any(String.class), anyTypeRef(), any());
   }
 
   /**

@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
@@ -38,7 +38,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -57,7 +56,6 @@ import org.springframework.web.context.WebApplicationContext;
  * </ul>
  */
 @SpringBootTest
-@SuppressWarnings("unchecked")
 class MissionsLiveFilterPageTest {
 
   @Autowired private WebApplicationContext context;
@@ -74,8 +72,7 @@ class MissionsLiveFilterPageTest {
 
     PageResponse<MissionListDto> emptyPage =
         new PageResponse<>(List.<MissionListDto>of(), 0, 20, 0L, 0, List.of());
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class), anyBoolean()))
-        .thenReturn(emptyPage);
+    when(backendApiClient.get(anyString(), anyTypeRef(), anyBoolean())).thenReturn(emptyPage);
   }
 
   @Test
