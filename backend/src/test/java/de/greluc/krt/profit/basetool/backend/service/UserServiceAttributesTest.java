@@ -49,6 +49,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -58,6 +59,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -109,6 +111,10 @@ class UserServiceAttributesTest {
   @Mock private OrgUnitMembershipService orgUnitMembershipService;
 
   @Mock private AuditService auditService;
+
+  @Mock private ObjectProvider<OrgUnitBankAccessService> orgUnitBankAccessServiceProvider;
+  @Mock private OrgUnitBankAccessService orgUnitBankAccessService;
+
   @InjectMocks private UserService userService;
 
   private static final UUID USER_ID = UUID.randomUUID();
@@ -502,6 +508,8 @@ class UserServiceAttributesTest {
       Authentication auth = new UsernamePasswordAuthenticationToken(jwt, "n/a", List.of());
       when(authHelperService.rawAuthentication()).thenReturn(auth);
       when(userRepository.findById(currentAdminId)).thenReturn(Optional.of(currentAdmin));
+      when(orgUnitBankAccessServiceProvider.getObject()).thenReturn(orgUnitBankAccessService);
+      when(orgUnitBankAccessService.snapshotResponsibleHoldersForUser(any())).thenReturn(Map.of());
 
       userService.deleteUser(USER_ID);
 

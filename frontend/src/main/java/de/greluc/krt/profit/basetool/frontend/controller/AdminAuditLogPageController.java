@@ -88,6 +88,7 @@ public class AdminAuditLogPageController {
               "ACCOUNT_RENAMED",
               "ACCOUNT_CLOSED",
               "ACCOUNT_REOPENED",
+              "ACCOUNT_RESPONSIBLE_CHANGED",
               "HOLDER_REGISTERED",
               "HOLDER_DEACTIVATED",
               "HOLDER_REACTIVATED",

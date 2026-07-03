@@ -640,6 +640,119 @@ tr.is-inert td {
     white-space: nowrap;
 }
 
+/* Collapsible Konto-Info tile head (REQ-BANK-017): the .bank-panel-head is a full-width toggle
+   button; it keeps the head look and the orange underline while resetting the native button chrome. */
+.bank-collapse-head {
+    width: 100%;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    border-top: 0;
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
+}
+
+.bank-collapse-head:hover {
+    background: var(--color-gray-3);
+}
+
+.bank-collapse-head:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
+}
+
+.bank-collapse-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Chevron shared by the info tile and the expandable booking rows: points right when collapsed and
+   rotates down (90deg) when its aria-expanded control is open. */
+.bank-chevron {
+    width: 0.85em;
+    height: 0.85em;
+    flex: 0 0 auto;
+    color: var(--color-primary);
+    transition: transform 0.15s ease;
+}
+
+[aria-expanded='true'] .bank-chevron {
+    transform: rotate(90deg);
+}
+
+/* Expandable booking rows: a leading chevron marks a row carrying a Begruendung/Notiz; clicking the
+   row (or its chevron) reveals the detail sub-row below it. */
+.bank-bookings-table .bank-expand-col {
+    width: 1.8rem;
+}
+
+.bank-bookings-table .bank-expand-cell {
+    padding-left: 4px;
+    padding-right: 4px;
+    text-align: center;
+}
+
+.bank-booking-row.is-expandable {
+    cursor: pointer;
+}
+
+.bank-booking-row.is-expandable:hover {
+    background: var(--color-gray-3);
+}
+
+.bank-row-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px;
+    background: none;
+    border: 0;
+    color: var(--color-primary);
+    cursor: pointer;
+}
+
+.bank-row-toggle:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
+}
+
+/* Booking-detail sub-row (REQ-BANK-045): the reason + note revealed on expand, indented under the
+   row and set on the input surface so it reads as belonging to the booking above. */
+.bank-booking-detail-cell {
+    padding: 8px 12px 10px 2.4rem;
+    background: var(--color-surface-input);
+}
+
+.bank-booking-detail-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.bank-detail-item {
+    display: flex;
+    gap: 10px;
+    font-size: 0.8rem;
+}
+
+.bank-detail-item .bank-detail-label {
+    flex: 0 0 7rem;
+    padding-top: 1px;
+    color: var(--color-gray-2);
+    font-size: 0.66rem;
+    font-weight: var(--fw-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.bank-detail-item .bank-detail-value {
+    color: var(--color-white);
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+}
+
 .bank-filterbar {
     display: flex;
     gap: 8px;

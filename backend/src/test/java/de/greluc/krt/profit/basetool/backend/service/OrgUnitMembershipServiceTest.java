@@ -61,6 +61,7 @@ import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -72,6 +73,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
@@ -97,6 +99,14 @@ class OrgUnitMembershipServiceTest {
   @Mock private AuditService auditService;
   @Mock private OrgChartService orgChartService;
   @Mock private StaffelMembershipResolver staffelMembershipResolver;
+
+  // The bank seam is injected as an ObjectProvider to break the DI cycle (ADR-0069); the leadership
+  // mutations resolve it to snapshot/record a responsible-holder change. Stubbed lenient below so
+  // the
+  // non-leadership tests do not trip strict-stubs; the seam mock's default (null snapshot, no-op
+  // record) leaves those flows unaffected.
+  @Mock private ObjectProvider<OrgUnitBankAccessService> orgUnitBankAccessServiceProvider;
+  @Mock private OrgUnitBankAccessService orgUnitBankAccessService;
 
   // Real MapStruct implementation (not a mock): the …Dto projection tests below assert the actual
   // entity→DTO mapping the controllers ship to the client, incl. the user.effectiveName read and
@@ -138,6 +148,15 @@ class OrgUnitMembershipServiceTest {
         .when(staffelMembershipResolver.resolveNameSortedStaffelIds(any()))
         .thenAnswer(
             invocation -> realResolver.resolveNameSortedStaffelIds(invocation.getArgument(0)));
+    // The leadership mutations resolve the bank seam through the provider (ADR-0069). Lenient so
+    // the
+    // many non-leadership tests do not trip strict-stubs; the seam mock no-ops the snapshot/record.
+    lenient()
+        .when(orgUnitBankAccessServiceProvider.getObject())
+        .thenReturn(orgUnitBankAccessService);
+    // The membership-removal paths (removeMember, reconcileStaffelMemberships) merge the seam's
+    // per-org-unit snapshot; a non-null map keeps the reconcile putAll from NPE-ing on the mock.
+    lenient().when(orgUnitBankAccessService.snapshotResponsibleHolders(any())).thenReturn(Map.of());
   }
 
   // --- findStaffelMembershipOrgUnitIds (name-sorted primary, REQ-ORG-017) -------------------

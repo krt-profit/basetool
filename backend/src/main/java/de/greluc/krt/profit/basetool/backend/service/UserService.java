@@ -58,6 +58,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -105,6 +106,15 @@ public class UserService {
   private final AuthHelperService authHelperService;
   private final OwnerScopeService ownerScopeService;
   private final OrgUnitMembershipService orgUnitMembershipService;
+
+  /**
+   * The org-unit-aware bank seam, injected as an {@link ObjectProvider} to avoid a constructor
+   * cycle. Used only by {@link #deleteUser(UUID)} to audit a change of a bank account's derived
+   * responsible holder when the deleted user was a leader whose membership the DB cascade removes
+   * (REQ-BANK-034, ADR-0069). All bank access stays inside the seam.
+   */
+  private final ObjectProvider<OrgUnitBankAccessService> orgUnitBankAccessServiceProvider;
+
   private final DefaultBlueprintProvisioningService defaultBlueprintProvisioningService;
   private final UserApprovalEventRepository userApprovalEventRepository;
   private final AuditService auditService;
@@ -1040,8 +1050,18 @@ public class UserService {
     userApprovalEventRepository.clearDecidedBy(userId);
     userRepository.clearApprovedBy(userId);
 
+    // Snapshot the responsible holders of every account tied to the user's org units BEFORE the
+    // delete: a leader (Staffelleiter / SK-Lead / Bereichsleiter / OL member) being deleted changes
+    // the derived Kontoverantwortliche/r of the affected account(s) (REQ-BANK-034, ADR-0069). The
+    // org-unit membership rows go via the DB ON DELETE CASCADE, so the delete is flushed before the
+    // re-diff so the recompute observes the post-cascade state.
+    final Map<UUID, Set<UUID>> responsibleBefore =
+        orgUnitBankAccessServiceProvider.getObject().snapshotResponsibleHoldersForUser(userId);
+
     // Delete the user
     userRepository.delete(user);
+    userRepository.flush();
+    orgUnitBankAccessServiceProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
     log.info("User {} deleted and references reassigned to admin {}", userId, admin.getId());
   }
 

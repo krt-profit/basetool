@@ -45,6 +45,8 @@ import de.greluc.krt.profit.basetool.backend.model.BankTransactionType;
 import de.greluc.krt.profit.basetool.backend.model.Bereich;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.model.Organisationsleitung;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
@@ -64,6 +66,7 @@ import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -426,10 +429,10 @@ class OrgUnitBankAccessServiceTest {
     BankBookingDto redacted = page.getContent().getFirst();
     assertThat(redacted.holderHandle()).isNull();
     assertThat(redacted.counterHolderHandle()).isNull();
-    // REQ-BANK-044: the deposit/withdrawal counterparty is player-identifying too, so it is
-    // redacted alongside the holder columns for org-unit viewers.
-    assertThat(redacted.counterpartyHandle()).isNull();
-    assertThat(redacted.counterpartyOrgUnitName()).isNull();
+    // REQ-BANK-044 (amended): the deposit/withdrawal counterparty (Einzahler/Empfänger) is now KEPT
+    // for org-unit viewers (owner decision); only the aUEC-custody Halter columns stay redacted.
+    assertThat(redacted.counterpartyHandle()).isEqualTo("carol");
+    assertThat(redacted.counterpartyOrgUnitName()).isEqualTo("Staffel Rot");
     assertThat(redacted.counterAccountNo()).isEqualTo("KB-0002");
     assertThat(redacted.amount()).isEqualByComparingTo("-100");
     // REQ-BANK-045: the Begründung is not player-identifying, so it survives redaction like the
@@ -1343,6 +1346,96 @@ class OrgUnitBankAccessServiceTest {
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.empty());
 
     assertThat(service.resolveResponsibleHolderUserIds(accountId)).isEmpty();
+  }
+
+  @Test
+  void snapshotResponsibleHolders_capturesOwnedAccountsCurrentHolders() {
+    // ADR-0069: before a leadership change the seam snapshots the current responsible holder(s) of
+    // the account the org unit owns; a non-Profit org unit does not pull in CARTEL/CARTEL_BANK.
+    UUID orgUnitId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID leiter = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(orgUnitId, "Own", "OWN"));
+    when(bankAccountRepository.findByOrgUnitId(orgUnitId)).thenReturn(Optional.of(account));
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(bereichRepository.findByDepartment(any())).thenReturn(List.of());
+    when(orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
+            orgUnitId, MembershipRole.STAFFELLEITER))
+        .thenReturn(Set.of(leiter));
+
+    Map<UUID, Set<UUID>> snapshot = service.snapshotResponsibleHolders(orgUnitId);
+
+    assertThat(snapshot).containsOnlyKeys(accountId);
+    assertThat(snapshot.get(accountId)).containsExactly(leiter);
+  }
+
+  @Test
+  void snapshotResponsibleHoldersForUser_coversEveryMembershipOrgUnitsAccount() {
+    // ADR-0069: deleting a user snapshots the responsible holders of every account tied to any org
+    // unit the user belongs to, so a leader-drop by the cascade is audited regardless of org unit.
+    UUID userId = UUID.randomUUID();
+    UUID staffelId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID leiter = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
+    OrgUnitMembership membership = new OrgUnitMembership();
+    membership.setId(new OrgUnitMembershipId(userId, staffelId));
+    when(orgUnitMembershipRepository.findAllByIdUserId(userId)).thenReturn(List.of(membership));
+    when(bankAccountRepository.findByOrgUnitId(staffelId)).thenReturn(Optional.of(account));
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(bereichRepository.findByDepartment(any())).thenReturn(List.of());
+    when(orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
+            staffelId, MembershipRole.STAFFELLEITER))
+        .thenReturn(Set.of(leiter));
+
+    Map<UUID, Set<UUID>> snapshot = service.snapshotResponsibleHoldersForUser(userId);
+
+    assertThat(snapshot).containsOnlyKeys(accountId);
+    assertThat(snapshot.get(accountId)).containsExactly(leiter);
+  }
+
+  @Test
+  void recordResponsibleHolderChanges_recordsEventWhenHolderSetChanged() {
+    // REQ-BANK-034/ADR-0069: a leadership change that moves the derived responsible-holder set
+    // records one ACCOUNT_RESPONSIBLE_CHANGED event; the sole new holder is the target user.
+    UUID orgUnitId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID oldLeiter = UUID.randomUUID();
+    UUID newLeiter = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(orgUnitId, "Own", "OWN"));
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    // The recompute after the mutation resolves the new Staffelleiter.
+    when(orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
+            orgUnitId, MembershipRole.STAFFELLEITER))
+        .thenReturn(Set.of(newLeiter));
+
+    service.recordResponsibleHolderChanges(Map.of(accountId, Set.of(oldLeiter)));
+
+    verify(bankAuditService)
+        .record(
+            eq(BankAuditEventType.ACCOUNT_RESPONSIBLE_CHANGED),
+            eq(accountId),
+            isNull(),
+            eq(newLeiter),
+            any());
+  }
+
+  @Test
+  void recordResponsibleHolderChanges_noEventWhenHolderSetUnchanged() {
+    // ADR-0069: a leadership change that leaves the derived responsible-holder set unchanged (a
+    // non-leader rank shuffle) records nothing.
+    UUID orgUnitId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID leiter = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(orgUnitId, "Own", "OWN"));
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
+            orgUnitId, MembershipRole.STAFFELLEITER))
+        .thenReturn(Set.of(leiter));
+
+    service.recordResponsibleHolderChanges(Map.of(accountId, Set.of(leiter)));
+
+    verifyNoInteractions(bankAuditService);
   }
 
   private static BankBookingRequestDto requestDto(UUID accountId, UUID orgUnitId) {

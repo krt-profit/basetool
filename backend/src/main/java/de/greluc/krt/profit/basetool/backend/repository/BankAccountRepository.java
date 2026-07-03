@@ -77,6 +77,18 @@ public interface BankAccountRepository extends JpaRepository<BankAccount, UUID> 
   boolean existsByType(BankAccountType type);
 
   /**
+   * Loads the singleton account of the given type with its owning org unit pre-fetched — used only
+   * for the {@code CARTEL} / {@code CARTEL_BANK} singletons (REQ-BANK-001) when the
+   * responsible-holder change audit resolves the Profit-Bereichsleiter ripple onto them
+   * (REQ-BANK-034/-047, ADR-0069).
+   *
+   * @param type the singleton account type ({@code CARTEL} or {@code CARTEL_BANK})
+   * @return the account, or empty when none of that type exists yet
+   */
+  @EntityGraph(attributePaths = {"orgUnit"})
+  Optional<BankAccount> findFirstByType(BankAccountType type);
+
+  /**
    * Existence probe backing the one-account-per-org-unit pre-check (REQ-BANK-001).
    *
    * @param orgUnitId the org unit to probe

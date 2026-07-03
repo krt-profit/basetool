@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.*;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
@@ -37,6 +38,7 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceDeleteTest {
@@ -62,6 +64,13 @@ class UserServiceDeleteTest {
   @Mock private OrgUnitMembershipService orgUnitMembershipService;
 
   @Mock private AuditService auditService;
+
+  // The bank seam is injected as an ObjectProvider (ADR-0069); deleteUser resolves it to audit a
+  // responsible-holder change when a deleted user was a leader. Stubbed lenient so the early-throw
+  // tests (which never reach the delete) do not trip strict-stubs; the seam mock no-ops.
+  @Mock private ObjectProvider<OrgUnitBankAccessService> orgUnitBankAccessServiceProvider;
+  @Mock private OrgUnitBankAccessService orgUnitBankAccessService;
+
   @InjectMocks private UserService userService;
 
   private User user;
@@ -81,6 +90,13 @@ class UserServiceDeleteTest {
     admin = new User();
     admin.setId(adminId);
     admin.setInKeycloak(true);
+
+    lenient()
+        .when(orgUnitBankAccessServiceProvider.getObject())
+        .thenReturn(orgUnitBankAccessService);
+    lenient()
+        .when(orgUnitBankAccessService.snapshotResponsibleHoldersForUser(any()))
+        .thenReturn(Map.of());
   }
 
   @Test

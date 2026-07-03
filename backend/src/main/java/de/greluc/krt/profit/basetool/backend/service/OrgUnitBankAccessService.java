@@ -58,6 +58,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BereichRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.util.BankAmounts;
@@ -1301,6 +1302,140 @@ public class OrgUnitBankAccessService {
     return holders;
   }
 
+  // ---------------------------------------------------------------------------------------------
+  // Derived responsible-holder change audit (REQ-BANK-034, ADR-0069)
+  // ---------------------------------------------------------------------------------------------
+
+  /**
+   * Snapshots, per bank account whose derived responsible holder(s) depend on the given org unit's
+   * leadership, the CURRENT responsible-holder user-id set — the "before" side of a leadership
+   * change, to be diffed by {@link #recordResponsibleHolderChanges(Map)} right after the mutation
+   * (REQ-BANK-034 change audit, ADR-0069). Affected accounts: the account the org unit owns
+   * (Staffel/SK &rarr; {@code ORG_UNIT}, Bereich &rarr; {@code AREA}, OL &rarr; {@code CARTEL})
+   * and, when the org unit is a {@code Department.PROFIT} Bereich, the collegial {@code CARTEL} and
+   * the {@code CARTEL_BANK} accounts too, whose responsible sets include the Profit-Bereichsleiter
+   * (REQ-BANK-034/-047). Called by {@code OrgUnitMembershipService} around each leadership
+   * mutation: the sanctioned seam owns the bank access, so the membership service never touches
+   * bank repos.
+   *
+   * @param orgUnitId the org unit whose leadership is about to change
+   * @return the affected accounts mapped to their current responsible-holder user ids; empty when
+   *     the org unit owns no account and is not a Profit Bereich
+   */
+  @NotNull
+  @Transactional
+  public Map<UUID, Set<UUID>> snapshotResponsibleHolders(@NotNull UUID orgUnitId) {
+    Map<UUID, Set<UUID>> snapshot = new HashMap<>();
+    for (UUID accountId : responsibleAuditAccountIds(orgUnitId)) {
+      snapshot.put(accountId, resolveResponsibleHolderUserIds(accountId));
+    }
+    return snapshot;
+  }
+
+  /**
+   * Snapshots the responsible holders of every bank account tied to any org unit the given user is
+   * a member of — the "before" side for a mutation that removes the user from several org units at
+   * once (a full user deletion, REQ-BANK-034/ADR-0069). Reuses {@link
+   * #snapshotResponsibleHolders(UUID)} per membership org unit (so the Profit ripple onto {@code
+   * CARTEL}/{@code CARTEL_BANK} is covered) and merges by account id. Over-covering a plain
+   * (non-leadership) membership is harmless — {@link #recordResponsibleHolderChanges(Map)} records
+   * nothing for an account whose set does not change.
+   *
+   * @param userId the user about to be removed from all their org units
+   * @return the affected accounts mapped to their current responsible-holder user ids
+   */
+  @NotNull
+  @Transactional
+  public Map<UUID, Set<UUID>> snapshotResponsibleHoldersForUser(@NotNull UUID userId) {
+    Set<UUID> orgUnitIds = new LinkedHashSet<>();
+    for (var membership : orgUnitMembershipRepository.findAllByIdUserId(userId)) {
+      orgUnitIds.add(membership.getId().getOrgUnitId());
+    }
+    Map<UUID, Set<UUID>> snapshot = new HashMap<>();
+    for (UUID orgUnitId : orgUnitIds) {
+      snapshot.putAll(snapshotResponsibleHolders(orgUnitId));
+    }
+    return snapshot;
+  }
+
+  /**
+   * Records one {@code ACCOUNT_RESPONSIBLE_CHANGED} bank audit event (REQ-BANK-034, ADR-0069) for
+   * every account whose derived responsible-holder set differs from the {@code before} snapshot —
+   * called right after a leadership mutation, on the same transaction, so the recompute sees the
+   * new state and {@link BankAuditService} captures the acting user automatically. The old/new
+   * user-id sets go into the details payload (ids are system identifiers, not PII — REQ-BANK-012);
+   * {@code targetUserId} is the sole new holder when the set is a singleton, else null (collegial
+   * account).
+   *
+   * @param before the pre-mutation snapshot from {@link #snapshotResponsibleHolders(UUID)}
+   */
+  @Transactional
+  public void recordResponsibleHolderChanges(@NotNull Map<UUID, Set<UUID>> before) {
+    before.forEach(
+        (accountId, oldHolders) -> {
+          Set<UUID> newHolders = resolveResponsibleHolderUserIds(accountId);
+          if (!oldHolders.equals(newHolders)) {
+            bankAuditService.record(
+                BankAuditEventType.ACCOUNT_RESPONSIBLE_CHANGED,
+                accountId,
+                null,
+                newHolders.size() == 1 ? newHolders.iterator().next() : null,
+                AuditDetails.of("old", joinResponsibleIds(oldHolders))
+                    .with("new", joinResponsibleIds(newHolders)));
+          }
+        });
+  }
+
+  /**
+   * The bank accounts whose derived responsible holder(s) can change when the given org unit's
+   * leadership changes: the account the org unit owns, plus — for a {@code Department.PROFIT}
+   * Bereich — the collegial {@code CARTEL} and the {@code CARTEL_BANK} singletons (their
+   * responsible sets include the Profit-Bereichsleiter, REQ-BANK-034/-047).
+   *
+   * @param orgUnitId the org unit whose leadership changes
+   * @return the affected account ids; never {@code null}, possibly empty
+   */
+  @NotNull
+  private Set<UUID> responsibleAuditAccountIds(@NotNull UUID orgUnitId) {
+    Set<UUID> ids = new LinkedHashSet<>();
+    bankAccountRepository.findByOrgUnitId(orgUnitId).ifPresent(account -> ids.add(account.getId()));
+    if (isProfitBereich(orgUnitId)) {
+      bankAccountRepository
+          .findFirstByType(BankAccountType.CARTEL)
+          .ifPresent(account -> ids.add(account.getId()));
+      bankAccountRepository
+          .findFirstByType(BankAccountType.CARTEL_BANK)
+          .ifPresent(account -> ids.add(account.getId()));
+    }
+    return ids;
+  }
+
+  /**
+   * {@code true} iff the org unit is a {@code Department.PROFIT} Bereich — whose Bereichsleiter is
+   * a responsible holder of the {@code CARTEL_BANK} account and part of the collegial {@code
+   * CARTEL} set (REQ-BANK-034/-047), so its leadership change ripples onto those two accounts.
+   *
+   * @param orgUnitId the org unit to test
+   * @return {@code true} for a Profit Bereich
+   */
+  private boolean isProfitBereich(@NotNull UUID orgUnitId) {
+    return bereichRepository.findByDepartment(Department.PROFIT).stream()
+        .anyMatch(bereich -> bereich.getId().equals(orgUnitId));
+  }
+
+  /**
+   * Joins a responsible-holder user-id set into a stable, comma-separated audit-detail value:
+   * sorted for a deterministic payload and free of whitespace, so it is a legal {@link
+   * AuditDetails} value.
+   *
+   * @param ids the user ids
+   * @return the sorted comma-joined ids, or an empty string for an empty set
+   */
+  @NotNull
+  private static String joinResponsibleIds(@NotNull Set<UUID> ids) {
+    return ids.stream().map(UUID::toString).sorted().collect(Collectors.joining(","));
+  }
+
   /**
    * {@code true} iff the caller may configure who else may view the account (REQ-BANK-035): the
    * responsible holder for an org-unit account; for a Sonderkonto an OL member <em>or</em> bank
@@ -1752,13 +1887,16 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Redacts the player-custody columns of a booking row for an org-unit viewer (REQ-BANK-038): the
-   * holder and counter-holder handles plus the deposit/withdrawal counterparty (Einzahler /
-   * Empf&auml;nger and their org unit, REQ-BANK-044 — likewise player-identifying) are nulled,
-   * everything else is preserved.
+   * Redacts the player-custody ("Halter") columns of a booking row for an org-unit viewer
+   * (REQ-BANK-038): the holder and counter-holder handles — the aUEC-custody chain — are nulled.
+   * The deposit/withdrawal counterparty (Einzahler / Empf&auml;nger and their org unit,
+   * REQ-BANK-044) is <em>kept</em>: the "von wem / an wen" of a booking on the member's own
+   * org-unit account is shown to viewers (owner decision, amends REQ-BANK-044/-038 — only the
+   * custody Halter stays hidden). The counter-<em>account</em> (transfer target/source) and the
+   * note/justification were never redacted.
    *
    * @param booking the bank-staff booking row
-   * @return a copy with the holder and counterparty handles removed
+   * @return a copy with only the holder/counter-holder handles removed
    */
   @NotNull
   private static BankBookingDto redact(@NotNull BankBookingDto booking) {
@@ -1777,8 +1915,8 @@ public class OrgUnitBankAccessService {
         null,
         booking.intraAccount(),
         booking.transferFee(),
-        null,
-        null);
+        booking.counterpartyHandle(),
+        booking.counterpartyOrgUnitName());
   }
 
   /**

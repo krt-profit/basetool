@@ -390,7 +390,10 @@ changes (`BALANCE_TARGET_SET` / `BALANCE_TARGET_CLEARED`) and **balance-visibili
 (`BALANCE_VISIBILITY_GRANTED` / `BALANCE_VISIBILITY_REVOKED`, with the grantee kind/role code in
 the details payload and the target user id for individual-user grants — no free text, no PII), and —
 since REQ-BANK-047 — the **KRT-account approval-threshold** changes (`CARTEL_APPROVAL_TIERS_SET` /
-`CARTEL_APPROVAL_TIERS_CLEARED`, the two amounts in the details payload — no PII).
+`CARTEL_APPROVAL_TIERS_CLEARED`, the two amounts in the details payload — no PII), and — since
+REQ-BANK-034 (ADR-0069) — a change of an account's **derived responsible holder**
+(`ACCOUNT_RESPONSIBLE_CHANGED`, with the old and new responsible-holder user-id sets in the details
+payload — ids are system identifiers, not free text or PII).
 Each event stores: timestamp, actor user id (FK
 `ON DELETE SET NULL`) **plus** a denormalized actor handle snapshot (the trail must
 survive user deletion), event type, affected account/transaction/target-user references,
@@ -449,6 +452,13 @@ existing Helvetica-based reports predate the rule), and is delivered via the est
 `ResponseEntity<byte[]>` + frontend-proxy + fetch/blob download pattern with the
 `X-User-Time-Zone` header. Statement labels come from the backend message bundles
 (German default), not string literals. Every export is audited (REQ-BANK-012).
+
+> **Amended (2026-07-03):** the "other side" column is renamed **GEGENSEITE → QUELL-/ZIELKONTO** (the
+> `pdf.bank.col.counterparty` label), and the **Begründung + Notiz** are carved out of their own
+> columns into an **indented per-booking sub-row** beneath each booking (reason first), so the main
+> columns stay wide (REQ-BANK-044/-045). The same rename + sub-row apply to the management report
+> (REQ-BANK-015). The redacted variant now drops **only** the Halter column and keeps
+> Quell-/Zielkonto (REQ-BANK-038 amended).
 
 **Acceptance**
 
@@ -537,6 +547,18 @@ patterns" block). The bank pages are **built to match these mockups** using the 
 component classes; deviations need an owner decision. Every user-visible string lives
 in `messages.properties` / `_de` / `_en` under new `bank.*`, `admin.bank.*` and
 `nav.bank.*` keys (umlauts as `\uXXXX` escapes in `.properties`).
+
+> **Amended (2026-07-03) — account-detail density:** both account-detail booking tables (bank-staff
+> `bank-account-detail.html` and the member `org-unit-bank-account-detail.html`) drop the wide
+> Notiz + Begründung columns; a booking that carries a reason and/or note becomes an **expandable
+> row** — a leading chevron (`.bank-chevron`, rotated on `aria-expanded`) marks it, and clicking the
+> row (or the `.bank-row-toggle` keyboard control) reveals an inline **detail sub-row** with the
+> Begründung **first**, then the Notiz. On the bank-staff detail the **Konto-Info** panel (plus the
+> read-only approval limits) becomes a **collapsible tile above** the now full-width history
+> (`.bank-collapse-head`, collapsed by default) — there is not enough horizontal room side by side.
+> Both toggles are CSP-safe, document-delegated in `bank.js` (survive the `krtFetch` fragment swap),
+> and every new string is a `bank.*` key (`bank.detail.toggleDetails`, the renamed
+> `bank.booking.counterparty` = "Quell-/Zielkonto").
 
 **Acceptance**
 
@@ -1148,8 +1170,31 @@ the bank surface stays org-unit-blind (REQ-BANK-008, ADR-0011). Naming note: the
 > `resolveResponsibleHolderUserIds(CARTEL)` — used only to *notify* — now returns **all `OL_MEMBER`s ∪
 > the Profit-Bereichsleiter**, so both band approvers are notified about a KRT request (each still sees
 > only its own band in „Fremde Anträge").
+>
+> **Amended by ADR-0069 (responsible-holder change audit):** a **change** of an account's derived
+> responsible holder is now recorded in the admin bank audit log (REQ-BANK-012) as
+> **`ACCOUNT_RESPONSIBLE_CHANGED`**. Because the holder is derived, the change is detected by
+> **bracketing** each of the seven `OrgUnitMembershipService` leadership mutations (assign/remove
+> Staffelleiter rank, toggle SK-Lead, add/remove Bereichsleiter, add/remove OL member): the seam
+> `OrgUnitBankAccessService` snapshots the affected accounts' responsible-holder sets **before** the
+> mutation and re-diffs **after** it, on the same transaction, and records one event per account whose
+> set changed. The affected accounts are the account the org unit owns **plus** — for a
+> `Department.PROFIT` Bereich — the collegial `CARTEL` and the `CARTEL_BANK` singletons (their sets
+> include the Profit-Bereichsleiter, REQ-BANK-047). The event carries the **old** and **new**
+> user-id sets in its details (ids, not PII), sets `targetUserId` to the sole new holder for a
+> singleton set (else null, for the collegial accounts), and the initiator is the acting user
+> `BankAuditService` snapshots automatically. The affected accounts are the account the org unit owns
+> **plus** — for a `Department.PROFIT` Bereich — the collegial `CARTEL` and the `CARTEL_BANK`
+> singletons (their sets include the Profit-Bereichsleiter, REQ-BANK-047). Coverage spans **every
+> app-driven path** that can change the derivation: the seven direct leadership mutations, the two
+> indirect membership-removal paths (`removeMember` for an SK-Lead, `reconcileStaffelMemberships` for a
+> Staffelleiter), and **`UserService.deleteUser`** — which snapshots all the user's org-unit accounts
+> up front and **flushes** the delete before the re-diff, since the membership rows go via the DB
+> `ON DELETE CASCADE`. The bank stays org-unit-blind for **authorization**: all bank access stays
+> inside the seam (both ArchUnit pins hold), reached from the membership/user services via an
+> `ObjectProvider` to break the constructor cycle.
 
-**Enforced by:** `OrgUnitBankAccessServiceTest` (holder resolution per type incl. CARTEL_BANK→PROFIT-Bereichsleiter, OL collegial) · **Code:** `service/OrgUnitBankAccessService`, `repository/BereichRepository#findByDepartment`, `service/OwnerScopeService` (membership helpers) · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
+**Enforced by:** `OrgUnitBankAccessServiceTest` (holder resolution per type incl. CARTEL_BANK→PROFIT-Bereichsleiter, OL collegial; `snapshotResponsibleHolders` / `…ForUser` / `recordResponsibleHolderChanges` diff + audit), `OrgUnitMembershipServiceTest` (leadership + removal brackets), `UserServiceDeleteTest` / `UserServiceAttributesTest` / `UserDeletionForeignKeyIntegrityTest` (deletion bracket + flush) · **Code:** `service/OrgUnitBankAccessService` (`snapshotResponsibleHolders(ForUser)` / `recordResponsibleHolderChanges`), `service/OrgUnitMembershipService` (leadership + `removeMember` + `reconcileStaffelMemberships` brackets), `service/UserService#deleteUser`, `repository/BereichRepository#findByDepartment`, `repository/BankAccountRepository#findFirstByType` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md), [ADR-0069](../adr/0069-bank-responsible-holder-change-audit.md) · **Issues:** #556
 
 ### REQ-BANK-035 — Configurable balance visibility
 
@@ -1224,6 +1269,14 @@ the wire, and the statement PDF is rendered without the Halter column. Bank staf
 non-redacted detail and statement (REQ-BANK-014). Authorization is enforced in the seam, which then
 reuses the bank's org-unit-blind read/PDF code; both ArchUnit pins stay green.
 
+> **Amended (2026-07-03, owner decision):** the redaction is now **Halter-only**. The
+> deposit/withdrawal counterparty (Einzahler/Empfänger) and the transfer counter-account are
+> **shown** to org-unit viewers in the renamed **Quell-/Zielkonto** column (both the read-only history
+> and the redacted Kontoauszug — see the REQ-BANK-044 / ADR-0054 amendments); only the holder /
+> counter-holder handles stay nulled and the Halter column stays dropped from the PDF. The
+> Begründung + Notiz of each booking move out of their own columns into an **expandable per-booking
+> sub-row** on both account-detail tables (REQ-BANK-017/-045).
+>
 > **Amendment (design-system layout):** the drill-in header drops the always-"Aktiv" status pill (the
 > page only ever lists active accounts), the facts render as a four-up `kpi-total` grid (balance,
 > target with progress bar — or a muted "no target" note —, ±30-day delta, booking count), and the
@@ -1581,6 +1634,17 @@ none. The audit detail names the counterparty handle + org-unit name (both syste
 user free text) and sets the structured `target_user_id` on `DEPOSIT_BOOKED` / `WITHDRAWAL_BOOKED`
 (REQ-BANK-012) — no new event type.
 
+> **Amended (2026-07-03, owner decision — see the [ADR-0054](../adr/0054-bank-transaction-counterparty.md)
+> amendment):** the counterparty is **no longer redacted** on the member-facing org-unit surfaces —
+> only the aUEC-custody **Halter** is (REQ-BANK-038). The org-unit read-only history keeps
+> `counterpartyHandle`/`counterpartyOrgUnitName`, and the member-facing redacted Kontoauszug **keeps**
+> the "other side" column (dropping only the Halter column). That unified column is **renamed**
+> "Gegenseite"/"Gegenpartei" → **"Quell-/Zielkonto"** on both account-detail tables and in both PDFs
+> (the `pdf.bank.col.counterparty` label becomes `QUELL-/ZIELKONTO`); on the tables it shows a
+> transfer's counter-account with a direction arrow (→ to / ← from) or the deposit/withdrawal
+> counterparty, unified exactly as the PDFs already do. The **Begründung + Notiz** move out of their own
+> columns into an **expandable per-booking sub-row** (REQ-BANK-017/-045), reason first.
+
 **Acceptance**
 
 - [x] A deposit/withdrawal naming a counterparty stamps `counterparty_user_id` + handle snapshot on
@@ -1589,8 +1653,9 @@ user free text) and sets the structured `target_user_id` on `DEPOSIT_BOOKED` / `
 - [x] The `DEPOSIT_BOOKED` / `WITHDRAWAL_BOOKED` audit row carries the counterparty as
   `target_user_id` and names the handle + org unit in its detail; a booking without a counterparty
   leaves both null.
-- [x] The account-detail history and both PDFs show the counterparty (Gegenpartei / Gegenseite); the
-  member-facing redacted Kontoauszug and the org-unit read-only history hide it, like the holder.
+- [x] The account-detail history and both PDFs show the counterparty in the **Quell-/Zielkonto**
+  column; it is shown to org-unit members too — only the aUEC-custody Halter is hidden from them
+  (amended: previously the counterparty was redacted like the holder).
 - [x] A confirmed deposit/withdrawal **request** records the requester as the counterparty user plus
   their deterministic primary org unit (null when the requester has no membership).
 
