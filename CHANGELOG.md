@@ -2,44 +2,73 @@
 
 ## [Unreleased]
 
+## [v1.0.13](https://github.com/krt-profit/basetool/releases/tag/v1.0.13) - 2026-07-03
+
 ### Added
 
 - **Bank: KRT-Konto mit dreistufiger Freigabe je nach Betrag.** Auszahlungen und Transfers vom KRT-Konto werden abhängig vom Betrag freigegeben: bis zur ersten Schwelle durch einen Bankmitarbeiter, darüber bis zur zweiten Schwelle durch den Bereichsleiter Profit, darüber durch die Organisationsleitung. Die beiden Schwellen pflegt ausschließlich die Bankleitung im neuen Reiter „KRT-Freigaben" der Bank-Verwaltung; die Freigaben durch Bereichsleiter Profit bzw. Organisationsleitung erfolgen in der Org-Einheits-Bank im Reiter „Fremde Anträge". Über der Bankmitarbeiter-Schwelle sind auch Direktbuchungen gesperrt (REQ-BANK-047, ADR-0066).
+
 - **Bank: „Mitglieder des Bereichs" als Sichtbarkeits- und Limit-Zielgruppe für Bereichskonten.** Bereichskonten können ihren Kontostand und ihr Freigabe-Limit jetzt zusätzlich für alle Angehörigen des gesamten Bereichs (Bereichsleitung plus alle Mitglieder der zugehörigen Staffeln und Spezialkommandos) öffnen — neben den bisherigen Rollen, „Alle Mitglieder" und einzelnen Nutzern (REQ-BANK-048).
+
 - **E-Mail-Benachrichtigung bei Freigabe oder Ablehnung der Registrierung.** Neue Nutzer werden jetzt per E-Mail informiert, sobald ein Administrator ihre Registrierung freigibt oder ablehnt; bei einer Ablehnung enthält die E-Mail die vom Administrator angegebene Begründung. Der E-Mail-Versand ist ein wiederverwendbarer Kanal (später auch für das Benachrichtigungssystem nutzbar); er ist standardmäßig aktiviert, verschickt aber erst tatsächlich Mails, sobald ein SMTP-Server konfiguriert ist (`SPRING_MAIL_HOST`, z. B. Gmail) — ohne Host bleibt er ein No-Op (REQ-NOTIF-013/-014, ADR-0064).
+
 - **Meine Blueprints: Alle eigenen Blueprints mit einem Klick löschen.** Auf der Blueprint-Seite (`/personal-inventory/blueprints`) entfernt ein neuer Button nach Bestätigung alle eigenen entfernbaren Blueprints auf einmal; automatisch vergebene Standard-Blueprints bleiben erhalten (REQ-INV-023).
+
 - **Admin: Blueprints aller Nutzer löschen.** Im Admin-Bereich „Pers. Blueprints" können Administratoren die Blueprints aller Nutzer auf einmal löschen. Die Aktion ist durch eine Tippbestätigung („LOESCHEN") abgesichert und meldet die Anzahl entfernter Blueprints; Standard-Blueprints bleiben erhalten (REQ-INV-024).
+
 - **Kartellbank: Konten live nach Namen filtern.** Auf der Kartellbank-Übersicht (`/bank`) neben dem „Verwaltung"-Button und über der Kontotabelle der Org-Einheits-Bank (`/org-unit-bank`) blendet ein neues Suchfeld beim Tippen sofort alle Kontokacheln bzw. -zeilen aus, deren Name nicht passt — rein clientseitig, ohne Nachladen (REQ-BANK-046).
+
 - **Einsatz anlegen: Ziele und Ablauf-Schritte gleich beim Anlegen erfassen.** Das Formular „Neuer Einsatz" zeigt jetzt über dem Beschreibungsfeld zwei optionale Editoren, um Ziele (inklusive Klassifizierung) und Ablauf-Schritte (mit optionaler Zeit/Ort-Angabe) direkt mitzugeben. Beides ist optional und lässt sich weiterhin auch später im Verwaltungs-Tab pflegen (REQ-MISSION-015).
+
 - **Kartellbank-Audit: Wechsel des/der Kontoverantwortlichen wird protokolliert.** Ändert sich der/die für ein Bankkonto Verantwortliche — weil sich die zugrunde liegende Führung ändert (neuer Staffelleiter, SK-Leitung, Bereichsleiter oder OL), ein Mitglied mit Leitungsrolle aus seiner Einheit entfernt oder ein Nutzer gelöscht wird —, hält das Bank-Audit dies jetzt als eigenes Ereignis fest: mit altem und neuem Verantwortlichen sowie der veranlassenden Person (REQ-BANK-034, ADR-0070).
 
 ### Changed
 
 - **Bank: „Alle Mitglieder"-Freigabe-Limit gilt nur noch für echte Mitglieder der Org-Einheit.** Das „Alle Mitglieder"-Limit eines Kontos greift jetzt ausschließlich für Mitglieder der kontoeigenen Org-Einheit (Staffel → Staffelmitglieder, SK → SK-Mitglieder, Bereichskonto → Bereichsleitung, KRT-Konto → Organisationsleitung). Außenstehende, die ein Konto nur über eine Einzel-Freigabe sehen, brauchen ein eigenes Limit — sonst ist eine Freigabe nötig. Die Sichtbarkeit des KRT-Kontos für alle Kartellmitglieder bleibt unverändert (REQ-BANK-041/-046).
+
 - **Discord-Registrierung: Warteseite macht die Freigabepflicht deutlicher.** Die Warteseite nach der Discord-Anmeldung sagt neuen Nutzern jetzt klar, dass sie das Tool erst nach der Freigabe durch einen Administrator nutzen können, und weist darauf hin, dass die Freigabe manuell erfolgt und 1 bis 2 Tage dauern kann (REQ-SEC-017).
+
 - **Benachrichtigungen: Löschen ohne Rückfrage.** Eine einzelne Benachrichtigung im Glocken-Menü oder auf der Benachrichtigungsseite wird jetzt sofort gelöscht — die zusätzliche Bestätigungsabfrage entfällt, da Benachrichtigungen unkritisch sind. Das Sammel-Löschen „Gelesene löschen" fragt weiterhin nach (REQ-NOTIF-005).
+
 - **Bank: Kontoname in der Antragsansicht besser sichtbar.** In der Antragsübersicht (`/bank/requests`) zeigt die Konto-Spalte jetzt den Kontonamen an erster Stelle; die Kontonummer steht klein darunter, das Einheitskürzel entfällt (REQ-BANK-023).
+
 - **API: Sortier-Tokens der Einsatz-Listen einheitlich in Kleinschreibung.** Die Einsatz- und Einsatz-Finanz-Listen geben die Sortierrichtung im `sort`-Feld ihrer Antwort jetzt wie alle anderen Listen klein zurück (`feld,asc` statt `feld,ASC`) — interne Vereinheitlichung der Paginierungs-Hülle ohne Funktionsänderung (#906).
+
 - **API: Rate-Limit-Antwort (429) vereinheitlicht.** Der 429-Body des Ratenlimiters trägt jetzt wie die übrigen Fehler einen stabilen `code` (`RATE_LIMIT_EXCEEDED`) und eine `correlationId`, und Titel/Detail werden gemäß `Accept-Language` lokalisiert statt fest englisch ausgegeben (#906).
+
 - **API/Fehler: Einheitliches RFC-7807-Fehlerformat auch an den Rändern.** Abgewiesene Anfragen der Sicherheitsschicht (fehlendes/ungültiges Token → 401, fehlende Berechtigung → 403), die Sperre noch nicht freigeschalteter Konten (403) und Container-Fehler liefern jetzt wie alle übrigen Fehler ein `application/problem+json` mit stabilem `code` und `correlationId` (auch als `X-Correlation-Id`-Header) statt der Spring-Standardantworten. Die Fehlerseite des Frontends zeigt die `correlationId` als Referenzcode zum Nennen beim Support an.
+
 - **Einsatz anlegen: Nach dem Speichern direkt im Verwaltungs-Tab des neuen Einsatzes.** Ein neu angelegter Einsatz führt jetzt unmittelbar auf dessen Detailseite in den Verwaltungs-Tab, statt zurück zur Einsatzliste — so lässt sich der Einsatz ohne Umweg weiter einrichten (REQ-MISSION-015).
+
 - **Einsatz-Verwaltung: Aktionsleiste (Löschen · Speichern · Zurück) am unteren Rand angeheftet.** Im Verwaltungs-Tab (und auf dem Anlege-Formular) bleibt die Button-Zeile fix am unteren Rand über der Fußleiste, während nur der übrige Inhalt scrollt — so sind die Aktionen beim Ausfüllen und Scrollen langer Formulare immer erreichbar (REQ-MISSION-015).
+
 - **Einsatz erstellen: Anzeigename einer Einheit ist jetzt Pflichtfeld.** Beim Anlegen einer Einheit ist der Anzeigename das einzige Pflichtfeld (mit Stern markiert); Schiffstyp und Schiff bleiben optional (REQ-MISSION-006).
+
 - **Einsatz: Zeichenlimits angehoben.** Ziele und Ablauf-Schritte erlauben jetzt bis zu 500 Zeichen im Titel (vorher 250 bzw. 200), die Einsatz-Beschreibung bis zu 20.000 Zeichen (REQ-MISSION-009/-012).
+
 - **Einsatz: Teilnehmer-Org-Einheiten nur noch bei Gästen auswählbar.** Beim Anmelden und Bearbeiten eines angemeldeten Nutzers muss keine Org-Einheit mehr ausgewählt werden — sie werden automatisch aus dem Account gelesen und im Bearbeiten-Dialog schreibgeschützt angezeigt. Die Auswahl erscheint nur noch für Gäste (REQ-MISSION-006).
+
 - **Einsatz-Übersicht: „Einsatzleiter" in „Mission auf einen Blick".** In der Kachel „Mission auf einen Blick" steht jetzt über dem Partyleiter ein Eintrag für den Einsatzleiter — mit derselben Logik wie das „Leiter"-Feld in der Infoleiste (REQ-MISSION-013).
+
 - **Kartellbank: Kontoansicht übersichtlicher.** Die Buchungshistorie in der Bank und der Org-Einheits-Bank nennt die „Gegenpartei"-Spalte jetzt „Quell-/Zielkonto" (vereinheitlicht: Gegenkonto einer Umbuchung bzw. Einzahler/Empfänger) und zeigt Begründung und Notiz einer Buchung erst nach Klick auf die Zeile in einer ausklappbaren Unterzeile (Begründung zuerst); die Konto-Infos samt Freigabe-Limits stehen als standardmäßig eingeklappte Kachel über der Historie. Mitglieder sehen den Einzahler/Empfänger jetzt ebenfalls (nur der Halter bleibt verborgen), und die PDF-Kontoauszüge sowie der Monatsreport übernehmen dieselbe Umbenennung samt Begründung/Notiz-Unterzeile je Buchung (REQ-BANK-044/-038/-014/-017).
 
 ### Fixed
 
 - **Einsatz anlegen: Formular nutzt jetzt die volle Breite.** Das Formular „Neuer Einsatz" (`/missions/new`) stand bisher in der linken Bildschirmhälfte, weil die rechte Spalte des Verwaltungs-Rasters nur die reinen Bearbeitungs-Editoren enthält, die beim Anlegen fehlen. Auf der Anlege-Seite fällt das Raster jetzt auf eine einzelne, volle Spalte zusammen, sodass die Details-Karte zentriert die gesamte Breite unter der Überschrift einnimmt (REQ-MISSION-015).
 - **Kein selbst verursachter Bearbeitungskonflikt mehr beim schnellen Bearbeiten.** Wer ein Ziel oder einen Ablauf-Schritt eingab und sofort auf „+", das Klassifizierungs-Dropdown oder die Sortierpfeile klickte, erhielt bisher fälschlich die Konflikt-Warnung („Aktuelle Werte laden?") — und das gerade Eingegebene konnte dabei verloren gehen. Aufeinanderfolgende eigene Änderungen desselben Abschnitts werden jetzt der Reihe nach gespeichert und übernehmen jeweils den aktuellen Stand. Tool-weit umgesetzt (u. a. auch Kartellbank-Freigaben, Lager-Zuordnungen und -Notizen, Auftragsstatus und Org-Struktur), REQ-FE-012.
+
 - **Einsatz: Live-Synchronisation aktualisiert jetzt auch Ablauf, Ziele und Funkfrequenzen bei anderen Betrachtern.** Bearbeitete ein Nutzer den Ablauf, die Ziele oder die Funkfrequenzen eines Einsatzes, blieben die Verwaltung-Editoren anderer Betrachter desselben Einsatzes bis zum manuellen Neuladen veraltet, weil das Änderungssignal für diese Abschnitte verworfen wurde. Jetzt ziehen alle Abschnitte live nach (REQ-FE-010).
+
 - **Mitgliederverwaltung: Kein fälschlicher Bearbeitungskonflikt mehr bei direkt aufeinanderfolgenden Änderungen.** Nach dem Ändern der Logistiker-/Einsatzleiter-Flags eines Mitglieds oder dem Setzen/Entfernen der SK-Leitung liefert die Antwort jetzt den aktuellen Versionszähler der Mitgliedschaftszeile zurück. Bisher trug sie den veralteten Stand, wodurch die unmittelbar nächste Änderung an derselben Zeile fälschlich als Konflikt (409) abgewiesen wurde (REQ-FE-003, ADR-0067).
+
 - **Benachrichtigungen: Admins werden jetzt zuverlässig über neue Konto-Freigabeanträge informiert.** Neue, noch nicht freigeschaltete Registrierungen (insbesondere über Discord) lösen jetzt immer genau eine Admin-Benachrichtigung aus — auch wenn der optionale Discord-Claim in Keycloak fehlt oder das Konto zuerst über die periodische Keycloak-Synchronisation statt über den Login angelegt wird. Bisher blieb die Meldung in diesen Fällen komplett aus (REQ-NOTIF-012).
+
 - **Lager: Meldungen beim Ändern der Zuordnung erscheinen jetzt übersetzt.** Beim Ändern der Auftrags- oder Einsatz-Zuordnung eines Eintrags im gesamten Lager (`/inventory/all`) zeigten Erfolgs- und Fehlerhinweise bisher rohen Platzhaltertext (`[[#{...}]]`) statt der Meldung; jetzt erscheinen die lokalisierten Texte.
+
 - **Lager: Rückfrage vor dem Entfernen einer Notiz erscheint jetzt wirklich.** Das Entfernen einer Notiz (im eigenen und im gesamten Lager) löschte bisher sofort ohne Nachfrage, weil der Bestätigungsdialog auf eine nicht existierende Funktion verwies; jetzt fragt der KRT-Bestätigungsdialog vor dem Entfernen nach.
+
 - **Lager (gesamtes Lager): Der Notiz-Dialog öffnet sich jetzt zentriert.** Im gesamten Lager (`/inventory/all`) erschien der Dialog zum Bearbeiten einer Notiz am oberen Bildschirmrand statt mittig; jetzt ist er wie im eigenen Lager und allen anderen Dialogen zentriert (#906).
+
 - **Deployment: Der Deploy-Zyklus erkennt jetzt einen abgedrifteten oder ungesunden Stack.** `deploy.sh` nimmt die „no change"-Abkürzung nur noch, wenn die laufenden Container tatsächlich den zuletzt ausgerollten Image-Digests entsprechen und gesund sind; andernfalls wird derselbe Stand automatisch neu angewendet — etwa nach einem manuellen `docker compose up` mit veraltetem lokalem `:stable`-Tag (Vorfall vom 02.07.2026). Für geplante Wartung vorher den `iri-deploy.timer` stoppen (REQ-OPS-013).
 
 ## [v1.0.12](https://github.com/krt-profit/basetool/releases/tag/v1.0.12) - 2026-07-01
