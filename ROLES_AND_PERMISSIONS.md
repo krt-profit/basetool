@@ -619,9 +619,11 @@ decides per account what is visible.
   Bank Empl. (for Sonderkonten only bank staff).
 - **Read-only detail + account statement (REQ-BANK-038):** whoever may view an account opens the
   read-only detail view **with history** and can retrieve an **account statement** — no
-  deposit/withdrawal/Umbuchung; the **holder column and the deposit/withdrawal counterparty**
-  (Einzahler/Empfänger, REQ-BANK-043 — likewise player-identifying) **are redacted** (in the table
-  and the PDF). Bank staff keep the full view incl. holders and counterparty.
+  deposit/withdrawal/Umbuchung; only the **holder column** (aUEC-custody Halter) **is redacted** (in
+  the table and the PDF). The deposit/withdrawal counterparty (Einzahler/Empfänger) and a transfer's
+  counter-account are **shown** in the **Quell-/Zielkonto** column (REQ-BANK-044, owner decision
+  2026-07); the Begründung + Notiz appear in an expandable per-booking sub-row. Bank staff
+  additionally keep the holder column.
 
 | Function (gate)                                                                                                |  Member (if granted)  | Responsible | Bank Empl. (access) | Admin |
 |:---------------------------------------------------------------------------------------------------------------|:---------------------:|:-----------:|:-------------------:|:-----:|

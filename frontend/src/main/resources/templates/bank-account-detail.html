@@ -97,133 +97,166 @@
         </div>
     </div>
 
-    <div class="bank-cols mt-2">
-        <!-- Left column: booking history (K1 table). -->
-        <div class="bank-panel" data-testid="bank-bookings-panel">
-            <div class="bank-panel-head">
-                <h2 th:text="#{bank.detail.history}">Buchungshistorie</h2>
+    <!-- Collapsible Konto-Info tile (REQ-BANK-017): account info + read-only approval limits as one
+         tile ABOVE the full-width booking history, collapsed by default — side by side there is not
+         enough horizontal room. Lives inside accountBody so a peer's limit write swaps it in on
+         refresh; a re-render resets it to collapsed, which matches the default. -->
+    <div class="bank-panel mt-2" data-testid="bank-info-panel">
+        <button type="button" class="bank-panel-head bank-collapse-head" data-trigger="bank-info-collapse"
+                aria-expanded="false" aria-controls="bank-info-body" data-testid="bank-info-toggle">
+            <span class="bank-collapse-title">
+                <svg class="krt-icon bank-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+                <span th:text="#{bank.detail.info}">Konto-Info</span>
+            </span>
+        </button>
+        <div class="bank-panel-body" id="bank-info-body" hidden>
+            <div class="bank-kv">
+                <span class="bank-kv-key" th:text="#{bank.detail.info.no}">Kontonummer</span>
+                <span class="bank-kv-value" th:text="${acct.accountNo()}">KB-0001</span>
             </div>
-            <div class="bank-panel-body">
-                <!-- AJAX swap target (REQ-FE-002): the booking-history pager re-renders only this
-                     block via krtFetch (fragment=bookings). The reverse button is delegated and the
-                     .utc-time cells are re-localised on krt:swapped, so swapped-in rows stay live.
-                     The no-JS page-btn links still reload the whole page. -->
-                <div id="bank-bookings-results">
-                <th:block th:fragment="bookings">
-                <div class="table-responsive" th:if="${bookings != null and !#lists.isEmpty(bookings.content())}">
-                    <table class="data-table">
-                        <thead>
-                        <tr>
-                            <th th:text="#{bank.booking.date}">Datum</th>
-                            <th th:text="#{bank.booking.type}">Typ</th>
-                            <th th:text="#{bank.booking.holder}">Halter</th>
-                            <th th:text="#{bank.booking.counterparty}">Gegenpartei</th>
-                            <th th:text="#{bank.booking.note}">Notiz</th>
-                            <th th:text="#{bank.booking.justification}">Begr&uuml;ndung</th>
-                            <th class="text-right" th:text="#{bank.booking.amount}">Betrag</th>
-                            <th sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)"></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr th:each="b : ${bookings.content()}" data-testid="bank-booking-row"
-                            th:attr="data-transaction-id=${b.transactionId()}">
-                            <td><span class="utc-time" th:text="${b.createdAt()}">2026-06-10T18:30:00Z</span></td>
-                            <td th:switch="${b.type()}">
-                                <span th:case="'DEPOSIT'" class="chip chip--success" th:text="#{bank.type.DEPOSIT}">Einzahlung</span>
-                                <span th:case="'WITHDRAWAL'" class="chip chip--warning" th:text="#{bank.type.WITHDRAWAL}">Auszahlung</span>
-                                <span th:case="'TRANSFER'" class="chip"
-                                      th:text="#{bank.type.TRANSFER} + (${b.counterAccountNo() != null} ? (${b.amount().signum() < 0} ? ' &#8594; ' : ' &#8592; ') + ${b.counterAccountNo()} : '')">Transfer &#8594; KB-0002</span>
-                                <span th:case="'REVERSAL'" class="chip chip--danger" th:text="#{bank.type.REVERSAL}">Storno</span>
-                                <span th:case="'WIPE_RESET'" class="chip chip--danger" th:text="#{bank.type.WIPE_RESET}">Wipe-Reset</span>
-                                <span th:case="*" class="chip" th:text="${b.type()}">?</span>
-                            </td>
-                            <td>
-                                <span th:if="${b.type() == 'TRANSFER' and b.counterHolderHandle() != null}"
-                                      th:text="${b.holderHandle()} + ' &#8594; ' + ${b.counterHolderHandle()}">A &#8594; B</span>
-                                <span th:unless="${b.type() == 'TRANSFER' and b.counterHolderHandle() != null}"
-                                      th:text="${b.holderHandle()}">greluc</span>
-                            </td>
-                            <!-- Counterparty (Einzahler / Empfänger) on deposits/withdrawals (REQ-BANK-044);
-                                 transfers leave it blank, the counter-account is shown in the Typ chip. -->
-                            <td class="bank-counterparty-cell" data-testid="bank-booking-counterparty">
-                                <span th:if="${b.counterpartyHandle() != null}"
-                                      th:text="${b.counterpartyHandle()} + (${b.counterpartyOrgUnitName() != null} ? ' (' + ${b.counterpartyOrgUnitName()} + ')' : '')">carol (Staffel Rot)</span>
-                            </td>
-                            <td class="bank-note-cell" th:text="${b.note()}" th:title="${b.note()}">Missionsertrag</td>
-                            <td class="bank-note-cell" data-testid="bank-booking-justification"
-                                th:text="${b.justification()}" th:title="${b.justification()}"></td>
-                            <td class="text-right">
-                                <span class="bank-amount"
-                                      th:classappend="${b.amount().signum() > 0} ? ' bank-amount--pos' : (${b.amount().signum() < 0} ? ' bank-amount--neg' : ' bank-amount--zero')"
-                                      th:text="${b.amount().signum() > 0 ? '+' : ''} + ${#numbers.formatInteger(@moneyFormat.round(b.amount()), 1, 'POINT')}">+250.000</span>
-                                <!-- In-game fee added on top (REQ-BANK-033, ADR-0052): the outgoing
-                                     leg is the gross debited, so the recipient received |amount| - fee. -->
-                                <span class="bank-fee-note text-muted" data-testid="bank-booking-fee"
-                                      th:if="${b.transferFee() != null and b.transferFee().signum() > 0 and b.amount().signum() < 0}"
-                                      th:text="#{bank.fee.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.transferFee()), 1, 'POINT')} + ' &middot; ' + #{bank.fee.net.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.amount().abs().subtract(b.transferFee())), 1, 'POINT')}">Geb&uuml;hr 25 &middot; kommt an 4.975.000</span>
-                            </td>
-                            <td sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)" class="text-right">
-                                <button type="button" class="btn btn-ghost btn-sm bank-reverse-btn"
-                                        th:if="${(b.type() == 'DEPOSIT' or b.type() == 'WITHDRAWAL' or b.type() == 'TRANSFER') and b.reversedTransactionId() == null}"
-                                        data-trigger="open-modal-display" data-modal-id="bank-reverse-modal"
-                                        th:attr="data-field-_id=${b.transactionId()}"
-                                        data-testid="bank-reverse-open"
-                                        th:text="#{bank.action.reverse}">Stornieren</button>
-                            </td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <p class="text-center text-muted" th:if="${bookings == null or #lists.isEmpty(bookings.content())}"
-                   data-testid="bank-bookings-empty" th:text="#{bank.detail.history.empty}">Noch keine Buchungen.</p>
-                <nav th:replace="~{fragments/pagination :: pagination(${bookings}, ${paginationBaseUrl})}"></nav>
-                </th:block>
-                </div>
+            <div class="bank-kv">
+                <span class="bank-kv-key" th:text="#{bank.detail.info.type}">Typ</span>
+                <span class="bank-kv-value" th:text="#{'bank.account.type.' + ${acct.type()}}">Staffel</span>
             </div>
-        </div>
-
-        <!-- Right column: account info (K1). The per-account holder distribution is gone (ADR-0039);
-             holder balances are global and live in the holder menu of the bank administration. -->
-        <div class="bank-col-side">
-            <div class="bank-panel" data-testid="bank-info-panel">
-                <div class="bank-panel-head">
-                    <h2 th:text="#{bank.detail.info}">Konto-Info</h2>
-                </div>
-                <div class="bank-panel-body">
-                    <div class="bank-kv">
-                        <span class="bank-kv-key" th:text="#{bank.detail.info.no}">Kontonummer</span>
-                        <span class="bank-kv-value" th:text="${acct.accountNo()}">KB-0001</span>
-                    </div>
-                    <div class="bank-kv">
-                        <span class="bank-kv-key" th:text="#{bank.detail.info.type}">Typ</span>
-                        <span class="bank-kv-value" th:text="#{'bank.account.type.' + ${acct.type()}}">Staffel</span>
-                    </div>
-                    <div class="bank-kv" th:if="${acct.orgUnit() != null}">
-                        <span class="bank-kv-key" th:text="#{bank.detail.info.orgUnit}">Org-Einheit</span>
-                        <span class="bank-kv-value" th:text="${acct.orgUnit().name()}">IRIDIUM</span>
-                    </div>
-                    <div class="bank-kv" th:if="${acct.areaName() != null}">
-                        <span class="bank-kv-key" th:text="#{bank.detail.info.area}">Bereich</span>
-                        <span class="bank-kv-value" th:text="${acct.areaName()}">Logistik</span>
-                    </div>
-                    <div class="bank-kv">
-                        <span class="bank-kv-key" th:text="#{bank.detail.info.status}">Status</span>
-                        <span class="bank-kv-value" th:text="#{'bank.account.status.' + ${acct.status()}}">Aktiv</span>
-                    </div>
-                    <div class="bank-kv">
-                        <span class="bank-kv-key" th:text="#{bank.detail.info.created}">Angelegt</span>
-                        <span class="bank-kv-value"><span class="utc-time" th:text="${acct.createdAt()}">2026-01-15T10:00:00Z</span></span>
-                    </div>
-                </div>
+            <div class="bank-kv" th:if="${acct.orgUnit() != null}">
+                <span class="bank-kv-key" th:text="#{bank.detail.info.orgUnit}">Org-Einheit</span>
+                <span class="bank-kv-value" th:text="${acct.orgUnit().name()}">IRIDIUM</span>
             </div>
-
-            <!-- Approval limits (REQ-BANK-041): read-only here for every viewer. The bank-staff
-                 account-detail surface never edits limits — the backend always assembles them with
-                 canEdit=false, so the display block renders whenever a limit is set, regardless of
-                 the viewer's role. Configuring limits happens exclusively in the org-unit bank
-                 settings. Lives inside accountBody so a peer's limit write swaps it in on refresh. -->
+            <div class="bank-kv" th:if="${acct.areaName() != null}">
+                <span class="bank-kv-key" th:text="#{bank.detail.info.area}">Bereich</span>
+                <span class="bank-kv-value" th:text="${acct.areaName()}">Logistik</span>
+            </div>
+            <div class="bank-kv">
+                <span class="bank-kv-key" th:text="#{bank.detail.info.status}">Status</span>
+                <span class="bank-kv-value" th:text="#{'bank.account.status.' + ${acct.status()}}">Aktiv</span>
+            </div>
+            <div class="bank-kv">
+                <span class="bank-kv-key" th:text="#{bank.detail.info.created}">Angelegt</span>
+                <span class="bank-kv-value"><span class="utc-time" th:text="${acct.createdAt()}">2026-01-15T10:00:00Z</span></span>
+            </div>
+            <!-- Approval limits (REQ-BANK-041): read-only here for every viewer, now inside the
+                 Konto-Info tile. The backend always assembles them with canEdit=false, so the display
+                 block renders whenever a limit is set; configuring limits happens in the org-unit
+                 bank settings. -->
             <th:block
                 th:replace="~{fragments/bank-approval-limits :: limitsDisplay(${detail.approvalLimits()})}"></th:block>
+        </div>
+    </div>
+
+    <!-- Booking history (K1 table), full width below the Konto-Info tile. -->
+    <div class="bank-panel mt-2" data-testid="bank-bookings-panel">
+        <div class="bank-panel-head">
+            <h2 th:text="#{bank.detail.history}">Buchungshistorie</h2>
+        </div>
+        <div class="bank-panel-body">
+            <!-- AJAX swap target (REQ-FE-002): the booking-history pager re-renders only this block
+                 via krtFetch (fragment=bookings). The reverse button and the row-expand toggle are
+                 document-delegated and the .utc-time cells are re-localised on krt:swapped, so
+                 swapped-in rows stay live. The no-JS page-btn links still reload the whole page. -->
+            <div id="bank-bookings-results">
+            <th:block th:fragment="bookings">
+            <div class="table-responsive" th:if="${bookings != null and !#lists.isEmpty(bookings.content())}">
+                <table class="data-table bank-bookings-table">
+                    <thead>
+                    <tr>
+                        <th class="bank-expand-col" aria-hidden="true"></th>
+                        <th th:text="#{bank.booking.date}">Datum</th>
+                        <th th:text="#{bank.booking.type}">Typ</th>
+                        <th th:text="#{bank.booking.holder}">Halter</th>
+                        <th th:text="#{bank.booking.counterparty}">Quell-/Zielkonto</th>
+                        <th class="text-right" th:text="#{bank.booking.amount}">Betrag</th>
+                        <th sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <th:block th:each="b : ${bookings.content()}"
+                              th:with="hasDetail=${!#strings.isEmpty(b.justification()) or !#strings.isEmpty(b.note())},detailId='bank-bk-' + ${b.postingId()}">
+                    <tr data-testid="bank-booking-row" class="bank-booking-row"
+                        th:classappend="${hasDetail} ? ' is-expandable' : ''"
+                        th:attr="data-transaction-id=${b.transactionId()}">
+                        <td class="bank-expand-cell">
+                            <button type="button" class="bank-row-toggle" th:if="${hasDetail}"
+                                    data-trigger="bank-row-expand" aria-expanded="false"
+                                    th:attr="aria-controls=${detailId}"
+                                    th:aria-label="#{bank.detail.toggleDetails}"
+                                    data-testid="bank-booking-expand">
+                                <svg class="krt-icon bank-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+                            </button>
+                        </td>
+                        <td><span class="utc-time" th:text="${b.createdAt()}">2026-06-10T18:30:00Z</span></td>
+                        <td th:switch="${b.type()}">
+                            <span th:case="'DEPOSIT'" class="chip chip--success" th:text="#{bank.type.DEPOSIT}">Einzahlung</span>
+                            <span th:case="'WITHDRAWAL'" class="chip chip--warning" th:text="#{bank.type.WITHDRAWAL}">Auszahlung</span>
+                            <span th:case="'TRANSFER'" class="chip" th:text="#{bank.type.TRANSFER}">Transfer</span>
+                            <span th:case="'REVERSAL'" class="chip chip--danger" th:text="#{bank.type.REVERSAL}">Storno</span>
+                            <span th:case="'WIPE_RESET'" class="chip chip--danger" th:text="#{bank.type.WIPE_RESET}">Wipe-Reset</span>
+                            <span th:case="*" class="chip" th:text="${b.type()}">?</span>
+                        </td>
+                        <td>
+                            <span th:if="${b.type() == 'TRANSFER' and b.counterHolderHandle() != null}"
+                                  th:text="${b.holderHandle()} + ' &#8594; ' + ${b.counterHolderHandle()}">A &#8594; B</span>
+                            <span th:unless="${b.type() == 'TRANSFER' and b.counterHolderHandle() != null}"
+                                  th:text="${b.holderHandle()}">greluc</span>
+                        </td>
+                        <!-- Quell-/Zielkonto (REQ-BANK-044): the far side of the booking — a transfer's
+                             counter-account with direction (&#8594; to / &#8592; from), or the
+                             deposit/withdrawal counterparty (Einzahler / Empf&auml;nger) + their unit. -->
+                        <td class="bank-counterparty-cell" data-testid="bank-booking-counterparty">
+                            <span th:if="${b.type() == 'TRANSFER' and b.counterAccountNo() != null}"
+                                  th:text="(${b.amount().signum() < 0} ? '&#8594; ' : '&#8592; ') + ${b.counterAccountNo()}">&#8594; KB-0002</span>
+                            <span th:if="${b.counterpartyHandle() != null}"
+                                  th:text="${b.counterpartyHandle()} + (${b.counterpartyOrgUnitName() != null} ? ' (' + ${b.counterpartyOrgUnitName()} + ')' : '')">carol (Staffel Rot)</span>
+                        </td>
+                        <td class="text-right">
+                            <span class="bank-amount"
+                                  th:classappend="${b.amount().signum() > 0} ? ' bank-amount--pos' : (${b.amount().signum() < 0} ? ' bank-amount--neg' : ' bank-amount--zero')"
+                                  th:text="${b.amount().signum() > 0 ? '+' : ''} + ${#numbers.formatInteger(@moneyFormat.round(b.amount()), 1, 'POINT')}">+250.000</span>
+                            <!-- In-game fee added on top (REQ-BANK-033, ADR-0052): the outgoing leg is
+                                 the gross debited, so the recipient received |amount| - fee. -->
+                            <span class="bank-fee-note text-muted" data-testid="bank-booking-fee"
+                                  th:if="${b.transferFee() != null and b.transferFee().signum() > 0 and b.amount().signum() < 0}"
+                                  th:text="#{bank.fee.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.transferFee()), 1, 'POINT')} + ' &middot; ' + #{bank.fee.net.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.amount().abs().subtract(b.transferFee())), 1, 'POINT')}">Geb&uuml;hr 25 &middot; kommt an 4.975.000</span>
+                        </td>
+                        <td sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)" class="text-right">
+                            <button type="button" class="btn btn-ghost btn-sm bank-reverse-btn"
+                                    th:if="${(b.type() == 'DEPOSIT' or b.type() == 'WITHDRAWAL' or b.type() == 'TRANSFER') and b.reversedTransactionId() == null}"
+                                    data-trigger="open-modal-display" data-modal-id="bank-reverse-modal"
+                                    th:attr="data-field-_id=${b.transactionId()}"
+                                    data-testid="bank-reverse-open"
+                                    th:text="#{bank.action.reverse}">Stornieren</button>
+                        </td>
+                    </tr>
+                    <!-- Detail sub-row (REQ-BANK-045): Begr&uuml;ndung first (more important), then
+                         Notiz; revealed by clicking the row, hidden by default. -->
+                    <tr class="bank-booking-detail" th:if="${hasDetail}" th:id="${detailId}" hidden
+                        data-testid="bank-booking-detail">
+                        <!-- The detail cell spans the 6 data columns (chevron..amount); the trailing
+                             cell fills the BANK_MANAGEMENT-only action column so the detail row's
+                             column count matches the booking row (6 without the role, 7 with it) and
+                             no phantom column is inferred either way. -->
+                        <td colspan="6" class="bank-booking-detail-cell">
+                            <div class="bank-booking-detail-body">
+                                <div class="bank-detail-item" th:if="${!#strings.isEmpty(b.justification())}">
+                                    <span class="bank-detail-label" th:text="#{bank.booking.justification}">Begr&uuml;ndung</span>
+                                    <span class="bank-detail-value" data-testid="bank-booking-justification" th:text="${b.justification()}">Missionsfreigabe</span>
+                                </div>
+                                <div class="bank-detail-item" th:if="${!#strings.isEmpty(b.note())}">
+                                    <span class="bank-detail-label" th:text="#{bank.booking.note}">Notiz</span>
+                                    <span class="bank-detail-value" th:text="${b.note()}">Missionsertrag</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)"></td>
+                    </tr>
+                    </th:block>
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-center text-muted" th:if="${bookings == null or #lists.isEmpty(bookings.content())}"
+               data-testid="bank-bookings-empty" th:text="#{bank.detail.history.empty}">Noch keine Buchungen.</p>
+            <nav th:replace="~{fragments/pagination :: pagination(${bookings}, ${paginationBaseUrl})}"></nav>
+            </th:block>
+            </div>
         </div>
     </div>
 

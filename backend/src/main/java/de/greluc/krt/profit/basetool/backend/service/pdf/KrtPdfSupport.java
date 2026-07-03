@@ -27,6 +27,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.openpdf.text.Chunk;
 import org.openpdf.text.Document;
 import org.openpdf.text.Element;
 import org.openpdf.text.Font;
@@ -340,6 +341,62 @@ public final class KrtPdfSupport {
     cell.setBorderColor(COLOR_HAIRLINE);
     cell.setBorderWidth(0.3f);
     cell.setPadding(8f);
+    table.addCell(cell);
+  }
+
+  /**
+   * Adds a full-width detail sub-row directly beneath the booking row it belongs to
+   * (REQ-BANK-044/-045): the Begr&uuml;ndung and Notiz of a booking, carved out of the main row
+   * into an indented secondary line so the row above stays narrow (the account views have little
+   * horizontal room). The reason is rendered <em>first</em> — it is the more important field — each
+   * value behind a muted bold label. The cell is visually tied to its booking: it drops its top
+   * border so it butts against the row above, keeps that row's alternating background band and
+   * hangs from a left indent. Call it only for a booking that actually has a reason and/or a note.
+   *
+   * @param table the data table
+   * @param reasonLabel the localized "Begr&uuml;ndung" label
+   * @param reason the justification text, or an empty string when the booking has none
+   * @param noteLabel the localized "Notiz" label
+   * @param note the note text, or an empty string when the booking has none
+   * @param background the parent row's background ({@link #rowBackground(boolean)}) so the sub-row
+   *     reads as the same zebra band
+   * @param colspan the number of columns to span (the full table width)
+   */
+  public static void addDetailSubRow(
+      @NotNull PdfPTable table,
+      @NotNull String reasonLabel,
+      @NotNull String reason,
+      @NotNull String noteLabel,
+      @NotNull String note,
+      @NotNull Color background,
+      int colspan) {
+    Phrase phrase = new Phrase();
+    boolean hasReason = !reason.isEmpty();
+    boolean hasNote = !note.isEmpty();
+    if (hasReason) {
+      phrase.add(new Chunk(reasonLabel + ": ", bold(8, COLOR_LABEL)));
+      phrase.add(new Chunk(reason, regular(8, COLOR_LIGHT_GRAY)));
+    }
+    if (hasReason && hasNote) {
+      phrase.add(new Chunk("      ", regular(8, COLOR_LIGHT_GRAY)));
+    }
+    if (hasNote) {
+      phrase.add(new Chunk(noteLabel + ": ", bold(8, COLOR_LABEL)));
+      phrase.add(new Chunk(note, regular(8, COLOR_LIGHT_GRAY)));
+    }
+    PdfPCell cell = new PdfPCell(phrase);
+    cell.setColspan(colspan);
+    cell.setBackgroundColor(background);
+    cell.setUseVariableBorders(true);
+    cell.setBorderColor(COLOR_HAIRLINE);
+    cell.setBorderWidth(0.3f);
+    // Drop the top border and its padding so the sub-row butts against — and reads as part of — the
+    // booking row above it, rather than as a standalone row.
+    cell.setBorderWidthTop(0f);
+    cell.setPaddingTop(0f);
+    cell.setPaddingBottom(6f);
+    cell.setPaddingLeft(18f);
+    cell.setPaddingRight(6f);
     table.addCell(cell);
   }
 
