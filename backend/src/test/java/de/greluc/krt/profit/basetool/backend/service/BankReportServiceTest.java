@@ -206,9 +206,11 @@ class BankReportServiceTest {
   }
 
   @Test
-  void statement_showsCounterpartyOnGegenseiteColumnAndRedactsIt() throws IOException {
-    // REQ-BANK-044: a deposit's recorded counterparty (Einzahler) shows in the Gegenseite column of
-    // the bank-staff statement, but is redacted — like the Halter — on the org-unit-facing variant.
+  void statement_showsCounterpartyOnQuellZielkontoColumnForBothVariants() throws IOException {
+    // REQ-BANK-044 (amended): a deposit's recorded counterparty (Einzahler) shows in the
+    // Quell-/Zielkonto column of the statement — for bank staff AND, now, for org-unit viewers
+    // (owner
+    // decision). Only the aUEC-custody Halter stays redacted on the org-unit-facing variant.
     Instant before = Instant.now().minus(1, ChronoUnit.HOURS);
     String counterpartyHandle = "cp-" + UUID.randomUUID().toString().substring(0, 8);
     User counterparty = newUser(counterpartyHandle);
@@ -227,10 +229,44 @@ class BankReportServiceTest {
     String redacted =
         extractText(statementService.generateStatement(account.getId(), before, after, null, true));
 
-    assertTrue(full.contains("GEGENSEITE"), "full statement carries the Gegenseite column header");
+    assertTrue(
+        full.contains("QUELL-/ZIELKONTO"),
+        "full statement carries the Quell-/Zielkonto column header");
     assertTrue(full.contains(counterpartyHandle), "full statement names the counterparty");
-    assertFalse(redacted.contains("GEGENSEITE"), "redacted statement drops the Gegenseite column");
-    assertFalse(redacted.contains(counterpartyHandle), "redacted statement hides the counterparty");
+    assertTrue(
+        redacted.contains("QUELL-/ZIELKONTO"),
+        "redacted statement keeps the Quell-/Zielkonto column");
+    assertTrue(
+        redacted.contains(counterpartyHandle),
+        "redacted statement still shows the counterparty (REQ-BANK-044 amended)");
+    assertFalse(
+        redacted.contains(holderHandle), "redacted statement still hides the aUEC-custody Halter");
+  }
+
+  @Test
+  void statement_rendersReasonAndNoteInDetailSubRow() throws IOException {
+    // REQ-BANK-045 (amended): the Begründung and Notiz of a booking are carved out of the main row
+    // into a per-booking sub-row, reason first (the more important field). Both texts render and
+    // the
+    // reason precedes the note; the "Notiz" sub-row label renders too.
+    Instant before = Instant.now().minus(1, ChronoUnit.HOURS);
+    deposit("500");
+    String reason = "reason-" + UUID.randomUUID().toString().substring(0, 8);
+    String note = "note-" + UUID.randomUUID().toString().substring(0, 8);
+    bankLedgerService.bookWithdrawal(
+        new BankWithdrawalRequest(
+            account.getId(), holder.getId(), new BigDecimal("100"), note, reason, null, null));
+    Instant after = Instant.now().plus(1, ChronoUnit.HOURS);
+
+    String text =
+        extractText(statementService.generateStatement(account.getId(), before, after, null));
+
+    assertTrue(text.contains(reason), "the Begründung renders in the sub-row");
+    assertTrue(text.contains(note), "the Notiz renders in the sub-row");
+    assertTrue(text.contains("Notiz"), "the sub-row Notiz label renders");
+    assertTrue(
+        text.indexOf(reason) < text.indexOf(note),
+        "the Begründung is rendered before the Notiz (it is the more important field)");
   }
 
   @Test

@@ -236,19 +236,20 @@ public class BankManagementReportService {
                 krt.writer(), opening, rows, from, to, dateOnly.format(from), dateOnly.format(to)));
     krt.document().add(new Paragraph(" "));
 
-    PdfPTable table = new PdfPTable(7);
+    // The Begründung + Notiz of each booking move into an indented sub-row beneath it
+    // (REQ-BANK-045,
+    // reason first) so the five main columns stay wide enough to never wrap.
+    PdfPTable table = new PdfPTable(5);
     table.setWidthPercentage(100);
-    // The Begründung column (REQ-BANK-045) is carved out of the wide note column so every other
-    // column keeps its original width and the type/holder labels never narrow into a wrap.
-    table.setWidths(new float[] {1.5f, 1.2f, 1.4f, 1.6f, 1.0f, 0.9f, 1.2f});
+    table.setWidths(new float[] {1.5f, 1.2f, 1.5f, 1.9f, 1.2f});
     KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.date"));
     KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.type"));
     KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.holder"));
     KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.counterparty"));
-    KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.note"));
-    KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.justification"));
     KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.amount"));
 
+    String reasonLabel = label("pdf.bank.sub.justification");
+    String noteLabel = label("pdf.bank.sub.note");
     boolean alt = false;
     for (BankBookingRow row : rows) {
       Color bg = KrtPdfSupport.rowBackground(alt);
@@ -262,23 +263,26 @@ public class BankManagementReportService {
       KrtPdfSupport.addTableCell(table, label("pdf.bank.type." + row.type().name()), bg, false);
       KrtPdfSupport.addTableCell(table, holder, bg, false);
       KrtPdfSupport.addTableCell(table, counterpartyCell(row, accountLegsByTx), bg, false);
-      KrtPdfSupport.addTableCell(table, row.note() != null ? row.note() : "", bg, false);
-      KrtPdfSupport.addTableCell(
-          table, row.justification() != null ? row.justification() : "", bg, false);
       KrtPdfSupport.addTableCell(table, BankPdfFormat.signedAmount(row.amount()), bg, true);
+      String reason = row.justification() != null ? row.justification() : "";
+      String note = row.note() != null ? row.note() : "";
+      if (!reason.isEmpty() || !note.isEmpty()) {
+        KrtPdfSupport.addDetailSubRow(table, reasonLabel, reason, noteLabel, note, bg, 5);
+      }
       alt = !alt;
     }
     if (rows.isEmpty()) {
-      KrtPdfSupport.addEmptyRow(table, label("pdf.bank.statement.empty"), 7);
+      KrtPdfSupport.addEmptyRow(table, label("pdf.bank.statement.empty"), 5);
     }
     krt.document().add(table);
   }
 
   /**
-   * Renders the "Gegenseite" cell for a report row (REQ-BANK-044) — the far side of the booking:
-   * for a {@code DEPOSIT}/{@code WITHDRAWAL} the recorded counterparty (Einzahler / Empf&auml;nger)
-   * with their org unit in parentheses; for a {@code TRANSFER} the counter account's number; empty
-   * otherwise. The type column and amount sign convey the direction, so no arrow glyph is rendered.
+   * Renders the "Quell-/Zielkonto" cell for a report row (REQ-BANK-044) — the far side of the
+   * booking: for a {@code DEPOSIT}/{@code WITHDRAWAL} the recorded counterparty (Einzahler /
+   * Empf&auml;nger) with their org unit in parentheses; for a {@code TRANSFER} the counter
+   * account's number; empty otherwise. The type column and amount sign convey the direction, so no
+   * arrow glyph is rendered.
    *
    * @param row the report row
    * @param accountLegsByTx the section's account legs grouped by transaction (transfer counter
