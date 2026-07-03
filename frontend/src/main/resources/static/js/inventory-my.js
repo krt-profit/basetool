@@ -194,13 +194,18 @@ function saveNote() {
 
 function removeNote() {
     if (!activeNoteButton) return;
-    if (!window.confirmKrtDialog) {
+    // showKrtConfirm is the shared promise-based confirm from fragments/toast.html (rendered
+    // on this page); if the fragment is ever absent, remove directly rather than dead-ending
+    // the button behind a dialog that can never appear.
+    if (typeof window.showKrtConfirm !== 'function') {
         submitNoteUpdate('');
         return;
     }
-    window.confirmKrtDialog(noteI18n.confirmTitle, noteI18n.confirmMessage, function () {
-        submitNoteUpdate('');
-    });
+    window
+        .showKrtConfirm(noteI18n.confirmTitle, noteI18n.confirmMessage)
+        .then(function (confirmed) {
+            if (confirmed) submitNoteUpdate('');
+        });
 }
 
 function submitNoteUpdate(noteValue) {

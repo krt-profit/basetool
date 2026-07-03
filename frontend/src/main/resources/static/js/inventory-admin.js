@@ -35,7 +35,7 @@
  * below; the parse-time DOM lookups (delete-all elements, bookOutForm / umbuchenForm) rely
  * on that document position.
  */
-/* global stackEntriesI18n, inventoryConflictI18n, bookOutI18n, umbuchenI18n, noteI18n */
+/* global stackEntriesI18n, inventoryConflictI18n, bookOutI18n, umbuchenI18n, noteI18n, assocI18n */
 
 let activeNoteButton = null;
 
@@ -82,13 +82,18 @@ function saveNote() {
 
 function removeNote() {
     if (!activeNoteButton) return;
-    if (window.confirmKrtDialog) {
-        window.confirmKrtDialog(noteI18n.confirmTitle, noteI18n.confirmMessage, function () {
-            submitNoteUpdate('');
-        });
-    } else {
+    // showKrtConfirm is the shared promise-based confirm from fragments/toast.html (rendered
+    // on this page); if the fragment is ever absent, remove directly rather than dead-ending
+    // the button behind a dialog that can never appear.
+    if (typeof window.showKrtConfirm !== 'function') {
         submitNoteUpdate('');
+        return;
     }
+    window
+        .showKrtConfirm(noteI18n.confirmTitle, noteI18n.confirmMessage)
+        .then(function (confirmed) {
+            if (confirmed) submitNoteUpdate('');
+        });
 }
 
 function submitNoteUpdate(noteValue) {
@@ -1016,9 +1021,6 @@ window.onclick = function (event) {
     });
 })();
 
-// Pre-existing bug kept verbatim by the #924 extraction: the bare [[#{...}]] markers in the
-// toast/console strings below are INERT literals — the original inline block had no th:inline,
-// so users already saw the raw marker text. Do not hoist or localize them here.
 async function updateInventoryAssociation(selectElement) {
     const id = selectElement.getAttribute('data-id');
     const version = parseInt(selectElement.getAttribute('data-version'));
@@ -1092,30 +1094,30 @@ async function updateInventoryAssociation(selectElement) {
             }
 
             if (typeof window.showFrontendSuccessToast === 'function') {
-                window.showFrontendSuccessToast('[[#{success.inventory.update}]]');
+                window.showFrontendSuccessToast(assocI18n.success);
             } else {
-                console.info('[[#{success.inventory.update}]]');
+                console.info(assocI18n.success);
             }
         } else if (response.status === 409) {
             if (typeof window.showFrontendErrorToast === 'function') {
-                window.showFrontendErrorToast('[[#{error.inventory.update.conflict}]]');
+                window.showFrontendErrorToast(assocI18n.conflict);
             } else {
-                console.error('[[#{error.inventory.update.conflict}]]');
+                console.error(assocI18n.conflict);
             }
             setTimeout(() => location.reload(), 2000);
         } else {
             if (typeof window.showFrontendErrorToast === 'function') {
-                window.showFrontendErrorToast('[[#{error.inventory.update.failed}]]');
+                window.showFrontendErrorToast(assocI18n.failed);
             } else {
-                console.error('[[#{error.inventory.update.failed}]]');
+                console.error(assocI18n.failed);
             }
         }
     } catch (e) {
         console.error(e);
         if (typeof window.showFrontendErrorToast === 'function') {
-            window.showFrontendErrorToast('[[#{error.inventory.update.failed}]]');
+            window.showFrontendErrorToast(assocI18n.failed);
         } else {
-            console.error('[[#{error.inventory.update.failed}]]');
+            console.error(assocI18n.failed);
         }
     }
 }
