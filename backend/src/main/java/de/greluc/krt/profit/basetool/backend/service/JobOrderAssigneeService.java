@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -193,7 +194,7 @@ public class JobOrderAssigneeService {
     OptimisticLock.checkOptionalClient(
         assignee.getVersion(), version, JobOrderAssignee.class, assignee.getId());
 
-    String trimmed = (note == null || note.isBlank()) ? null : note.strip();
+    String trimmed = StringNormalization.trimToNull(note);
     assignee.setNote(trimmed);
     JobOrder saved = jobOrderRepository.saveAndFlush(jobOrder);
     // PII: the note body is user free text — record only its presence/length, never the content.
