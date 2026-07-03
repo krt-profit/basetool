@@ -280,8 +280,9 @@ admin-editable at runtime.
 The backend has a channel-agnostic e-mail seam so system events can notify a user **by e-mail** in
 addition to (or instead of) the in-app inbox. `MailService.send(MailMessage)` takes a domain-free
 `MailMessage(to, subject, body)` — no notion of approval or notification — so any producer can reuse
-it; the first consumer is the account decision mail (REQ-NOTIF-014, [ADR-0064](../adr/0064-transactional-email-delivery-channel.md)),
-and the in-app rule engine may adopt it later as a second delivery channel.
+it; its consumers are the account decision mail (REQ-NOTIF-014, [ADR-0064](../adr/0064-transactional-email-delivery-channel.md))
+and the pending-registration admin mail (REQ-NOTIF-015, in [`discord-integration.md`](discord-integration.md)),
+and the in-app rule engine may adopt it later as a generic second delivery channel.
 
 Sending is **three-gated** and **best-effort**: the `SmtpMailService` implementation sends only when
 `app.mail.enabled` is on (an explicit kill-switch that ships `true`), a non-blank `spring.mail.host`
@@ -312,9 +313,10 @@ logged** (REQ-OBS).
 
 ## Out of scope (v1)
 
-- Per-notification e-mail routing (fan-out of in-app notification types to e-mail), user channel
-  preferences/opt-in, and digest emails. A **basic transactional e-mail transport** now exists
-  (REQ-NOTIF-013, first used by the account decision mail REQ-NOTIF-014); wiring it into the rule
+- Per-notification e-mail routing (generic fan-out of in-app notification types to e-mail), user
+  channel preferences/opt-in, and digest emails. A **basic transactional e-mail transport** now
+  exists (REQ-NOTIF-013, used so far by two hand-wired consumers — the account decision mail
+  REQ-NOTIF-014 and the pending-registration admin mail REQ-NOTIF-015); wiring it into the rule
   engine per notification type is deferred.
 - Discord channel delivery.
 - OS / browser push notifications.
