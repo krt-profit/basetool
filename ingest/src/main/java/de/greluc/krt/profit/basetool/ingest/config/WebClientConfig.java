@@ -67,6 +67,16 @@ public class WebClientConfig {
   private final SslBundles sslBundles;
 
   /**
+   * Micrometer observation registry wired into the backend-relay WebClient (REQ-OBS-009, epic #936
+   * Phase 1b). The client is hand-built via {@code WebClient.builder()} (not the auto-configured
+   * {@code WebClient.Builder} bean), so Boot's observation customizer does not apply — without this
+   * explicit wiring no {@code http.client.requests} metrics are recorded and, with tracing enabled,
+   * no {@code traceparent} header would propagate to the backend. With tracing disabled (the
+   * default) the registry only feeds metrics; no tracing machinery runs.
+   */
+  private final io.micrometer.observation.ObservationRegistry observationRegistry;
+
+  /**
    * The backend-facing {@link WebClient}: a 5&nbsp;s connect timeout, 15&nbsp;s read/write/response
    * timeouts, profile-gated TLS trust, and a response decoder capped at the configured max payload
    * size so a hostile or buggy backend response cannot exhaust heap.
@@ -79,6 +89,7 @@ public class WebClientConfig {
     return WebClient.builder()
         .baseUrl(ingestProperties.getBackendBaseUrl())
         .clientConnector(new ReactorClientHttpConnector(buildHttpClient()))
+        .observationRegistry(observationRegistry)
         .codecs(codecs -> codecs.defaultCodecs().maxInMemorySize(maxInMemory))
         .build();
   }

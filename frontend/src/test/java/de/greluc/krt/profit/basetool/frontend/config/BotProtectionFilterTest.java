@@ -339,6 +339,45 @@ class BotProtectionFilterTest {
   }
 
   @Test
+  void isBotPath_shouldReturnFalse_forWhitelistedActuatorPrometheus() {
+    // The monitoring scrape endpoint (REQ-OBS-005, epic #936) must reach the dedicated
+    // fail-closed basic-auth chain in MonitoringScrapeSecurityConfig — without the whitelist
+    // entry the bot filter would answer 404 before any security chain runs. Every other
+    // /actuator/... path stays blocked (assertion below).
+    assertFalse(filter.isBotPath("/actuator/prometheus"));
+    assertTrue(filter.isBotPath("/actuator/env"));
+    assertTrue(filter.isBotPath("/actuator/metrics"));
+    assertTrue(filter.isBotPath("/actuator"));
+  }
+
+  @Test
+  void isBotPath_shouldMatchActuatorPrometheusExactlyOnly() {
+    // The prometheus whitelist is exact and case-sensitive, mirroring the scrape chain's
+    // securityMatcher: the endpoint has no sub-resources, so sub-paths, trailing slashes and
+    // case variants are scanner noise and keep the cheap bot 404 instead of falling through to
+    // the main OAuth2 chain (login redirect + request-cache churn).
+    assertTrue(filter.isBotPath("/actuator/prometheus/"));
+    assertTrue(filter.isBotPath("/actuator/prometheus/anything"));
+    assertTrue(filter.isBotPath("/ACTUATOR/PROMETHEUS"));
+    assertTrue(filter.isBotPath("/Actuator/Prometheus"));
+  }
+
+  @Test
+  void doFilterInternal_shouldPassThrough_forActuatorPrometheus() throws Exception {
+    // Given
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/actuator/prometheus");
+    request.setRequestURI("/actuator/prometheus");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    // When
+    filter.doFilterInternal(request, response, filterChain);
+
+    // Then: the scrape path reaches the (fail-closed) security chain instead of a bot 404.
+    assertEquals(200, response.getStatus(), "/actuator/prometheus must pass the bot filter");
+    verify(filterChain, times(1)).doFilter(request, response);
+  }
+
+  @Test
   void isBotFileExtension_shouldReturnTrue_forKnownBotExtensions() {
     assertTrue(filter.isBotFileExtension("/config.php"));
     assertTrue(filter.isBotFileExtension("/dump.sql"));

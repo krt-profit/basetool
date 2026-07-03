@@ -38,6 +38,20 @@ dependencies {
   implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
   implementation("org.springframework.boot:spring-boot-starter-validation")
   implementation("org.springframework.boot:spring-boot-starter-actuator")
+  // Prometheus text-format rendering for /actuator/prometheus (REQ-OBS-005). Version from the
+  // Spring Boot BOM. The endpoint itself is guarded by the fail-closed basic-auth chain in
+  // MonitoringScrapeSecurityConfig.
+  implementation("io.micrometer:micrometer-registry-prometheus")
+  // Distributed tracing (REQ-OBS-009, epic #936 Phase 1b): Boot 4's OpenTelemetry starter
+  // (Micrometer Tracing on the OTel SDK + OTLP export auto-configuration). Version from the
+  // Spring Boot BOM. Inert unless MONITORING_TRACING_ENABLED=true (see application.yml
+  // `management.tracing`). micrometer-registry-otlp is excluded: it would activate Boot's OTLP
+  // metrics PUSH with a localhost default endpoint in every environment (periodic
+  // connection-refused noise) - metrics are exclusively Prometheus PULL via
+  // /actuator/prometheus (REQ-OBS-005).
+  implementation("org.springframework.boot:spring-boot-starter-opentelemetry") {
+    exclude(group = "io.micrometer", module = "micrometer-registry-otlp")
+  }
   // Redis for the short-lived single-use handoff staging (no DB, no JPA).
   implementation("org.springframework.boot:spring-boot-starter-data-redis")
   // Resilience4j around the backend WebClient relay (timeout, retry, circuit

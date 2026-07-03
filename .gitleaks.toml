@@ -26,6 +26,13 @@ paths = [
 # never a real id — and a Discord *client id* is a public identifier, not a secret —
 # so the default discord-client-id rule's match on it is a false positive. Scoped to
 # this exact literal so any genuinely secret-shaped value still trips the scan.
+#
+# Second entry: the public jwt.io demo token (truncated segments), used as the shared
+# JWT fixture of the PiiMaskingLogstashEncoder tests in backend, frontend and ingest —
+# it exists so the tests can prove such a token is MASKED before it reaches any log
+# sink. It is a published documentation sample, not a credential. Scoped to the exact
+# literal so any real JWT still trips the scan.
 regexes = [
   '''123456789012345678''',
+  '''eyJhbGciOiJIUzI1NiIsInR5cCI\.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZ\.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c''',
 ]

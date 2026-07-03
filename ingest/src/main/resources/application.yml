@@ -69,6 +69,14 @@ app:
       # Opt-in audience check. Empty by default; set to `basetool-backend` ONLY after both the
       # extractor and frontend tokens carry that audience (docs/INGEST_KEYCLOAK_SETUP.md).
       expected-audiences: ${APP_SECURITY_JWT_EXPECTED_AUDIENCES:}
+  monitoring:
+    scrape:
+      # Basic-auth credentials for GET /actuator/prometheus (REQ-OBS-005, ADR-0072). Fail-closed:
+      # when either variable is unset/blank, MonitoringScrapeSecurityConfig denies every request
+      # to the endpoint. Set both only where a Prometheus scraper actually runs; never commit
+      # real values.
+      username: ${MONITORING_SCRAPE_USER:}
+      password: ${MONITORING_SCRAPE_PASSWORD:}
 
 # Resilience4j around the backend relay. HTTP response errors are ignored (a 400 envelope reject is
 # a client problem, not a backend-health signal); only transport failures open the breaker.
@@ -88,15 +96,54 @@ logging:
     root: INFO
     io.github.resilience4j: INFO
 
-# Actuator: expose only `health` (Docker HEALTHCHECK / compose service_healthy gating); bare status.
+# Actuator: expose `health` (Docker HEALTHCHECK / compose service_healthy gating; bare status)
+# plus `prometheus` for the monitoring scrape (REQ-OBS-005). `/actuator/prometheus` is NOT
+# public: MonitoringScrapeSecurityConfig guards it with fail-closed basic auth (denyAll until
+# MONITORING_SCRAPE_USER/PASSWORD are set).
 management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health, prometheus
   endpoint:
     health:
       show-details: never
       show-components: never
       probes:
         enabled: true
+  metrics:
+    tags:
+      # Common tag on every meter; the Grafana "Spring Boot apps" dashboard selects the
+      # module through this `application` label (epic #936 dashboard set).
+      application: basetool-ingest
+  tracing:
+    export:
+      otlp:
+        # Second half of the master gate: without the monitoring stack the OTLP span exporter
+        # bean is not even instantiated (Boot gates it via ConditionalOnEnabledTracingExport;
+        # belt and braces on top of management.opentelemetry.enabled below).
+        enabled: ${MONITORING_TRACING_ENABLED:false}
+    sampling:
+      # Only honored while tracing is enabled. Low traffic makes full sampling affordable;
+      # revisited in the Phase-3 tuning (epic #936).
+      probability: ${MONITORING_TRACING_SAMPLING_PROBABILITY:1.0}
+  opentelemetry:
+    # Master gate for distributed tracing (REQ-OBS-009, epic #936 Phase 1b). Default false keeps
+    # dev/test/e2e and a prod host without the monitoring stack inert: no OTel tracer, no span
+    # exporter, no export attempts (Boot leaves only no-op propagators behind). Phase 2 sets
+    # MONITORING_TRACING_ENABLED=true together with the OTLP endpoint below. Boot 4 note: THIS
+    # flag is the gate the OTel tracing auto-configuration actually honours
+    # (@ConditionalOnEnabledOpenTelemetry); the legacy `management.tracing.enabled` is not
+    # consumed by any Boot 4.1 auto-configuration (verified against the module bytecode) and an
+    # endpoint-only gate is likewise not possible - tracing would be active by default.
+    enabled: ${MONITORING_TRACING_ENABLED:false}
+    resource-attributes:
+      # Align the trace service name with the `application` metric tag so Grafana's
+      # logs<->traces<->metrics correlation uses one identity per module.
+      "service.name": basetool-ingest
+    tracing:
+      export:
+        otlp:
+          # OTLP HTTP endpoint of the span collector (Phase 2: Alloy on the scrape network,
+          # http://alloy:4318/v1/traces). Only honored while tracing is enabled.
+          endpoint: ${MONITORING_OTLP_ENDPOINT:http://localhost:4318/v1/traces}

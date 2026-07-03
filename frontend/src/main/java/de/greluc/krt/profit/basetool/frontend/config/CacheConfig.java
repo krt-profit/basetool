@@ -38,12 +38,21 @@ public class CacheConfig {
    * Caffeine-backed {@link CacheManager} exposing the {@link #STATIC_DATA_CACHE} cache (10-minute
    * TTL, max 1000 entries). Used by {@code BackendApiClient.getCached(...)} for slow-changing
    * lookup data.
+   *
+   * <p>{@code recordStats()} keeps Caffeine's hit/miss counters, which Spring Boot's cache metrics
+   * auto-configuration binds as {@code cache_*} meters on {@code /actuator/prometheus}
+   * (REQ-OBS-005, epic #936) — without it the hit-ratio panels of the monitoring dashboards would
+   * read zero forever. The counters are plain {@code LongAdder}s; the overhead is negligible
+   * against the backend HTTP round-trip each miss saves.
    */
   @Bean
   public CacheManager cacheManager() {
     CaffeineCacheManager cacheManager = new CaffeineCacheManager(STATIC_DATA_CACHE);
     cacheManager.setCaffeine(
-        Caffeine.newBuilder().expireAfterWrite(10, TimeUnit.MINUTES).maximumSize(1000));
+        Caffeine.newBuilder()
+            .expireAfterWrite(10, TimeUnit.MINUTES)
+            .maximumSize(1000)
+            .recordStats());
     return cacheManager;
   }
 }

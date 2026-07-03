@@ -6,6 +6,18 @@
 
 - **E-Mail an Administratoren bei neuer Registrierung.** Sobald eine neue Registrierung auf Freigabe wartet, erhalten jetzt alle Administratoren mit hinterlegter E-Mail-Adresse zusätzlich zur bestehenden In-App-Benachrichtigung eine E-Mail — so bemerken auch Administratoren, die gerade nicht im Tool angemeldet sind, dass eine Freigabe ansteht. Der Versand nutzt denselben wiederverwendbaren E-Mail-Kanal wie die Freigabe-/Ablehnungs-Mails und verschickt erst tatsächlich Mails, sobald ein SMTP-Server konfiguriert ist (`SPRING_MAIL_HOST`) — ohne Host bleibt er ein No-Op (REQ-NOTIF-015, ADR-0064).
 
+- **Monitoring: Prometheus-Metrik-Endpunkt in allen drei Modulen.** Backend, Frontend und Ingest exponieren jetzt Micrometer-Metriken (JVM, HTTP, Caches, Verbindungspools) unter `/actuator/prometheus` — abgesichert über einen fail-closed Basic-Auth-Zugang (`MONITORING_SCRAPE_USER`/`MONITORING_SCRAPE_PASSWORD`; ohne Konfiguration wird jeder Zugriff abgelehnt). Grundstein für den Monitoring-Stack aus Epic #936 (REQ-OBS-005, ADR-0072).
+
+- **Monitoring: Verteiltes Tracing (OpenTelemetry) in allen drei Modulen vorbereitet.** Frontend-, Backend- und Ingest-Aufrufe können durchgängig als Traces verfolgt werden (W3C `traceparent`, Trace-IDs in den JSON-Logs). Query-Strings und rohe IDs werden aus Metrik-Tags und Span-Attributen entfernt. Standardmäßig vollständig inaktiv; erst `MONITORING_TRACING_ENABLED=true` plus OTLP-Endpunkt aktivieren den Export zum Monitoring-Stack (REQ-OBS-009, Epic #936 Phase 1b).
+
+### Fixed
+
+- **Sicherheit: Eingebetteter Tomcat auf 11.0.23 angehoben.** Die Version schließt drei frisch veröffentlichte CVEs (u. a. RewriteValve-Bedingungsauswertung, CVE-2026-53404); Spring Boot 4.1.0 liefert noch 11.0.22 aus, daher wird die Version bis zum nächsten Boot-Patch zentral übersteuert.
+
+- **Frontend: Caffeine-Cache erfasst jetzt Trefferstatistiken.** Der `staticData`-Cache liefert damit Hit-Ratio-Werte an den Metrik-Endpunkt; zuvor wären die Cache-Panels des künftigen Monitorings dauerhaft leer geblieben (Epic #936).
+
+- **Ingest: Prod-Logs werden jetzt PII-maskiert.** Der Ingest-Dienst nutzt wie Backend und Frontend den maskierenden JSON-Encoder (JWTs, E-Mail-Adressen, Token-Schlüsselwörter); zuvor war er der letzte unmaskierte Log-Ausgang (REQ-OBS-004).
+
 ## [v1.0.14](https://github.com/krt-profit/basetool/releases/tag/v1.0.14) - 2026-07-03
 
 ## [v1.0.13](https://github.com/krt-profit/basetool/releases/tag/v1.0.13) - 2026-07-03
@@ -61,6 +73,7 @@
 ### Fixed
 
 - **Einsatz anlegen: Formular nutzt jetzt die volle Breite.** Das Formular „Neuer Einsatz" (`/missions/new`) stand bisher in der linken Bildschirmhälfte, weil die rechte Spalte des Verwaltungs-Rasters nur die reinen Bearbeitungs-Editoren enthält, die beim Anlegen fehlen. Auf der Anlege-Seite fällt das Raster jetzt auf eine einzelne, volle Spalte zusammen, sodass die Details-Karte zentriert die gesamte Breite unter der Überschrift einnimmt (REQ-MISSION-015).
+
 - **Kein selbst verursachter Bearbeitungskonflikt mehr beim schnellen Bearbeiten.** Wer ein Ziel oder einen Ablauf-Schritt eingab und sofort auf „+", das Klassifizierungs-Dropdown oder die Sortierpfeile klickte, erhielt bisher fälschlich die Konflikt-Warnung („Aktuelle Werte laden?") — und das gerade Eingegebene konnte dabei verloren gehen. Aufeinanderfolgende eigene Änderungen desselben Abschnitts werden jetzt der Reihe nach gespeichert und übernehmen jeweils den aktuellen Stand. Tool-weit umgesetzt (u. a. auch Kartellbank-Freigaben, Lager-Zuordnungen und -Notizen, Auftragsstatus und Org-Struktur), REQ-FE-012.
 
 - **Einsatz: Live-Synchronisation aktualisiert jetzt auch Ablauf, Ziele und Funkfrequenzen bei anderen Betrachtern.** Bearbeitete ein Nutzer den Ablauf, die Ziele oder die Funkfrequenzen eines Einsatzes, blieben die Verwaltung-Editoren anderer Betrachter desselben Einsatzes bis zum manuellen Neuladen veraltet, weil das Änderungssignal für diese Abschnitte verworfen wurde. Jetzt ziehen alle Abschnitte live nach (REQ-FE-010).

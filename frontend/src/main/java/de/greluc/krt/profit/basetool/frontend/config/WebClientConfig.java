@@ -117,6 +117,16 @@ public class WebClientConfig {
   private final SslBundles sslBundles;
 
   /**
+   * Micrometer observation registry wired into the request/response WebClients (REQ-OBS-009, epic
+   * #936 Phase 1b). These clients are hand-built via {@code WebClient.builder()} (not the
+   * auto-configured {@code WebClient.Builder} bean), so Boot's observation customizer does not
+   * apply — without this explicit wiring no {@code http.client.requests} metrics are recorded and,
+   * with tracing enabled, no {@code traceparent} header would propagate to the backend. With
+   * tracing disabled (the default) the registry only feeds metrics; no tracing machinery runs.
+   */
+  private final io.micrometer.observation.ObservationRegistry observationRegistry;
+
+  /**
    * Builds the Netty SSL context for the backend WebClient. Three behaviours, picked by active
    * profile and presence of a configured SSL bundle:
    *
@@ -350,6 +360,7 @@ public class WebClientConfig {
     return WebClient.builder()
         .exchangeStrategies(strategies)
         .clientConnector(connector(false))
+        .observationRegistry(observationRegistry)
         .apply(oauth2Client.oauth2Configuration())
         .filter(webClientLoggingFilter.correlationIdPropagation())
         .filter(activeSquadronRelayFilter.relayActiveSquadron())
@@ -383,6 +394,7 @@ public class WebClientConfig {
     return WebClient.builder()
         .exchangeStrategies(strategies)
         .clientConnector(connector(false))
+        .observationRegistry(observationRegistry)
         .filter(webClientLoggingFilter.correlationIdPropagation())
         .filter(userLocaleRelayFilter.relayUserLocale())
         .filter(clientIpRelayFilter.relayClientIp())
@@ -416,6 +428,11 @@ public class WebClientConfig {
    * resolves the bearer read-only and sets it as a plain {@code Authorization} header instead, so
    * the relay is structurally refresh-incapable rather than depending on a warm cache. Used only by
    * the frontend stream relay; all request/response traffic still goes through {@link #webClient}.
+   *
+   * <p>Also deliberately NOT wired to the observation registry (REQ-OBS-009): a ~30-minute SSE
+   * relay would hold a single client observation/span open for the whole stream, skewing the
+   * latency metrics and delaying span export; the correlation-id relay already covers debuggability
+   * here.
    *
    * @return the streaming WebClient
    */
