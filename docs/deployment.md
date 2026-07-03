@@ -708,6 +708,69 @@ emergency fallback only, revert `KEYCLOAK_ADMIN_URL` to `http://keycloak:18080` 
 
 ---
 
+## Keycloak Admin Console via SSH tunnel
+
+The Keycloak Admin Console (`https://keycloak.profit-base.online/admin`) is served on the public
+vhost but must never be reachable from the open internet. It is locked to an operator SSH tunnel:
+NPM allows the console **only** for connections that originate from the host itself, and the
+operator reaches the host over SSH.
+
+### How the lock-down works
+
+The operator opens a local port-forward to NPM's published `443` through the host loopback:
+
+```bash
+ssh -N -L 443:127.0.0.1:443 root@178.104.94.14
+```
+
+and adds a hosts entry so the browser resolves the vhost to the tunnel and SNI/cert still match:
+
+```
+127.0.0.1  keycloak.profit-base.online
+```
+
+Then `https://keycloak.profit-base.online/admin` reaches the console through the tunnel.
+
+The access control is an nginx `allow … / deny all` on the `/admin` **custom location** of the
+`keycloak.profit-base.online` proxy host, configured in the NPM admin UI (`127.0.0.1:10081` →
+*Proxy Hosts → keycloak → Custom locations → `/admin` → Advanced*):
+
+```nginx
+# Keycloak Admin Console — reachable only through the operator SSH tunnel.
+# Host-origin traffic (the tunnel hitting NPM's published 443 via 127.0.0.1) is
+# SNAT'd by Docker to the gateway of the net-proxy-* bridge, so nginx sees a
+# 172.28.x.1 source, NOT the operator's real IP. External clients keep their
+# real public IP and hit `deny all`. The gateways are stable because the bridge
+# subnets are pinned in docker-compose.yml (172.28.0.0/16).
+allow 172.28.3.1;   # net-proxy-frontend gateway
+allow 172.28.4.1;   # net-proxy-keycloak gateway
+allow 172.28.7.1;   # net-proxy-ingest gateway
+deny all;
+```
+
+Docker decides which of NPM's three proxy-network gateways the published-port DNAT resolves to,
+and that choice can differ across Docker versions or attachment order — so all three are listed.
+Equivalently you may use a single `allow 172.28.0.0/16;` (the whole pinned range); both are safe
+because no external client can present a `172.28.x` source over a completed TCP handshake, and NPM
+does not trust an inbound `X-Forwarded-For` for `allow`/`deny` (`$remote_addr` is the real TCP
+peer).
+
+### Why the allowed IP used to change — and no longer does
+
+Before the subnets were pinned, Docker drew each bridge's subnet from its dynamic address pool, so
+a `docker compose down` / restart reassigned `net-proxy-*` a fresh subnet and moved its gateway
+(e.g. `172.24.0.1` → something else). The `/admin` allow-list then matched nothing and silently
+locked the console out until the new gateway was looked up by hand. The `ipam` blocks in
+`docker-compose.yml` now pin every bridge to a fixed `/24` under `172.28.0.0/16`, so the gateway
+the allow-list depends on is constant across restarts. **If you ever change those pinned subnets,
+update this `/admin` block to match** — they move together.
+
+> This is an operator convenience, not a security boundary on its own: the console is still behind
+> Keycloak's own admin login. The IP lock-down is defence-in-depth so the admin login form is not
+> even reachable from the public internet.
+
+---
+
 ## Keycloak custom providers — Discord login SPI (epic #720)
 
 Discord login ships as a Keycloak provider JAR built from the `keycloak-spi` module
