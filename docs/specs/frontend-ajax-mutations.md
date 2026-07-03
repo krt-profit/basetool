@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-29.
-> **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0053
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-03.
+> **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0053, ADR-0069
 
 # Frontend AJAX mutations — krtFetch, krtCsrf & fragment swaps
 
@@ -15,9 +15,22 @@ child issues (#573–#582).
 
 The foundation lives in [`krt-fetch.js`](../../frontend/src/main/resources/static/js/krt-fetch.js),
 loaded globally from `fragments/head.html`. It exposes `window.krtFetch` (`write`, `submitForm`,
-`swap`, `syncVersion`) and `window.krtCsrf` (`headers`, `token`, `refresh`). The toast/confirm infrastructure
+`swap`, `syncVersion`, `sectionWrite`) and `window.krtCsrf` (`headers`, `token`, `refresh`). The toast/confirm infrastructure
 (`showFrontendSuccessToast`, `showFrontendErrorToast`, `showKrtConfirm`) is the design-system-mandated
 replacement for native dialogs (see [`ui-design-system.md`](ui-design-system.md)).
+
+**Section-structured pages use the `krtFetch.sectionWrite(config)` factory** (ADR-0069, #924): from
+a config of already-localized i18n lookups (a late-bound dict getter + key prefixes + fallbacks), a
+section→`{container, fragmentValue}` map, a page-URL getter and an optional peer-broadcast closure,
+it returns the page's `{write, refresh, notify}` seam — `write` decorates `krtFetch.write` with the
+section's localized success/error/conflict strings, `refresh` re-renders one or more sections in
+place via `krtFetch.swap` (broadcasting to peers first unless the refresh itself applies a peer
+signal, `{broadcast: false}`), and `notify` is the broadcast-only sibling for handlers that patch
+their own DOM surgically. Every lookup is late-bound (evaluated per call), because the i18n dicts
+and the presence client are published by bootstraps that run after the module loads. mission-detail
+is the canonical consumer (its `window.krtMissionWrite` / `window.krtRefreshMissionSection` /
+`window.krtNotifyMissionChanged` aliases are the factory's three returns); new pages with per-section
+writes reuse the factory instead of hand-rolling the wrapper trio.
 
 ## Requirements
 

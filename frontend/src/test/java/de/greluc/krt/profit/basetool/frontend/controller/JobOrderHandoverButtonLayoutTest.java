@@ -142,9 +142,12 @@ class JobOrderHandoverButtonLayoutTest {
 
     String html = result.getResponse().getContentAsString();
 
-    // Then: Button muss nach dem Bearbeiter-Bereich erscheinen
+    // Then: Button muss nach dem Bearbeiter-Bereich erscheinen. Anchored on the button's own
+    // data-testid marker: the former "openHandoverModal()" needle matched the inline script that
+    // #924 moved into static/js/orders-detail.js (and, sitting at the end of the body, it was
+    // always after every markup index anyway).
     int assigneesSectionIndex = html.indexOf("Bearbeiter");
-    int handoverButtonIndex = html.indexOf("openHandoverModal()");
+    int handoverButtonIndex = html.indexOf("data-testid=\"order-handover-open\"");
 
     assertThat(assigneesSectionIndex)
         .as("Bearbeiter-Bereich muss im HTML vorhanden sein")
