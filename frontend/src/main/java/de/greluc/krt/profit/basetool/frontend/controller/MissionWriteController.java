@@ -397,8 +397,7 @@ public class MissionWriteController {
   public org.springframework.http.ResponseEntity<MissionDto> updateActualTime(
       @PathVariable @NotNull UUID id,
       @Valid @RequestBody
-          de.greluc.krt.profit.basetool.frontend.model.dto.MissionActualTimeUpdateRequest request,
-      @AuthenticationPrincipal OidcUser principal) {
+          de.greluc.krt.profit.basetool.frontend.model.dto.MissionActualTimeUpdateRequest request) {
     if (request == null
         || request.version() == null
         || (!"actualStartTime".equals(request.field())
