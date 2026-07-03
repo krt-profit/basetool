@@ -61,6 +61,10 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminLocationsPageController {
 
+  /** Captured generic type for decoding the paged locations catalog. */
+  private static final ParameterizedTypeReference<PageResponse<LocationDto>> LOCATION_PAGE =
+      new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -76,8 +80,7 @@ public class AdminLocationsPageController {
     try {
       PageResponse<LocationDto> locationsPage =
           backendApiClient.get(
-              "/api/v1/locations?size=1000&sort=name,asc&includeHidden=true",
-              new ParameterizedTypeReference<PageResponse<LocationDto>>() {});
+              "/api/v1/locations?size=1000&sort=name,asc&includeHidden=true", LOCATION_PAGE);
 
       List<LocationDto> locations = new ArrayList<>();
       if (locationsPage != null && locationsPage.content() != null) {

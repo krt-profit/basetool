@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.config;
 
+import de.greluc.krt.profit.basetool.frontend.support.StringNormalization;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.InitBinder;
@@ -28,10 +29,11 @@ import org.springframework.web.bind.annotation.InitBinder;
 public class GlobalBindingAdvice {
   /**
    * Registers {@link NormalizedStringEditor} for every controller so form-bound Strings are trimmed
-   * and length-capped (8 KB) before validation runs.
+   * and length-capped at {@link StringNormalization#MAX_FREE_TEXT_LENGTH} before validation runs.
    */
   @InitBinder
   public void initBinder(WebDataBinder binder) {
-    binder.registerCustomEditor(String.class, new NormalizedStringEditor(8000, true));
+    binder.registerCustomEditor(
+        String.class, new NormalizedStringEditor(StringNormalization.MAX_FREE_TEXT_LENGTH, true));
   }
 }

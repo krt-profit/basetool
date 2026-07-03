@@ -58,6 +58,18 @@ public class BlueprintOverviewPageController {
   /** Page size applied when the request carries none (or a non-whitelisted one). */
   private static final int DEFAULT_PAGE_SIZE = 50;
 
+  /**
+   * Response type for one server-side page of the blueprint availability list. A shared static
+   * {@link ParameterizedTypeReference} is behaviourally identical to a fresh anonymous instance per
+   * call (Q10).
+   */
+  private static final ParameterizedTypeReference<PageResponse<BlueprintOverviewEntryDto>>
+      OVERVIEW_PAGE_TYPE = new ParameterizedTypeReference<>() {};
+
+  /** Response type for the lazy owner drill-down list returned by {@code /overview/owners}. */
+  private static final ParameterizedTypeReference<List<BlueprintOverviewOwnerDto>> OWNER_LIST_TYPE =
+      new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -96,9 +108,8 @@ public class BlueprintOverviewPageController {
           "/api/v1/personal-blueprints/overview?page=" + effectivePage + "&size=" + effectiveSize;
       res =
           trimmedSearch != null
-              ? backendApiClient.get(
-                  uri + "&search={search}", new ParameterizedTypeReference<>() {}, trimmedSearch)
-              : backendApiClient.get(uri, new ParameterizedTypeReference<>() {});
+              ? backendApiClient.get(uri + "&search={search}", OVERVIEW_PAGE_TYPE, trimmedSearch)
+              : backendApiClient.get(uri, OVERVIEW_PAGE_TYPE);
       if (res != null && res.content() != null) {
         overview = new ArrayList<>(res.content());
       }
@@ -128,7 +139,7 @@ public class BlueprintOverviewPageController {
       List<BlueprintOverviewOwnerDto> owners =
           backendApiClient.get(
               "/api/v1/personal-blueprints/overview/owners?productKey={productKey}",
-              new ParameterizedTypeReference<>() {},
+              OWNER_LIST_TYPE,
               productKey);
       return owners != null ? owners : List.of();
     } catch (Exception e) {

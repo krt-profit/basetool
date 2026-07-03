@@ -53,6 +53,17 @@ public class BankRequestQueuePageController {
   private static final Set<String> ALLOWED_STATUSES =
       Set.of("PENDING", "CONFIRMED", "REJECTED", "CANCELLED");
 
+  /** Response type for one page of booking requests ({@code /api/v1/bank/requests}). */
+  private static final ParameterizedTypeReference<PageResponse<BankBookingRequestDto>>
+      BOOKING_REQUEST_PAGE = new ParameterizedTypeReference<>() {};
+
+  /**
+   * Response type for the bank-wide holder registry ({@code /api/v1/bank/holders}) feeding the
+   * confirm modal's holder select.
+   */
+  private static final ParameterizedTypeReference<List<BankHolderDto>> BANK_HOLDER_LIST =
+      new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -78,10 +89,8 @@ public class BankRequestQueuePageController {
                 .queryParam("status", effectiveStatus)
                 .queryParam("size", 200)
                 .toUriString(),
-            new ParameterizedTypeReference<>() {});
-    List<BankHolderDto> holders =
-        backendApiClient.get(
-            "/api/v1/bank/holders", new ParameterizedTypeReference<List<BankHolderDto>>() {});
+            BOOKING_REQUEST_PAGE);
+    List<BankHolderDto> holders = backendApiClient.get("/api/v1/bank/holders", BANK_HOLDER_LIST);
     model.addAttribute("requests", requests);
     model.addAttribute("status", effectiveStatus);
     model.addAttribute("holders", holders == null ? List.<BankHolderDto>of() : holders);

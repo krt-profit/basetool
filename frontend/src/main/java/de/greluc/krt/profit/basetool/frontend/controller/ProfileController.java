@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.ProfileBlueprintSharing
 import de.greluc.krt.profit.basetool.frontend.model.form.ProfileDescriptionForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ProfilePayoutPreferenceForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -66,8 +67,13 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @Slf4j
 public class ProfileController {
 
+  /** Shared response type for the raw {@code Map<String, Object>} backend payloads on this page. */
+  private static final ParameterizedTypeReference<Map<String, Object>> STRING_OBJECT_MAP_TYPE =
+      new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
   private final MessageSource messageSource;
+  private final FrontendAuthHelperService authHelper;
 
   @Value("${spring.security.oauth2.client.provider.keycloak.issuer-uri}")
   private String issuerUri;
@@ -85,7 +91,7 @@ public class ProfileController {
    */
   @GetMapping("/profile")
   public String profile(Model model, @AuthenticationPrincipal OidcUser principal) {
-    if (principal == null) {
+    if (authHelper.isAnonymous()) {
       return "redirect:/";
     }
 
@@ -99,9 +105,7 @@ public class ProfileController {
 
     // Fetch from Backend to get latest DB state
     try {
-      Map<String, Object> user =
-          backendApiClient.get(
-              "/api/v1/users/me", new ParameterizedTypeReference<Map<String, Object>>() {});
+      Map<String, Object> user = backendApiClient.get("/api/v1/users/me", STRING_OBJECT_MAP_TYPE);
 
       if (user != null) {
         if (user.get("rank") != null) {
@@ -147,9 +151,7 @@ public class ProfileController {
     PayoutPreference defaultPayoutPreference = PayoutPreference.PAYOUT;
     try {
       Map<String, Object> pref =
-          backendApiClient.get(
-              "/api/v1/users/me/payout-preference",
-              new ParameterizedTypeReference<Map<String, Object>>() {});
+          backendApiClient.get("/api/v1/users/me/payout-preference", STRING_OBJECT_MAP_TYPE);
       if (pref != null && pref.get("defaultPayoutPreference") != null) {
         defaultPayoutPreference =
             PayoutPreference.valueOf(String.valueOf(pref.get("defaultPayoutPreference")));
@@ -170,9 +172,7 @@ public class ProfileController {
     boolean shareBlueprintsGlobally = false;
     try {
       Map<String, Object> sharing =
-          backendApiClient.get(
-              "/api/v1/users/me/blueprint-sharing",
-              new ParameterizedTypeReference<Map<String, Object>>() {});
+          backendApiClient.get("/api/v1/users/me/blueprint-sharing", STRING_OBJECT_MAP_TYPE);
       if (sharing != null && sharing.get("shareBlueprintsGlobally") != null) {
         shareBlueprintsGlobally =
             Boolean.parseBoolean(String.valueOf(sharing.get("shareBlueprintsGlobally")));
@@ -308,7 +308,7 @@ public class ProfileController {
       @Valid @RequestBody ProfileDescriptionForm form,
       BindingResult bindingResult,
       @AuthenticationPrincipal OidcUser principal) {
-    if (principal == null) {
+    if (authHelper.isAnonymous()) {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
           .body(Map.of("detail", msg("error.profile.update.failed")));
     }
@@ -427,7 +427,7 @@ public class ProfileController {
       @Valid @RequestBody ProfilePayoutPreferenceForm form,
       BindingResult bindingResult,
       @AuthenticationPrincipal OidcUser principal) {
-    if (principal == null) {
+    if (authHelper.isAnonymous()) {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
           .body(Map.of("detail", msg("error.profile.update.failed")));
     }
@@ -542,7 +542,7 @@ public class ProfileController {
       @Valid @RequestBody ProfileBlueprintSharingForm form,
       BindingResult bindingResult,
       @AuthenticationPrincipal OidcUser principal) {
-    if (principal == null) {
+    if (authHelper.isAnonymous()) {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
           .body(Map.of("detail", msg("error.profile.update.failed")));
     }
@@ -589,9 +589,7 @@ public class ProfileController {
    */
   private Long refreshedUserVersion(Long priorVersion) {
     try {
-      Map<String, Object> me =
-          backendApiClient.get(
-              "/api/v1/users/me", new ParameterizedTypeReference<Map<String, Object>>() {});
+      Map<String, Object> me = backendApiClient.get("/api/v1/users/me", STRING_OBJECT_MAP_TYPE);
       if (me != null && me.get("version") != null) {
         return parseLong(me.get("version"));
       }

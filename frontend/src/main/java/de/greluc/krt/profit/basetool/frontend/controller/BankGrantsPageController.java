@@ -49,6 +49,18 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Slf4j
 public class BankGrantsPageController {
 
+  /** Response type for the bank-grant list pulls ({@code GET /api/v1/bank/grants}). */
+  private static final ParameterizedTypeReference<List<BankGrantDto>> BANK_GRANT_LIST_TYPE =
+      new ParameterizedTypeReference<>() {};
+
+  /** Response type for the paginated bank-account pull ({@code GET /api/v1/bank/accounts}). */
+  private static final ParameterizedTypeReference<PageResponse<BankAccountDto>>
+      BANK_ACCOUNT_PAGE_TYPE = new ParameterizedTypeReference<>() {};
+
+  /** Response type for the user-reference lookup ({@code GET /api/v1/users/lookup}). */
+  private static final ParameterizedTypeReference<List<UserReferenceDto>> USER_REFERENCE_LIST_TYPE =
+      new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -82,23 +94,18 @@ public class BankGrantsPageController {
     } else if (!byEmployee && accountId != null) {
       grantsUri.queryParam("accountId", accountId);
     }
-    List<BankGrantDto> grants =
-        backendApiClient.get(
-            grantsUri.toUriString(), new ParameterizedTypeReference<List<BankGrantDto>>() {});
+    List<BankGrantDto> grants = backendApiClient.get(grantsUri.toUriString(), BANK_GRANT_LIST_TYPE);
     model.addAttribute("grants", grants == null ? List.<BankGrantDto>of() : grants);
     if ("grantsMatrix".equals(fragment)) {
       return "bank-grants :: grantsMatrix";
     }
 
     List<BankGrantDto> allGrants =
-        backendApiClient.get(
-            "/api/v1/bank/grants", new ParameterizedTypeReference<List<BankGrantDto>>() {});
+        backendApiClient.get("/api/v1/bank/grants", BANK_GRANT_LIST_TYPE);
     PageResponse<BankAccountDto> accounts =
-        backendApiClient.get(
-            "/api/v1/bank/accounts?size=500", new ParameterizedTypeReference<>() {});
+        backendApiClient.get("/api/v1/bank/accounts?size=500", BANK_ACCOUNT_PAGE_TYPE);
     final List<UserReferenceDto> users =
-        backendApiClient.get(
-            "/api/v1/users/lookup", new ParameterizedTypeReference<List<UserReferenceDto>>() {});
+        backendApiClient.get("/api/v1/users/lookup", USER_REFERENCE_LIST_TYPE);
 
     // The per-employee selector lists every grantee that currently holds at least one grant.
     Map<UUID, String> grantees = new LinkedHashMap<>();

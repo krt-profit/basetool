@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.ProfileDescriptionForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ProfilePayoutPreferenceForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -71,6 +72,7 @@ class ProfileControllerTest {
   @Mock private RedirectAttributes redirectAttributes;
   @Mock private BindingResult bindingResult;
   @Mock private MessageSource messageSource;
+  @Mock private FrontendAuthHelperService authHelper;
 
   @InjectMocks private ProfileController controller;
 
@@ -85,7 +87,9 @@ class ProfileControllerTest {
   void profile_unauthenticated_redirectsHome() {
     // The page is public but only meaningful for logged-in users; the
     // controller short-circuits before hitting the backend so a logged-out
-    // request doesn't burn a HTTP call.
+    // request doesn't burn a HTTP call. Since #906 Q10 the anonymous check reads
+    // authHelper.isAnonymous() rather than the null principal parameter.
+    when(authHelper.isAnonymous()).thenReturn(true);
     String view = controller.profile(new ConcurrentModel(), /*principal*/ null);
 
     assertEquals("redirect:/", view);

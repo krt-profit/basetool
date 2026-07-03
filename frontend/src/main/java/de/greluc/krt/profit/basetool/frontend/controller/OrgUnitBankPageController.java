@@ -80,6 +80,29 @@ public class OrgUnitBankPageController {
   private final BackendApiClient backendApiClient;
   private final ParallelPageLoader parallelPageLoader;
 
+  /** Response type for the caller's viewable balance cards ({@code /bank/balances}). */
+  private static final ParameterizedTypeReference<List<OrgUnitBankBalanceDto>> BALANCE_LIST_TYPE =
+      new ParameterizedTypeReference<>() {};
+
+  /**
+   * Response type for the booking-request lists ({@code /bank/requests} and its {@code /foreign}
+   * variant), both of which return a bare list of requests.
+   */
+  private static final ParameterizedTypeReference<List<BankBookingRequestDto>>
+      BOOKING_REQUEST_LIST_TYPE = new ParameterizedTypeReference<>() {};
+
+  /** Response type for the active transfer/deposit target accounts ({@code /transfer-targets}). */
+  private static final ParameterizedTypeReference<List<BankAccountRefDto>> ACCOUNT_REF_LIST_TYPE =
+      new ParameterizedTypeReference<>() {};
+
+  /** Response type for one paginated page of an account's booking history. */
+  private static final ParameterizedTypeReference<PageResponse<BankBookingDto>>
+      BANK_BOOKING_PAGE_TYPE = new ParameterizedTypeReference<>() {};
+
+  /** Response type for the user-lookup dropdown feeding the visibility/limit pickers. */
+  private static final ParameterizedTypeReference<List<UserReferenceDto>> USER_REFERENCE_LIST_TYPE =
+      new ParameterizedTypeReference<>() {};
+
   /**
    * Renders the overview page (or its {@code orgUnitBank} fragment for an in-place swap after a
    * booking write).
@@ -177,9 +200,7 @@ public class OrgUnitBankPageController {
   private List<OrgUnitBankBalanceDto> fetchBalances() {
     try {
       List<OrgUnitBankBalanceDto> balances =
-          backendApiClient.get(
-              "/api/v1/org-units/bank/balances",
-              new ParameterizedTypeReference<List<OrgUnitBankBalanceDto>>() {});
+          backendApiClient.get("/api/v1/org-units/bank/balances", BALANCE_LIST_TYPE);
       if (balances != null) {
         return balances;
       }
@@ -197,9 +218,7 @@ public class OrgUnitBankPageController {
   private List<BankBookingRequestDto> fetchOwnRequests() {
     try {
       List<BankBookingRequestDto> requests =
-          backendApiClient.get(
-              "/api/v1/org-units/bank/requests",
-              new ParameterizedTypeReference<List<BankBookingRequestDto>>() {});
+          backendApiClient.get("/api/v1/org-units/bank/requests", BOOKING_REQUEST_LIST_TYPE);
       if (requests != null) {
         return requests;
       }
@@ -218,8 +237,7 @@ public class OrgUnitBankPageController {
     try {
       List<BankBookingRequestDto> requests =
           backendApiClient.get(
-              "/api/v1/org-units/bank/requests/foreign",
-              new ParameterizedTypeReference<List<BankBookingRequestDto>>() {});
+              "/api/v1/org-units/bank/requests/foreign", BOOKING_REQUEST_LIST_TYPE);
       if (requests != null) {
         return requests;
       }
@@ -237,9 +255,7 @@ public class OrgUnitBankPageController {
   private List<BankAccountRefDto> fetchTransferTargets() {
     try {
       List<BankAccountRefDto> targets =
-          backendApiClient.get(
-              "/api/v1/org-units/bank/transfer-targets",
-              new ParameterizedTypeReference<List<BankAccountRefDto>>() {});
+          backendApiClient.get("/api/v1/org-units/bank/transfer-targets", ACCOUNT_REF_LIST_TYPE);
       if (targets != null) {
         return targets;
       }
@@ -277,7 +293,7 @@ public class OrgUnitBankPageController {
     PageResponse<BankBookingDto> bookings =
         backendApiClient.get(
             "/api/v1/org-units/bank/accounts/" + id + "/transactions?page=" + effectivePage,
-            new ParameterizedTypeReference<PageResponse<BankBookingDto>>() {});
+            BANK_BOOKING_PAGE_TYPE);
     model.addAttribute("detail", detail);
     model.addAttribute("bookings", bookings);
     model.addAttribute("paginationBaseUrl", "/org-unit-bank/accounts/" + id);
@@ -297,9 +313,7 @@ public class OrgUnitBankPageController {
       // The user dropdown feeds both the individual-visibility and the individual-limit pickers.
       if (detail.canConfigureVisibility() || detail.canConfigureApprovalLimits()) {
         List<UserReferenceDto> lookup =
-            backendApiClient.get(
-                "/api/v1/users/lookup",
-                new ParameterizedTypeReference<List<UserReferenceDto>>() {});
+            backendApiClient.get("/api/v1/users/lookup", USER_REFERENCE_LIST_TYPE);
         users = lookup == null ? List.<UserReferenceDto>of() : lookup;
       }
     }

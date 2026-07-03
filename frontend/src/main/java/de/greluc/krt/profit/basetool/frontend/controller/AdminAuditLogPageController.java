@@ -263,6 +263,20 @@ public class AdminAuditLogPageController {
               "PROMOTION_AUDIT_EXPORTED",
               "PROMOTION_AUDIT_PURGED"));
 
+  /**
+   * Response type for one page of the bank audit trail ({@code /api/v1/bank/admin/audit}), read for
+   * the BANK tab.
+   */
+  private static final ParameterizedTypeReference<PageResponse<BankAuditEventDto>> BANK_AUDIT_PAGE =
+      new ParameterizedTypeReference<>() {};
+
+  /**
+   * Response type for one page of a generic-area audit trail ({@code /api/v1/audit/{domain}}), read
+   * for every non-BANK tab.
+   */
+  private static final ParameterizedTypeReference<PageResponse<AuditEventDto>> GENERIC_AUDIT_PAGE =
+      new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -308,16 +322,9 @@ public class AdminAuditLogPageController {
     try {
       events =
           isBank
-              ? adaptBank(
-                  backendApiClient.get(
-                      uri.toUriString(),
-                      new ParameterizedTypeReference<PageResponse<BankAuditEventDto>>() {}),
-                  eventKeyPrefix)
+              ? adaptBank(backendApiClient.get(uri.toUriString(), BANK_AUDIT_PAGE), eventKeyPrefix)
               : adaptGeneric(
-                  backendApiClient.get(
-                      uri.toUriString(),
-                      new ParameterizedTypeReference<PageResponse<AuditEventDto>>() {}),
-                  eventKeyPrefix);
+                  backendApiClient.get(uri.toUriString(), GENERIC_AUDIT_PAGE), eventKeyPrefix);
     } catch (Exception e) {
       log.error("Failed to load audit log for domain {}", activeDomain, e);
       model.addAttribute("error", "admin.audit.error.load");

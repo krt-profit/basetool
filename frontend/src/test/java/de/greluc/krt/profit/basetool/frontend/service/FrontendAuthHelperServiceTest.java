@@ -107,4 +107,32 @@ class FrontendAuthHelperServiceTest {
     // When / Then
     assertTrue(service.isMemberOrAbove(), "officer authority on the token counts as member");
   }
+
+  @Test
+  void isAnonymous_withAuthenticatedToken_returnsFalse() {
+    // Given — a logged-in caller (the #906 Q10 guard replaces "@AuthenticationPrincipal OidcUser
+    // principal == null" with this; an authenticated user is never anonymous)
+    authenticateWith("ROLE_OFFICER");
+    // When / Then
+    assertFalse(service.isAnonymous(), "an authenticated caller is not anonymous");
+  }
+
+  @Test
+  void isAnonymous_withNoAuthentication_returnsTrue() {
+    // Given — empty security context (guest hitting a permitAll page)
+    SecurityContextHolder.clearContext();
+    // When / Then
+    assertTrue(service.isAnonymous(), "a missing authentication is anonymous");
+  }
+
+  @Test
+  void isAnonymous_withAnonymousToken_returnsTrue() {
+    // Given — Spring's anonymous token is treated as not-authenticated
+    SecurityContextHolder.getContext()
+        .setAuthentication(
+            new AnonymousAuthenticationToken(
+                "key", "anonymousUser", List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS"))));
+    // When / Then
+    assertTrue(service.isAnonymous(), "an anonymous token is anonymous");
+  }
 }

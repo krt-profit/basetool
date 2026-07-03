@@ -48,6 +48,21 @@ class MissionPageControllerTest {
   // method-local controller instances; harmless when a test never reaches the member finance block.
   private static final ParallelPageLoader PARALLEL = new ParallelPageLoader();
 
+  /**
+   * Builds a {@link FrontendAuthHelperService} mock whose {@link
+   * FrontendAuthHelperService#isAnonymous()} returns the requested value, so a {@link
+   * MissionWriteController} write handler resolves its {@code isPublic} flag to the branch the test
+   * exercises (guest → {@code true}, authenticated → {@code false}).
+   *
+   * @param anonymous the value {@code isAnonymous()} should report
+   * @return a stubbed auth-helper mock for injection into the controller under test
+   */
+  private static FrontendAuthHelperService authHelper(boolean anonymous) {
+    FrontendAuthHelperService helper = mock(FrontendAuthHelperService.class);
+    when(helper.isAnonymous()).thenReturn(anonymous);
+    return helper;
+  }
+
   @Test
   void createMissionForm_ShouldInitializeModelCorrectly() {
     // Arrange
@@ -87,7 +102,8 @@ class MissionPageControllerTest {
             backendApiClient,
             mock(MessageSource.class),
             new MissionPageController(
-                backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL));
+                backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
+            authHelper(true));
 
     when(backendApiClient.post(anyString(), any(), eq(Void.class), eq(true))).thenReturn(null);
 
@@ -123,7 +139,8 @@ class MissionPageControllerTest {
             backendApiClient,
             mock(MessageSource.class),
             new MissionPageController(
-                backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL));
+                backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
+            authHelper(true));
     RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
 
     when(backendApiClient.post(anyString(), any(), eq(Void.class), eq(true)))
@@ -159,7 +176,8 @@ class MissionPageControllerTest {
             backendApiClient,
             mock(MessageSource.class),
             new MissionPageController(
-                backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL));
+                backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
+            authHelper(false));
     OidcUser user = mock(OidcUser.class);
 
     when(backendApiClient.post(anyString(), any(), eq(Void.class), eq(false))).thenReturn(null);
@@ -190,7 +208,8 @@ class MissionPageControllerTest {
             backendApiClient,
             mock(MessageSource.class),
             new MissionPageController(
-                backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL));
+                backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
+            authHelper(false));
     RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
 
     when(backendApiClient.put(anyString(), any(), eq(Void.class), eq(false))).thenReturn(null);
@@ -214,7 +233,8 @@ class MissionPageControllerTest {
             backendApiClient,
             mock(MessageSource.class),
             new MissionPageController(
-                backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL));
+                backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
+            authHelper(false));
     RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
 
     when(backendApiClient.put(anyString(), any(), eq(Void.class), eq(false)))
@@ -241,7 +261,8 @@ class MissionPageControllerTest {
             backendApiClient,
             mock(MessageSource.class),
             new MissionPageController(
-                backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL));
+                backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
+            authHelper(false));
     OidcUser user = mock(OidcUser.class);
 
     when(backendApiClient.delete(anyString(), eq(Void.class), eq(false))).thenReturn(null);
@@ -270,7 +291,8 @@ class MissionPageControllerTest {
             backendApiClient,
             mock(MessageSource.class),
             new MissionPageController(
-                backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL));
+                backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
+            authHelper(true));
 
     when(backendApiClient.delete(anyString(), eq(Void.class), eq(true))).thenReturn(null);
 
@@ -298,7 +320,8 @@ class MissionPageControllerTest {
             backendApiClient,
             mock(MessageSource.class),
             new MissionPageController(
-                backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL));
+                backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
+            authHelper(false));
     OidcUser user = mock(OidcUser.class);
 
     when(backendApiClient.put(anyString(), any(), eq(Void.class), eq(false))).thenReturn(null);
@@ -336,7 +359,8 @@ class MissionPageControllerTest {
             backendApiClient,
             mock(MessageSource.class),
             new MissionPageController(
-                backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL));
+                backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
+            authHelper(true));
 
     when(backendApiClient.put(anyString(), any(), eq(Void.class), eq(true))).thenReturn(null);
 
@@ -396,9 +420,13 @@ class MissionPageControllerTest {
   void listMissions_ShowPastTrue_Guest_ShouldIgnoreShowPast() {
     // Arrange
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    FrontendAuthHelperService authHelper = mock(FrontendAuthHelperService.class);
+    // Guest: since #906 Q10 the anonymous signal is authHelper.isAnonymous(), not the null
+    // principal parameter, so it is stubbed here to drive the guest (isPublic=true, showPast-off)
+    // path.
+    when(authHelper.isAnonymous()).thenReturn(true);
     MissionPageController controller =
-        new MissionPageController(
-            backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL);
+        new MissionPageController(backendApiClient, authHelper, PARALLEL);
     Model model = new ConcurrentModel();
     // No user (null)
 
@@ -430,9 +458,12 @@ class MissionPageControllerTest {
     // Arrange
     UUID id = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    FrontendAuthHelperService authHelper = mock(FrontendAuthHelperService.class);
+    // Null principal -> public (isPublic=true) reads; since #906 Q10 the signal is
+    // authHelper.isAnonymous().
+    when(authHelper.isAnonymous()).thenReturn(true);
     MissionPageController controller =
-        new MissionPageController(
-            backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL);
+        new MissionPageController(backendApiClient, authHelper, PARALLEL);
     Model model = new ConcurrentModel();
 
     de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto mission =
@@ -577,6 +608,9 @@ class MissionPageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     FrontendAuthHelperService authHelper = mock(FrontendAuthHelperService.class);
     when(authHelper.isMemberOrAbove()).thenReturn(true);
+    // Null principal -> the mission fetch is a public (isPublic=true) read; since #906 Q10 that
+    // signal is authHelper.isAnonymous() rather than the principal parameter.
+    when(authHelper.isAnonymous()).thenReturn(true);
     MissionPageController controller =
         new MissionPageController(backendApiClient, authHelper, PARALLEL);
     Model model = new ConcurrentModel();

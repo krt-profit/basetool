@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
+import de.greluc.krt.profit.basetool.frontend.support.StringNormalization;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -87,6 +88,14 @@ public class AdminPersonalBlueprintsPageController {
 
   /** Page size for the owned-blueprint list — one row per product. */
   private static final int PAGE_SIZE = 200;
+
+  /** Response type for the paged {@code /api/v1/users} member-picker read. */
+  private static final ParameterizedTypeReference<PageResponse<UserDto>> USER_PAGE_TYPE =
+      new ParameterizedTypeReference<>() {};
+
+  /** Response type for the paged admin owned-blueprint list read. */
+  private static final ParameterizedTypeReference<PageResponse<PersonalBlueprintDto>>
+      PERSONAL_BLUEPRINT_PAGE_TYPE = new ParameterizedTypeReference<>() {};
 
   private final BackendApiClient backendApiClient;
   private final WebClient webClient;
@@ -182,7 +191,7 @@ public class AdminPersonalBlueprintsPageController {
       backendApiClient.put(
           "/api/v1/admin/personal-blueprints/items/" + id,
           new PersonalBlueprintUpdateRequest(
-              parseInstantOrNull(acquiredAt), emptyToNull(note), version),
+              parseInstantOrNull(acquiredAt), StringNormalization.blankToNull(note), version),
           PersonalBlueprintDto.class);
       redirectAttributes.addFlashAttribute(
           "successToast", "personalInventory.blueprints.toast.noteUpdated");
@@ -378,7 +387,7 @@ public class AdminPersonalBlueprintsPageController {
   private List<UserDto> fetchUsers() {
     try {
       PageResponse<UserDto> result =
-          backendApiClient.get("/api/v1/users?size=1000", new ParameterizedTypeReference<>() {});
+          backendApiClient.get("/api/v1/users?size=1000", USER_PAGE_TYPE);
       if (result == null || result.content() == null) {
         return Collections.emptyList();
       }
@@ -411,7 +420,7 @@ public class AdminPersonalBlueprintsPageController {
       if (q != null && !q.isBlank()) {
         uri.append("&q=").append(enc(q));
       }
-      return backendApiClient.get(uri.toString(), new ParameterizedTypeReference<>() {});
+      return backendApiClient.get(uri.toString(), PERSONAL_BLUEPRINT_PAGE_TYPE);
     } catch (Exception e) {
       log.error("Failed to fetch owned blueprints for user {}", userSub, e);
       return new PageResponse<>(new ArrayList<>(), 0, PAGE_SIZE, 0, 0, List.of());
@@ -453,16 +462,6 @@ public class AdminPersonalBlueprintsPageController {
     } catch (Exception e) {
       return null;
     }
-  }
-
-  /**
-   * Collapses a blank string to {@code null}.
-   *
-   * @param value the raw value
-   * @return the trimmed value, or {@code null} if blank
-   */
-  private static String emptyToNull(String value) {
-    return (value == null || value.isBlank()) ? null : value;
   }
 
   /**

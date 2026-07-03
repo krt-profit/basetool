@@ -19,11 +19,17 @@
 
 package de.greluc.krt.profit.basetool.frontend.config;
 
+import de.greluc.krt.profit.basetool.frontend.support.StringNormalization;
 import java.beans.PropertyEditorSupport;
-import java.text.Normalizer;
 import lombok.RequiredArgsConstructor;
 
-/** Spring Normalized String property editor. */
+/**
+ * Spring {@link PropertyEditorSupport} that trims, NFC-normalizes and length-caps form-bound {@code
+ * String} fields, delegating to {@link StringNormalization#normalize(String, int, boolean)} so the
+ * frontend and backend apply the identical canonicalization. Registered globally via {@code
+ * GlobalBindingAdvice}; the {@code emptyAsNull} flag controls whether a blank input becomes {@code
+ * null} (the default for write-DTOs) or stays the empty string.
+ */
 @RequiredArgsConstructor
 public class NormalizedStringEditor extends PropertyEditorSupport {
 
@@ -32,19 +38,6 @@ public class NormalizedStringEditor extends PropertyEditorSupport {
 
   @Override
   public void setAsText(String text) throws IllegalArgumentException {
-    if (text == null) {
-      setValue(null);
-      return;
-    }
-    String trimmed = text.trim();
-    if (emptyAsNull && trimmed.isEmpty()) {
-      setValue(null);
-      return;
-    }
-    String normalized = Normalizer.normalize(trimmed, Normalizer.Form.NFC);
-    if (normalized.length() > maxLength) {
-      throw new IllegalArgumentException("String exceeds maximum allowed length of " + maxLength);
-    }
-    setValue(normalized);
+    setValue(StringNormalization.normalize(text, maxLength, emptyAsNull));
   }
 }

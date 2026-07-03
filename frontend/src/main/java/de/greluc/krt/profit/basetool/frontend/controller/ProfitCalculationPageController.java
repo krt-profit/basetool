@@ -52,6 +52,14 @@ public class ProfitCalculationPageController {
 
   private final BackendApiClient backendApiClient;
 
+  /** Response type for the cached ship-type catalog page fed into the ship dropdown. */
+  private static final ParameterizedTypeReference<PageResponse<ShipTypeDto>> SHIP_TYPE_PAGE_TYPE =
+      new ParameterizedTypeReference<>() {};
+
+  /** Response type for the cached terminal catalog page, mined for its distinct star systems. */
+  private static final ParameterizedTypeReference<PageResponse<Map<String, Object>>>
+      TERMINAL_PAGE_TYPE = new ParameterizedTypeReference<>() {};
+
   /**
    * Renders the profit-calculation page after loading the ship-type catalog (capacity-filtered) and
    * the distinct set of star systems from the terminal list. A backend failure for either call
@@ -70,8 +78,7 @@ public class ProfitCalculationPageController {
       // Fetch ship types for the dropdown
       PageResponse<ShipTypeDto> shipTypesPage =
           backendApiClient.getCached(
-              "/api/v1/ship-types?size=1000&sort=name,asc",
-              new ParameterizedTypeReference<PageResponse<ShipTypeDto>>() {});
+              "/api/v1/ship-types?size=1000&sort=name,asc", SHIP_TYPE_PAGE_TYPE);
 
       List<ShipTypeDto> shipTypes =
           (shipTypesPage != null && shipTypesPage.content() != null)
@@ -90,9 +97,7 @@ public class ProfitCalculationPageController {
 
       // Fetch terminals to get unique star systems
       PageResponse<Map<String, Object>> terminalsPage =
-          backendApiClient.getCached(
-              "/api/v1/terminals?size=10000",
-              new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {});
+          backendApiClient.getCached("/api/v1/terminals?size=10000", TERMINAL_PAGE_TYPE);
 
       Set<String> starSystems = new TreeSet<>();
       if (terminalsPage != null && terminalsPage.content() != null) {
