@@ -56,6 +56,28 @@
 // evaluated per call): the dictionary is assigned by the inline bootstrap and
 // window.missionPresence only exists after the conditional presence bootstrap's
 // DOMContentLoaded (and only on !isNew pages with an authUserId).
+// Single source of truth for the mission's refreshable sections (sectionKey ->
+// {container, fragmentValue}). Shared by the write seam below AND the live-sync receiver
+// further down, which derives its container map from it — keeping them one object means a
+// section added here is automatically picked up by peers' receivers (REQ-FE-010); the two
+// maps drifted apart once (objectives/frequencies missing on the receive side) and must not
+// diverge again.
+const MISSION_SECTIONS = {
+    crew: { container: '#crew-board-results', fragmentValue: 'crew-board' },
+    finance: { container: '#finance-results', fragmentValue: 'finance' },
+    mgmt: { container: '#mission-mgmt-results', fragmentValue: 'mgmt' },
+    overview: { container: '#overview-results', fragmentValue: 'overview' },
+    steps: { container: '#mission-steps-results', fragmentValue: 'steps-editor' },
+    objectives: {
+        container: '#mission-objectives-results',
+        fragmentValue: 'objectives-editor',
+    },
+    frequencies: {
+        container: '#mission-frequencies-results',
+        fragmentValue: 'frequencies-editor',
+    },
+};
+
 const missionSeam = window.krtFetch.sectionWrite({
     dict: function () {
         return window.MISSION_SUBRES_I18N || {};
@@ -79,21 +101,7 @@ const missionSeam = window.krtFetch.sectionWrite({
         reloadDetailFallback: 'Bitte Seite neu laden.',
         refreshErrorKey: 'mission.section.refresh.error',
     },
-    sections: {
-        crew: { container: '#crew-board-results', fragmentValue: 'crew-board' },
-        finance: { container: '#finance-results', fragmentValue: 'finance' },
-        mgmt: { container: '#mission-mgmt-results', fragmentValue: 'mgmt' },
-        overview: { container: '#overview-results', fragmentValue: 'overview' },
-        steps: { container: '#mission-steps-results', fragmentValue: 'steps-editor' },
-        objectives: {
-            container: '#mission-objectives-results',
-            fragmentValue: 'objectives-editor',
-        },
-        frequencies: {
-            container: '#mission-frequencies-results',
-            fragmentValue: 'frequencies-editor',
-        },
-    },
+    sections: MISSION_SECTIONS,
     pageUrl: function () {
         return window.missionId ? '/missions/' + window.missionId : null;
     },
@@ -251,13 +259,14 @@ document.addEventListener('krt:swapped', function (ev) {
 // through its own authenticated, authorization-checked fragment endpoint, so guest redaction and
 // the member-only finance gate still apply per viewer.
 (function () {
-    const SECTION_CONTAINERS = {
-        crew: '#crew-board-results',
-        finance: '#finance-results',
-        mgmt: '#mission-mgmt-results',
-        overview: '#overview-results',
-        steps: '#mission-steps-results',
-    };
+    // Derived from the seam's MISSION_SECTIONS map (same file, top) so the receiver covers
+    // exactly the sections the write side broadcasts — a hand-maintained copy here once lost
+    // 'objectives' and 'frequencies', leaving peers' Ziele / Weitere Frequenzen stale until a
+    // manual reload.
+    const SECTION_CONTAINERS = {};
+    Object.keys(MISSION_SECTIONS).forEach(function (sectionKey) {
+        SECTION_CONTAINERS[sectionKey] = MISSION_SECTIONS[sectionKey].container;
+    });
     const ALL_SECTIONS = Object.keys(SECTION_CONTAINERS);
     const COALESCE_MS = 400;
     const pendingNow = {}; // sections queued for the next debounce tick (Set-like map)

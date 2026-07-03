@@ -539,8 +539,9 @@ controller-local `@ExceptionHandler` is bypassed.
 ### REQ-FE-010 — Live multi-user mission updates over the presence WebSocket
 
 When several users have the same mission detail page open, a change one of them makes (a participant
-joining, a crew move, a finance entry, a manager/owner change, a core/schedule/status/party-lead/
-frequency edit) must appear on the **others'** views without a manual reload. REQ-FE-001…007 keep the
+joining, a crew move, a finance entry, a manager/owner change, a core/schedule/status/party-lead
+edit, an Ablauf-step, Ziele-objective or frequency/custom-frequency edit) must appear on the
+**others'** views without a manual reload. REQ-FE-001…007 keep the
 **acting** user's own document fresh; they cannot reach a second user's already-rendered page. The gap
 is the in-place sibling of the bfcache gap (REQ-FE-008): the other viewer's DOM is stale until they
 reload.
@@ -558,8 +559,18 @@ from echoing back into a loop.
 affected fragment through its own authenticated, authorization-checked
 `GET /missions/{id}?fragment=…`, so guest field-redaction and the member-only finance gate still
 apply per viewer; a guest never receives privileged data via the push. The relay sanitises the
-inbound `sections` array (keys outside {`crew`,`finance`,`mgmt`,`overview`} dropped, count capped) so
+inbound `sections` array (keys outside the whitelist
+{`crew`,`finance`,`mgmt`,`overview`,`steps`,`objectives`,`frequencies`} dropped, count capped) so
 a client can neither target an arbitrary fetch nor amplify one frame into an unbounded fan-out. The
+whitelist, the acting client's broadcast and the peers' receiver all mirror the single
+`MISSION_SECTIONS` seam map in `mission-detail.js` — a section key present in the seam map but
+missing from the relay whitelist or the receiver leaves the peers' section stale until a manual
+reload. **Binding:** these three mirror points must be kept in sync in the **same change** whenever a
+live-synced section is **added, changed or removed** — the receiver derives its map from the seam
+map so those two cannot diverge, and the server whitelist (which cannot share the client map) must be
+edited alongside. A live-synced mutation added on one side but not propagated across all three is
+incomplete; this is the REQ-FE-010 defect that shipped when `objectives`/`frequencies` were added to
+the write seam but not the receiver or the whitelist. The
 `overview` fragment (Tab-1 + a `#overview-head-meta` carrier that patches the sticky header title /
 status pill / facts) is added by this requirement so core/schedule/status edits propagate too.
 
@@ -585,8 +596,10 @@ swap-out point is `MissionPresenceService` / `MissionPresenceWebSocketHandler` (
 **Acceptance**
 
 - [ ] With the same mission open in two sessions, a mutation by user A (participant add, crew move,
-  finance entry, manager/owner change, core/schedule/status/party-lead/frequency edit) appears on
-  user B's view within a short delay without a manual reload.
+  finance entry, manager/owner change, core/schedule/status/party-lead edit, Ablauf-step,
+  Ziele-objective or frequency/custom-frequency edit) appears on user B's view within a short delay
+  without a manual reload — including the Verwaltung steps/objectives/frequencies editors, not only
+  their Übersicht mirrors.
 - [ ] No mission data crosses the socket — a guest viewer's auto-refresh still renders the
   guest-redacted fragment and the member-only finance section stays gated per viewer.
 - [ ] An incoming change while user B has a modal open (or is editing the affected section) does not
@@ -596,22 +609,26 @@ swap-out point is `MissionPresenceService` / `MissionPresenceWebSocketHandler` (
 - [ ] An authenticated user cannot open the presence socket for a mission the backend forbids
   (handshake refused), and a flood of `changed` frames from one session is rate-limited.
 
-Coverage note: `MissionLiveSyncE2eTest` exercises the representative path end-to-end (a participant
-add propagating to a second viewer in place, no reload); the remaining mutation kinds in the first
-bullet all route through the same `krtRefreshMissionSection` / `krtNotifyMissionChanged` chokepoint, so
-they inherit the same behaviour, and the per-viewer guest-redaction guarantee rests on the existing
+Coverage note: `MissionLiveSyncE2eTest` exercises the representative path end-to-end twice — a
+participant add propagating to a second viewer in place (no reload), and a Ziele-objective add
+reaching a passive viewer's backgrounded editor (pinning a section key beyond the original four
+across broadcast → relay whitelist → receiver); the remaining mutation kinds in the first bullet all
+route through the same `krtRefreshMissionSection` / `krtNotifyMissionChanged` chokepoint, so they
+inherit the same behaviour, and the per-viewer guest-redaction guarantee rests on the existing
 authenticated fragment GET (covered by the mission fragment/redaction tests) rather than a dedicated
 live-sync case.
 
 **Enforced by:** `MissionPresenceWebSocketHandlerTest` (relay to peers, origin exclusion, key
-sanitising/dedup, no-op on empty, per-session rate limit) · `MissionPresenceHandshakeAuthInterceptorTest`
+sanitising/dedup, full seam-map whitelist relay, no-op on empty, per-session rate limit) ·
+`MissionPresenceHandshakeAuthInterceptorTest`
 (handshake allowed on authorized read, refused on 403/404, fail-open on transient, 400 on a malformed
 path) · `MissionLiveSyncE2eTest` (two-context live participant-add propagation + no-reload assertion) ·
 **Code:** `MissionPresenceWebSocketHandler.broadcastChanged` / `allowChangedFrame`,
 `MissionPresenceHandshakeAuthInterceptor`, `mission-presence.js` (`sendChanged` / `krt:mission-changed`
-/ `krt:mission-resync`), `mission-detail.html` (`krtRefreshMissionSection` broadcast + live-sync
-receiver with flush-time busy re-check + `overviewSection` fragment + finance-badge `krt:swapped`
-listener), `MissionPageController` (`overview` fragment case) · **ADR:** ADR-0031
+/ `krt:mission-resync`), `mission-detail.js` (`krtRefreshMissionSection` broadcast + live-sync
+receiver — its container map derived from the `MISSION_SECTIONS` seam map — with flush-time busy
+re-check + finance-badge `krt:swapped` listener), `mission-detail.html` (`overviewSection` fragment),
+`MissionPageController` (`overview` fragment case) · **ADR:** ADR-0031, ADR-0069
 
 ### REQ-FE-011 — User-selection fields are searchable comboboxes (username + display name)
 
