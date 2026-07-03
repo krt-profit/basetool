@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.0.14](https://github.com/krt-profit/basetool/releases/tag/v1.0.14) - 2026-07-03
+
 ## [v1.0.13](https://github.com/krt-profit/basetool/releases/tag/v1.0.13) - 2026-07-03
 
 ### Added
@@ -54,6 +56,7 @@
 
 ### Fixed
 
+- **Einsatz anlegen: Formular nutzt jetzt die volle Breite.** Das Formular „Neuer Einsatz" (`/missions/new`) stand bisher in der linken Bildschirmhälfte, weil die rechte Spalte des Verwaltungs-Rasters nur die reinen Bearbeitungs-Editoren enthält, die beim Anlegen fehlen. Auf der Anlege-Seite fällt das Raster jetzt auf eine einzelne, volle Spalte zusammen, sodass die Details-Karte zentriert die gesamte Breite unter der Überschrift einnimmt (REQ-MISSION-015).
 - **Kein selbst verursachter Bearbeitungskonflikt mehr beim schnellen Bearbeiten.** Wer ein Ziel oder einen Ablauf-Schritt eingab und sofort auf „+", das Klassifizierungs-Dropdown oder die Sortierpfeile klickte, erhielt bisher fälschlich die Konflikt-Warnung („Aktuelle Werte laden?") — und das gerade Eingegebene konnte dabei verloren gehen. Aufeinanderfolgende eigene Änderungen desselben Abschnitts werden jetzt der Reihe nach gespeichert und übernehmen jeweils den aktuellen Stand. Tool-weit umgesetzt (u. a. auch Kartellbank-Freigaben, Lager-Zuordnungen und -Notizen, Auftragsstatus und Org-Struktur), REQ-FE-012.
 
 - **Einsatz: Live-Synchronisation aktualisiert jetzt auch Ablauf, Ziele und Funkfrequenzen bei anderen Betrachtern.** Bearbeitete ein Nutzer den Ablauf, die Ziele oder die Funkfrequenzen eines Einsatzes, blieben die Verwaltung-Editoren anderer Betrachter desselben Einsatzes bis zum manuellen Neuladen veraltet, weil das Änderungssignal für diese Abschnitte verworfen wurde. Jetzt ziehen alle Abschnitte live nach (REQ-FE-010).
