@@ -173,6 +173,7 @@ class ArchitectureTest {
           "move",
           "reset",
           "patch",
+          "toggle",
           "complete",
           "approve",
           "reject",
@@ -307,6 +308,34 @@ class ArchitectureTest {
   }
 
   @Test
+  void controllersMustNotInjectTheLazyMembershipMapper() {
+    // Reasoning: OrgUnitMembershipMapper.toDto reads user.effectiveName through the LAZY user
+    // association. With open-in-view disabled, a controller that maps the entity to its DTO
+    // response after the service transaction committed throws LazyInitializationException — the
+    // write succeeds but the response 500s (the shipped /organisation/leitung "assign
+    // Kommandoleiter" regression). ADR-0067 therefore moved the membership DTO projection into
+    // OrgUnitMembershipService's own transactions; this rule pins the new invariant by keeping
+    // the mapper out of the controller layer entirely, replacing the retired
+    // controllersUsingTheLazyMembershipMapperMustBeTransactional rule (which only demanded a
+    // class-level @Transactional around controller-side mapping and became vacuous once no
+    // controller injected the mapper anymore).
+    noClasses()
+        .that()
+        .areAnnotatedWith("org.springframework.web.bind.annotation.RestController")
+        .should()
+        .dependOnClassesThat()
+        .haveFullyQualifiedName(
+            "de.greluc.krt.profit.basetool.backend.mapper.OrgUnitMembershipMapper")
+        .because(
+            "Membership DTO projection happens inside OrgUnitMembershipService (ADR-0067) — a"
+                + " controller-side mapping outside a transaction throws"
+                + " LazyInitializationException on the LAZY user association once the service"
+                + " transaction has committed (the write succeeds but the response 500s). Use the"
+                + " service's …Dto projection methods instead.")
+        .check(CLASSES);
+  }
+
+  @Test
   void everyRestControllerShouldDeclareAtLeastOneAuthorisationAnnotation() {
     // Reasoning: every @RestController must make at least one explicit authorisation
     // decision somewhere — either a class-level @PreAuthorize or at least one
@@ -327,45 +356,6 @@ class ArchitectureTest {
             "Every REST controller class must declare at least one @PreAuthorize annotation (either"
                 + " on the class or on any method) so it cannot silently bypass authorisation."
                 + " Public endpoints should use @PreAuthorize(\"permitAll()\").")
-        .check(CLASSES);
-  }
-
-  @Test
-  void controllersUsingTheLazyMembershipMapperMustBeTransactional() {
-    // Reasoning: OrgUnitMembershipMapper.toDto reads user.effectiveName through the LAZY user
-    // association. When a controller maps a service-returned entity to its DTO response *after*
-    // the service @Transactional has already committed, the persistence session is gone and the
-    // mapper throws LazyInitializationException — the write succeeds but the response 500s. That is
-    // exactly the /organisation/leitung "assign Kommandoleiter" regression: SquadronRoleController
-    // shipped without the class-level @Transactional that every other mapper-wiring controller
-    // carries. A class-level @Transactional keeps the session open across the mapping, so every
-    // @RestController that depends on this mapper must be transactional.
-    DescribedPredicate<JavaClass> injectTheLazyMembershipMapper =
-        new DescribedPredicate<>("inject OrgUnitMembershipMapper") {
-          @Override
-          public boolean test(JavaClass javaClass) {
-            return javaClass.getFields().stream()
-                .anyMatch(
-                    field ->
-                        field
-                            .getRawType()
-                            .getFullName()
-                            .equals(
-                                "de.greluc.krt.profit.basetool.backend.mapper."
-                                    + "OrgUnitMembershipMapper"));
-          }
-        };
-    classes()
-        .that()
-        .areAnnotatedWith("org.springframework.web.bind.annotation.RestController")
-        .and(injectTheLazyMembershipMapper)
-        .should()
-        .beAnnotatedWith(TRANSACTIONAL)
-        .because(
-            "OrgUnitMembershipMapper.toDto reads user.effectiveName through the LAZY user"
-                + " association; a controller that maps the entity to its DTO response outside a"
-                + " transaction throws LazyInitializationException once the service has committed"
-                + " (the write succeeds but the response 500s).")
         .check(CLASSES);
   }
 

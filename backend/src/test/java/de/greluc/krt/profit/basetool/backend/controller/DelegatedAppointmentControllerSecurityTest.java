@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.model.dto.KommandoGroupDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipDto;
 import de.greluc.krt.profit.basetool.backend.service.KommandoGroupService;
 import de.greluc.krt.profit.basetool.backend.service.OrgRoleManagementSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipService;
@@ -78,12 +79,12 @@ class DelegatedAppointmentControllerSecurityTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 
-  private OrgUnitMembership membershipStub() {
-    OrgUnitMembership m = new OrgUnitMembership();
-    m.setId(new OrgUnitMembershipId(targetUser, squadronId));
-    m.setRole(MembershipRole.KOMMANDOLEITER);
-    m.setVersion(1L);
-    return m;
+  private OrgUnitMembershipDto dtoStub() {
+    // The squadron-rank endpoints now return the service's DTO projection (assignSquadronRankDto),
+    // so the mocked service yields a DTO directly (L4, #923). This gate matrix only asserts the
+    // status, so a minimal DTO with null display fields is sufficient.
+    return new OrgUnitMembershipDto(
+        targetUser, null, squadronId, null, false, false, false, null, 1L);
   }
 
   private static org.springframework.test.web.servlet.request.RequestPostProcessor member(
@@ -110,8 +111,8 @@ class DelegatedAppointmentControllerSecurityTest {
 
   @Test
   void assignSquadronRank_admin_isAllowed() throws Exception {
-    when(orgUnitMembershipService.assignSquadronRank(any(), any(), any(), any(), any()))
-        .thenReturn(membershipStub());
+    when(orgUnitMembershipService.assignSquadronRankDto(any(), any(), any(), any(), any()))
+        .thenReturn(dtoStub());
     mockMvc
         .perform(
             put("/api/v1/squadrons/{s}/ranks/{u}", squadronId, targetUser)
@@ -125,8 +126,8 @@ class DelegatedAppointmentControllerSecurityTest {
   void assignSquadronRank_delegatedStaffelleiter_isAllowed() throws Exception {
     when(orgRoleManagementSecurityService.canAssignSquadronRank(any(), any(), any()))
         .thenReturn(true);
-    when(orgUnitMembershipService.assignSquadronRank(any(), any(), any(), any(), any()))
-        .thenReturn(membershipStub());
+    when(orgUnitMembershipService.assignSquadronRankDto(any(), any(), any(), any(), any()))
+        .thenReturn(dtoStub());
     mockMvc
         .perform(
             put("/api/v1/squadrons/{s}/ranks/{u}", squadronId, targetUser)
