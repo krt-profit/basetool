@@ -25,7 +25,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /**
  * Basic-auth credentials for the Prometheus scrape endpoint {@code /actuator/prometheus} (prefix
  * {@code app.monitoring.scrape}, fed by the {@code MONITORING_SCRAPE_USER} / {@code
- * MONITORING_SCRAPE_PASSWORD} environment variables — REQ-OBS-005, ADR-0066).
+ * MONITORING_SCRAPE_PASSWORD} environment variables — REQ-OBS-005, ADR-0072).
  *
  * <p>Both values are deliberately optional and carry no {@code @NotBlank} constraint: an
  * environment without a Prometheus scraper (dev, test, e2e, prod before the monitoring rollout)

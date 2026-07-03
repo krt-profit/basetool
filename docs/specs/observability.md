@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-02.
-> **Owner area:** OBS · **Related:** [`security-and-access.md`](security-and-access.md), [`org-unit-tenancy.md`](org-unit-tenancy.md), [ADR-0066](../adr/0066-monitoring-stack-prometheus-grafana.md), monitoring epic [#936](https://github.com/krt-profit/basetool/issues/936)
+> **Owner area:** OBS · **Related:** [`security-and-access.md`](security-and-access.md), [`org-unit-tenancy.md`](org-unit-tenancy.md), [ADR-0072](../adr/0072-monitoring-stack-prometheus-grafana.md), monitoring epic [#936](https://github.com/krt-profit/basetool/issues/936)
 
 # Observability & logging
 
@@ -8,7 +8,7 @@
 Every request is traceable end-to-end across all three modules (backend, frontend, ingest)
 via shared MDC fields, with machine-parseable JSON logs in prod — and never any PII in the
 logs. The monitoring stack (Prometheus/Grafana/Loki/Tempo/Alloy, epic
-[#936](https://github.com/krt-profit/basetool/issues/936), ADR-0066) builds on these
+[#936](https://github.com/krt-profit/basetool/issues/936), ADR-0072) builds on these
 guarantees; REQ-OBS-005 onward record its binding rules.
 
 ## Requirements
@@ -53,7 +53,7 @@ same UUID space and is not PII).
 ### REQ-OBS-005 — Prometheus metrics endpoint, fail-closed
 
 All three modules expose Micrometer metrics at `GET /actuator/prometheus` for the monitoring
-scrape (epic #936, ADR-0066). The endpoint is **never public**:
+scrape (epic #936, ADR-0072). The endpoint is **never public**:
 
 - Each module guards exactly this path with a **dedicated `SecurityFilterChain`**
   (`MonitoringScrapeSecurityConfig`, ordered before the main chain) using HTTP basic auth
@@ -78,7 +78,7 @@ scrape (epic #936, ADR-0066). The endpoint is **never public**:
   reachable from the internal scrape network. This is also the compensating control for the
   per-request BCrypt cost of basic auth — without the edge deny, an internet client could
   drive unthrottled credential guesses / CPU load against the endpoint (residual-risk record
-  in ADR-0066).
+  in ADR-0072).
 - Every meter carries the common tag `application=basetool-{backend,frontend,ingest}` so
   dashboards can select the module.
 
@@ -106,7 +106,7 @@ rule — no blanket "everything is masked" claim:
   owner-approved data-protection decision (2026-07-02) for security monitoring and abuse
   detection; it is conditioned on the privacy-policy extension (`privacy.html` + DE/EN
   bundles) that ships with the Phase-2 PR, and Loki is deliberately excluded from backups so
-  the GFS retention cannot silently extend those 31 days (ADR-0066).
+  the GFS retention cannot silently extend those 31 days (ADR-0072).
 - **PostgreSQL container logs** — ingested with `log_error_verbosity=terse` so `DETAIL`
   lines cannot leak row data.
 - Loki labels stay low-cardinality (`app`, `level`, bounded `host`); log lines are never
@@ -126,7 +126,7 @@ rule — no blanket "everything is masked" claim:
   plain HTTP. This carve-out is
   owner-approved (2026-07-02, epic #936) and amends the HTTPS-only posture; the REQ-SEC-014
   wording in [`security-and-access.md`](security-and-access.md) is amended in the Phase-2 PR
-  that actually creates those networks. Rationale and residual risk live in ADR-0066.
+  that actually creates those networks. Rationale and residual risk live in ADR-0072.
 - The private key of the shared `keystore.p12` never leaves the four existing services;
   Grafana gets its own self-signed certificate.
 

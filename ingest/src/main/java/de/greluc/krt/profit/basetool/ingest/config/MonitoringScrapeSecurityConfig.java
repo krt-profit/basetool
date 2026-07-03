@@ -37,7 +37,7 @@ import org.springframework.security.web.SecurityFilterChain;
 
 /**
  * Dedicated, fail-closed security filter chain for the Prometheus scrape endpoint {@code
- * /actuator/prometheus} (REQ-OBS-005, ADR-0066, epic #936 Phase 1). Mirrors the backend/frontend
+ * /actuator/prometheus} (REQ-OBS-005, ADR-0072, epic #936 Phase 1). Mirrors the backend/frontend
  * configs of the same name.
  *
  * <p>Design decisions, all deliberate:

@@ -27,9 +27,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.mapper.OrgUnitMembershipMapper;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipLeadToggleRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipDto;
@@ -46,13 +44,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 /**
  * Pure-method unit tests for {@link SpecialCommandMembershipController}. The Spring-MVC binding
  * ({@code @PreAuthorize} SpEL on the security service, JSON marshalling) is covered by integration
- * tests; here we pin the controller's delegation to the service + mapper.
+ * tests; here we pin the controller's delegation to the service. Since L4 (#923) the entity-&gt;DTO
+ * mapping moved into {@link OrgUnitMembershipService} (the {@code *Dto} projections), so the
+ * controller no longer wires the mapper and simply forwards the DTO the service returns.
  */
 @ExtendWith(MockitoExtension.class)
 class SpecialCommandMembershipControllerTest {
 
   @Mock private OrgUnitMembershipService service;
-  @Mock private OrgUnitMembershipMapper mapper;
 
   @InjectMocks private SpecialCommandMembershipController controller;
 
@@ -62,12 +61,10 @@ class SpecialCommandMembershipControllerTest {
   }
 
   @Test
-  void listMembers_mapsEntityListThroughMapper() {
+  void listMembers_forwardsServiceDtoProjection() {
     UUID scId = UUID.randomUUID();
-    OrgUnitMembership entity = new OrgUnitMembership();
     OrgUnitMembershipDto dto = sampleDto(UUID.randomUUID(), scId);
-    when(service.listMembers(scId)).thenReturn(List.of(entity));
-    when(mapper.toDto(entity)).thenReturn(dto);
+    when(service.listMemberDtos(scId)).thenReturn(List.of(dto));
 
     List<OrgUnitMembershipDto> result = controller.listMembers(scId);
 
@@ -76,18 +73,16 @@ class SpecialCommandMembershipControllerTest {
   }
 
   @Test
-  void addMember_delegatesAndMaps() {
+  void addMember_forwardsServiceDto() {
     UUID scId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    OrgUnitMembership entity = new OrgUnitMembership();
     OrgUnitMembershipDto dto = sampleDto(userId, scId);
-    when(service.addMember(scId, userId)).thenReturn(entity);
-    when(mapper.toDto(entity)).thenReturn(dto);
+    when(service.addMemberDto(scId, userId)).thenReturn(dto);
 
     OrgUnitMembershipDto result = controller.addMember(scId, userId);
 
     assertSame(dto, result);
-    verify(service).addMember(scId, userId);
+    verify(service).addMemberDto(scId, userId);
   }
 
   @Test
@@ -102,34 +97,30 @@ class SpecialCommandMembershipControllerTest {
   }
 
   @Test
-  void patchFlags_delegatesAndMaps() {
+  void patchFlags_forwardsServiceDto() {
     UUID scId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     MembershipFlagsPatchRequest request = new MembershipFlagsPatchRequest(true, null, 4L);
-    OrgUnitMembership entity = new OrgUnitMembership();
     OrgUnitMembershipDto dto = sampleDto(userId, scId);
-    when(service.patchFlags(scId, userId, request)).thenReturn(entity);
-    when(mapper.toDto(entity)).thenReturn(dto);
+    when(service.patchFlagsDto(scId, userId, request)).thenReturn(dto);
 
     OrgUnitMembershipDto result = controller.patchFlags(scId, userId, request);
 
     assertSame(dto, result);
-    verify(service).patchFlags(eq(scId), eq(userId), any(MembershipFlagsPatchRequest.class));
+    verify(service).patchFlagsDto(eq(scId), eq(userId), any(MembershipFlagsPatchRequest.class));
   }
 
   @Test
-  void toggleLead_delegatesAndMaps() {
+  void toggleLead_forwardsServiceDto() {
     UUID scId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     MembershipLeadToggleRequest request = new MembershipLeadToggleRequest(true, 0L);
-    OrgUnitMembership entity = new OrgUnitMembership();
     OrgUnitMembershipDto dto = sampleDto(userId, scId);
-    when(service.toggleLead(scId, userId, request)).thenReturn(entity);
-    when(mapper.toDto(entity)).thenReturn(dto);
+    when(service.toggleLeadDto(scId, userId, request)).thenReturn(dto);
 
     OrgUnitMembershipDto result = controller.toggleLead(scId, userId, request);
 
     assertSame(dto, result);
-    verify(service).toggleLead(eq(scId), eq(userId), any(MembershipLeadToggleRequest.class));
+    verify(service).toggleLeadDto(eq(scId), eq(userId), any(MembershipLeadToggleRequest.class));
   }
 }

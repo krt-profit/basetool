@@ -20,18 +20,21 @@
 package de.greluc.krt.profit.basetool.backend.support;
 
 import java.text.Normalizer;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Shared free-text normalization primitives for inbound string fields.
  *
  * <p>Both the JSON path ({@code NormalizedStringDeserializer}) and the form-binding path ({@code
  * NormalizedStringEditor}) must land a submitted value in the same canonical form so a JSON post
- * and a form post of the identical text reach the database identically. This class holds the two
- * pieces they share — the single authoritative free-text length cap and the
- * NFC-normalize-and-length-check step — while each caller keeps its own null/blank policy (which
- * deliberately differ: the JSON deserializer maps any Unicode-whitespace-only value to {@code
- * null}, the form editor only an ASCII-empty one, and only when its {@code emptyAsNull} flag is
- * set).
+ * and a form post of the identical text reach the database identically. This class holds the pieces
+ * they share — the single authoritative free-text length cap, the NFC-normalize-and-length-check
+ * step, the full trim + empty-policy + normalize {@link #normalize(String, int, boolean) pipeline},
+ * and the two blank-collapse primitives ({@link #blankToNull(String)}, {@link #trimToNull(String)})
+ * that the service layer reuses instead of re-inlining the {@code null}/blank idiom at each note
+ * field. The JSON deserializer keeps its own Unicode-blank-to-{@code null} policy inline because it
+ * deliberately differs from the form editor's ASCII-empty policy.
  */
 public final class StringNormalization {
 
@@ -64,5 +67,74 @@ public final class StringNormalization {
       throw new IllegalArgumentException("String exceeds maximum allowed length of " + maxLength);
     }
     return normalized;
+  }
+
+  /**
+   * Collapses a {@code null} or blank string to {@code null}, otherwise returns it unchanged.
+   *
+   * <p>"Blank" is {@link String#isBlank()} — a {@link Character#isWhitespace(int)}-based test — so
+   * a value made up only of spaces, tabs or other Unicode whitespace (e.g. an em space) maps to
+   * {@code null}, whereas a non-breaking space (U+00A0, deliberately not {@code isWhitespace})
+   * counts as content. Unlike {@link #trimToNull(String)} the returned value is <em>not</em>
+   * stripped; this is the plain "empty means absent" collapse used by importer resolution code that
+   * must leave an otherwise-present value byte-for-byte intact.
+   *
+   * @param value the candidate value, may be {@code null}
+   * @return {@code null} when {@code value} is {@code null} or blank, otherwise {@code value}
+   *     unchanged
+   */
+  @Contract(value = "null -> null", pure = true)
+  public static @Nullable String blankToNull(@Nullable String value) {
+    return (value == null || value.isBlank()) ? null : value;
+  }
+
+  /**
+   * Strips leading/trailing (Unicode) whitespace and collapses a {@code null} or blank result to
+   * {@code null}.
+   *
+   * <p>Equivalent to {@code value == null || value.isBlank() ? null : value.strip()}: a {@code
+   * null} or whitespace-only input yields {@code null}, otherwise the {@link String#strip()
+   * stripped} value. This is the canonical free-text "note" collapse. Every inbound note has
+   * already been trimmed, NFC-normalized and length-capped by the global binder ({@code
+   * NormalizedStringDeserializer} for JSON, {@code NormalizedStringEditor} for forms), so at the
+   * service layer this only re-asserts the "blank means cleared" invariant on an already-clean
+   * value — it centralizes the idiom the note setters used to inline five different ways.
+   *
+   * @param value the candidate value, may be {@code null}
+   * @return the stripped value, or {@code null} when {@code value} is {@code null} or blank
+   */
+  @Contract(value = "null -> null", pure = true)
+  public static @Nullable String trimToNull(@Nullable String value) {
+    return (value == null || value.isBlank()) ? null : value.strip();
+  }
+
+  /**
+   * Full inbound-string pipeline: trim, optional empty-to-{@code null}, then NFC-normalize and cap.
+   *
+   * <p>Mirrors {@code NormalizedStringEditor}'s form-binding path exactly so the editor is a
+   * one-line delegate: a {@code null} input stays {@code null}; the value is trimmed with {@link
+   * String#trim()}; when {@code emptyAsNull} is set and the trimmed value is ASCII-empty it becomes
+   * {@code null}; otherwise it is passed through {@link #normalizeAndCap(String, int)}. The {@code
+   * emptyAsNull} flag lets a caller choose whether a blank input reads as "absent" ({@code null})
+   * or as an explicitly-cleared empty string.
+   *
+   * @param value the raw inbound value, may be {@code null}
+   * @param maxLength the inclusive maximum length enforced after normalization
+   * @param emptyAsNull whether a trimmed-empty value collapses to {@code null}
+   * @return the trimmed, NFC-normalized, length-checked value, or {@code null}
+   * @throws IllegalArgumentException when the normalized value exceeds {@code maxLength}; {@code
+   *     GlobalExceptionHandler} maps this to an HTTP 400
+   */
+  @Contract(value = "null, _, _ -> null", pure = true)
+  public static @Nullable String normalize(
+      @Nullable String value, int maxLength, boolean emptyAsNull) {
+    if (value == null) {
+      return null;
+    }
+    String trimmed = value.trim();
+    if (emptyAsNull && trimmed.isEmpty()) {
+      return null;
+    }
+    return normalizeAndCap(trimmed, maxLength);
   }
 }

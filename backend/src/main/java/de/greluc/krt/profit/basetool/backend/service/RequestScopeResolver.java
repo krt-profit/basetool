@@ -740,6 +740,27 @@ public class RequestScopeResolver {
   }
 
   /**
+   * {@code true} iff the caller is a member anywhere in the whole area cascade of the given Bereich
+   * — a direct member of the Bereich itself (the Bereichsleitung) <em>or</em> a member of any of
+   * its child Staffeln / Spezialkommandos. Pure membership check used by the org-unit bank seam to
+   * evaluate the {@code AREA_MEMBERS} view grant / approval-limit tier ("Mitglieder des Bereichs",
+   * REQ-BANK-048) on a Bereichskonto. Since the org hierarchy is exactly three levels (OL &gt;
+   * Bereich &gt; Staffel/SK), the Bereich's direct children are its whole subtree.
+   *
+   * @param bereichId the owning Bereich org unit; never {@code null}
+   * @return {@code true} iff the caller has any membership on the Bereich or one of its children
+   */
+  public boolean currentUserIsMemberOfAreaCascade(@NotNull UUID bereichId) {
+    List<UUID> childIds = orgUnitRepository.findChildOrgUnitIds(bereichId);
+    return currentCallerMemberships().stream()
+        .anyMatch(
+            m -> {
+              UUID ou = m.getId().getOrgUnitId();
+              return ou.equals(bereichId) || childIds.contains(ou);
+            });
+  }
+
+  /**
    * Convenience entry point for the aggregate-service create paths: returns the {@link Squadron}
    * entity that matches {@link #currentSquadronId()}, loaded from the DB. Empty when the caller has
    * no effective squadron (admin in "all squadrons" mode, guest, or unauthenticated). Services use

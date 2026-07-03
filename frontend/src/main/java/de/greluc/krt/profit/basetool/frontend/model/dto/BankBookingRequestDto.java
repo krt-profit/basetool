@@ -57,6 +57,9 @@ import org.jetbrains.annotations.Nullable;
  * @param requiresOwnerApproval whether the amount exceeds the requester's approval limit
  *     (REQ-BANK-041)
  * @param applicableLimit the requester's resolved approval limit, or {@code null} = unlimited
+ * @param requiredApprover which approver class a flagged request needs (REQ-BANK-041/-046) — {@code
+ *     RESPONSIBLE_HOLDER} / {@code AREA_LEAD_PROFIT} / {@code ORGANISATIONSLEITUNG}, or {@code
+ *     null} when no approval is needed
  * @param ownerApprovalGranted whether the responsible holder has granted in-app approval
  * @param ownerApprovalGrantedByHandle the responsible holder's handle who granted approval, or
  *     {@code null}
@@ -91,6 +94,7 @@ public record BankBookingRequestDto(
     @Nullable String targetAccountNo,
     boolean requiresOwnerApproval,
     @Nullable BigDecimal applicableLimit,
+    @Nullable String requiredApprover,
     boolean ownerApprovalGranted,
     @Nullable String ownerApprovalGrantedByHandle,
     boolean splitEnabled,

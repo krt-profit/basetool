@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-29.
-> **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0053
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-03.
+> **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0053, ADR-0069, ADR-0071
 
 # Frontend AJAX mutations — krtFetch, krtCsrf & fragment swaps
 
@@ -15,9 +15,22 @@ child issues (#573–#582).
 
 The foundation lives in [`krt-fetch.js`](../../frontend/src/main/resources/static/js/krt-fetch.js),
 loaded globally from `fragments/head.html`. It exposes `window.krtFetch` (`write`, `submitForm`,
-`swap`, `syncVersion`) and `window.krtCsrf` (`headers`, `token`, `refresh`). The toast/confirm infrastructure
+`swap`, `syncVersion`, `sectionWrite`, `serialize`) and `window.krtCsrf` (`headers`, `token`, `refresh`). The toast/confirm infrastructure
 (`showFrontendSuccessToast`, `showFrontendErrorToast`, `showKrtConfirm`) is the design-system-mandated
 replacement for native dialogs (see [`ui-design-system.md`](ui-design-system.md)).
+
+**Section-structured pages use the `krtFetch.sectionWrite(config)` factory** (ADR-0069, #924): from
+a config of already-localized i18n lookups (a late-bound dict getter + key prefixes + fallbacks), a
+section→`{container, fragmentValue}` map, a page-URL getter and an optional peer-broadcast closure,
+it returns the page's `{write, refresh, notify}` seam — `write` decorates `krtFetch.write` with the
+section's localized success/error/conflict strings, `refresh` re-renders one or more sections in
+place via `krtFetch.swap` (broadcasting to peers first unless the refresh itself applies a peer
+signal, `{broadcast: false}`), and `notify` is the broadcast-only sibling for handlers that patch
+their own DOM surgically. Every lookup is late-bound (evaluated per call), because the i18n dicts
+and the presence client are published by bootstraps that run after the module loads. mission-detail
+is the canonical consumer (its `window.krtMissionWrite` / `window.krtRefreshMissionSection` /
+`window.krtNotifyMissionChanged` aliases are the factory's three returns); new pages with per-section
+writes reuse the factory instead of hand-rolling the wrapper trio.
 
 ## Requirements
 
@@ -526,8 +539,9 @@ controller-local `@ExceptionHandler` is bypassed.
 ### REQ-FE-010 — Live multi-user mission updates over the presence WebSocket
 
 When several users have the same mission detail page open, a change one of them makes (a participant
-joining, a crew move, a finance entry, a manager/owner change, a core/schedule/status/party-lead/
-frequency edit) must appear on the **others'** views without a manual reload. REQ-FE-001…007 keep the
+joining, a crew move, a finance entry, a manager/owner change, a core/schedule/status/party-lead
+edit, an Ablauf-step, Ziele-objective or frequency/custom-frequency edit) must appear on the
+**others'** views without a manual reload. REQ-FE-001…007 keep the
 **acting** user's own document fresh; they cannot reach a second user's already-rendered page. The gap
 is the in-place sibling of the bfcache gap (REQ-FE-008): the other viewer's DOM is stale until they
 reload.
@@ -545,8 +559,18 @@ from echoing back into a loop.
 affected fragment through its own authenticated, authorization-checked
 `GET /missions/{id}?fragment=…`, so guest field-redaction and the member-only finance gate still
 apply per viewer; a guest never receives privileged data via the push. The relay sanitises the
-inbound `sections` array (keys outside {`crew`,`finance`,`mgmt`,`overview`} dropped, count capped) so
+inbound `sections` array (keys outside the whitelist
+{`crew`,`finance`,`mgmt`,`overview`,`steps`,`objectives`,`frequencies`} dropped, count capped) so
 a client can neither target an arbitrary fetch nor amplify one frame into an unbounded fan-out. The
+whitelist, the acting client's broadcast and the peers' receiver all mirror the single
+`MISSION_SECTIONS` seam map in `mission-detail.js` — a section key present in the seam map but
+missing from the relay whitelist or the receiver leaves the peers' section stale until a manual
+reload. **Binding:** these three mirror points must be kept in sync in the **same change** whenever a
+live-synced section is **added, changed or removed** — the receiver derives its map from the seam
+map so those two cannot diverge, and the server whitelist (which cannot share the client map) must be
+edited alongside. A live-synced mutation added on one side but not propagated across all three is
+incomplete; this is the REQ-FE-010 defect that shipped when `objectives`/`frequencies` were added to
+the write seam but not the receiver or the whitelist. The
 `overview` fragment (Tab-1 + a `#overview-head-meta` carrier that patches the sticky header title /
 status pill / facts) is added by this requirement so core/schedule/status edits propagate too.
 
@@ -572,8 +596,10 @@ swap-out point is `MissionPresenceService` / `MissionPresenceWebSocketHandler` (
 **Acceptance**
 
 - [ ] With the same mission open in two sessions, a mutation by user A (participant add, crew move,
-  finance entry, manager/owner change, core/schedule/status/party-lead/frequency edit) appears on
-  user B's view within a short delay without a manual reload.
+  finance entry, manager/owner change, core/schedule/status/party-lead edit, Ablauf-step,
+  Ziele-objective or frequency/custom-frequency edit) appears on user B's view within a short delay
+  without a manual reload — including the Verwaltung steps/objectives/frequencies editors, not only
+  their Übersicht mirrors.
 - [ ] No mission data crosses the socket — a guest viewer's auto-refresh still renders the
   guest-redacted fragment and the member-only finance section stays gated per viewer.
 - [ ] An incoming change while user B has a modal open (or is editing the affected section) does not
@@ -583,22 +609,26 @@ swap-out point is `MissionPresenceService` / `MissionPresenceWebSocketHandler` (
 - [ ] An authenticated user cannot open the presence socket for a mission the backend forbids
   (handshake refused), and a flood of `changed` frames from one session is rate-limited.
 
-Coverage note: `MissionLiveSyncE2eTest` exercises the representative path end-to-end (a participant
-add propagating to a second viewer in place, no reload); the remaining mutation kinds in the first
-bullet all route through the same `krtRefreshMissionSection` / `krtNotifyMissionChanged` chokepoint, so
-they inherit the same behaviour, and the per-viewer guest-redaction guarantee rests on the existing
+Coverage note: `MissionLiveSyncE2eTest` exercises the representative path end-to-end twice — a
+participant add propagating to a second viewer in place (no reload), and a Ziele-objective add
+reaching a passive viewer's backgrounded editor (pinning a section key beyond the original four
+across broadcast → relay whitelist → receiver); the remaining mutation kinds in the first bullet all
+route through the same `krtRefreshMissionSection` / `krtNotifyMissionChanged` chokepoint, so they
+inherit the same behaviour, and the per-viewer guest-redaction guarantee rests on the existing
 authenticated fragment GET (covered by the mission fragment/redaction tests) rather than a dedicated
 live-sync case.
 
 **Enforced by:** `MissionPresenceWebSocketHandlerTest` (relay to peers, origin exclusion, key
-sanitising/dedup, no-op on empty, per-session rate limit) · `MissionPresenceHandshakeAuthInterceptorTest`
+sanitising/dedup, full seam-map whitelist relay, no-op on empty, per-session rate limit) ·
+`MissionPresenceHandshakeAuthInterceptorTest`
 (handshake allowed on authorized read, refused on 403/404, fail-open on transient, 400 on a malformed
 path) · `MissionLiveSyncE2eTest` (two-context live participant-add propagation + no-reload assertion) ·
 **Code:** `MissionPresenceWebSocketHandler.broadcastChanged` / `allowChangedFrame`,
 `MissionPresenceHandshakeAuthInterceptor`, `mission-presence.js` (`sendChanged` / `krt:mission-changed`
-/ `krt:mission-resync`), `mission-detail.html` (`krtRefreshMissionSection` broadcast + live-sync
-receiver with flush-time busy re-check + `overviewSection` fragment + finance-badge `krt:swapped`
-listener), `MissionPageController` (`overview` fragment case) · **ADR:** ADR-0031
+/ `krt:mission-resync`), `mission-detail.js` (`krtRefreshMissionSection` broadcast + live-sync
+receiver — its container map derived from the `MISSION_SECTIONS` seam map — with flush-time busy
+re-check + finance-badge `krt:swapped` listener), `mission-detail.html` (`overviewSection` fragment),
+`MissionPageController` (`overview` fragment case) · **ADR:** ADR-0031, ADR-0069
 
 ### REQ-FE-011 — User-selection fields are searchable comboboxes (username + display name)
 
@@ -653,6 +683,59 @@ converted-picker flows now drive the combobox end-to-end (open → pick → subm
 (`makeItem` + `data-search` local filter, global `enhanceWithin` on `DOMContentLoaded` + `krt:swapped`,
 `id`/`data-*` passthrough, `setValue` API, `window.krtEnhanceComboboxes`), `fragments/head.html`
 (global load + `window.krtComboboxI18n`), and the converted templates/selects · **ADR:** ADR-0053
+
+### REQ-FE-012 — A user's own back-to-back writes to one lock scope never self-collide
+
+A version-carrying write that a user can re-fire — before its response returns — against the **same**
+optimistic-lock scope (typing a Ziel title then immediately clicking "+" / the Klassifizierung
+dropdown / a ▲▼ reorder; toggling two capability flags on one bank-grant row; changing both
+association selects of one inventory row; a status change then a variant-counting toggle on one order)
+must not 409 the user against **themselves**. The old failure mode: the second interaction's
+`change`/`click` handler read the section version from the DOM and shipped it **concurrently** with
+the first, still-in-flight write; the first bumped the version server-side, the second arrived stale
+and 409'd, and "Aktuelle Werte laden" then reloaded and discarded the just-typed row. This is a
+first-party race — distinct from the genuine two-user conflict that REQ-FE-003 / the OPTIMISTIC_LOCK
+reload-confirm exist to handle.
+
+`krtFetch` closes it with **per-scope write serialization plus a lazily-resolved version**:
+
+- **`opts.serialize` (a lock-scope key).** Writes that share a key run **strictly one at a time in
+  submission order**; the primitive is also exposed as `krtFetch.serialize(key, task)` for raw-`fetch`
+  call sites. Distinct keys keep running concurrently, so a Ziele edit still never blocks a concurrent
+  Ablauf / core / schedule edit — the REQ-ORG-018 fine-grained-lock invariant is preserved.
+- **Lazy `url` / `payload`.** `opts.url` and `opts.payload` may be a value **or** a `() =>` thunk that
+  `write` / `submitForm` evaluate at **send** time — after the queue lets the write proceed. A
+  version-carrying inline write therefore reads its version from the DOM **when it is actually sent**,
+  so a queued write picks up the version the write before it bumped, not the value captured when the
+  handler first fired.
+- **Awaited `onSuccess`.** `send` awaits a thenable `onSuccess`, so a serialized chain waits for the
+  caller's fragment refresh (which rewrites the `data-*-version` holder the next write re-reads)
+  before the next queued write starts.
+
+The `sectionWrite` seam defaults `serialize` to the section key, so **every** section write (all of
+mission-detail's Ziele / Ablauf / frequency / crew / … writes) is auto-serialized by section without a
+per-call-site opt-in. A whole-payload lazy read is required where the payload carries sibling state
+the prior write may have changed (the bank-grant toggle re-reads all three flags at send time, else a
+serialized second toggle would silently revert the first).
+
+**Acceptance**
+
+- [ ] Typing a Ziel/Ablauf entry and immediately clicking add / a classification dropdown / a reorder
+  saves both in order with **no** 409 conflict prompt, and the just-typed entry is never lost.
+- [ ] The same holds for the other version-carrying inline editors swept in — the bank-grant flag
+  matrix, the inventory job/mission association selects and the note edit, the order status +
+  variant-counting toggles, and the org-structure parent select.
+- [ ] Two **different** users editing the same entity still get the genuine OPTIMISTIC_LOCK
+  reload-confirm (REQ-FE-003) — serialization only orders one client's own writes.
+- [ ] Editing two **disjoint** sections/scopes concurrently does not serialize them against each
+  other.
+
+**Enforced by:** code review + the per-area double-action e2e assertions (REQ-FE-003) extended to the
+type-then-add race · **Code:** `krt-fetch.js` (`runSerialized`, lazy `url`/`payload` in `write` /
+`submitForm`, awaited `onSuccess`, the `sectionWrite` `serialize` default, exposed `krtFetch.serialize`),
+`mission-detail.js` (`objectivesVersion` / `stepsVersion` lazy readers), `bank.js`, `inventory-my.js`,
+`inventory-admin.js`, `inventory-note-modal.js`, `orders-detail.js` (`krtOrderWrite` serialize default
++ `_orderVersion`), `admin-org-structure.js`, `leitung.js` · **ADR:** ADR-0071
 
 ## Out of scope
 

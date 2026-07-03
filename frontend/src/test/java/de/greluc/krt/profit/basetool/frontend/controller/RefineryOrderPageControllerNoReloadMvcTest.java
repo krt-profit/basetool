@@ -46,7 +46,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC tests for the #575 no-reload AJAX twins on {@link RefineryOrderPageController}: update /
+ * MVC tests for the #575 no-reload AJAX twins on {@link RefineryOrderWriteController}: update /
  * store / cancel, each routed by the {@code X-Requested-With} header so the classic form-POST
  * handlers stay the no-JS fallback. Verifies the navigation-target JSON on success and the 400 on a
  * validation/empty-goods failure.

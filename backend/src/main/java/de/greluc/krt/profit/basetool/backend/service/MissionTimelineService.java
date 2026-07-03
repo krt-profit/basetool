@@ -44,6 +44,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -119,6 +120,36 @@ public class MissionTimelineService {
         null,
         AuditDetails.of("step", step.getId()));
     return mission;
+  }
+
+  /**
+   * Creates a step (Ablauf-Schritt) as part of the mission's initial create — no optimistic-lock
+   * version check or bump, because the mission has just been persisted and has no concurrent editor
+   * yet. The caller assigns a contiguous {@code orderIndex} (0..n-1 in create order). Mirrors
+   * {@link #addStep} minus the section guard and runs inside the create transaction ({@code
+   * MANDATORY}). Records a {@code MISSION_STEP_ADDED} audit event carrying the step id only — never
+   * the title (user free text) — exactly like {@link #addStep}.
+   *
+   * @param mission the managed, already-persisted mission to append the step to
+   * @param title the required step title
+   * @param meta the optional free-text time/place hint
+   * @param orderIndex the 0-based position to assign this step, in create order
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void addStepAtCreate(@NotNull Mission mission, String title, String meta, int orderIndex) {
+    MissionStep step = new MissionStep();
+    step.setTitle(title == null ? null : title.trim());
+    step.setMeta(normalizeStepMeta(meta));
+    step.setDone(false);
+    step.setOrderIndex(orderIndex);
+    mission.addStep(step);
+    missionStepRepository.save(step);
+    auditService.record(
+        AuditEventType.MISSION_STEP_ADDED,
+        mission.getId(),
+        mission.getName(),
+        null,
+        AuditDetails.of("step", step.getId()));
   }
 
   /**
@@ -354,6 +385,36 @@ public class MissionTimelineService {
         null,
         AuditDetails.of("objective", objective.getId()).with("kind", kind));
     return mission;
+  }
+
+  /**
+   * Creates a goal (Ziel) as part of the mission's initial create — no optimistic-lock version
+   * check or bump, because the mission has just been persisted and has no concurrent editor yet.
+   * The caller assigns a contiguous {@code orderIndex} (0..n-1 in create order). Mirrors {@link
+   * #addObjective} minus the section guard and runs inside the create transaction ({@code
+   * MANDATORY}). Records a {@code MISSION_OBJECTIVE_ADDED} audit event carrying the goal id and
+   * kind only — never the title (user free text) — exactly like {@link #addObjective}.
+   *
+   * @param mission the managed, already-persisted mission to append the goal to
+   * @param title the required goal text
+   * @param kind the classification (primary / secondary / non-goal)
+   * @param orderIndex the 0-based position to assign this goal, in create order
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void addObjectiveAtCreate(
+      @NotNull Mission mission, String title, @NotNull MissionObjectiveKind kind, int orderIndex) {
+    MissionObjective objective = new MissionObjective();
+    objective.setTitle(title == null ? null : title.trim());
+    objective.setKind(kind);
+    objective.setOrderIndex(orderIndex);
+    mission.addObjective(objective);
+    missionObjectiveRepository.save(objective);
+    auditService.record(
+        AuditEventType.MISSION_OBJECTIVE_ADDED,
+        mission.getId(),
+        mission.getName(),
+        null,
+        AuditDetails.of("objective", objective.getId()).with("kind", kind));
   }
 
   /**

@@ -147,6 +147,41 @@ public class OrgUnitBankVisibilityService {
   }
 
   /**
+   * Enables or disables the "Mitglieder des Bereichs" cascade view grant of a Bereichskonto
+   * (REQ-BANK-048): every member of the whole area cascade — the Bereichsleitung plus every member
+   * of the Bereich's child Staffeln/SKs — may view it. Records the matching grant/revoke audit
+   * event only when the grant state actually changes. Idempotent; area-members support was
+   * validated by the caller.
+   *
+   * @param account the already-loaded, already-authorized account
+   * @param enabled whether the whole area cascade may view the account
+   */
+  @Transactional
+  public void setAreaMembers(@NotNull BankAccount account, boolean enabled) {
+    boolean exists =
+        viewGrantRepository.existsByAccountIdAndGranteeKind(
+            account.getId(), BankAccountViewGranteeKind.AREA_MEMBERS);
+    if (enabled && !exists) {
+      createViewGrant(account, BankAccountViewGranteeKind.AREA_MEMBERS, null, null);
+      bankAuditService.record(
+          BankAuditEventType.BALANCE_VISIBILITY_GRANTED,
+          account.getId(),
+          null,
+          null,
+          "AREA_MEMBERS");
+    } else if (!enabled && exists) {
+      viewGrantRepository.deleteByAccountIdAndGranteeKind(
+          account.getId(), BankAccountViewGranteeKind.AREA_MEMBERS);
+      bankAuditService.record(
+          BankAuditEventType.BALANCE_VISIBILITY_REVOKED,
+          account.getId(),
+          null,
+          null,
+          "AREA_MEMBERS");
+    }
+  }
+
+  /**
    * Grants an individual user view access to an account if not already granted, then records the
    * grant audit event (REQ-BANK-035). Idempotent.
    *

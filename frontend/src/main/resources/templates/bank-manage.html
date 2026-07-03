@@ -66,6 +66,58 @@
             <span th:text="#{bank.manage.tab.accounts}">Konten</span>
             <span class="tab-count" th:text="${#lists.size(accounts)}">7</span>
         </a>
+        <!-- KRT-Freigaben: Bankleitung-only 3-stage approval thresholds for the KRT account
+             (REQ-BANK-047). Rendered only for a management caller. -->
+        <a th:if="${management}" th:href="@{/bank/manage(tab='krt-freigaben')}" class="tab" role="tab"
+           th:classappend="${activeTab == 'krt-freigaben'} ? ' active' : ''"
+           th:aria-selected="${activeTab == 'krt-freigaben'}" data-testid="bank-tab-krt-approvals">
+            <span th:text="#{bank.manage.tab.krtApprovals}">KRT-Freigaben</span>
+        </a>
+    </div>
+
+    <!-- ============ Tab: KRT-Freigaben (Bankleitung-only, REQ-BANK-047) ============ -->
+    <div class="bank-panel mt-2" th:if="${activeTab == 'krt-freigaben' and management}"
+         data-testid="bank-krt-approvals-panel">
+        <div class="bank-panel-body">
+            <h2 class="sub-h" th:text="#{bank.manage.krt.title}">KRT-Konto Freigabe-Stufen</h2>
+            <p class="text-muted" th:text="#{bank.manage.krt.hint}">
+                Lege die zwei Schwellen fest, ab denen Auszahlungen und Transfers vom KRT-Konto durch den
+                Bereichsleiter Profit bzw. die Organisationsleitung freigegeben werden m&uuml;ssen. Bis zur
+                ersten Schwelle gibt ein Bankmitarbeiter selbst frei.</p>
+
+            <div th:if="${cartelAccount == null}" class="bank-empty" data-testid="bank-krt-approvals-empty"
+                 th:text="#{bank.manage.krt.noAccount}">Es existiert noch kein KRT-Konto.</div>
+
+            <form th:if="${cartelAccount != null}" class="bank-ajax-form no-track" data-refresh="manageBody"
+                  data-endpoint="/api/proxy/bank/accounts/{id}/approval-tiers" data-method="PATCH"
+                  data-testid="bank-krt-approvals-form">
+                <input type="hidden" name="_id" th:value="${cartelAccount.id()}">
+                <input type="hidden" name="version" th:value="${cartelAccount.version()}">
+                <div class="bank-form-row">
+                    <label for="bank-krt-t1" th:text="#{bank.manage.krt.employeeCeiling}">Bankmitarbeiter bis (aUEC)</label>
+                    <input type="number" id="bank-krt-t1" name="employeeCeiling" min="0" step="1"
+                           inputmode="numeric" data-testid="bank-krt-t1"
+                           th:value="${cartelAccount.employeeApprovalCeiling() != null ? cartelAccount.employeeApprovalCeiling().toBigInteger() : ''}"
+                           th:placeholder="#{bank.manage.krt.ceiling.placeholder}">
+                    <span class="bank-field-hint" th:text="#{bank.manage.krt.employeeCeiling.hint}">Bis zu diesem Betrag gibt ein Bankmitarbeiter selbst frei; leer lassen = keine Selbstfreigabe.</span>
+                    <span class="bank-field-error" data-error-for="employeeCeiling"></span>
+                </div>
+                <div class="bank-form-row">
+                    <label for="bank-krt-t2" th:text="#{bank.manage.krt.areaLeadCeiling}">Bereichsleiter Profit bis (aUEC)</label>
+                    <input type="number" id="bank-krt-t2" name="areaLeadCeiling" min="0" step="1"
+                           inputmode="numeric" data-testid="bank-krt-t2"
+                           th:value="${cartelAccount.areaLeadApprovalCeiling() != null ? cartelAccount.areaLeadApprovalCeiling().toBigInteger() : ''}"
+                           th:placeholder="#{bank.manage.krt.ceiling.placeholder}">
+                    <span class="bank-field-hint" th:text="#{bank.manage.krt.areaLeadCeiling.hint}">Bis zu diesem Betrag gibt der Bereichsleiter Profit frei; dar&uuml;ber die Organisationsleitung. Leer lassen = keine OL-Stufe.</span>
+                    <span class="bank-field-error" data-error-for="areaLeadCeiling"></span>
+                </div>
+                <span class="bank-field-error" data-error-for="_global"></span>
+                <div class="mt-2">
+                    <button type="submit" class="btn btn--cta" data-testid="bank-krt-approvals-save"
+                            th:text="#{bank.manage.krt.save}">Speichern</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- ===================== Tab: Konten ===================== -->

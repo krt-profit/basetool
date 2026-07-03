@@ -49,7 +49,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-Tests fuer den Handover-POST-Pfad in {@link JobOrderPageController#createHandover}.
+ * MVC-Tests fuer den Handover-POST-Pfad in {@link JobOrderWriteController#createHandover}.
  *
  * <p>Dient als zusaetzliche Absicherung des in der Backend-Korrektur behobenen Optimistic-Locking-
  * Bugs auf der Frontend-Seite: das Frontend leitet Erfolgs- wie Fehlerantworten unveraendert via

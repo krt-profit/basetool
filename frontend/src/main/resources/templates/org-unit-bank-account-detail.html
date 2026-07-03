@@ -118,6 +118,36 @@
         <th:block th:if="${settings == null}"
                   th:replace="~{fragments/bank-approval-limits :: limitsDisplay(${detail.detail().approvalLimits()})}"></th:block>
 
+        <!-- KRT-account (CARTEL) amount-tiered approval ladder, read-only to every viewer
+             (REQ-BANK-047): the amount bands and who approves each. Managed only by the Bankleitung in
+             the Verwaltung tab. Shown for the KRT account regardless of settings, so a plain member and
+             the OL both see it. -->
+        <div class="hud-box mt-2" th:if="${acct.type() == 'CARTEL'}"
+             data-testid="org-unit-bank-cartel-ladder"
+             th:with="t1=${acct.employeeApprovalCeiling()},t2=${acct.areaLeadApprovalCeiling()}">
+            <h3 class="sub-h" th:text="#{bank.cartelLadder.title}">Freigabe-Stufen</h3>
+            <p class="text-muted" style="font-size: 0.8rem;" th:text="#{bank.cartelLadder.hint}">
+                Auszahlungen und Transfers vom KRT-Konto werden je nach H&ouml;he des Betrags freigegeben.</p>
+            <div class="vis-row">
+                <span class="v-label" th:text="#{bank.cartelLadder.tier.employee}">Bankmitarbeiter</span>
+                <span class="vis-state bank-amount" th:if="${t1 != null}"
+                      th:text="'&#8804; ' + ${#numbers.formatInteger(@moneyFormat.round(t1), 1, 'POINT')} + ' aUEC'">&#8804; 1.000.000 aUEC</span>
+                <span class="vis-state bank-amount" th:unless="${t1 != null}"
+                      th:text="#{bank.cartelLadder.none}">keine Selbstfreigabe</span>
+            </div>
+            <div class="vis-row">
+                <span class="v-label" th:text="#{bank.cartelLadder.tier.areaLead}">Bereichsleiter Profit</span>
+                <span class="vis-state bank-amount" th:if="${t2 != null}"
+                      th:text="'&#8804; ' + ${#numbers.formatInteger(@moneyFormat.round(t2), 1, 'POINT')} + ' aUEC'">&#8804; 5.000.000 aUEC</span>
+                <span class="vis-state bank-amount" th:unless="${t2 != null}"
+                      th:text="#{bank.cartelLadder.above}">dar&uuml;ber</span>
+            </div>
+            <div class="vis-row">
+                <span class="v-label" th:text="#{bank.cartelLadder.tier.ol}">Organisationsleitung</span>
+                <span class="vis-state bank-amount" th:text="#{bank.cartelLadder.above}">dar&uuml;ber</span>
+            </div>
+        </div>
+
         <!-- VERANTWORTUNG & SICHTBARKEIT tab panel: the responsible holder's settings (balance target,
              configurable visibility, approval limits). Shown ONLY to the responsible holder / manager
              (settings != null, == hasSettingsTab); hidden by default — Buchungshistorie is the
@@ -179,6 +209,24 @@
                                     th:classappend="${settings.allMembersGranted()} ? ' btn-ghost' : ' btn-outline'"
                                     data-testid="org-unit-vis-all-members"
                                     th:text="${settings.allMembersGranted()} ? #{bank.orgUnit.settings.visibility.user.remove} : #{bank.orgUnit.settings.visibility.grant}">Freigeben</button>
+                        </form>
+                    </span>
+                </div>
+
+                <!-- Mitglieder des Bereichs (whole area cascade, AREA accounts only, REQ-BANK-048) -->
+                <div th:if="${settings.areaMembersSupported()}" class="vis-row">
+                    <span class="v-label" th:text="#{bank.orgUnit.settings.visibility.areaMembers}">Mitglieder des Bereichs</span>
+                    <span class="vis-state">
+                        <span th:if="${settings.areaMembersGranted()}" class="chip chip--success"
+                              th:text="#{bank.orgUnit.settings.visibility.granted}">Freigegeben</span>
+                        <form class="bank-ajax-form no-track" data-refresh="orgUnitBankSettings"
+                              th:attr="data-endpoint='/api/proxy/org-units/bank/accounts/{id}/visibility/area-members/' + ${!settings.areaMembersGranted()}"
+                              data-method="PUT" style="display:inline;">
+                            <input type="hidden" name="_id" th:value="${acct.id()}">
+                            <button type="submit" class="btn btn-xs"
+                                    th:classappend="${settings.areaMembersGranted()} ? ' btn-ghost' : ' btn-outline'"
+                                    data-testid="org-unit-vis-area-members"
+                                    th:text="${settings.areaMembersGranted()} ? #{bank.orgUnit.settings.visibility.user.remove} : #{bank.orgUnit.settings.visibility.grant}">Freigeben</button>
                         </form>
                     </span>
                 </div>
@@ -272,28 +320,49 @@
             <div id="org-unit-bank-bookings-results">
             <th:block th:fragment="orgUnitBankBookings">
             <div class="table-responsive" th:if="${bookings != null and !#lists.isEmpty(bookings.content())}">
-                <table class="data-table">
+                <table class="data-table bank-bookings-table">
                     <thead>
                     <tr>
+                        <th class="bank-expand-col" aria-hidden="true"></th>
                         <th th:text="#{bank.booking.date}">Datum</th>
                         <th th:text="#{bank.booking.type}">Typ</th>
-                        <th th:text="#{bank.booking.note}">Notiz</th>
+                        <th th:text="#{bank.booking.counterparty}">Quell-/Zielkonto</th>
                         <th class="text-right" th:text="#{bank.booking.amount}">Betrag</th>
                     </tr>
                     </thead>
                     <tbody>
-                    <tr th:each="b : ${bookings.content()}" data-testid="org-unit-bank-booking-row">
+                    <th:block th:each="b : ${bookings.content()}"
+                              th:with="hasDetail=${!#strings.isEmpty(b.justification()) or !#strings.isEmpty(b.note())},detailId='oud-bk-' + ${b.postingId()}">
+                    <tr data-testid="org-unit-bank-booking-row" class="bank-booking-row"
+                        th:classappend="${hasDetail} ? ' is-expandable' : ''">
+                        <td class="bank-expand-cell">
+                            <button type="button" class="bank-row-toggle" th:if="${hasDetail}"
+                                    data-trigger="bank-row-expand" aria-expanded="false"
+                                    th:attr="aria-controls=${detailId}"
+                                    th:aria-label="#{bank.detail.toggleDetails}"
+                                    data-testid="org-unit-bank-booking-expand">
+                                <svg class="krt-icon bank-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+                            </button>
+                        </td>
                         <td><span class="utc-time" th:text="${b.createdAt()}">2026-06-10T18:30:00Z</span></td>
                         <td th:switch="${b.type()}">
                             <span th:case="'DEPOSIT'" class="chip chip--success" th:text="#{bank.type.DEPOSIT}">Einzahlung</span>
                             <span th:case="'WITHDRAWAL'" class="chip chip--warning" th:text="#{bank.type.WITHDRAWAL}">Auszahlung</span>
-                            <span th:case="'TRANSFER'" class="chip"
-                                  th:text="#{bank.type.TRANSFER} + (${b.counterAccountNo() != null} ? (${b.amount().signum() < 0} ? ' &#8594; ' : ' &#8592; ') + ${b.counterAccountNo()} : '')">Transfer</span>
+                            <span th:case="'TRANSFER'" class="chip" th:text="#{bank.type.TRANSFER}">Transfer</span>
                             <span th:case="'REVERSAL'" class="chip chip--danger" th:text="#{bank.type.REVERSAL}">Storno</span>
                             <span th:case="'WIPE_RESET'" class="chip chip--danger" th:text="#{bank.type.WIPE_RESET}">Wipe-Reset</span>
                             <span th:case="*" class="chip" th:text="${b.type()}">?</span>
                         </td>
-                        <td class="bank-note-cell" th:text="${b.note()}" th:title="${b.note()}">Missionsertrag</td>
+                        <!-- Quell-/Zielkonto (REQ-BANK-044): a transfer's counter-account with direction,
+                             or the deposit/withdrawal counterparty (Einzahler / Empf&auml;nger). The
+                             counterparty is shown to members too now (owner decision); only the
+                             aUEC-custody Halter stays redacted (REQ-BANK-038). -->
+                        <td class="bank-counterparty-cell" data-testid="org-unit-bank-booking-counterparty">
+                            <span th:if="${b.type() == 'TRANSFER' and b.counterAccountNo() != null}"
+                                  th:text="(${b.amount().signum() < 0} ? '&#8594; ' : '&#8592; ') + ${b.counterAccountNo()}">&#8594; KB-0002</span>
+                            <span th:if="${b.counterpartyHandle() != null}"
+                                  th:text="${b.counterpartyHandle()} + (${b.counterpartyOrgUnitName() != null} ? ' (' + ${b.counterpartyOrgUnitName()} + ')' : '')">carol (Staffel Rot)</span>
+                        </td>
                         <td class="text-right">
                             <span class="bank-amount"
                                   th:classappend="${b.amount().signum() > 0} ? ' bank-amount--pos' : (${b.amount().signum() < 0} ? ' bank-amount--neg' : ' bank-amount--zero')"
@@ -303,6 +372,25 @@
                                   th:text="#{bank.fee.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.transferFee()), 1, 'POINT')} + ' &middot; ' + #{bank.fee.net.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.amount().abs().subtract(b.transferFee())), 1, 'POINT')}">Geb&uuml;hr</span>
                         </td>
                     </tr>
+                    <!-- Detail sub-row (REQ-BANK-045): Begr&uuml;ndung first, then Notiz; revealed by
+                         clicking the row, hidden by default. Kept through redaction (not
+                         player-identifying). -->
+                    <tr class="bank-booking-detail" th:if="${hasDetail}" th:id="${detailId}" hidden
+                        data-testid="org-unit-bank-booking-detail">
+                        <td colspan="5" class="bank-booking-detail-cell">
+                            <div class="bank-booking-detail-body">
+                                <div class="bank-detail-item" th:if="${!#strings.isEmpty(b.justification())}">
+                                    <span class="bank-detail-label" th:text="#{bank.booking.justification}">Begr&uuml;ndung</span>
+                                    <span class="bank-detail-value" th:text="${b.justification()}">Missionsfreigabe</span>
+                                </div>
+                                <div class="bank-detail-item" th:if="${!#strings.isEmpty(b.note())}">
+                                    <span class="bank-detail-label" th:text="#{bank.booking.note}">Notiz</span>
+                                    <span class="bank-detail-value" th:text="${b.note()}">Missionsertrag</span>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    </th:block>
                     </tbody>
                 </table>
             </div>

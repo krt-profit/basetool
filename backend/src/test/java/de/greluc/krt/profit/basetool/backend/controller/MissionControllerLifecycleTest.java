@@ -779,7 +779,7 @@ class MissionControllerLifecycleTest {
     UUID parentId = UUID.randomUUID();
     CreateMissionRequest request =
         new CreateMissionRequest(
-            "Sub", "desc", null, "PLANNED", null, null, null, false, null, null, null);
+            "Sub", "desc", null, "PLANNED", null, null, null, false, null, null, null, null, null);
     Mission persistedParent = new Mission();
     MissionDto parentDto = fullMissionDto(parentId);
     when(missionService.addSubMission(parentId, request)).thenReturn(persistedParent);

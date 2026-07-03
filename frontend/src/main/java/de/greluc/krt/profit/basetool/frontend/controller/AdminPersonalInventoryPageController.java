@@ -68,6 +68,14 @@ public class AdminPersonalInventoryPageController {
 
   private final BackendApiClient backendApiClient;
 
+  /** Response type for one paginated page of the squadron user list feeding the member picker. */
+  private static final ParameterizedTypeReference<PageResponse<UserDto>> USER_PAGE_TYPE =
+      new ParameterizedTypeReference<>() {};
+
+  /** Response type for one paginated page of a target user's personal-inventory items. */
+  private static final ParameterizedTypeReference<PageResponse<PersonalInventoryItemDto>>
+      PERSONAL_INVENTORY_PAGE_TYPE = new ParameterizedTypeReference<>() {};
+
   /**
    * Renders the admin personal-inventory page.
    *
@@ -258,7 +266,7 @@ public class AdminPersonalInventoryPageController {
   private List<UserDto> fetchUsers() {
     try {
       PageResponse<UserDto> result =
-          backendApiClient.get("/api/v1/users?size=1000", new ParameterizedTypeReference<>() {});
+          backendApiClient.get("/api/v1/users?size=1000", USER_PAGE_TYPE);
       if (result == null || result.content() == null) {
         return Collections.emptyList();
       }
@@ -290,7 +298,7 @@ public class AdminPersonalInventoryPageController {
       if (q != null && !q.isBlank()) {
         uri.append("&q=").append(URLEncoder.encode(q, StandardCharsets.UTF_8));
       }
-      return backendApiClient.get(uri.toString(), new ParameterizedTypeReference<>() {});
+      return backendApiClient.get(uri.toString(), PERSONAL_INVENTORY_PAGE_TYPE);
     } catch (Exception e) {
       log.error("Failed to fetch personal inventory items for {}", userSub, e);
       return new PageResponse<>(new ArrayList<>(), 0, size == null ? 50 : size, 0, 0, List.of());

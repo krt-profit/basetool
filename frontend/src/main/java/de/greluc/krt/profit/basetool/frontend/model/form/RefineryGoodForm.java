@@ -31,7 +31,7 @@ import lombok.Data;
  * <p>{@code outputQuantity} is required and must be at least 1 — the user explicitly enters the
  * expected yield per material and the value drives the SCU display + later refinery payout. {@code
  * quality} defaults to 0; if the user leaves the field empty the controller normalises the bound
- * {@code null} back to 0 before sending to the backend (see {@code RefineryOrderPageController}).
+ * {@code null} back to 0 before sending to the backend (see {@code RefineryOrderWriteController}).
  */
 @Data
 public class RefineryGoodForm {

@@ -138,7 +138,7 @@ app:
     structured-enabled: false
   monitoring:
     scrape:
-      # Basic-auth credentials for GET /actuator/prometheus (REQ-OBS-005, ADR-0066). Fail-closed:
+      # Basic-auth credentials for GET /actuator/prometheus (REQ-OBS-005, ADR-0072). Fail-closed:
       # when either variable is unset/blank, MonitoringScrapeSecurityConfig denies every request
       # to the endpoint. Set both only where a Prometheus scraper actually runs; never commit
       # real values.

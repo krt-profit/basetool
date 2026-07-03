@@ -4634,6 +4634,101 @@
         } ]
       }
     },
+    "/api/v1/org-units/bank/accounts/{id}/visibility/area-members/{enabled}" : {
+      "put" : {
+        "tags" : [ "org-unit-bank-controller" ],
+        "summary" : "Toggle the area-members (Mitglieder des Bereichs) view grant",
+        "operationId" : "setAreaMembersVisibility",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "enabled",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "boolean"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OrgUnitBankAccountSettingsDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/org-units/bank/accounts/{id}/visibility/all-members/{enabled}" : {
       "put" : {
         "tags" : [ "org-unit-bank-controller" ],
@@ -5149,6 +5244,190 @@
           "required" : true,
           "schema" : {
             "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OrgUnitBankAccountSettingsDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/org-units/bank/accounts/{id}/approval-limit/area-members" : {
+      "put" : {
+        "tags" : [ "org-unit-bank-controller" ],
+        "summary" : "Set the area-members (Mitglieder des Bereichs) approval limit",
+        "operationId" : "setAreaMembersApprovalLimit",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SetBankApprovalLimitRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OrgUnitBankAccountSettingsDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "org-unit-bank-controller" ],
+        "summary" : "Clear the area-members (Mitglieder des Bereichs) approval limit",
+        "operationId" : "clearAreaMembersApprovalLimit",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
           }
         } ],
         "responses" : {
@@ -7154,7 +7433,7 @@
       "put" : {
         "tags" : [ "Missions" ],
         "summary" : "Update a mission (full replace)",
-        "description" : "Aktualisiert den gesamten Einsatz in einem Request. Fuer eine bessere Multi-User-Experience wird empfohlen, stattdessen die Section-PATCH-Endpoints (/core, /schedule, /flags) zu verwenden, damit parallele Aenderungen an anderen Sektionen keine Optimistic-Lock-Konflikte ausloesen.",
+        "description" : "Replaces the entire mission in a single request. For a better multi-user experience, prefer the section PATCH endpoints (/core, /schedule, /flags) instead, so concurrent edits to other sections do not trigger optimistic-lock conflicts.",
         "operationId" : "updateMission",
         "parameters" : [ {
           "name" : "id",
@@ -29898,7 +30177,7 @@
       "patch" : {
         "tags" : [ "Missions" ],
         "summary" : "Patch mission schedule section",
-        "description" : "Aktualisiert nur die Zeitplan-Sektion (Meeting-/Planned-/Actual-Zeiten) eines Einsatzes. Parallele Aenderungen an Teilnehmern, Units oder Finanzen fuehren dank entkoppelter Sub-Collections nicht mehr zum Versionskonflikt. Zeitstempel in UTC.",
+        "description" : "Patches only the schedule section (meeting/planned/actual times) of a mission. Thanks to decoupled sub-collections, concurrent edits to participants, units or finances no longer cause a version conflict. Timestamps are in UTC.",
         "operationId" : "patchMissionSchedule",
         "parameters" : [ {
           "name" : "id",
@@ -29997,7 +30276,7 @@
       "patch" : {
         "tags" : [ "Missions" ],
         "summary" : "Patch mission flags section",
-        "description" : "Aktualisiert nur die Flags-Sektion (z.B. isInternal) eines Einsatzes.",
+        "description" : "Patches only the flags section (e.g. isInternal) of a mission.",
         "operationId" : "patchMissionFlags",
         "parameters" : [ {
           "name" : "id",
@@ -30096,7 +30375,7 @@
       "patch" : {
         "tags" : [ "Missions" ],
         "summary" : "Patch mission core section",
-        "description" : "Aktualisiert nur die Stammdaten-Sektion (Name, Beschreibung, Kalenderlink, Status) eines Einsatzes. Andere Sektionen und Sub-Aggregate bleiben unberuehrt. Bei einem Versionskonflikt wird HTTP 409 (application/problem+json) zurueckgegeben.",
+        "description" : "Patches only the core section (name, description, calendar link, status) of a mission. Other sections and sub-aggregates stay untouched. A version conflict returns HTTP 409 (application/problem+json).",
         "operationId" : "patchMissionCore",
         "parameters" : [ {
           "name" : "id",
@@ -30998,6 +31277,104 @@
             "application/json" : {
               "schema" : {
                 "$ref" : "#/components/schemas/SetBankBalanceTargetRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BankAccountDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bank/accounts/{id}/approval-tiers" : {
+      "patch" : {
+        "tags" : [ "bank-account-controller" ],
+        "summary" : "Set or clear the KRT-account 3-stage approval thresholds (management)",
+        "operationId" : "setCartelApprovalTiers",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SetCartelApprovalTiersRequest"
               }
             }
           },
@@ -44306,7 +44683,7 @@
           "required" : false,
           "schema" : {
             "type" : "string",
-            "enum" : [ "ACCOUNT_CREATED", "ACCOUNT_RENAMED", "ACCOUNT_CLOSED", "ACCOUNT_REOPENED", "HOLDER_REGISTERED", "HOLDER_DEACTIVATED", "HOLDER_REACTIVATED", "GRANT_CREATED", "GRANT_UPDATED", "GRANT_REVOKED", "DEPOSIT_BOOKED", "DEPOSIT_SPLIT_BOOKED", "WITHDRAWAL_BOOKED", "TRANSFER_BOOKED", "HOLDER_TRANSFER", "HOLDER_REBOOKED", "TRANSACTION_REVERSED", "WIPE_RESET_EXECUTED", "STATEMENT_EXPORTED", "MANAGEMENT_REPORT_EXPORTED", "AUDIT_LOG_EXPORTED", "AUDIT_LOG_PURGED", "BOOKING_REQUEST_CREATED", "BOOKING_REQUEST_CONFIRMED", "BOOKING_REQUEST_REJECTED", "BOOKING_REQUEST_CANCELLED", "BALANCE_TARGET_SET", "BALANCE_TARGET_CLEARED", "BALANCE_VISIBILITY_GRANTED", "BALANCE_VISIBILITY_REVOKED", "APPROVAL_LIMIT_SET", "APPROVAL_LIMIT_CLEARED", "BOOKING_REQUEST_OWNER_APPROVAL_GRANTED", "BOOKING_REQUEST_OWNER_APPROVAL_REVOKED", "BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED" ]
+            "enum" : [ "ACCOUNT_CREATED", "ACCOUNT_RENAMED", "ACCOUNT_CLOSED", "ACCOUNT_REOPENED", "ACCOUNT_RESPONSIBLE_CHANGED", "HOLDER_REGISTERED", "HOLDER_DEACTIVATED", "HOLDER_REACTIVATED", "GRANT_CREATED", "GRANT_UPDATED", "GRANT_REVOKED", "DEPOSIT_BOOKED", "DEPOSIT_SPLIT_BOOKED", "WITHDRAWAL_BOOKED", "TRANSFER_BOOKED", "HOLDER_TRANSFER", "HOLDER_REBOOKED", "TRANSACTION_REVERSED", "WIPE_RESET_EXECUTED", "STATEMENT_EXPORTED", "MANAGEMENT_REPORT_EXPORTED", "AUDIT_LOG_EXPORTED", "AUDIT_LOG_PURGED", "BOOKING_REQUEST_CREATED", "BOOKING_REQUEST_CONFIRMED", "BOOKING_REQUEST_REJECTED", "BOOKING_REQUEST_CANCELLED", "BALANCE_TARGET_SET", "BALANCE_TARGET_CLEARED", "BALANCE_VISIBILITY_GRANTED", "BALANCE_VISIBILITY_REVOKED", "APPROVAL_LIMIT_SET", "APPROVAL_LIMIT_CLEARED", "BOOKING_REQUEST_OWNER_APPROVAL_GRANTED", "BOOKING_REQUEST_OWNER_APPROVAL_REVOKED", "BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED", "CARTEL_APPROVAL_TIERS_SET", "CARTEL_APPROVAL_TIERS_CLEARED" ]
           }
         }, {
           "name" : "page",
@@ -48849,6 +49226,9 @@
           "allMembersSupported" : {
             "type" : "boolean"
           },
+          "areaMembersSupported" : {
+            "type" : "boolean"
+          },
           "availableRoleCodes" : {
             "type" : "array",
             "items" : {
@@ -48862,6 +49242,9 @@
             }
           },
           "allMembersLimit" : {
+            "type" : "number"
+          },
+          "areaMembersLimit" : {
             "type" : "number"
           },
           "userLimits" : {
@@ -48912,6 +49295,9 @@
           "allMembersSupported" : {
             "type" : "boolean"
           },
+          "areaMembersSupported" : {
+            "type" : "boolean"
+          },
           "roleBucketsGlobal" : {
             "type" : "boolean"
           },
@@ -48928,6 +49314,9 @@
             }
           },
           "allMembersGranted" : {
+            "type" : "boolean"
+          },
+          "areaMembersGranted" : {
             "type" : "boolean"
           },
           "grantedUsers" : {
@@ -49894,7 +50283,7 @@
           },
           "description" : {
             "type" : "string",
-            "maxLength" : 10000,
+            "maxLength" : 20000,
             "minLength" : 0
           },
           "calendarLink" : {
@@ -50522,7 +50911,8 @@
             "maxLength" : 500,
             "minLength" : 0
           }
-        }
+        },
+        "required" : [ "name" ]
       },
       "UpdateCrewRequest" : {
         "type" : "object",
@@ -50542,7 +50932,7 @@
         "properties" : {
           "title" : {
             "type" : "string",
-            "maxLength" : 200,
+            "maxLength" : 500,
             "minLength" : 0
           },
           "meta" : {
@@ -50684,7 +51074,7 @@
         "properties" : {
           "title" : {
             "type" : "string",
-            "maxLength" : 250,
+            "maxLength" : 500,
             "minLength" : 0
           },
           "kind" : {
@@ -51758,6 +52148,9 @@
           "applicableLimit" : {
             "type" : "number"
           },
+          "requiredApprover" : {
+            "type" : "string"
+          },
           "ownerApprovalGranted" : {
             "type" : "boolean"
           },
@@ -52197,7 +52590,7 @@
           },
           "description" : {
             "type" : "string",
-            "maxLength" : 10000,
+            "maxLength" : 20000,
             "minLength" : 0
           },
           "calendarLink" : {
@@ -52238,9 +52631,52 @@
             "type" : "string",
             "maxLength" : 200,
             "minLength" : 0
+          },
+          "objectives" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/NewObjective"
+            }
+          },
+          "steps" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/NewStep"
+            }
           }
         },
         "required" : [ "name" ]
+      },
+      "NewObjective" : {
+        "type" : "object",
+        "properties" : {
+          "title" : {
+            "type" : "string",
+            "maxLength" : 500,
+            "minLength" : 0
+          },
+          "kind" : {
+            "type" : "string",
+            "enum" : [ "PRIMARY", "SECONDARY", "NON_GOAL" ]
+          }
+        },
+        "required" : [ "kind", "title" ]
+      },
+      "NewStep" : {
+        "type" : "object",
+        "properties" : {
+          "title" : {
+            "type" : "string",
+            "maxLength" : 500,
+            "minLength" : 0
+          },
+          "meta" : {
+            "type" : "string",
+            "maxLength" : 200,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "title" ]
       },
       "AddCrewRequest" : {
         "type" : "object",
@@ -52265,7 +52701,7 @@
         "properties" : {
           "title" : {
             "type" : "string",
-            "maxLength" : 200,
+            "maxLength" : 500,
             "minLength" : 0
           },
           "meta" : {
@@ -52329,7 +52765,7 @@
         "properties" : {
           "title" : {
             "type" : "string",
-            "maxLength" : 250,
+            "maxLength" : 500,
             "minLength" : 0
           },
           "kind" : {
@@ -52987,6 +53423,12 @@
           "balanceTarget" : {
             "type" : "number"
           },
+          "employeeApprovalCeiling" : {
+            "type" : "number"
+          },
+          "areaLeadApprovalCeiling" : {
+            "type" : "number"
+          },
           "version" : {
             "type" : "integer",
             "format" : "int64"
@@ -53527,7 +53969,7 @@
           },
           "description" : {
             "type" : "string",
-            "maxLength" : 10000,
+            "maxLength" : 20000,
             "minLength" : 0
           },
           "calendarLink" : {
@@ -53648,6 +54090,26 @@
             "type" : "number",
             "maximum" : 1.0E12,
             "minimum" : 1
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "version" ]
+      },
+      "SetCartelApprovalTiersRequest" : {
+        "type" : "object",
+        "properties" : {
+          "employeeCeiling" : {
+            "type" : "number",
+            "maximum" : 1.0E12,
+            "minimum" : 0
+          },
+          "areaLeadCeiling" : {
+            "type" : "number",
+            "maximum" : 1.0E12,
+            "minimum" : 0
           },
           "version" : {
             "type" : "integer",
@@ -57136,7 +57598,7 @@
           },
           "eventType" : {
             "type" : "string",
-            "enum" : [ "ACCOUNT_CREATED", "ACCOUNT_RENAMED", "ACCOUNT_CLOSED", "ACCOUNT_REOPENED", "HOLDER_REGISTERED", "HOLDER_DEACTIVATED", "HOLDER_REACTIVATED", "GRANT_CREATED", "GRANT_UPDATED", "GRANT_REVOKED", "DEPOSIT_BOOKED", "DEPOSIT_SPLIT_BOOKED", "WITHDRAWAL_BOOKED", "TRANSFER_BOOKED", "HOLDER_TRANSFER", "HOLDER_REBOOKED", "TRANSACTION_REVERSED", "WIPE_RESET_EXECUTED", "STATEMENT_EXPORTED", "MANAGEMENT_REPORT_EXPORTED", "AUDIT_LOG_EXPORTED", "AUDIT_LOG_PURGED", "BOOKING_REQUEST_CREATED", "BOOKING_REQUEST_CONFIRMED", "BOOKING_REQUEST_REJECTED", "BOOKING_REQUEST_CANCELLED", "BALANCE_TARGET_SET", "BALANCE_TARGET_CLEARED", "BALANCE_VISIBILITY_GRANTED", "BALANCE_VISIBILITY_REVOKED", "APPROVAL_LIMIT_SET", "APPROVAL_LIMIT_CLEARED", "BOOKING_REQUEST_OWNER_APPROVAL_GRANTED", "BOOKING_REQUEST_OWNER_APPROVAL_REVOKED", "BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED" ]
+            "enum" : [ "ACCOUNT_CREATED", "ACCOUNT_RENAMED", "ACCOUNT_CLOSED", "ACCOUNT_REOPENED", "ACCOUNT_RESPONSIBLE_CHANGED", "HOLDER_REGISTERED", "HOLDER_DEACTIVATED", "HOLDER_REACTIVATED", "GRANT_CREATED", "GRANT_UPDATED", "GRANT_REVOKED", "DEPOSIT_BOOKED", "DEPOSIT_SPLIT_BOOKED", "WITHDRAWAL_BOOKED", "TRANSFER_BOOKED", "HOLDER_TRANSFER", "HOLDER_REBOOKED", "TRANSACTION_REVERSED", "WIPE_RESET_EXECUTED", "STATEMENT_EXPORTED", "MANAGEMENT_REPORT_EXPORTED", "AUDIT_LOG_EXPORTED", "AUDIT_LOG_PURGED", "BOOKING_REQUEST_CREATED", "BOOKING_REQUEST_CONFIRMED", "BOOKING_REQUEST_REJECTED", "BOOKING_REQUEST_CANCELLED", "BALANCE_TARGET_SET", "BALANCE_TARGET_CLEARED", "BALANCE_VISIBILITY_GRANTED", "BALANCE_VISIBILITY_REVOKED", "APPROVAL_LIMIT_SET", "APPROVAL_LIMIT_CLEARED", "BOOKING_REQUEST_OWNER_APPROVAL_GRANTED", "BOOKING_REQUEST_OWNER_APPROVAL_REVOKED", "BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED", "CARTEL_APPROVAL_TIERS_SET", "CARTEL_APPROVAL_TIERS_CLEARED" ]
           },
           "accountId" : {
             "type" : "string",

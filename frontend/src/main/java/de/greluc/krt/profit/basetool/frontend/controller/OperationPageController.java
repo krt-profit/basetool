@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.form.OperationForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.service.MarkdownRenderer;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.math.BigDecimal;
@@ -83,6 +84,19 @@ public class OperationPageController {
 
   private final BackendApiClient backendApiClient;
   private final MarkdownRenderer markdown;
+  private final FrontendAuthHelperService authHelper;
+
+  /** Response type for one paginated page of the operations search endpoint. */
+  private static final ParameterizedTypeReference<PageResponse<OperationDto>> OPERATION_PAGE_TYPE =
+      new ParameterizedTypeReference<>() {};
+
+  /** Response type for the caller's pickable org units feeding the owner-picker fragment. */
+  private static final ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>
+      PICKABLE_ORG_UNIT_LIST_TYPE = new ParameterizedTypeReference<>() {};
+
+  /** Response type for one paginated page of an operation's embedded missions. */
+  private static final ParameterizedTypeReference<PageResponse<MissionListDto>> MISSION_PAGE_TYPE =
+      new ParameterizedTypeReference<>() {};
 
   /**
    * Renders the paginated, filtered operations list. Mirrors the missions overview filter contract
@@ -106,8 +120,8 @@ public class OperationPageController {
    * @param size page size (default 20)
    * @param fragment when equal to {@code "results"}, render only the results fragment
    * @param model Thymeleaf model populated with the page content and metadata
-   * @param principal current OIDC user (null for guests — the endpoint stays auth-only via
-   *     {@code @PreAuthorize}, this is used to decide whether {@code showPast} is honoured)
+   * @param principal current OIDC user, bound from the security context; the {@code showPast}
+   *     honouring now consults {@code authHelper.isAnonymous()} rather than this parameter directly
    * @return the {@code operations-index} view name, or the results fragment for AJAX
    */
   @GetMapping
@@ -136,7 +150,7 @@ public class OperationPageController {
     uri.append("size=").append(size).append("&");
     uri.append("sort=createdAt,desc&");
 
-    boolean effectiveShowPast = showPast && principal != null;
+    boolean effectiveShowPast = showPast && !authHelper.isAnonymous();
     if (effectiveShowPast) {
       uri.append("status=PLANNED&status=ACTIVE&status=COMPLETED&status=CANCELED&");
     } else {
@@ -145,10 +159,7 @@ public class OperationPageController {
 
     try {
       PageResponse<OperationDto> operationsPage =
-          backendApiClient.get(
-              uri.toString(),
-              new ParameterizedTypeReference<PageResponse<OperationDto>>() {},
-              false);
+          backendApiClient.get(uri.toString(), OPERATION_PAGE_TYPE, false);
       model.addAttribute("operations", operationsPage.content());
       model.addAttribute("operationsPage", operationsPage);
       model.addAttribute("search", search);
@@ -162,7 +173,7 @@ public class OperationPageController {
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
       return "operations-index :: operationsResults";
     }
-    model.addAttribute("ownerOptions", fetchCallerMembershipOptions(principal));
+    model.addAttribute("ownerOptions", fetchCallerMembershipOptions());
     return "operations-index";
   }
 
@@ -173,11 +184,10 @@ public class OperationPageController {
    * anonymous callers or on backend hiccup; the fragment collapses to its hidden state in either
    * case.
    *
-   * @param principal authenticated OIDC user, may be {@code null} for guests.
    * @return picker options or empty list; never {@code null}.
    */
-  private List<OrgUnitMembershipOptionDto> fetchCallerMembershipOptions(OidcUser principal) {
-    if (principal == null) {
+  private List<OrgUnitMembershipOptionDto> fetchCallerMembershipOptions() {
+    if (authHelper.isAnonymous()) {
       return List.of();
     }
     try {
@@ -185,8 +195,7 @@ public class OperationPageController {
       // cascading leadership reach (own Bereich/OL + overseen subordinate Staffeln/SKs). Unchanged
       // for an ordinary member.
       List<OrgUnitMembershipOptionDto> options =
-          backendApiClient.get(
-              "/api/v1/users/me/pickable-org-units", new ParameterizedTypeReference<>() {});
+          backendApiClient.get("/api/v1/users/me/pickable-org-units", PICKABLE_ORG_UNIT_LIST_TYPE);
       return options != null ? options : List.of();
     } catch (Exception e) {
       log.warn("Failed to fetch pickable org units for operation-create owner-picker", e);
@@ -328,7 +337,7 @@ public class OperationPageController {
             + "&size="
             + size
             + "&sort=plannedStartTime,asc",
-        new ParameterizedTypeReference<PageResponse<MissionListDto>>() {},
+        MISSION_PAGE_TYPE,
         false);
   }
 

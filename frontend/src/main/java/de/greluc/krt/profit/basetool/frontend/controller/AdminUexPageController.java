@@ -84,6 +84,13 @@ public class AdminUexPageController {
   private static final Set<String> ALLOWED_LOADING_DOCK_KINDS =
       Set.of("cities", "space-stations", "outposts", "pois", "terminals");
 
+  /**
+   * Response type for the generic UEX-entity page pulls (cities, stations, outposts, POIs,
+   * terminals), each read as an untyped {@code Map} page before being parsed into its DTO.
+   */
+  private static final ParameterizedTypeReference<PageResponse<Map<String, Object>>> MAP_PAGE_TYPE =
+      new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -521,8 +528,7 @@ public class AdminUexPageController {
   }
 
   private PageResponse<Map<String, Object>> loadPage(String uri) {
-    return backendApiClient.get(
-        uri, new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {});
+    return backendApiClient.get(uri, MAP_PAGE_TYPE);
   }
 
   private List<CityDto> parseCities(PageResponse<Map<String, Object>> page) {

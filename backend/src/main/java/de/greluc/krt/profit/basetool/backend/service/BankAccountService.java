@@ -373,6 +373,64 @@ public class BankAccountService {
   }
 
   /**
+   * Sets or clears the KRT-account (CARTEL) 3-stage approval thresholds T1/T2 (REQ-BANK-047) from
+   * the Verwaltung tab. Only the KRT account carries thresholds; both {@code null} clears the
+   * ladder. The whole-aUEC / non-negativity of each value is validated on the request; here the
+   * business rules are enforced: the account must be a {@code CARTEL} account and — when both are
+   * set — the area-lead ceiling {@code T2} must be at or above the bank-employee ceiling {@code
+   * T1}. Gated at the controller to bank management (admins pass via the hierarchy). Audited.
+   * Shares the account row's {@code @Version} with rename/close/target.
+   *
+   * @param accountId the KRT account
+   * @param employeeCeiling the bank-employee self-approval ceiling {@code T1}, or {@code null} to
+   *     clear it
+   * @param areaLeadCeiling the Bereichsleiter-Profit ceiling {@code T2}, or {@code null} to clear
+   *     it
+   * @param version the echoed optimistic-locking version
+   * @return the updated account incl. its balance
+   * @throws NotFoundException when the account does not exist
+   * @throws BadRequestException when the account is not the KRT account or {@code T2 < T1}
+   * @throws ObjectOptimisticLockingFailureException on a version mismatch (409)
+   */
+  @Transactional
+  public BankAccountDto setCartelApprovalTiers(
+      @NotNull UUID accountId,
+      @Nullable BigDecimal employeeCeiling,
+      @Nullable BigDecimal areaLeadCeiling,
+      @NotNull Long version) {
+    BankAccount account = requireAccount(accountId);
+    if (account.getType() != BankAccountType.CARTEL) {
+      throw new BadRequestException(
+          "Approval thresholds may be configured only on the KRT (CARTEL) account");
+    }
+    if (employeeCeiling != null
+        && areaLeadCeiling != null
+        && areaLeadCeiling.compareTo(employeeCeiling) < 0) {
+      throw new BadRequestException(
+          "The area-lead ceiling must be at or above the bank-employee ceiling");
+    }
+    requireVersionMatch(account, version);
+    account.setEmployeeApprovalCeiling(employeeCeiling);
+    account.setAreaLeadApprovalCeiling(areaLeadCeiling);
+    BankAccount saved = accountRepository.save(account);
+    boolean cleared = employeeCeiling == null && areaLeadCeiling == null;
+    bankAuditService.record(
+        cleared
+            ? BankAuditEventType.CARTEL_APPROVAL_TIERS_CLEARED
+            : BankAuditEventType.CARTEL_APPROVAL_TIERS_SET,
+        saved.getId(),
+        null,
+        null,
+        cleared
+            ? null
+            : "employee="
+                + (employeeCeiling == null ? "-" : BankAmounts.plain(employeeCeiling))
+                + ",areaLead="
+                + (areaLeadCeiling == null ? "-" : BankAmounts.plain(areaLeadCeiling)));
+    return bankAccountMapper.toDto(saved, postingRepository.accountBalance(accountId));
+  }
+
+  /**
    * Closes an account (REQ-BANK-002): requires a zero balance — transfer the remainder first. The
    * closed account stays fully readable with its history; only postings are rejected.
    *

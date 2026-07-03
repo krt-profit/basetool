@@ -21,9 +21,11 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyClass;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
@@ -44,6 +46,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -80,8 +83,11 @@ class MissionPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "OFFICER")
   void createMission_WithEmptyDescription_ShouldSucceed() throws Exception {
-    // Prepare Mocks
-    when(backendApiClient.post(any(String.class), any(), Mockito.eq(Void.class))).thenReturn(null);
+    // Prepare Mocks — the create endpoint now reads the persisted MissionDto to redirect to the new
+    // mission's Verwaltung tab (REQ-MISSION-015).
+    UUID missionId = UUID.randomUUID();
+    when(backendApiClient.post(any(String.class), any(), Mockito.eq(MissionDto.class)))
+        .thenReturn(minimalMission(missionId));
 
     // Perform Request
     mockMvc
@@ -95,7 +101,7 @@ class MissionPageControllerMvcTest {
                 .with(csrf()))
         .andExpect(status().is3xxRedirection())
         .andDo(org.springframework.test.web.servlet.result.MockMvcResultHandlers.print())
-        .andExpect(redirectedUrl("/missions"));
+        .andExpect(redirectedUrl("/missions/" + missionId + "?tab=verw"));
   }
 
   @Test
@@ -113,9 +119,9 @@ class MissionPageControllerMvcTest {
     // rule and added confusion to anyone reading this test.
     MissionDto mission = minimalMission(missionId);
 
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), eq(true)))
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
         .thenReturn(mission);
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
     // OFFICER is a member, so the member-only finance ledger fetch now runs (REQ-SEC-013); stub it
     // empty so the page renders without exercising the entry-row template here.
@@ -147,9 +153,9 @@ class MissionPageControllerMvcTest {
   @WithMockUser(roles = "KRT_MEMBER")
   void missionDetail_asMember_fetchesFinanceLedger() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), eq(true)))
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
         .thenReturn(minimalMission(missionId));
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
     stubEmptyFinance(missionId);
 
@@ -195,9 +201,9 @@ class MissionPageControllerMvcTest {
         new de.greluc.krt.profit.basetool.frontend.model.dto.MissionStepDto(
             UUID.randomUUID(), "Mining", null, false, 1);
 
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), eq(true)))
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
         .thenReturn(missionWithSteps(missionId, java.util.List.of(step1, step2)));
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
     stubEmptyFinance(missionId);
 
@@ -233,9 +239,9 @@ class MissionPageControllerMvcTest {
     // carries empty objectives + empty steps; here it also gets a description so the collapsible
     // renders. The Verwaltung drag-editors (canEdit fixture) stay regardless of emptiness.
     UUID missionId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), eq(true)))
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
         .thenReturn(minimalMission(missionId, "**Briefing** folgt."));
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
     stubEmptyFinance(missionId);
 
@@ -459,9 +465,9 @@ class MissionPageControllerMvcTest {
             java.util.List.of(),
             0L,
             null);
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), eq(true)))
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
         .thenReturn(mission);
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -534,9 +540,9 @@ class MissionPageControllerMvcTest {
             java.util.List.of(),
             0L,
             null);
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), eq(true)))
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
         .thenReturn(mission);
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -552,7 +558,27 @@ class MissionPageControllerMvcTest {
         // Regression guard: the edit modal must re-sync the datetime-split widget
         // after programmatically setting the hidden value (otherwise the visible
         // date/time inputs stay empty even though startTime/endTime are present).
-        .andExpect(content().string(containsString("krtSyncDatetimeSplitGroup")));
+        // Since #924 the sync call lives in the static page module, so the page must
+        // load it and the module must still carry the call.
+        .andExpect(content().string(containsString("src=\"/js/mission-detail.js\"")));
+    assertThat(missionDetailModuleSource()).contains("krtSyncDatetimeSplitGroup");
+  }
+
+  /**
+   * Reads the mission-detail page module ({@code static/js/mission-detail.js}) from the classpath.
+   * The #924 extraction moved the page's inline JavaScript there, so script-content regression
+   * guards now assert against the module source while the MockMvc render is only expected to carry
+   * the module's loader tag.
+   *
+   * @return the full UTF-8 source of the mission-detail page module
+   * @throws IOException if the classpath resource cannot be read (build misconfiguration)
+   */
+  private static String missionDetailModuleSource() throws IOException {
+    try (var in =
+        new org.springframework.core.io.ClassPathResource("static/js/mission-detail.js")
+            .getInputStream()) {
+      return new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+    }
   }
 
   @Test
@@ -627,9 +653,9 @@ class MissionPageControllerMvcTest {
             java.util.List.of(),
             0L,
             null);
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), eq(true)))
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
         .thenReturn(mission);
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -641,8 +667,11 @@ class MissionPageControllerMvcTest {
         // Pre-JS fallback is explicitly UTC-labelled (never an unlabelled, misleading local-looking
         // string).
         .andExpect(content().string(containsString("10.02.2026 11:00 UTC")))
-        // The conversion script must be present so the value becomes browser-local on load.
-        .andExpect(content().string(containsString("krtFormatLocalDateTime")));
+        // The conversion script must ship so the value becomes browser-local on load. Since #924
+        // it lives in the static page module, so the page must load the module and the module
+        // must still carry the converter.
+        .andExpect(content().string(containsString("src=\"/js/mission-detail.js\"")));
+    assertThat(missionDetailModuleSource()).contains("krtFormatLocalDateTime");
   }
 
   @Test
@@ -737,9 +766,9 @@ class MissionPageControllerMvcTest {
             java.util.List.of(),
             0L,
             null);
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), eq(true)))
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
         .thenReturn(mission);
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -2764,9 +2793,9 @@ class MissionPageControllerMvcTest {
             0L,
             null);
 
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), eq(true)))
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
         .thenReturn(mission);
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -2825,9 +2854,9 @@ class MissionPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void missionDetail_CrewBoardFragment_RendersBoardOnly() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), eq(true)))
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
         .thenReturn(editableMission(missionId));
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -2844,9 +2873,9 @@ class MissionPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void missionDetail_FinanceFragment_RendersFinancePaneOnly() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), eq(true)))
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
         .thenReturn(editableMission(missionId));
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -2862,9 +2891,9 @@ class MissionPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void missionDetail_MgmtFragment_RendersManagementPanelOnly() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), eq(true)))
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
         .thenReturn(editableMission(missionId));
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
 
     mockMvc

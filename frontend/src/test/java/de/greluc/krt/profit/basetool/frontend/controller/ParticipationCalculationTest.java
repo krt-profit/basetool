@@ -37,7 +37,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.springframework.context.MessageSource;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
@@ -119,10 +118,7 @@ class ParticipationCalculationTest {
 
     MissionPageController controller =
         new MissionPageController(
-            backendApiClient,
-            mock(MessageSource.class),
-            mock(FrontendAuthHelperService.class),
-            PARALLEL);
+            backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL);
     Model model = new ConcurrentModel();
 
     // Act
@@ -236,10 +232,7 @@ class ParticipationCalculationTest {
 
     MissionPageController controller =
         new MissionPageController(
-            backendApiClient,
-            mock(MessageSource.class),
-            mock(FrontendAuthHelperService.class),
-            PARALLEL);
+            backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL);
     Model model = new ConcurrentModel();
 
     // Act

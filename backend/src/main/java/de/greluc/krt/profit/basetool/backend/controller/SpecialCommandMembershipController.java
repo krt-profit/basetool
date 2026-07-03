@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
-import de.greluc.krt.profit.basetool.backend.mapper.OrgUnitMembershipMapper;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipLeadToggleRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipDto;
@@ -34,7 +33,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -58,11 +56,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/special-commands/{id}/members")
 @RequiredArgsConstructor
-@Transactional
 public class SpecialCommandMembershipController {
 
   private final OrgUnitMembershipService membershipService;
-  private final OrgUnitMembershipMapper membershipMapper;
 
   /**
    * Lists every member of the given Spezialkommando. Used by the admin roster page; the response
@@ -87,7 +83,7 @@ public class SpecialCommandMembershipController {
     @ApiResponse(responseCode = "404", description = "No Spezialkommando matches the given id.")
   })
   public List<OrgUnitMembershipDto> listMembers(@PathVariable @NotNull UUID id) {
-    return membershipService.listMembers(id).stream().map(membershipMapper::toDto).toList();
+    return membershipService.listMemberDtos(id);
   }
 
   /**
@@ -116,7 +112,7 @@ public class SpecialCommandMembershipController {
   })
   public OrgUnitMembershipDto addMember(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
-    return membershipMapper.toDto(membershipService.addMember(id, userId));
+    return membershipService.addMemberDto(id, userId);
   }
 
   /**
@@ -179,7 +175,7 @@ public class SpecialCommandMembershipController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID userId,
       @RequestBody @Valid MembershipFlagsPatchRequest request) {
-    return membershipMapper.toDto(membershipService.patchFlags(id, userId, request));
+    return membershipService.patchFlagsDto(id, userId, request);
   }
 
   /**
@@ -222,6 +218,6 @@ public class SpecialCommandMembershipController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID userId,
       @RequestBody @Valid MembershipLeadToggleRequest request) {
-    return membershipMapper.toDto(membershipService.toggleLead(id, userId, request));
+    return membershipService.toggleLeadDto(id, userId, request);
   }
 }

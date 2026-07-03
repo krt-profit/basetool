@@ -147,6 +147,43 @@ public class OrgUnitBankApprovalLimitService {
   }
 
   /**
+   * Sets or changes the "Mitglieder des Bereichs" cascade approval limit on a Bereichskonto and
+   * records the set audit event (REQ-BANK-048): the ceiling for any member of the whole area
+   * cascade (Bereichsleitung + child Staffel/SK members) who matches no more specific tier. The
+   * area-members-tier support was validated by the caller.
+   *
+   * @param account the already-loaded, already-authorized account
+   * @param limit the whole-aUEC ceiling (&gt;= 0)
+   */
+  @Transactional
+  public void setAreaMembers(@NotNull BankAccount account, @NotNull BigDecimal limit) {
+    upsertLimit(account, BankAccountViewGranteeKind.AREA_MEMBERS, null, null, limit);
+    bankAuditService.record(
+        BankAuditEventType.APPROVAL_LIMIT_SET,
+        account.getId(),
+        null,
+        null,
+        AuditDetails.of("AREA_MEMBERS", plain(limit)));
+  }
+
+  /**
+   * Removes the "Mitglieder des Bereichs" cascade approval limit from a Bereichskonto, recording
+   * the cleared audit event when a row was actually deleted (REQ-BANK-048).
+   *
+   * @param account the already-loaded, already-authorized account
+   */
+  @Transactional
+  public void clearAreaMembers(@NotNull BankAccount account) {
+    long removed =
+        approvalLimitRepository.deleteByAccountIdAndGranteeKind(
+            account.getId(), BankAccountViewGranteeKind.AREA_MEMBERS);
+    if (removed > 0) {
+      bankAuditService.record(
+          BankAuditEventType.APPROVAL_LIMIT_CLEARED, account.getId(), null, null, "AREA_MEMBERS");
+    }
+  }
+
+  /**
    * Sets or changes an individual user's approval limit on an account and records the set audit
    * event (REQ-BANK-041); the most specific tier, overriding any role/all-members limit for that
    * user.
@@ -217,7 +254,7 @@ public class OrgUnitBankApprovalLimitService {
                   account.getId(), kind, roleCode);
           case USER ->
               approvalLimitRepository.findByAccountIdAndGranteeUserId(account.getId(), userId);
-          case ALL_MEMBERS ->
+          case ALL_MEMBERS, AREA_MEMBERS ->
               approvalLimitRepository.findByAccountIdAndGranteeKind(account.getId(), kind);
         };
     BankAccountApprovalLimit limit =

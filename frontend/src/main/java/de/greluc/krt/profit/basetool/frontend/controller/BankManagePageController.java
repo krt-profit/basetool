@@ -53,6 +53,22 @@ import org.springframework.web.bind.annotation.RequestParam;
 @Slf4j
 public class BankManagePageController {
 
+  /** Response type for the paged {@code /bank/accounts} listing. */
+  private static final ParameterizedTypeReference<PageResponse<BankAccountDto>>
+      BANK_ACCOUNT_PAGE_TYPE = new ParameterizedTypeReference<>() {};
+
+  /** Response type for the {@code /bank/holders} holder-registry list. */
+  private static final ParameterizedTypeReference<List<BankHolderDto>> BANK_HOLDER_LIST_TYPE =
+      new ParameterizedTypeReference<>() {};
+
+  /** Response type for the {@code /org-units/active-all-kinds} org-unit option list. */
+  private static final ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>
+      ORG_UNIT_OPTION_LIST_TYPE = new ParameterizedTypeReference<>() {};
+
+  /** Response type for the {@code /users/lookup} user-reference list. */
+  private static final ParameterizedTypeReference<List<UserReferenceDto>> USER_REFERENCE_LIST_TYPE =
+      new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -82,18 +98,22 @@ public class BankManagePageController {
       Model model) {
     boolean management = hasRole(authentication, Roles.authority(Roles.BANK_MANAGEMENT));
     PageResponse<BankAccountDto> accounts =
-        backendApiClient.get(
-            "/api/v1/bank/accounts?size=500", new ParameterizedTypeReference<>() {});
+        backendApiClient.get("/api/v1/bank/accounts?size=500", BANK_ACCOUNT_PAGE_TYPE);
     List<BankHolderDto> holders =
-        backendApiClient.get(
-            "/api/v1/bank/holders", new ParameterizedTypeReference<List<BankHolderDto>>() {});
-    model.addAttribute(
-        "accounts",
+        backendApiClient.get("/api/v1/bank/holders", BANK_HOLDER_LIST_TYPE);
+    List<BankAccountDto> orderedAccounts =
         accounts == null
             ? List.<BankAccountDto>of()
-            : BankAccountOrder.byName(accounts.content(), BankAccountDto::name));
+            : BankAccountOrder.byName(accounts.content(), BankAccountDto::name);
+    model.addAttribute("accounts", orderedAccounts);
     model.addAttribute("holders", holders == null ? List.<BankHolderDto>of() : holders);
     model.addAttribute("management", management);
+    // The KRT account (singleton CARTEL) for the Bankleitung-only "KRT-Freigaben" tab
+    // (REQ-BANK-047),
+    // where the two 3-stage thresholds T1/T2 are edited; null until a KRT account exists.
+    model.addAttribute(
+        "cartelAccount",
+        orderedAccounts.stream().filter(a -> "CARTEL".equals(a.type())).findFirst().orElse(null));
     // The caller's own user id (OIDC sub) so the holder tab can link only the caller's own holder
     // row to its history; management links every row (REQ-BANK-032). The real per-holder gate is
     // server-side (canSeeHolder) — this only governs which links the UI renders.
@@ -103,9 +123,20 @@ public class BankManagePageController {
     // own holder. principal.getSubject() is the sub (UUID) that equals BankHolderDto.userId; same
     // fix as the mission participant self-edit carve-out (MissionPageController#authUserId).
     model.addAttribute("selfUserId", principal != null ? principal.getSubject() : null);
-    // Halter is the default-open tab (it sits first/left in the tab nav); only an explicit
-    // ?tab=konten opens the accounts tab.
-    model.addAttribute("activeTab", "konten".equalsIgnoreCase(tab) ? "konten" : "halter");
+    // Halter is the default-open tab (it sits first/left in the tab nav); ?tab=konten opens the
+    // accounts tab and ?tab=krt-freigaben the Bankleitung-only KRT approval-thresholds tab
+    // (REQ-BANK-047) — the latter only for a management caller, so a plain employee forcing the
+    // query
+    // param falls back to Halter and never sees the KRT-thresholds panel.
+    String activeTab;
+    if (management && "krt-freigaben".equalsIgnoreCase(tab)) {
+      activeTab = "krt-freigaben";
+    } else if ("konten".equalsIgnoreCase(tab)) {
+      activeTab = "konten";
+    } else {
+      activeTab = "halter";
+    }
+    model.addAttribute("activeTab", activeTab);
     if ("manageBody".equals(fragment)) {
       return "bank-manage :: manageBody";
     }
@@ -116,12 +147,9 @@ public class BankManagePageController {
     // management-gated — are skipped for a plain employee (REQ-BANK-030).
     if (management) {
       List<OrgUnitMembershipOptionDto> orgUnits =
-          backendApiClient.get(
-              "/api/v1/org-units/active-all-kinds",
-              new ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>() {});
+          backendApiClient.get("/api/v1/org-units/active-all-kinds", ORG_UNIT_OPTION_LIST_TYPE);
       List<UserReferenceDto> users =
-          backendApiClient.get(
-              "/api/v1/users/lookup", new ParameterizedTypeReference<List<UserReferenceDto>>() {});
+          backendApiClient.get("/api/v1/users/lookup", USER_REFERENCE_LIST_TYPE);
       model.addAttribute(
           "orgUnits", orgUnits == null ? List.<OrgUnitMembershipOptionDto>of() : orgUnits);
       model.addAttribute("users", users == null ? List.<UserReferenceDto>of() : users);

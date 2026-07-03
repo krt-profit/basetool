@@ -29,11 +29,11 @@ import jakarta.validation.constraints.Size;
  * list (next {@code orderIndex}). {@code objectivesVersion} is the mission's expected {@code
  * objectives_version} section counter — a stale value yields HTTP 409.
  *
- * @param title the required goal text (≤250 chars)
+ * @param title the required goal text (≤500 chars)
  * @param kind the classification (primary / secondary / non-goal)
  * @param objectivesVersion the expected mission goals-section version (optimistic-lock guard)
  */
 public record AddMissionObjectiveRequest(
-    @NotBlank @Size(max = 250) String title,
+    @NotBlank @Size(max = 500) String title,
     @NotNull MissionObjectiveKind kind,
     @NotNull Long objectivesVersion) {}

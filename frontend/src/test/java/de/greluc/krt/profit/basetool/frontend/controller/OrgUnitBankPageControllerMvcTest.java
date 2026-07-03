@@ -131,6 +131,7 @@ class OrgUnitBankPageControllerMvcTest {
             null,
             false,
             null,
+            null,
             false,
             null,
             false,
@@ -259,6 +260,7 @@ class OrgUnitBankPageControllerMvcTest {
             null,
             false,
             null,
+            null,
             false,
             null,
             false,
@@ -364,6 +366,8 @@ class OrgUnitBankPageControllerMvcTest {
             null,
             new BigDecimal("1850000"),
             new BigDecimal("2000000"),
+            null,
+            null,
             3L,
             Instant.parse("2026-01-01T00:00:00Z"));
     BankAccountDetailDto inner =
@@ -376,8 +380,10 @@ class OrgUnitBankPageControllerMvcTest {
                 false,
                 false,
                 false,
+                false,
                 java.util.List.of(),
                 java.util.Map.of(),
+                null,
                 null,
                 java.util.List.of()));
     OrgUnitBankAccountDetailDto detail =
@@ -396,8 +402,10 @@ class OrgUnitBankPageControllerMvcTest {
             true,
             true,
             false,
+            false,
             List.of("LOGISTICIAN", "MISSION_MANAGER"),
             List.of("LOGISTICIAN"),
+            false,
             false,
             List.of(new OrgUnitBankViewUserDto(UUID.randomUUID(), "greluc")),
             true,
@@ -405,8 +413,10 @@ class OrgUnitBankPageControllerMvcTest {
                 false,
                 false,
                 false,
+                false,
                 java.util.List.of(),
                 java.util.Map.of(),
+                null,
                 null,
                 java.util.List.of()));
     BankBookingDto booking =
@@ -493,6 +503,8 @@ class OrgUnitBankPageControllerMvcTest {
             null,
             new BigDecimal("50000"),
             null,
+            null,
+            null,
             1L,
             Instant.parse("2026-01-01T00:00:00Z"));
     BankAccountDetailDto inner =
@@ -505,8 +517,10 @@ class OrgUnitBankPageControllerMvcTest {
                 false,
                 false,
                 false,
+                false,
                 java.util.List.of(),
                 java.util.Map.of(),
+                null,
                 null,
                 java.util.List.of()));
     OrgUnitBankAccountDetailDto detail =
@@ -552,6 +566,8 @@ class OrgUnitBankPageControllerMvcTest {
             null,
             new BigDecimal("100000"),
             null,
+            null,
+            null,
             1L,
             Instant.parse("2026-01-01T00:00:00Z"));
     BankAccountDetailDto inner =
@@ -564,8 +580,10 @@ class OrgUnitBankPageControllerMvcTest {
                 false,
                 true,
                 true,
+                false,
                 java.util.List.of("KOMMANDOLEITER"),
                 java.util.Map.of("KOMMANDOLEITER", new BigDecimal("1000000")),
+                null,
                 null,
                 java.util.List.of()));
     OrgUnitBankAccountDetailDto detail =

@@ -59,6 +59,18 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @Slf4j
 public class AdminDefaultBlueprintsPageController {
 
+  /**
+   * Response type for the blueprint product type-ahead search results. A shared static {@link
+   * ParameterizedTypeReference} is behaviourally identical to a fresh anonymous instance per call
+   * (Q10).
+   */
+  private static final ParameterizedTypeReference<List<BlueprintProductDto>>
+      BLUEPRINT_PRODUCT_LIST_TYPE = new ParameterizedTypeReference<>() {};
+
+  /** Response type for the current default-blueprint set read. */
+  private static final ParameterizedTypeReference<List<DefaultBlueprintDto>>
+      DEFAULT_BLUEPRINT_LIST_TYPE = new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -94,8 +106,7 @@ public class AdminDefaultBlueprintsPageController {
               + URLEncoder.encode(query, StandardCharsets.UTF_8)
               + "&limit="
               + effectiveLimit;
-      List<BlueprintProductDto> result =
-          backendApiClient.get(uri, new ParameterizedTypeReference<>() {});
+      List<BlueprintProductDto> result = backendApiClient.get(uri, BLUEPRINT_PRODUCT_LIST_TYPE);
       return result == null ? Collections.emptyList() : result;
     } catch (Exception e) {
       log.warn("Default-blueprint product type-ahead failed for query='{}': {}", q, e.getMessage());
@@ -181,8 +192,7 @@ public class AdminDefaultBlueprintsPageController {
   private List<DefaultBlueprintDto> fetchDefaults() {
     try {
       List<DefaultBlueprintDto> result =
-          backendApiClient.get(
-              "/api/v1/admin/default-blueprints", new ParameterizedTypeReference<>() {});
+          backendApiClient.get("/api/v1/admin/default-blueprints", DEFAULT_BLUEPRINT_LIST_TYPE);
       return result == null ? Collections.emptyList() : result;
     } catch (Exception e) {
       log.error("Failed to fetch default blueprints", e);

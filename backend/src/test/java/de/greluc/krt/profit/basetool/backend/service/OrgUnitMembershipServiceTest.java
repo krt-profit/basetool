@@ -35,6 +35,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.mapper.OrgUnitMembershipMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.Bereich;
 import de.greluc.krt.profit.basetool.backend.model.KommandoGroup;
@@ -50,6 +51,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.BereichLeadershipRole;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipLeadToggleRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.repository.KommandoGroupRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
@@ -59,22 +61,28 @@ import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mapstruct.factory.Mappers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
  * Mockito unit tests for {@link OrgUnitMembershipService}. Pins the CRUD contract that the SK
  * member-management UI relies on: listing through the SK existence guard, add/remove happy paths
  * plus the duplicate-409 and not-found-404 paths, the flag-patch semantics including
- * optimistic-lock failures, and the dedicated lead toggle.
+ * optimistic-lock failures, and the dedicated lead toggle. The {@code …Dto} projection wrappers
+ * (L4, #923, ADR-0067) are covered against the real MapStruct mapper so the wire shape — incl. the
+ * flushed {@code @Version} the client must echo back (REQ-FE-003) — is asserted, not mocked.
  */
 @ExtendWith(MockitoExtension.class)
 class OrgUnitMembershipServiceTest {
@@ -91,6 +99,21 @@ class OrgUnitMembershipServiceTest {
   @Mock private AuditService auditService;
   @Mock private OrgChartService orgChartService;
   @Mock private StaffelMembershipResolver staffelMembershipResolver;
+
+  // The bank seam is injected as an ObjectProvider to break the DI cycle (ADR-0070); the leadership
+  // mutations resolve it to snapshot/record a responsible-holder change. Stubbed lenient below so
+  // the
+  // non-leadership tests do not trip strict-stubs; the seam mock's default (null snapshot, no-op
+  // record) leaves those flows unaffected.
+  @Mock private ObjectProvider<OrgUnitBankAccessService> orgUnitBankAccessServiceProvider;
+  @Mock private OrgUnitBankAccessService orgUnitBankAccessService;
+
+  // Real MapStruct implementation (not a mock): the …Dto projection tests below assert the actual
+  // entity→DTO mapping the controllers ship to the client, incl. the user.effectiveName read and
+  // the derived isLead flag (L4, #923, ADR-0067).
+  @Spy
+  private OrgUnitMembershipMapper orgUnitMembershipMapper =
+      Mappers.getMapper(OrgUnitMembershipMapper.class);
 
   @InjectMocks private OrgUnitMembershipService membershipService;
 
@@ -125,6 +148,15 @@ class OrgUnitMembershipServiceTest {
         .when(staffelMembershipResolver.resolveNameSortedStaffelIds(any()))
         .thenAnswer(
             invocation -> realResolver.resolveNameSortedStaffelIds(invocation.getArgument(0)));
+    // The leadership mutations resolve the bank seam through the provider (ADR-0070). Lenient so
+    // the
+    // many non-leadership tests do not trip strict-stubs; the seam mock no-ops the snapshot/record.
+    lenient()
+        .when(orgUnitBankAccessServiceProvider.getObject())
+        .thenReturn(orgUnitBankAccessService);
+    // The membership-removal paths (removeMember, reconcileStaffelMemberships) merge the seam's
+    // per-org-unit snapshot; a non-null map keeps the reconcile putAll from NPE-ing on the mock.
+    lenient().when(orgUnitBankAccessService.snapshotResponsibleHolders(any())).thenReturn(Map.of());
   }
 
   // --- findStaffelMembershipOrgUnitIds (name-sorted primary, REQ-ORG-017) -------------------
@@ -372,7 +404,7 @@ class OrgUnitMembershipServiceTest {
     MembershipFlagsPatchRequest request = new MembershipFlagsPatchRequest(true, true, 3L);
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
     when(membershipRepository.findById(id)).thenReturn(Optional.of(m));
-    when(membershipRepository.save(m)).thenReturn(m);
+    when(membershipRepository.saveAndFlush(m)).thenReturn(m);
 
     OrgUnitMembership updated = membershipService.patchFlags(scId, userId, request);
 
@@ -391,7 +423,7 @@ class OrgUnitMembershipServiceTest {
     MembershipFlagsPatchRequest request = new MembershipFlagsPatchRequest(true, null, 0L);
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
     when(membershipRepository.findById(id)).thenReturn(Optional.of(m));
-    when(membershipRepository.save(m)).thenReturn(m);
+    when(membershipRepository.saveAndFlush(m)).thenReturn(m);
 
     OrgUnitMembership updated = membershipService.patchFlags(scId, userId, request);
 
@@ -410,7 +442,7 @@ class OrgUnitMembershipServiceTest {
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
         () -> membershipService.patchFlags(scId, userId, request));
-    verify(membershipRepository, never()).save(any());
+    verify(membershipRepository, never()).saveAndFlush(any());
   }
 
   @Test
@@ -432,7 +464,7 @@ class OrgUnitMembershipServiceTest {
     MembershipLeadToggleRequest request = new MembershipLeadToggleRequest(true, 0L);
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
     when(membershipRepository.findById(id)).thenReturn(Optional.of(m));
-    when(membershipRepository.save(m)).thenReturn(m);
+    when(membershipRepository.saveAndFlush(m)).thenReturn(m);
 
     OrgUnitMembership updated = membershipService.toggleLead(scId, userId, request);
 
@@ -450,7 +482,7 @@ class OrgUnitMembershipServiceTest {
     MembershipLeadToggleRequest request = new MembershipLeadToggleRequest(false, 2L);
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
     when(membershipRepository.findById(id)).thenReturn(Optional.of(m));
-    when(membershipRepository.save(m)).thenReturn(m);
+    when(membershipRepository.saveAndFlush(m)).thenReturn(m);
 
     OrgUnitMembership updated = membershipService.toggleLead(scId, userId, request);
 
@@ -487,7 +519,7 @@ class OrgUnitMembershipServiceTest {
 
     assertThrows(
         BadRequestException.class, () -> membershipService.toggleLead(scId, userId, request));
-    verify(membershipRepository, never()).save(any());
+    verify(membershipRepository, never()).saveAndFlush(any());
   }
 
   // --- reconcileStaffelMemberships (REQ-ORG-017: up to two Staffeln) ---------
@@ -898,6 +930,183 @@ class OrgUnitMembershipServiceTest {
         BadRequestException.class,
         () -> membershipService.removeSquadronRank(squadronId, userId, 0L));
     verify(membershipRepository, never()).saveAndFlush(any());
+  }
+
+  // --- …Dto projections (L4, #923, ADR-0067) ---------------------------------
+  // These run the REAL MapStruct mapper (see the @Spy field) so they pin the wire shape the
+  // controllers ship: userDisplayName from user.effectiveName, isLead derived from the unified
+  // rank, and — for the write wrappers — the @Version the flush bumped (REQ-FE-003).
+
+  @Test
+  void listMemberDtos_mapsRowsToWireShape() {
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setId(id);
+    m.setKind(OrgUnitKind.SPECIAL_COMMAND);
+    m.setUser(user);
+    m.setVersion(4L);
+    when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
+    when(membershipRepository.findAllByIdOrgUnitId(scId)).thenReturn(List.of(m));
+
+    List<OrgUnitMembershipDto> dtos = membershipService.listMemberDtos(scId);
+
+    assertEquals(1, dtos.size());
+    OrgUnitMembershipDto dto = dtos.get(0);
+    assertEquals(userId, dto.userId());
+    assertEquals(scId, dto.orgUnitId());
+    assertEquals("Alice", dto.userDisplayName());
+    assertEquals(4L, dto.version().longValue());
+  }
+
+  @Test
+  void addMemberDto_mapsThePersistedRow() {
+    when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, scId)).thenReturn(false);
+    when(membershipRepository.save(any(OrgUnitMembership.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    OrgUnitMembershipDto dto = membershipService.addMemberDto(scId, userId);
+
+    assertEquals(userId, dto.userId());
+    assertEquals(scId, dto.orgUnitId());
+    assertEquals("Alice", dto.userDisplayName());
+    assertEquals(Boolean.FALSE, dto.isLogistician());
+    assertEquals(Boolean.FALSE, dto.isMissionManager());
+    assertEquals(Boolean.FALSE, dto.isLead());
+  }
+
+  @Test
+  void patchFlagsDto_carriesTheFlushedVersion() {
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setId(id);
+    m.setKind(OrgUnitKind.SPECIAL_COMMAND);
+    m.setUser(user);
+    m.setVersion(3L);
+    MembershipFlagsPatchRequest request = new MembershipFlagsPatchRequest(true, true, 3L);
+    when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
+    when(membershipRepository.findById(id)).thenReturn(Optional.of(m));
+    // Simulate the flush bumping the row's @Version — the DTO must carry the bumped value, not
+    // the stale pre-flush one, or the client's next echo 409s (REQ-FE-003).
+    when(membershipRepository.saveAndFlush(m))
+        .thenAnswer(
+            inv -> {
+              m.setVersion(4L);
+              return m;
+            });
+
+    OrgUnitMembershipDto dto = membershipService.patchFlagsDto(scId, userId, request);
+
+    assertEquals(Boolean.TRUE, dto.isLogistician());
+    assertEquals(Boolean.TRUE, dto.isMissionManager());
+    assertEquals(4L, dto.version().longValue());
+  }
+
+  @Test
+  void patchSquadronMemberFlagsDto_carriesTheFlushedVersion() {
+    UUID squadronId = UUID.randomUUID();
+    Squadron squadron = new Squadron();
+    squadron.setId(squadronId);
+    squadron.setName("Alpha");
+    squadron.setShorthand("ALF");
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setId(new OrgUnitMembershipId(userId, squadronId));
+    m.setKind(OrgUnitKind.SQUADRON);
+    m.setUser(user);
+    m.setVersion(1L);
+    MembershipFlagsPatchRequest request = new MembershipFlagsPatchRequest(true, null, 1L);
+    when(squadronRepository.findById(squadronId)).thenReturn(Optional.of(squadron));
+    when(membershipRepository.findById(new OrgUnitMembershipId(userId, squadronId)))
+        .thenReturn(Optional.of(m));
+    when(membershipRepository.saveAndFlush(m))
+        .thenAnswer(
+            inv -> {
+              m.setVersion(2L);
+              return m;
+            });
+
+    OrgUnitMembershipDto dto =
+        membershipService.patchSquadronMemberFlagsDto(squadronId, userId, request);
+
+    assertEquals(Boolean.TRUE, dto.isLogistician());
+    assertEquals(2L, dto.version().longValue());
+  }
+
+  @Test
+  void toggleLeadDto_mapsTheDerivedLeadFlagAndFlushedVersion() {
+    OrgUnitMembership m = new OrgUnitMembership();
+    m.setId(id);
+    m.setKind(OrgUnitKind.SPECIAL_COMMAND);
+    m.setUser(user);
+    m.setVersion(0L);
+    MembershipLeadToggleRequest request = new MembershipLeadToggleRequest(true, 0L);
+    when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
+    when(membershipRepository.findById(id)).thenReturn(Optional.of(m));
+    when(membershipRepository.saveAndFlush(m))
+        .thenAnswer(
+            inv -> {
+              m.setVersion(1L);
+              return m;
+            });
+
+    OrgUnitMembershipDto dto = membershipService.toggleLeadDto(scId, userId, request);
+
+    assertEquals(Boolean.TRUE, dto.isLead());
+    assertEquals(1L, dto.version().longValue());
+  }
+
+  @Test
+  void assignSquadronRankDto_mapsThePersistedRank() {
+    UUID squadronId = UUID.randomUUID();
+    OrgUnitMembership m = squadronMember(squadronId, MembershipRole.MEMBER);
+    m.setUser(user);
+    when(membershipRepository.findById(any(OrgUnitMembershipId.class))).thenReturn(Optional.of(m));
+    when(membershipRepository.findAllByIdOrgUnitId(squadronId)).thenReturn(List.of(m));
+    when(membershipRepository.saveAndFlush(any(OrgUnitMembership.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    OrgUnitMembershipDto dto =
+        membershipService.assignSquadronRankDto(
+            squadronId, userId, MembershipRole.STAFFELLEITER, null, 0L);
+
+    assertEquals(userId, dto.userId());
+    assertEquals(squadronId, dto.orgUnitId());
+    assertEquals("Alice", dto.userDisplayName());
+    assertEquals(Boolean.FALSE, dto.isLead(), "a squadron rank is not the SK lead");
+  }
+
+  @Test
+  void removeSquadronRankDto_mapsTheClearedRank() {
+    UUID squadronId = UUID.randomUUID();
+    OrgUnitMembership m = squadronMember(squadronId, MembershipRole.STAFFELLEITER);
+    m.setUser(user);
+    when(membershipRepository.findById(any(OrgUnitMembershipId.class))).thenReturn(Optional.of(m));
+    when(membershipRepository.saveAndFlush(any(OrgUnitMembership.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    OrgUnitMembershipDto dto = membershipService.removeSquadronRankDto(squadronId, userId, 0L);
+
+    assertEquals(userId, dto.userId());
+    assertEquals("Alice", dto.userDisplayName());
+    assertEquals(Boolean.FALSE, dto.isLead());
+  }
+
+  @Test
+  void findAllMembershipDtosForUser_mapsEveryMembershipStaffelFirst() {
+    UUID squadronId = UUID.randomUUID();
+    OrgUnitMembership staffel = squadronMember(squadronId, MembershipRole.MEMBER);
+    staffel.setUser(user);
+    OrgUnitMembership sk = new OrgUnitMembership();
+    sk.setId(id);
+    sk.setKind(OrgUnitKind.SPECIAL_COMMAND);
+    sk.setUser(user);
+    when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of(sk, staffel));
+
+    List<OrgUnitMembershipDto> dtos = membershipService.findAllMembershipDtosForUser(userId);
+
+    assertEquals(2, dtos.size());
+    assertEquals(OrgUnitKind.SQUADRON, dtos.get(0).kind(), "Staffel sorts before the SK");
+    assertEquals(OrgUnitKind.SPECIAL_COMMAND, dtos.get(1).kind());
+    assertEquals("Alice", dtos.get(0).userDisplayName());
   }
 
   // --- listOptionsForUser ---------------------------------------------------

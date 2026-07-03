@@ -86,7 +86,9 @@ precedence over `#tab=`, then a server-side validation-error hint (re-renders la
 then the last tab from `localStorage`, then `ueb`. Browser back/forward re-applies the URL state.
 Tabs use the WAI-ARIA tabs pattern (`role="tablist"/"tab"/"tabpanel"`, `aria-selected`, arrow-key
 navigation). Switching away from a Verwaltung tab with unsaved form input asks for confirmation.
-The create page (`/missions/new`) renders the details form without tabs.
+The create page (`/missions/new`) renders the details form without tabs; it additionally carries the
+optional create-time Ziele + Ablauf editors above the description and a floating Speichern, and on a
+successful create lands the user on the new mission's Verwaltung tab (REQ-MISSION-015).
 
 ### REQ-MISSION-005 — Crew board replaces the assign-crew modal (same backend)
 
@@ -123,10 +125,19 @@ The **sign-up modal** carries an "Auszahlungsart" select: an explicit choice is 
 participant and wins over the user's profile default; the empty "Standard" option keeps the
 existing default chain (profile default for members per REQ-MISSION-002, `PAYOUT` for guests).
 
+**Org-unit assignment is guest-only.** The participant modals' "Org-Einheiten" multi-select is offered
+only when signing up / editing a **guest**; a registered member's org units are derived from their
+account and are never selected — the edit modal shows them **read-only** (all of them, as badges) and
+hides the picker (owner request 2026-07-03). The add modal already hides the picker once a registered
+user is matched; the edit modal toggles picker vs. read-only badge list from the row's `data-guest` /
+`data-org-unit-names`.
+
 The **unit modal** matches the approved mock: ship type and hangar ship are offered
 **separately** (hangar select filtered by type, with an explicit "— keines · nur Typ verwenden —"
-option), the display name is **optional** (when blank the backend derives the stored name from the
-assigned ship respectively ship type; without name, ship, and type the request is rejected), a
+option), the display name (Anzeigename) is the unit's **single required field** — marked with a `*`
+and `@NotBlank` on `AddUnitRequest` / `UnitForm` (owner decision 2026-07-03, superseding the earlier
+name-optional / derive-from-ship-or-type rule); ship type and ship stay optional. (The service's
+name-from-ship/type derivation survives for internal callers below the validated API boundary.) A
 **Verantwortlich** select pins an explicit responsible person from the registered participants
 (empty = automatic fallback to the assigned ship's owner, also in the board's unit head), an HVU
 checkbox, the frequency field (existing function, kept beyond the mock), and a free-text **Notiz**
@@ -149,7 +160,7 @@ read-only to non-editors in the old Details panel remains visible via the Übers
 ### REQ-MISSION-009 — Ablauf (procedure timeline) steps
 
 A mission carries an ordered, reorderable list of **Ablauf** steps — a procedure timeline. Each step
-is a persisted `MissionStep` child of the mission (`title` required ≤200 chars, optional free-text
+is a persisted `MissionStep` child of the mission (`title` required ≤500 chars, optional free-text
 `meta` "Zeit / Ort" hint ≤200 chars, a shared `done` flag, an explicit `orderIndex`). The Ablauf is
 authored in the **Verwaltung** tab through a drag-sortable editor (`#mission-step-list`: per-row
 title + meta inputs, up/down + drag reorder, delete, "Schritt hinzufügen", a live "N Schritte"
@@ -173,7 +184,8 @@ overview-checklist fragments in place via `krtFetch`/`krtRefreshMissionSection([
 (no reload) and propagate to peers over the presence socket (REQ-FE-010, ADR-0031). Missionen is an
 audited area: each mutation records a `MISSION_STEP_*` event (`ADDED` / `UPDATED` / `REMOVED` /
 `REORDERED` / `DONE_CHANGED`) carrying only ids/counts/the done flag — **never** the step title or
-meta (free text), per REQ-AUDIT-001. Migration: V192 (`mission_step` table + `mission.steps_version`).
+meta (free text), per REQ-AUDIT-001. Migration: V192 (`mission_step` table + `mission.steps_version`). Steps may additionally be **seeded at
+mission-create time** (each still recording `MISSION_STEP_ADDED`) — REQ-MISSION-015.
 
 ### REQ-MISSION-010 — Rally point (Treffpunkt)
 
@@ -181,7 +193,9 @@ A mission carries the short free-text core-section field **`meetingPoint`** (Tre
 the rally point), edited in the Verwaltung details form and belonging to the **core** section (guarded
 by `coreVersion`, persisted via the existing `/core` patch; no new lock). It is non-PII planning data,
 forwarded to outsiders/guests like the units and frequencies (the long Markdown description remains the
-one free-text field hidden from outsiders). Migration: V192 (`mission.meeting_point`).
+one free-text field hidden from outsiders, capped at **20,000 chars** — owner request 2026-07-03;
+the `mission.description` column is already `TEXT`, so the cap moved only on the DTOs / form, no
+migration). Migration: V192 (`mission.meeting_point`).
 
 > The former single short **`objective`** (Ziel, ≤250 chars, shown first in "Mission auf einen Blick")
 > was **superseded by the structured, classified mission goals** of REQ-MISSION-012. V199 drops
@@ -217,7 +231,7 @@ asymmetric authorization, missions pager) is preserved.
 
 A mission carries an ordered, reorderable list of **goals** (Ziele) that **replaces** the former
 single short `objective` (REQ-MISSION-010). Each goal is a persisted `MissionObjective` child of the
-mission (`title` required ≤250 chars, a `kind` classification, an explicit `orderIndex`). The
+mission (`title` required ≤500 chars, a `kind` classification, an explicit `orderIndex`). The
 classification is one of three kinds — **Hauptziel** (`PRIMARY`), **Nebenziel** (`SECONDARY`) and
 **Nicht-Ziel** (`NON_GOAL`, an explicit *non*-goal the operation deliberately does not pursue, stated
 to bound the scope). A goal has **no** `done` flag (it is a scope statement, not a progress item like
@@ -248,7 +262,9 @@ over the presence socket (REQ-FE-010, ADR-0031). Missionen is an audited area: e
 the **kind enum** — **never** the goal title (free text), per REQ-AUDIT-001. Migration: V199
 (`mission_objective` table + `mission.objectives_version`), which also drops the legacy
 `mission.objective` column after migrating each existing non-empty value into one `PRIMARY` goal.
-Decision: [ADR-0057](../adr/0057-mission-goals-classified-ordered-children.md).
+Goals may additionally be **seeded at mission-create time** (each still recording
+`MISSION_OBJECTIVE_ADDED`) — REQ-MISSION-015. Decision:
+[ADR-0057](../adr/0057-mission-goals-classified-ordered-children.md).
 
 ### REQ-MISSION-013 — Facts-bar leader (Einsatzleiter) and Treffpunkt
 
@@ -258,7 +274,10 @@ participant whose `plannedMissionJobType` is the single designated **mission-lea
 and to "none" otherwise (the owner is redacted for outsiders, so a guest with no Einsatzleiter sees
 "none"). This **replaces** the former behaviour where the facts bar mirrored the built-in
 **Partyleiter** (`partyLeadUser`); the Partyleiter remains a separate field shown in the "Mission auf
-einen Blick" panel and is no longer reflected in the facts bar. The leader name is computed
+einen Blick" panel and is no longer reflected in the facts bar. The same Einsatzleiter is **also**
+surfaced as a dedicated **"Einsatzleiter" row directly above the Partyleiter** in that overview panel
+(`#overview-einsatzleiter`), reusing the identical `factLeaderName` value, so it live-updates through
+the overview fragment swap (owner request 2026-07-03). The leader name is computed
 server-side, rendered into the facts cell and exposed on the `#overview-head-meta` fragment as
 `data-leader`; the `krt:swapped` handler patches the cell (which lives outside the overview fragment)
 on every overview refresh. Because the leader derives from a participant's planned job type, the
@@ -315,3 +334,47 @@ reload) and propagate to peers over the presence socket (REQ-FE-010, ADR-0031). 
 area: add/edit record `MISSION_FREQUENCY_CHANGED` and delete records `MISSION_FREQUENCY_REMOVED`,
 carrying only the row id — **never** the free-text label — per REQ-AUDIT-001. Migration: V201
 (`mission_frequency.name` + nullable `frequency_type_id` + the XOR check constraint).
+
+### REQ-MISSION-015 — Create-time Ziele/Ablauf seeding, Verwaltung landing, and floating Speichern
+
+**Seeding goals + steps at create.** The create form (`/missions/new`) carries the Ziele
+(REQ-MISSION-012) and Ablauf (REQ-MISSION-009) editors **above** the description field so a planner can
+lay out goals and steps in the same action instead of a follow-up per-item call. Both are **optional**
+(an empty section seeds nothing) and can equally be added later through the Verwaltung section editors.
+Because the mission has no id yet, these are **client-side rows** — no per-row AJAX, no section version
+— reusing the same `.ae-row` markup, the Klassifizierung `<select>` and the time/place `meta` field as
+the Verwaltung editors. On submit the rows are serialized (blank-title rows dropped) into two hidden
+JSON carriers (`objectivesJson` / `stepsJson`) bound to the `MissionForm`; the write controller parses
+them into the backend `CreateMissionRequest`'s nested `objectives` / `steps` lists, which the service
+persists onto the just-created mission at a contiguous `orderIndex` with **no** version check/bump (no
+concurrent editor exists at create). The rows survive a validation-failure re-render (the JSON carriers
+round-trip through the form binding and re-hydrate the editors on load). Missionen is an audited area:
+each seeded goal/step records the same `MISSION_OBJECTIVE_ADDED` / `MISSION_STEP_ADDED` event as its
+post-create counterpart, carrying only the id (plus the goal kind) — **never** the title — per
+REQ-AUDIT-001. `CreateMissionRequest` stays the create-path security boundary (audit finding C-3):
+`objectives` / `steps` are an explicit, `@Valid`-checked addition (non-blank title, valid kind), and
+the id / orderIndex / step done-state remain server-stamped.
+
+**Landing on Verwaltung after create.** A successful create redirects to the new mission's detail page
+on its **Verwaltung** tab (`redirect:/missions/{newId}?tab=verw`, via the REQ-MISSION-004 `?tab=`
+deeplink), so the planner keeps working (crew, refine goals/steps) instead of being dropped on the
+list. The frontend create handler reads the created mission's id from the backend `MissionDto` response
+for the redirect (replacing the former `redirect:/missions`).
+
+**Sticky action row in Verwaltung.** In the Verwaltung tab — also the sole pane on the create page —
+the whole action row (**Löschen · Speichern · Zurück**) is pinned to the bottom of the viewport
+above the fixed footer while the tiles scroll behind it (owner request 2026-07-03, superseding the
+earlier float-just-the-save-button design). The `.footacts` bar is `position: fixed` above the footer
+(z-index above the footer, below the modal overlay and the sidebar drawer), with a solid bar
+background + top border; the Save keeps its `form="mission-form"` binding (the classic no-JS submit is
+unchanged). The rule is scoped to the **active** Verwaltung pane so it never pins on another tab, and
+the pane reserves extra `padding-bottom` so the last tile is never hidden behind the bar.
+
+**Enforced by:** `MissionTimelineCreateSeedTest` (create-time seeders: contiguous orderIndex, no version
+bump, no re-fetch, id-only / kind-only audit) + `MissionServiceTest` /
+`MissionControllerCreatePathTest` (create request wiring) + `MissionPageControllerTest` (create form) ·
+**Code:** backend `CreateMissionRequest` (nested `NewObjective` / `NewStep`),
+`MissionService.createMission` / `MissionTimelineService.addObjectiveAtCreate` / `addStepAtCreate`;
+frontend `MissionForm` (`objectivesJson` / `stepsJson`), `CreateMissionRequest`,
+`MissionWriteController.createMission`, `mission-detail.html` (create editors + floating-save rule),
+`mission-detail.js` (create-form editor module).

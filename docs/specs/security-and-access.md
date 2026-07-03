@@ -115,6 +115,9 @@ The following must always hold and are enforced as ArchUnit rules in
 - No `SecurityContextHolder` use outside the auth-helper service.
 - Every `@RestController` carries at least one `@PreAuthorize`.
 - Controllers never return JPA entities (DTOs only — see [`api-conventions.md`](api-conventions.md)).
+- No controller depends on `OrgUnitMembershipMapper` — the membership entity→DTO projection runs
+  inside `OrgUnitMembershipService`'s own transactions, never controller-side after commit
+  (`controllersMustNotInjectTheLazyMembershipMapper`, ADR-0067).
 - The frontend does not depend on Spring Data JPA.
 
 ### REQ-SEC-004 — Roles & hierarchy

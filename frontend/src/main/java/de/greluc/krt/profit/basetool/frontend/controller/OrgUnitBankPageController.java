@@ -80,6 +80,29 @@ public class OrgUnitBankPageController {
   private final BackendApiClient backendApiClient;
   private final ParallelPageLoader parallelPageLoader;
 
+  /** Response type for the caller's viewable balance cards ({@code /bank/balances}). */
+  private static final ParameterizedTypeReference<List<OrgUnitBankBalanceDto>> BALANCE_LIST_TYPE =
+      new ParameterizedTypeReference<>() {};
+
+  /**
+   * Response type for the booking-request lists ({@code /bank/requests} and its {@code /foreign}
+   * variant), both of which return a bare list of requests.
+   */
+  private static final ParameterizedTypeReference<List<BankBookingRequestDto>>
+      BOOKING_REQUEST_LIST_TYPE = new ParameterizedTypeReference<>() {};
+
+  /** Response type for the active transfer/deposit target accounts ({@code /transfer-targets}). */
+  private static final ParameterizedTypeReference<List<BankAccountRefDto>> ACCOUNT_REF_LIST_TYPE =
+      new ParameterizedTypeReference<>() {};
+
+  /** Response type for one paginated page of an account's booking history. */
+  private static final ParameterizedTypeReference<PageResponse<BankBookingDto>>
+      BANK_BOOKING_PAGE_TYPE = new ParameterizedTypeReference<>() {};
+
+  /** Response type for the user-lookup dropdown feeding the visibility/limit pickers. */
+  private static final ParameterizedTypeReference<List<UserReferenceDto>> USER_REFERENCE_LIST_TYPE =
+      new ParameterizedTypeReference<>() {};
+
   /**
    * Renders the overview page (or its {@code orgUnitBank} fragment for an in-place swap after a
    * booking write).
@@ -121,19 +144,21 @@ public class OrgUnitBankPageController {
     // options and which source-account options carry a debit affordance + approval limit.
     boolean anyCanRequest = safeBalances.stream().anyMatch(OrgUnitBankBalanceDto::canRequest);
     model.addAttribute("anyCanRequest", anyCanRequest);
-    // "Fremde Anträge" tab (REQ-BANK-041): requests on the accounts the caller is responsible for.
-    // The tab is shown whenever the caller manages any account (responsible holder / OL / admin),
-    // even when it currently holds no request.
-    model.addAttribute("foreignRequests", foreignRequestsFuture.join());
+    // "Fremde Anträge" tab (REQ-BANK-041/-046): requests the caller may act on.
+    List<BankBookingRequestDto> foreignRequests = foreignRequestsFuture.join();
+    model.addAttribute("foreignRequests", foreignRequests);
     // Show the tab when the caller manages a REQUEST-CAPABLE account (canManageSettings on an
-    // ORG_UNIT/AREA/CARTEL account == its responsible holder). This matches the backend scope of
-    // /requests/foreign (responsibleAccountIds), so the tab is never shown empty to an
-    // OL/management
-    // user who can only configure a SPECIAL account's visibility (SPECIAL is never
-    // request-capable).
+    // ORG_UNIT/AREA/CARTEL account == its responsible holder) OR when the band-routed list already
+    // carries a request for them — the latter covers the KRT-account middle-band approver
+    // (Bereichsleiter Profit), who is not the account's responsible holder but sees its
+    // AREA_LEAD_PROFIT-band requests (REQ-BANK-047). SPECIAL is never request-capable, so an
+    // OL/management user who can only configure a Sonderkonto's visibility still does not see the
+    // tab
+    // unless a routed request exists.
     model.addAttribute(
         "hasResponsibleAccounts",
-        safeBalances.stream().anyMatch(b -> b.canManageSettings() && b.canRequest()));
+        safeBalances.stream().anyMatch(b -> b.canManageSettings() && b.canRequest())
+            || !foreignRequests.isEmpty());
     // Deposit / transfer-destination source: every active account (REQ-BANK-040/-042), ordered A→Z
     // by name like every other account picker (BankAccountOrder).
     List<BankAccountRefDto> transferTargets =
@@ -175,9 +200,7 @@ public class OrgUnitBankPageController {
   private List<OrgUnitBankBalanceDto> fetchBalances() {
     try {
       List<OrgUnitBankBalanceDto> balances =
-          backendApiClient.get(
-              "/api/v1/org-units/bank/balances",
-              new ParameterizedTypeReference<List<OrgUnitBankBalanceDto>>() {});
+          backendApiClient.get("/api/v1/org-units/bank/balances", BALANCE_LIST_TYPE);
       if (balances != null) {
         return balances;
       }
@@ -195,9 +218,7 @@ public class OrgUnitBankPageController {
   private List<BankBookingRequestDto> fetchOwnRequests() {
     try {
       List<BankBookingRequestDto> requests =
-          backendApiClient.get(
-              "/api/v1/org-units/bank/requests",
-              new ParameterizedTypeReference<List<BankBookingRequestDto>>() {});
+          backendApiClient.get("/api/v1/org-units/bank/requests", BOOKING_REQUEST_LIST_TYPE);
       if (requests != null) {
         return requests;
       }
@@ -216,8 +237,7 @@ public class OrgUnitBankPageController {
     try {
       List<BankBookingRequestDto> requests =
           backendApiClient.get(
-              "/api/v1/org-units/bank/requests/foreign",
-              new ParameterizedTypeReference<List<BankBookingRequestDto>>() {});
+              "/api/v1/org-units/bank/requests/foreign", BOOKING_REQUEST_LIST_TYPE);
       if (requests != null) {
         return requests;
       }
@@ -235,9 +255,7 @@ public class OrgUnitBankPageController {
   private List<BankAccountRefDto> fetchTransferTargets() {
     try {
       List<BankAccountRefDto> targets =
-          backendApiClient.get(
-              "/api/v1/org-units/bank/transfer-targets",
-              new ParameterizedTypeReference<List<BankAccountRefDto>>() {});
+          backendApiClient.get("/api/v1/org-units/bank/transfer-targets", ACCOUNT_REF_LIST_TYPE);
       if (targets != null) {
         return targets;
       }
@@ -275,7 +293,7 @@ public class OrgUnitBankPageController {
     PageResponse<BankBookingDto> bookings =
         backendApiClient.get(
             "/api/v1/org-units/bank/accounts/" + id + "/transactions?page=" + effectivePage,
-            new ParameterizedTypeReference<PageResponse<BankBookingDto>>() {});
+            BANK_BOOKING_PAGE_TYPE);
     model.addAttribute("detail", detail);
     model.addAttribute("bookings", bookings);
     model.addAttribute("paginationBaseUrl", "/org-unit-bank/accounts/" + id);
@@ -295,9 +313,7 @@ public class OrgUnitBankPageController {
       // The user dropdown feeds both the individual-visibility and the individual-limit pickers.
       if (detail.canConfigureVisibility() || detail.canConfigureApprovalLimits()) {
         List<UserReferenceDto> lookup =
-            backendApiClient.get(
-                "/api/v1/users/lookup",
-                new ParameterizedTypeReference<List<UserReferenceDto>>() {});
+            backendApiClient.get("/api/v1/users/lookup", USER_REFERENCE_LIST_TYPE);
         users = lookup == null ? List.<UserReferenceDto>of() : lookup;
       }
     }

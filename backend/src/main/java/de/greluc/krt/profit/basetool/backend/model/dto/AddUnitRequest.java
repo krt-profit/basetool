@@ -19,20 +19,20 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
 /**
  * Inbound request payload for the Add Unit operation.
  *
- * <p>{@code name} is an optional display name (per the approved unit-modal mock): when blank, the
- * service derives the stored name from the assigned ship or ship type — at least one of name / ship
- * / ship type must be present. {@code responsibleUserId} optionally pins an explicit responsible
- * person (otherwise the UI falls back to the ship owner); {@code note} is a free-text planning
- * note.
+ * <p>{@code name} is the required display name of the unit (owner decision 2026-07-03): it is the
+ * unit's single mandatory field, while the ship type and ship stay optional. {@code
+ * responsibleUserId} optionally pins an explicit responsible person (otherwise the UI falls back to
+ * the ship owner); {@code note} is a free-text planning note.
  */
 public record AddUnitRequest(
-    @Size(max = 255) String name,
+    @NotBlank @Size(max = 255) String name,
     UUID shipTypeId,
     UUID shipId,
     Boolean highValueUnit,

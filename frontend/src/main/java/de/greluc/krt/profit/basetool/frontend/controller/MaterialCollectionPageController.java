@@ -48,6 +48,21 @@ import org.springframework.web.bind.annotation.RequestMapping;
 @Slf4j
 public class MaterialCollectionPageController {
 
+  /**
+   * Response type for the per-order material-collection entries ({@code GET
+   * /api/v1/orders/{id}/material-collection}).
+   */
+  private static final ParameterizedTypeReference<List<MaterialCollectionEntryDto>>
+      MATERIAL_COLLECTION_ENTRY_LIST_TYPE = new ParameterizedTypeReference<>() {};
+
+  /** Response type for the user-reference lookup ({@code GET /api/v1/users/lookup}). */
+  private static final ParameterizedTypeReference<List<UserReferenceDto>> USER_REFERENCE_LIST_TYPE =
+      new ParameterizedTypeReference<>() {};
+
+  /** Response type for the location-reference lookup ({@code GET /api/v1/locations/lookup}). */
+  private static final ParameterizedTypeReference<List<LocationReferenceDto>>
+      LOCATION_REFERENCE_LIST_TYPE = new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -76,7 +91,7 @@ public class MaterialCollectionPageController {
       entries =
           backendApiClient.get(
               "/api/v1/orders/" + jobOrderId + "/material-collection",
-              new ParameterizedTypeReference<List<MaterialCollectionEntryDto>>() {});
+              MATERIAL_COLLECTION_ENTRY_LIST_TYPE);
     } catch (BackendServiceException e) {
       log.warn(
           "Could not load material collection for job order {}: {}", jobOrderId, e.getMessage());
@@ -84,7 +99,7 @@ public class MaterialCollectionPageController {
 
     try {
       List<UserReferenceDto> rawUsers =
-          backendApiClient.get("/api/v1/users/lookup", new ParameterizedTypeReference<>() {});
+          backendApiClient.get("/api/v1/users/lookup", USER_REFERENCE_LIST_TYPE);
       users =
           rawUsers.stream()
               .sorted(
@@ -101,8 +116,7 @@ public class MaterialCollectionPageController {
 
     try {
       locations =
-          backendApiClient.getCached(
-              "/api/v1/locations/lookup", new ParameterizedTypeReference<>() {});
+          backendApiClient.getCached("/api/v1/locations/lookup", LOCATION_REFERENCE_LIST_TYPE);
     } catch (BackendServiceException e) {
       log.warn("Could not load locations: {}", e.getMessage());
     }

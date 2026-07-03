@@ -31,10 +31,10 @@ import org.springframework.stereotype.Service;
  *
  * <p>The frontend module renders Thymeleaf pages on behalf of an OAuth2 browser session rather than
  * processing a JWT-bearing API call, so it has no JWT {@code sub} the way the backend does; the
- * helper therefore exposes only the two predicates the rendering layer actually needs (is the
- * caller authenticated? do they reach the admin role?). New callers should depend on this bean
- * instead of touching {@link SecurityContextHolder} directly so the request-scoped auth contract
- * stays testable through a single, mock-friendly seam.
+ * helper therefore exposes only the predicates the rendering layer actually needs (is the caller
+ * authenticated / anonymous? do they reach the admin or member role?). New callers should depend on
+ * this bean instead of touching {@link SecurityContextHolder} directly so the request-scoped auth
+ * contract stays testable through a single, mock-friendly seam.
  *
  * <p>Existing frontend touch points that still call {@link SecurityContextHolder} directly
  * (filters, exception handler, page controllers that propagate the JWT to the backend) are
@@ -56,6 +56,21 @@ public class FrontendAuthHelperService {
     return auth != null
         && auth.isAuthenticated()
         && !(auth instanceof AnonymousAuthenticationToken);
+  }
+
+  /**
+   * {@code true} when the current request carries no authenticated, non-anonymous principal — the
+   * negation of {@link #isAuthenticated()}, centralising the {@code @AuthenticationPrincipal
+   * OidcUser principal == null} guard the page controllers used to inline. On the frontend the only
+   * authenticated principal type is the Keycloak {@code OidcUser}, so a null
+   * {@code @AuthenticationPrincipal} and an anonymous / missing security context are the same
+   * condition; reading the request {@link Authentication} keeps the anonymous check on the same
+   * source as {@link #isAuthenticated()}, {@code sec:authorize} and {@code @PreAuthorize}.
+   *
+   * @return whether the current request is anonymous (guest / not logged in).
+   */
+  public boolean isAnonymous() {
+    return !isAuthenticated();
   }
 
   /**

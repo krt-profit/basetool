@@ -103,7 +103,7 @@ class BankAccountDetailFragmentMvcTest {
         .perform(get("/bank/accounts/" + accountId).param("fragment", "bookings"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("Fragment note")))
-        // REQ-BANK-045: the Begründung column renders alongside the note.
+        // REQ-BANK-045: the Begründung and Notiz render in the expandable per-row detail sub-row.
         .andExpect(content().string(containsString("Fragment reason")))
         .andExpect(content().string(containsString("class=\"pagination\"")))
         .andExpect(content().string(containsString("/bank/accounts/" + accountId + "?page=1")))

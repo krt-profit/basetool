@@ -70,6 +70,14 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @Slf4j
 public class PersonalInventoryPageController {
 
+  /** Response type for the {@code /api/v1/uex/locations/search} typeahead read. */
+  private static final ParameterizedTypeReference<List<UexLocationDto>> UEX_LOCATION_LIST_TYPE =
+      new ParameterizedTypeReference<>() {};
+
+  /** Response type for the paged {@code /api/v1/personal-inventory} listing read. */
+  private static final ParameterizedTypeReference<PageResponse<PersonalInventoryItemDto>>
+      PERSONAL_INVENTORY_ITEM_PAGE_TYPE = new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -364,8 +372,7 @@ public class PersonalInventoryPageController {
               + URLEncoder.encode(query, StandardCharsets.UTF_8)
               + "&limit="
               + effectiveLimit;
-      List<UexLocationDto> result =
-          backendApiClient.get(uri, new ParameterizedTypeReference<>() {});
+      List<UexLocationDto> result = backendApiClient.get(uri, UEX_LOCATION_LIST_TYPE);
       return result == null ? Collections.emptyList() : result;
     } catch (Exception e) {
       log.warn("UEX location typeahead failed for query='{}': {}", q, e.getMessage());
@@ -400,7 +407,7 @@ public class PersonalInventoryPageController {
       if (q != null && !q.isBlank()) {
         uri.append("&q=").append(URLEncoder.encode(q, StandardCharsets.UTF_8));
       }
-      return backendApiClient.get(uri.toString(), new ParameterizedTypeReference<>() {});
+      return backendApiClient.get(uri.toString(), PERSONAL_INVENTORY_ITEM_PAGE_TYPE);
     } catch (Exception e) {
       log.error("Failed to fetch personal inventory items", e);
       return new PageResponse<>(new ArrayList<>(), 0, size == null ? 50 : size, 0, 0, List.of());

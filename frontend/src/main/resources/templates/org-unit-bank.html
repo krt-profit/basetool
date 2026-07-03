@@ -95,15 +95,7 @@
                      user types; read-only + purely visual, no server round-trip. Lives inside the
                      swapped fragment, so it resets to "show all" after a request create/cancel swap. -->
                 <div class="mb-2">
-                    <div class="bank-acc-search">
-                        <label for="ou-acc-filter" class="visually-hidden"
-                               th:text="#{bank.filter.label}">Konten nach Namen filtern</label>
-                        <svg class="krt-icon bank-acc-search-icon" aria-hidden="true"><use href="#krt-icon-search"/></svg>
-                        <input type="search" id="ou-acc-filter" class="bank-acc-search-input" autocomplete="off"
-                               data-bank-acc-filter data-filter-scope="#ou-panel-konten .ou-list"
-                               data-filter-empty="#ou-acc-filter-empty"
-                               th:attr="placeholder=#{bank.filter.placeholder},aria-label=#{bank.filter.label}">
-                    </div>
+                    <th:block th:replace="~{fragments/components :: bankAccSearch('ou-acc-filter', '#ou-panel-konten .ou-list', '#ou-acc-filter-empty')}"></th:block>
                 </div>
                 <div class="ou-list">
                     <div class="ou-rowhead" aria-hidden="true">

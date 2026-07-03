@@ -44,7 +44,7 @@ import org.jetbrains.annotations.Nullable;
  */
 public record PatchMissionCoreRequest(
     @NotBlank @Size(max = 255) String name,
-    @Nullable @Size(max = 10000) String description,
+    @Nullable @Size(max = 20000) String description,
     @Nullable
         @Size(max = 2048)
         @Pattern(regexp = DtoConstraints.HTTPS_URL_REGEX, message = "must start with https://")

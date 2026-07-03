@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.model.BankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.model.BankHolder;
+import de.greluc.krt.profit.basetool.backend.model.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.model.BankTransaction;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -128,6 +129,9 @@ public class BankBookingRequestService {
    * @param requiresOwnerApproval whether the amount exceeds the requester's approval limit
    *     (snapshot)
    * @param applicableLimit the requester's resolved approval limit (snapshot), or {@code null}
+   * @param requiredApprover which approver class a flagged request needs (REQ-BANK-041/-046
+   *     snapshot), or {@code null} when it needs no approval; opaque to this org-unit-blind service
+   *     (the seam resolves the band&rarr;identity mapping)
    * @param splitEnabled whether a deposit distributes a percentage across the squadron accounts on
    *     confirmation (REQ-BANK-044); always {@code false} for withdrawal/transfer
    * @param splitPercent the whole-percent (1–100) of the deposit gross to distribute; {@code null}
@@ -147,6 +151,7 @@ public class BankBookingRequestService {
       @Nullable UUID targetAccountId,
       boolean requiresOwnerApproval,
       @Nullable BigDecimal applicableLimit,
+      @Nullable BankRequestApprover requiredApprover,
       boolean splitEnabled,
       @Nullable BigDecimal splitPercent) {
     BankAccount account =
@@ -192,6 +197,7 @@ public class BankBookingRequestService {
     request.setRequesterHandle(requesterHandle);
     request.setRequiresOwnerApproval(requiresOwnerApproval);
     request.setApplicableLimit(applicableLimit);
+    request.setRequiredApprover(requiredApprover);
     request.setSplitEnabled(splitEnabled);
     request.setSplitPercent(splitPercent);
     BankBookingRequest saved = requestRepository.save(request);
@@ -730,6 +736,7 @@ public class BankBookingRequestService {
         target == null ? null : target.getAccountNo(),
         request.isRequiresOwnerApproval(),
         request.getApplicableLimit(),
+        request.getRequiredApprover() == null ? null : request.getRequiredApprover().name(),
         request.isOwnerApprovalGranted(),
         request.getOwnerApprovalGrantedByHandle(),
         request.isSplitEnabled(),

@@ -8,6 +8,16 @@
   ADR-0039 (decoupled holder ledger) · concurrency & org-unit-blindness rules in `CLAUDE.md`,
   ADR-0011/0020
 
+> **Amended (2026-07-03, owner decision):** the counterparty is **no longer redacted** on the
+> member-facing org-unit surfaces. Decision point 6 below redacted the Einzahler/Empfänger alongside
+> the holder; the owner has since decided members should see "von wem / an wen" on their own org
+> unit's account, so **only the aUEC-custody Halter stays redacted** (REQ-BANK-038). The org-unit
+> read-only history keeps `counterpartyHandle`/`counterpartyOrgUnitName`, and the member-facing
+> redacted Kontoauszug **keeps** the "other side" column (dropping only the Halter column).
+> Separately, that unified column is **renamed** "Gegenseite"/"Gegenpartei" → **"Quell-/Zielkonto"**
+> in both account-detail tables and both PDFs, and the Begründung + Notiz move into an expandable
+> per-booking sub-row (REQ-BANK-045).
+
 ## Context
 
 A bank booking records only the **holder** — the bank custodian who physically received a deposit

@@ -109,11 +109,14 @@ public class BankStatementReportService {
    * Generates the statement PDF for one account and period and records the export in the audit log.
    * Write transaction on purpose: the audit insert runs {@code MANDATORY} inside it.
    *
-   * <p>When {@code redactHolders} is {@code true} the player-custody ("Halter") column is omitted —
-   * the redacted variant the org-unit-aware seam ({@code OrgUnitBankAccessService}) hands to
-   * org-unit viewers of an account they may see but do not staff (REQ-BANK-038): they get the full
-   * history (date / type / note / amount / running balance) but not who physically holds the money.
-   * Bank staff pass {@code false} and keep the full statement (REQ-BANK-014).
+   * <p>When {@code redactHolders} is {@code true} only the player-custody ("Halter") column is
+   * omitted — the redacted variant the org-unit-aware seam ({@code OrgUnitBankAccessService}) hands
+   * to org-unit viewers of an account they may see but do not staff (REQ-BANK-038): they keep the
+   * full history (date / type / Quell-/Zielkonto / amount / running balance, plus the
+   * Begr&uuml;ndung and Notiz in the per-booking sub-row) — including the counter-account and the
+   * counterparty Einzahler/Empf&auml;nger (REQ-BANK-044, owner decision) — but not who physically
+   * holds the money. Bank staff pass {@code false} and additionally get the Halter column
+   * (REQ-BANK-014).
    *
    * @param accountId the account
    * @param from period start (inclusive)
@@ -148,10 +151,12 @@ public class BankStatementReportService {
             ? Map.of()
             : bankHolderPostingRepository.findHolderLegsByTransactionIds(txIds).stream()
                 .collect(Collectors.groupingBy(BankHolderLeg::transactionId));
-    // Account legs back the "Gegenseite" column's transfer counter-account (REQ-BANK-044); only
-    // fetched for the non-redacted bank-staff variant, which is the only one carrying that column.
+    // Account legs back the "Quell-/Zielkonto" column's transfer counter-account (REQ-BANK-044).
+    // Fetched for both variants: the member-facing redacted statement keeps that column too — only
+    // the aUEC-custody Halter is redacted now (REQ-BANK-038 amended), not the
+    // counter-account/party.
     Map<UUID, List<BankCounterLeg>> accountLegsByTx =
-        (redactHolders || txIds.isEmpty())
+        txIds.isEmpty()
             ? Map.of()
             : bankPostingRepository.findLegsByTransactionIds(txIds).stream()
                 .collect(Collectors.groupingBy(BankCounterLeg::transactionId));
@@ -219,29 +224,31 @@ public class BankStatementReportService {
 
       KrtPdfSupport.addSectionHeader(krt, label("pdf.bank.statement.bookings"));
 
-      // Org-unit viewers get the same history without the player-custody column (REQ-BANK-038): the
-      // redacted layout drops both the "Halter" and the counterparty "Gegenseite" column, since the
-      // latter likewise names a player. Bank staff get both.
-      int columns = redactHolders ? 6 : 8;
+      // Org-unit viewers get the same history without the player-custody "Halter" column
+      // (REQ-BANK-038): only the aUEC-custody holder is redacted. The "Quell-/Zielkonto" column
+      // (the
+      // transfer counter-account, or the Einzahler/Empfänger of a deposit/withdrawal, REQ-BANK-044)
+      // is kept for them too (owner decision). The Begründung + Notiz of each booking move into an
+      // indented sub-row beneath the row (REQ-BANK-045), reason first, so the main row stays
+      // narrow.
+      int columns = redactHolders ? 5 : 6;
       PdfPTable table = new PdfPTable(columns);
       table.setWidthPercentage(100);
-      // The Begründung column (REQ-BANK-045) is carved out of the wide note column so every other
-      // column keeps its original width — the type/holder labels must not narrow into a wrap.
       table.setWidths(
           redactHolders
-              ? new float[] {1.6f, 1.3f, 1.4f, 1.3f, 1.3f, 1.4f}
-              : new float[] {1.5f, 1.2f, 1.4f, 1.6f, 1.0f, 0.9f, 1.2f, 1.3f});
+              ? new float[] {1.6f, 1.3f, 1.9f, 1.3f, 1.4f}
+              : new float[] {1.5f, 1.2f, 1.4f, 1.8f, 1.2f, 1.3f});
       KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.date"));
       KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.type"));
       if (!redactHolders) {
         KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.holder"));
-        KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.counterparty"));
       }
-      KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.note"));
-      KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.justification"));
+      KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.counterparty"));
       KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.amount"));
       KrtPdfSupport.addTableHeader(table, label("pdf.bank.col.balance"));
 
+      String reasonLabel = label("pdf.bank.sub.justification");
+      String noteLabel = label("pdf.bank.sub.note");
       boolean alt = false;
       BigDecimal running = opening;
       for (BankBookingRow row : rows) {
@@ -257,13 +264,15 @@ public class BankStatementReportService {
                       holderLegsByTx.getOrDefault(row.transactionId(), List.of()),
                       row.amount().signum());
           KrtPdfSupport.addTableCell(table, holder, bg, false);
-          KrtPdfSupport.addTableCell(table, counterpartyCell(row, accountLegsByTx), bg, false);
         }
-        KrtPdfSupport.addTableCell(table, row.note() != null ? row.note() : "", bg, false);
-        KrtPdfSupport.addTableCell(
-            table, row.justification() != null ? row.justification() : "", bg, false);
+        KrtPdfSupport.addTableCell(table, counterpartyCell(row, accountLegsByTx), bg, false);
         KrtPdfSupport.addTableCell(table, BankPdfFormat.signedAmount(row.amount()), bg, true);
         KrtPdfSupport.addTableCell(table, BankPdfFormat.amount(running), bg, true);
+        String reason = row.justification() != null ? row.justification() : "";
+        String note = row.note() != null ? row.note() : "";
+        if (!reason.isEmpty() || !note.isEmpty()) {
+          KrtPdfSupport.addDetailSubRow(table, reasonLabel, reason, noteLabel, note, bg, columns);
+        }
         alt = !alt;
       }
       if (rows.isEmpty()) {
@@ -282,11 +291,12 @@ public class BankStatementReportService {
   }
 
   /**
-   * Renders the "Gegenseite" cell for a statement row (REQ-BANK-044) — the far side of the booking:
-   * for a {@code DEPOSIT}/{@code WITHDRAWAL} the recorded counterparty (Einzahler / Empf&auml;nger)
-   * with their org unit in parentheses; for a {@code TRANSFER} the counter account's number (the
-   * account leg on the other account); empty for every other type or when nothing was recorded. The
-   * type column and the amount sign already convey the direction, so no arrow glyph is rendered.
+   * Renders the "Quell-/Zielkonto" cell for a statement row (REQ-BANK-044) — the far side of the
+   * booking: for a {@code DEPOSIT}/{@code WITHDRAWAL} the recorded counterparty (Einzahler /
+   * Empf&auml;nger) with their org unit in parentheses; for a {@code TRANSFER} the counter
+   * account's number (the account leg on the other account); empty for every other type or when
+   * nothing was recorded. The type column and the amount sign already convey the direction, so no
+   * arrow glyph is rendered (WinAnsi carries no arrow glyph either).
    *
    * @param row the statement row
    * @param accountLegsByTx the page's account legs grouped by transaction (for transfer counter

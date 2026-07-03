@@ -47,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.service.scwiki.BlueprintOutputNameOverrides;
+import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -762,11 +763,11 @@ public class P4kImportService {
       GameItem item = new GameItem();
       item.setName(dto.name().trim());
       item.setExternalUuid(guid);
-      item.setClassName(blankToNull(dto.className()));
+      item.setClassName(StringNormalization.blankToNull(dto.className()));
       item.setManufacturer(manufacturerByGuid.get(dto.manufacturerGuid()));
       item.setMass(dto.mass());
-      item.setDescriptionEn(blankToNull(dto.desc()));
-      item.setDescriptionDe(blankToNull(dto.descDe()));
+      item.setDescriptionEn(StringNormalization.blankToNull(dto.desc()));
+      item.setDescriptionDe(StringNormalization.blankToNull(dto.descDe()));
       item.setKind(GameItemKind.GENERIC);
       item.setSourceSystems(GameItemSourceSystem.P4K);
       item.setP4kUuid(guid);
@@ -807,10 +808,10 @@ public class P4kImportService {
       ShipType ship = new ShipType();
       ship.setName(name);
       ship.setExternalUuid(guid);
-      ship.setClassName(blankToNull(dto.className()));
+      ship.setClassName(StringNormalization.blankToNull(dto.className()));
       ship.setManufacturer(manufacturerByGuid.get(dto.manufacturerGuid()));
-      ship.setDescriptionEn(blankToNull(dto.desc()));
-      ship.setDescriptionDe(blankToNull(dto.descDe()));
+      ship.setDescriptionEn(StringNormalization.blankToNull(dto.desc()));
+      ship.setDescriptionDe(StringNormalization.blankToNull(dto.descDe()));
       ship.setSourceSystems(GameItemSourceSystem.P4K);
       ship.setP4kUuid(guid);
       ship.setP4kSyncedAt(now);
@@ -860,7 +861,7 @@ public class P4kImportService {
     manufacturer.setAbbreviation(code);
     manufacturer.setScwikiUuid(guid);
     manufacturer.setScwikiCode(code);
-    manufacturer.setDescription(blankToNull(dto.desc()));
+    manufacturer.setDescription(StringNormalization.blankToNull(dto.desc()));
     manufacturer.setP4kUuid(guid);
     manufacturer.setP4kSyncedAt(now);
     // Indexed for in-run linking on preview and apply (count parity); persisted only on apply.
@@ -902,7 +903,7 @@ public class P4kImportService {
       Material material = new Material();
       material.setName(name);
       material.setType(MaterialType.NO_REFINE);
-      material.setDescription(blankToNull(dto.desc()));
+      material.setDescription(StringNormalization.blankToNull(dto.desc()));
       material.setScwikiUuid(guid);
       material.setIsVisible(false);
       material.setSourceSystems(MaterialSourceSystem.P4K);
@@ -983,7 +984,7 @@ public class P4kImportService {
   private BlueprintIngredient buildIngredient(@NotNull P4kIngredientDto ing, int orderIndex) {
     BlueprintIngredient line = new BlueprintIngredient();
     line.setOrderIndex(orderIndex);
-    line.setWikiNameSnapshot(blankToNull(ing.slot()));
+    line.setWikiNameSnapshot(StringNormalization.blankToNull(ing.slot()));
     line.setMinQuality(ing.minQuality());
     UUID resourceGuid = parseUuid(ing.resourceGuid());
     if (resourceGuid != null) {
@@ -1098,18 +1099,6 @@ public class P4kImportService {
       index = haystack.indexOf(token, index + 1);
     }
     return false;
-  }
-
-  /**
-   * Null-or-blank-collapsing helper: returns {@code null} for a {@code null} or whitespace-only
-   * string, otherwise the value unchanged.
-   *
-   * @param value the candidate value
-   * @return the value, or {@code null} when blank
-   */
-  @Nullable
-  private static String blankToNull(@Nullable String value) {
-    return (value == null || value.isBlank()) ? null : value;
   }
 
   // ──────────────────────────────────────────────────────────── shared steps ──

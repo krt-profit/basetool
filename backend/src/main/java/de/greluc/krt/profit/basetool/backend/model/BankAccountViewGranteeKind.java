@@ -21,9 +21,11 @@ package de.greluc.krt.profit.basetool.backend.model;
 
 /**
  * The kind of audience a {@link BankAccountViewGrant} opens balance + read-only-detail access to
- * (REQ-BANK-035). Persisted as {@code VARCHAR(16)} via {@code @Enumerated(STRING)}; the V189 {@code
- * chk_bank_view_grant_kind} / {@code chk_bank_view_grant_payload} CHECKs mirror this set and which
- * columns each kind populates.
+ * (REQ-BANK-035), reused one-for-one as the tier dimension of {@link BankAccountApprovalLimit}
+ * (REQ-BANK-041). Persisted as {@code VARCHAR(16)} via {@code @Enumerated(STRING)}; the V189 {@code
+ * chk_bank_view_grant_kind} / {@code chk_bank_view_grant_payload} and V193 {@code
+ * chk_bank_appr_limit_kind} / {@code chk_bank_appr_limit_payload} CHECKs (widened by V202 for
+ * {@link #AREA_MEMBERS}) mirror this set and which columns each kind populates.
  */
 public enum BankAccountViewGranteeKind {
 
@@ -46,7 +48,19 @@ public enum BankAccountViewGranteeKind {
 
   /**
    * All members of the owning org unit (org-unit accounts) or all KRT members ({@link
-   * BankAccountType#SPECIAL} accounts) — evaluated by account type. Carries no role/user.
+   * BankAccountType#SPECIAL} accounts) — evaluated by account type. Carries no role/user. For an
+   * {@link BankAccountType#AREA} account this resolves to the direct members of the owning Bereich
+   * org unit (the Bereichsleitung), <em>not</em> the whole area cascade — that is {@link
+   * #AREA_MEMBERS}.
    */
-  ALL_MEMBERS
+  ALL_MEMBERS,
+
+  /**
+   * Every member of the whole area cascade of an {@link BankAccountType#AREA} account's owning
+   * Bereich — the Bereichsleitung <em>plus</em> every member of the Bereich's child Staffeln and
+   * Spezialkommandos ("Mitglieder des Bereichs", REQ-BANK-048). Carries no role/user and is only
+   * offered/valid for AREA accounts; the cascade is resolved inside {@code
+   * OrgUnitBankAccessService} so the bank stays org-unit-blind.
+   */
+  AREA_MEMBERS
 }

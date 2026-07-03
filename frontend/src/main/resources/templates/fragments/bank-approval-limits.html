@@ -32,6 +32,12 @@
             <span class="vis-state bank-amount"
                   th:text="${#numbers.formatInteger(@moneyFormat.round(limits.allMembersLimit()), 1, 'POINT')} + ' aUEC'">500.000 aUEC</span>
         </div>
+        <div class="vis-row" th:if="${limits.areaMembersLimit() != null}"
+             data-testid="bank-approval-limit-display-area-members">
+            <span class="v-label" th:text="#{bank.orgUnit.settings.visibility.areaMembers}">Mitglieder des Bereichs</span>
+            <span class="vis-state bank-amount"
+                  th:text="${#numbers.formatInteger(@moneyFormat.round(limits.areaMembersLimit()), 1, 'POINT')} + ' aUEC'">500.000 aUEC</span>
+        </div>
         <div class="vis-row" th:each="u : ${limits.userLimits()}" data-testid="bank-approval-limit-display-user">
             <span class="v-label" th:text="${u.displayName()}">greluc</span>
             <span class="vis-state bank-amount"
@@ -94,6 +100,33 @@
                 <form th:if="${current != null}" class="bank-ajax-form no-track" style="display:inline;"
                       th:attr="data-refresh=${refresh}"
                       data-endpoint="/api/proxy/org-units/bank/accounts/{id}/approval-limit/all-members"
+                      data-method="DELETE">
+                    <input type="hidden" name="_id" th:value="${acct.id()}">
+                    <button type="submit" class="btn btn-xs btn-ghost"
+                            th:text="#{bank.approvalLimit.clear}">Entfernen</button>
+                </form>
+            </span>
+        </div>
+
+        <!-- Mitglieder des Bereichs (whole area cascade, AREA accounts only, REQ-BANK-048) -->
+        <div th:if="${limits.areaMembersSupported()}" class="vis-row" th:with="current=${limits.areaMembersLimit()}">
+            <span class="v-label" th:text="#{bank.orgUnit.settings.visibility.areaMembers}">Mitglieder des Bereichs</span>
+            <span class="vis-state bank-limit-edit">
+                <form class="bank-ajax-form no-track" style="display:inline;"
+                      th:attr="data-refresh=${refresh}"
+                      data-endpoint="/api/proxy/org-units/bank/accounts/{id}/approval-limit/area-members"
+                      data-method="PUT">
+                    <input type="hidden" name="_id" th:value="${acct.id()}">
+                    <input type="number" name="limit" min="0" step="1" required class="bank-limit-input"
+                           th:value="${current != null ? @moneyFormat.round(current) : ''}"
+                           data-testid="bank-limit-area-members" th:placeholder="#{bank.approvalLimit.placeholder}">
+                    <button type="submit" class="btn btn-xs btn-outline"
+                            th:text="#{bank.approvalLimit.save}">Setzen</button>
+                    <span class="bank-field-error" data-error-for="limit"></span>
+                </form>
+                <form th:if="${current != null}" class="bank-ajax-form no-track" style="display:inline;"
+                      th:attr="data-refresh=${refresh}"
+                      data-endpoint="/api/proxy/org-units/bank/accounts/{id}/approval-limit/area-members"
                       data-method="DELETE">
                     <input type="hidden" name="_id" th:value="${acct.id()}">
                     <button type="submit" class="btn btn-xs btn-ghost"

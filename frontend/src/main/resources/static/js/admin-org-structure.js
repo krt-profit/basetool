@@ -108,13 +108,18 @@
                 return;
             }
             const id = row.getAttribute('data-org-unit-id');
-            const version = row.getAttribute('data-version');
             window.krtFetch.write({
                 method: 'PATCH',
                 url: '/admin/org-structure/org-units/' + encodeURIComponent(id) + '/parent',
-                payload: {
-                    parentOrgUnitId: emptyToNull(select.value),
-                    version: version == null ? null : Number(version),
+                // Serialize per org-unit + read the row version lazily so a rapid second parent
+                // change on the same unit queues behind the first and ships the fresh version.
+                serialize: 'org-unit:' + id,
+                payload: function () {
+                    const version = row.getAttribute('data-version');
+                    return {
+                        parentOrgUnitId: emptyToNull(select.value),
+                        version: version == null ? null : Number(version),
+                    };
                 },
                 successMessage: i18n.saved,
                 errorMessage: i18n.error,

@@ -73,6 +73,10 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @Slf4j
 public class LeitungPageController {
 
+  /** Captured generic type for decoding the raw-{@code Map} user-lookup list response. */
+  private static final ParameterizedTypeReference<List<Map<String, Object>>> MAP_LIST =
+      new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -448,10 +452,7 @@ public class LeitungPageController {
    */
   private List<UserReferenceDto> fetchUserLookup() {
     try {
-      List<Map<String, Object>> raw =
-          backendApiClient.get(
-              "/api/v1/users/lookup",
-              new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+      List<Map<String, Object>> raw = backendApiClient.get("/api/v1/users/lookup", MAP_LIST);
       if (raw == null) {
         return List.of();
       }

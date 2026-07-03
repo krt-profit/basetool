@@ -44,7 +44,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-Tests fuer den unlinkMaterial-POST-Pfad in {@link JobOrderPageController#unlinkMaterial}.
+ * MVC-Tests fuer den unlinkMaterial-POST-Pfad in {@link JobOrderWriteController#unlinkMaterial}.
  *
  * <p>Testet, dass Logistiker/Officer/Admin ein Material aus einem Auftrag entlinken koennen:
  *

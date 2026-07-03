@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.request.BankAccountLifecy
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateBankAccountRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.RenameBankAccountRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.SetBankBalanceTargetRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.SetCartelApprovalTiersRequest;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.BankAccountService;
 import de.greluc.krt.profit.basetool.backend.service.BankSecurityService;
@@ -183,6 +184,27 @@ public class BankAccountController {
   public BankAccountDto setBalanceTarget(
       @PathVariable @NotNull UUID id, @RequestBody @Valid SetBankBalanceTargetRequest request) {
     return bankAccountService.setBalanceTarget(id, request.target(), request.version());
+  }
+
+  /**
+   * Sets or clears the KRT-account (CARTEL) 3-stage approval thresholds T1/T2 (REQ-BANK-047):
+   * bank-employee self-approval ceiling {@code T1} and Bereichsleiter-Profit ceiling {@code T2}
+   * (above {@code T2} the Organisationsleitung approves). Bankleitung-only — {@code
+   * hasRole('BANK_MANAGEMENT')} (admins pass via the role hierarchy). The Verwaltung tab is the
+   * only surface that edits these; the account-detail surfaces show them read-only.
+   *
+   * @param id the KRT account
+   * @param request the two ceilings (each {@code null} clears its band) plus the echoed version
+   * @return the updated account
+   */
+  @Operation(summary = "Set or clear the KRT-account 3-stage approval thresholds (management)")
+  @PatchMapping("/{id}/approval-tiers")
+  @PreAuthorize("hasRole('" + Roles.BANK_MANAGEMENT + "')")
+  @Transactional
+  public BankAccountDto setCartelApprovalTiers(
+      @PathVariable @NotNull UUID id, @RequestBody @Valid SetCartelApprovalTiersRequest request) {
+    return bankAccountService.setCartelApprovalTiers(
+        id, request.employeeCeiling(), request.areaLeadCeiling(), request.version());
   }
 
   /**
