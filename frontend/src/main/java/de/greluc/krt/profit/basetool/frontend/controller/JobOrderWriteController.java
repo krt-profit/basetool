@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemHandoverForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.support.MutationResponseHelper;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.time.Instant;
@@ -108,6 +109,12 @@ public class JobOrderWriteController {
    * mutations.
    */
   private final MutationResponseHelper mutationResponseHelper;
+
+  /**
+   * Auth helper resolving whether the SecurityContext is anonymous, backing the guest-routing
+   * checks on the order-create handlers.
+   */
+  private final FrontendAuthHelperService authHelper;
 
   /**
    * Response type for the user-list pull backing the assignee picker ({@code GET /api/v1/users}).
@@ -179,7 +186,7 @@ public class JobOrderWriteController {
 
       // Anonymous guests and non-profit members cannot browse the queue, so keep them on the create
       // form (with the success toast) instead of bouncing them to a list they may not see.
-      if (principal == null || !canViewJobOrders) {
+      if (authHelper.isAnonymous() || !canViewJobOrders) {
         return "redirect:/orders/create"
             + (form.getSource() != null ? "?source=" + form.getSource() : "");
       }
@@ -419,7 +426,7 @@ public class JobOrderWriteController {
 
       // Anonymous guests and non-profit members cannot browse the queue, so keep them on the create
       // form (with the success toast) instead of bouncing them to a list they may not see.
-      if (principal == null || !canViewJobOrders) {
+      if (authHelper.isAnonymous() || !canViewJobOrders) {
         return "redirect:/orders/create"
             + (form.getSource() != null ? "?source=" + form.getSource() : "");
       }

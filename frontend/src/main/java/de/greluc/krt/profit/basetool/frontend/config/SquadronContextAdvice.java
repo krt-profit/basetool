@@ -78,6 +78,14 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 @Slf4j
 public class SquadronContextAdvice {
 
+  /** Captured generic type for decoding the paged Squadron catalogue. */
+  private static final ParameterizedTypeReference<PageResponse<SquadronDto>> SQUADRON_PAGE =
+      new ParameterizedTypeReference<>() {};
+
+  /** Captured generic type for decoding the caller's OrgUnit-membership option rows. */
+  private static final ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>
+      ORG_UNIT_MEMBERSHIP_OPTION_LIST = new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
   private final MessageSource messageSource;
   private final FrontendAuthHelperService authHelper;
@@ -216,8 +224,7 @@ public class SquadronContextAdvice {
       // squadron mutations) so this advice does not re-fetch it on every authenticated render and
       // shares the cached entry with the admin switcher's identical call below (REQ-DATA-007).
       PageResponse<SquadronDto> page =
-          backendApiClient.getCached(
-              "/api/v1/squadrons?size=1000&sort=name,asc", new ParameterizedTypeReference<>() {});
+          backendApiClient.getCached("/api/v1/squadrons?size=1000&sort=name,asc", SQUADRON_PAGE);
       return page != null && page.content() != null ? page.content() : List.of();
     } catch (Exception ex) {
       log.debug("Failed to load squadron list for sidebar dropdown", ex);
@@ -271,8 +278,7 @@ public class SquadronContextAdvice {
       // Cached global catalogue — same URI (and therefore same STATIC_DATA_CACHE entry) as
       // availableSquadrons() above, so the admin render no longer double-fetches the squadron list.
       PageResponse<SquadronDto> squadrons =
-          backendApiClient.getCached(
-              "/api/v1/squadrons?size=1000&sort=name,asc", new ParameterizedTypeReference<>() {});
+          backendApiClient.getCached("/api/v1/squadrons?size=1000&sort=name,asc", SQUADRON_PAGE);
       if (squadrons != null && squadrons.content() != null) {
         for (SquadronDto s : squadrons.content()) {
           combined.add(
@@ -290,9 +296,7 @@ public class SquadronContextAdvice {
       // the cache TTL after an SK lifecycle change. This call is admin-switcher-only (not every
       // render), so a plain fetch is the safe trade-off until SK mutations wire eviction.
       PageResponse<SquadronDto> specialCommands =
-          backendApiClient.get(
-              "/api/v1/special-commands?size=1000&sort=name,asc",
-              new ParameterizedTypeReference<>() {});
+          backendApiClient.get("/api/v1/special-commands?size=1000&sort=name,asc", SQUADRON_PAGE);
       if (specialCommands != null && specialCommands.content() != null) {
         for (SquadronDto sk : specialCommands.content()) {
           combined.add(
@@ -322,7 +326,7 @@ public class SquadronContextAdvice {
       }
       List<OrgUnitMembershipOptionDto> memberships =
           backendApiClient.get(
-              "/api/v1/users/" + me.id() + "/memberships", new ParameterizedTypeReference<>() {});
+              "/api/v1/users/" + me.id() + "/memberships", ORG_UNIT_MEMBERSHIP_OPTION_LIST);
       return memberships != null ? memberships : List.of();
     } catch (Exception ex) {
       log.debug("Failed to load memberships for non-admin switcher", ex);

@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
+import de.greluc.krt.profit.basetool.frontend.support.StringNormalization;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -68,6 +69,14 @@ public class AdminMaterialAliasesPageController {
 
   private static final String BACKEND_BASE = "/api/v1/material-external-aliases";
 
+  /** Response type for the {@code /material-external-aliases} alias list. */
+  private static final ParameterizedTypeReference<List<MaterialExternalAliasDto>> ALIAS_LIST_TYPE =
+      new ParameterizedTypeReference<>() {};
+
+  /** Response type for the {@code /materials/lookup} material-reference list. */
+  private static final ParameterizedTypeReference<List<MaterialReferenceDto>>
+      MATERIAL_REFERENCE_LIST_TYPE = new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -80,15 +89,11 @@ public class AdminMaterialAliasesPageController {
   @GetMapping
   public String list(Model model) {
     try {
-      List<MaterialExternalAliasDto> aliases =
-          backendApiClient.get(
-              BACKEND_BASE, new ParameterizedTypeReference<List<MaterialExternalAliasDto>>() {});
+      List<MaterialExternalAliasDto> aliases = backendApiClient.get(BACKEND_BASE, ALIAS_LIST_TYPE);
       model.addAttribute("aliases", aliases == null ? List.of() : aliases);
 
       List<MaterialReferenceDto> materials =
-          backendApiClient.get(
-              "/api/v1/materials/lookup",
-              new ParameterizedTypeReference<List<MaterialReferenceDto>>() {});
+          backendApiClient.get("/api/v1/materials/lookup", MATERIAL_REFERENCE_LIST_TYPE);
       List<MaterialReferenceDto> sorted =
           new ArrayList<>(materials == null ? List.of() : materials);
       sorted.sort(
@@ -155,10 +160,10 @@ public class AdminMaterialAliasesPageController {
               materialId,
               sourceSystem,
               externalName,
-              blankToNull(externalKey),
+              StringNormalization.trimToNull(externalKey),
               externalUuid,
-              blankToNull(externalCode),
-              blankToNull(note),
+              StringNormalization.trimToNull(externalCode),
+              StringNormalization.trimToNull(note),
               null);
       backendApiClient.post(BACKEND_BASE, body, MaterialExternalAliasDto.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
@@ -203,10 +208,10 @@ public class AdminMaterialAliasesPageController {
               materialId,
               sourceSystem,
               externalName,
-              blankToNull(externalKey),
+              StringNormalization.trimToNull(externalKey),
               externalUuid,
-              blankToNull(externalCode),
-              blankToNull(note),
+              StringNormalization.trimToNull(externalCode),
+              StringNormalization.trimToNull(note),
               version);
       backendApiClient.put(BACKEND_BASE + "/" + id, body, MaterialExternalAliasDto.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
@@ -255,10 +260,10 @@ public class AdminMaterialAliasesPageController {
               request.materialId(),
               request.sourceSystem(),
               request.externalName(),
-              blankToNull(request.externalKey()),
+              StringNormalization.trimToNull(request.externalKey()),
               request.externalUuid(),
-              blankToNull(request.externalCode()),
-              blankToNull(request.note()),
+              StringNormalization.trimToNull(request.externalCode()),
+              StringNormalization.trimToNull(request.note()),
               null);
       return ResponseEntity.ok(
           backendApiClient.post(BACKEND_BASE, body, MaterialExternalAliasDto.class));
@@ -292,10 +297,10 @@ public class AdminMaterialAliasesPageController {
               request.materialId(),
               request.sourceSystem(),
               request.externalName(),
-              blankToNull(request.externalKey()),
+              StringNormalization.trimToNull(request.externalKey()),
               request.externalUuid(),
-              blankToNull(request.externalCode()),
-              blankToNull(request.note()),
+              StringNormalization.trimToNull(request.externalCode()),
+              StringNormalization.trimToNull(request.note()),
               request.version());
       return ResponseEntity.ok(
           backendApiClient.put(BACKEND_BASE + "/" + id, body, MaterialExternalAliasDto.class));
@@ -328,20 +333,5 @@ public class AdminMaterialAliasesPageController {
       log.error("Delete alias {} (ajax) failed", id, e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
-  }
-
-  /**
-   * Trims any leading / trailing whitespace and returns {@code null} for an empty result, so a
-   * cleared form field does not survive as an empty string in the DB.
-   *
-   * @param value raw form value
-   * @return normalised value, or {@code null} if blank
-   */
-  private static String blankToNull(String value) {
-    if (value == null) {
-      return null;
-    }
-    String trimmed = value.trim();
-    return trimmed.isEmpty() ? null : trimmed;
   }
 }

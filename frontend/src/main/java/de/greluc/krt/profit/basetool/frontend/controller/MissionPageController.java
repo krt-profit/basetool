@@ -138,6 +138,15 @@ public class MissionPageController {
   private static final ParameterizedTypeReference<Map<String, Object>> STRING_OBJECT_MAP =
       new ParameterizedTypeReference<Map<String, Object>>() {};
 
+  /**
+   * Response type for the org-unit option reads — the active-org-unit guest picker ({@code
+   * /api/v1/org-units/active}) and the caller's pickable-org-unit owner picker ({@code
+   * /api/v1/users/me/pickable-org-units}), both of which return a flat {@link
+   * OrgUnitMembershipOptionDto} list.
+   */
+  private static final ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>
+      ORG_UNIT_MEMBERSHIP_OPTION_LIST = new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -276,7 +285,7 @@ public class MissionPageController {
     uri.append("sort=plannedStartTime,desc&");
 
     if ((status == null || status.isEmpty())) {
-      if (showPast && principal != null) {
+      if (showPast && !authHelperService.isAnonymous()) {
         // Explicitly request all statuses ONLY if authenticated
         uri.append("status=PLANNED&status=ACTIVE&status=COMPLETED&status=CANCELLED&");
       } else {
@@ -289,7 +298,7 @@ public class MissionPageController {
     }
 
     try {
-      boolean isPublic = (principal == null);
+      boolean isPublic = authHelperService.isAnonymous();
 
       PageResponse<MissionListDto> missionsPage =
           backendApiClient.get(uri.toString(), MISSION_LIST_PAGE, isPublic);
@@ -298,7 +307,7 @@ public class MissionPageController {
       model.addAttribute("search", search);
       model.addAttribute("start", start);
       model.addAttribute("end", end);
-      model.addAttribute("showPast", showPast && principal != null);
+      model.addAttribute("showPast", showPast && !authHelperService.isAnonymous());
     } catch (Exception e) {
       log.error("Error loading missions", e);
       model.addAttribute("error", "error.missions.load");
@@ -339,7 +348,7 @@ public class MissionPageController {
       @RequestParam(required = false) String fragment) {
     try {
       MissionDto mission =
-          backendApiClient.get("/api/v1/missions/" + id, MISSION, principal == null);
+          backendApiClient.get("/api/v1/missions/" + id, MISSION, authHelperService.isAnonymous());
 
       // Sort participants and build groupings
       List<MissionParticipantDto> participants = new java.util.ArrayList<>(mission.participants());
@@ -526,7 +535,7 @@ public class MissionPageController {
       model.addAttribute("customFrequencies", customFrequencies);
 
       // Fetch all users for manager selection
-      if (principal != null) {
+      if (!authHelperService.isAnonymous()) {
         try {
           List<UserReferenceDto> allUsers =
               backendApiClient.get("/api/v1/users/lookup", USER_REFERENCE_LIST, false);
@@ -565,9 +574,9 @@ public class MissionPageController {
       model.addAttribute("isNew", false);
       model.addAttribute("authUserId", principal != null ? principal.getSubject() : null);
       addFormsToModel(model, principal);
-      addOperationsToModel(model, principal == null);
+      addOperationsToModel(model, authHelperService.isAnonymous());
 
-      model.addAttribute("roundingMode", fetchRoundingMode(principal == null));
+      model.addAttribute("roundingMode", fetchRoundingMode(authHelperService.isAnonymous()));
 
       // Fetch Mission JobTypes
       try {
@@ -602,11 +611,10 @@ public class MissionPageController {
       // the participant add/edit modals. The backend endpoint requires a role, and an anonymous
       // guest's submitted org units are dropped server-side (H-3) anyway, so the picker is only
       // populated for authenticated callers labeling a guest.
-      if (principal != null) {
+      if (!authHelperService.isAnonymous()) {
         try {
           List<OrgUnitMembershipOptionDto> orgUnits =
-              backendApiClient.get(
-                  "/api/v1/org-units/active", new ParameterizedTypeReference<>() {});
+              backendApiClient.get("/api/v1/org-units/active", ORG_UNIT_MEMBERSHIP_OPTION_LIST);
           model.addAttribute("orgUnits", orgUnits != null ? orgUnits : List.of());
         } catch (Exception e) {
           model.addAttribute("orgUnits", List.of());
@@ -628,7 +636,7 @@ public class MissionPageController {
       }
 
       // Fetch Ships (Only if authenticated)
-      if (principal != null) {
+      if (!authHelperService.isAnonymous()) {
         // Unit ship pickers are populated from the mission-scoped endpoint, not the caller's
         // OrgUnit-scoped hangar: it returns ships of registered participants (any OrgUnit) plus
         // ships already assigned to a unit. Only fetched when the caller may edit the mission —
@@ -891,7 +899,7 @@ public class MissionPageController {
       // for an ordinary member.
       List<OrgUnitMembershipOptionDto> options =
           backendApiClient.get(
-              "/api/v1/users/me/pickable-org-units", new ParameterizedTypeReference<>() {});
+              "/api/v1/users/me/pickable-org-units", ORG_UNIT_MEMBERSHIP_OPTION_LIST);
       return options != null ? options : List.of();
     } catch (Exception e) {
       log.warn("Failed to fetch pickable org units for mission-create owner-picker", e);

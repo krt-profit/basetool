@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.CrewForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.MissionForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ParticipantForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.validation.Valid;
 import java.time.Instant;
@@ -120,6 +121,15 @@ public class MissionWriteController {
   private final MissionPageController missionPageController;
 
   /**
+   * Centralised anonymous-principal predicate. The guest-flow endpoints route to the public
+   * WebClient when no OIDC principal is present; this helper replaces the inlined
+   * {@code @AuthenticationPrincipal OidcUser principal == null} guard with a single, mock-friendly
+   * seam (Q10) — on this frontend the only authenticated principal type is the Keycloak {@code
+   * OidcUser}, so a null principal and an anonymous security context are the same condition.
+   */
+  private final FrontendAuthHelperService authHelper;
+
+  /**
    * Web binder configuration scoped to this controller. Registers any custom property editors
    * needed for the mission forms (currently only the inherited default editors).
    *
@@ -173,7 +183,7 @@ public class MissionWriteController {
       }
       body.put("comment", form.comment());
 
-      boolean isPublic = (principal == null);
+      boolean isPublic = authHelper.isAnonymous();
       backendApiClient.post(
           "/api/v1/missions/" + id + "/participants/add", body, Void.class, isPublic);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
@@ -300,7 +310,7 @@ public class MissionWriteController {
       @AuthenticationPrincipal OidcUser principal,
       RedirectAttributes redirectAttributes) {
     try {
-      boolean isPublic = (principal == null);
+      boolean isPublic = authHelper.isAnonymous();
       backendApiClient.post(
           "/api/v1/missions/" + id + "/participants/" + participantId + "/check-in",
           null,
@@ -326,7 +336,7 @@ public class MissionWriteController {
       @AuthenticationPrincipal OidcUser principal,
       RedirectAttributes redirectAttributes) {
     try {
-      boolean isPublic = (principal == null);
+      boolean isPublic = authHelper.isAnonymous();
       backendApiClient.post(
           "/api/v1/missions/" + id + "/participants/" + participantId + "/check-out",
           null,
@@ -354,7 +364,7 @@ public class MissionWriteController {
       @RequestBody UpdatePayoutPreferenceRequest request,
       @AuthenticationPrincipal OidcUser principal) {
     try {
-      boolean isPublic = (principal == null);
+      boolean isPublic = authHelper.isAnonymous();
       MissionDto updatedMission =
           backendApiClient.put(
               "/api/v1/missions/" + id + "/participants/" + participantId + "/payout-preference",
@@ -458,7 +468,7 @@ public class MissionWriteController {
       @AuthenticationPrincipal OidcUser principal,
       RedirectAttributes redirectAttributes) {
     try {
-      boolean isPublic = (principal == null);
+      boolean isPublic = authHelper.isAnonymous();
       backendApiClient.delete(
           "/api/v1/missions/" + id + "/participants/" + participantId, Void.class, isPublic);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
@@ -520,7 +530,7 @@ public class MissionWriteController {
         body.put("version", form.version());
       }
 
-      boolean isPublic = (principal == null);
+      boolean isPublic = authHelper.isAnonymous();
       backendApiClient.put(
           "/api/v1/missions/" + id + "/participants/" + participantId, body, Void.class, isPublic);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
@@ -1803,7 +1813,7 @@ public class MissionWriteController {
       // Previously this method was annotated with @PreAuthorize("isAuthenticated()")
       // and always passed isPublic=false, which produced the AccessDeniedException
       // observed in live-log/log.txt for anonymous mission signups.
-      boolean isPublic = (principal == null);
+      boolean isPublic = authHelper.isAnonymous();
       Object result =
           backendApiClient.post(
               "/api/v1/missions/" + id + "/participants/slim", body, Object.class, isPublic);
@@ -1836,7 +1846,7 @@ public class MissionWriteController {
       // (see backend MissionSecurityService#canAccessParticipant: guest entries
       // with user == null are editable). Route via the public WebClient when no
       // OIDC principal is present, mirroring addParticipantAjax.
-      boolean isPublic = (principal == null);
+      boolean isPublic = authHelper.isAnonymous();
       Object result =
           backendApiClient.put(
               "/api/v1/missions/" + id + "/participants/" + participantId + "/slim",
@@ -1871,7 +1881,7 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID participantId,
       @AuthenticationPrincipal OidcUser principal) {
     try {
-      boolean isPublic = (principal == null);
+      boolean isPublic = authHelper.isAnonymous();
       backendApiClient.delete(
           "/api/v1/missions/" + id + "/participants/" + participantId + "/slim",
           Void.class,
@@ -1904,7 +1914,7 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID participantId,
       @AuthenticationPrincipal OidcUser principal) {
     try {
-      boolean isPublic = (principal == null);
+      boolean isPublic = authHelper.isAnonymous();
       Object result =
           backendApiClient.post(
               "/api/v1/missions/" + id + "/participants/" + participantId + "/check-in/slim",
@@ -1941,7 +1951,7 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID participantId,
       @AuthenticationPrincipal OidcUser principal) {
     try {
-      boolean isPublic = (principal == null);
+      boolean isPublic = authHelper.isAnonymous();
       Object result =
           backendApiClient.post(
               "/api/v1/missions/" + id + "/participants/" + participantId + "/check-out/slim",

@@ -55,6 +55,10 @@ public class AdminBlueprintsPageController {
   /** Page size for the blueprint list — one detail-rich card per row, so kept modest. */
   private static final int PAGE_SIZE = 25;
 
+  /** Response type for the paginated blueprint list ({@code GET /api/v1/blueprints}). */
+  private static final ParameterizedTypeReference<PageResponse<BlueprintDto>> BLUEPRINT_PAGE_TYPE =
+      new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -90,8 +94,7 @@ public class AdminBlueprintsPageController {
 
     try {
       PageResponse<BlueprintDto> response =
-          backendApiClient.get(
-              uri.toString(), new ParameterizedTypeReference<PageResponse<BlueprintDto>>() {});
+          backendApiClient.get(uri.toString(), BLUEPRINT_PAGE_TYPE);
       if (response != null) {
         model.addAttribute(
             "blueprints", response.content() == null ? List.of() : response.content());

@@ -70,6 +70,14 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminMaterialsPageController {
 
+  /** Response type for the paginated materials pull ({@code GET /api/v1/materials}). */
+  private static final ParameterizedTypeReference<PageResponse<MaterialDto>> MATERIAL_PAGE_TYPE =
+      new ParameterizedTypeReference<>() {};
+
+  /** Response type for the material-category list ({@code GET /api/v1/material-categories}). */
+  private static final ParameterizedTypeReference<List<MaterialCategoryDto>>
+      MATERIAL_CATEGORY_LIST_TYPE = new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -90,8 +98,7 @@ public class AdminMaterialsPageController {
       // the flag and get only visible rows.
       PageResponse<MaterialDto> materialsPage =
           backendApiClient.get(
-              "/api/v1/materials?size=1000&sort=name,asc&includeHidden=true",
-              new ParameterizedTypeReference<PageResponse<MaterialDto>>() {});
+              "/api/v1/materials?size=1000&sort=name,asc&includeHidden=true", MATERIAL_PAGE_TYPE);
 
       List<MaterialDto> materials = new ArrayList<>();
       if (materialsPage != null && materialsPage.content() != null) {
@@ -117,9 +124,7 @@ public class AdminMaterialsPageController {
       model.addAttribute("materials", sortedMaterials);
 
       List<MaterialCategoryDto> categories =
-          backendApiClient.get(
-              "/api/v1/material-categories",
-              new ParameterizedTypeReference<List<MaterialCategoryDto>>() {});
+          backendApiClient.get("/api/v1/material-categories", MATERIAL_CATEGORY_LIST_TYPE);
       model.addAttribute("categories", categories);
 
     } catch (Exception e) {

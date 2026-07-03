@@ -86,6 +86,25 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminSpecialCommandsPageController {
 
+  /**
+   * Response type for the paged SK catalog read ({@code /special-commands?...}). A shared static
+   * {@link ParameterizedTypeReference} is behaviourally identical to a fresh anonymous instance per
+   * call (Q10).
+   */
+  private static final ParameterizedTypeReference<PageResponse<Map<String, Object>>> MAP_PAGE_TYPE =
+      new ParameterizedTypeReference<>() {};
+
+  /** Response type for a single raw-JSON SK read ({@code /special-commands/{id}}). */
+  private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE =
+      new ParameterizedTypeReference<>() {};
+
+  /**
+   * Response type for the raw-JSON list reads (SK members and the user lookup). Both endpoints emit
+   * the same {@code List<Map<String, Object>>} shape, so one shared constant serves both.
+   */
+  private static final ParameterizedTypeReference<List<Map<String, Object>>> MAP_LIST_TYPE =
+      new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -134,7 +153,7 @@ public class AdminSpecialCommandsPageController {
     PageResponse<Map<String, Object>> page =
         backendApiClient.get(
             "/api/v1/special-commands?size=1000&sort=name,asc&includeInactive=" + includeInactive,
-            new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {});
+            MAP_PAGE_TYPE);
     if (page == null || page.content() == null) {
       return List.of();
     }
@@ -687,10 +706,7 @@ public class AdminSpecialCommandsPageController {
   // ---------- helper fetchers for the detail page ---------------------------------
 
   private SpecialCommandDto fetchSpecialCommand(UUID id) {
-    Map<String, Object> map =
-        backendApiClient.get(
-            "/api/v1/special-commands/" + id,
-            new ParameterizedTypeReference<Map<String, Object>>() {});
+    Map<String, Object> map = backendApiClient.get("/api/v1/special-commands/" + id, MAP_TYPE);
     if (map == null) {
       return null;
     }
@@ -707,8 +723,7 @@ public class AdminSpecialCommandsPageController {
   private List<OrgUnitMembershipDto> fetchMembers(UUID specialCommandId) {
     List<Map<String, Object>> raw =
         backendApiClient.get(
-            "/api/v1/special-commands/" + specialCommandId + "/members",
-            new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+            "/api/v1/special-commands/" + specialCommandId + "/members", MAP_LIST_TYPE);
     if (raw == null) {
       return List.of();
     }
@@ -735,9 +750,7 @@ public class AdminSpecialCommandsPageController {
   }
 
   private List<UserReferenceDto> fetchUserLookup() {
-    List<Map<String, Object>> raw =
-        backendApiClient.get(
-            "/api/v1/users/lookup", new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+    List<Map<String, Object>> raw = backendApiClient.get("/api/v1/users/lookup", MAP_LIST_TYPE);
     if (raw == null) {
       return List.of();
     }

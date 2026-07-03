@@ -164,6 +164,18 @@ public class MaterialsPageController {
 
   private final BackendApiClient backendApiClient;
 
+  /** Response type for the materials price-overview page fetch backing the accordion. */
+  private static final ParameterizedTypeReference<PageResponse<MaterialPriceOverviewDto>>
+      MATERIAL_PRICE_OVERVIEW_PAGE_TYPE = new ParameterizedTypeReference<>() {};
+
+  /** Response type for the full trade-matrix projection fetch feeding the virtual-scroll grid. */
+  private static final ParameterizedTypeReference<PageResponse<MaterialMatrixItemDto>>
+      MATERIAL_MATRIX_PAGE_TYPE = new ParameterizedTypeReference<>() {};
+
+  /** Response type for a material's per-terminal price list on the detail page. */
+  private static final ParameterizedTypeReference<PageResponse<MaterialPriceDto>>
+      MATERIAL_PRICE_PAGE_TYPE = new ParameterizedTypeReference<>() {};
+
   /**
    * Renders the materials overview ({@code /materials}). Fetches the price-overview projection for
    * all materials in one large page and groups them by category for the template's accordion
@@ -178,7 +190,7 @@ public class MaterialsPageController {
       PageResponse<MaterialPriceOverviewDto> page =
           backendApiClient.get(
               "/api/v1/materials/prices-overview?size=10000&sort=name,asc",
-              new ParameterizedTypeReference<PageResponse<MaterialPriceOverviewDto>>() {});
+              MATERIAL_PRICE_OVERVIEW_PAGE_TYPE);
 
       List<MaterialPriceOverviewDto> materials = new ArrayList<>();
       if (page != null && page.content() != null) {
@@ -291,8 +303,7 @@ public class MaterialsPageController {
   private List<MaterialMatrixItemDto> fetchMatrixItems() {
     PageResponse<MaterialMatrixItemDto> page =
         backendApiClient.getCached(
-            "/api/v1/materials/matrix?size=100000",
-            new ParameterizedTypeReference<PageResponse<MaterialMatrixItemDto>>() {});
+            "/api/v1/materials/matrix?size=100000", MATERIAL_MATRIX_PAGE_TYPE);
     if (page == null || page.content() == null) {
       return new ArrayList<>();
     }
@@ -428,7 +439,7 @@ public class MaterialsPageController {
       PageResponse<MaterialPriceDto> pricesPage =
           backendApiClient.get(
               "/api/v1/materials/" + id + "/prices?size=1000&sort=terminal.name,asc",
-              new ParameterizedTypeReference<PageResponse<MaterialPriceDto>>() {});
+              MATERIAL_PRICE_PAGE_TYPE);
 
       List<MaterialPriceDto> prices = new ArrayList<>();
       if (pricesPage != null && pricesPage.content() != null) {
