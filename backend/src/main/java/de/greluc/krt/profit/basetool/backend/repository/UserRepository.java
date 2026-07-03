@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.repository;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -32,6 +33,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -50,6 +52,26 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public interface UserRepository extends JpaRepository<User, UUID> {
+
+  /**
+   * Counts users in the given approval status, backing the {@code basetool_registration_pending_*}
+   * queue-depth gauge (REQ-OBS-011).
+   *
+   * @param approvalStatus the bounded approval status to count (typically {@code PENDING})
+   * @return the number of users in that status
+   */
+  long countByApprovalStatus(ApprovalStatus approvalStatus);
+
+  /**
+   * Finds the registration timestamp of the oldest user in the given approval status, for the
+   * "oldest pending registration age" gauge (REQ-OBS-011).
+   *
+   * @param approvalStatus the bounded approval status to scan (typically {@code PENDING})
+   * @return the earliest {@code createdAt} in that status, or {@code null} when none exists
+   */
+  @Query("SELECT MIN(u.createdAt) FROM User u WHERE u.approvalStatus = :approvalStatus")
+  Instant findOldestCreatedAtByApprovalStatus(
+      @Param("approvalStatus") ApprovalStatus approvalStatus);
 
   /**
    * Returns the registrations awaiting approval (status {@link ApprovalStatus#PENDING}), oldest

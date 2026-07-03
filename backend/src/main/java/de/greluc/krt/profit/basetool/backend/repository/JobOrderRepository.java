@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.repository;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import jakarta.persistence.LockModeType;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -37,6 +38,25 @@ import org.springframework.stereotype.Repository;
 /** Spring Data repository for Job Order. */
 @Repository
 public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
+
+  /**
+   * Counts job orders in the given lifecycle status, backing the {@code basetool_job_order_open_*}
+   * queue-depth gauge (REQ-OBS-011).
+   *
+   * @param status the bounded lifecycle status to count
+   * @return the number of job orders in that status
+   */
+  long countByStatus(JobOrderStatus status);
+
+  /**
+   * Finds the creation timestamp of the oldest job order in the given status, for the "oldest open
+   * job order age" gauge (REQ-OBS-011).
+   *
+   * @param status the bounded lifecycle status to scan (typically {@code OPEN})
+   * @return the earliest {@code createdAt} in that status, or {@code null} when none exists
+   */
+  @Query("SELECT MIN(o.createdAt) FROM JobOrder o WHERE o.status = :status")
+  Instant findOldestCreatedAtByStatus(@Param("status") JobOrderStatus status);
 
   /**
    * Derived Spring-Data query - returns entities matching {@code Id}. Eagerly fetches the

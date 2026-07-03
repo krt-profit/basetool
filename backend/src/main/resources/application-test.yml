@@ -89,6 +89,11 @@ app:
       # never seed degraded rows or race assertions. Tests that exercise the feature re-enable it
       # explicitly via @TestPropertySource / @DynamicPropertySource.
       enabled: false
+  monitoring:
+    business-metrics:
+      # The 60s queue-depth/oldest-age collector is disabled under @SpringBootTest so it never
+      # queries the DB mid-test; BusinessMetricsCollectorTest drives it directly with mocks.
+      enabled: false
 
 # Disable the KeycloakHealthIndicator under @SpringBootTest. The test issuer URI
 # (http://keycloak.example.com) is a non-resolvable placeholder; leaving the

@@ -144,6 +144,12 @@ app:
       # real values.
       username: ${MONITORING_SCRAPE_USER:}
       password: ${MONITORING_SCRAPE_PASSWORD:}
+    business-metrics:
+      # BusinessMetricsCollector samples the approval/work-queue depth and oldest-pending-age
+      # gauges (basetool_*_pending_*, REQ-OBS-011) on this fixed cadence. Disabled under the test
+      # profile so the sweep never queries the DB during @SpringBootTest.
+      enabled: true
+      interval-ms: 60000
   keycloak:
     sync:
       enabled: true

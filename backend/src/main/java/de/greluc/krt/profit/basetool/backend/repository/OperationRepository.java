@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.Operation;
+import de.greluc.krt.profit.basetool.backend.model.OperationStatus;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationReferenceDto;
 import java.time.Instant;
 import java.util.List;
@@ -36,6 +37,25 @@ import org.springframework.stereotype.Repository;
 /** Spring Data repository for Operation. */
 @Repository
 public interface OperationRepository extends JpaRepository<Operation, UUID> {
+
+  /**
+   * Counts operations in the given lifecycle status, backing the {@code basetool_operation_open_*}
+   * queue-depth gauge (REQ-OBS-011).
+   *
+   * @param status the bounded lifecycle status to count
+   * @return the number of operations in that status
+   */
+  long countByStatus(OperationStatus status);
+
+  /**
+   * Finds the creation timestamp of the oldest operation in the given status, for the "oldest
+   * un-started operation age" gauge (REQ-OBS-011).
+   *
+   * @param status the bounded lifecycle status to scan (typically {@code PLANNED})
+   * @return the earliest {@code createdAt} in that status, or {@code null} when none exists
+   */
+  @Query("SELECT MIN(o.createdAt) FROM Operation o WHERE o.status = :status")
+  Instant findOldestCreatedAtByStatus(@Param("status") OperationStatus status);
 
   /**
    * Pre-fetches the missions of an operation, their participants, and the participants' user
