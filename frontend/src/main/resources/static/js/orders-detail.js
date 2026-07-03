@@ -268,8 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (itemHandoverForm) {
         itemHandoverForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            if (typeof validateItemHandoverForm === 'function' && !validateItemHandoverForm())
-                return;
+            if (!validateItemHandoverForm()) return;
             const orderId = itemHandoverForm.getAttribute('data-order-id');
             if (!orderId || !window.krtFetch || typeof krtOrderWrite !== 'function') {
                 itemHandoverForm.submit();
@@ -997,7 +996,7 @@ async function downloadHandoverReport(btn) {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-    } catch (e) {
+    } catch {
         showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
     }
 }
@@ -1058,7 +1057,7 @@ async function downloadItemHandoverReport(btn) {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-    } catch (e) {
+    } catch {
         showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
     }
 }
@@ -1086,7 +1085,6 @@ async function previewHandoverReport(btn) {
         '#' + orderId;
     const datePart = document.querySelector('#handover-modal .date-part')?.value;
     const timePart = document.querySelector('#handover-modal .time-part')?.value;
-    const handoverTimeVal = document.getElementById('handoverTime')?.value;
     const recipientHandle = document.getElementById('recipientHandle')?.value?.trim();
     const itemRows = document.querySelectorAll('#handover-items-container .handover-item-row');
     const hasValidItem = Array.from(itemRows).some((row) => {
@@ -1140,7 +1138,7 @@ async function previewHandoverReport(btn) {
             return;
         }
         handoverTimeIso = localDateStr;
-    } catch (e) {
+    } catch {
         showFrontendErrorToast(MSG_HANDOVER_REPORT_VALIDATION_DATE);
         return;
     }
@@ -1187,7 +1185,7 @@ async function previewHandoverReport(btn) {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-    } catch (e) {
+    } catch {
         showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
     }
 }
@@ -1380,7 +1378,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         // re-index so the remaining rows keep contiguous form field names.
         const row = el.parentElement && el.parentElement.parentElement;
         if (row) row.remove();
-        if (typeof updateHandoverIndexes === 'function') updateHandoverIndexes();
+        updateHandoverIndexes();
     });
     window.krtEvents.on('submit', 'od-disable-submit', function (el) {
         const btn = el.querySelector('button[type=submit]');
@@ -1439,7 +1437,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
                 const refreshed = await window.krtCsrf.refresh();
                 if (refreshed) res = await fetch(url, buildInit());
             }
-        } catch (e) {
+        } catch {
             showFrontendErrorToast(opts.errorMsg || I18N_NOTE_ERROR);
             return false;
         }

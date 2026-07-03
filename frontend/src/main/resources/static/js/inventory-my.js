@@ -135,9 +135,7 @@ async function executeBulkCheckout() {
             if (bulkCount) {
                 bulkCount.textContent = '';
             }
-            if (typeof filterMyInventory === 'function') {
-                filterMyInventory();
-            }
+            filterMyInventory();
         },
     });
 }
@@ -433,7 +431,7 @@ function filterMyInventory() {
     if (personalOnly) visibleUrl.searchParams.append('personalOnly', 'true');
     try {
         window.history.replaceState({}, '', visibleUrl.toString());
-    } catch (e) {
+    } catch {
         /* ignore */
     }
 
@@ -626,7 +624,9 @@ document.addEventListener('DOMContentLoaded', function () {
             let expandedRows = [];
             try {
                 expandedRows = JSON.parse(localStorage.getItem(storageKey) || '[]');
-            } catch (e) {}
+            } catch {
+                /* ignore */
+            }
             if (expandedRows.length > 0) {
                 document.querySelectorAll('.tree-row--group').forEach(function (row) {
                     const materialId = row.getAttribute('data-material-id');
@@ -953,7 +953,7 @@ function submitUmbuchen(event) {
             conflict: inventoryConflictI18n,
             onSuccess: function () {
                 closeUmbuchenModal();
-                if (typeof filterMyInventory === 'function') filterMyInventory();
+                filterMyInventory();
             },
         })
         .then(function () {
@@ -1016,9 +1016,7 @@ function submitBookOut(event) {
             conflict: inventoryConflictI18n,
             onSuccess: function () {
                 closeBookOutModal();
-                if (typeof filterMyInventory === 'function') {
-                    filterMyInventory();
-                }
+                filterMyInventory();
             },
         })
         .then(function () {
@@ -1144,8 +1142,6 @@ window.onclick = function (event) {
 
 async function updateInventoryAssociation(selectElement) {
     const id = selectElement.getAttribute('data-id');
-    const field = selectElement.getAttribute('data-field');
-    const value = selectElement.value;
     const version = parseInt(selectElement.getAttribute('data-version'));
 
     // Wir benötigen die anderen Felder für das DTO
@@ -1208,7 +1204,7 @@ async function updateInventoryAssociation(selectElement) {
             let updated = null;
             try {
                 updated = await response.json();
-            } catch (e) {
+            } catch {
                 /* tolerate empty body */
             }
             if (updated && updated.version != null && window.krtFetch) {

@@ -329,7 +329,7 @@ function filterInventory() {
     activeMissions.forEach((m) => visibleUrl.searchParams.append('missionIds', m));
     try {
         window.history.replaceState({}, '', visibleUrl.toString());
-    } catch (e) {
+    } catch {
         /* ignore */
     }
 
@@ -523,7 +523,9 @@ document.addEventListener('DOMContentLoaded', function () {
             let expandedRows = [];
             try {
                 expandedRows = JSON.parse(localStorage.getItem(storageKey) || '[]');
-            } catch (e) {}
+            } catch {
+                /* ignore */
+            }
             if (expandedRows.length > 0) {
                 document.querySelectorAll('.tree-row--group').forEach(function (row) {
                     const materialId = row.getAttribute('data-material-id');
@@ -777,7 +779,7 @@ function submitUmbuchen(event) {
             conflict: inventoryConflictI18n,
             onSuccess: function () {
                 closeUmbuchenModal();
-                if (typeof filterInventory === 'function') filterInventory();
+                filterInventory();
             },
         })
         .then(function () {
@@ -839,9 +841,7 @@ function submitBookOut(event) {
             conflict: inventoryConflictI18n,
             onSuccess: function () {
                 closeBookOutModal();
-                if (typeof filterInventory === 'function') {
-                    filterInventory();
-                }
+                filterInventory();
             },
         })
         .then(function () {
@@ -1004,10 +1004,8 @@ window.onclick = function (event) {
                 toast: false,
                 errorMessage: deleteBtn.getAttribute('data-error-failed'),
                 onSuccess: function () {
-                    if (typeof showInventoryToast === 'function') {
-                        showInventoryToast('success', deleteBtn.getAttribute('data-success'));
-                    }
-                    if (typeof filterInventory === 'function') filterInventory();
+                    showInventoryToast('success', deleteBtn.getAttribute('data-success'));
+                    filterInventory();
                 },
             });
             closeModal();
@@ -1023,8 +1021,6 @@ window.onclick = function (event) {
 // so users already saw the raw marker text. Do not hoist or localize them here.
 async function updateInventoryAssociation(selectElement) {
     const id = selectElement.getAttribute('data-id');
-    const field = selectElement.getAttribute('data-field');
-    const value = selectElement.value;
     const version = parseInt(selectElement.getAttribute('data-version'));
 
     const materialId = selectElement.getAttribute('data-material-id');
@@ -1085,7 +1081,7 @@ async function updateInventoryAssociation(selectElement) {
             let updated = null;
             try {
                 updated = await response.json();
-            } catch (e) {
+            } catch {
                 /* tolerate empty body */
             }
             if (updated && updated.version != null && window.krtFetch) {

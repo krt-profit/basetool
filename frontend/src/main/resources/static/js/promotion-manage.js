@@ -280,14 +280,14 @@ function pmLoadCollapsedTopics() {
         if (!raw) return [];
         const parsed = JSON.parse(raw);
         return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
+    } catch {
         return [];
     }
 }
 function pmSaveCollapsedTopics(ids) {
     try {
         sessionStorage.setItem(STORAGE_KEY_COLLAPSED, JSON.stringify(ids));
-    } catch (e) {
+    } catch {
         /* ignore */
     }
 }
@@ -380,7 +380,7 @@ function pmSaveFilters() {
                 noEvalOnly: f.noEvalOnly,
             }),
         );
-    } catch (e) {
+    } catch {
         /* ignore */
     }
 }
@@ -393,7 +393,7 @@ function pmRestoreFilters() {
         const noEval = document.getElementById('pm-filter-no-eval');
         if (elig && typeof f.eligibleOnly === 'boolean') elig.checked = f.eligibleOnly;
         if (noEval && typeof f.noEvalOnly === 'boolean') noEval.checked = f.noEvalOnly;
-    } catch (e) {
+    } catch {
         /* ignore */
     }
 }
@@ -435,7 +435,7 @@ function pmSetSortMode(mode) {
     if (indicator) indicator.textContent = SORT_LABELS[mode] || SORT_LABELS[0];
     try {
         sessionStorage.setItem(STORAGE_KEY_SORT, String(mode));
-    } catch (e) {
+    } catch {
         /* ignore */
     }
 }
@@ -445,7 +445,7 @@ function pmRestoreSortMode() {
         if (!raw) return 0;
         const m = parseInt(raw, 10);
         return m >= 0 && m <= 4 ? m : 0;
-    } catch (e) {
+    } catch {
         return 0;
     }
 }

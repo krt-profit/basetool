@@ -43,7 +43,7 @@
  * callbacks here; showFrontendErrorToast is the window-property function from fragments/toast.html
  * that block 5 historically calls without the window. prefix.
  */
-/* global MSG_ERROR_PAYOUT_UPDATE, MSG_ERROR_PERMISSION_DENIED, MSG_ERROR_MANAGER_ADD, MSG_ERROR_MANAGER_REMOVE, MSG_SUCCESS_MANAGER_ADD, MSG_SUCCESS_MANAGER_REMOVE, MSG_SUCCESS_OWNER_CHANGE, MSG_ERROR_OWNER_CHANGE, MSG_CONFIRM_OWNER_CHANGE, MSG_SUCCESS_OWNING_ORG_UNIT_CHANGE, MSG_ERROR_OWNING_ORG_UNIT_CHANGE, MSG_CONFIRM_OWNING_ORG_UNIT_CHANGE, MSG_CONFIRM_MANAGER_REMOVE, MSG_ERROR_USER_REQUIRED, missionId, openEditFinanceModal, showFrontendErrorToast */
+/* global MSG_ERROR_PAYOUT_UPDATE, MSG_ERROR_MANAGER_ADD, MSG_ERROR_MANAGER_REMOVE, MSG_ERROR_OWNER_CHANGE, MSG_CONFIRM_OWNER_CHANGE, MSG_ERROR_OWNING_ORG_UNIT_CHANGE, MSG_CONFIRM_OWNING_ORG_UNIT_CHANGE, MSG_CONFIRM_MANAGER_REMOVE, MSG_ERROR_USER_REQUIRED, missionId, openEditFinanceModal, showFrontendErrorToast */
 
 // ---- #574 in-place AJAX seam (retires window.MissionSubresource) -----------------
 // krtMissionWrite wraps window.krtFetch.write and sources the already-localized section/conflict
@@ -1085,7 +1085,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.addEventListener('krt:swapped', bindEditParticipantButtons);
 
         if (eForm) {
-            eForm.addEventListener('submit', function (e) {
+            eForm.addEventListener('submit', function () {
                 const eStartTimeUi = document.getElementById('edit-participant-start-time-ui');
                 const eEndTimeUi = document.getElementById('edit-participant-end-time-ui');
                 const eStartTimeHidden = document.getElementById(
@@ -1345,9 +1345,6 @@ document.addEventListener('DOMContentLoaded', function () {
     })();
 
     // Autocomplete Logic
-    const searchInput = document.getElementById('participant-search-input');
-    const userIdInput = document.getElementById('participant-user-id');
-    const resultsDiv = document.getElementById('participant-search-results');
 
     // Delete Modal Logic
     const deleteModal = document.getElementById('delete-confirm-modal');
@@ -1865,7 +1862,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (searchInput && resultsDiv && userIdInput) {
         let debounceTimer;
 
-        searchInput.addEventListener('input', function (e) {
+        searchInput.addEventListener('input', function () {
             const val = this.value;
 
             // Reset ID on any input change
@@ -1912,7 +1909,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                 }
                             });
 
-                            div.addEventListener('click', function (e) {
+                            div.addEventListener('click', function () {
                                 searchInput.value = displayName;
                                 userIdInput.value = user.id;
                                 // A registered user's org units are derived server-side, so hide
@@ -2665,7 +2662,7 @@ if (document.readyState === 'loading') {
         });
         try {
             localStorage.setItem(storeKey, key);
-        } catch (e) {
+        } catch {
             /* private mode */
         }
     }
@@ -2712,7 +2709,7 @@ if (document.readyState === 'loading') {
             try {
                 const s = localStorage.getItem(storeKey);
                 if (s && validKeys.includes(s)) return s;
-            } catch (e) {
+            } catch {
                 /* private mode */
             }
         }
@@ -2866,7 +2863,7 @@ if (document.readyState === 'loading') {
                             headers: buildHeaders(),
                         });
                 }
-            } catch (e) {
+            } catch {
                 if (window.showFrontendErrorToast) window.showFrontendErrorToast(FAILED);
                 return;
             }
@@ -2874,7 +2871,7 @@ if (document.readyState === 'loading') {
                 let map = {};
                 try {
                     map = await res.json();
-                } catch (e) {
+                } catch {
                     /* non-JSON body */
                 }
                 renderFieldErrors(map);
@@ -2884,7 +2881,7 @@ if (document.readyState === 'loading') {
                 let problem = {};
                 try {
                     problem = await res.json();
-                } catch (e) {
+                } catch {
                     /* non-JSON body */
                 }
                 handleConflict(problem);
@@ -2897,7 +2894,7 @@ if (document.readyState === 'loading') {
             let versions = null;
             try {
                 versions = await res.json();
-            } catch (e) {
+            } catch {
                 /* non-JSON body */
             }
             writeVersions(versions);
