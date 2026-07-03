@@ -11,6 +11,7 @@
 - **Admin: Blueprints aller Nutzer löschen.** Im Admin-Bereich „Pers. Blueprints" können Administratoren die Blueprints aller Nutzer auf einmal löschen. Die Aktion ist durch eine Tippbestätigung („LOESCHEN") abgesichert und meldet die Anzahl entfernter Blueprints; Standard-Blueprints bleiben erhalten (REQ-INV-024).
 - **Kartellbank: Konten live nach Namen filtern.** Auf der Kartellbank-Übersicht (`/bank`) neben dem „Verwaltung"-Button und über der Kontotabelle der Org-Einheits-Bank (`/org-unit-bank`) blendet ein neues Suchfeld beim Tippen sofort alle Kontokacheln bzw. -zeilen aus, deren Name nicht passt — rein clientseitig, ohne Nachladen (REQ-BANK-046).
 - **Einsatz anlegen: Ziele und Ablauf-Schritte gleich beim Anlegen erfassen.** Das Formular „Neuer Einsatz" zeigt jetzt über dem Beschreibungsfeld zwei optionale Editoren, um Ziele (inklusive Klassifizierung) und Ablauf-Schritte (mit optionaler Zeit/Ort-Angabe) direkt mitzugeben. Beides ist optional und lässt sich weiterhin auch später im Verwaltungs-Tab pflegen (REQ-MISSION-015).
+- **Kartellbank-Audit: Wechsel des/der Kontoverantwortlichen wird protokolliert.** Ändert sich der/die für ein Bankkonto Verantwortliche — weil sich die zugrunde liegende Führung ändert (neuer Staffelleiter, SK-Leitung, Bereichsleiter oder OL), ein Mitglied mit Leitungsrolle aus seiner Einheit entfernt oder ein Nutzer gelöscht wird —, hält das Bank-Audit dies jetzt als eigenes Ereignis fest: mit altem und neuem Verantwortlichen sowie der veranlassenden Person (REQ-BANK-034, ADR-0070).
 
 ### Changed
 
@@ -27,6 +28,7 @@
 - **Einsatz: Zeichenlimits angehoben.** Ziele und Ablauf-Schritte erlauben jetzt bis zu 500 Zeichen im Titel (vorher 250 bzw. 200), die Einsatz-Beschreibung bis zu 20.000 Zeichen (REQ-MISSION-009/-012).
 - **Einsatz: Teilnehmer-Org-Einheiten nur noch bei Gästen auswählbar.** Beim Anmelden und Bearbeiten eines angemeldeten Nutzers muss keine Org-Einheit mehr ausgewählt werden — sie werden automatisch aus dem Account gelesen und im Bearbeiten-Dialog schreibgeschützt angezeigt. Die Auswahl erscheint nur noch für Gäste (REQ-MISSION-006).
 - **Einsatz-Übersicht: „Einsatzleiter" in „Mission auf einen Blick".** In der Kachel „Mission auf einen Blick" steht jetzt über dem Partyleiter ein Eintrag für den Einsatzleiter — mit derselben Logik wie das „Leiter"-Feld in der Infoleiste (REQ-MISSION-013).
+- **Kartellbank: Kontoansicht übersichtlicher.** Die Buchungshistorie in der Bank und der Org-Einheits-Bank nennt die „Gegenpartei"-Spalte jetzt „Quell-/Zielkonto" (vereinheitlicht: Gegenkonto einer Umbuchung bzw. Einzahler/Empfänger) und zeigt Begründung und Notiz einer Buchung erst nach Klick auf die Zeile in einer ausklappbaren Unterzeile (Begründung zuerst); die Konto-Infos samt Freigabe-Limits stehen als standardmäßig eingeklappte Kachel über der Historie. Mitglieder sehen den Einzahler/Empfänger jetzt ebenfalls (nur der Halter bleibt verborgen), und die PDF-Kontoauszüge sowie der Monatsreport übernehmen dieselbe Umbenennung samt Begründung/Notiz-Unterzeile je Buchung (REQ-BANK-044/-038/-014/-017).
 
 ### Fixed
 

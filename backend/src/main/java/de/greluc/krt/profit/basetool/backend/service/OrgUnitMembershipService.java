@@ -60,6 +60,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -102,6 +103,16 @@ public class OrgUnitMembershipService {
   private final OrgChartService orgChartService;
   private final StaffelMembershipResolver staffelMembershipResolver;
   private final OrgUnitMembershipMapper orgUnitMembershipMapper;
+
+  /**
+   * The org-unit-aware bank seam, injected as an {@link ObjectProvider} to break the constructor
+   * cycle (the seam depends on {@code BankBookingRequestService}, which depends on this service).
+   * It is resolved lazily around each leadership mutation to audit a change of the affected
+   * accounts' derived responsible holder(s) (Kontoverantwortliche/r, REQ-BANK-034/ADR-0070). All
+   * bank access stays inside the seam — this service only brackets its mutation with a before/after
+   * snapshot.
+   */
+  private final ObjectProvider<OrgUnitBankAccessService> orgUnitBankAccessServiceProvider;
 
   /**
    * Lists every active org unit (Staffel + Spezialkommando) as picker options, irrespective of
@@ -462,6 +473,11 @@ public class OrgUnitMembershipService {
     if (!membershipRepository.existsById(id)) {
       throw new NotFoundException("Membership not found");
     }
+    // Removing an SK member who is the SK-Lead drops the SK account's derived responsible holder,
+    // so
+    // snapshot before the delete and re-diff after it (REQ-BANK-034, ADR-0070).
+    final Map<UUID, Set<UUID>> responsibleBefore =
+        orgUnitBankAccessServiceProvider.getObject().snapshotResponsibleHolders(sc.getId());
     membershipRepository.deleteById(id);
     // Drop any mirrored SK chart seat (an SK-Leiter losing the membership) in the same transaction
     // so no stale seat lingers (REQ-ROLE-006).
@@ -479,6 +495,7 @@ public class OrgUnitMembershipService {
         orgUnitLabel(sc),
         userId,
         "kind=SPECIAL_COMMAND");
+    orgUnitBankAccessServiceProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
   }
 
   /**
@@ -527,6 +544,11 @@ public class OrgUnitMembershipService {
       m.setKind(OrgUnitKind.BEREICH);
       m.setJoinedAt(Instant.now());
     }
+    // Snapshot the Bereich account's (and, for a Profit Bereich, the CARTEL/CARTEL_BANK accounts')
+    // derived responsible holder(s) before the role changes, to audit the change (REQ-BANK-034,
+    // ADR-0070). Bank access is confined to the seam; the ObjectProvider breaks the DI cycle.
+    final Map<UUID, Set<UUID>> responsibleBefore =
+        orgUnitBankAccessServiceProvider.getObject().snapshotResponsibleHolders(bereichId);
     // The unified rank is the sole source of truth (epic #800, REQ-ROLE-001); the legacy boolean
     // leadership flags (is_bereichsleiter / -koordinator / -operator) were dropped in the Phase 5
     // cleanup (V187).
@@ -551,6 +573,7 @@ public class OrgUnitMembershipService {
         orgUnitLabel(bereich),
         userId,
         firstGrant ? "role=" + saved.getRole() : "from=" + previousRole + " to=" + saved.getRole());
+    orgUnitBankAccessServiceProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
     return saved;
   }
 
@@ -569,6 +592,8 @@ public class OrgUnitMembershipService {
             .findById(id)
             .orElseThrow(() -> new NotFoundException("Bereichsleitung membership not found"));
     final MembershipRole previousRole = m.getRole();
+    final Map<UUID, Set<UUID>> responsibleBefore =
+        orgUnitBankAccessServiceProvider.getObject().snapshotResponsibleHolders(bereichId);
     membershipRepository.delete(m);
     // Remove the mirrored chart seat in the same transaction (REQ-ROLE-006).
     orgChartService.mirrorRemoveUnitSeat(bereichId, userId);
@@ -578,6 +603,7 @@ public class OrgUnitMembershipService {
         orgUnitLabelById(bereichId),
         userId,
         AuditDetails.of("role", previousRole));
+    orgUnitBankAccessServiceProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
   }
 
   /**
@@ -617,17 +643,24 @@ public class OrgUnitMembershipService {
     m.setUser(user);
     m.setKind(OrgUnitKind.ORGANISATIONSLEITUNG);
     m.setJoinedAt(Instant.now());
+    // Snapshot the CARTEL account's collegial responsible holders (all OL members) before the add,
+    // to audit the change (REQ-BANK-034, ADR-0070).
+    final Map<UUID, Set<UUID>> responsibleBefore =
+        orgUnitBankAccessServiceProvider
+            .getObject()
+            .snapshotResponsibleHolders(organisationsleitungId);
     // The unified rank is the sole source of truth (epic #800, REQ-ROLE-001); is_ol_member was
     // dropped in the Phase 5 cleanup (V187).
     m.setRole(MembershipRole.OL_MEMBER);
     // saveAndFlush for parity with addBereichLeader: surfaces the V165 trigger as a clean
     // in-transaction failure and keeps the flushed @Version in the response under the
     // class-@Transactional controller.
-    OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
+    final OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
     // Mirror the OL seat onto the descriptive chart in the same transaction (REQ-ROLE-006).
     orgChartService.mirrorOlMember(ol.getId(), userId);
     auditService.record(
         AuditEventType.ROLE_GRANTED, ol.getId(), orgUnitLabel(ol), userId, "role=OL_MEMBER");
+    orgUnitBankAccessServiceProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
     return saved;
   }
 
@@ -646,6 +679,10 @@ public class OrgUnitMembershipService {
             .findById(id)
             .orElseThrow(() -> new NotFoundException("Organisationsleitung membership not found"));
     final MembershipRole previousRole = m.getRole();
+    final Map<UUID, Set<UUID>> responsibleBefore =
+        orgUnitBankAccessServiceProvider
+            .getObject()
+            .snapshotResponsibleHolders(organisationsleitungId);
     membershipRepository.delete(m);
     // Remove the mirrored OL chart seat in the same transaction (REQ-ROLE-006).
     orgChartService.mirrorRemoveUnitSeat(organisationsleitungId, userId);
@@ -655,6 +692,7 @@ public class OrgUnitMembershipService {
         orgUnitLabelById(organisationsleitungId),
         userId,
         AuditDetails.of("role", previousRole));
+    orgUnitBankAccessServiceProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
   }
 
   /**
@@ -823,6 +861,18 @@ public class OrgUnitMembershipService {
             .filter(m -> !distinctIds.contains(m.getId().getOrgUnitId()))
             .toList();
     if (!toRemove.isEmpty()) {
+      // A removed Staffel membership that carried the Staffelleiter rank drops that Staffel
+      // account's
+      // derived responsible holder — snapshot the affected accounts before the delete and re-diff
+      // after it (REQ-BANK-034, ADR-0070). A Staffel is never a Profit Bereich, so there is no
+      // ripple.
+      final Map<UUID, Set<UUID>> responsibleBefore = new LinkedHashMap<>();
+      for (OrgUnitMembership removed : toRemove) {
+        responsibleBefore.putAll(
+            orgUnitBankAccessServiceProvider
+                .getObject()
+                .snapshotResponsibleHolders(removed.getId().getOrgUnitId()));
+      }
       membershipRepository.deleteAll(toRemove);
       membershipRepository.flush();
       for (OrgUnitMembership removed : toRemove) {
@@ -831,6 +881,9 @@ public class OrgUnitMembershipService {
         // (REQ-ROLE-006).
         orgChartService.mirrorRemoveSquadronRank(removed.getId().getOrgUnitId(), user.getId());
       }
+      orgUnitBankAccessServiceProvider
+          .getObject()
+          .recordResponsibleHolderChanges(responsibleBefore);
     }
 
     // 2. Additions + in-place flag patches.
@@ -912,13 +965,18 @@ public class OrgUnitMembershipService {
           "User belongs to a Staffel and cannot be made an SK lead — remove the Staffel membership"
               + " first (REQ-ORG-017)");
     }
+    // Snapshot the SK account's derived responsible holder (its SK-Lead) before the toggle, to
+    // audit
+    // the change (REQ-BANK-034, ADR-0070).
+    final Map<UUID, Set<UUID>> responsibleBefore =
+        orgUnitBankAccessServiceProvider.getObject().snapshotResponsibleHolders(specialCommandId);
     // The unified rank is the sole source of truth (epic #800, REQ-ROLE-001); is_lead was dropped
     // in
     // the Phase 5 cleanup (V187). The request's isLead boolean is the API verb (promote/demote).
     m.setRole(request.isLead() ? MembershipRole.SK_LEAD : MembershipRole.MEMBER);
     // saveAndFlush (not save): flush before the DTO wrapper maps the response so the client gets
     // the bumped @Version, not the stale pre-flush one (REQ-FE-003).
-    OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
+    final OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
     // Mirror the SK-Leiter seat onto the descriptive chart in the same transaction (REQ-ROLE-006).
     orgChartService.mirrorSkLead(specialCommandId, userId, request.isLead());
     auditService.record(
@@ -927,6 +985,7 @@ public class OrgUnitMembershipService {
         orgUnitLabelById(specialCommandId),
         userId,
         "role=SK_LEAD");
+    orgUnitBankAccessServiceProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
     return saved;
   }
 
@@ -974,9 +1033,14 @@ public class OrgUnitMembershipService {
     assertSquadronRankCardinality(squadronId, userId, rank, group);
 
     final MembershipRole previousRole = m.getRole();
+    // Snapshot the Staffel account's derived responsible holder (its Staffelleiter) before the rank
+    // change, to audit a change of the account holder (REQ-BANK-034, ADR-0070). Only a
+    // Staffelleiter assignment/clearing actually moves the set; the seam no-ops otherwise.
+    final Map<UUID, Set<UUID>> responsibleBefore =
+        orgUnitBankAccessServiceProvider.getObject().snapshotResponsibleHolders(squadronId);
     m.setRole(rank);
     m.setKommandoGroup(group);
-    OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
+    final OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
     // Mirror the squadron seat onto the descriptive chart in the same transaction (REQ-ROLE-006):
     // Staffelleiter / Kommandoleiter (vacates+fills the group node) / stellv. / Ensign.
     orgChartService.mirrorSquadronRank(squadronId, userId, rank, group);
@@ -988,6 +1052,7 @@ public class OrgUnitMembershipService {
         orgUnitLabelById(squadronId),
         userId,
         firstGrant ? "role=" + rank : "from=" + previousRole + " to=" + rank);
+    orgUnitBankAccessServiceProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
     return saved;
   }
 
@@ -1018,9 +1083,14 @@ public class OrgUnitMembershipService {
     if (!previousRole.isSquadronRank()) {
       throw new BadRequestException("Member holds no squadron rank to remove");
     }
+    // Snapshot the Staffel account's derived responsible holder before clearing the rank, to audit
+    // a
+    // Staffelleiter (account holder) change (REQ-BANK-034, ADR-0070).
+    final Map<UUID, Set<UUID>> responsibleBefore =
+        orgUnitBankAccessServiceProvider.getObject().snapshotResponsibleHolders(squadronId);
     m.setRole(MembershipRole.MEMBER);
     m.setKommandoGroup(null);
-    OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
+    final OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
     // Clear the mirrored squadron chart seat in the same transaction (REQ-ROLE-006).
     orgChartService.mirrorRemoveSquadronRank(squadronId, userId);
     auditService.record(
@@ -1029,6 +1099,7 @@ public class OrgUnitMembershipService {
         orgUnitLabelById(squadronId),
         userId,
         AuditDetails.of("role", previousRole));
+    orgUnitBankAccessServiceProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
     return saved;
   }
 

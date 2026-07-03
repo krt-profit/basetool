@@ -282,10 +282,12 @@ class OrgUnitBankVisibilityMatrixE2eTest {
   @Test
   void drillInDetailHistoryOmitsHalterColumn() {
     // The read-only drill-in history must NOT carry the Halter (player-custody) column
-    // (REQ-BANK-038): once at least one booking exists the table renders with exactly four columns
-    // (Datum / Typ / Notiz / Betrag) and no Halter column. A fresh, booked Sonderkonto keeps the
-    // shared fixtures untouched; a Bereichsleiter auto-views it. (The empty-state shows no table at
-    // all — th:if on a non-empty page — so a seeded booking is required to assert the redaction.)
+    // (REQ-BANK-038): once at least one booking exists the table renders with exactly five header
+    // cells (expand-toggle / Datum / Typ / Quell-/Zielkonto / Betrag) and no Halter column. Since
+    // #967 the justification and note live in the expandable sub-row, so they are no longer their
+    // own column. A fresh, booked Sonderkonto keeps the shared fixtures untouched; a Bereichsleiter
+    // auto-views it. (The empty-state shows no table at all — th:if on a non-empty page — so a
+    // seeded booking is required to assert the redaction.)
     String special =
         seeder.createBankAccount(MGMT_USER, MGMT_PASSWORD, "E2E Bank Vis Drill SK", "SPECIAL");
     String holderId = seeder.registerBankHolder(MGMT_USER, MGMT_PASSWORD, memberUserId);
@@ -305,7 +307,15 @@ class OrgUnitBankVisibilityMatrixE2eTest {
         assertThat(page.locator("[data-testid='org-unit-bank-bookings-panel']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
         assertThat(page.locator("[data-testid='org-unit-bank-bookings-panel'] thead th"))
-            .hasCount(4);
+            .hasCount(5);
+        // Guard the redaction itself, not just the count (which legitimately grows as columns are
+        // added): no header cell carries the Halter label. The default locale is German, so the
+        // redacted header would read "Halter".
+        assertThat(
+                page.locator(
+                    "[data-testid='org-unit-bank-bookings-panel'] thead th",
+                    new Page.LocatorOptions().setHasText("Halter")))
+            .hasCount(0);
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "org-unit-bank-visibility-drill-in");
         throw failure;

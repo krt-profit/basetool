@@ -1,4 +1,4 @@
-# ADR-0070 — Client-side per-scope serialization of optimistic-locked writes
+# ADR-0071 — Client-side per-scope serialization of optimistic-locked writes
 
 - **Status:** Accepted
 - **Date:** 2026-07-03

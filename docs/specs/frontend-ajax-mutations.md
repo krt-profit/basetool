@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-03.
-> **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0053, ADR-0069, ADR-0070
+> **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0053, ADR-0069, ADR-0071
 
 # Frontend AJAX mutations — krtFetch, krtCsrf & fragment swaps
 
@@ -735,7 +735,7 @@ type-then-add race · **Code:** `krt-fetch.js` (`runSerialized`, lazy `url`/`pay
 `submitForm`, awaited `onSuccess`, the `sectionWrite` `serialize` default, exposed `krtFetch.serialize`),
 `mission-detail.js` (`objectivesVersion` / `stepsVersion` lazy readers), `bank.js`, `inventory-my.js`,
 `inventory-admin.js`, `inventory-note-modal.js`, `orders-detail.js` (`krtOrderWrite` serialize default
-+ `_orderVersion`), `admin-org-structure.js`, `leitung.js` · **ADR:** ADR-0070
++ `_orderVersion`), `admin-org-structure.js`, `leitung.js` · **ADR:** ADR-0071
 
 ## Out of scope
 

@@ -1407,4 +1407,58 @@
             applyAccountNameFilter(input);
         }
     });
+
+    /**
+     * Toggles a collapsible region driven by an aria-expanded control and an aria-controls target:
+     * flips aria-expanded on the control (the CSS rotates the chevron) and shows/hides the target
+     * element. Shared by the booking-row detail sub-row (REQ-BANK-045) and the account-detail
+     * Konto-Info tile (REQ-BANK-017).
+     *
+     * @param {HTMLElement} control the button carrying aria-expanded + aria-controls
+     */
+    function toggleAriaRegion(control) {
+        const expanded = control.getAttribute('aria-expanded') === 'true';
+        control.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+        const id = control.getAttribute('aria-controls');
+        const target = id ? document.getElementById(id) : null;
+        if (target) {
+            target.hidden = expanded;
+        }
+    }
+
+    // Booking-row expand (REQ-BANK-045): the chevron button toggles the detail sub-row directly; a
+    // click anywhere else on an expandable row toggles it too — but not when it lands on another
+    // control (the reverse button, a link, an input), so the whole row is the click target the design
+    // asks for while the button stays the keyboard control. Document-delegated so it survives the
+    // booking-history fragment swap (REQ-FE-002), on both the bank-staff and org-unit detail pages.
+    document.addEventListener('click', function (event) {
+        const toggle = event.target.closest
+            ? event.target.closest('[data-trigger="bank-row-expand"]')
+            : null;
+        if (toggle) {
+            toggleAriaRegion(toggle);
+            return;
+        }
+        if (event.target.closest('a, button, input, select, textarea, label')) {
+            return;
+        }
+        const row = event.target.closest('tr.bank-booking-row.is-expandable');
+        if (row) {
+            const btn = row.querySelector('[data-trigger="bank-row-expand"]');
+            if (btn) {
+                toggleAriaRegion(btn);
+            }
+        }
+    });
+
+    // Collapsible Konto-Info tile (REQ-BANK-017): the head button toggles its body. Document-delegated
+    // so it survives the accountBody fragment swap; a swap re-renders it collapsed (the default).
+    document.addEventListener('click', function (event) {
+        const head = event.target.closest
+            ? event.target.closest('[data-trigger="bank-info-collapse"]')
+            : null;
+        if (head) {
+            toggleAriaRegion(head);
+        }
+    });
 })();
