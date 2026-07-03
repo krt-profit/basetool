@@ -36,6 +36,12 @@
 
 /* global noteI18n */
 
+// These top-level functions are the shared note-modal API: they are referenced not from within
+// this file but from the delegated krtEvents note bindings in inventory-my.js and inventory-admin.js
+// (classic scripts sharing one global scope). The `exported` directive documents that cross-script
+// use so per-file static analysis does not flag them as unused.
+/* exported openNoteModal, closeNoteModal, updateNoteCounter, saveNote, removeNote, showInventoryToast */
+
 let activeNoteButton = null;
 
 function openNoteModal(btn) {
