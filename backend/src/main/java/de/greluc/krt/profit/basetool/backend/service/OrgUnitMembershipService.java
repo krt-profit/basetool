@@ -108,7 +108,7 @@ public class OrgUnitMembershipService {
    * The org-unit-aware bank seam, injected as an {@link ObjectProvider} to break the constructor
    * cycle (the seam depends on {@code BankBookingRequestService}, which depends on this service).
    * It is resolved lazily around each leadership mutation to audit a change of the affected
-   * accounts' derived responsible holder(s) (Kontoverantwortliche/r, REQ-BANK-034/ADR-0069). All
+   * accounts' derived responsible holder(s) (Kontoverantwortliche/r, REQ-BANK-034/ADR-0070). All
    * bank access stays inside the seam — this service only brackets its mutation with a before/after
    * snapshot.
    */
@@ -475,7 +475,7 @@ public class OrgUnitMembershipService {
     }
     // Removing an SK member who is the SK-Lead drops the SK account's derived responsible holder,
     // so
-    // snapshot before the delete and re-diff after it (REQ-BANK-034, ADR-0069).
+    // snapshot before the delete and re-diff after it (REQ-BANK-034, ADR-0070).
     final Map<UUID, Set<UUID>> responsibleBefore =
         orgUnitBankAccessServiceProvider.getObject().snapshotResponsibleHolders(sc.getId());
     membershipRepository.deleteById(id);
@@ -546,7 +546,7 @@ public class OrgUnitMembershipService {
     }
     // Snapshot the Bereich account's (and, for a Profit Bereich, the CARTEL/CARTEL_BANK accounts')
     // derived responsible holder(s) before the role changes, to audit the change (REQ-BANK-034,
-    // ADR-0069). Bank access is confined to the seam; the ObjectProvider breaks the DI cycle.
+    // ADR-0070). Bank access is confined to the seam; the ObjectProvider breaks the DI cycle.
     final Map<UUID, Set<UUID>> responsibleBefore =
         orgUnitBankAccessServiceProvider.getObject().snapshotResponsibleHolders(bereichId);
     // The unified rank is the sole source of truth (epic #800, REQ-ROLE-001); the legacy boolean
@@ -644,7 +644,7 @@ public class OrgUnitMembershipService {
     m.setKind(OrgUnitKind.ORGANISATIONSLEITUNG);
     m.setJoinedAt(Instant.now());
     // Snapshot the CARTEL account's collegial responsible holders (all OL members) before the add,
-    // to audit the change (REQ-BANK-034, ADR-0069).
+    // to audit the change (REQ-BANK-034, ADR-0070).
     final Map<UUID, Set<UUID>> responsibleBefore =
         orgUnitBankAccessServiceProvider
             .getObject()
@@ -864,7 +864,7 @@ public class OrgUnitMembershipService {
       // A removed Staffel membership that carried the Staffelleiter rank drops that Staffel
       // account's
       // derived responsible holder — snapshot the affected accounts before the delete and re-diff
-      // after it (REQ-BANK-034, ADR-0069). A Staffel is never a Profit Bereich, so there is no
+      // after it (REQ-BANK-034, ADR-0070). A Staffel is never a Profit Bereich, so there is no
       // ripple.
       final Map<UUID, Set<UUID>> responsibleBefore = new LinkedHashMap<>();
       for (OrgUnitMembership removed : toRemove) {
@@ -967,7 +967,7 @@ public class OrgUnitMembershipService {
     }
     // Snapshot the SK account's derived responsible holder (its SK-Lead) before the toggle, to
     // audit
-    // the change (REQ-BANK-034, ADR-0069).
+    // the change (REQ-BANK-034, ADR-0070).
     final Map<UUID, Set<UUID>> responsibleBefore =
         orgUnitBankAccessServiceProvider.getObject().snapshotResponsibleHolders(specialCommandId);
     // The unified rank is the sole source of truth (epic #800, REQ-ROLE-001); is_lead was dropped
@@ -1034,7 +1034,7 @@ public class OrgUnitMembershipService {
 
     final MembershipRole previousRole = m.getRole();
     // Snapshot the Staffel account's derived responsible holder (its Staffelleiter) before the rank
-    // change, to audit a change of the account holder (REQ-BANK-034, ADR-0069). Only a
+    // change, to audit a change of the account holder (REQ-BANK-034, ADR-0070). Only a
     // Staffelleiter assignment/clearing actually moves the set; the seam no-ops otherwise.
     final Map<UUID, Set<UUID>> responsibleBefore =
         orgUnitBankAccessServiceProvider.getObject().snapshotResponsibleHolders(squadronId);
@@ -1085,7 +1085,7 @@ public class OrgUnitMembershipService {
     }
     // Snapshot the Staffel account's derived responsible holder before clearing the rank, to audit
     // a
-    // Staffelleiter (account holder) change (REQ-BANK-034, ADR-0069).
+    // Staffelleiter (account holder) change (REQ-BANK-034, ADR-0070).
     final Map<UUID, Set<UUID>> responsibleBefore =
         orgUnitBankAccessServiceProvider.getObject().snapshotResponsibleHolders(squadronId);
     m.setRole(MembershipRole.MEMBER);

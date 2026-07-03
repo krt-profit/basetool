@@ -80,7 +80,7 @@ public interface BankAccountRepository extends JpaRepository<BankAccount, UUID> 
    * Loads the singleton account of the given type with its owning org unit pre-fetched — used only
    * for the {@code CARTEL} / {@code CARTEL_BANK} singletons (REQ-BANK-001) when the
    * responsible-holder change audit resolves the Profit-Bereichsleiter ripple onto them
-   * (REQ-BANK-034/-047, ADR-0069).
+   * (REQ-BANK-034/-047, ADR-0070).
    *
    * @param type the singleton account type ({@code CARTEL} or {@code CARTEL_BANK})
    * @return the account, or empty when none of that type exists yet

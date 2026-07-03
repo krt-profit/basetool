@@ -1,4 +1,4 @@
-# ADR-0069 — Bank: audit a change of an account's derived responsible holder (Kontoverantwortliche/r)
+# ADR-0070 — Bank: audit a change of an account's derived responsible holder (Kontoverantwortliche/r)
 
 - **Status:** Accepted
 - **Date:** 2026-07-03

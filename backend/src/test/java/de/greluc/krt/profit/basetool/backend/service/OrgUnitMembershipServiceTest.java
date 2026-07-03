@@ -100,7 +100,7 @@ class OrgUnitMembershipServiceTest {
   @Mock private OrgChartService orgChartService;
   @Mock private StaffelMembershipResolver staffelMembershipResolver;
 
-  // The bank seam is injected as an ObjectProvider to break the DI cycle (ADR-0069); the leadership
+  // The bank seam is injected as an ObjectProvider to break the DI cycle (ADR-0070); the leadership
   // mutations resolve it to snapshot/record a responsible-holder change. Stubbed lenient below so
   // the
   // non-leadership tests do not trip strict-stubs; the seam mock's default (null snapshot, no-op
@@ -148,7 +148,7 @@ class OrgUnitMembershipServiceTest {
         .when(staffelMembershipResolver.resolveNameSortedStaffelIds(any()))
         .thenAnswer(
             invocation -> realResolver.resolveNameSortedStaffelIds(invocation.getArgument(0)));
-    // The leadership mutations resolve the bank seam through the provider (ADR-0069). Lenient so
+    // The leadership mutations resolve the bank seam through the provider (ADR-0070). Lenient so
     // the
     // many non-leadership tests do not trip strict-stubs; the seam mock no-ops the snapshot/record.
     lenient()

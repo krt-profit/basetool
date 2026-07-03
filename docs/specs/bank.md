@@ -391,7 +391,7 @@ changes (`BALANCE_TARGET_SET` / `BALANCE_TARGET_CLEARED`) and **balance-visibili
 the details payload and the target user id for individual-user grants — no free text, no PII), and —
 since REQ-BANK-047 — the **KRT-account approval-threshold** changes (`CARTEL_APPROVAL_TIERS_SET` /
 `CARTEL_APPROVAL_TIERS_CLEARED`, the two amounts in the details payload — no PII), and — since
-REQ-BANK-034 (ADR-0069) — a change of an account's **derived responsible holder**
+REQ-BANK-034 (ADR-0070) — a change of an account's **derived responsible holder**
 (`ACCOUNT_RESPONSIBLE_CHANGED`, with the old and new responsible-holder user-id sets in the details
 payload — ids are system identifiers, not free text or PII).
 Each event stores: timestamp, actor user id (FK
@@ -1171,7 +1171,7 @@ the bank surface stays org-unit-blind (REQ-BANK-008, ADR-0011). Naming note: the
 > the Profit-Bereichsleiter**, so both band approvers are notified about a KRT request (each still sees
 > only its own band in „Fremde Anträge").
 >
-> **Amended by ADR-0069 (responsible-holder change audit):** a **change** of an account's derived
+> **Amended by ADR-0070 (responsible-holder change audit):** a **change** of an account's derived
 > responsible holder is now recorded in the admin bank audit log (REQ-BANK-012) as
 > **`ACCOUNT_RESPONSIBLE_CHANGED`**. Because the holder is derived, the change is detected by
 > **bracketing** each of the seven `OrgUnitMembershipService` leadership mutations (assign/remove
@@ -1194,7 +1194,7 @@ the bank surface stays org-unit-blind (REQ-BANK-008, ADR-0011). Naming note: the
 > inside the seam (both ArchUnit pins hold), reached from the membership/user services via an
 > `ObjectProvider` to break the constructor cycle.
 
-**Enforced by:** `OrgUnitBankAccessServiceTest` (holder resolution per type incl. CARTEL_BANK→PROFIT-Bereichsleiter, OL collegial; `snapshotResponsibleHolders` / `…ForUser` / `recordResponsibleHolderChanges` diff + audit), `OrgUnitMembershipServiceTest` (leadership + removal brackets), `UserServiceDeleteTest` / `UserServiceAttributesTest` / `UserDeletionForeignKeyIntegrityTest` (deletion bracket + flush) · **Code:** `service/OrgUnitBankAccessService` (`snapshotResponsibleHolders(ForUser)` / `recordResponsibleHolderChanges`), `service/OrgUnitMembershipService` (leadership + `removeMember` + `reconcileStaffelMemberships` brackets), `service/UserService#deleteUser`, `repository/BereichRepository#findByDepartment`, `repository/BankAccountRepository#findFirstByType` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md), [ADR-0069](../adr/0069-bank-responsible-holder-change-audit.md) · **Issues:** #556
+**Enforced by:** `OrgUnitBankAccessServiceTest` (holder resolution per type incl. CARTEL_BANK→PROFIT-Bereichsleiter, OL collegial; `snapshotResponsibleHolders` / `…ForUser` / `recordResponsibleHolderChanges` diff + audit), `OrgUnitMembershipServiceTest` (leadership + removal brackets), `UserServiceDeleteTest` / `UserServiceAttributesTest` / `UserDeletionForeignKeyIntegrityTest` (deletion bracket + flush) · **Code:** `service/OrgUnitBankAccessService` (`snapshotResponsibleHolders(ForUser)` / `recordResponsibleHolderChanges`), `service/OrgUnitMembershipService` (leadership + `removeMember` + `reconcileStaffelMemberships` brackets), `service/UserService#deleteUser`, `repository/BereichRepository#findByDepartment`, `repository/BankAccountRepository#findFirstByType` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md), [ADR-0070](../adr/0070-bank-responsible-holder-change-audit.md) · **Issues:** #556
 
 ### REQ-BANK-035 — Configurable balance visibility
 

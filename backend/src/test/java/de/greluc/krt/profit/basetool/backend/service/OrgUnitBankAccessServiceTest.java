@@ -1350,7 +1350,7 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void snapshotResponsibleHolders_capturesOwnedAccountsCurrentHolders() {
-    // ADR-0069: before a leadership change the seam snapshots the current responsible holder(s) of
+    // ADR-0070: before a leadership change the seam snapshots the current responsible holder(s) of
     // the account the org unit owns; a non-Profit org unit does not pull in CARTEL/CARTEL_BANK.
     UUID orgUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
@@ -1371,7 +1371,7 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void snapshotResponsibleHoldersForUser_coversEveryMembershipOrgUnitsAccount() {
-    // ADR-0069: deleting a user snapshots the responsible holders of every account tied to any org
+    // ADR-0070: deleting a user snapshots the responsible holders of every account tied to any org
     // unit the user belongs to, so a leader-drop by the cascade is audited regardless of org unit.
     UUID userId = UUID.randomUUID();
     UUID staffelId = UUID.randomUUID();
@@ -1396,7 +1396,7 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void recordResponsibleHolderChanges_recordsEventWhenHolderSetChanged() {
-    // REQ-BANK-034/ADR-0069: a leadership change that moves the derived responsible-holder set
+    // REQ-BANK-034/ADR-0070: a leadership change that moves the derived responsible-holder set
     // records one ACCOUNT_RESPONSIBLE_CHANGED event; the sole new holder is the target user.
     UUID orgUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
@@ -1422,7 +1422,7 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void recordResponsibleHolderChanges_noEventWhenHolderSetUnchanged() {
-    // ADR-0069: a leadership change that leaves the derived responsible-holder set unchanged (a
+    // ADR-0070: a leadership change that leaves the derived responsible-holder set unchanged (a
     // non-leader rank shuffle) records nothing.
     UUID orgUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();

@@ -111,7 +111,7 @@ public class UserService {
    * The org-unit-aware bank seam, injected as an {@link ObjectProvider} to avoid a constructor
    * cycle. Used only by {@link #deleteUser(UUID)} to audit a change of a bank account's derived
    * responsible holder when the deleted user was a leader whose membership the DB cascade removes
-   * (REQ-BANK-034, ADR-0069). All bank access stays inside the seam.
+   * (REQ-BANK-034, ADR-0070). All bank access stays inside the seam.
    */
   private final ObjectProvider<OrgUnitBankAccessService> orgUnitBankAccessServiceProvider;
 
@@ -1052,7 +1052,7 @@ public class UserService {
 
     // Snapshot the responsible holders of every account tied to the user's org units BEFORE the
     // delete: a leader (Staffelleiter / SK-Lead / Bereichsleiter / OL member) being deleted changes
-    // the derived Kontoverantwortliche/r of the affected account(s) (REQ-BANK-034, ADR-0069). The
+    // the derived Kontoverantwortliche/r of the affected account(s) (REQ-BANK-034, ADR-0070). The
     // org-unit membership rows go via the DB ON DELETE CASCADE, so the delete is flushed before the
     // re-diff so the recompute observes the post-cascade state.
     final Map<UUID, Set<UUID>> responsibleBefore =

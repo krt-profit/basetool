@@ -1303,14 +1303,14 @@ public class OrgUnitBankAccessService {
   }
 
   // ---------------------------------------------------------------------------------------------
-  // Derived responsible-holder change audit (REQ-BANK-034, ADR-0069)
+  // Derived responsible-holder change audit (REQ-BANK-034, ADR-0070)
   // ---------------------------------------------------------------------------------------------
 
   /**
    * Snapshots, per bank account whose derived responsible holder(s) depend on the given org unit's
    * leadership, the CURRENT responsible-holder user-id set — the "before" side of a leadership
    * change, to be diffed by {@link #recordResponsibleHolderChanges(Map)} right after the mutation
-   * (REQ-BANK-034 change audit, ADR-0069). Affected accounts: the account the org unit owns
+   * (REQ-BANK-034 change audit, ADR-0070). Affected accounts: the account the org unit owns
    * (Staffel/SK &rarr; {@code ORG_UNIT}, Bereich &rarr; {@code AREA}, OL &rarr; {@code CARTEL})
    * and, when the org unit is a {@code Department.PROFIT} Bereich, the collegial {@code CARTEL} and
    * the {@code CARTEL_BANK} accounts too, whose responsible sets include the Profit-Bereichsleiter
@@ -1335,7 +1335,7 @@ public class OrgUnitBankAccessService {
   /**
    * Snapshots the responsible holders of every bank account tied to any org unit the given user is
    * a member of — the "before" side for a mutation that removes the user from several org units at
-   * once (a full user deletion, REQ-BANK-034/ADR-0069). Reuses {@link
+   * once (a full user deletion, REQ-BANK-034/ADR-0070). Reuses {@link
    * #snapshotResponsibleHolders(UUID)} per membership org unit (so the Profit ripple onto {@code
    * CARTEL}/{@code CARTEL_BANK} is covered) and merges by account id. Over-covering a plain
    * (non-leadership) membership is harmless — {@link #recordResponsibleHolderChanges(Map)} records
@@ -1359,7 +1359,7 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Records one {@code ACCOUNT_RESPONSIBLE_CHANGED} bank audit event (REQ-BANK-034, ADR-0069) for
+   * Records one {@code ACCOUNT_RESPONSIBLE_CHANGED} bank audit event (REQ-BANK-034, ADR-0070) for
    * every account whose derived responsible-holder set differs from the {@code before} snapshot —
    * called right after a leadership mutation, on the same transaction, so the recompute sees the
    * new state and {@link BankAuditService} captures the acting user automatically. The old/new
