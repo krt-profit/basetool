@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-02.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-03.
 > **Owner area:** OBS · **Related:** [`security-and-access.md`](security-and-access.md), [`org-unit-tenancy.md`](org-unit-tenancy.md), [ADR-0072](../adr/0072-monitoring-stack-prometheus-grafana.md), monitoring epic [#936](https://github.com/krt-profit/basetool/issues/936)
 
 # Observability & logging
@@ -171,4 +171,80 @@ Tracing on the OTel SDK) behind a hard master gate:
   hold one span open for its whole lifetime).
 - Trace retention is short (14 days, Tempo, Phase 2) and access is admin-only via Grafana
   (REQ-OBS-008).
+
+### REQ-OBS-010 — NPM access-log IP retention (reserved, Phase 2/3)
+
+Reserved for the deliberate, owner-approved decision to ingest the NPM edge access logs
+(client IPs, 31-day retention) as a documented data-protection trade-off (epic
+[#936](https://github.com/krt-profit/basetool/issues/936), ADR-0072). Not implemented in the
+Phase-1 app instrumentation; the requirement is recorded here so the REQ-OBS numbering stays
+continuous and the decision has a home before the Phase-2 stack rollout.
+
+### REQ-OBS-011 — Business metrics (`basetool_*`)
+
+The three modules expose custom `basetool_*` business metrics on existing choke points so
+operations can alarm on regressions, security signals and work-queue backlog without scraping
+logs. All of them obey REQ-OBS-006: **only bounded, enumerable labels** (application enums, a
+fixed local literal set) — never a username, `sub`, IP, id, path, URI or amount — and bank
+figures are exposed as **counts only**, never balances or transaction amounts.
+
+**Mechanics.** Meter names live in a per-module `metrics.MetricNames` constants holder (the
+single source of truth for names, tag keys and the non-enum label values). The backend
+`metrics` package is a dependency leaf (Micrometer only) so `service` / `task` / `filter` /
+`exception` reuse it without a package cycle (ADR-0047). Scheduled-job health flows through the
+shared `metrics.TaskMetrics` wrapper; queue depth is sampled by the `task.BusinessMetricsCollector`
+on a fixed timer (`app.monitoring.business-metrics.interval-ms`, default 60 s, one read-only
+transaction per pass) rather than per-scrape.
+
+**Backend.**
+
+- `basetool_scheduled_job_executions_total{job,outcome}` counter,
+  `basetool_scheduled_job_duration_seconds{job}` timer and
+  `basetool_scheduled_job_last_success_timestamp_seconds{job}` gauge for the six batch jobs
+  (`user_sync`, `notification_retention`, `default_blueprint_provisioning`,
+  `bank_ledger_integrity`, `uex_sync`, `scwiki_sync`) via `TaskMetrics`. The last-success gauge
+  is the source of the "user sync stale > 15 min" alert (`job="user_sync"`); it is registered
+  lazily so a config-gated-off job never reports a falsely-stale `0`.
+- `basetool_http_error_total{code}` counter at the `GlobalExceptionHandler` 409/401/403 methods
+  (`OPTIMISTIC_LOCK` = optimistic-locking regression indicator, `PESSIMISTIC_LOCK`,
+  `UNAUTHENTICATED`, `ACCESS_DENIED`). Filter-level 401/403 re-dispatch through the same advice,
+  so there is exactly one non-double-counted increment site per status.
+- `basetool_audit_events_total{domain}` counter at the single `AuditService.record` choke point
+  (`domain` = the 8 `AuditDomain` values; the physically separate Bank audit trail is out of
+  scope here).
+- `basetool_ratelimit_rejections_total{bucket}` counter at the `RateLimitingFilter` reject branch
+  (`bucket` = the rule name, or `global` for the umbrella `/api/**` budget).
+- `basetool_bank_ledger_integrity_violations{category}` gauge fed by the hourly integrity sweep
+  (six `category` values; **any value > 0 is CRITICAL** — the ledger broke an invariant).
+- Queue-depth gauges (`BusinessMetricsCollector`): `basetool_registration_pending_count` +
+  `_oldest_age_seconds`, `basetool_bank_booking_request_pending_count` + `_oldest_age_seconds`,
+  and `{status}`-labelled `basetool_job_order_open_count` / `basetool_operation_open_count` /
+  `basetool_refinery_order_open_count` / `basetool_p4k_import_job_pending_count` each with an
+  `_oldest_age_seconds` companion. The oldest-age gauges drive the "oldest pending > 48 h" style
+  alerts; an empty queue reports `0`.
+
+**Frontend.** `basetool_mission_presence_missions` gauge (missions with a live editor; single-JVM
+edit-awareness, unlabelled), `basetool_active_sessions` gauge (active Spring Session sessions;
+`@Profile("!test")`), and `basetool_backend_client_errors_total{reason,method}` counter at the
+`BackendApiClient` failure funnels. `reason` is a fixed **local** enumeration
+(`backend_4xx`/`backend_5xx`/`circuit_open`/`bulkhead_full`/`timeout`/`unknown`) derived from the
+failure branch — never the backend's response-body code, which could be arbitrary — and `method`
+is the HTTP verb.
+
+**Ingest.** `basetool_ingest_handoff_total{kind}` (accepted+staged handoffs per `HandoffKind`),
+`basetool_ingest_handoff_errors_total{reason}` (relay failures: `backend_reject` /
+`backend_unavailable` / `internal`; pre-relay rejections are not counted here), and
+`basetool_ratelimit_rejections_total{bucket}` (`bucket` = `ip` / `subject`; shares the metric name
+with the backend counter, the `application` common tag separating the modules).
+
+**Deliberately excluded** (documented so the gap is intentional, not an oversight): notifications
+(no org-wide queue — only per-recipient unread, which is PII-adjacent), org units (no lifecycle
+status) and missions (a free-text `status` column, not a bounded enum, so it cannot back a
+bounded label). Bank amounts and per-user breakdowns are out of scope by rule.
+
+**Metrics move with the code.** Every change that adds, renames or removes one of these surfaces
+updates its metric in the same change — a new scheduled job without `TaskMetrics`, a new bounded
+status queue without a gauge, or a renamed metric that silently breaks a dashboard/alert is
+incomplete (epic [#936](https://github.com/krt-profit/basetool/issues/936); the binding
+"monitoring moves with every feature" rule ships with the Phase-2 stack).
 
