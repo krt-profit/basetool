@@ -47,7 +47,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 /**
  * MVC tests for the AJAX {@code DELETE /orders/{id}/assignees/{userId}} unenroll path in {@link
- * JobOrderPageController#removeAssignee}. Since the Bearbeiter section moved to AJAX, the endpoint
+ * JobOrderWriteController#removeAssignee}. Since the Bearbeiter section moved to AJAX, the endpoint
  * no longer redirects with a flash toast — it re-renders the {@code orders-detail ::
  * assigneesSection} fragment and the page JS swaps it in place. The tests assert:
  *

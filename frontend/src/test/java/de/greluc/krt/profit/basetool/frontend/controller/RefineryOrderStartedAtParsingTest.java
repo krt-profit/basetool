@@ -40,7 +40,7 @@ class RefineryOrderStartedAtParsingTest {
     String input = "2026-04-19T14:30:00Z";
 
     // When
-    Instant parsed = RefineryOrderPageController.parseStartedAt(input);
+    Instant parsed = RefineryOrderWriteController.parseStartedAt(input);
 
     // Then
     assertEquals(Instant.parse("2026-04-19T14:30:00Z"), parsed);
@@ -50,7 +50,7 @@ class RefineryOrderStartedAtParsingTest {
   void shouldParseIsoInstantWithMillis() {
     String input = "2026-04-19T14:30:00.000Z";
 
-    Instant parsed = RefineryOrderPageController.parseStartedAt(input);
+    Instant parsed = RefineryOrderWriteController.parseStartedAt(input);
 
     assertEquals(Instant.parse("2026-04-19T14:30:00Z"), parsed);
   }
@@ -60,7 +60,7 @@ class RefineryOrderStartedAtParsingTest {
     // Given: Sommerzeit Europe/Berlin (+02:00), User-Eingabe 16:30 lokal
     String input = "2026-04-19T16:30:00+02:00";
 
-    Instant parsed = RefineryOrderPageController.parseStartedAt(input);
+    Instant parsed = RefineryOrderWriteController.parseStartedAt(input);
 
     assertEquals(Instant.parse("2026-04-19T14:30:00Z"), parsed);
     assertEquals(OffsetDateTime.parse(input).toInstant(), parsed);
@@ -71,7 +71,7 @@ class RefineryOrderStartedAtParsingTest {
     // Given: Winterzeit Europe/Berlin (+01:00), User-Eingabe 16:30 lokal
     String input = "2026-11-15T16:30:00+01:00";
 
-    Instant parsed = RefineryOrderPageController.parseStartedAt(input);
+    Instant parsed = RefineryOrderWriteController.parseStartedAt(input);
 
     assertEquals(Instant.parse("2026-11-15T15:30:00Z"), parsed);
   }
@@ -80,7 +80,7 @@ class RefineryOrderStartedAtParsingTest {
   void shouldParseDateOnlyAsUtcStartOfDay() {
     String input = "2026-04-19";
 
-    Instant parsed = RefineryOrderPageController.parseStartedAt(input);
+    Instant parsed = RefineryOrderWriteController.parseStartedAt(input);
 
     assertEquals(Instant.parse("2026-04-19T00:00:00Z"), parsed);
   }
@@ -92,15 +92,15 @@ class RefineryOrderStartedAtParsingTest {
     // da dies zu doppelter DST-Umrechnung fuehrt.
     String input = "2026-04-19T14:30";
 
-    Instant parsed = RefineryOrderPageController.parseStartedAt(input);
+    Instant parsed = RefineryOrderWriteController.parseStartedAt(input);
 
     assertEquals(Instant.parse("2026-04-19T14:30:00Z"), parsed);
   }
 
   @Test
   void shouldReturnNowForNullOrBlank() {
-    Instant parsedNull = RefineryOrderPageController.parseStartedAt(null);
-    Instant parsedBlank = RefineryOrderPageController.parseStartedAt("   ");
+    Instant parsedNull = RefineryOrderWriteController.parseStartedAt(null);
+    Instant parsedBlank = RefineryOrderWriteController.parseStartedAt("   ");
 
     assertNotNull(parsedNull);
     assertNotNull(parsedBlank);
@@ -113,7 +113,7 @@ class RefineryOrderStartedAtParsingTest {
         OffsetDateTime.of(2026, 4, 19, 16, 30, 0, 0, ZoneOffset.ofHours(2)).toInstant();
 
     // When: durch den Parser geschickt
-    Instant roundTripped = RefineryOrderPageController.parseStartedAt(original.toString());
+    Instant roundTripped = RefineryOrderWriteController.parseStartedAt(original.toString());
 
     // Then: exakt derselbe Instant
     assertEquals(original, roundTripped);

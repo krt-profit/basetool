@@ -67,11 +67,13 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC tests for the #575 no-reload additions to {@link JobOrderPageController}: the AJAX priority
- * reorder endpoint ({@code PUT /orders/{id}/priority/ajax}) and the {@code ?fragment=} section-swap
- * support on the order-detail GET. Verifies the LOGISTICIAN gate, the {@code propagateBackendError}
- * RFC 7807 passthrough that {@code krt-fetch.js} needs for its conflict UX, and that the fragment
- * error path answers with a section-sized fragment instead of a redirect a swap would follow.
+ * MVC tests for the #575 no-reload additions to the job-order controllers: the AJAX priority
+ * reorder endpoint ({@code PUT /orders/{id}/priority/ajax}, since the #924 split in {@link
+ * JobOrderWriteController}) and the {@code ?fragment=} section-swap support on {@link
+ * JobOrderPageController}'s order-detail GET. Verifies the LOGISTICIAN gate, the {@code
+ * propagateBackendError} RFC 7807 passthrough that {@code krt-fetch.js} needs for its conflict UX,
+ * and that the fragment error path answers with a section-sized fragment instead of a redirect a
+ * swap would follow.
  */
 @SpringBootTest
 @ActiveProfiles("test")

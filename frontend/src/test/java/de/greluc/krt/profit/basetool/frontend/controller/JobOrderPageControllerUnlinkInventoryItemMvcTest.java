@@ -45,7 +45,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 /**
  * MVC-Tests fuer den unlinkInventoryItem-POST-Pfad in {@link
- * JobOrderPageController#unlinkInventoryItem}.
+ * JobOrderWriteController#unlinkInventoryItem}.
  *
  * <p>Testet, dass Logistiker/Officer/Admin einen einzelnen Lagereintrag aus einem Auftrag entlinken
  * koennen:

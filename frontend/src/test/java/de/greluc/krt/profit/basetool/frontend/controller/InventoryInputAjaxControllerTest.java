@@ -49,7 +49,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 /**
  * MVC tests for the #577 in-place book-in twin {@link
- * InventoryPageController#addInventoryItemAjax}: a valid {@code X-Requested-With} create returns
+ * InventoryWriteController#addInventoryItemAjax}: a valid {@code X-Requested-With} create returns
  * the source listing URL for the client to navigate to, the server-side cross-field rule (a
  * personal entry cannot carry an order/mission) returns {@code 422} {@code problem+json} with a
  * stable code and no backend call, a backend failure is propagated as {@code problem+json}, and a
