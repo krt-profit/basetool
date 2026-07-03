@@ -483,6 +483,15 @@
         confirmTitle: /*[[#{inventory.note.confirmRemove.title}]]*/ 'Notiz entfernen',
         confirmMessage: /*[[#{inventory.note.confirmRemove.message}]]*/ 'Notiz wirklich entfernen?'
     };
+
+    // Association-update toast strings. The pre-#924 inline block declared these inside a
+    // script without th:inline, so users saw the raw [[#{...}]] markers; hoisting them into
+    // this bootstrap dict (mirroring inventory-my.html) is what makes them localizable.
+    var assocI18n = {
+        success: /*[[#{success.inventory.update}]]*/ 'Lagerbestand erfolgreich aktualisiert.',
+        conflict: /*[[#{error.inventory.update.conflict}]]*/ 'Der Eintrag wurde in der Zwischenzeit von einem anderen Nutzer ge\u00e4ndert. Bitte lade die Seite neu.',
+        failed: /*[[#{error.inventory.update.failed}]]*/ 'Fehler beim Aktualisieren des Lagers.'
+    };
 </script>
 <script th:src="@{/js/inventory-admin.js}" th:attr="nonce=${cspNonce}"></script>
 </body>
