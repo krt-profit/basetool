@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
@@ -41,7 +42,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -76,8 +76,7 @@ class AdminOrgStructurePageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void page_admin_emptyHierarchy_returns200() throws Exception {
-    when(backendApiClient.get(
-            eq("/api/v1/org-hierarchy/org-units"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/org-hierarchy/org-units"), anyTypeRef()))
         .thenReturn(List.of());
 
     mockMvc.perform(get("/admin/org-structure")).andExpect(status().isOk());
@@ -98,8 +97,7 @@ class AdminOrgStructurePageControllerMvcTest {
                 olId, "Organisationsleitung KRT", "OL", "ORGANISATIONSLEITUNG", null, null, 0L),
             new OrgUnitNodeDto(bereichId, "Bereich Profit", "PRF", "BEREICH", olId, "PROFIT", 0L),
             new OrgUnitNodeDto(staffelId, "Iridium", "IRI", "SQUADRON", bereichId, null, 0L));
-    when(backendApiClient.get(
-            eq("/api/v1/org-hierarchy/org-units"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/org-hierarchy/org-units"), anyTypeRef()))
         .thenReturn(nodes);
 
     mockMvc

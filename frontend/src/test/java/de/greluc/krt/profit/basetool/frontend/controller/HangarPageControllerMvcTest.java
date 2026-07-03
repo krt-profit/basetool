@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -42,7 +42,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -82,14 +81,11 @@ class HangarPageControllerMvcTest {
     PageResponse<LocationDto> locations =
         new PageResponse<>(List.of(location), 0, 10, 1, 1, List.of());
 
-    when(backendApiClient.get(
-            eq("/api/v1/hangar/my-ships?page=0&size=50"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/hangar/my-ships?page=0&size=50"), anyTypeRef()))
         .thenReturn(ships);
-    when(backendApiClient.getCached(
-            eq("/api/v1/ship-types?size=1000"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.getCached(eq("/api/v1/ship-types?size=1000"), anyTypeRef()))
         .thenReturn(shipTypes);
-    when(backendApiClient.getCached(
-            eq("/api/v1/locations?size=1000"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.getCached(eq("/api/v1/locations?size=1000"), anyTypeRef()))
         .thenReturn(locations);
 
     // When & Then
@@ -109,8 +105,7 @@ class HangarPageControllerMvcTest {
         new ShipDto(UUID.randomUUID(), "My Titan", shipType, "LTI", null, true, null, null, 0L);
     PageResponse<ShipDto> ships = new PageResponse<>(List.of(ship), 0, 50, 1, 1, List.of());
 
-    when(backendApiClient.get(
-            eq("/api/v1/hangar/my-ships?page=0&size=50"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/hangar/my-ships?page=0&size=50"), anyTypeRef()))
         .thenReturn(ships);
 
     // When & Then
@@ -139,11 +134,9 @@ class HangarPageControllerMvcTest {
 
     LocationDto homeLoc = new LocationDto(UUID.randomUUID(), "Orison", null, false, true, 1L);
 
-    when(backendApiClient.get(
-            eq("/api/v1/hangar/my-ships?page=0&size=50"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/hangar/my-ships?page=0&size=50"), anyTypeRef()))
         .thenReturn(ships);
-    when(backendApiClient.getCached(
-            eq("/api/v1/locations/home-locations"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.getCached(eq("/api/v1/locations/home-locations"), anyTypeRef()))
         .thenReturn(List.of(homeLoc));
 
     // When & Then
@@ -171,8 +164,7 @@ class HangarPageControllerMvcTest {
         new ShipDto(UUID.randomUUID(), "My Titan", shipType, "LTI", null, true, null, null, 0L);
     PageResponse<ShipDto> ships = new PageResponse<>(List.of(ship), 0, 50, 1, 1, List.of());
 
-    when(backendApiClient.get(
-            eq("/api/v1/hangar/my-ships?page=0&size=50"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/hangar/my-ships?page=0&size=50"), anyTypeRef()))
         .thenReturn(ships);
 
     mockMvc
@@ -202,9 +194,7 @@ class HangarPageControllerMvcTest {
     PageResponse<SquadronShipOverviewDto> page =
         new PageResponse<>(List.of(overview), 0, 50, 12, 1, List.of());
 
-    when(backendApiClient.get(
-            eq("/api/v1/hangar/squadron-overview?page=0&size=50"),
-            any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/hangar/squadron-overview?page=0&size=50"), anyTypeRef()))
         .thenReturn(page);
 
     // When & Then: the server-side search form and the 10/50/100 page-size picker render;
@@ -228,9 +218,7 @@ class HangarPageControllerMvcTest {
     // it snaps to the default page size (50) instead.
     PageResponse<SquadronShipOverviewDto> page =
         new PageResponse<>(List.of(), 0, 50, 0, 1, List.of());
-    when(backendApiClient.get(
-            eq("/api/v1/hangar/squadron-overview?page=0&size=50"),
-            any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/hangar/squadron-overview?page=0&size=50"), anyTypeRef()))
         .thenReturn(page);
 
     mockMvc
@@ -247,8 +235,7 @@ class HangarPageControllerMvcTest {
     PageResponse<SquadronShipOverviewDto> page =
         new PageResponse<>(List.of(), 0, 50, 12, 1, List.of());
     when(backendApiClient.get(
-            eq("/api/v1/hangar/squadron-overview?page=0&size=50&search=Cutlass"),
-            any(ParameterizedTypeReference.class)))
+            eq("/api/v1/hangar/squadron-overview?page=0&size=50&search=Cutlass"), anyTypeRef()))
         .thenReturn(page);
 
     mockMvc

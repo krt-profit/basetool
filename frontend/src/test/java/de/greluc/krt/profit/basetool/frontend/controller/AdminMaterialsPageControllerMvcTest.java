@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
@@ -43,7 +44,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -112,11 +112,9 @@ class AdminMaterialsPageControllerMvcTest {
         new PageResponse<>(List.of(material), 0, 1000, 1, 1, Collections.emptyList());
 
     when(backendApiClient.get(
-            eq("/api/v1/materials?size=1000&sort=name,asc&includeHidden=true"),
-            any(ParameterizedTypeReference.class)))
+            eq("/api/v1/materials?size=1000&sort=name,asc&includeHidden=true"), anyTypeRef()))
         .thenReturn(materialsPage);
-    when(backendApiClient.get(
-            eq("/api/v1/material-categories"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/material-categories"), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
     mockMvc

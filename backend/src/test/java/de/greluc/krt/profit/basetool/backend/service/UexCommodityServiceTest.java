@@ -581,8 +581,7 @@ class UexCommodityServiceTest {
     // pre-existing (material, terminal) row that UEX dropped from this run gets its prices
     // nulled. This is the Quantanium regression: terminals that stop listing a commodity used to
     // keep stale priceBuy values forever.
-    @SuppressWarnings("unchecked")
-    ArgumentCaptor<Collection<UUID>> idsCap = ArgumentCaptor.forClass(Collection.class);
+    ArgumentCaptor<Collection<UUID>> idsCap = ArgumentCaptor.captor();
     verify(materialPriceRepository).clearStalePrices(idsCap.capture());
     assertEquals(Set.of(assignedPriceId), Set.copyOf(idsCap.getValue()));
   }

@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import static de.greluc.krt.profit.basetool.backend.util.BankAmounts.plain;
-
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
@@ -32,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.model.BankAccountViewGranteeKind;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestType;
+import de.greluc.krt.profit.basetool.backend.model.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.model.Bereich;
 import de.greluc.krt.profit.basetool.backend.model.Department;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
@@ -59,7 +58,6 @@ import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BereichRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.util.BankAmounts;
@@ -97,6 +95,16 @@ import org.springframework.transaction.annotation.Transactional;
  * single, deliberately non-{@code Bank*}-named seam that carries that org-unit logic; it authorizes
  * here and then reuses the bank's own org-unit-blind read/PDF code ({@link BankAccountService},
  * {@link BankStatementReportService}), so the bank stays 100% org-unit-blind.
+ *
+ * <p>The org-unit authorization brain (who may view / configure / is responsible for an account)
+ * stays in this bridge, because it couples {@link OwnerScopeService} to the bank-account repository
+ * and only this class may (ADR-0020, {@code orgUnitAwareBankSeamIsContainedToOneClass}). The L3
+ * split (#922) extracted the two write-mechanics slabs it orchestrates — the view-grant
+ * grant/revoke ({@link OrgUnitBankVisibilityService}, incl. the shared {@code createViewGrant}
+ * factory) and the approval-limit upsert/clear ({@link OrgUnitBankApprovalLimitService}) — into
+ * focused collaborators that hold no org-unit scope: each facade settings method still loads +
+ * authorizes + validates here, then delegates the persistence + audit to the collaborator and
+ * re-reads the settings snapshot.
  *
  * <p>It serves four things on the org-unit bank page:
  *
@@ -177,6 +185,8 @@ public class OrgUnitBankAccessService {
   private final BankStatementReportService bankStatementReportService;
   private final BankBookingRequestService bankBookingRequestService;
   private final BankAuditService bankAuditService;
+  private final OrgUnitBankVisibilityService orgUnitBankVisibilityService;
+  private final OrgUnitBankApprovalLimitService orgUnitBankApprovalLimitService;
 
   // ---------------------------------------------------------------------------------------------
   // F1 — card list
@@ -421,20 +431,7 @@ public class OrgUnitBankAccessService {
     BankAccount account = requireAccount(accountId);
     requireCanConfigureVisibility(account);
     BankAccountViewGranteeKind kind = requireValidRoleBucket(account, roleCode);
-    if (!viewGrantRepository.existsByAccountIdAndGranteeKindAndRoleCode(
-        accountId, kind, roleCode)) {
-      BankAccountViewGrant grant = new BankAccountViewGrant();
-      grant.setAccount(account);
-      grant.setGranteeKind(kind);
-      grant.setRoleCode(roleCode);
-      viewGrantRepository.save(grant);
-      bankAuditService.record(
-          BankAuditEventType.BALANCE_VISIBILITY_GRANTED,
-          accountId,
-          null,
-          null,
-          kind.name() + ":" + roleCode);
-    }
+    orgUnitBankVisibilityService.grantRole(account, kind, roleCode);
     return toSettingsDto(account);
   }
 
@@ -455,16 +452,7 @@ public class OrgUnitBankAccessService {
     BankAccount account = requireAccount(accountId);
     requireCanConfigureVisibility(account);
     BankAccountViewGranteeKind kind = requireValidRoleBucket(account, roleCode);
-    long removed =
-        viewGrantRepository.deleteByAccountIdAndGranteeKindAndRoleCode(accountId, kind, roleCode);
-    if (removed > 0) {
-      bankAuditService.record(
-          BankAuditEventType.BALANCE_VISIBILITY_REVOKED,
-          accountId,
-          null,
-          null,
-          kind.name() + ":" + roleCode);
-    }
+    orgUnitBankVisibilityService.revokeRole(account, kind, roleCode);
     return toSettingsDto(account);
   }
 
@@ -488,22 +476,7 @@ public class OrgUnitBankAccessService {
     if (!allMembersSupported(account.getType())) {
       throw new BadRequestException("This account type has no all-members visibility bucket");
     }
-    boolean exists =
-        viewGrantRepository.existsByAccountIdAndGranteeKind(
-            accountId, BankAccountViewGranteeKind.ALL_MEMBERS);
-    if (enabled && !exists) {
-      BankAccountViewGrant grant = new BankAccountViewGrant();
-      grant.setAccount(account);
-      grant.setGranteeKind(BankAccountViewGranteeKind.ALL_MEMBERS);
-      viewGrantRepository.save(grant);
-      bankAuditService.record(
-          BankAuditEventType.BALANCE_VISIBILITY_GRANTED, accountId, null, null, "ALL_MEMBERS");
-    } else if (!enabled && exists) {
-      viewGrantRepository.deleteByAccountIdAndGranteeKind(
-          accountId, BankAccountViewGranteeKind.ALL_MEMBERS);
-      bankAuditService.record(
-          BankAuditEventType.BALANCE_VISIBILITY_REVOKED, accountId, null, null, "ALL_MEMBERS");
-    }
+    orgUnitBankVisibilityService.setAllMembers(account, enabled);
     return toSettingsDto(account);
   }
 
@@ -522,18 +495,7 @@ public class OrgUnitBankAccessService {
       @NotNull UUID accountId, @NotNull UUID userId) {
     BankAccount account = requireAccount(accountId);
     requireCanConfigureVisibility(account);
-    if (!userRepository.existsById(userId)) {
-      throw new NotFoundException("User not found");
-    }
-    if (!viewGrantRepository.existsByAccountIdAndGranteeUserId(accountId, userId)) {
-      BankAccountViewGrant grant = new BankAccountViewGrant();
-      grant.setAccount(account);
-      grant.setGranteeKind(BankAccountViewGranteeKind.USER);
-      grant.setGranteeUserId(userId);
-      viewGrantRepository.save(grant);
-      bankAuditService.record(
-          BankAuditEventType.BALANCE_VISIBILITY_GRANTED, accountId, null, userId, "USER");
-    }
+    orgUnitBankVisibilityService.grantUser(account, userId);
     return toSettingsDto(account);
   }
 
@@ -552,11 +514,33 @@ public class OrgUnitBankAccessService {
       @NotNull UUID accountId, @NotNull UUID userId) {
     BankAccount account = requireAccount(accountId);
     requireCanConfigureVisibility(account);
-    long removed = viewGrantRepository.deleteByAccountIdAndGranteeUserId(accountId, userId);
-    if (removed > 0) {
-      bankAuditService.record(
-          BankAuditEventType.BALANCE_VISIBILITY_REVOKED, accountId, null, userId, "USER");
+    orgUnitBankVisibilityService.revokeUser(account, userId);
+    return toSettingsDto(account);
+  }
+
+  /**
+   * Enables or disables the "Mitglieder des Bereichs" cascade view grant of a Bereichskonto
+   * (REQ-BANK-048): every member of the whole area cascade — the Bereichsleitung plus every member
+   * of the Bereich's child Staffeln/SKs — may view it. Idempotent; only valid for {@code AREA}
+   * accounts.
+   *
+   * @param accountId the account
+   * @param enabled whether the whole area cascade may view the account
+   * @return the refreshed settings
+   * @throws NotFoundException when the account does not exist
+   * @throws AccessDeniedException when the caller may not configure visibility
+   * @throws BadRequestException when the account type has no area-members bucket
+   */
+  @NotNull
+  @Transactional
+  public OrgUnitBankAccountSettingsDto setAreaMembersVisibility(
+      @NotNull UUID accountId, boolean enabled) {
+    BankAccount account = requireAccount(accountId);
+    requireCanConfigureVisibility(account);
+    if (!areaMembersSupported(account.getType())) {
+      throw new BadRequestException("This account type has no area-members visibility bucket");
     }
+    orgUnitBankVisibilityService.setAreaMembers(account, enabled);
     return toSettingsDto(account);
   }
 
@@ -584,13 +568,7 @@ public class OrgUnitBankAccessService {
     BankAccount account = requireAccount(accountId);
     requireCanConfigureApprovalLimits(account);
     requireValidLimitRoleBucket(account, roleCode);
-    upsertLimit(account, BankAccountViewGranteeKind.MEMBERSHIP_ROLE, roleCode, null, limit);
-    bankAuditService.record(
-        BankAuditEventType.APPROVAL_LIMIT_SET,
-        accountId,
-        null,
-        null,
-        "MEMBERSHIP_ROLE:" + roleCode + "=" + plain(limit));
+    orgUnitBankApprovalLimitService.setRole(account, roleCode, limit);
     return toSettingsDto(account);
   }
 
@@ -611,17 +589,7 @@ public class OrgUnitBankAccessService {
     BankAccount account = requireAccount(accountId);
     requireCanConfigureApprovalLimits(account);
     requireValidLimitRoleBucket(account, roleCode);
-    long removed =
-        approvalLimitRepository.deleteByAccountIdAndGranteeKindAndRoleCode(
-            accountId, BankAccountViewGranteeKind.MEMBERSHIP_ROLE, roleCode);
-    if (removed > 0) {
-      bankAuditService.record(
-          BankAuditEventType.APPROVAL_LIMIT_CLEARED,
-          accountId,
-          null,
-          null,
-          "MEMBERSHIP_ROLE:" + roleCode);
-    }
+    orgUnitBankApprovalLimitService.clearRole(account, roleCode);
     return toSettingsDto(account);
   }
 
@@ -645,13 +613,7 @@ public class OrgUnitBankAccessService {
     if (!BankApprovalLimitService.allMembersSupported(account.getType())) {
       throw new BadRequestException("This account type has no all-members approval-limit tier");
     }
-    upsertLimit(account, BankAccountViewGranteeKind.ALL_MEMBERS, null, null, limit);
-    bankAuditService.record(
-        BankAuditEventType.APPROVAL_LIMIT_SET,
-        accountId,
-        null,
-        null,
-        AuditDetails.of("ALL_MEMBERS", plain(limit)));
+    orgUnitBankApprovalLimitService.setAllMembers(account, limit);
     return toSettingsDto(account);
   }
 
@@ -668,13 +630,50 @@ public class OrgUnitBankAccessService {
   public OrgUnitBankAccountSettingsDto clearAllMembersApprovalLimit(@NotNull UUID accountId) {
     BankAccount account = requireAccount(accountId);
     requireCanConfigureApprovalLimits(account);
-    long removed =
-        approvalLimitRepository.deleteByAccountIdAndGranteeKind(
-            accountId, BankAccountViewGranteeKind.ALL_MEMBERS);
-    if (removed > 0) {
-      bankAuditService.record(
-          BankAuditEventType.APPROVAL_LIMIT_CLEARED, accountId, null, null, "ALL_MEMBERS");
+    orgUnitBankApprovalLimitService.clearAllMembers(account);
+    return toSettingsDto(account);
+  }
+
+  /**
+   * Sets or changes the "Mitglieder des Bereichs" cascade approval limit on a Bereichskonto
+   * (REQ-BANK-048): the ceiling for any member of the whole area cascade (Bereichsleitung + child
+   * Staffel/SK members) who matches no more specific tier.
+   *
+   * @param accountId the account
+   * @param limit the whole-aUEC ceiling (>= 0)
+   * @return the refreshed settings
+   * @throws NotFoundException when the account does not exist
+   * @throws AccessDeniedException when the caller may not configure approval limits
+   * @throws BadRequestException when the account type has no area-members tier
+   */
+  @NotNull
+  @Transactional
+  public OrgUnitBankAccountSettingsDto setAreaMembersApprovalLimit(
+      @NotNull UUID accountId, @NotNull BigDecimal limit) {
+    BankAccount account = requireAccount(accountId);
+    requireCanConfigureApprovalLimits(account);
+    if (!BankApprovalLimitService.areaMembersSupported(account.getType())) {
+      throw new BadRequestException("This account type has no area-members approval-limit tier");
     }
+    orgUnitBankApprovalLimitService.setAreaMembers(account, limit);
+    return toSettingsDto(account);
+  }
+
+  /**
+   * Removes the "Mitglieder des Bereichs" cascade approval limit from a Bereichskonto
+   * (REQ-BANK-048).
+   *
+   * @param accountId the account
+   * @return the refreshed settings
+   * @throws NotFoundException when the account does not exist
+   * @throws AccessDeniedException when the caller may not configure approval limits
+   */
+  @NotNull
+  @Transactional
+  public OrgUnitBankAccountSettingsDto clearAreaMembersApprovalLimit(@NotNull UUID accountId) {
+    BankAccount account = requireAccount(accountId);
+    requireCanConfigureApprovalLimits(account);
+    orgUnitBankApprovalLimitService.clearAreaMembers(account);
     return toSettingsDto(account);
   }
 
@@ -695,16 +694,7 @@ public class OrgUnitBankAccessService {
       @NotNull UUID accountId, @NotNull UUID userId, @NotNull BigDecimal limit) {
     BankAccount account = requireAccount(accountId);
     requireCanConfigureApprovalLimits(account);
-    if (!userRepository.existsById(userId)) {
-      throw new NotFoundException("User not found");
-    }
-    upsertLimit(account, BankAccountViewGranteeKind.USER, null, userId, limit);
-    bankAuditService.record(
-        BankAuditEventType.APPROVAL_LIMIT_SET,
-        accountId,
-        null,
-        userId,
-        AuditDetails.of("USER", plain(limit)));
+    orgUnitBankApprovalLimitService.setUser(account, userId, limit);
     return toSettingsDto(account);
   }
 
@@ -723,11 +713,7 @@ public class OrgUnitBankAccessService {
       @NotNull UUID accountId, @NotNull UUID userId) {
     BankAccount account = requireAccount(accountId);
     requireCanConfigureApprovalLimits(account);
-    long removed = approvalLimitRepository.deleteByAccountIdAndGranteeUserId(accountId, userId);
-    if (removed > 0) {
-      bankAuditService.record(
-          BankAuditEventType.APPROVAL_LIMIT_CLEARED, accountId, null, userId, "USER");
-    }
+    orgUnitBankApprovalLimitService.clearUser(account, userId);
     return toSettingsDto(account);
   }
 
@@ -789,6 +775,8 @@ public class OrgUnitBankAccessService {
           null,
           false,
           null,
+          // A deposit is never approval-limited, so it needs no approver (REQ-BANK-042).
+          null,
           request.splitEnabled(),
           request.splitPercent());
     }
@@ -811,14 +799,44 @@ public class OrgUnitBankAccessService {
     } else if (request.targetAccountId() != null) {
       throw new BadRequestException("A non-transfer request must not carry a destination account");
     }
-    // REQ-BANK-041: resolve the requester's applicable limit now and snapshot whether the request
-    // needs the responsible holder's approval; the org-unit-blind confirm path only reads the flag.
-    // When NO limit applies to the requester (no per-user, role or all-members limit configured),
-    // the request ALWAYS needs the responsible holder's approval; a configured limit only triggers
-    // approval above its ceiling. All request-capable account types support approval limits.
-    BigDecimal applicableLimit = resolveApplicableLimit(account);
-    boolean requiresOwnerApproval =
-        applicableLimit == null || request.amount().compareTo(applicableLimit) > 0;
+    // REQ-BANK-041/-046: resolve which approver (if any) the request needs and snapshot it. The
+    // org-unit-blind confirm path only reads the boolean; the seam routes the "Fremde Anträge"
+    // approval surface by the recorded approver class.
+    BigDecimal applicableLimit;
+    boolean requiresOwnerApproval;
+    BankRequestApprover requiredApprover;
+    if (account.getType() == BankAccountType.CARTEL) {
+      // The KRT account uses the amount-tiered ladder (REQ-BANK-047): amount <= T1 the bank
+      // employee
+      // self-approves; T1 < amount <= T2 the Bereichsleiter Profit; amount > T2 the
+      // Organisationsleitung. An unset T1 is treated as 0 (no employee self-approval band); an
+      // unset
+      // T2 as +infinity (the Bereichsleiter Profit covers everything above T1, the OL band empty).
+      BigDecimal t1 =
+          account.getEmployeeApprovalCeiling() == null
+              ? BigDecimal.ZERO
+              : account.getEmployeeApprovalCeiling();
+      BigDecimal t2 = account.getAreaLeadApprovalCeiling();
+      applicableLimit = t1;
+      if (request.amount().compareTo(t1) <= 0) {
+        requiresOwnerApproval = false;
+        requiredApprover = null;
+      } else if (t2 == null || request.amount().compareTo(t2) <= 0) {
+        requiresOwnerApproval = true;
+        requiredApprover = BankRequestApprover.AREA_LEAD_PROFIT;
+      } else {
+        requiresOwnerApproval = true;
+        requiredApprover = BankRequestApprover.ORGANISATIONSLEITUNG;
+      }
+    } else {
+      // Every other request-capable account: a configured per-audience limit lets the requester
+      // through up to its ceiling; no matching limit ⇒ the responsible holder's approval is the
+      // safe default (REQ-BANK-041).
+      applicableLimit = resolveApplicableLimit(account);
+      requiresOwnerApproval =
+          applicableLimit == null || request.amount().compareTo(applicableLimit) > 0;
+      requiredApprover = requiresOwnerApproval ? BankRequestApprover.RESPONSIBLE_HOLDER : null;
+    }
     // A withdrawal/transfer never carries a split (REQ-BANK-043, DEPOSIT-only).
     return bankBookingRequestService.create(
         account.getId(),
@@ -829,6 +847,7 @@ public class OrgUnitBankAccessService {
         targetAccountId,
         requiresOwnerApproval,
         applicableLimit,
+        requiredApprover,
         false,
         null);
   }
@@ -875,32 +894,91 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Lists every booking request raised against the accounts the caller is responsible for — the
-   * "Fremde Anträge" tab (REQ-BANK-041). Newest first; an admin sees the requests of every account.
+   * Lists the booking requests the caller may act on in the "Fremde Anträge" tab
+   * (REQ-BANK-041/-046). For every account the caller is the responsible holder of, all its
+   * requests are listed; the KRT account's amount-band-routed requests are additionally surfaced to
+   * their band approver — the {@code AREA_LEAD_PROFIT} band to the Bereichsleiter Profit, the
+   * {@code ORGANISATIONSLEITUNG} band to the OL. An admin sees every account's requests.
    *
-   * @return the requests on the caller's responsible accounts; never {@code null}, empty when the
-   *     caller is responsible for no account
+   * @return the requests the caller may act on; never {@code null}, empty when there are none
    */
   @NotNull
   @Transactional(readOnly = true)
   public List<BankBookingRequestDto> listRequestsForResponsibleAccounts() {
-    Set<UUID> accountIds = responsibleAccountIds();
-    if (accountIds.isEmpty()) {
+    boolean admin = authHelperService.isAdmin();
+    boolean profitBl = isProfitBereichsleiter();
+    // One pass over the accounts (findAllByOrderByAccountNoAsc carries @EntityGraph(orgUnit) so
+    // isResponsibleHolder's org-unit dereference is N+1-free, REQ-DATA-003): the accounts the
+    // caller
+    // is the responsible holder of, plus the KRT account for the Bereichsleiter Profit (who
+    // approves
+    // its middle band without being its responsible holder, REQ-BANK-047).
+    Set<UUID> responsibleIds = new LinkedHashSet<>();
+    Set<UUID> cartelIds = new LinkedHashSet<>();
+    for (BankAccount account : bankAccountRepository.findAllByOrderByAccountNoAsc()) {
+      if (admin || isResponsibleHolder(account)) {
+        responsibleIds.add(account.getId());
+      }
+      if (account.getType() == BankAccountType.CARTEL) {
+        cartelIds.add(account.getId());
+      }
+    }
+    Set<UUID> candidateIds = new LinkedHashSet<>(responsibleIds);
+    if (profitBl) {
+      candidateIds.addAll(cartelIds);
+    }
+    if (candidateIds.isEmpty()) {
       return List.of();
     }
-    return bankBookingRequestService.listForAccounts(accountIds);
+    boolean olMember = ownerScopeService.currentUserIsOlMember();
+    return bankBookingRequestService.listForAccounts(candidateIds).stream()
+        .filter(request -> canSeeForeignRequest(request, admin, profitBl, olMember, responsibleIds))
+        .toList();
   }
 
   /**
-   * Grants the responsible holder's in-app approval for an over-limit booking request
-   * (REQ-BANK-041), which pre-fills the bank employee's confirmation checkbox. Only the account's
-   * responsible holder (or an admin) may do this; the request must currently require approval and
-   * still be pending.
+   * Whether a "Fremde Anträge" row is visible to the caller (REQ-BANK-047 band routing): a
+   * KRT-account band-flagged request is shown only to its band approver (the Bereichsleiter Profit
+   * for {@code AREA_LEAD_PROFIT}, the OL for {@code ORGANISATIONSLEITUNG}); every other request
+   * stays visible to the account's responsible holder. Admins see all.
+   *
+   * @param request the request row
+   * @param admin whether the caller is an admin
+   * @param profitBl whether the caller is a Bereichsleiter Profit
+   * @param olMember whether the caller is an OL member
+   * @param responsibleIds the ids of accounts the caller is the responsible holder of
+   * @return whether the caller may see (and, if flagged and pending, approve) the request
+   */
+  private static boolean canSeeForeignRequest(
+      @NotNull BankBookingRequestDto request,
+      boolean admin,
+      boolean profitBl,
+      boolean olMember,
+      @NotNull Set<UUID> responsibleIds) {
+    if (admin) {
+      return true;
+    }
+    String approver = request.requiredApprover();
+    if (BankRequestApprover.AREA_LEAD_PROFIT.name().equals(approver)) {
+      return profitBl;
+    }
+    if (BankRequestApprover.ORGANISATIONSLEITUNG.name().equals(approver)) {
+      return olMember;
+    }
+    return responsibleIds.contains(request.accountId());
+  }
+
+  /**
+   * Grants the required approver's in-app approval for an over-limit booking request
+   * (REQ-BANK-041/-046), which pre-fills the bank employee's confirmation checkbox. Only the
+   * request's required approver — the account's responsible holder, or for a KRT amount band the
+   * Bereichsleiter Profit / Organisationsleitung — or an admin may do this ({@link #canApprove});
+   * the request must currently require approval and still be pending.
    *
    * @param requestId the request to approve
    * @return the updated request
    * @throws NotFoundException when the request does not exist
-   * @throws AccessDeniedException when the caller is not responsible for the request's account
+   * @throws AccessDeniedException when the caller may not approve the request
    * @throws BadRequestException when the request needs no approval or is no longer pending
    */
   @NotNull
@@ -910,12 +988,12 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Revokes a previously granted in-app approval for a booking request (REQ-BANK-041).
+   * Revokes a previously granted in-app approval for a booking request (REQ-BANK-041/-046).
    *
    * @param requestId the request whose approval to revoke
    * @return the updated request
    * @throws NotFoundException when the request does not exist
-   * @throws AccessDeniedException when the caller is not responsible for the request's account
+   * @throws AccessDeniedException when the caller may not approve the request
    */
   @NotNull
   @Transactional
@@ -924,9 +1002,12 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Loads and locks a request, authorizes the caller as the account's responsible holder (or admin)
-   * — the org-unit-aware half — then delegates the blind mutation + audit to {@link
-   * BankBookingRequestService#applyOwnerApprovalWithinTransaction(BankBookingRequest, boolean)}.
+   * Loads and locks a request, authorizes the caller as the request's required approver — the
+   * account's responsible holder, or for a KRT amount band the Bereichsleiter Profit ({@code
+   * AREA_LEAD_PROFIT}) / Organisationsleitung ({@code ORGANISATIONSLEITUNG}); admins always pass
+   * ({@link #canApprove}) — the org-unit-aware half — then delegates the blind mutation + audit to
+   * {@link BankBookingRequestService#applyOwnerApprovalWithinTransaction(BankBookingRequest,
+   * boolean)}.
    *
    * @param requestId the request
    * @param granted whether to grant ({@code true}) or revoke ({@code false}) the approval
@@ -938,31 +1019,35 @@ public class OrgUnitBankAccessService {
         bankBookingRequestRepository
             .findByIdForUpdate(requestId)
             .orElseThrow(() -> new NotFoundException("Booking request not found"));
-    if (!authHelperService.isAdmin() && !isResponsibleHolder(request.getAccount())) {
-      throw new AccessDeniedException("The caller is not responsible for this request's account");
+    if (!canApprove(request)) {
+      throw new AccessDeniedException("The caller may not approve this request");
     }
     return bankBookingRequestService.applyOwnerApprovalWithinTransaction(request, granted);
   }
 
   /**
-   * The ids of the accounts the caller is responsible for (REQ-BANK-034); an admin gets every
-   * account. Backs the "Fremde Anträge" listing and tab visibility.
+   * {@code true} iff the caller may grant/revoke the in-app approval of a booking request
+   * (REQ-BANK-041/-046): an admin always; for a KRT amount band the band approver (Bereichsleiter
+   * Profit for {@code AREA_LEAD_PROFIT}, OL for {@code ORGANISATIONSLEITUNG}); otherwise the
+   * account's responsible holder. The single-request authorization counterpart of {@link
+   * #canSeeForeignRequest}.
    *
-   * @return the responsible account ids, insertion-ordered; possibly empty
+   * @param request the request entity
+   * @return whether the caller may act on its approval
    */
-  @NotNull
-  private Set<UUID> responsibleAccountIds() {
-    boolean admin = authHelperService.isAdmin();
-    Set<UUID> ids = new LinkedHashSet<>();
-    // findAllByOrderByAccountNoAsc carries @EntityGraph(orgUnit); the bare findAll() does not, so
-    // isResponsibleHolder's account.getOrgUnit() dereference would fire one SELECT org_unit per row
-    // (N+1, REQ-DATA-003). The order is irrelevant here — only ids are collected.
-    for (BankAccount account : bankAccountRepository.findAllByOrderByAccountNoAsc()) {
-      if (admin || isResponsibleHolder(account)) {
-        ids.add(account.getId());
-      }
+  private boolean canApprove(@NotNull BankBookingRequest request) {
+    if (authHelperService.isAdmin()) {
+      return true;
     }
-    return ids;
+    BankRequestApprover approver = request.getRequiredApprover();
+    if (approver == null) {
+      return isResponsibleHolder(request.getAccount());
+    }
+    return switch (approver) {
+      case RESPONSIBLE_HOLDER -> isResponsibleHolder(request.getAccount());
+      case AREA_LEAD_PROFIT -> isProfitBereichsleiter();
+      case ORGANISATIONSLEITUNG -> ownerScopeService.currentUserIsOlMember();
+    };
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -1008,7 +1093,7 @@ public class OrgUnitBankAccessService {
           owner != null && (viewScope.permits(owner) || matchesOrgUnitGrant(owner, grants));
       case CARTEL ->
           (owner != null && viewScope.permits(owner)) || authHelperService.isMemberOrAbove();
-      case CARTEL_BANK -> isCartelBankHolder();
+      case CARTEL_BANK -> isProfitBereichsleiter();
       case SPECIAL -> currentUserCanAutoViewSpecial() || matchesSpecialGrant(grants);
     };
   }
@@ -1034,6 +1119,10 @@ public class OrgUnitBankAccessService {
                   && ownerScopeService.currentUserHoldsRoleOnOrgUnit(owningOrgUnitId, role);
             }
             case ALL_MEMBERS -> ownerScopeService.currentUserIsMemberOfOrgUnit(owningOrgUnitId);
+            // "Mitglieder des Bereichs" (REQ-BANK-048): the whole area cascade of a Bereichskonto.
+            // Only ever granted on AREA accounts, whose owning unit is the Bereich.
+            case AREA_MEMBERS ->
+                ownerScopeService.currentUserIsMemberOfAreaCascade(owningOrgUnitId);
             case USER -> userId.isPresent() && userId.get().equals(grant.getGranteeUserId());
             case GLOBAL_ROLE -> false;
           };
@@ -1061,7 +1150,9 @@ public class OrgUnitBankAccessService {
                 authHelperService.hasReachableRole(Roles.authority(grant.getRoleCode()));
             case ALL_MEMBERS -> authHelperService.isMemberOrAbove();
             case USER -> userId.isPresent() && userId.get().equals(grant.getGranteeUserId());
-            case MEMBERSHIP_ROLE -> false;
+            // SPECIAL accounts have no owning org unit, so neither membership-role nor the
+            // Bereich-cascade audience applies to them.
+            case MEMBERSHIP_ROLE, AREA_MEMBERS -> false;
           };
       if (match) {
         return true;
@@ -1082,12 +1173,13 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * {@code true} iff the caller is the responsible holder of the {@code CARTEL_BANK} account — the
-   * {@code BEREICHSLEITER} of a {@code Department.PROFIT} Bereich (REQ-BANK-037).
+   * {@code true} iff the caller is the {@code BEREICHSLEITER} of a {@code Department.PROFIT}
+   * Bereich. This is both the responsible holder of the {@code CARTEL_BANK} account (REQ-BANK-037)
+   * and the middle-band approver of the KRT amount ladder (REQ-BANK-047, {@code AREA_LEAD_PROFIT}).
    *
    * @return {@code true} iff the caller leads a PROFIT Bereich
    */
-  private boolean isCartelBankHolder() {
+  private boolean isProfitBereichsleiter() {
     Set<UUID> profitBereichIds =
         bereichRepository.findByDepartment(Department.PROFIT).stream()
             .map(Bereich::getId)
@@ -1124,7 +1216,7 @@ public class OrgUnitBankAccessService {
               && ownerScopeService.currentUserHoldsRoleOnOrgUnit(
                   owner, MembershipRole.BEREICHSLEITER);
       case CARTEL -> ownerScopeService.currentUserIsOlMember();
-      case CARTEL_BANK -> isCartelBankHolder();
+      case CARTEL_BANK -> isProfitBereichsleiter();
       case SPECIAL -> false;
     };
   }
@@ -1141,8 +1233,9 @@ public class OrgUnitBankAccessService {
    *
    * <p>Per account type: a Staffelkonto → its {@code STAFFELLEITER}; an SK-Konto → its {@code
    * SK_LEAD}; a Bereichskonto → its {@code BEREICHSLEITER}; the {@code CARTEL}/KRT account → all
-   * {@code OL_MEMBER}s; the {@code CARTEL_BANK} → the {@code BEREICHSLEITER} of every {@code
-   * Department.PROFIT} Bereich; a Sonderkonto → none.
+   * {@code OL_MEMBER}s <em>plus</em> the Bereichsleiter Profit (the middle-band approver of the KRT
+   * amount ladder, REQ-BANK-047, so both approver classes are notified); the {@code CARTEL_BANK} →
+   * the {@code BEREICHSLEITER} of every {@code Department.PROFIT} Bereich; a Sonderkonto → none.
    *
    * @param accountId the account whose responsible holder(s) to resolve
    * @return the responsible holders' user ids; never {@code null}, empty for a Sonderkonto, an
@@ -1172,11 +1265,19 @@ public class OrgUnitBankAccessService {
               ? Set.of()
               : orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
                   owner, MembershipRole.BEREICHSLEITER);
-      case CARTEL ->
-          owner == null
-              ? Set.of()
-              : orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
-                  owner, MembershipRole.OL_MEMBER);
+      case CARTEL -> {
+        Set<UUID> holders = new LinkedHashSet<>();
+        if (owner != null) {
+          holders.addAll(
+              orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
+                  owner, MembershipRole.OL_MEMBER));
+        }
+        // REQ-BANK-047: the KRT account's amount ladder additionally routes approval to the
+        // Bereichsleiter Profit (middle band), so they are notified about its requests too — each
+        // party still sees only its own band in the "Fremde Anträge" tab.
+        holders.addAll(resolveCartelBankResponsibleHolders());
+        yield holders;
+      }
       case CARTEL_BANK -> resolveCartelBankResponsibleHolders();
       case SPECIAL -> Set.of();
     };
@@ -1185,7 +1286,7 @@ public class OrgUnitBankAccessService {
   /**
    * Resolves the responsible holders of the {@code CARTEL_BANK} account (REQ-BANK-034): the {@code
    * BEREICHSLEITER} of every {@code Department.PROFIT} Bereich, unioned. The reverse of {@link
-   * #isCartelBankHolder}.
+   * #isProfitBereichsleiter}.
    *
    * @return the Profit-Bereichsleiter user ids; never {@code null}, possibly empty
    */
@@ -1278,7 +1379,10 @@ public class OrgUnitBankAccessService {
    * @return whether the caller may configure approval limits
    */
   private boolean canConfigureApprovalLimits(@NotNull BankAccount account) {
-    if (!BankApprovalLimitService.configurable(account.getType())) {
+    // Per-audience limits are editable only on ORG_UNIT / AREA accounts (REQ-BANK-041). The KRT
+    // account (CARTEL) is request-capable but uses the Verwaltung-managed amount ladder instead
+    // (REQ-BANK-047), so it is not per-audience-configurable here.
+    if (!BankApprovalLimitService.audienceLimitsSupported(account.getType())) {
       return false;
     }
     return authHelperService.isAdmin()
@@ -1314,52 +1418,6 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Idempotent upsert of one approval-limit row: updates the existing tier row's amount in place
-   * (dirty-checking) or inserts a new one. The partial unique indexes guarantee at most one row per
-   * (account, tier).
-   *
-   * @param account the account
-   * @param kind the tier kind
-   * @param roleCode the role code for a role tier, else {@code null}
-   * @param userId the user for a user tier, else {@code null}
-   * @param amount the new ceiling
-   */
-  private void upsertLimit(
-      @NotNull BankAccount account,
-      @NotNull BankAccountViewGranteeKind kind,
-      @Nullable String roleCode,
-      @Nullable UUID userId,
-      @NotNull BigDecimal amount) {
-    // Serialise concurrent set-limit calls for the same account on its row lock (a plain SELECT FOR
-    // UPDATE that does NOT bump the account @Version) so the find-or-insert below cannot race two
-    // inserts into a V193 partial unique index (uq_bank_appr_limit_*). The lock is released at tx
-    // end.
-    bankAccountRepository.findByIdForUpdate(account.getId());
-    Optional<BankAccountApprovalLimit> existing =
-        switch (kind) {
-          case MEMBERSHIP_ROLE, GLOBAL_ROLE ->
-              approvalLimitRepository.findByAccountIdAndGranteeKindAndRoleCode(
-                  account.getId(), kind, roleCode);
-          case USER ->
-              approvalLimitRepository.findByAccountIdAndGranteeUserId(account.getId(), userId);
-          case ALL_MEMBERS ->
-              approvalLimitRepository.findByAccountIdAndGranteeKind(account.getId(), kind);
-        };
-    BankAccountApprovalLimit limit =
-        existing.orElseGet(
-            () -> {
-              BankAccountApprovalLimit fresh = new BankAccountApprovalLimit();
-              fresh.setAccount(account);
-              fresh.setGranteeKind(kind);
-              fresh.setRoleCode(roleCode);
-              fresh.setGranteeUserId(userId);
-              return fresh;
-            });
-    limit.setLimitAmount(amount);
-    approvalLimitRepository.save(limit);
-  }
-
-  /**
    * Resolves the current caller's applicable approval limit for an account (REQ-BANK-041), loading
    * the account's limit rows on demand. See {@link #resolveApplicableLimit(BankAccount, List)}.
    *
@@ -1373,13 +1431,25 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Resolves the current caller's applicable approval limit from the given limit rows: an
-   * individual-user limit wins; otherwise the most permissive (maximum) of the limits for the role
-   * tiers the caller holds; otherwise the all-members limit (the catch-all ceiling, applied to
-   * every eligible viewer who matches no more specific tier — every caller has already passed the
-   * {@code canView} gate upstream, so org-unit membership is <em>not</em> additionally required);
-   * otherwise {@code null} = unlimited. The {@code null} default preserves the pre-feature
-   * behaviour (REQ-BANK-041).
+   * Resolves the current caller's applicable approval limit from the given limit rows
+   * (REQ-BANK-041, amended by REQ-BANK-047/-047).
+   *
+   * <ul>
+   *   <li>The KRT account ({@code CARTEL}) does not use per-audience limits at all — its ladder
+   *       (REQ-BANK-047) governs approval; the value returned here is only the display/self-approve
+   *       ceiling, the bank-employee band {@code T1} (its {@code employeeApprovalCeiling}).
+   *   <li>Otherwise an individual-user limit wins outright; else the <em>most permissive</em>
+   *       (maximum) of every membership tier the caller actually matches — a role bucket held on
+   *       the owning unit, the whole-area cascade ({@code AREA_MEMBERS}) when the caller is
+   *       anywhere in it, and the all-members ceiling <em>only when the caller is a member of the
+   *       owning org unit</em> ("Alle Mitglieder" = the account's own org unit, REQ-BANK-047); else
+   *       {@code null} = unlimited.
+   * </ul>
+   *
+   * <p>The members-only gating of the {@code ALL_MEMBERS} tier means an outsider holding only an
+   * individual view grant matches no membership tier and falls through to {@code null} (⇒ the
+   * caller needs an explicit USER limit, else the request requires approval) — retiring the former
+   * catch-all-for-everyone behaviour.
    *
    * @param account the account
    * @param limits the account's approval-limit rows (possibly empty)
@@ -1388,6 +1458,9 @@ public class OrgUnitBankAccessService {
   @Nullable
   private BigDecimal resolveApplicableLimit(
       @NotNull BankAccount account, @NotNull List<BankAccountApprovalLimit> limits) {
+    if (account.getType() == BankAccountType.CARTEL) {
+      return account.getEmployeeApprovalCeiling();
+    }
     if (limits.isEmpty()) {
       return null;
     }
@@ -1412,26 +1485,17 @@ public class OrgUnitBankAccessService {
             }
             case GLOBAL_ROLE ->
                 authHelperService.hasReachableRole(Roles.authority(limit.getRoleCode()));
-            default -> false;
+            case AREA_MEMBERS ->
+                owner != null && ownerScopeService.currentUserIsMemberOfAreaCascade(owner);
+            case ALL_MEMBERS ->
+                owner != null && ownerScopeService.currentUserIsMemberOfOrgUnit(owner);
+            case USER -> false;
           };
       if (matches) {
         best = best == null ? limit.getLimitAmount() : best.max(limit.getLimitAmount());
       }
     }
-    if (best != null) {
-      return best;
-    }
-    // The all-members tier is the catch-all ceiling for everyone who may raise a request but
-    // matches no more specific tier. Every caller has already cleared canView / isRequestCapable
-    // upstream, so it must apply to an outsider holding only a USER view-grant and to a plain KRT
-    // member viewing a CARTEL account too — gating it on org-unit membership would silently exempt
-    // exactly the audience the cap is meant to constrain (REQ-BANK-041).
-    for (BankAccountApprovalLimit limit : limits) {
-      if (limit.getGranteeKind() == BankAccountViewGranteeKind.ALL_MEMBERS) {
-        return limit.getLimitAmount();
-      }
-    }
-    return null;
+    return best;
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -1458,6 +1522,9 @@ public class OrgUnitBankAccessService {
     boolean allMembersGranted =
         grants.stream()
             .anyMatch(grant -> grant.getGranteeKind() == BankAccountViewGranteeKind.ALL_MEMBERS);
+    boolean areaMembersGranted =
+        grants.stream()
+            .anyMatch(grant -> grant.getGranteeKind() == BankAccountViewGranteeKind.AREA_MEMBERS);
     List<UUID> grantedUserIds =
         grants.stream()
             .filter(grant -> grant.getGranteeKind() == BankAccountViewGranteeKind.USER)
@@ -1488,10 +1555,12 @@ public class OrgUnitBankAccessService {
         canConfigureVisibility(account),
         visibilityConfigurable(account.getType()),
         allMembersSupported(account.getType()),
+        areaMembersSupported(account.getType()),
         roleBucketsGlobal(account.getType()),
         availableRoleCodes(account),
         grantedRoleCodes,
         allMembersGranted,
+        areaMembersGranted,
         grantedUsers,
         canConfigureApprovalLimits,
         approvalLimits);
@@ -1562,6 +1631,17 @@ public class OrgUnitBankAccessService {
    */
   private static boolean allMembersSupported(@NotNull BankAccountType type) {
     return visibilityConfigurable(type);
+  }
+
+  /**
+   * {@code true} iff the account type has a "Mitglieder des Bereichs" cascade visibility bucket —
+   * only {@code AREA} (Bereichskonto) accounts (REQ-BANK-048).
+   *
+   * @param type the account type
+   * @return whether the area-members visibility bucket applies
+   */
+  private static boolean areaMembersSupported(@NotNull BankAccountType type) {
+    return type == BankAccountType.AREA;
   }
 
   /**

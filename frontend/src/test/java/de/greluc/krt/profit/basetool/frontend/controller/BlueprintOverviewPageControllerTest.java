@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -37,7 +38,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.ui.ExtendedModelMap;
 import org.springframework.ui.Model;
 
@@ -60,8 +60,7 @@ class BlueprintOverviewPageControllerTest {
             1,
             List.of());
     when(backendApiClient.get(
-            contains("/api/v1/personal-blueprints/overview?page=0&size=50"),
-            any(ParameterizedTypeReference.class)))
+            contains("/api/v1/personal-blueprints/overview?page=0&size=50"), anyTypeRef()))
         .thenReturn(page);
 
     Model model = new ExtendedModelMap();
@@ -78,31 +77,26 @@ class BlueprintOverviewPageControllerTest {
   // the query string cannot turn the page into an unbounded fetch again.
   @Test
   void view_nonWhitelistedSize_fallsBackToDefault() {
-    when(backendApiClient.get(contains("?page=2&size=50"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("?page=2&size=50"), anyTypeRef()))
         .thenReturn(new PageResponse<BlueprintOverviewEntryDto>(List.of(), 2, 50, 0, 0, List.of()));
 
     controller.view(2, 1000, null, null, new ExtendedModelMap());
 
-    verify(backendApiClient)
-        .get(contains("?page=2&size=50"), any(ParameterizedTypeReference.class));
+    verify(backendApiClient).get(contains("?page=2&size=50"), anyTypeRef());
   }
 
   // covers REQ-INV-013 — the search is relayed as a URI template variable (percent-encoded by the
   // WebClient) and echoed back to the model for the filter form.
   @Test
   void view_search_isRelayedAsUriVariable_andEchoedTrimmed() {
-    when(backendApiClient.get(
-            contains("&search={search}"), any(ParameterizedTypeReference.class), eq("Aurora")))
+    when(backendApiClient.get(contains("&search={search}"), anyTypeRef(), eq("Aurora")))
         .thenReturn(new PageResponse<BlueprintOverviewEntryDto>(List.of(), 0, 10, 0, 0, List.of()));
 
     Model model = new ExtendedModelMap();
     controller.view(0, 10, "  Aurora  ", null, model);
 
     verify(backendApiClient)
-        .get(
-            contains("?page=0&size=10&search={search}"),
-            any(ParameterizedTypeReference.class),
-            eq("Aurora"));
+        .get(contains("?page=0&size=10&search={search}"), anyTypeRef(), eq("Aurora"));
     assertEquals("Aurora", model.getAttribute("search"));
   }
 
@@ -110,7 +104,7 @@ class BlueprintOverviewPageControllerTest {
   // pagination fragment, not the full page, while the model is populated identically.
   @Test
   void view_fragmentResults_returnsResultsFragmentView() {
-    when(backendApiClient.get(contains("?page=0&size=50"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("?page=0&size=50"), anyTypeRef()))
         .thenReturn(new PageResponse<BlueprintOverviewEntryDto>(List.of(), 0, 50, 0, 0, List.of()));
 
     Model model = new ExtendedModelMap();
@@ -122,7 +116,7 @@ class BlueprintOverviewPageControllerTest {
 
   @Test
   void view_onBackendError_setsErrorKey_andEmptyOverview() {
-    when(backendApiClient.get(any(String.class), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(any(String.class), anyTypeRef()))
         .thenThrow(new RuntimeException("boom"));
 
     Model model = new ExtendedModelMap();
@@ -140,7 +134,7 @@ class BlueprintOverviewPageControllerTest {
     // Object...). The raw key therefore arrives as a separate argument, not inside the template.
     when(backendApiClient.get(
             contains("/api/v1/personal-blueprints/overview/owners?productKey={productKey}"),
-            any(ParameterizedTypeReference.class),
+            anyTypeRef(),
             eq("aurora")))
         .thenReturn(List.of(new BlueprintOverviewOwnerDto("Alpha", true)));
 
@@ -152,8 +146,7 @@ class BlueprintOverviewPageControllerTest {
 
   @Test
   void owners_onBackendError_returnsEmptyList() {
-    when(backendApiClient.get(
-            any(String.class), any(ParameterizedTypeReference.class), eq("aurora")))
+    when(backendApiClient.get(any(String.class), anyTypeRef(), eq("aurora")))
         .thenThrow(new RuntimeException("boom"));
 
     assertTrue(controller.owners("aurora").isEmpty());

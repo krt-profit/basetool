@@ -175,5 +175,15 @@ public enum BankAuditEventType {
    * A bank employee confirmed, at booking-request confirmation, that the responsible holder's
    * approval had been obtained (the mandatory checkbox for an over-limit request, REQ-BANK-041).
    */
-  BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED
+  BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED,
+
+  /**
+   * The KRT-account (CARTEL) 3-stage approval thresholds T1/T2 were set or changed by bank
+   * management in the Verwaltung tab (REQ-BANK-047). The details payload carries the two amounts —
+   * never any free text or PII.
+   */
+  CARTEL_APPROVAL_TIERS_SET,
+
+  /** The KRT-account 3-stage approval thresholds were cleared (REQ-BANK-047). */
+  CARTEL_APPROVAL_TIERS_CLEARED
 }

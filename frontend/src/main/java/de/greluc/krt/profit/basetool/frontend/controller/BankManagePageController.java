@@ -87,13 +87,19 @@ public class BankManagePageController {
     List<BankHolderDto> holders =
         backendApiClient.get(
             "/api/v1/bank/holders", new ParameterizedTypeReference<List<BankHolderDto>>() {});
-    model.addAttribute(
-        "accounts",
+    List<BankAccountDto> orderedAccounts =
         accounts == null
             ? List.<BankAccountDto>of()
-            : BankAccountOrder.byName(accounts.content(), BankAccountDto::name));
+            : BankAccountOrder.byName(accounts.content(), BankAccountDto::name);
+    model.addAttribute("accounts", orderedAccounts);
     model.addAttribute("holders", holders == null ? List.<BankHolderDto>of() : holders);
     model.addAttribute("management", management);
+    // The KRT account (singleton CARTEL) for the Bankleitung-only "KRT-Freigaben" tab
+    // (REQ-BANK-047),
+    // where the two 3-stage thresholds T1/T2 are edited; null until a KRT account exists.
+    model.addAttribute(
+        "cartelAccount",
+        orderedAccounts.stream().filter(a -> "CARTEL".equals(a.type())).findFirst().orElse(null));
     // The caller's own user id (OIDC sub) so the holder tab can link only the caller's own holder
     // row to its history; management links every row (REQ-BANK-032). The real per-holder gate is
     // server-side (canSeeHolder) — this only governs which links the UI renders.
@@ -103,9 +109,20 @@ public class BankManagePageController {
     // own holder. principal.getSubject() is the sub (UUID) that equals BankHolderDto.userId; same
     // fix as the mission participant self-edit carve-out (MissionPageController#authUserId).
     model.addAttribute("selfUserId", principal != null ? principal.getSubject() : null);
-    // Halter is the default-open tab (it sits first/left in the tab nav); only an explicit
-    // ?tab=konten opens the accounts tab.
-    model.addAttribute("activeTab", "konten".equalsIgnoreCase(tab) ? "konten" : "halter");
+    // Halter is the default-open tab (it sits first/left in the tab nav); ?tab=konten opens the
+    // accounts tab and ?tab=krt-freigaben the Bankleitung-only KRT approval-thresholds tab
+    // (REQ-BANK-047) — the latter only for a management caller, so a plain employee forcing the
+    // query
+    // param falls back to Halter and never sees the KRT-thresholds panel.
+    String activeTab;
+    if (management && "krt-freigaben".equalsIgnoreCase(tab)) {
+      activeTab = "krt-freigaben";
+    } else if ("konten".equalsIgnoreCase(tab)) {
+      activeTab = "konten";
+    } else {
+      activeTab = "halter";
+    }
+    model.addAttribute("activeTab", activeTab);
     if ("manageBody".equals(fragment)) {
       return "bank-manage :: manageBody";
     }

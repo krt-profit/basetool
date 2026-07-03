@@ -71,6 +71,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Mockito unit tests for {@link OwnerScopeService}. Inherits the test scenarios that previously
@@ -166,6 +167,53 @@ class OwnerScopeServiceTest {
     // The resolver's single-Staffel fast path now does a cheap existsById to drop a dangling row
     // (finding #4). Every Staffel in these scenarios exists, so resolve it to present.
     lenient().when(squadronRepository.existsById(any())).thenReturn(true);
+
+    wireDelegates();
+  }
+
+  /**
+   * Wires the L3-split (#922) collaborators into the {@link OwnerScopeService} facade under test.
+   * Mockito does not inject one {@code @InjectMocks} target into another, so the facade's three
+   * sub-service fields are built here as REAL instances fed with the same mocks the scenarios stub,
+   * then set via {@link ReflectionTestUtils}. A single {@link RequestScopeResolver} instance is
+   * shared by the facade, the gates and the stamping service so the request-scoped memoisation
+   * (backed by the shared {@code request} mock) collapses repeated reads exactly as in production.
+   * Constructor-arg order matches each service's {@code @RequiredArgsConstructor} field-declaration
+   * order.
+   */
+  private void wireDelegates() {
+    RequestScopeResolver requestScopeResolver =
+        new RequestScopeResolver(
+            authHelper,
+            squadronRepository,
+            orgUnitMembershipRepository,
+            orgUnitRepository,
+            orgUnitCascadeService,
+            staffelMembershipResolver,
+            request);
+    AccessGateService accessGateService =
+        new AccessGateService(
+            requestScopeResolver,
+            authHelper,
+            missionRepository,
+            jobOrderRepository,
+            inventoryItemRepository,
+            refineryOrderRepository,
+            operationRepository,
+            shipRepository,
+            orgUnitMembershipRepository);
+    OrgUnitStampingService orgUnitStampingService =
+        new OrgUnitStampingService(
+            requestScopeResolver,
+            accessGateService,
+            authHelper,
+            squadronRepository,
+            specialCommandRepository,
+            orgUnitMembershipRepository,
+            orgUnitRepository);
+    ReflectionTestUtils.setField(service, "requestScopeResolver", requestScopeResolver);
+    ReflectionTestUtils.setField(service, "accessGateService", accessGateService);
+    ReflectionTestUtils.setField(service, "orgUnitStampingService", orgUnitStampingService);
   }
 
   /** Returns a Staffel membership row pointing the given user at the given Squadron. */

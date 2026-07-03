@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
@@ -44,7 +44,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -91,10 +90,7 @@ class HomeControllerMvcTest {
     // Anonymous home() path: backendApiClient.get(searchUri, typeRef, isPublic=true) for the
     // next-7-days upcoming-missions search. Returning null is a valid "no upcoming missions"
     // response and keeps the template's empty-state branch simple.
-    when(backendApiClient.get(
-            startsWith("/api/v1/missions/search"),
-            any(ParameterizedTypeReference.class),
-            anyBoolean()))
+    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef(), anyBoolean()))
         .thenReturn(null);
   }
 
@@ -198,10 +194,7 @@ class HomeControllerMvcTest {
             new SquadronReferenceDto(UUID.randomUUID(), "Alpha Staffel", "ALF"),
             null,
             0L);
-    when(backendApiClient.get(
-            startsWith("/api/v1/missions/search"),
-            any(ParameterizedTypeReference.class),
-            anyBoolean()))
+    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef(), anyBoolean()))
         .thenReturn(new PageResponse<>(List.of(mission), 0, 50, 1, 1, List.of()));
 
     mockMvc
@@ -234,10 +227,7 @@ class HomeControllerMvcTest {
             null,
             null,
             0L);
-    when(backendApiClient.get(
-            startsWith("/api/v1/missions/search"),
-            any(ParameterizedTypeReference.class),
-            anyBoolean()))
+    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef(), anyBoolean()))
         .thenReturn(new PageResponse<>(List.of(mission), 0, 50, 1, 1, List.of()));
 
     mockMvc
@@ -295,10 +285,7 @@ class HomeControllerMvcTest {
             myStaffel,
             null,
             0L);
-    when(backendApiClient.get(
-            startsWith("/api/v1/missions/search"),
-            any(ParameterizedTypeReference.class),
-            anyBoolean()))
+    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef(), anyBoolean()))
         .thenReturn(new PageResponse<>(List.of(ownMission), 0, 50, 1, 1, List.of()));
 
     mockMvc
@@ -355,10 +342,7 @@ class HomeControllerMvcTest {
             new SquadronReferenceDto(UUID.randomUUID(), "Falke Staffel", "FLK"),
             null,
             0L);
-    when(backendApiClient.get(
-            startsWith("/api/v1/missions/search"),
-            any(ParameterizedTypeReference.class),
-            anyBoolean()))
+    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef(), anyBoolean()))
         .thenReturn(new PageResponse<>(List.of(foreignMission), 0, 50, 1, 1, List.of()));
 
     mockMvc
@@ -399,8 +383,7 @@ class HomeControllerMvcTest {
             null,
             null);
     when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(me);
-    when(backendApiClient.get(
-            eq("/api/v1/users/me/org-unit-ids"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/users/me/org-unit-ids"), anyTypeRef()))
         .thenReturn(List.of(specialCommandId));
 
     MissionListDto skMission =
@@ -420,10 +403,7 @@ class HomeControllerMvcTest {
             new SquadronReferenceDto(specialCommandId, "Phantom SK", "PHA"),
             null,
             0L);
-    when(backendApiClient.get(
-            startsWith("/api/v1/missions/search"),
-            any(ParameterizedTypeReference.class),
-            anyBoolean()))
+    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef(), anyBoolean()))
         .thenReturn(new PageResponse<>(List.of(skMission), 0, 50, 1, 1, List.of()));
 
     mockMvc

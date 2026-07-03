@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static org.mockito.ArgumentMatchers.any;
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -37,7 +37,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -79,13 +78,12 @@ class PromotionFeatureFlagPageGateTest {
   private void stubSquadronContext(UUID squadronId, boolean promotionEnabled) {
     SquadronDto squadron =
         new SquadronDto(squadronId, "IRIDIUM", "IRI", null, true, promotionEnabled, false, 0L);
-    when(backendApiClient.get(contains("/api/v1/squadrons"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/squadrons"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(squadron), 0, 1000, 1, 1, List.of()));
     // SquadronContextAdvice.availableSquadrons() now reads the catalogue from the STATIC_DATA_CACHE
     // (getCached) rather than a plain get (REQ-DATA-007), so the promotion gate's flag lookup goes
     // through getCached — stub it too or the squadron list is empty and the gate misreads the flag.
-    when(backendApiClient.getCached(
-            contains("/api/v1/squadrons"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.getCached(contains("/api/v1/squadrons"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(squadron), 0, 1000, 1, 1, List.of()));
     when(backendApiClient.get(
             eq("/api/v1/me/active-org-unit"),

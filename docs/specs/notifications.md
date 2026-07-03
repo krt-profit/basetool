@@ -275,9 +275,48 @@ admin-editable at runtime.
 `db/migration/V160__seed_bank_booking_request_notification_rule.sql`,
 `db/migration/V161__seed_bank_booking_request_decision_notification_rules.sql` · **Issues:** #666
 
+### REQ-NOTIF-013 — Reusable, best-effort transactional e-mail channel
+
+The backend has a channel-agnostic e-mail seam so system events can notify a user **by e-mail** in
+addition to (or instead of) the in-app inbox. `MailService.send(MailMessage)` takes a domain-free
+`MailMessage(to, subject, body)` — no notion of approval or notification — so any producer can reuse
+it; the first consumer is the account decision mail (REQ-NOTIF-014, [ADR-0064](../adr/0064-transactional-email-delivery-channel.md)),
+and the in-app rule engine may adopt it later as a second delivery channel.
+
+Sending is **three-gated** and **best-effort**: the `SmtpMailService` implementation sends only when
+`app.mail.enabled` is on (an explicit kill-switch that ships `true`), a non-blank `spring.mail.host`
+is configured (the effective switch, unset outside prod), **and** a `JavaMailSender` bean exists
+(Spring Boot autoconfigures it only when the host is set). Any gate closed makes `send` a logged
+no-op — the explicit host check means an empty `SPRING_MAIL_HOST` env never fires a broken sender —
+so dev/test/CI never contact SMTP. A delivery failure is caught
+and logged, never rethrown, so mail can never fail or roll back the caller. Producers publish an
+after-commit event handled by an `@Async(MAIL_EXECUTOR)` `@TransactionalEventListener(AFTER_COMMIT)`
+so SMTP latency stays off the request thread and a rolled-back action sends nothing. Bodies are
+localized via the backend `MessageSource`; the recipient address, name and any free-text are **never
+logged** (REQ-OBS).
+
+**Acceptance**
+
+- [x] `MailService`/`MailMessage` carry no domain concept; `SmtpMailService` no-ops (with a log) when
+  disabled, when `spring.mail.host` is blank, or when no `JavaMailSender` is configured, and swallows
+  a send failure (`SmtpMailServiceTest`).
+- [x] Mail composition/sending runs off-thread after commit on a dedicated `MAIL_EXECUTOR`, distinct
+  from the notification executor, so a stalled relay cannot starve in-app notification creation.
+- [x] Only the static localized subject is ever logged — never the address, name or reason.
+- [ ] Operator: the channel ships enabled; prod sets `SPRING_MAIL_HOST` (+ port/credentials) to start
+  sending. With no host it stays a no-op; `APP_MAIL_ENABLED=false` hard-disables it.
+
+**Enforced by:** `SmtpMailServiceTest` · **Code:** `service/MailService`, `service/MailMessage`,
+`service/SmtpMailService`, `config/MailProperties`, `config/AsyncConfig#MAIL_EXECUTOR`,
+`application.yml` (`spring.mail.*` / `app.mail.*`) · **Decision:** ADR-0064 · **Issues:** #720
+
 ## Out of scope (v1)
 
-- Email / Discord channels and digest emails.
+- Per-notification e-mail routing (fan-out of in-app notification types to e-mail), user channel
+  preferences/opt-in, and digest emails. A **basic transactional e-mail transport** now exists
+  (REQ-NOTIF-013, first used by the account decision mail REQ-NOTIF-014); wiring it into the rule
+  engine per notification type is deferred.
+- Discord channel delivery.
 - OS / browser push notifications.
 - Multi-backend-instance push fan-out (Redis pub/sub).
 - A dedicated user-group entity (the `GROUP` selector kind is reserved for it).

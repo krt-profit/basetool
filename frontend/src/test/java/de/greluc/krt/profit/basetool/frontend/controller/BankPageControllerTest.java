@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -50,7 +51,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
@@ -205,26 +205,27 @@ class BankPageControllerTest {
                 false,
                 false,
                 false,
+                false,
                 java.util.List.of(),
                 java.util.Map.of(),
+                null,
                 null,
                 java.util.List.of()));
 
     when(backendApiClient.get(
             eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class)))
         .thenReturn(detail);
-    when(backendApiClient.get(contains("/transactions"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef()))
         .thenReturn(
             new PageResponse<BankBookingDto>(List.of(), 0, 20, 0, 0, Collections.emptyList()));
-    when(backendApiClient.get(eq("/api/v1/bank/holders"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/bank/holders"), anyTypeRef()))
         .thenReturn(
             List.of(
                 new BankHolderDto(
                     holderA, UUID.randomUUID(), "alpha", true, BigDecimal.ZERO, false, 0L),
                 new BankHolderDto(
                     holderB, UUID.randomUUID(), "bravo", false, BigDecimal.ZERO, false, 0L)));
-    when(backendApiClient.get(
-            eq("/api/v1/bank/accounts?size=500"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/bank/accounts?size=500"), anyTypeRef()))
         .thenReturn(
             new PageResponse<>(
                 List.of(self, activeOther, closedOther), 0, 500, 3, 1, Collections.emptyList()));
@@ -271,15 +272,16 @@ class BankPageControllerTest {
                 false,
                 false,
                 false,
+                false,
                 java.util.List.of(),
                 java.util.Map.of(),
+                null,
                 null,
                 java.util.List.of()));
     when(backendApiClient.get(
             eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class)))
         .thenReturn(detail);
-    when(backendApiClient.get(any(String.class), any(ParameterizedTypeReference.class)))
-        .thenReturn(null);
+    when(backendApiClient.get(any(String.class), anyTypeRef())).thenReturn(null);
 
     // When
     controller.accountDetail(accountId, -3, null, model);
@@ -302,8 +304,7 @@ class BankPageControllerTest {
     UUID accountId = UUID.randomUUID();
     PageResponse<BankBookingDto> bookings =
         new PageResponse<>(List.of(), 0, 20, 0, 0, Collections.emptyList());
-    when(backendApiClient.get(contains("/transactions"), any(ParameterizedTypeReference.class)))
-        .thenReturn(bookings);
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef())).thenReturn(bookings);
 
     // When
     String view = controller.accountDetail(accountId, 2, "bookings", model);
@@ -315,8 +316,7 @@ class BankPageControllerTest {
     // The fragment path must not load the account detail, holder registry or accounts list.
     verify(backendApiClient, never())
         .get(eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class));
-    verify(backendApiClient, never())
-        .get(eq("/api/v1/bank/holders"), any(ParameterizedTypeReference.class));
+    verify(backendApiClient, never()).get(eq("/api/v1/bank/holders"), anyTypeRef());
   }
 
   // covers REQ-FE-005 (#579) — an in-place money-write re-render (fragment=accountBody) returns the
@@ -342,23 +342,24 @@ class BankPageControllerTest {
                 false,
                 false,
                 false,
+                false,
                 java.util.List.of(),
                 java.util.Map.of(),
+                null,
                 null,
                 java.util.List.of()));
     when(backendApiClient.get(
             eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class)))
         .thenReturn(detail);
-    when(backendApiClient.get(contains("/transactions"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef()))
         .thenReturn(
             new PageResponse<BankBookingDto>(List.of(), 0, 20, 0, 0, Collections.emptyList()));
-    when(backendApiClient.get(eq("/api/v1/bank/holders"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/bank/holders"), anyTypeRef()))
         .thenReturn(
             List.of(
                 new BankHolderDto(
                     holderA, UUID.randomUUID(), "alpha", true, BigDecimal.ZERO, false, 0L)));
-    when(backendApiClient.get(
-            eq("/api/v1/bank/accounts?size=500"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/bank/accounts?size=500"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(self), 0, 500, 1, 1, Collections.emptyList()));
 
     // When
@@ -392,8 +393,7 @@ class BankPageControllerTest {
         new PageResponse<>(List.of(), 0, 20, 0, 0, Collections.emptyList());
     when(backendApiClient.get(eq("/api/v1/bank/holders/" + holderId), eq(BankHolderDto.class)))
         .thenReturn(holder);
-    when(backendApiClient.get(contains("/transactions"), any(ParameterizedTypeReference.class)))
-        .thenReturn(bookings);
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef())).thenReturn(bookings);
 
     // When
     String view = controller.holderDetail(holderId, null, null, model);
@@ -417,8 +417,7 @@ class BankPageControllerTest {
     UUID holderId = UUID.randomUUID();
     PageResponse<BankHolderBookingDto> bookings =
         new PageResponse<>(List.of(), 0, 20, 0, 0, Collections.emptyList());
-    when(backendApiClient.get(contains("/transactions"), any(ParameterizedTypeReference.class)))
-        .thenReturn(bookings);
+    when(backendApiClient.get(contains("/transactions"), anyTypeRef())).thenReturn(bookings);
 
     // When
     String view = controller.holderDetail(holderId, 2, "holderBookings", model);
@@ -441,6 +440,8 @@ class BankPageControllerTest {
         null,
         null,
         new BigDecimal(balance),
+        null,
+        null,
         null,
         0L,
         Instant.parse("2026-01-15T10:00:00Z"));

@@ -72,6 +72,23 @@ spring:
     name: backend
   messages:
     fallback-to-system-locale: false
+  mail:
+    # SMTP transport for the transactional e-mail channel (REQ-NOTIF-013). spring.mail.host is
+    # deliberately NOT set here: MailSenderAutoConfiguration wires a JavaMailSender only when
+    # spring.mail.host is present, so leaving it unset keeps mail a no-op in dev/test/CI. Prod sets
+    # SPRING_MAIL_HOST (relaxed binding of spring.mail.host) to switch the transport on; the
+    # app.mail.enabled flag below is the second, explicit gate.
+    port: ${SPRING_MAIL_PORT:587}
+    username: ${SPRING_MAIL_USERNAME:}
+    password: ${SPRING_MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: "true"
+      # Encrypt the SMTP connection with STARTTLS and REQUIRE it (fail rather than fall back to
+      # plaintext) — credentials + message never travel unencrypted. JavaMail validates the server
+      # certificate against the JVM default truststore (no trust-all); Gmail's cert chains to a public
+      # CA. For an implicit-TLS relay on :465 instead, set mail.smtp.ssl.enable=true + SPRING_MAIL_PORT=465.
+      mail.smtp.starttls.enable: "true"
+      mail.smtp.starttls.required: "true"
   web:
     resources:
       cache:
@@ -127,6 +144,17 @@ app:
       realm: ${KEYCLOAK_REALM:iri}
       client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:backend-service}
       client-secret: ${KEYCLOAK_ADMIN_CLIENT_SECRET}
+  mail:
+    # App-level gate + envelope metadata for the transactional e-mail channel (account
+    # approval/rejection notices — REQ-NOTIF-013/-014). The kill-switch ships ON; the effective
+    # switch is whether an SMTP host is set (spring.mail.host, above) — with no host, mail is a safe
+    # no-op. Set APP_MAIL_ENABLED=false to hard-disable regardless of SMTP config. default-locale
+    # picks the language of system-initiated mails (no per-user locale is stored yet), German by
+    # default.
+    enabled: ${APP_MAIL_ENABLED:true}
+    from: ${APP_MAIL_FROM_ADDRESS:no-reply@profit-base.online}
+    from-name: ${APP_MAIL_FROM_NAME:Profit Basetool}
+    default-locale: ${APP_MAIL_DEFAULT_LOCALE:de}
   discord:
     spi-precheck:
       # Shared secret the Keycloak Discord SPI presents (header X-KRT-SPI-Secret) to the internal

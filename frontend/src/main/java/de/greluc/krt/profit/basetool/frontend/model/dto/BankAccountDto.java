@@ -39,6 +39,10 @@ import org.jetbrains.annotations.Nullable;
  * @param areaName free-form Bereich name for area accounts, else {@code null}
  * @param balance current balance (signed whole aUEC)
  * @param balanceTarget aspirational balance goal (REQ-BANK-036), or {@code null} when none is set
+ * @param employeeApprovalCeiling the KRT-account bank-employee approval ceiling T1 (REQ-BANK-047),
+ *     or {@code null} for a non-CARTEL / unconfigured account
+ * @param areaLeadApprovalCeiling the KRT-account Bereichsleiter-Profit ceiling T2 (REQ-BANK-047),
+ *     or {@code null} for a non-CARTEL account / unconfigured upper band
  * @param version optimistic-locking version to echo on mutations
  * @param createdAt creation instant (UTC)
  */
@@ -52,5 +56,7 @@ public record BankAccountDto(
     @Nullable String areaName,
     BigDecimal balance,
     @Nullable BigDecimal balanceTarget,
+    @Nullable BigDecimal employeeApprovalCeiling,
+    @Nullable BigDecimal areaLeadApprovalCeiling,
     Long version,
     Instant createdAt) {}

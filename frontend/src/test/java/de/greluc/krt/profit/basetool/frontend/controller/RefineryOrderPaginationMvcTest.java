@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oauth2Login;
@@ -39,7 +39,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -93,8 +92,7 @@ class RefineryOrderPaginationMvcTest {
   // 10/50/100 size picker; both keep the default status filter, and size links jump back to page 0.
   @Test
   void viewOrders_multiPageResult_rendersPaginationAndSizePicker() throws Exception {
-    when(backendApiClient.get(
-            contains("/api/v1/refinery-orders/"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/refinery-orders/"), anyTypeRef()))
         .thenReturn(page(1, 50, 300));
 
     mockMvc
@@ -116,8 +114,7 @@ class RefineryOrderPaginationMvcTest {
   // covers REQ-REFINERY-019 — the onlyMine toggle is preserved in every paging/sizing link.
   @Test
   void viewOrders_onlyMine_keepsToggleInPaginationLinks() throws Exception {
-    when(backendApiClient.get(
-            contains("/api/v1/refinery-orders/"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/refinery-orders/"), anyTypeRef()))
         .thenReturn(page(1, 50, 300));
 
     mockMvc
@@ -136,8 +133,7 @@ class RefineryOrderPaginationMvcTest {
   // filter form (both outside the fragment) are not.
   @Test
   void viewOrders_fragmentResults_rendersOnlyTableFragment() throws Exception {
-    when(backendApiClient.get(
-            contains("/api/v1/refinery-orders/"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/refinery-orders/"), anyTypeRef()))
         .thenReturn(page(0, 50, 300));
 
     mockMvc
@@ -152,8 +148,7 @@ class RefineryOrderPaginationMvcTest {
   // covers REQ-REFINERY-019 — a single short page needs neither page-nav nor size picker.
   @Test
   void viewOrders_singleShortPage_rendersNeitherPageNavNorSizePicker() throws Exception {
-    when(backendApiClient.get(
-            contains("/api/v1/refinery-orders/"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/refinery-orders/"), anyTypeRef()))
         .thenReturn(page(0, 50, 5));
 
     mockMvc

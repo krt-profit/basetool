@@ -20,13 +20,17 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.event.UserApprovalDecidedEvent;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalDecision;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
@@ -42,6 +46,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /** Mockito unit tests for the registration approve/reject path on {@link UserService}. */
@@ -50,6 +55,7 @@ class UserServiceApprovalTest {
 
   @Mock private UserRepository userRepository;
   @Mock private UserApprovalEventRepository userApprovalEventRepository;
+  @Mock private ApplicationEventPublisher eventPublisher;
 
   @InjectMocks private UserService userService;
 
@@ -67,6 +73,8 @@ class UserServiceApprovalTest {
   @Test
   void approveUser_setsActive_stampsAdmin_andAuditsApproved() {
     User user = pendingUser(3L);
+    user.setEmail("pilot@example.test");
+    user.setDisplayName("Maverick");
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
     when(userRepository.saveAndFlush(user)).thenReturn(user);
 
@@ -80,11 +88,23 @@ class UserServiceApprovalTest {
     assertEquals(ApprovalDecision.APPROVED, audit.getValue().getDecision());
     assertEquals(USER_ID, audit.getValue().getUserId());
     assertEquals(ADMIN_ID, audit.getValue().getDecidedById());
+    // REQ-NOTIF-014: an approval publishes the decision-mail event carrying the recipient's
+    // address + name and no reason.
+    ArgumentCaptor<UserApprovalDecidedEvent> mail =
+        ArgumentCaptor.forClass(UserApprovalDecidedEvent.class);
+    verify(eventPublisher).publishEvent(mail.capture());
+    assertTrue(mail.getValue().approved());
+    assertEquals(USER_ID, mail.getValue().userId());
+    assertEquals("pilot@example.test", mail.getValue().recipientEmail());
+    assertEquals("Maverick", mail.getValue().recipientName());
+    assertNull(mail.getValue().reason());
   }
 
   @Test
   void rejectUser_setsRejected_andAuditsReason() {
     User user = pendingUser(0L);
+    user.setEmail("reject@example.test");
+    user.setDisplayName("Goose");
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
     when(userRepository.saveAndFlush(user)).thenReturn(user);
 
@@ -95,6 +115,13 @@ class UserServiceApprovalTest {
     verify(userApprovalEventRepository).save(audit.capture());
     assertEquals(ApprovalDecision.REJECTED, audit.getValue().getDecision());
     assertEquals("not a real member", audit.getValue().getReason());
+    // REQ-NOTIF-014: a rejection publishes the decision-mail event carrying the admin's reason.
+    ArgumentCaptor<UserApprovalDecidedEvent> mail =
+        ArgumentCaptor.forClass(UserApprovalDecidedEvent.class);
+    verify(eventPublisher).publishEvent(mail.capture());
+    assertFalse(mail.getValue().approved());
+    assertEquals("reject@example.test", mail.getValue().recipientEmail());
+    assertEquals("not a real member", mail.getValue().reason());
   }
 
   @Test
@@ -107,6 +134,8 @@ class UserServiceApprovalTest {
         () -> userService.approveUser(USER_ID, 3L, ADMIN_ID));
 
     verify(userApprovalEventRepository, never()).save(any());
+    // No decision-mail event on a rejected (409) decision.
+    verify(eventPublisher, never()).publishEvent(any());
     assertEquals(ApprovalStatus.PENDING, user.getApprovalStatus());
   }
 
@@ -122,6 +151,8 @@ class UserServiceApprovalTest {
         () -> userService.rejectUser(USER_ID, "oops", 2L, ADMIN_ID));
 
     verify(userApprovalEventRepository, never()).save(any());
+    // No decision-mail event when the decision itself conflicts (409).
+    verify(eventPublisher, never()).publishEvent(any());
     assertEquals(ApprovalStatus.ACTIVE, active.getApprovalStatus());
   }
 }

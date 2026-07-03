@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
@@ -36,7 +37,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
@@ -56,10 +56,9 @@ class BankGrantsPageControllerTest {
     Model model = new ConcurrentModel();
     UUID accountId = UUID.randomUUID();
     UUID user = UUID.randomUUID();
-    when(backendApiClient.get(any(String.class), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(any(String.class), anyTypeRef()))
         .thenReturn(List.of(grant(user, "alpha", accountId)));
-    when(backendApiClient.get(
-            eq("/api/v1/bank/accounts?size=500"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/bank/accounts?size=500"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 500, 0, 0, Collections.emptyList()));
 
     // When
@@ -69,10 +68,7 @@ class BankGrantsPageControllerTest {
     assertEquals("bank-grants", view);
     assertEquals(Boolean.FALSE, model.getAttribute("byEmployee"));
     assertEquals(accountId, model.getAttribute("selectedAccountId"));
-    verify(backendApiClient)
-        .get(
-            eq("/api/v1/bank/grants?accountId=" + accountId),
-            any(ParameterizedTypeReference.class));
+    verify(backendApiClient).get(eq("/api/v1/bank/grants?accountId=" + accountId), anyTypeRef());
   }
 
   @Test
@@ -88,16 +84,12 @@ class BankGrantsPageControllerTest {
             grant(userId, "alpha", UUID.randomUUID()),
             grant(userId, "alpha", UUID.randomUUID()),
             grant(otherUser, "bravo", UUID.randomUUID()));
-    when(backendApiClient.get(
-            eq("/api/v1/bank/grants?userId=" + userId), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/bank/grants?userId=" + userId), anyTypeRef()))
         .thenReturn(List.of(allGrants.get(0)));
-    when(backendApiClient.get(eq("/api/v1/bank/grants"), any(ParameterizedTypeReference.class)))
-        .thenReturn(allGrants);
-    when(backendApiClient.get(
-            eq("/api/v1/bank/accounts?size=500"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/bank/grants"), anyTypeRef())).thenReturn(allGrants);
+    when(backendApiClient.get(eq("/api/v1/bank/accounts?size=500"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 500, 0, 0, Collections.emptyList()));
-    when(backendApiClient.get(eq("/api/v1/users/lookup"), any(ParameterizedTypeReference.class)))
-        .thenReturn(List.of());
+    when(backendApiClient.get(eq("/api/v1/users/lookup"), anyTypeRef())).thenReturn(List.of());
 
     // When
     controller.grants("employee", null, userId, null, model);
@@ -124,9 +116,7 @@ class BankGrantsPageControllerTest {
     Model model = new ConcurrentModel();
     UUID accountId = UUID.randomUUID();
     UUID user = UUID.randomUUID();
-    when(backendApiClient.get(
-            eq("/api/v1/bank/grants?accountId=" + accountId),
-            any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/bank/grants?accountId=" + accountId), anyTypeRef()))
         .thenReturn(List.of(grant(user, "alpha", accountId)));
 
     // When
@@ -138,9 +128,7 @@ class BankGrantsPageControllerTest {
     assertNotNull(grants);
     assertEquals(1, grants.size());
     // The fragment path must not load the filter selectors / create-modal lookups.
-    verify(backendApiClient, never())
-        .get(eq("/api/v1/bank/accounts?size=500"), any(ParameterizedTypeReference.class));
-    verify(backendApiClient, never())
-        .get(eq("/api/v1/users/lookup"), any(ParameterizedTypeReference.class));
+    verify(backendApiClient, never()).get(eq("/api/v1/bank/accounts?size=500"), anyTypeRef());
+    verify(backendApiClient, never()).get(eq("/api/v1/users/lookup"), anyTypeRef());
   }
 }

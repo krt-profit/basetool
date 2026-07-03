@@ -111,6 +111,14 @@ public final class BankConflictException extends AppException {
   public static final String CODE_BANK_OWNER_APPROVAL_REQUIRED = "BANK_OWNER_APPROVAL_REQUIRED";
 
   /**
+   * Direct withdrawal/transfer leaving the KRT ({@code CARTEL}) account by a plain bank employee
+   * for an amount above the bank-employee approval ceiling T1 — the money must instead go through
+   * the booking-request → external-approval flow (Bereichsleiter Profit / Organisationsleitung).
+   * Management and admins are unrestricted (REQ-BANK-047).
+   */
+  public static final String CODE_BANK_CARTEL_APPROVAL_REQUIRED = "BANK_CARTEL_APPROVAL_REQUIRED";
+
+  /**
    * Split deposit (REQ-BANK-043) attempted while there is no active squadron account to distribute
    * to — none exists, or the only one is the deposit's own named account (which is excluded from
    * the split). The split cannot be honoured.

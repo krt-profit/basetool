@@ -154,9 +154,7 @@ class MissionCoreEditAjaxControllerTest {
                 .param("plannedStartTime", "2026-06-21T11:59:58.222717")
                 .param("scheduleVersion", "5"))
         .andExpect(status().isOk());
-
-    @SuppressWarnings("unchecked")
-    ArgumentCaptor<Map<String, Object>> scheduleBody = ArgumentCaptor.forClass(Map.class);
+    ArgumentCaptor<Map<String, Object>> scheduleBody = ArgumentCaptor.captor();
     verify(backendApiClient)
         .patch(
             eq("/api/v1/missions/" + MISSION_ID + "/schedule"),

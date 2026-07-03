@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyClass;
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -48,7 +50,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -109,8 +110,7 @@ class MemberManagementControllerTest {
     void noSearch_appendsSortOnlyToBaseUri() {
       Model model = new ConcurrentModel();
       PageResponse<UserDto> page = newPage(List.of(newUser("alice")));
-      when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-          .thenReturn(page);
+      when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
       String view = controller.listMembers(null, null, null, null, model);
 
@@ -120,7 +120,7 @@ class MemberManagementControllerTest {
       // are exercised by their own test.
       ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
       verify(backendApiClient, org.mockito.Mockito.atLeastOnce())
-          .get(uriCaptor.capture(), any(ParameterizedTypeReference.class));
+          .get(uriCaptor.capture(), anyTypeRef());
       assertEquals(
           "/api/v1/users?sort=username,asc",
           uriCaptor.getAllValues().get(0),
@@ -133,13 +133,12 @@ class MemberManagementControllerTest {
     @Test
     void withSearch_routesToSearchEndpointWithQueryParam() {
       Model model = new ConcurrentModel();
-      when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-          .thenReturn(newPage(List.of()));
+      when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(newPage(List.of()));
 
       controller.listMembers("alice", null, null, null, model);
 
       ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
-      verify(backendApiClient).get(uriCaptor.capture(), any(ParameterizedTypeReference.class));
+      verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef());
       String uri = uriCaptor.getValue();
       assertTrue(
           uri.startsWith("/api/v1/users/search?query=alice"),
@@ -152,26 +151,24 @@ class MemberManagementControllerTest {
     void blankSearch_routesToListEndpoint() {
       // Treat blank search as "no search" — uses the listing endpoint, not search.
       Model model = new ConcurrentModel();
-      when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-          .thenReturn(newPage(List.of()));
+      when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(newPage(List.of()));
 
       controller.listMembers("   ", null, null, null, model);
 
       ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
-      verify(backendApiClient).get(uriCaptor.capture(), any(ParameterizedTypeReference.class));
+      verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef());
       assertTrue(uriCaptor.getValue().startsWith("/api/v1/users?"));
     }
 
     @Test
     void pageAndSizeParams_appendedToUri() {
       Model model = new ConcurrentModel();
-      when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-          .thenReturn(newPage(List.of()));
+      when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(newPage(List.of()));
 
       controller.listMembers(null, 2, 25, null, model);
 
       ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
-      verify(backendApiClient).get(uriCaptor.capture(), any(ParameterizedTypeReference.class));
+      verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef());
       String uri = uriCaptor.getValue();
       assertTrue(uri.contains("page=2"), "page param missing in: " + uri);
       assertTrue(uri.contains("size=25"));
@@ -182,8 +179,7 @@ class MemberManagementControllerTest {
       // Defensive: if the backend returns null (e.g. mid-degradation), the model
       // must NOT NPE — users stays null and the view still renders.
       Model model = new ConcurrentModel();
-      when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-          .thenReturn(null);
+      when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
 
       String view = controller.listMembers(null, null, null, null, model);
 
@@ -197,7 +193,7 @@ class MemberManagementControllerTest {
       Model model = new ConcurrentModel();
       doThrow(new RuntimeException("backend down"))
           .when(backendApiClient)
-          .get(anyString(), any(ParameterizedTypeReference.class));
+          .get(anyString(), anyTypeRef());
 
       String view = controller.listMembers(null, null, null, null, model);
 
@@ -209,7 +205,7 @@ class MemberManagementControllerTest {
     void fragmentRequest_returnsResultsFragmentSelector() {
       // Given — an AJAX swap request (fragment=true) for in-place filter/paging (#573).
       Model model = new ConcurrentModel();
-      when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
+      when(backendApiClient.get(anyString(), anyTypeRef()))
           .thenReturn(newPage(List.of(newUser("alice"))));
 
       // When
@@ -227,7 +223,7 @@ class MemberManagementControllerTest {
   @Test
   void searchMembers_returnsContentList() {
     PageResponse<UserDto> page = newPage(List.of(newUser("alice"), newUser("bob")));
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
     List<UserDto> result = controller.searchMembers("ali");
 
@@ -236,7 +232,7 @@ class MemberManagementControllerTest {
 
   @Test
   void searchMembers_nullResponse_returnsNull() {
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(null);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
 
     assertNull(controller.searchMembers("ali"));
   }
@@ -327,7 +323,7 @@ class MemberManagementControllerTest {
       Model model = new ConcurrentModel();
       doThrow(new RuntimeException("not found"))
           .when(backendApiClient)
-          .get(anyString(), any(Class.class));
+          .get(anyString(), anyClass());
 
       String view = controller.editMember(id, null, model, redirectAttributes);
 

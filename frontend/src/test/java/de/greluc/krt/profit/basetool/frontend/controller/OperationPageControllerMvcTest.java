@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
@@ -50,7 +51,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -69,7 +69,6 @@ import org.springframework.web.context.WebApplicationContext;
  * value.
  */
 @SpringBootTest
-@SuppressWarnings("unchecked")
 class OperationPageControllerMvcTest {
 
   @Autowired private WebApplicationContext context;
@@ -100,10 +99,7 @@ class OperationPageControllerMvcTest {
             UUID.randomUUID(), "Op Alpha", "First op", "PLANNED", null, 0L, null, null, null);
     PageResponse<OperationDto> page =
         new PageResponse<>(List.of(op), 0, 20, 1L, 1, List.of("createdAt,desc"));
-    when(backendApiClient.get(
-            startsWith("/api/v1/operations/search?"),
-            any(ParameterizedTypeReference.class),
-            anyBoolean()))
+    when(backendApiClient.get(startsWith("/api/v1/operations/search?"), anyTypeRef(), anyBoolean()))
         .thenReturn(page);
 
     mockMvc
@@ -129,10 +125,7 @@ class OperationPageControllerMvcTest {
             UUID.randomUUID(), "Op Alpha", "First op", "ACTIVE", null, 0L, null, null, null);
     PageResponse<OperationDto> page =
         new PageResponse<>(List.of(op), 0, 20, 1L, 1, List.of("createdAt,desc"));
-    when(backendApiClient.get(
-            startsWith("/api/v1/operations/search?"),
-            any(ParameterizedTypeReference.class),
-            anyBoolean()))
+    when(backendApiClient.get(startsWith("/api/v1/operations/search?"), anyTypeRef(), anyBoolean()))
         .thenReturn(page);
 
     // English locale resolves to messages_en.properties → "ACTIVE".
@@ -190,9 +183,7 @@ class OperationPageControllerMvcTest {
             eq("/api/v1/operations/" + opId), eq(OperationDto.class), anyBoolean()))
         .thenReturn(operation);
     when(backendApiClient.get(
-            contains("/api/v1/missions/search?operationId=" + opId),
-            any(ParameterizedTypeReference.class),
-            anyBoolean()))
+            contains("/api/v1/missions/search?operationId=" + opId), anyTypeRef(), anyBoolean()))
         .thenReturn(new PageResponse<>(List.<MissionListDto>of(), 0, 10, 0L, 0, List.of()));
     when(backendApiClient.get(
             eq("/api/v1/operations/" + opId + "/finances"),
@@ -242,9 +233,7 @@ class OperationPageControllerMvcTest {
     PageResponse<MissionListDto> missionsPage =
         new PageResponse<>(List.of(mission), 0, 10, 1L, 1, List.of("plannedStartTime,asc"));
     when(backendApiClient.get(
-            contains("/api/v1/missions/search?operationId=" + opId),
-            any(ParameterizedTypeReference.class),
-            anyBoolean()))
+            contains("/api/v1/missions/search?operationId=" + opId), anyTypeRef(), anyBoolean()))
         .thenReturn(missionsPage);
 
     // Empty finance/payout stubs so the page renders without NPE.
@@ -308,9 +297,7 @@ class OperationPageControllerMvcTest {
             0L);
     // Two pages so the embedded pager renders.
     when(backendApiClient.get(
-            contains("/api/v1/missions/search?operationId=" + opId),
-            any(ParameterizedTypeReference.class),
-            anyBoolean()))
+            contains("/api/v1/missions/search?operationId=" + opId), anyTypeRef(), anyBoolean()))
         .thenReturn(
             new PageResponse<>(List.of(mission), 0, 10, 15L, 2, List.of("plannedStartTime,asc")));
 

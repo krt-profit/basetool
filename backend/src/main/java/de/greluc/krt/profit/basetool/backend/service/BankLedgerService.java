@@ -51,6 +51,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -384,6 +385,47 @@ public class BankLedgerService {
             + counterpartyDetail(counterparty, "->")
             + feeDetail(fee));
     return toDto(tx);
+  }
+
+  /**
+   * Enforces the KRT-account direct-booking cap (REQ-BANK-047): a plain bank employee may
+   * <em>directly</em> book a withdrawal / transfer leaving the KRT ({@code CARTEL}) account only up
+   * to the bank-employee approval ceiling {@code T1} ({@link
+   * BankAccount#getEmployeeApprovalCeiling()}, an unset ceiling treated as {@code 0}); above it the
+   * money must go through the booking-request → external-approval flow (Bereichsleiter Profit /
+   * Organisationsleitung). Bank management and admins (management-or-above) are unrestricted, and
+   * every non-CARTEL account is a no-op. Called by the <em>direct-booking</em> controller only —
+   * NOT the request-confirmation path, whose over-limit approval was already attested via the
+   * confirm checkbox, so {@link #bookWithdrawal}/{@link #bookTransfer} stay uncapped and reusable
+   * there.
+   *
+   * @param accountId the (source) account the direct booking debits
+   * @param amount the entered whole-aUEC amount leaving the account
+   * @throws BankConflictException {@code BANK_CARTEL_APPROVAL_REQUIRED} when a plain employee
+   *     exceeds the ceiling on the KRT account
+   */
+  @Transactional(readOnly = true)
+  public void requireCartelDirectBookingAllowed(
+      @NotNull UUID accountId, @NotNull BigDecimal amount) {
+    if (authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT))) {
+      return;
+    }
+    BankAccount account = accountRepository.findById(accountId).orElse(null);
+    if (account == null || account.getType() != BankAccountType.CARTEL) {
+      return;
+    }
+    BigDecimal ceiling =
+        account.getEmployeeApprovalCeiling() == null
+            ? BigDecimal.ZERO
+            : account.getEmployeeApprovalCeiling();
+    if (amount.compareTo(ceiling) > 0) {
+      throw new BankConflictException(
+          BankConflictException.CODE_BANK_CARTEL_APPROVAL_REQUIRED,
+          "The amount exceeds the bank-employee approval ceiling for the KRT account; raise a"
+              + " booking request so the Bereichsleiter Profit / Organisationsleitung can approve"
+              + " it",
+          Map.of("ceiling", plain(ceiling)));
+    }
   }
 
   /**

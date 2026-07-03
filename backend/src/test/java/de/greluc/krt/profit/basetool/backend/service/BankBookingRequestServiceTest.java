@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.model.BankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.model.BankHolder;
+import de.greluc.krt.profit.basetool.backend.model.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.model.BankTransaction;
 import de.greluc.krt.profit.basetool.backend.model.BankTransactionType;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
@@ -169,6 +170,7 @@ class BankBookingRequestServiceTest {
             null,
             false,
             null,
+            null,
             false,
             null);
 
@@ -220,6 +222,7 @@ class BankBookingRequestServiceTest {
         null,
         false,
         null,
+        null,
         true,
         new BigDecimal("30"));
 
@@ -246,6 +249,7 @@ class BankBookingRequestServiceTest {
                     null,
                     null,
                     false,
+                    null,
                     null,
                     false,
                     null));
@@ -275,6 +279,7 @@ class BankBookingRequestServiceTest {
                     null,
                     true,
                     null,
+                    BankRequestApprover.RESPONSIBLE_HOLDER,
                     false,
                     null));
     assertThat(ex.getCode()).isEqualTo(BankConflictException.CODE_BANK_JUSTIFICATION_REQUIRED);
@@ -309,6 +314,7 @@ class BankBookingRequestServiceTest {
         null,
         true,
         null,
+        BankRequestApprover.RESPONSIBLE_HOLDER,
         false,
         null);
 
@@ -343,6 +349,7 @@ class BankBookingRequestServiceTest {
         null,
         true,
         null,
+        BankRequestApprover.RESPONSIBLE_HOLDER,
         false,
         null);
 

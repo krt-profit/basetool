@@ -21,7 +21,15 @@
     'use strict';
 
     /** Form field names serialized as JSON numbers instead of strings. */
-    const NUMBER_FIELDS = ['amount', 'version', 'target', 'limit', 'splitPercent'];
+    const NUMBER_FIELDS = [
+        'amount',
+        'version',
+        'target',
+        'limit',
+        'splitPercent',
+        'employeeCeiling',
+        'areaLeadCeiling',
+    ];
 
     /** Form field names serialized as JSON booleans ("true"/"false" hidden inputs). */
     const BOOLEAN_FIELDS = ['active'];

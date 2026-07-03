@@ -397,7 +397,6 @@ class JobOrderItemBlueprintOwnersServiceTest {
   // and listed as an owner even when they are NOT a member of the responsible org unit; the service
   // unions their sub into the owner-set passed to the blueprint lookup.
   @Test
-  @SuppressWarnings("unchecked")
   void globalSharerOutsideResponsibleOrgUnit_isCountedAndListed() {
     JobOrder order = order(item("Aurora MR", "Aurora MR Ship"));
     when(jobOrderRepository.findByIdWithItemBlueprints(ORDER_ID)).thenReturn(Optional.of(order));
@@ -405,7 +404,7 @@ class JobOrderItemBlueprintOwnersServiceTest {
         .thenReturn(Set.of(ALICE));
     // CARLA is not a member of the responsible org unit but opted into global sharing.
     when(userRepository.findIdsBySharingBlueprintsGlobally()).thenReturn(Set.of(CARLA));
-    ArgumentCaptor<Collection<String>> ownerSubs = ArgumentCaptor.forClass(Collection.class);
+    ArgumentCaptor<Collection<String>> ownerSubs = ArgumentCaptor.captor();
     when(personalBlueprintRepository.findOwnerProductByOwnerSubIn(ownerSubs.capture()))
         .thenReturn(List.of(owned(ALICE, "Aurora MR"), owned(CARLA, "Aurora MR")));
     when(userRepository.findAllById(any()))
@@ -430,14 +429,13 @@ class JobOrderItemBlueprintOwnersServiceTest {
   // covers REQ-INV-018 — a user who is neither a member of the responsible org unit nor a global
   // sharer is never counted: the global-sharer union is empty, so the owner-set is members-only.
   @Test
-  @SuppressWarnings("unchecked")
   void nonMemberNonSharer_isNotCounted() {
     JobOrder order = order(item("Aurora MR", "Aurora MR Ship"));
     when(jobOrderRepository.findByIdWithItemBlueprints(ORDER_ID)).thenReturn(Optional.of(order));
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_ID)))
         .thenReturn(Set.of(ALICE));
     when(userRepository.findIdsBySharingBlueprintsGlobally()).thenReturn(Set.of());
-    ArgumentCaptor<Collection<String>> ownerSubs = ArgumentCaptor.forClass(Collection.class);
+    ArgumentCaptor<Collection<String>> ownerSubs = ArgumentCaptor.captor();
     when(personalBlueprintRepository.findOwnerProductByOwnerSubIn(ownerSubs.capture()))
         .thenReturn(List.of(owned(ALICE, "Aurora MR")));
     when(userRepository.findAllById(any())).thenReturn(List.of(user(ALICE, "Alice")));

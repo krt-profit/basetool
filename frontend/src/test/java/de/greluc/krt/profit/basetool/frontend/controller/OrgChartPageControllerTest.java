@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -38,7 +39,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
@@ -76,7 +76,7 @@ class OrgChartPageControllerTest {
 
     assertEquals("org-chart", view);
     assertSame(chart, model.getAttribute("orgChart"));
-    verify(backend, never()).get(eq("/api/v1/users/lookup"), any(ParameterizedTypeReference.class));
+    verify(backend, never()).get(eq("/api/v1/users/lookup"), anyTypeRef());
   }
 
   @Test

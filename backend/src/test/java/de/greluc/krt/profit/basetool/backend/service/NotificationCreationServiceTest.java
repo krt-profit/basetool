@@ -77,7 +77,7 @@ class NotificationCreationServiceTest {
     int created = service.createFromEvent(event);
 
     assertThat(created).isEqualTo(2);
-    ArgumentCaptor<List<Notification>> captor = ArgumentCaptor.forClass(List.class);
+    ArgumentCaptor<List<Notification>> captor = ArgumentCaptor.captor();
     verify(notificationRepository).saveAll(captor.capture());
     List<Notification> saved = captor.getValue();
     assertThat(saved).hasSize(2);

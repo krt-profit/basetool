@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -42,7 +43,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
 /**
@@ -62,8 +62,7 @@ class PersonalInventoryBlueprintsControllerTest {
     BlueprintProductDto dto =
         new BlueprintProductDto("arclight pistol", "Arclight Pistol", 2, "Behring", "key", false);
     when(backendApiClient.get(
-            contains("/api/v1/blueprints/products/search?q=arc&limit=25"),
-            any(ParameterizedTypeReference.class)))
+            contains("/api/v1/blueprints/products/search?q=arc&limit=25"), anyTypeRef()))
         .thenReturn(List.of(dto));
 
     List<BlueprintProductDto> result = controller.search("arc", null);
@@ -74,16 +73,14 @@ class PersonalInventoryBlueprintsControllerTest {
 
   @Test
   void search_clampsLimitTo200() {
-    when(backendApiClient.get(contains("limit=200"), any(ParameterizedTypeReference.class)))
-        .thenReturn(List.of());
+    when(backendApiClient.get(contains("limit=200"), anyTypeRef())).thenReturn(List.of());
 
     assertTrue(controller.search("x", 9999).isEmpty());
   }
 
   @Test
   void search_returnsEmptyList_whenBackendThrows() {
-    when(backendApiClient.get(any(), any(ParameterizedTypeReference.class)))
-        .thenThrow(new RuntimeException("boom"));
+    when(backendApiClient.get(any(), anyTypeRef())).thenThrow(new RuntimeException("boom"));
 
     List<BlueprintProductDto> result = controller.search("anything", 25);
 

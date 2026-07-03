@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static org.mockito.ArgumentMatchers.any;
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -42,7 +42,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -64,7 +63,6 @@ import org.springframework.web.context.WebApplicationContext;
  * JobOrderPageControllerCreateFormAnonymousMvcTest}.
  */
 @SpringBootTest
-@SuppressWarnings("unchecked")
 class JobOrderPageControllerResponsiblePickerMvcTest {
 
   private static final String ACTIVE_URI = "/api/v1/org-units/active";
@@ -103,11 +101,10 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
 
     // Reference catalogs (materials / orderable items / squadrons) go through the cached client;
     // empty keeps them from blocking the render.
-    when(backendApiClient.getCached(
-            anyString(), any(ParameterizedTypeReference.class), anyBoolean()))
+    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
     // Authenticated requesting picker sources the all-kinds catalog via the authenticated client.
-    when(backendApiClient.get(eq(ALL_KINDS_URI), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq(ALL_KINDS_URI), anyTypeRef()))
         .thenReturn(List.of(profitStaffel, profitSk, bereich, ol));
 
     mockMvc
@@ -122,10 +119,8 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
         .andExpect(content().string(Matchers.containsString("Kartellleitung XYZ")));
 
     // Authenticated callers source the all-kinds catalog — never the Staffel/SK-only /active.
-    verify(backendApiClient).get(eq(ALL_KINDS_URI), any(ParameterizedTypeReference.class));
-    verify(backendApiClient, never())
-        .get(eq(ACTIVE_URI), any(ParameterizedTypeReference.class), anyBoolean());
-    verify(backendApiClient, never())
-        .getCached(eq(SK_CATALOG_URI), any(ParameterizedTypeReference.class), anyBoolean());
+    verify(backendApiClient).get(eq(ALL_KINDS_URI), anyTypeRef());
+    verify(backendApiClient, never()).get(eq(ACTIVE_URI), anyTypeRef(), anyBoolean());
+    verify(backendApiClient, never()).getCached(eq(SK_CATALOG_URI), anyTypeRef(), anyBoolean());
   }
 }

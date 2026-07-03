@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -42,7 +42,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -118,30 +117,25 @@ class PromotionAdminRankRequirementsPageMvcTest {
             1,
             1,
             List.of());
-    when(backendApiClient.get(contains("/api/v1/squadrons"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/squadrons"), anyTypeRef()))
         .thenReturn(squadronPage);
     // availableSquadrons() reads the catalogue through the STATIC_DATA_CACHE (getCached) now
     // (REQ-DATA-007); stub that path too or the officer's promotion-feature flag resolves empty.
-    when(backendApiClient.getCached(
-            contains("/api/v1/squadrons"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.getCached(contains("/api/v1/squadrons"), anyTypeRef()))
         .thenReturn(squadronPage);
     when(backendApiClient.get(
             eq("/api/v1/me/active-org-unit"),
             eq(SquadronContextAdvice.ActiveOrgUnitResponse.class)))
         .thenReturn(new SquadronContextAdvice.ActiveOrgUnitResponse(squadronId));
 
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/rank-requirements"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/rank-requirements"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(req), 0, 1000, 1, 1, List.of()));
-    when(backendApiClient.get(
-            eq("/api/v1/promotion/topics/all"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/promotion/topics/all"), anyTypeRef()))
         .thenReturn(List.of(topic));
     when(backendApiClient.get(
-            contains("/api/v1/promotion/categories/by-topic/" + topicId + "/all"),
-            any(ParameterizedTypeReference.class)))
+            contains("/api/v1/promotion/categories/by-topic/" + topicId + "/all"), anyTypeRef()))
         .thenReturn(List.of(cat));
-    when(backendApiClient.get(
-            contains("/api/v1/promotion/categories?size="), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/promotion/categories?size="), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(cat), 0, 1000, 1, 1, List.of()));
 
     mockMvc

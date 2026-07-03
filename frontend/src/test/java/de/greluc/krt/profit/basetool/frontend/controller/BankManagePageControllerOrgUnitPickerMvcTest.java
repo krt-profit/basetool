@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static org.mockito.ArgumentMatchers.any;
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -38,7 +38,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -56,7 +55,6 @@ import org.springframework.web.context.WebApplicationContext;
  * visible label and its id as the option value.
  */
 @SpringBootTest
-@SuppressWarnings("unchecked")
 class BankManagePageControllerOrgUnitPickerMvcTest {
 
   // Epic #692 Phase 6 (REQ-ORG-019): the bank create form sources its picker from the all-kinds
@@ -86,9 +84,8 @@ class BankManagePageControllerOrgUnitPickerMvcTest {
 
     // The accounts / holders / users fetches may return null; the controller defaults them to empty
     // lists. Only the org-unit catalog needs a concrete option to assert the picker label.
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(null);
-    when(backendApiClient.get(eq(ACTIVE_URI), any(ParameterizedTypeReference.class)))
-        .thenReturn(List.of(staffel));
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(eq(ACTIVE_URI), anyTypeRef())).thenReturn(List.of(staffel));
 
     mockMvc
         .perform(get("/bank/manage"))

@@ -51,6 +51,9 @@ import org.springframework.web.server.ResponseStatusException;
  * <p>{@link MockWebServer} stands in for the backend so the real WebClient fluent chain (URI /
  * content-type / multipart body / bodyToMono) is exercised.
  */
+// Most tests here deliberately exercise the deprecated-for-removal importFleetview proxy alias;
+// referencing it triggers expected [removal] warnings, hence the class-level suppression.
+@SuppressWarnings("removal")
 class HangarImportProxyControllerTest {
 
   private MockWebServer server;

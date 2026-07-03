@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -33,7 +34,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.core.ParameterizedTypeReference;
 
 /**
  * Unit tests for {@link MaterialProxyController}. The controller is a thin frontend-side proxy that
@@ -66,8 +66,7 @@ class MaterialProxyControllerTest {
             Map.of("terminalName", "Lorville TDD", "priceBuy", 12.5),
             Map.of("terminalName", "Area18 TDD", "priceBuy", 13.0));
     when(backendApiClient.<List<Map<String, Object>>>get(
-            eq("/api/v1/materials/" + materialId + "/terminals"),
-            any(ParameterizedTypeReference.class)))
+            eq("/api/v1/materials/" + materialId + "/terminals"), anyTypeRef()))
         .thenReturn(backendData);
 
     // When
@@ -76,9 +75,7 @@ class MaterialProxyControllerTest {
     // Then
     assertEquals(backendData, result);
     verify(backendApiClient)
-        .get(
-            eq("/api/v1/materials/" + materialId + "/terminals"),
-            any(ParameterizedTypeReference.class));
+        .get(eq("/api/v1/materials/" + materialId + "/terminals"), anyTypeRef());
   }
 
   @Test
@@ -86,8 +83,7 @@ class MaterialProxyControllerTest {
     // Given — the backend returned null (e.g. material not found, 204 No Content)
     UUID materialId = UUID.randomUUID();
     when(backendApiClient.<List<Map<String, Object>>>get(
-            eq("/api/v1/materials/" + materialId + "/terminals"),
-            any(ParameterizedTypeReference.class)))
+            eq("/api/v1/materials/" + materialId + "/terminals"), anyTypeRef()))
         .thenReturn(null);
 
     // When
@@ -105,8 +101,7 @@ class MaterialProxyControllerTest {
   void getProfitCalculation_withoutStarSystemNames_buildsBaseUri() {
     // Given
     UUID shipId = UUID.randomUUID();
-    when(backendApiClient.<List<Map<String, Object>>>get(
-            any(String.class), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.<List<Map<String, Object>>>get(any(String.class), anyTypeRef()))
         .thenReturn(List.of());
 
     // When
@@ -114,7 +109,7 @@ class MaterialProxyControllerTest {
 
     // Then — no query parameters appended beyond the mandatory shipId
     ArgumentCaptor<String> uriCap = ArgumentCaptor.forClass(String.class);
-    verify(backendApiClient).get(uriCap.capture(), any(ParameterizedTypeReference.class));
+    verify(backendApiClient).get(uriCap.capture(), anyTypeRef());
     assertEquals("/api/v1/materials/profit-calculation?shipId=" + shipId, uriCap.getValue());
   }
 
@@ -122,8 +117,7 @@ class MaterialProxyControllerTest {
   void getProfitCalculation_withEmptyStarSystemList_buildsBaseUri() {
     // Given — explicit empty list should behave like null
     UUID shipId = UUID.randomUUID();
-    when(backendApiClient.<List<Map<String, Object>>>get(
-            any(String.class), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.<List<Map<String, Object>>>get(any(String.class), anyTypeRef()))
         .thenReturn(List.of());
 
     // When
@@ -131,7 +125,7 @@ class MaterialProxyControllerTest {
 
     // Then
     ArgumentCaptor<String> uriCap = ArgumentCaptor.forClass(String.class);
-    verify(backendApiClient).get(uriCap.capture(), any(ParameterizedTypeReference.class));
+    verify(backendApiClient).get(uriCap.capture(), anyTypeRef());
     assertEquals("/api/v1/materials/profit-calculation?shipId=" + shipId, uriCap.getValue());
   }
 
@@ -139,8 +133,7 @@ class MaterialProxyControllerTest {
   void getProfitCalculation_withMultipleStarSystems_appendsEachAsRepeatedParam() {
     // Given
     UUID shipId = UUID.randomUUID();
-    when(backendApiClient.<List<Map<String, Object>>>get(
-            any(String.class), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.<List<Map<String, Object>>>get(any(String.class), anyTypeRef()))
         .thenReturn(List.of());
 
     // When
@@ -149,7 +142,7 @@ class MaterialProxyControllerTest {
     // Then — each star system is appended as its own query parameter,
     // matching backend's Pageable/multi-value binding (NOT CSV-encoded)
     ArgumentCaptor<String> uriCap = ArgumentCaptor.forClass(String.class);
-    verify(backendApiClient).get(uriCap.capture(), any(ParameterizedTypeReference.class));
+    verify(backendApiClient).get(uriCap.capture(), anyTypeRef());
     String uri = uriCap.getValue();
     assertTrue(uri.startsWith("/api/v1/materials/profit-calculation?shipId=" + shipId));
     assertTrue(uri.contains("&starSystemNames=Stanton"));
@@ -161,14 +154,13 @@ class MaterialProxyControllerTest {
   @Test
   void getProfitCalculation_withSingleStarSystem_appendsOneParam() {
     UUID shipId = UUID.randomUUID();
-    when(backendApiClient.<List<Map<String, Object>>>get(
-            any(String.class), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.<List<Map<String, Object>>>get(any(String.class), anyTypeRef()))
         .thenReturn(List.of());
 
     controller.getProfitCalculation(shipId, List.of("Stanton"));
 
     ArgumentCaptor<String> uriCap = ArgumentCaptor.forClass(String.class);
-    verify(backendApiClient).get(uriCap.capture(), any(ParameterizedTypeReference.class));
+    verify(backendApiClient).get(uriCap.capture(), anyTypeRef());
     assertEquals(
         "/api/v1/materials/profit-calculation?shipId=" + shipId + "&starSystemNames=Stanton",
         uriCap.getValue());
@@ -178,8 +170,7 @@ class MaterialProxyControllerTest {
   void getProfitCalculation_withNullBackendResponse_returnsEmptyList() {
     // Given
     UUID shipId = UUID.randomUUID();
-    when(backendApiClient.<List<Map<String, Object>>>get(
-            any(String.class), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.<List<Map<String, Object>>>get(any(String.class), anyTypeRef()))
         .thenReturn(null);
 
     // When

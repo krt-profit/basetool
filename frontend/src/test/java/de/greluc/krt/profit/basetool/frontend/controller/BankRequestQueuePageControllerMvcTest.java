@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static org.mockito.ArgumentMatchers.any;
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
@@ -43,7 +43,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -57,7 +56,6 @@ import org.springframework.web.context.WebApplicationContext;
  * resolves for the in-place swap.
  */
 @SpringBootTest
-@SuppressWarnings("unchecked")
 class BankRequestQueuePageControllerMvcTest {
 
   private static final String HOLDERS_URI = "/api/v1/bank/holders";
@@ -103,6 +101,7 @@ class BankRequestQueuePageControllerMvcTest {
             null,
             false,
             null,
+            null,
             false,
             null,
             false,
@@ -113,12 +112,9 @@ class BankRequestQueuePageControllerMvcTest {
     BankHolderDto holder =
         new BankHolderDto(
             UUID.randomUUID(), UUID.randomUUID(), "greluc", true, BigDecimal.ZERO, false, 0L);
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(null);
-    when(backendApiClient.get(
-            startsWith("/api/v1/bank/requests"), any(ParameterizedTypeReference.class)))
-        .thenReturn(page);
-    when(backendApiClient.get(eq(HOLDERS_URI), any(ParameterizedTypeReference.class)))
-        .thenReturn(List.of(holder));
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(startsWith("/api/v1/bank/requests"), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(eq(HOLDERS_URI), anyTypeRef())).thenReturn(List.of(holder));
   }
 
   @Test

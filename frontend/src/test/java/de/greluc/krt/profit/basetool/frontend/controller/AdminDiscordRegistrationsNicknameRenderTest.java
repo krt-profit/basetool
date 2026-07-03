@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
@@ -37,7 +37,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -70,7 +69,6 @@ class AdminDiscordRegistrationsNicknameRenderTest {
   }
 
   @Test
-  @SuppressWarnings("unchecked")
   void queue_showsServerNickname_andDashWhenAbsent() throws Exception {
     PendingRegistrationDto withNick =
         new PendingRegistrationDto(
@@ -83,8 +81,7 @@ class AdminDiscordRegistrationsNicknameRenderTest {
         new PendingRegistrationDto(
             UUID.randomUUID(), "BobCallsign", null, Instant.parse("2026-06-22T00:00:00Z"), 1L);
 
-    when(backendApiClient.get(
-            eq("/api/v1/admin/registrations"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/admin/registrations"), anyTypeRef()))
         .thenReturn(List.of(withNick, withoutNick));
 
     String html =

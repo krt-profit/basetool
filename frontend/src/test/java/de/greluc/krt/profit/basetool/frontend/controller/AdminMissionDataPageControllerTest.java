@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -32,7 +32,6 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import java.util.*;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
@@ -65,13 +64,11 @@ class AdminMissionDataPageControllerTest {
         new PageResponse<>(squadrons, 0, 1000, squadrons.size(), 1, List.of("name,asc"));
 
     when(backendApiClient.get(
-            eq("/api/v1/job-types?size=1000&sort=name,asc&includeInactive=false"),
-            any(ParameterizedTypeReference.class)))
+            eq("/api/v1/job-types?size=1000&sort=name,asc&includeInactive=false"), anyTypeRef()))
         .thenReturn(jobTypesPage);
 
     when(backendApiClient.get(
-            eq("/api/v1/squadrons?size=1000&sort=name,asc&includeInactive=false"),
-            any(ParameterizedTypeReference.class)))
+            eq("/api/v1/squadrons?size=1000&sort=name,asc&includeInactive=false"), anyTypeRef()))
         .thenReturn(squadronsPage);
 
     // Act

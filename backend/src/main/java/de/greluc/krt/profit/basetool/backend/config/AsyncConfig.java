@@ -69,6 +69,15 @@ public class AsyncConfig {
   public static final String NOTIFICATION_EXECUTOR = "notificationExecutor";
 
   /**
+   * Spring-bean name of the mail executor, referenced from {@code @Async("mailExecutor")}. Carries
+   * the after-commit transactional-mail work (account approval/rejection notices — REQ-NOTIF-014)
+   * off the request thread so SMTP latency never adds to (or fails) the originating business
+   * transaction. Kept distinct from the notification pool so a slow/unreachable SMTP relay cannot
+   * starve in-app notification creation, and vice-versa.
+   */
+  public static final String MAIL_EXECUTOR = "mailExecutor";
+
+  /**
    * Bounded executor for the periodic UEX sync sweep dispatched by {@link
    * de.greluc.krt.profit.basetool.backend.service.UexScheduler}.
    *
@@ -175,6 +184,28 @@ public class AsyncConfig {
   @Bean(name = NOTIFICATION_EXECUTOR)
   public Executor notificationExecutor() {
     return buildExecutor(2, 4, 200, "notification-async-", 20);
+  }
+
+  /**
+   * Bounded executor for after-commit transactional mail dispatched by the mail event listener.
+   *
+   * <p>Sizing rationale: each task composes one localized message and makes a single blocking SMTP
+   * call — a handful of seconds at worst against a healthy relay. A core pool of two with head-room
+   * to four absorbs a small burst of approvals/rejections without unbounded thread growth; the
+   * 200-slot queue tolerates a spike before {@link ThreadPoolExecutor.AbortPolicy} engages and
+   * surfaces a {@link java.util.concurrent.RejectedExecutionException} in the logs. Dropping a mail
+   * task is non-fatal (the decision already committed and delivery is best-effort), but a loud
+   * rejection is still the desired signal. Kept separate from {@link #notificationExecutor()} so a
+   * stalled SMTP relay cannot block in-app notification creation.
+   *
+   * <p>{@link MdcPropagatingTaskDecorator} keeps the correlation/user/org-unit MDC fields of the
+   * deciding request on the worker thread, exactly as for the other executors.
+   *
+   * @return configured mail async executor
+   */
+  @Bean(name = MAIL_EXECUTOR)
+  public Executor mailExecutor() {
+    return buildExecutor(2, 4, 200, "mail-async-", 20);
   }
 
   /**

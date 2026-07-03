@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.mock;
@@ -37,7 +38,6 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.MessageSource;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
@@ -114,10 +114,7 @@ class ParticipationCalculationTest {
             null);
 
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    when(backendApiClient.get(
-            eq("/api/v1/missions/" + missionId),
-            any(ParameterizedTypeReference.class),
-            anyBoolean()))
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
         .thenReturn(mission);
 
     MissionPageController controller =
@@ -132,8 +129,7 @@ class ParticipationCalculationTest {
     controller.missionDetail(missionId, model, null, null);
 
     // Assert
-    Map<UUID, Double> percentages =
-        (Map<UUID, Double>) model.getAttribute("participationPercentages");
+    Map<?, ?> percentages = (Map<?, ?>) model.getAttribute("participationPercentages");
     assertNotNull(percentages);
 
     // Should use UUID keys now
@@ -235,10 +231,7 @@ class ParticipationCalculationTest {
             null);
 
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    when(backendApiClient.get(
-            eq("/api/v1/missions/" + missionId),
-            any(ParameterizedTypeReference.class),
-            anyBoolean()))
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
         .thenReturn(mission);
 
     MissionPageController controller =
@@ -253,13 +246,17 @@ class ParticipationCalculationTest {
     controller.missionDetail(missionId, model, null, null);
 
     // Assert
-    Map<UUID, Double> percentages =
-        (Map<UUID, Double>) model.getAttribute("participationPercentages");
+    Map<?, ?> percentages = (Map<?, ?>) model.getAttribute("participationPercentages");
     assertNotNull(percentages);
 
     assertTrue(
         percentages.containsKey(p2Id), "P2 should have a percentage entry even without startTime");
-    assertEquals(0.0, percentages.get(p2Id), 0.001, "P2 percentage should be 0.0");
-    assertEquals(100.0, percentages.get(p1Id), 0.001, "P1 percentage should be 100.0");
+    assertEquals(
+        0.0, ((Number) percentages.get(p2Id)).doubleValue(), 0.001, "P2 percentage should be 0.0");
+    assertEquals(
+        100.0,
+        ((Number) percentages.get(p1Id)).doubleValue(),
+        0.001,
+        "P1 percentage should be 100.0");
   }
 }

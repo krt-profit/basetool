@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -39,7 +39,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.IdTokenClaimNames;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
@@ -119,12 +118,10 @@ class OfficerRefineryAccessTest {
             false);
     PageResponse<UserDto> userPage =
         new PageResponse<>(List.of(userDto, memberDto), 0, 10, 2L, 1, Collections.emptyList());
-    when(backendApiClient.get(eq("/api/v1/users?size=1000"), any(ParameterizedTypeReference.class)))
-        .thenReturn(userPage);
+    when(backendApiClient.get(eq("/api/v1/users?size=1000"), anyTypeRef())).thenReturn(userPage);
 
     // Mock other data
-    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
     when(backendApiClient.get(
             eq("/api/v1/settings/refinery.rounding.mode"), eq(SystemSettingDto.class)))
         .thenReturn(new SystemSettingDto("refinery.rounding.mode", "UP", 1L));

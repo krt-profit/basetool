@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.*;
 
@@ -32,11 +32,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
-@SuppressWarnings("unchecked")
 class MaterialCollectionPageControllerTest {
 
   @Test
@@ -54,13 +52,9 @@ class MaterialCollectionPageControllerTest {
     List<LocationReferenceDto> locations =
         List.of(new LocationReferenceDto(UUID.randomUUID(), "Port Olisar"));
 
-    when(backendApiClient.get(
-            contains("/material-collection"), any(ParameterizedTypeReference.class)))
-        .thenReturn(entries);
-    when(backendApiClient.get(contains("/users/lookup"), any(ParameterizedTypeReference.class)))
-        .thenReturn(users);
-    when(backendApiClient.getCached(
-            contains("/locations/lookup"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/material-collection"), anyTypeRef())).thenReturn(entries);
+    when(backendApiClient.get(contains("/users/lookup"), anyTypeRef())).thenReturn(users);
+    when(backendApiClient.getCached(contains("/locations/lookup"), anyTypeRef()))
         .thenReturn(locations);
 
     // When
@@ -83,13 +77,10 @@ class MaterialCollectionPageControllerTest {
     Model model = new ConcurrentModel();
     UUID jobOrderId = UUID.randomUUID();
 
-    when(backendApiClient.get(
-            contains("/material-collection"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/material-collection"), anyTypeRef()))
         .thenThrow(new BackendServiceException("Backend error", null, 500));
-    when(backendApiClient.get(contains("/users/lookup"), any(ParameterizedTypeReference.class)))
-        .thenReturn(List.of());
-    when(backendApiClient.getCached(
-            contains("/locations/lookup"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/users/lookup"), anyTypeRef())).thenReturn(List.of());
+    when(backendApiClient.getCached(contains("/locations/lookup"), anyTypeRef()))
         .thenReturn(List.of());
 
     // When
@@ -111,13 +102,11 @@ class MaterialCollectionPageControllerTest {
     Model model = new ConcurrentModel();
     UUID jobOrderId = UUID.randomUUID();
 
-    when(backendApiClient.get(
-            contains("/material-collection"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/material-collection"), anyTypeRef()))
         .thenReturn(List.of());
-    when(backendApiClient.get(contains("/users/lookup"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/users/lookup"), anyTypeRef()))
         .thenThrow(new BackendServiceException("Backend error", null, 500));
-    when(backendApiClient.getCached(
-            contains("/locations/lookup"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.getCached(contains("/locations/lookup"), anyTypeRef()))
         .thenReturn(List.of());
 
     // When
@@ -139,13 +128,10 @@ class MaterialCollectionPageControllerTest {
     Model model = new ConcurrentModel();
     UUID jobOrderId = UUID.randomUUID();
 
-    when(backendApiClient.get(
-            contains("/material-collection"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/material-collection"), anyTypeRef()))
         .thenReturn(List.of());
-    when(backendApiClient.get(contains("/users/lookup"), any(ParameterizedTypeReference.class)))
-        .thenReturn(List.of());
-    when(backendApiClient.getCached(
-            contains("/locations/lookup"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/users/lookup"), anyTypeRef())).thenReturn(List.of());
+    when(backendApiClient.getCached(contains("/locations/lookup"), anyTypeRef()))
         .thenThrow(new BackendServiceException("Backend error", null, 500));
 
     // When

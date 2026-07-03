@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -44,7 +45,6 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 import tools.jackson.databind.JsonNode;
@@ -82,8 +82,7 @@ class AdminAuditLogPageControllerTest {
             null,
             null,
             "+100 aUEC");
-    when(backendApiClient.get(
-            contains("/api/v1/bank/admin/audit"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/bank/admin/audit"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(bankRow), 0, 50, 1, 1, List.of()));
 
     // When
@@ -118,8 +117,7 @@ class AdminAuditLogPageControllerTest {
             "Quantanium @ Port Olisar",
             null,
             "qty=5.0");
-    when(backendApiClient.get(
-            contains("/api/v1/audit/INVENTORY"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/audit/INVENTORY"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(genericRow), 0, 50, 1, 1, List.of()));
 
     // When
@@ -151,8 +149,7 @@ class AdminAuditLogPageControllerTest {
             "Grundlagen",
             null,
             null);
-    when(backendApiClient.get(
-            contains("/api/v1/audit/PROMOTION"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(contains("/api/v1/audit/PROMOTION"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(genericRow), 0, 50, 1, 1, List.of()));
 
     // When
@@ -175,7 +172,7 @@ class AdminAuditLogPageControllerTest {
   void unknownDomain_fallsBackToBankTab() {
     // Given
     Model model = new ConcurrentModel();
-    when(backendApiClient.get(any(String.class), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(any(String.class), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
     // When
@@ -189,7 +186,7 @@ class AdminAuditLogPageControllerTest {
   void fragmentResults_returnsResultsFragmentSelector() {
     // Given
     Model model = new ConcurrentModel();
-    when(backendApiClient.get(any(String.class), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(any(String.class), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
     // When
@@ -211,7 +208,7 @@ class AdminAuditLogPageControllerTest {
     assertTrue(produced.contains("HOLDER_TRANSFER"), "sanity: openapi should list HOLDER_TRANSFER");
 
     Model model = new ConcurrentModel();
-    when(backendApiClient.get(any(String.class), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(any(String.class), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
     controller.auditLog("BANK", null, null, null, null, 0, null, model);
     List<String> filterTypes = (List<String>) model.getAttribute("eventTypes");
@@ -289,7 +286,7 @@ class AdminAuditLogPageControllerTest {
   void backendFailure_setsErrorAttribute() {
     // Given
     Model model = new ConcurrentModel();
-    when(backendApiClient.get(any(String.class), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(any(String.class), anyTypeRef()))
         .thenThrow(new RuntimeException("down"));
 
     // When

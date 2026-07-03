@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyClass;
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -33,14 +35,12 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.MessageSource;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-@SuppressWarnings("unchecked")
 class MissionPageControllerTest {
 
   // Real loader so the parallelized finance/refinery fetches actually run their suppliers (against
@@ -379,8 +379,7 @@ class MissionPageControllerTest {
     OidcUser user = mock(OidcUser.class); // Mock authenticated user
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
-    when(backendApiClient.get(
-            uriCaptor.capture(), any(ParameterizedTypeReference.class), eq(false)))
+    when(backendApiClient.get(uriCaptor.capture(), anyTypeRef(), eq(false)))
         .thenReturn(
             new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
                 Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList()));
@@ -396,7 +395,7 @@ class MissionPageControllerTest {
     assertTrue(uri.contains("status=ACTIVE"));
     assertTrue((Boolean) model.getAttribute("showPast"));
 
-    verify(backendApiClient).get(anyString(), any(ParameterizedTypeReference.class), eq(false));
+    verify(backendApiClient).get(anyString(), anyTypeRef(), eq(false));
   }
 
   @Test
@@ -413,7 +412,7 @@ class MissionPageControllerTest {
     // No user (null)
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
-    when(backendApiClient.get(uriCaptor.capture(), any(ParameterizedTypeReference.class), eq(true)))
+    when(backendApiClient.get(uriCaptor.capture(), anyTypeRef(), eq(true)))
         .thenReturn(
             new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
                 Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList()));
@@ -432,7 +431,7 @@ class MissionPageControllerTest {
     // Model attribute should be false for guest
     assertFalse((Boolean) model.getAttribute("showPast"));
 
-    verify(backendApiClient).get(anyString(), any(ParameterizedTypeReference.class), eq(true));
+    verify(backendApiClient).get(anyString(), anyTypeRef(), eq(true));
   }
 
   @Test
@@ -489,10 +488,9 @@ class MissionPageControllerTest {
             0L,
             null);
 
-    when(backendApiClient.get(
-            eq("/api/v1/missions/" + id), any(ParameterizedTypeReference.class), eq(true)))
+    when(backendApiClient.get(eq("/api/v1/missions/" + id), anyTypeRef(), eq(true)))
         .thenReturn(mission);
-    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class), eq(true)))
+    when(backendApiClient.getCached(anyString(), anyTypeRef(), eq(true)))
         .thenReturn(Collections.emptyList());
 
     // Act
@@ -500,21 +498,12 @@ class MissionPageControllerTest {
 
     // Assert
     assertEquals("mission-detail", view);
+    verify(backendApiClient).get(eq("/api/v1/missions/" + id), anyTypeRef(), eq(true));
     verify(backendApiClient)
-        .get(eq("/api/v1/missions/" + id), any(ParameterizedTypeReference.class), eq(true));
+        .getCached(eq("/api/v1/job-types?archetype=MISSION&size=1000"), anyTypeRef(), eq(true));
     verify(backendApiClient)
-        .getCached(
-            eq("/api/v1/job-types?archetype=MISSION&size=1000"),
-            any(ParameterizedTypeReference.class),
-            eq(true));
-    verify(backendApiClient)
-        .getCached(
-            eq("/api/v1/job-types?archetype=CREW&size=1000"),
-            any(ParameterizedTypeReference.class),
-            eq(true));
-    verify(backendApiClient)
-        .getCached(
-            eq("/api/v1/squadrons?size=1000"), any(ParameterizedTypeReference.class), eq(true));
+        .getCached(eq("/api/v1/job-types?archetype=CREW&size=1000"), anyTypeRef(), eq(true));
+    verify(backendApiClient).getCached(eq("/api/v1/squadrons?size=1000"), anyTypeRef(), eq(true));
   }
 
   @Test
@@ -571,32 +560,24 @@ class MissionPageControllerTest {
             0L,
             null);
 
-    when(backendApiClient.get(
-            eq("/api/v1/missions/" + id), any(ParameterizedTypeReference.class), eq(true)))
+    when(backendApiClient.get(eq("/api/v1/missions/" + id), anyTypeRef(), eq(true)))
         .thenReturn(mission);
     when(backendApiClient.get(
-            eq("/api/v1/missions/" + id + "/units?size=1000"),
-            any(ParameterizedTypeReference.class),
-            eq(true)))
+            eq("/api/v1/missions/" + id + "/units?size=1000"), anyTypeRef(), eq(true)))
         .thenReturn(
             new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
                 Collections.emptyList(), 0, 10, 0, 0, Collections.emptyList()));
-    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(Collections.emptyList());
-    when(backendApiClient.getCached(
-            anyString(), any(ParameterizedTypeReference.class), anyBoolean()))
+    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
 
     // Act
     controller.missionDetail(id, model, null, null);
 
     // Assert
-    verify(backendApiClient, never())
-        .get(contains("/finance-entries"), any(ParameterizedTypeReference.class), anyBoolean());
-    verify(backendApiClient, never())
-        .get(contains("/refinery-orders"), any(ParameterizedTypeReference.class), anyBoolean());
-    verify(backendApiClient, never())
-        .get(contains("/finance-entries"), any(Class.class), anyBoolean());
+    verify(backendApiClient, never()).get(contains("/finance-entries"), anyTypeRef(), anyBoolean());
+    verify(backendApiClient, never()).get(contains("/refinery-orders"), anyTypeRef(), anyBoolean());
+    verify(backendApiClient, never()).get(contains("/finance-entries"), anyClass(), anyBoolean());
   }
 
   @Test
@@ -657,15 +638,12 @@ class MissionPageControllerTest {
             0L,
             null);
 
-    when(backendApiClient.get(
-            eq("/api/v1/missions/" + id), any(ParameterizedTypeReference.class), eq(true)))
+    when(backendApiClient.get(eq("/api/v1/missions/" + id), anyTypeRef(), eq(true)))
         .thenReturn(mission);
-    when(backendApiClient.getCached(anyString(), any(ParameterizedTypeReference.class), eq(true)))
+    when(backendApiClient.getCached(anyString(), anyTypeRef(), eq(true)))
         .thenReturn(Collections.emptyList());
     when(backendApiClient.get(
-            eq("/api/v1/missions/" + id + "/finance-entries?size=1000"),
-            any(ParameterizedTypeReference.class),
-            eq(false)))
+            eq("/api/v1/missions/" + id + "/finance-entries?size=1000"), anyTypeRef(), eq(false)))
         .thenReturn(
             new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
                 Collections.emptyList(), 0, 1000, 0, 0, Collections.emptyList()));
@@ -674,28 +652,19 @@ class MissionPageControllerTest {
             eq(java.math.BigDecimal.class),
             eq(false)))
         .thenReturn(java.math.BigDecimal.ZERO);
-    when(backendApiClient.get(
-            eq("/api/v1/refinery-orders/mission/" + id),
-            any(ParameterizedTypeReference.class),
-            eq(false)))
+    when(backendApiClient.get(eq("/api/v1/refinery-orders/mission/" + id), anyTypeRef(), eq(false)))
         .thenReturn(Collections.emptyList());
 
     controller.missionDetail(id, model, null, null);
 
     verify(backendApiClient)
-        .get(
-            eq("/api/v1/missions/" + id + "/finance-entries?size=1000"),
-            any(ParameterizedTypeReference.class),
-            eq(false));
+        .get(eq("/api/v1/missions/" + id + "/finance-entries?size=1000"), anyTypeRef(), eq(false));
     verify(backendApiClient)
         .get(
             eq("/api/v1/missions/" + id + "/finance-entries/sum"),
             eq(java.math.BigDecimal.class),
             eq(false));
     verify(backendApiClient)
-        .get(
-            eq("/api/v1/refinery-orders/mission/" + id),
-            any(ParameterizedTypeReference.class),
-            eq(false));
+        .get(eq("/api/v1/refinery-orders/mission/" + id), anyTypeRef(), eq(false));
   }
 }

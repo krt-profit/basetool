@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -40,7 +40,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -87,7 +86,7 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
             Instant.parse("2026-01-01T00:00:00Z"));
     PageResponse<PersonalBlueprintDto> page =
         new PageResponse<>(List.of(bp), 0, 200, 1, 1, List.of());
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
     mockMvc
         .perform(get("/personal-inventory/blueprints"))
@@ -137,8 +136,7 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
         new PageResponse<>(List.of(first), 0, 500, 2, 2, List.of());
     PageResponse<PersonalBlueprintDto> page1 =
         new PageResponse<>(List.of(second), 1, 500, 2, 2, List.of());
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class)))
-        .thenReturn(page0, page1);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page0, page1);
 
     mockMvc
         .perform(get("/personal-inventory/blueprints"))
@@ -167,7 +165,7 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
             Instant.parse("2026-01-01T00:00:00Z"));
     PageResponse<PersonalBlueprintDto> page =
         new PageResponse<>(List.of(bp), 0, 200, 1, 1, List.of());
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
     mockMvc
         .perform(get("/personal-inventory/blueprints"))
@@ -198,7 +196,7 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
             Instant.parse("2026-01-01T00:00:00Z"));
     PageResponse<PersonalBlueprintDto> page =
         new PageResponse<>(List.of(bp), 0, 200, 1, 1, List.of());
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
     mockMvc
         .perform(get("/personal-inventory/blueprints").param("fragment", "list"))

@@ -219,6 +219,18 @@ x-backend: &backend-template
     # endpoint the Keycloak Discord SPI calls. Blank → the endpoint is disabled (503) and the SPI
     # fails open. Must equal the KRT_DISCORD_SPI_SHARED_SECRET set on the keycloak service.
     KRT_DISCORD_SPI_SHARED_SECRET: ${KRT_DISCORD_SPI_SHARED_SECRET:-}
+    # Transactional e-mail (account approval/rejection notices — REQ-NOTIF-013/-014). app.mail is
+    # enabled by default; mail is only actually sent once SPRING_MAIL_HOST is set, so leaving these
+    # blank is a safe no-op. To send via Gmail, set in .env: SPRING_MAIL_HOST=smtp.gmail.com,
+    # SPRING_MAIL_PORT=587, SPRING_MAIL_USERNAME=<you>@gmail.com, SPRING_MAIL_PASSWORD=<16-char App
+    # Password>, APP_MAIL_FROM_ADDRESS=<you>@gmail.com (STARTTLS + auth come from application.yml).
+    SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-}
+    SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
+    SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+    SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+    APP_MAIL_ENABLED: ${APP_MAIL_ENABLED:-true}
+    APP_MAIL_FROM_ADDRESS: ${APP_MAIL_FROM_ADDRESS:-no-reply@profit-base.online}
+    APP_MAIL_FROM_NAME: ${APP_MAIL_FROM_NAME:-Profit Basetool}
     # The keystore lives on the host filesystem (bind-mounted below) and is
     # explicitly NOT packaged into the GHCR image. Both backend and frontend
     # share the same PKCS12 file because the cert's SAN covers the Docker

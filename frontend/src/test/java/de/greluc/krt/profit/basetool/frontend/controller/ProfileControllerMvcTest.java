@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static org.mockito.ArgumentMatchers.any;
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
@@ -36,7 +36,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -66,7 +65,7 @@ class ProfileControllerMvcTest {
     LocalDate joinDate = LocalDate.now().minusMonths(14);
     long expectedMonths = ChronoUnit.MONTHS.between(joinDate, LocalDate.now());
 
-    when(backendApiClient.get(eq("/api/v1/users/me"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/users/me"), anyTypeRef()))
         .thenReturn(
             Map.of(
                 "rank", "Pilot",
@@ -86,7 +85,7 @@ class ProfileControllerMvcTest {
   @Test
   void profile_ShouldNotSetMonthsInSquadron_WhenJoinDateIsAbsent() throws Exception {
     // Given
-    when(backendApiClient.get(eq("/api/v1/users/me"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/users/me"), anyTypeRef()))
         .thenReturn(
             Map.of(
                 "rank", "Pilot",
@@ -112,8 +111,7 @@ class ProfileControllerMvcTest {
     userMap.put("version", 1L);
     userMap.put("joinDate", null);
 
-    when(backendApiClient.get(eq("/api/v1/users/me"), any(ParameterizedTypeReference.class)))
-        .thenReturn(userMap);
+    when(backendApiClient.get(eq("/api/v1/users/me"), anyTypeRef())).thenReturn(userMap);
 
     // When & Then
     mockMvc

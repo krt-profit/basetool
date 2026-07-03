@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -39,7 +39,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -76,19 +75,16 @@ class MembersPageDiscordColumnRenderTest {
   }
 
   @Test
-  @SuppressWarnings("unchecked")
   void memberList_showsDiscordIconOnlyForLinkedMember() throws Exception {
     UserDto linked = user("AliceLinked", Boolean.TRUE);
     UserDto notLinked = user("BobUnlinked", Boolean.FALSE);
     PageResponse<UserDto> page =
         new PageResponse<>(List.of(linked, notLinked), 0, 20, 2, 1, List.of("username,asc"));
 
-    when(backendApiClient.get(
-            eq("/api/v1/users?sort=username,asc"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq("/api/v1/users?sort=username,asc"), anyTypeRef()))
         .thenReturn(page);
     // Per-user SK membership lookups (one per row) — none needed for this assertion.
-    when(backendApiClient.get(contains("/memberships"), any(ParameterizedTypeReference.class)))
-        .thenReturn(List.of());
+    when(backendApiClient.get(contains("/memberships"), anyTypeRef())).thenReturn(List.of());
 
     String html =
         mockMvc

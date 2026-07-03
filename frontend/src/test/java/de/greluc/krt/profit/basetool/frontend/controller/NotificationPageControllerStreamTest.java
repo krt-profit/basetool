@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.any;
@@ -35,7 +36,6 @@ import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.MessageSource;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
@@ -151,7 +151,7 @@ class NotificationPageControllerStreamTest {
     when(uriSpec.uri(anyString())).thenReturn(headersSpec);
     when(headersSpec.headers(any())).thenReturn(headersSpec);
     when(headersSpec.retrieve()).thenReturn(responseSpec);
-    when(responseSpec.bodyToFlux(any(ParameterizedTypeReference.class))).thenReturn(Flux.empty());
+    when(responseSpec.bodyToFlux(anyTypeRef())).thenReturn(Flux.empty());
 
     // When the browser opens the stream
     SseEmitter emitter = controller.stream(request, authentication);
@@ -159,7 +159,7 @@ class NotificationPageControllerStreamTest {
     // Then the upstream call was issued (no fail-soft on a present token) carrying the snapshot
     // bearer verbatim — proving the relay used the read-only token without obtaining a fresh one.
     assertNotNull(emitter);
-    ArgumentCaptor<Consumer<HttpHeaders>> headersCaptor = ArgumentCaptor.forClass(Consumer.class);
+    ArgumentCaptor<Consumer<HttpHeaders>> headersCaptor = ArgumentCaptor.captor();
     verify(headersSpec).headers(headersCaptor.capture());
     HttpHeaders applied = new HttpHeaders();
     headersCaptor.getValue().accept(applied);

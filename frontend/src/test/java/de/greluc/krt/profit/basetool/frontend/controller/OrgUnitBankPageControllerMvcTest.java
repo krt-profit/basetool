@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static org.mockito.ArgumentMatchers.any;
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -52,7 +52,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -66,7 +65,6 @@ import org.springframework.web.context.WebApplicationContext;
  * {@code orgUnitBank} fragment view resolves for the in-place swap.
  */
 @SpringBootTest
-@SuppressWarnings("unchecked")
 class OrgUnitBankPageControllerMvcTest {
 
   private static final String BALANCES_URI = "/api/v1/org-units/bank/balances";
@@ -133,6 +131,7 @@ class OrgUnitBankPageControllerMvcTest {
             null,
             false,
             null,
+            null,
             false,
             null,
             false,
@@ -140,13 +139,10 @@ class OrgUnitBankPageControllerMvcTest {
             0L);
     BankAccountRefDto target =
         new BankAccountRefDto(accountId, "KB-0001", "Staffel IRIDIUM", "ORG_UNIT");
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(null);
-    when(backendApiClient.get(eq(BALANCES_URI), any(ParameterizedTypeReference.class)))
-        .thenReturn(List.of(balance));
-    when(backendApiClient.get(eq(REQUESTS_URI), any(ParameterizedTypeReference.class)))
-        .thenReturn(List.of(request));
-    when(backendApiClient.get(eq(TRANSFER_TARGETS_URI), any(ParameterizedTypeReference.class)))
-        .thenReturn(List.of(target));
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(eq(BALANCES_URI), anyTypeRef())).thenReturn(List.of(balance));
+    when(backendApiClient.get(eq(REQUESTS_URI), anyTypeRef())).thenReturn(List.of(request));
+    when(backendApiClient.get(eq(TRANSFER_TARGETS_URI), anyTypeRef())).thenReturn(List.of(target));
   }
 
   @Test
@@ -264,16 +260,16 @@ class OrgUnitBankPageControllerMvcTest {
             null,
             false,
             null,
+            null,
             false,
             null,
             false,
             null,
             0L);
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(null);
-    when(backendApiClient.get(eq(BALANCES_URI), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(eq(BALANCES_URI), anyTypeRef()))
         .thenThrow(new RuntimeException("backend down"));
-    when(backendApiClient.get(eq(REQUESTS_URI), any(ParameterizedTypeReference.class)))
-        .thenReturn(List.of(request));
+    when(backendApiClient.get(eq(REQUESTS_URI), anyTypeRef())).thenReturn(List.of(request));
 
     mockMvc
         .perform(get("/org-unit-bank"))
@@ -314,13 +310,10 @@ class OrgUnitBankPageControllerMvcTest {
             null);
     BankAccountRefDto target =
         new BankAccountRefDto(specialId, "KB-0042", "Event Sonderkonto", "SPECIAL");
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(null);
-    when(backendApiClient.get(eq(BALANCES_URI), any(ParameterizedTypeReference.class)))
-        .thenReturn(List.of(special));
-    when(backendApiClient.get(eq(REQUESTS_URI), any(ParameterizedTypeReference.class)))
-        .thenReturn(List.of());
-    when(backendApiClient.get(eq(TRANSFER_TARGETS_URI), any(ParameterizedTypeReference.class)))
-        .thenReturn(List.of(target));
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(eq(BALANCES_URI), anyTypeRef())).thenReturn(List.of(special));
+    when(backendApiClient.get(eq(REQUESTS_URI), anyTypeRef())).thenReturn(List.of());
+    when(backendApiClient.get(eq(TRANSFER_TARGETS_URI), anyTypeRef())).thenReturn(List.of(target));
 
     mockMvc
         .perform(get("/org-unit-bank"))
@@ -342,13 +335,10 @@ class OrgUnitBankPageControllerMvcTest {
     // +
     // modal render whenever at least one active account exists (here only via transfer-targets).
     BankAccountRefDto target = new BankAccountRefDto(UUID.randomUUID(), "KB-0001", "KRT", "CARTEL");
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(null);
-    when(backendApiClient.get(eq(BALANCES_URI), any(ParameterizedTypeReference.class)))
-        .thenReturn(List.of());
-    when(backendApiClient.get(eq(REQUESTS_URI), any(ParameterizedTypeReference.class)))
-        .thenReturn(List.of());
-    when(backendApiClient.get(eq(TRANSFER_TARGETS_URI), any(ParameterizedTypeReference.class)))
-        .thenReturn(List.of(target));
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(eq(BALANCES_URI), anyTypeRef())).thenReturn(List.of());
+    when(backendApiClient.get(eq(REQUESTS_URI), anyTypeRef())).thenReturn(List.of());
+    when(backendApiClient.get(eq(TRANSFER_TARGETS_URI), anyTypeRef())).thenReturn(List.of(target));
 
     mockMvc
         .perform(get("/org-unit-bank"))
@@ -376,6 +366,8 @@ class OrgUnitBankPageControllerMvcTest {
             null,
             new BigDecimal("1850000"),
             new BigDecimal("2000000"),
+            null,
+            null,
             3L,
             Instant.parse("2026-01-01T00:00:00Z"));
     BankAccountDetailDto inner =
@@ -388,8 +380,10 @@ class OrgUnitBankPageControllerMvcTest {
                 false,
                 false,
                 false,
+                false,
                 java.util.List.of(),
                 java.util.Map.of(),
+                null,
                 null,
                 java.util.List.of()));
     OrgUnitBankAccountDetailDto detail =
@@ -408,8 +402,10 @@ class OrgUnitBankPageControllerMvcTest {
             true,
             true,
             false,
+            false,
             List.of("LOGISTICIAN", "MISSION_MANAGER"),
             List.of("LOGISTICIAN"),
+            false,
             false,
             List.of(new OrgUnitBankViewUserDto(UUID.randomUUID(), "greluc")),
             true,
@@ -417,8 +413,10 @@ class OrgUnitBankPageControllerMvcTest {
                 false,
                 false,
                 false,
+                false,
                 java.util.List.of(),
                 java.util.Map.of(),
+                null,
                 null,
                 java.util.List.of()));
     BankBookingDto booking =
@@ -445,16 +443,14 @@ class OrgUnitBankPageControllerMvcTest {
         new UserReferenceDto(UUID.randomUUID(), "cmdr.valk", "cmdr.valk", "cmdr.valk", 1);
 
     String detailUri = "/api/v1/org-units/bank/accounts/" + accountId;
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(null);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class)))
         .thenReturn(detail);
     when(backendApiClient.get(eq(detailUri + "/settings"), eq(OrgUnitBankAccountSettingsDto.class)))
         .thenReturn(settings);
-    when(backendApiClient.get(
-            eq(detailUri + "/transactions?page=0"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq(detailUri + "/transactions?page=0"), anyTypeRef()))
         .thenReturn(bookings);
-    when(backendApiClient.get(eq("/api/v1/users/lookup"), any(ParameterizedTypeReference.class)))
-        .thenReturn(List.of(user));
+    when(backendApiClient.get(eq("/api/v1/users/lookup"), anyTypeRef())).thenReturn(List.of(user));
   }
 
   @Test
@@ -507,6 +503,8 @@ class OrgUnitBankPageControllerMvcTest {
             null,
             new BigDecimal("50000"),
             null,
+            null,
+            null,
             1L,
             Instant.parse("2026-01-01T00:00:00Z"));
     BankAccountDetailDto inner =
@@ -519,18 +517,19 @@ class OrgUnitBankPageControllerMvcTest {
                 false,
                 false,
                 false,
+                false,
                 java.util.List.of(),
                 java.util.Map.of(),
+                null,
                 null,
                 java.util.List.of()));
     OrgUnitBankAccountDetailDto detail =
         new OrgUnitBankAccountDetailDto(inner, true, false, false, true, false, null);
     String detailUri = "/api/v1/org-units/bank/accounts/" + accountId;
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(null);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class)))
         .thenReturn(detail);
-    when(backendApiClient.get(
-            eq(detailUri + "/transactions?page=0"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq(detailUri + "/transactions?page=0"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 20, 0L, 0, List.of()));
 
     mockMvc
@@ -567,6 +566,8 @@ class OrgUnitBankPageControllerMvcTest {
             null,
             new BigDecimal("100000"),
             null,
+            null,
+            null,
             1L,
             Instant.parse("2026-01-01T00:00:00Z"));
     BankAccountDetailDto inner =
@@ -579,19 +580,20 @@ class OrgUnitBankPageControllerMvcTest {
                 false,
                 true,
                 true,
+                false,
                 java.util.List.of("KOMMANDOLEITER"),
                 java.util.Map.of("KOMMANDOLEITER", new BigDecimal("1000000")),
+                null,
                 null,
                 java.util.List.of()));
     OrgUnitBankAccountDetailDto detail =
         new OrgUnitBankAccountDetailDto(
             inner, true, false, false, true, false, new BigDecimal("1000000"));
     String detailUri = "/api/v1/org-units/bank/accounts/" + accountId;
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(null);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class)))
         .thenReturn(detail);
-    when(backendApiClient.get(
-            eq(detailUri + "/transactions?page=0"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(eq(detailUri + "/transactions?page=0"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 20, 0L, 0, List.of()));
 
     mockMvc

@@ -17,7 +17,8 @@
 <main>
     <div class="hud-box" style="max-width: 640px; margin: 3rem auto; text-align: center;">
         <h1 th:text="#{pendingApproval.title}">Freigabe ausstehend</h1>
-        <p th:text="#{pendingApproval.message}">Dein Account wurde erstellt und wartet auf die Freigabe durch einen Administrator.</p>
+        <p th:text="#{pendingApproval.message}">Dein Account wurde erstellt und wartet auf die Freigabe durch einen Administrator. Du kannst das Tool erst nutzen, sobald ein Administrator deinen Zugang freigegeben hat.</p>
+        <p style="font-weight: 700;" th:text="#{pendingApproval.patience}">Die Freigabe erfolgt manuell und kann 1 bis 2 Tage dauern. Bitte habe so lange etwas Geduld.</p>
         <p style="color: var(--color-gray-2); font-size: 0.9rem;" th:text="#{pendingApproval.help}">Sobald du freigeschaltet bist, kannst du dich erneut anmelden.</p>
         <form th:action="@{/logout}" method="post" style="margin-top: 1.5rem;">
             <button type="submit" class="btn btn-outline" th:text="#{nav.logout}">Abmelden</button>

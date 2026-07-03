@@ -40,6 +40,10 @@ dependencies {
   implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
   implementation("org.springframework.boot:spring-boot-starter-validation")
   implementation("org.springframework.boot:spring-boot-starter-cache")
+  // Transactional e-mail (account approval/rejection notices — REQ-NOTIF-013/-014). BOM-managed
+  // version; brings JavaMailSender. The channel is dual-gated off by default (app.mail.enabled +
+  // spring.mail.host), so no SMTP is contacted in dev/test/CI.
+  implementation("org.springframework.boot:spring-boot-starter-mail")
   implementation("com.github.ben-manes.caffeine:caffeine")
   // springdoc -api (NOT -ui): generates the OpenAPI document at /v3/api-docs without bundling the
   // Swagger UI webjar. The committed openapi.json is the single documentation artifact (produced by

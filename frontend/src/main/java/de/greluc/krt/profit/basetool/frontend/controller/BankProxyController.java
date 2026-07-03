@@ -199,6 +199,22 @@ public class BankProxyController {
   }
 
   /**
+   * Forwards setting/clearing the KRT-account (CARTEL) 3-stage approval thresholds T1/T2
+   * (REQ-BANK-047). Bank-management-only, enforced by the backend. A {@code null} ceiling in the
+   * body clears that band.
+   *
+   * @param id the KRT account
+   * @param body the thresholds payload (employeeCeiling + areaLeadCeiling + echoed version)
+   * @return the updated account
+   */
+  @PatchMapping("/accounts/{id}/approval-tiers")
+  @PreAuthorize("isAuthenticated()")
+  public Map<String, Object> setCartelApprovalTiers(
+      @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
+    return patchMap("/api/v1/bank/accounts/" + id + "/approval-tiers", body);
+  }
+
+  /**
    * Forwards an account close (zero-balance rule enforced by the backend, 409 inline).
    *
    * @param id the account

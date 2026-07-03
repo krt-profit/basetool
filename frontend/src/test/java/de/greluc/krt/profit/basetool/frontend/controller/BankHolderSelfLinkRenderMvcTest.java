@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -40,7 +40,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -61,7 +60,6 @@ import org.springframework.web.context.WebApplicationContext;
  * participant self-edit carve-out.
  */
 @SpringBootTest
-@SuppressWarnings("unchecked")
 class BankHolderSelfLinkRenderMvcTest {
 
   @Autowired private WebApplicationContext context;
@@ -94,8 +92,8 @@ class BankHolderSelfLinkRenderMvcTest {
             foreignHolderId, UUID.randomUUID(), "other", true, BigDecimal.ZERO, false, 0L);
 
     // Default any unmatched backend read (sidebar / controller-advice lookups) to null.
-    when(backendApiClient.get(anyString(), any(ParameterizedTypeReference.class))).thenReturn(null);
-    when(backendApiClient.get(eq("/api/v1/bank/holders"), any(ParameterizedTypeReference.class)))
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(eq("/api/v1/bank/holders"), anyTypeRef()))
         .thenReturn(List.of(own, foreign));
     when(backendApiClient.get(
             eq("/api/v1/bank/transfer-fee-rate"), eq(BankTransferFeeRateDto.class)))

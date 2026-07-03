@@ -654,6 +654,20 @@ Building on 3.11.1/3.11.2, still solely via the seam `OrgUnitBankAccessService` 
 
 \* Bank Empl./Bank Management reach the request endpoint only as far as they may view the account themselves (view/oversight scope). The two approval acts lie on **different surfaces of different users**; an out-of-band approval bumps the `@Version` of the request — an open bank queue with an old version runs into 409 `OPTIMISTIC_LOCK` on the next confirmation and recovers via reload (intended behavior, REQ-BANK-041).
 
+#### 3.11.4 KRT-account 3-stage approval ladder & the "Mitglieder des Bereichs" audience (REQ-BANK-047/-047)
+
+- **KRT-account (`CARTEL`) amount ladder (REQ-BANK-047):** the KRT account replaces the per-audience limits of 3.11.3 with an **amount-tiered** approval on withdrawals/transfers leaving it. Two thresholds `T1 ≤ T2` define who approves: **≤ T1** the **bank employee** (self-approve), **T1..T2** the **Bereichsleiter Profit**, **> T2** the **Organisationsleitung**. The thresholds are set **only by the Bankleitung** (`ROLE_BANK_MANAGEMENT`; Admin via hierarchy) in the **new „KRT-Freigaben" tab** of the bank Verwaltung (`PATCH …/approval-tiers`, audited `CARTEL_APPROVAL_TIERS_SET/CLEARED`); the account-detail pages show the ladder read-only to every viewer. The **Bereichsleiter Profit** and **OL** approve their band's requests in Org-Einheits-Bank → „Fremde Anträge" (band-routed: each sees only its own band; Admin sees all), then a bank employee confirms with the same mandatory checkbox as 3.11.3. A plain bank employee's **direct** KRT withdrawal/transfer above `T1` is refused `BANK_CARTEL_APPROVAL_REQUIRED` (management/admin uncapped).
+
+| Function (gate)                                                                         | Member | Bereichsl. Profit | OL | Bank Empl. | Bank Mgmt. | Admin |
+|:----------------------------------------------------------------------------------------|:------:|:-----------------:|:--:|:----------:|:----------:|:-----:|
+| Set/remove the KRT thresholds `T1`/`T2` (`setCartelApprovalTiers`, „KRT-Freigaben" tab) |   ❌    |         ❌         | ❌  |     ❌      |     ✅      |   ✅   |
+| **Approve** a KRT `T1..T2`-band request („Fremde Anträge", `AREA_LEAD_PROFIT`)          |   ❌    |         ✅         | ❌  |     ❌      |     ❌      |   ✅   |
+| **Approve** a KRT `> T2`-band request („Fremde Anträge", `ORGANISATIONSLEITUNG`)        |   ❌    |         ❌         | ✅  |     ❌      |     ❌      |   ✅   |
+| **Direct** KRT withdrawal/transfer above `T1` (blocked → use the request flow)          |   —    |         —         | —  |   ❌ 409    |     ✅      |   ✅   |
+
+- **"Mitglieder des Bereichs" audience (REQ-BANK-048):** a Bereichskonto (`AREA`) may additionally open its balance/limit to the **whole area cascade** (Bereichsleitung + all child Staffel/SK members) via the new `AREA_MEMBERS` bucket — alongside the existing Bereich sub-ranks, all-Bereichsleitung (`ALL_MEMBERS`) and individual users. Only the responsible holder / Bank Management / Admin configure it.
+- **"Alle Mitglieder" = the owning org unit, for limits (REQ-BANK-047):** the `ALL_MEMBERS` limit tier now applies **only to actual members of the account's owning org unit** (Staffel→Staffelmitglieder, SK→SK, Bereichskonto→Bereichsleitung, KRT→OL); an outsider who only holds an individual view grant is not covered and needs their own `USER` limit, else approval is required. The KRT account's all-member **visibility** (every Kartellmitglied, REQ-BANK-037) is unchanged.
+
 ---
 
 ## 4. Multi-OrgUnit visibility (scoping)
