@@ -66,7 +66,7 @@ public class MissionObjective extends AbstractEntity<UUID> {
   private Mission mission;
 
   /** Required short goal text (e.g. "Erz-Quote 30k aUEC"); the bullet label on the overview. */
-  @Column(nullable = false, length = 250)
+  @Column(nullable = false, length = 500)
   private String title;
 
   /**

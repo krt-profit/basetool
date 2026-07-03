@@ -498,6 +498,12 @@ document.addEventListener('DOMContentLoaded', () => {
 function krtOrderWrite(opts) {
     return window.krtFetch.write(
         Object.assign({}, opts, {
+            // All order writes touch the same order @Version (one order per page), so serialize them
+            // under one key: a status change, a variant-counting toggle, an edit save and a handover
+            // run in submission order instead of racing each other into a self-collision 409. A
+            // caller may override opts.serialize (the per-edge assignee writes use oaSend, a separate
+            // raw fetch, and are unaffected).
+            serialize: opts.serialize || 'order',
             conflict: {
                 title: ORDER_CONFLICT.title,
                 reloadLabel: ORDER_CONFLICT.reload,
@@ -817,12 +823,7 @@ function updateStatus(selectElement) {
         _previousStatus = _knownStatus(selectElement);
         document.getElementById('status-warning-modal').style.display = 'flex';
     } else {
-        _doStatusUpdate(
-            selectElement.dataset.orderId,
-            newStatus,
-            parseInt(selectElement.dataset.version, 10),
-            selectElement,
-        );
+        _doStatusUpdate(selectElement.dataset.orderId, newStatus, selectElement);
     }
 }
 
@@ -840,12 +841,26 @@ function confirmStatusChange() {
     document.getElementById('status-warning-modal').style.display = 'none';
     const sel = document.getElementById('status-select');
     if (!sel || !_pendingStatus) return;
-    _doStatusUpdate(sel.dataset.orderId, _pendingStatus, parseInt(sel.dataset.version, 10), sel);
+    _doStatusUpdate(sel.dataset.orderId, _pendingStatus, sel);
     _pendingStatus = null;
     _previousStatus = null;
 }
 
-function _doStatusUpdate(orderId, status, version, selectElement) {
+// The order's current optimistic-lock @Version, read from its canonical live carriers — the status
+// select and, as a fallback, the edit-modal hidden input — both of which every order write's
+// onSuccess patches. Read at SEND time (from inside a payload thunk) so a serialized order write
+// picks up the version the write before it bumped, instead of a value captured when the handler
+// first fired (the self-collision fix).
+function _orderVersion() {
+    const sel = document.getElementById('status-select');
+    if (sel && sel.dataset.version != null && sel.dataset.version !== '') {
+        return parseInt(sel.dataset.version, 10);
+    }
+    const editVer = document.querySelector('#edit-modal input[name="version"]');
+    return editVer && editVer.value ? parseInt(editVer.value, 10) : null;
+}
+
+function _doStatusUpdate(orderId, status, selectElement) {
     // In-place (#575): no reload. Capture the last-good status up front so a failed change can
     // revert the optimistic <select>; krtOrderWrite reads CSRF via krtCsrf (+ retry-on-403) and
     // surfaces the 409 conflict reload-prompt itself.
@@ -853,7 +868,9 @@ function _doStatusUpdate(orderId, status, version, selectElement) {
     krtOrderWrite({
         method: 'POST',
         url: '/orders/' + orderId + '/status',
-        payload: { status: status, version: version },
+        payload: function () {
+            return { status: status, version: _orderVersion() };
+        },
         toast: false,
         errorMessage: MSG_STATUS_ERROR,
         onSuccess: function (data) {
@@ -908,18 +925,22 @@ function _doStatusUpdate(orderId, status, version, selectElement) {
 function _toggleBlueprintCounting(checkbox) {
     const orderId = checkbox.getAttribute('data-order-id');
     const desired = checkbox.checked;
-    const version = parseInt(checkbox.getAttribute('data-version'), 10);
     if (!orderId || !window.krtFetch) {
         return;
     }
     // Disable for the round-trip so a quick double-toggle can't fire a second, stale-version
     // write (a change-event control isn't covered by krtFetch's submit-button double-submit
     // guard). On success the panel swap replaces this checkbox; on failure we re-enable + revert.
+    // The version is read lazily from the order's canonical carrier (status select / edit-modal
+    // input) at send time, since this checkbox's own data-version is not patched by other order
+    // writes — only those two carriers are.
     checkbox.disabled = true;
     krtOrderWrite({
         method: 'POST',
         url: '/orders/' + orderId + '/blueprint-variant-counting',
-        payload: { countBlueprintsWithVariants: desired, version: version },
+        payload: function () {
+            return { countBlueprintsWithVariants: desired, version: _orderVersion() };
+        },
         toast: false,
         errorMessage: MSG_BP_COUNTING_ERROR,
         onSuccess: function (data) {

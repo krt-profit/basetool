@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.profit.basetool.frontend.model.dto.CreateMissionRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationDto;
@@ -128,6 +131,15 @@ public class MissionWriteController {
    * OidcUser}, so a null principal and an anonymous security context are the same condition.
    */
   private final FrontendAuthHelperService authHelper;
+
+  /**
+   * Parses the create form's {@code objectivesJson} / {@code stepsJson} hidden carriers into the
+   * backend create request's nested {@code objectives} / {@code steps} lists. A controller-owned
+   * instance — the frontend application context registers no {@code ObjectMapper} bean, and
+   * Jackson's mapper is thread-safe once configured — initialised at declaration so Lombok's {@code
+   * RequiredArgsConstructor} keeps it out of the generated constructor signature.
+   */
+  private final ObjectMapper objectMapper = new ObjectMapper();
 
   /**
    * Web binder configuration scoped to this controller. Registers any custom property editors
@@ -789,6 +801,14 @@ public class MissionWriteController {
                   null)
               : null;
 
+      List<CreateMissionRequest.NewObjective> objectives =
+          parseCreateList(
+              form.objectivesJson(),
+              new TypeReference<List<CreateMissionRequest.NewObjective>>() {});
+      List<CreateMissionRequest.NewStep> steps =
+          parseCreateList(
+              form.stepsJson(), new TypeReference<List<CreateMissionRequest.NewStep>>() {});
+
       CreateMissionRequest createRequest =
           new CreateMissionRequest(
               form.name(),
@@ -801,17 +821,44 @@ public class MissionWriteController {
               form.isInternal(),
               operation != null ? operation.id() : null,
               form.owningOrgUnitId(),
-              form.meetingPoint());
+              form.meetingPoint(),
+              objectives,
+              steps);
 
-      backendApiClient.post("/api/v1/missions", createRequest, Void.class);
+      MissionDto created =
+          backendApiClient.post("/api/v1/missions", createRequest, MissionDto.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
+      // Land the user straight on the freshly-created mission's Verwaltung tab (?tab=verw deeplink)
+      // so they can keep planning (crew, refine goals/steps) without hunting for it in the list.
+      return "redirect:/missions/" + created.id() + "?tab=verw";
     } catch (Exception e) {
       log.error("Create mission failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.mission.create");
       redirectAttributes.addFlashAttribute("missionForm", form);
       return "redirect:/missions/new";
     }
-    return "redirect:/missions";
+  }
+
+  /**
+   * Parses one of the create form's JSON row carriers ({@code objectivesJson} / {@code stepsJson})
+   * into a nested create-request list. A blank carrier — the common case, no goals/steps entered —
+   * yields {@code null}, as does an empty array, so the backend seeds nothing. A malformed body
+   * propagates the {@link JsonProcessingException} to the create handler's catch, which surfaces
+   * the generic create error and re-flashes the form (the carriers ride along, so nothing is lost).
+   *
+   * @param json the hidden carrier's raw JSON, or {@code null}/blank when the section is empty
+   * @param typeRef the target list element type
+   * @param <T> the nested create-request element type ({@code NewObjective} / {@code NewStep})
+   * @return the parsed list, or {@code null} when the carrier is blank or the array is empty
+   * @throws JsonProcessingException when the carrier holds malformed JSON
+   */
+  private <T> List<T> parseCreateList(String json, TypeReference<List<T>> typeRef)
+      throws JsonProcessingException {
+    if (json == null || json.isBlank()) {
+      return null;
+    }
+    List<T> list = objectMapper.readValue(json, typeRef);
+    return (list == null || list.isEmpty()) ? null : list;
   }
 
   /**

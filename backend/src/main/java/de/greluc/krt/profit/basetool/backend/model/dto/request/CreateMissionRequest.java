@@ -19,11 +19,15 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto.request;
 
+import de.greluc.krt.profit.basetool.backend.model.MissionObjectiveKind;
 import de.greluc.krt.profit.basetool.backend.validation.DtoConstraints;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
@@ -49,6 +53,12 @@ import org.jetbrains.annotations.Nullable;
  *   <li>{@code parent}: stamped from the path variable in {@code addSubMission} — never the body.
  *   <li>{@code managers} / participants / units / frequencies / inventory / refinery: have their
  *       own dedicated endpoints; not part of the create payload.
+ *   <li>{@code objectives} (Ziele) / {@code steps} (Ablauf): MAY be seeded here so the create form
+ *       can plan goals and steps in the same request (both optional, empty allowed). They remain
+ *       editable afterwards through their own {@code /objectives} and {@code /steps} endpoints.
+ *       Only the title (and goal classification / step time-place hint) is caller-controllable; the
+ *       id, {@code orderIndex} and step done-state are stamped server-side, and no section version
+ *       is accepted (a just-created mission has no concurrent editor to lose a race against).
  *   <li>{@code actualStartTime} / {@code actualEndTime}: lifecycle-only fields, set via the {@code
  *       /schedule} patch endpoint or auto-stamped on status transition.
  * </ul>
@@ -61,7 +71,7 @@ import org.jetbrains.annotations.Nullable;
  */
 public record CreateMissionRequest(
     @NotBlank @Size(max = 255) String name,
-    @Nullable @Size(max = 10000) String description,
+    @Nullable @Size(max = 20000) String description,
     @Nullable
         @Size(max = 2048)
         @Pattern(regexp = DtoConstraints.HTTPS_URL_REGEX, message = "must start with https://")
@@ -73,4 +83,30 @@ public record CreateMissionRequest(
     @Nullable Boolean isInternal,
     @Nullable UUID operationId,
     @Nullable UUID owningOrgUnitId,
-    @Nullable @Size(max = 200) String meetingPoint) {}
+    @Nullable @Size(max = 200) String meetingPoint,
+    @Nullable @Valid List<NewObjective> objectives,
+    @Nullable @Valid List<NewStep> steps) {
+
+  /**
+   * A goal (Ziel) to create together with the mission on the {@code POST /api/v1/missions} path, so
+   * the create form can seed goals in the same request instead of a follow-up per-goal call.
+   * Carries only the title and classification; the id and {@code orderIndex} are assigned
+   * server-side and no section version is echoed (a just-created mission has no concurrent editor).
+   *
+   * @param title the goal text (required, non-blank, at most 500 chars)
+   * @param kind the classification (Hauptziel / Nebenziel / Nicht-Ziel)
+   */
+  public record NewObjective(
+      @NotBlank @Size(max = 500) String title, @NotNull MissionObjectiveKind kind) {}
+
+  /**
+   * A step (Ablauf-Schritt) to create together with the mission on the {@code POST
+   * /api/v1/missions} path. Carries only the title and the optional time/place hint; the id, {@code
+   * orderIndex} and the initial not-done state are assigned server-side.
+   *
+   * @param title the step title (required, non-blank, at most 500 chars)
+   * @param meta the optional free-text time/place hint (at most 200 chars)
+   */
+  public record NewStep(
+      @NotBlank @Size(max = 500) String title, @Nullable @Size(max = 200) String meta) {}
+}

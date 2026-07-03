@@ -494,6 +494,8 @@ class MissionServiceTest {
             false,
             null,
             null,
+            null,
+            null,
             null);
 
     assertThrows(IllegalArgumentException.class, () -> missionService.createMission(request));
@@ -512,6 +514,8 @@ class MissionServiceTest {
             now.plus(2, ChronoUnit.HOURS),
             now.plus(1, ChronoUnit.HOURS),
             false,
+            null,
+            null,
             null,
             null,
             null);
@@ -540,7 +544,8 @@ class MissionServiceTest {
     Mission saved =
         missionService.createMission(
             new de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest(
-                "Test", null, null, "PLANNED", null, null, null, false, null, null, null));
+                "Test", null, null, "PLANNED", null, null, null, false, null, null, null, null,
+                null));
 
     assertEquals(home, saved.getOwningOrgUnit());
     assertEquals(caller, saved.getOwner());
@@ -571,6 +576,8 @@ class MissionServiceTest {
                 false,
                 null,
                 null,
+                null,
+                null,
                 null));
 
     assertNull(saved.getOwningOrgUnit(), "membershipless leadership owner → ownerless mission");
@@ -593,7 +600,8 @@ class MissionServiceTest {
     Mission saved =
         missionService.createMission(
             new de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest(
-                "Test", null, null, "PLANNED", null, null, null, false, null, null, null));
+                "Test", null, null, "PLANNED", null, null, null, false, null, null, null, null,
+                null));
 
     assertEquals(scopeSquadron, saved.getOwningOrgUnit());
   }
@@ -623,6 +631,8 @@ class MissionServiceTest {
                 false,
                 null,
                 picked.getId(),
+                null,
+                null,
                 null));
 
     assertEquals(picked, saved.getOwningOrgUnit(), "picker output must be honoured verbatim");
@@ -644,7 +654,8 @@ class MissionServiceTest {
         missionService.addSubMission(
             parentId,
             new de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest(
-                "Sub", null, null, "PLANNED", null, null, null, false, null, null, null));
+                "Sub", null, null, "PLANNED", null, null, null, false, null, null, null, null,
+                null));
 
     assertEquals(parentSquadron, saved.getOwningOrgUnit());
     assertEquals(parent, saved.getParent());

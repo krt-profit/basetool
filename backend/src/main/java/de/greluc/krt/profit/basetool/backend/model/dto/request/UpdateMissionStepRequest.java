@@ -28,11 +28,11 @@ import org.jetbrains.annotations.Nullable;
  * Request DTO for editing an Ablauf step's title and/or time/place hint. {@code stepsVersion} is
  * the mission's expected {@code steps_version} section counter — a stale value yields HTTP 409.
  *
- * @param title the required step title (≤200 chars)
+ * @param title the required step title (≤500 chars)
  * @param meta the optional free-text "Zeit / Ort" hint (≤200 chars)
  * @param stepsVersion the expected mission steps-section version (optimistic-lock guard)
  */
 public record UpdateMissionStepRequest(
-    @NotBlank @Size(max = 200) String title,
+    @NotBlank @Size(max = 500) String title,
     @Nullable @Size(max = 200) String meta,
     @NotNull Long stepsVersion) {}

@@ -63,7 +63,7 @@ public class MissionStep extends AbstractEntity<UUID> {
   private Mission mission;
 
   /** Required short step title (e.g. "Briefing", "Mining"); the checklist line label. */
-  @Column(nullable = false, length = 200)
+  @Column(nullable = false, length = 500)
   private String title;
 
   /** Optional free-text "Zeit / Ort" hint shown next to the title (e.g. "TS 19:30"). Nullable. */

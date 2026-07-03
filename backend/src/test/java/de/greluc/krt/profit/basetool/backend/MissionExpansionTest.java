@@ -80,7 +80,19 @@ class MissionExpansionTest {
     Mission mission =
         missionService.createMission(
             new de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest(
-                "Test Mission", null, null, "PLANNED", null, null, null, false, null, null, null));
+                "Test Mission",
+                null,
+                null,
+                "PLANNED",
+                null,
+                null,
+                null,
+                false,
+                null,
+                null,
+                null,
+                null,
+                null));
 
     // 4. Add Participant first — a unit's ship must belong to a registered participant, so the
     // ship owner has to be signed up before the ship can be assigned to the unit.

@@ -44,10 +44,17 @@ import java.util.UUID;
  * service validates it via {@code OwnerScopeService.resolveSquadronForPickerOutput} and rejects
  * Spezialkommando selections with 400 until the destructive cleanup release loosens NOT NULL on the
  * legacy {@code owning_squadron_id} column. {@code null} preserves the legacy stamping path.
+ *
+ * <p>{@code objectivesJson} / {@code stepsJson} carry the create form's optional Ziele / Ablauf
+ * rows as a compact JSON array, client-serialized into a hidden input on submit (blank when none).
+ * They are used only on the create path — the edit page manages goals and steps through their own
+ * AJAX section editors — and the write controller parses them into the backend create request's
+ * nested {@code objectives} / {@code steps} lists. Binding them as form fields makes them survive a
+ * validation-failure re-render / error re-flash exactly like the other inputs.
  */
 public record MissionForm(
     @NotBlank(message = "{validation.name.required}") @Size(max = 255) String name,
-    @Size(max = 2000) String description,
+    @Size(max = 20000) String description,
     @Size(max = 2048)
         @Pattern(regexp = "^(https://.*)?$", message = "{validation.calendarLink.httpsOnly}")
         String calendarLink,
@@ -64,4 +71,6 @@ public record MissionForm(
     Long scheduleVersion,
     Long flagsVersion,
     UUID owningOrgUnitId,
-    @Size(max = 200) String meetingPoint) {}
+    @Size(max = 200) String meetingPoint,
+    @Size(max = 65535) String objectivesJson,
+    @Size(max = 65535) String stepsJson) {}

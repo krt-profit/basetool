@@ -5,6 +5,8 @@
     <th:block th:fragment="extraLinks">
     <style th:attr="nonce=${cspNonce}">
         label { display: block; margin-bottom: 0.5rem; font-family: var(--font-body); font-size: 0.9rem; font-weight: bold; }
+        /* Required-field marker (the "*" the owner asked for on mandatory unit fields). */
+        .req { color: var(--color-danger-text); font-weight: var(--fw-bold); margin-left: 2px; }
         input[type="text"], input[type="url"], select, textarea, input[type="date"], input[type="time"], input[type="datetime-local"], input[type="number"] { width: 100%; padding: 0.8rem; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; }
         input:focus, select:focus, textarea:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 5px rgba(231, 126, 35, 0.3); }
         .form-actions { margin-top: 2rem; display: flex; gap: 1rem; }
@@ -183,6 +185,24 @@
 
         /* Verwaltung */
         .footacts { display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-wrap: wrap; border-top: var(--border-hairline); padding-top: 12px; }
+        /* The Verwaltung action row (Delete / Save / Back) stays anchored to the bottom of the
+           viewport, above the fixed footer, while the tiles scroll behind it (owner request). Scoped
+           to the active Verwaltung pane — also the sole pane on the create page. z-index clears the
+           footer (999) yet stays below the modal overlay (3000) and the sidebar drawer (2000). A
+           solid bar + top border separate it from the scrolling content; the pane's extra
+           padding-bottom keeps the last tile from hiding behind it. */
+        #pane-verw.on { padding-bottom: 4rem; }
+        #pane-verw.on .footacts {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: var(--krt-footer-height, 5rem);
+            z-index: 1100;
+            margin: 0;
+            padding: 12px 16px;
+            background-color: var(--color-bg-dark-gray);
+            border-top: var(--border-hairline);
+        }
         .manager-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--color-surface-input); border: var(--border-hairline); padding: 0.2rem 0.5rem; }
 
         /* Finance type segment control */
@@ -466,7 +486,9 @@
                                 <dd th:text="${mission.operation != null ? mission.operation.name : '&mdash;'}">&mdash;</dd>
                                 <dt th:if="${mission.canEdit and mission.isInternal != null and mission.isInternal}" th:text="#{mission.is_internal}">Intern</dt>
                                 <dd th:if="${mission.canEdit and mission.isInternal != null and mission.isInternal}"><span class="chip chip--warning chip-xs" th:text="#{general.yes}">Ja</span></dd>
-                                <dt th:text="#{mission.party_lead}">Einsatzleiter</dt>
+                                <dt th:text="#{mission.einsatzleiter}">Einsatzleiter</dt>
+                                <dd id="overview-einsatzleiter" th:text="${!#strings.isEmpty(factLeaderName) ? factLeaderName : #messages.msg('general.none')}">&mdash;</dd>
+                                <dt th:text="#{mission.party_lead}">Partyleiter</dt>
                                 <dd id="overview-party-lead">
                                     <span th:if="${mission.partyLeadUser != null}" th:text="${mission.partyLeadUser.effectiveName}">Lead</span>
                                     <span th:if="${mission.partyLeadUser == null and mission.partyLeadGuestName != null and !mission.partyLeadGuestName.isEmpty()}" th:text="${mission.partyLeadGuestName}">Guest Lead</span>
@@ -894,9 +916,81 @@
                 <div class="field-error" data-error-for="name" th:text="${#fields.hasErrors('name') ? #fields.errors('name')[0] : ''}"></div>
             </div>
 
+            <!-- Create-only Ziele + Ablauf editors (optional; sit ABOVE the description per owner
+                 request). The mission has no id yet, so these are client-side rows (no AJAX, no
+                 section version) serialized into the hidden objectivesJson / stepsJson carriers on
+                 submit; the write controller parses them into the create request. Goals/steps can
+                 equally be added later via the Verwaltung section editors. -->
+            <div class="form-group" th:if="${isNew}">
+                <label th:text="#{mission.objective.section}">Ziele</label>
+                <div class="kpanel">
+                    <div class="kpanel-body">
+                        <div class="ae-list" id="mission-create-objective-list"></div>
+                        <button type="button" class="btn btn-ghost btn-xs2" id="mission-create-objective-add"
+                                data-trigger="create-objective-add" style="margin-top: 12px;"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.objective.add}">Ziel hinzuf&uuml;gen</span></button>
+                        <p class="form-hint" style="margin-top: 10px;" th:text="#{mission.objective.editor.hint}">Titel + Klassifizierung frei editierbar.</p>
+                    </div>
+                </div>
+                <input type="hidden" name="objectivesJson" id="mission-objectives-json" th:value="*{objectivesJson}">
+                <template id="mission-create-objective-row">
+                    <div class="ae-row">
+                        <span class="ae-num">1</span>
+                        <span class="ae-fields">
+                            <input class="ae-title" type="text" maxlength="500"
+                                   th:placeholder="#{mission.objective.title.placeholder}" th:aria-label="#{mission.objective.title.placeholder}">
+                            <select class="ae-kind" th:aria-label="#{mission.objective.kind.label}">
+                                <option value="PRIMARY" th:text="#{mission.objective.kind.primary}">Hauptziel</option>
+                                <option value="SECONDARY" th:text="#{mission.objective.kind.secondary}">Nebenziel</option>
+                                <option value="NON_GOAL" th:text="#{mission.objective.kind.non_goal}">Nicht-Ziel</option>
+                            </select>
+                        </span>
+                        <span class="ae-move">
+                            <button type="button" class="btn btn-ghost btn-icon" data-trigger="create-objective-up"
+                                    th:title="#{mission.objective.move_up}" th:aria-label="#{mission.objective.move_up}">&#x25B2;</button>
+                            <button type="button" class="btn btn-ghost btn-icon" data-trigger="create-objective-down"
+                                    th:title="#{mission.objective.move_down}" th:aria-label="#{mission.objective.move_down}">&#x25BC;</button>
+                        </span>
+                        <button type="button" class="btn btn-quiet-danger btn-icon" data-trigger="create-objective-delete"
+                                th:title="#{mission.objective.remove}" th:aria-label="#{mission.objective.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                    </div>
+                </template>
+            </div>
+
+            <div class="form-group" th:if="${isNew}">
+                <label th:text="#{mission.step.section}">Ablauf</label>
+                <div class="kpanel">
+                    <div class="kpanel-body">
+                        <div class="ae-list" id="mission-create-step-list"></div>
+                        <button type="button" class="btn btn-ghost btn-xs2" id="mission-create-step-add"
+                                data-trigger="create-step-add" style="margin-top: 12px;"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.step.add}">Schritt hinzuf&uuml;gen</span></button>
+                        <p class="form-hint" style="margin-top: 10px;" th:text="#{mission.step.editor.hint}">Titel + optionale Zeit/Ort frei editierbar.</p>
+                    </div>
+                </div>
+                <input type="hidden" name="stepsJson" id="mission-steps-json" th:value="*{stepsJson}">
+                <template id="mission-create-step-row">
+                    <div class="ae-row">
+                        <span class="ae-num">1</span>
+                        <span class="ae-fields">
+                            <input class="ae-title" type="text" maxlength="500"
+                                   th:placeholder="#{mission.step.title.placeholder}" th:aria-label="#{mission.step.title.placeholder}">
+                            <input class="ae-meta" type="text" maxlength="200"
+                                   th:placeholder="#{mission.step.meta.placeholder}" th:aria-label="#{mission.step.meta.placeholder}">
+                        </span>
+                        <span class="ae-move">
+                            <button type="button" class="btn btn-ghost btn-icon" data-trigger="create-step-up"
+                                    th:title="#{mission.step.move_up}" th:aria-label="#{mission.step.move_up}">&#x25B2;</button>
+                            <button type="button" class="btn btn-ghost btn-icon" data-trigger="create-step-down"
+                                    th:title="#{mission.step.move_down}" th:aria-label="#{mission.step.move_down}">&#x25BC;</button>
+                        </span>
+                        <button type="button" class="btn btn-quiet-danger btn-icon" data-trigger="create-step-delete"
+                                th:title="#{mission.step.remove}" th:aria-label="#{mission.step.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                    </div>
+                </template>
+            </div>
+
             <div class="form-group" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).KRT_MEMBER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).MISSION_MANAGER)">
                 <label th:text="#{mission.description}">Description</label>
-                <textarea name="description" rows="5" th:text="*{description}"
+                <textarea name="description" rows="5" maxlength="20000" th:text="*{description}"
                           th:disabled="${!isNew and !mission.canEdit}"></textarea>
                 <small class="form-hint" th:text="#{mission.description.markdown_hint}">Markdown wird unterst&uuml;tzt.</small>
                 <div class="field-error" data-error-for="description" th:text="${#fields.hasErrors('description') ? #fields.errors('description')[0] : ''}"></div>
@@ -1045,7 +1139,7 @@
                                     <span class="ae-grip" th:title="#{mission.objective.drag}" aria-hidden="true">&#x283F;</span>
                                     <span class="ae-num" th:text="${st.count}">1</span>
                                     <span class="ae-fields">
-                                        <input class="ae-title" type="text" maxlength="250" th:value="${o.title}"
+                                        <input class="ae-title" type="text" maxlength="500" th:value="${o.title}"
                                                th:placeholder="#{mission.objective.title.placeholder}" th:aria-label="#{mission.objective.title.placeholder}">
                                         <select class="ae-kind" th:aria-label="#{mission.objective.kind.label}">
                                             <option value="PRIMARY" th:text="#{mission.objective.kind.primary}" th:selected="${o.kind != null and o.kind.name() == 'PRIMARY'}">Hauptziel</option>
@@ -1090,7 +1184,7 @@
                                     <span class="ae-grip" th:title="#{mission.step.drag}" aria-hidden="true">&#x283F;</span>
                                     <span class="ae-num" th:text="${st.count}">1</span>
                                     <span class="ae-fields">
-                                        <input class="ae-title" type="text" maxlength="200" th:value="${s.title}"
+                                        <input class="ae-title" type="text" maxlength="500" th:value="${s.title}"
                                                th:placeholder="#{mission.step.title.placeholder}" th:aria-label="#{mission.step.title.placeholder}">
                                         <input class="ae-meta" type="text" maxlength="200" th:value="${s.meta}"
                                                th:placeholder="#{mission.step.meta.placeholder}" th:aria-label="#{mission.step.meta.placeholder}">
@@ -1354,6 +1448,8 @@
                         th:data-job="${p?.desiredMissionJobType != null ? p.desiredMissionJobType.id : ''}"
                         th:data-planned-job="${p?.plannedMissionJobType != null ? p.plannedMissionJobType.id : ''}"
                         th:data-org-units="${p?.orgUnits != null ? #strings.listJoin(p.orgUnits.![id], ',') : ''}"
+                        th:data-org-unit-names="${p?.orgUnits != null ? #strings.listJoin(p.orgUnits.![name], ',') : ''}"
+                        th:data-guest="${p?.user == null}"
                         th:data-is-member="${p?.user != null and p.user.roles != null and (p.user.roles.contains('KRT_MEMBER') or p.user.roles.contains('ROLE_KRT_MEMBER') or p.user.roles.contains('ADMIN') or p.user.roles.contains('ROLE_ADMIN') or p.user.roles.contains('OFFICER') or p.user.roles.contains('ROLE_OFFICER'))}"
                         th:data-payout-preference="${p?.payoutPreference?.name()}"
                         th:data-comment="${p?.comment}"
@@ -1476,6 +1572,14 @@
                     </select>
                     <small class="form-hint" th:text="#{mission.participant.org_units.guest_hint}">Nur fuer Gaeste relevant.</small>
                 </div>
+                <!-- Registered members get their org units from their account (never selected). JS
+                     shows this read-only list (populated from the row's data-org-unit-names) and hides
+                     the picker above for a member, or does the reverse for a guest. -->
+                <div class="form-group" id="edit-org-units-readonly-group" style="display:none;">
+                    <label th:text="#{mission.participant.org_units}">Org-Einheiten</label>
+                    <div id="edit-org-units-readonly" class="chiprow"></div>
+                    <small class="form-hint" th:text="#{mission.participant.org_units.member_hint}">Aus dem Account abgeleitet.</small>
+                </div>
 
                 <div class="form-group">
                     <label th:text="#{mission.participant.payout_preference}">Auszahlungsart</label>
@@ -1555,8 +1659,8 @@
                 </div>
                 <div class="form-row">
                 <div class="form-group">
-                    <label th:text="#{mission.unit.display_name}">Anzeigename (optional)</label>
-                    <input type="text" name="name" th:value="*{name}">
+                    <label><span th:text="#{mission.unit.display_name}">Anzeigename</span><span class="req" aria-hidden="true">*</span></label>
+                    <input type="text" name="name" th:value="*{name}" required>
                     <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" class="field-error"></div>
                 </div>
                 <div class="form-group">
@@ -1680,8 +1784,8 @@
                 </div>
                 <div class="form-row">
                 <div class="form-group">
-                    <label th:text="#{mission.unit.display_name}">Anzeigename (optional)</label>
-                    <input type="text" name="name" id="edit-unit-name" th:value="*{name}">
+                    <label><span th:text="#{mission.unit.display_name}">Anzeigename</span><span class="req" aria-hidden="true">*</span></label>
+                    <input type="text" name="name" id="edit-unit-name" th:value="*{name}" required>
                     <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" class="field-error"></div>
                 </div>
                 <div class="form-group">

@@ -817,14 +817,13 @@
         if (!row) {
             return;
         }
-        const flags = {
-            canDeposit: row.getAttribute('data-can-deposit') === 'true',
-            canWithdraw: row.getAttribute('data-can-withdraw') === 'true',
-            canTransfer: row.getAttribute('data-can-transfer') === 'true',
-        };
         const flag = flagButton.getAttribute('data-flag');
-        flags[flag] = !flags[flag];
-        flags.version = Number(row.getAttribute('data-version'));
+        // The intended new state of the CLICKED flag, captured now. The rest of the payload (the
+        // other two flags + the row's optimistic-lock version) is re-read from the row LAZILY at send
+        // time (see the payload thunk) and the write is serialized per grant row, so toggling a
+        // second flag on the same row while the first is in flight sees the first toggle's applied
+        // state + fresh version instead of reverting it or 409-ing (self-collision fix).
+        const newValue = row.getAttribute(FLAG_ATTR[flag]) !== 'true';
         const endpoint =
             '/api/proxy/bank/grants/' +
             encodeURIComponent(row.getAttribute('data-user-id')) +
@@ -838,12 +837,26 @@
         await window.krtFetch.write({
             method: 'PATCH',
             url: endpoint,
-            payload: flags,
+            serialize:
+                'bank-grant:' +
+                row.getAttribute('data-user-id') +
+                ':' +
+                row.getAttribute('data-account-id'),
+            payload: function () {
+                const p = {
+                    canDeposit: row.getAttribute('data-can-deposit') === 'true',
+                    canWithdraw: row.getAttribute('data-can-withdraw') === 'true',
+                    canTransfer: row.getAttribute('data-can-transfer') === 'true',
+                    version: Number(row.getAttribute('data-version')),
+                };
+                p[flag] = newValue;
+                return p;
+            },
             submitter: flagButton,
             toast: false,
             errorMessage: genericError(),
             onSuccess: function (payload) {
-                applyGrantFlagResult(flagButton, row, flag, flags[flag], payload);
+                applyGrantFlagResult(flagButton, row, flag, newValue, payload);
             },
             onError: function (status, payload) {
                 const message = payload && payload.message ? payload.message : genericError();

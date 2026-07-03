@@ -83,8 +83,11 @@ class MissionPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "OFFICER")
   void createMission_WithEmptyDescription_ShouldSucceed() throws Exception {
-    // Prepare Mocks
-    when(backendApiClient.post(any(String.class), any(), Mockito.eq(Void.class))).thenReturn(null);
+    // Prepare Mocks — the create endpoint now reads the persisted MissionDto to redirect to the new
+    // mission's Verwaltung tab (REQ-MISSION-015).
+    UUID missionId = UUID.randomUUID();
+    when(backendApiClient.post(any(String.class), any(), Mockito.eq(MissionDto.class)))
+        .thenReturn(minimalMission(missionId));
 
     // Perform Request
     mockMvc
@@ -98,7 +101,7 @@ class MissionPageControllerMvcTest {
                 .with(csrf()))
         .andExpect(status().is3xxRedirection())
         .andDo(org.springframework.test.web.servlet.result.MockMvcResultHandlers.print())
-        .andExpect(redirectedUrl("/missions"));
+        .andExpect(redirectedUrl("/missions/" + missionId + "?tab=verw"));
   }
 
   @Test
