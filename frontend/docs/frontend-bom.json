@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:7d2ba884-7be0-47f8-881d-00ff35f2c0a4",
+  "serialNumber" : "urn:uuid:47df0849-aa2e-4b32-a86e-1710969dcdc9",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-07-03T18:40:48Z",
+    "timestamp" : "2026-07-03T20:49:29Z",
     "tools" : {
       "components" : [
         {
@@ -26,7 +26,7 @@
       "externalReferences" : [
         {
           "type" : "build-system",
-          "url" : "https://github.com/krt-profit/basetool/actions/runs/28677927106"
+          "url" : "https://github.com/krt-profit/basetool/actions/runs/28682766035"
         },
         {
           "type" : "vcs",
@@ -2029,6 +2029,69 @@
     },
     {
       "type" : "library",
+      "bom-ref" : "pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.3.2?type=jar",
+      "group" : "com.squareup.okhttp3",
+      "name" : "okhttp-jvm",
+      "version" : "5.3.2",
+      "description" : "Square’s meticulous HTTP client for Java and Kotlin.",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "827a887aa959c1f1d6b12f3345df2484"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "f31e8de27feebe1e56d6c9d354a0986b65be0e1d"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "c771f48075b763f6c322055e21129a94b7de4c1faf3f8f58ace320b0c9517a30"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "302cba8ec649ecb20512b4878b9f347645cdeada2001e7469363b21ca251bbb05c00e48e426449a88780f0ec25c672f214112b101d8dfd059b5275999ab48768"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "a2bc92e52d8e1b2b9be40b0955828313f32a4276717bf7e1cace0aefa3bf5fad17997e409aeca7f68f335c9d975f1073"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "e585ea8e1ffbd6599654b5f7e9b1210ff972799f5019420652a0215b7dde6660b3a15e56b39d4702b42e307b3040b5d1"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "4737bb453c46672bef36c86ea7292a46f9552caaccfd7e6799bb9b3c508c4467"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "08ed5b2a6449ca0b8cced909bc2ded5cf20314b5bf8f8b094ed8641c5dd90e6b738fc66c917dd0eafbcf1e51497ba05ca154cc3d6fb4832a0ebc350a35c26abe"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.3.2?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/square/okhttp"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
       "bom-ref" : "pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.4.0?type=jar",
       "group" : "com.squareup.okhttp3",
       "name" : "okhttp-jvm",
@@ -2092,6 +2155,35 @@
     },
     {
       "type" : "library",
+      "bom-ref" : "pkg:maven/com.squareup.okhttp3/okhttp@5.3.2?type=pom",
+      "group" : "com.squareup.okhttp3",
+      "name" : "okhttp",
+      "version" : "5.3.2",
+      "description" : "Square’s meticulous HTTP client for Java and Kotlin.",
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/com.squareup.okhttp3/okhttp@5.3.2?type=pom",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/square/okhttp"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
       "bom-ref" : "pkg:maven/com.squareup.okhttp3/okhttp@5.4.0?type=pom",
       "group" : "com.squareup.okhttp3",
       "name" : "okhttp",
@@ -2116,6 +2208,69 @@
         {
           "name" : "cdx:maven:package:test",
           "value" : "true"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/com.squareup.okio/okio-jvm@3.16.4?type=jar",
+      "group" : "com.squareup.okio",
+      "name" : "okio-jvm",
+      "version" : "3.16.4",
+      "description" : "A modern I/O library for Android, Java, and Kotlin Multiplatform.",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "34d866f45bb2a65bf601cde52b72d096"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "ceb794cf0bbf8d0d20f49aa91ce20db7fd77675d"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "2196b993cd34dbbd919e7e01f57a4781b58bee80f86106163e287c20343a96a7"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "1a7158538ae341b8a61fe7292506e12ca6063c5a51a1c122d0e934164395c7da585dc31b26ed88a993c47aeca89f6a854042c67a4bc7d771d35a0ece6c4dbde0"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "37949576947630aba9caf7b24ffb00677f4b21b29a98543a0a66043340d20bb42128419d2bebc4b2f2b93569f35f9ada"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "32830517d7f960b4c86229f5347e40033658999029162aad0f273636640ed8b7130689de57277aaff169ac9f227885be"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "3f65833b5d5128064f885b68da6a3955667cf4c31a098da08431561949fe398b"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "ee404499bb148b817e575c22049cb5487531605413bf38edf8fd2cecf0d15f899de42e37d7dafa5dc8bc5493e24b7a976c2bc14c42d6d7056af410bd72513ad3"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/com.squareup.okio/okio-jvm@3.16.4?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/square/okio/"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
         }
       ]
     },
@@ -2179,6 +2334,35 @@
         {
           "name" : "cdx:maven:package:test",
           "value" : "true"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/com.squareup.okio/okio@3.16.4?type=pom",
+      "group" : "com.squareup.okio",
+      "name" : "okio",
+      "version" : "3.16.4",
+      "description" : "A modern I/O library for Android, Java, and Kotlin Multiplatform.",
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/com.squareup.okio/okio@3.16.4?type=pom",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/square/okio/"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
         }
       ]
     },
@@ -3950,6 +4134,177 @@
     },
     {
       "type" : "library",
+      "bom-ref" : "pkg:maven/io.micrometer/micrometer-registry-prometheus@1.17.0?type=jar",
+      "group" : "io.micrometer",
+      "name" : "micrometer-registry-prometheus",
+      "version" : "1.17.0",
+      "description" : "MeterRegistry implementation for Prometheus using io.prometheus:prometheus-metrics-core. If you have compatibility issues with this module, you can go back to io.micrometer:micrometer-registry-prometheus-simpleclient that uses io.prometheus:simpleclient_common.",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "939592019806beae5d09180f9f04d95b"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "13f882d6ff49ea5088b1b3746775f072d8524ecf"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "6fc1177ec572a4bec332d00515859cf4a7adec232d66d2b5bedb4ad96456a4e3"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "c17206a911afd54c148f48db141b7bb2549932506a49276e1128098e8d9db8d692ab5a034e775e2df47bb87b1b280904af4ec038c78b1d43766abc8cd6f66815"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "b62097cb9bd23b7049eb1f79db0c65abf9d727f5a6f92ee47478b9c8fbaacdacf432d45316a052aa7c5a1b3cd8852200"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "3c0f22c4a67256b5f64d09c1303112d37b32a6767641eea631b9968f4b5e63887a46c580fe43b66057333def32170c74"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "597e03cd6b951e75c77cd1802cb00953329cedd44e3141ec13e12ca3d1e16c2d"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "987889531494af4633c9728c93fbc5f9660095f35b40331d0ace6e4a18236dc59f2a4009e5e81f997dd424305f5d285f0ccec2969501f37448de45d4b8cdea09"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.micrometer/micrometer-registry-prometheus@1.17.0?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.micrometer/micrometer-tracing-bridge-otel@1.7.0?type=jar",
+      "group" : "io.micrometer",
+      "name" : "micrometer-tracing-bridge-otel",
+      "version" : "1.7.0",
+      "description" : "Facade over tracing concepts",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "f3a95340454170114f600a9ce9d7fefc"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "7a958170dc43ffa721dd6112f6437ae437c723f0"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "ce302503079dc3946d9f547fc7173517f53d968d67d1bc1dce2b645f92c96959"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "d2798d3da0f01bee2e1bf9c607a4e5cd978388b611ecbed5887b63c32f196a776277f5b0d49edc3527c9da9db14a5f6c3b4be95677364784789fa98859d8bf2d"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "2835e3f8e2505b8e5ca0218094923b73b5888764a456bff90cc1358d87a2e15df91d377a21069b737e7a00f57db2ec47"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "8da59ff79f6da76c0f3f6737a75b1c93667fef90155598e3cac0359779b14b2ddee6c2382e4c43cef9c63b1c1a01ff9e"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "0aecebd1aad1e651e60900b7880c87ecad18e24a9559fa2e16d6d886dfe65755"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "eb7fc3abd94b756abbfa79b4d7925a9f3fce4c59a4a1b09742cd1855eacd654c718f4bb4fe24ba9723bc23f30bff61b9ca0bb7b05edabaa0531f3b1383579d11"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.micrometer/micrometer-tracing-bridge-otel@1.7.0?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.micrometer/micrometer-tracing@1.7.0?type=jar",
+      "group" : "io.micrometer",
+      "name" : "micrometer-tracing",
+      "version" : "1.7.0",
+      "description" : "Facade over tracing concepts",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "1a7541f1d39a27ec1dad4889263c3870"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "47434783bb73871e0c7a383ae7adf05f180eb35f"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "990788f635dde631cdd66977c1526f3b23d8857731f53cb02dea05745b1758db"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "c9112533354f0ad4974b296b4da3bdd1a3b3e0ea83786c7faad2a3be6ab318767b3d44dfe285786e78a2c35e7704da599747ab017db0fab94fa71e724a01da9f"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "33dc09fd0da98c9e216dc98e9f99acd7d06ca4d7722bc5637f36bfb3c322020348ac8b1868b99c2dc6781c696a6e0911"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "82926b1447aa3ccc9b90b3b1619ed701f1d5af6b8c9b0526ec58909b8fcc482f707007c6163e0036d6455efb147b0516"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "73436da8cdb4d1c48bfb3480e2c7803ec78a904ebed1f9ac08f0f8b4c206ce86"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "a52bed52574aefa52052713800c57defa5cac959acb5ce87e795cfdf8268137a28c8f9a98379a780acbc75afed989c4d41506f7cf8829194c0d67df58689eecd"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.micrometer/micrometer-tracing@1.7.0?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
       "bom-ref" : "pkg:maven/io.netty/netty-buffer@4.2.15.Final?type=jar",
       "group" : "io.netty",
       "name" : "netty-buffer",
@@ -5134,6 +5489,861 @@
     },
     {
       "type" : "library",
+      "bom-ref" : "pkg:maven/io.opentelemetry.semconv/opentelemetry-semconv@1.41.1?type=jar",
+      "group" : "io.opentelemetry.semconv",
+      "name" : "opentelemetry-semconv",
+      "version" : "1.41.1",
+      "description" : "OpenTelemetry Stable Semantic Conventions generated classes for Java",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "91b26f5c31500408217fb3c80f2fcb3c"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "e03d5a337bd4855b10852acbdbf8a59070746800"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "636ad7dac093d22fb84bf8d928ef836694f2d63c92d72b3df21b86002e8becef"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "4a7e213b09fcb7ad219d2f5190f47b0dbd7816e47bc3e43237dbb275ec2c664e040cf3cec27c0373038f1f0d691694fcecc1dedbf01f840c0646b246d6f9e380"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "b700168584979b7017aeeb0d1aa58b269d44cec5814007f528c1359d4a9fd96d3195c3d56d6e3f21ea35074f642f2da7"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "231b4d6c4625815fb659f0f779603d4ad9f7bf2faabebb7bd725e10a6efe60fa7d95ca698a005a547ba1062cc2b7c22b"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "023df29ad67e95ad55bd3da5c3d79091a8af116e0bcc3afa7a960042d4f0f9d5"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "f022dfd92cf226f25403c00bec66f13c02a1627a9a9b281427003263e5c3eed8936f1153e0ac4a182339520d33bcea8acafa72dcfc9fbc81d96c7294fe6f7d15"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.opentelemetry.semconv/opentelemetry-semconv@1.41.1?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-api@1.62.0?type=jar",
+      "group" : "io.opentelemetry",
+      "name" : "opentelemetry-api",
+      "version" : "1.62.0",
+      "description" : "OpenTelemetry API",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "ab1fb1c47f1d1b3e5fc7bbadbbf4b97f"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "c4ee83d77005567852a72e08b945ebb023be1daa"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "d58143928c049233653e6bf1282ff8a767ebdd5e6a82b3f336158c30e40b431d"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "996180883beb3feba27bf7568021ac8dee1609dd27d1b734a0c4d2681949fae2a77ed61f1019691241573148214c8b153986222a12f4fcf7fca93ec7405b3192"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "583672ac291e69eb54e44f60953a4ef8dfc093932113e26d3a6c4f94da3d279642c9b856cd21a5e3d0abf26df32b9efc"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "70d1c3465d77ea4240f5523898e1837dff8c80415b32c43bd6ce8b783969a195c0a201e63fb463c98b3bd38e27157601"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "43ddd4f2984a918b3ec38b6dadc277c620fd974c93aed28d5c8b2ba1f6d5c2b5"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "327b17b086acf1be3b971ada8f3b801e40222f7940a99fffd90cc6b7c5faab53caed09a7c637f6e62383660cc932ed7720fd6830b16439dd20313caca4806125"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-api@1.62.0?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-common@1.62.0?type=jar",
+      "group" : "io.opentelemetry",
+      "name" : "opentelemetry-common",
+      "version" : "1.62.0",
+      "description" : "OpenTelemetry API Common",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "b46788c85866dfdc8d35e55d4b8a376b"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "e6468bd64a94429b68761f7c13e143c3fdfaafc7"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "d6310bebde67d65c1519696728d8604005315ed08ab14071956fc0826fd71815"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "c6309d35b5ceb54ae33b0d4d3edd3f7f4b80c9d1729cc1a5bd1a3caec3f921139dc9d213255be42a1131d25da3face650ba4f99b2108612adb430b811826be5f"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "1f095af7821c841a87f7d40e4ad1aff61671161e78b38d3cd46e715dfd272a60de441dd9167671bb4a98962d5e0a2ed8"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "dcbaa0a896d6ba4fe945d4fc1c3c7987e5748a08cae1ef2cadf29dafcc0ac9d3f625852ee84ec26543bd01cb047093b6"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "a1204e629d3c637e8127a727d649e162175af073c32cfd4cc9b990c1729e3ddd"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "23cfc615bd5bef3836c54b4a65cbb3472fe8384033a1b814ea455b1eaf67e70f4d56c952a7972fcf9254ce12f76bbf1c8069a241da107af8c1203f7ef179bde6"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-common@1.62.0?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-context@1.62.0?type=jar",
+      "group" : "io.opentelemetry",
+      "name" : "opentelemetry-context",
+      "version" : "1.62.0",
+      "description" : "OpenTelemetry Context (Incubator)",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "bdbe90d25966ce1e3e52e6607ae5236e"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "365cee4d1f365e4d4a05654742b50aa436c2dd8e"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "8ec86c3609222b9b6307bf40154c1f1c288d1f18ada0155409e7797adbdbe517"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "e7556bed83309b3a4e3ed77a0e98a1bb8c5de6c5ca4b5087df33c3b10aa627917c3077b53498756447c63e7055a53e25e6cbaec7bea85ae11c40c36957f58dae"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "593711508961839c41deea8ff4ee0824105e78a9de468a78a305e44a21c04a2929d302ad185f2d7f65a55014dffe5d0a"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "32edf3a67c3a5a774f6da56c7b47515e56e16e9bd6eb196c647814571409152b7fab7d990173b3da1e6ab834fe637cd7"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "7bfb884d0dc2da4a11042414d017acba911308966311131b9d9db2020d490eec"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "2197765910d39cad617bf676272450b62b6b4b9776ef10bb1d4ee276ccf2a9b7a496e53973036393298cdafe569bb65eb2f513551e66c257a2635cb383c4fecd"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-context@1.62.0?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-common@1.62.0?type=jar",
+      "group" : "io.opentelemetry",
+      "name" : "opentelemetry-exporter-common",
+      "version" : "1.62.0",
+      "description" : "OpenTelemetry Exporter Common",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "3b83d7f4bef7f6a3a5eb08dcf913e624"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "2dafa6ae65cbf1aa321cd644d200f3ff8465284d"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "50f84b5b58048f69bd684ec874413944209995e01c177200555c151dabfe1ec9"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "fb8a16d0aa94a2d2fa306513907924e9037a498d3e47253bcdd072264b3206de8bb069524d0e568beda2ab7634529e62f731c5dfa635c929257bc05e0bcdd875"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "247cad79aee2c1026c38ce50b86db68d6c3e58184a970973fe21663e7048070a3147b15d59e5883df46b24f1fc7fe998"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "1a3cb1ca2d70c16e50128683d49e1718b24d78960652536f355105428d54cfbb56c8a990e7747586a4bd56522a30fd73"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "699bdc5cfadaddfd79eac72964c15d1b4de14742dc56bd2751f7d4884e59540c"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "ab64f351dedffd172ccf9e269a1df95713ad34ca0e3553e38c2d416b927aa39fcb30e5451f7806332b8d35ef241afdfd1ec3ab6418b922b23e397ef7baade2e1"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-common@1.62.0?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp-common@1.62.0?type=jar",
+      "group" : "io.opentelemetry",
+      "name" : "opentelemetry-exporter-otlp-common",
+      "version" : "1.62.0",
+      "description" : "OpenTelemetry Protocol Exporter",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "db9554493c7d05451efa4a1ac61693b0"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "6f269df0e3f065fbd2e590458e7b2107cde2a106"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "79eaaaf044df15209ee1461b668f7c93547734a793d6cf6ad5e57290d3f8c0ea"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "b4da2eae6bb8a6d7367f3441a96d241613f29d180d94ffb1745e94888f3123f03ea9bbb522086b4ee9f6169b12df16b6262d5ff10fcce7781272189f307c44f1"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "a1cc3a8996f32c7321eecde13cc2ca96cc219a99a7ee964339239035763342fb39f9605d152c8838ed486bef1ef986a1"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "b03307e0a440102c27938dd33f11697b3716a7d775b105f01550d7bddbdf67b2d1039d7edbe17265d20040ff53092e97"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "d7f80299f8b1400b8f5d422c4cf845444ae6fd534a788fb28535186f03081ea1"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "0fbfd6b6cd4a259be14362fc199d55453798d2b54cce094861de0cc586731c4bc43c4ab5b33402658dfd100dd680839f8dec2c4edbe1b438c990ce47ac8de3a0"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp-common@1.62.0?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp@1.62.0?type=jar",
+      "group" : "io.opentelemetry",
+      "name" : "opentelemetry-exporter-otlp",
+      "version" : "1.62.0",
+      "description" : "OpenTelemetry Protocol (OTLP) Exporters",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "5273d2e1631f922bd91392f0c13f71e6"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "8e4cb9199ac868332a1213ca27408a18905ba369"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "59df47fdc4bef6866ed39eb6a04892c68e28d7938eaeaa21801ac5dd2dcb0d65"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "028607cc50f0340d615cbe39430e1f43d6b918012cfa6bf5c5aa1040d1e009ed4f586489f3f11f030c85900d5404950bcd6740b993099d9fcbc6a5d3d62c5d4c"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "2783808085e7803c7c4a305ae94cf69d61ba166c7d2caef3e8ca28476135a46d3f0d25adc41aabb68c86fe6ed1c0de9c"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "4a85292cee1ee852c986b7405ba6ba686f568e4cab910ae7a5ee4846ccd0e1e5d4c2fa6b01157ff40e926cb7ea4b4e02"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "599ea4efb1a8db5ccd7c10814e5dbc289e439830da52a7b970da11741f6d7e3e"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "7feb4a0d007bbb1fe10166544411a9305e4f25c2518b88e03db7b39742fc7dedc0a6dbf1e632d78192e72a2b4e31bb94510720678df6db52872af24102e8b67c"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp@1.62.0?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-sender-okhttp@1.62.0?type=jar",
+      "group" : "io.opentelemetry",
+      "name" : "opentelemetry-exporter-sender-okhttp",
+      "version" : "1.62.0",
+      "description" : "OpenTelemetry OkHttp Senders",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "d88461f803b2a1f277d27dbb616e421a"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "19b5e023db9037a38fe2531afb6e44456e963fba"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "8c9b2c4394543c4f28e0a6c66d16259a1bfaf67a47a689fb001bd9a92dafb6ea"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "6160593760b992e597f597d0b047ffb9af17ed793c7849618d1360577bd34a146cc79e33f329055bd46a341db4395c0131f7537dac1119a3a80f51714be7c354"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "2aafc4d91692b775b525897eaaf33dec2bc63875c122754ec5b6570b0ef2f062d90b17b8e4611ba64d9a06c152de1db2"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "f97f2b134e7c01ccda8e4e97262d548ad670aa51da1bb4d819f6fa58ab0ce56be838d52363fa839aeea9d66b6c701ac9"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "73ab10d68492bbc5126d0752ed0a6f9d16be468807a92ca6790a01e25881850b"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "d0c8ff302395db29f30b7610f17ea016ec544518b39a34b1cd81ef4d02a3772b3dabffeec588beea8cda9a4dc0cbf11e429ea539c3de709dea291a60148c13f8"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-sender-okhttp@1.62.0?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-extension-trace-propagators@1.62.0?type=jar",
+      "group" : "io.opentelemetry",
+      "name" : "opentelemetry-extension-trace-propagators",
+      "version" : "1.62.0",
+      "description" : "OpenTelemetry Extension : Trace Propagators",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "3b0ad4e7ad0e32b57a278679fdb07bf1"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "c7e77f33c8d67342ca389548552f423c006bf483"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "d301b26215e8f18553b62759d2c17493f321b8c74d9782841446ab8d2d716b9f"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "c4038604dbd9e13b4d39289be1b4083971300829469286dec64334cd4c0937ba81a4d0b3e51cbbd712f813bd3763be5892efb29675584cab2ad126bd07a5b015"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "a3252a2315d1c79ef5ac1a0d24d9192ad87f90376d36ebc88d1c554129fad9abf7f56cbadd5118cb56af54bf9865d9bd"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "dc735c6611e1298893e0efed7f9851f5883b10e4119eb97efa82a81a8a8bf43c4e88e2e355ebb11c421a688ad82de303"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "3b12fba41017b659788ebe6cf2a3d24159c0d2e64830d080eebdb3adc4762729"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "38db945cca8503b81528233c65f018b4b6d7c3f110af0811f81aea43f0744fd010ae1448b2f9c0c3aab5cf1d9fbc4ec9117f9219402db2575b7cd4d2416f09e9"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-extension-trace-propagators@1.62.0?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.62.0?type=jar",
+      "group" : "io.opentelemetry",
+      "name" : "opentelemetry-sdk-common",
+      "version" : "1.62.0",
+      "description" : "OpenTelemetry SDK Common",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "30f565b2736f947c9b67530227fbf249"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "b6742282daab8e13598b78a83ddfa54f10b5752b"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "bf9d13df9a50e49a5db664ba8ebfad79f73f03219d2ac6f6709d432f6896eba0"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "f4149565c9846adc77326096cc4c39b60ea2b5980292c03dc8034d5f65f2a5b054c00caab8c77a088b15c0b7d5c8633e314ac66fdc27ffbd67f0ad254e6f184b"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "f3618dd48b344cdb35f9d859dc7adadc6e33490384614baf4c71eca402f4d2cd04b8dbce1a3af2ba6f78cbe5a99f1465"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "ececa60090e2778fbc55fafcf4814d4ab4409603d523ba53f9e08a6b381ef321ff4c10cd1256aace731a3cc80fa05545"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "27c258a312ed41c4e00c01ec8e484541d911f21ad732f64f4bc7816ccd861da7"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "93935747aa2fce88757f4aa63cdd78b28e7c2eada4e9787daa062c39d86e159abfeb9b1f83f046eaa271cf8ea5e8a0d5995583ea7d5bcad102ab928ef04333f9"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.62.0?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-extension-autoconfigure-spi@1.62.0?type=jar",
+      "group" : "io.opentelemetry",
+      "name" : "opentelemetry-sdk-extension-autoconfigure-spi",
+      "version" : "1.62.0",
+      "description" : "OpenTelemetry SDK Auto-configuration SPI",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "743349c422aa50a3e4b6fde1a74d1a78"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "99bbc1bf4cae62c793e6eaa3f41436e29710b876"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "220c22bcf420faae59b7225c789f572eaa22e7af2304d55508aaf2a3efcfecf8"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "52bf51b3ab91ceac2d36cff7da3232b0a5a24223cc9d4927b4f516156e4d284193ca7ef31ab37914dac648dbd0e7661f796bf02a19eade572f04f12f507d275a"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "cf1d40cbc4c4e109883c0c7dae1f1f0c4aed169e47641e3eeaed694e60aa5967828b37e03488287ebcfd44d89168e7c8"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "5583583949b981349717cff9525676482f21dc1546552e71746ba3ddf1ca57e83e10f8cf8c7cbc4d19449502125fdffc"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "3459f89508c82c47a77222f315760c282a02577aecbaa525d7c9cc812fcb30ea"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "e23db3f3f212d0af969c7331cfafcd843b7006d856a31131de119e07780fb4a63a476114befd166e33bf99ca6d61019dc79fa0d497b42c61dec2b0a80e41b7cc"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-extension-autoconfigure-spi@1.62.0?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-logs@1.62.0?type=jar",
+      "group" : "io.opentelemetry",
+      "name" : "opentelemetry-sdk-logs",
+      "version" : "1.62.0",
+      "description" : "OpenTelemetry Log SDK",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "5a7a1fbfce1916cc0c016bb938620cfb"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "f242422084100da0bd3a5f6f2bcf364aaf4d2c53"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "51c94329bc8e335ed79027d29d49c075c11b91b39e48679edf590e784a392406"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "85d1360cdfc694989e554c5f5a00f30d0acc78cb7e31c216376cbe83c0d321d4d623db613145a8fc31cd42c37b8b4a7e50d9fd16fcda651f230e78c5aefc5362"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "c778639b7e79184d1351c2ae3225a69a3b7f261f34e6746109d01099afd2f43dee992a67f896e52c4bb116918401f724"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "69b2f06b404dffc33d6d8f48f5a7c93066d32e2e57595099c8b2e79599e4767f85a15a0fb8c03f388768859a32d29f8b"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "b6422b689f699fc3577230b64b6249a3c9b2083a41990bc54bb06dca0cedcd17"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "697a05e927d9f80eb38d4cf01a11d9d8525d73962669fde1dbc2fd71a83716d30ad05797b0d92190b05fef62d4c40c9358ae76c479ff5f0047438771ae282482"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-logs@1.62.0?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-metrics@1.62.0?type=jar",
+      "group" : "io.opentelemetry",
+      "name" : "opentelemetry-sdk-metrics",
+      "version" : "1.62.0",
+      "description" : "OpenTelemetry SDK Metrics",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "31e8a3c48819215f3b89af583aa9d00f"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "5838371075930a4a15f7f61240b4b64cb3e924d8"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "50b057fbf063f6801f623212f4b51b6a3fefc77837314a1316b2f54894c8b5d4"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "d08e99c57763e53f0b9f958b848f3a8d2e30da188f494f1e5359b5a58545d36b9330c3d2e56870dc23977283a1b35d5f3a3bb7146fed7ce78d9d7adbd5f6591f"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "807123425f6188388def2e24dc93280f946c6bc9b7e9ef0c05125f7eed39989a009e1aff24822bcd01e6c62abb4329c3"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "692e5fe180b9a0d497ef622cb4c7534655131d26b6fba0e9fb77fc97e3bf5209db16c51678c1287aaa60e707600e8c84"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "d6dd8631e6de56c30e8cfba64b8c884edc8c9b97f00c7e50b24237d05721121f"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "bdaeb247a6d6f0b004394291ce055c655167bb0d91a720eaa551cf256cd0df6e34d51115e7725141a715f69695f250972c291ffbd3437e1729f898feb1f6a870"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-metrics@1.62.0?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.62.0?type=jar",
+      "group" : "io.opentelemetry",
+      "name" : "opentelemetry-sdk-trace",
+      "version" : "1.62.0",
+      "description" : "OpenTelemetry SDK For Tracing",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "e87149bd2dfc2f88307459a4bb916c0e"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "7a337d2f887b151d27e734d1c221eb51b1c5b734"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "fb6c0953b229a6da1db813135ae11a621bf9da56b7356c1e93049ed4b088c232"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "abdd3e3670297d3aab76ea2f6e23732db17177bd38298151a0ee831a12f38e048246ff1e9178bcda81caf6c13b4343cc4bfa923e11fcc78517a5eabb6ee6b637"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "99f92b29bc371a03af23f58e166fead4e231fe6f9e0247d6ea7b230155c615f4e84789506b7e1e37fb8ba108bc635fd9"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "a9b0c4410a3997277d2a4d7be647bcd308823a303c8e00b3e107d8a4d163e7740975a45351640089367b19d101d47123"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "c618b52115890f5effa7dba0d9dabe9bb8347e8a752e6ab383bd15f2c680e8d1"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "34cb64a28919e49fe1e2400b66a8c8ab3d4c3e9aa1ca0dd9dd757261db1f89af7fd7582ea2678164c00ca3d2b09ba0a36f2b29396d9a651118d844d6d8292199"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.62.0?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk@1.62.0?type=jar",
+      "group" : "io.opentelemetry",
+      "name" : "opentelemetry-sdk",
+      "version" : "1.62.0",
+      "description" : "OpenTelemetry SDK",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "0b3bd8d10ba2a82e7819f5f4bf913e2d"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "06fa52c4641322b14b8bd515eb048bb9b1365d0c"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "99d421ea0e5a1ca8e45cb67f1d5db7f0e8a718dd55eeb86c1323597e1f10aed3"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "6187261ec841f10ce75c2d6eb18037511cafe8ad5cfee414a2962a766344dcfeb901d42abf1c176fdc14f50879394347990e54f9270601c8d4bb12eec33d2a15"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "b615d53eeda6455257ac73c047494d02a23a064f377037ed55f570c00631e3b9c33fa504177e60ede19dd74b38e3166a"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "326774df07579949cde38589f7ddef5ab1c1f306b27505657e804b055a971040d50250fccd0eecd1ee4561624f9c5d36"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "de23a50ebb688abf2cfc0f487d29fc89c75104a382d8eca3eab082e76f06d031"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "371f271f201b380c40e7aff44ec26190abd2cb9c7ddf8f87201e3271cbe67ad23a45deff3d5f87f869c94b6f27f42593a4afd07da064017183affeb709bfdb6e"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-sdk@1.62.0?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
       "bom-ref" : "pkg:maven/io.projectreactor.netty/reactor-netty-core@1.3.6?type=jar",
       "publisher" : "reactor",
       "group" : "io.projectreactor.netty",
@@ -5341,6 +6551,348 @@
           "url" : "https://github.com/reactor/reactor-core"
         }
       ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.prometheus/prometheus-metrics-config@1.5.1?type=jar",
+      "group" : "io.prometheus",
+      "name" : "prometheus-metrics-config",
+      "version" : "1.5.1",
+      "description" : "Configuration for Prometheus metrics and exposition formats.",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "ef0187a254f049d3d95755ae154f2587"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "ad86683e4e0047f0c85906378bc3b6214155e4f6"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "77ac62a4676e82d5428f259da4541b30c9f6dba245d25ed1792e88022ce0f849"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "1d527a699e154feca7e80e3ec96767cff0d6988629b34f462312af78b94d18ec29970266fad69633c2474f2893d185af9698014238b7a639c3269e4e72bc110d"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "c5ab417cdabe558960086dd02f4e89521d5f3b96148721328c3420fd336baf9dd0e1d52f8feae4e3d31d16dccb8e6f0f"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "5da802e60d4c88f1797ada9bfded13e1e39e72a0f94575506bfc029ed4e2108e5cadb9dc4cbafe561515903f978a5bd6"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "cc02524024fb075d0eac105fca96dd379637dd313d2a17ea987da9c9259b55a9"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "18ab4a5cfa40286f22480a06b3834d3572787424cff75667bd0b2800dc622daca9fb5e02de24f9f521bf424b1773f4a840b753e9bf91a05d5cfa17566f42f2b3"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.prometheus/prometheus-metrics-config@1.5.1?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.prometheus/prometheus-metrics-core@1.5.1?type=jar",
+      "group" : "io.prometheus",
+      "name" : "prometheus-metrics-core",
+      "version" : "1.5.1",
+      "description" : "Core Prometheus metric types",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "7f5637e3ddc069cf9330e5b1757a3192"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "962da972dd2a14fa2d4763b25a103b9bba862eda"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "1c2e4dc5fc86a07362d3d2c1fce11793386f00451dba59182e44d4044dd4fc2f"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "3ba553a07cff06916ecd1a1e69fbdb106787be9c5f4323d6d4a165ffba82022a6eafcfcd77e31930ce3b1fc489acb9968813ce2874c560b780637dad9f09857b"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "f20b42cdebb34e0d9addaa7c5c640a44feb28f022e8a03795ebfe83a63281141ab4373095bfa599244bc967698014bb2"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "4548e4b8e08bb41967ab30d478b4bbc1245c4affaaa0457139c55481bf8ef9ce4d990a32a02cb8eac529f8ce418d6f32"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "ed8aa4b2cee814644dd5e63326585c56e3924dc4c150083667acd0149b814d94"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "868dfe9a2e30f3086426ef7b48886c1c4e91361fc016dba0630b8bb5c648fe22e2b57bcaa09318108cd596663af4501518b1abe7311262af2e0936c2b919acca"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.prometheus/prometheus-metrics-core@1.5.1?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.prometheus/prometheus-metrics-exposition-formats@1.5.1?type=jar",
+      "group" : "io.prometheus",
+      "name" : "prometheus-metrics-exposition-formats",
+      "version" : "1.5.1",
+      "description" : "Prometheus exposition formats.",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "c984c27d71d40ec44f8e84d89f65227b"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "6674936927c33ff402574d499b93914153e1d9e8"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "d21ac460c15baa4949101c72dc59cd80b7c7d359578be68b635fcf8aed057ab9"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "5201ee65129eaf67e1f5f23ce7829c9aa0925bacd235df233532b959de08ccd111ac83c5ecd6a1c2042a4920d38786a7ef3422e4d9a2bc42a7e4be02f80e3a86"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "af98e26da06937327443bead610505cbf5995d6c06b60537a989edc61d98b79169e8729e0c33d7c58f9c721903760204"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "053f2d38b011778bd09a5fd554ec5ca66ae5836fababfca20e095805c4a1b69662e6352e1a9762916301a117755c4aaa"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "93a590d23aecb9615fdd5844c4af066300e529db37b6904e225e5d7dc284870a"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "0b876889c340934e71703be061f4727f7c73fc0d78137ab3209008bb0cc0a8dd7fe67ac2a96c77d956b3e447088071ce9c25341d172d464f3922bbe77bdf79b7"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.prometheus/prometheus-metrics-exposition-formats@1.5.1?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.prometheus/prometheus-metrics-exposition-textformats@1.5.1?type=jar",
+      "group" : "io.prometheus",
+      "name" : "prometheus-metrics-exposition-textformats",
+      "version" : "1.5.1",
+      "description" : "Prometheus exposition text formats.",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "cc8d749c8823e142e5acf13f2d21b98b"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "a19fc890e26391515134c2a3f4ae960b7d393206"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "4b39c6034b2f63865e12a7ef297a5a3d88efa06fcd90c9ff1a5fccfac80289f5"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "70b4d21bef302372f5393466779a87f374ce86a3fa92e0476d956e6f9d9fa239b3a10ea467fb1e7cff8b634d795d15604a841d88ed99117e0701d952fa2a1cc1"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "acb6c76a5bc70008a856a1e63636f63a846f77f5a1d24a35ccde9fbf99df6c10efe7d6d7475e9ed7b145fa8f236681f7"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "f4df1cc09567a3ed5b644ea37b2009ee6db15764cd001910614ae0cbbf5ac4dc4ef40c79c36fc7c6e815981136a59d73"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "66c6a9b01221d8d90fc8d0cd0d85660980b89ef7869ab7daa3dca3f8e98ea276"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "695c0af4f7329f5cc3d8ea1b52aa50f074e233cfdbe7607fd186f5f416f638b55f2d4e826f9bdfa3cd1ac0c93692b31479266946d5817eef99239db034007964"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.prometheus/prometheus-metrics-exposition-textformats@1.5.1?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.prometheus/prometheus-metrics-model@1.5.1?type=jar",
+      "group" : "io.prometheus",
+      "name" : "prometheus-metrics-model",
+      "version" : "1.5.1",
+      "description" : "Data model for read-only immutable Prometheus metrics snapshots.",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "280cf81a4fc01bb6f76f8a4ee851ec8c"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "4fc0389959f2d4b7812fac6af1e925c4c1991fbb"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "381d107abe62e353cdefee3f01e0ee4d71631ae155ba528f08c9c5393da1183e"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "9a5fec404b3acb36f84daa9e5602310845e9b8e6986464f66cec4f243552c15fb9a29129f1c2e945888b619d7bee13fc1562ce61463684472fbfd85174d91964"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "247a5ead583d56d624f852fbf339dc3ad7accb365f37750dae72241704d3e71adbedcc9b5eda1b00a51c8bd90dc93517"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "977e7d3384306140bbfdcc7d6228795cb44d5dfa739d7a011683ee8995932f265d49f227002706de6d53e47e0334522a"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "3061848b203847cf2a8a521aff0eb3288c3863f8e95e924c9549629832f359a2"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "b77e8a7b053bf44f85b4454a924808ccb5029e818ea0729e80f0b2cb8d171344e2aa9e6eb09cb56335c8e8d0919dea57ab85e06c35dc5e8bbc7ffedc059ada81"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.prometheus/prometheus-metrics-model@1.5.1?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.prometheus/prometheus-metrics-tracer-common@1.5.1?type=jar",
+      "group" : "io.prometheus",
+      "name" : "prometheus-metrics-tracer-common",
+      "version" : "1.5.1",
+      "description" : "Common Module for Prometheus integrations with distributed tracing libraries.",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "155fe9fd0919d391e88b3fb25544d12d"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "09e7b5b67899ff7e779fd5f816bf631fb9b58ae3"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "51e6e5f292bf78ceaf0fbd9983dfc658e36be4a44dd1d881ffb869a0f5274e9d"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "ac14790c8ea708407118238c5282375bf04118a363e875367573b2e52de7ba0c894f1a866968eb254d078c9e48186b8d554794bcc2817cdd3f94b4d487288d7d"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "19c5539b7e0bd3e8900534437c7adadf2b8a4f7aeff85bc021053a55de8715e511180f998d4127f38fb1594a8aea665d"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "b2615b7f747ba3fb1dfc781793cc4cf713fe545b19b7def7c987ada6d5b5b2613cf2d75bca3e0ce6857df55604b055c3"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "68ceb77f27a31e2d043d48b1ed6a46de8c89a2cda62150bfa9b3eec651845f40"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "03698e465b46ba776a0d08c57072e946b77da311232a58daae4f7503742dfbfcaa824e2d7a600eda93278d660348ae46d7999bc9a3d93e46c87be178db3c0685"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.prometheus/prometheus-metrics-tracer-common@1.5.1?type=jar",
+      "modified" : false,
       "properties" : [
         {
           "name" : "cdx:maven:package:test",
@@ -7216,43 +8768,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@11.0.22?type=jar",
+      "bom-ref" : "pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@11.0.23?type=jar",
       "group" : "org.apache.tomcat.embed",
       "name" : "tomcat-embed-core",
-      "version" : "11.0.22",
+      "version" : "11.0.23",
       "description" : "Core Tomcat implementation",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "a9d30a411c840f543a0a09c52f982237"
+          "content" : "ce900a488f01b4891de44983d35c9c85"
         },
         {
           "alg" : "SHA-1",
-          "content" : "cc7307efaa60c0d31784bf053ec4aa48a404f44b"
+          "content" : "19f68be0972add443a53b68cffe8fefb4d5d467f"
         },
         {
           "alg" : "SHA-256",
-          "content" : "78cd7cd7c104b6b87142c1b0bd902e1ce005b0245c3cefa8a06759148947200b"
+          "content" : "53c4038175e4180182a0d27ef777ddafe7289d9a7acc43d367e556b071f03075"
         },
         {
           "alg" : "SHA-512",
-          "content" : "f1f560348f3553c147ddb2ca5bd2300fae7541fcb7d7a83d5ab57d0f63b92a33a2ac7443ac27ced74373f8256422acf9cbc7388c27ad95ac6975180a8af1b071"
+          "content" : "dac351d0ac357dc85b8f2ebe8bf69465c394d3048f356f85e4776432126299fd360c55951e138becc6977b525136911e44b2df9eefe4c76fb30579897d0aa11a"
         },
         {
           "alg" : "SHA-384",
-          "content" : "a02bdef8a35b707cc31b6a2bd6879ac9fd8b2e9a819de677c074fef0b528a3677d222645962670930a0cdf33759a203a"
+          "content" : "72301df524692526acb9d6b1b6c00faf97b934d74a23d18c8dad06882e302b40c022b73061e572d22690df466caec8be"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "4d1c3abd4b2d24b896b7004af91fd98f8809bd0e736e1b966d9a7493ba9294183d309e63a7c1bea22c41a3e00b977e5c"
+          "content" : "04d5cbd2e42819af5190ca2b649058bd6f41974a98cecfe3ec0eed322d1b6d947a86ba020c81a34a9e849cea9b75ef9a"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "bb013f06fe4327dc6a2651cbe306994213604bcb004f1ca9f5c289f870b7df1c"
+          "content" : "77835fd06b7bc66378603f73936bdfd60260f135f18d70c4d80524e19727994d"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "ea8653955200e92509a113d8de2737dc4dcec132999a6dc9b2060e2054d1bd6c374308535f0b9a5d754b0188b1a70b99df8e11682831c9c23eb0c43ea37d817a"
+          "content" : "591cfac28c4c1f3236b2db918449f4b9f58fdef4d0730eb8620a14526f87db61e2d4d7a52473c4e406a0cfb11b85bda305314c33c630c92d8f1463fadc39da8e"
         }
       ],
       "licenses" : [
@@ -7262,7 +8814,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@11.0.22?type=jar",
+      "purl" : "pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@11.0.23?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -7273,43 +8825,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@11.0.22?type=jar",
+      "bom-ref" : "pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@11.0.23?type=jar",
       "group" : "org.apache.tomcat.embed",
       "name" : "tomcat-embed-el",
-      "version" : "11.0.22",
+      "version" : "11.0.23",
       "description" : "Core Tomcat implementation",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "daa86c437637545a21900a63e9626424"
+          "content" : "c9323a063917170e04dc0c70a3818d78"
         },
         {
           "alg" : "SHA-1",
-          "content" : "db92447e16c3561e9ca7bf9311b6b6389816699e"
+          "content" : "0c150c217d8f54250882cce29fa02b07db909c3d"
         },
         {
           "alg" : "SHA-256",
-          "content" : "1b34c33b858c141df36c501b4d809e68036c406bca3671a86facae297917c7de"
+          "content" : "bf917bed94ca89a0155a5f448ded801d8c0869eb1622d4b0243059f3ed213120"
         },
         {
           "alg" : "SHA-512",
-          "content" : "e34597b4f17e39a9ae7da056375a43aec3238b1a0d97fc79b8e0f09a3c611e1adb5f24c4b988303d13de65529dd2693f097b480692a15a544b9b98debef39c71"
+          "content" : "23293e051ccbe42725b414d30c77a7abca5a6d99fdd342eedc57a79d07352e288543bdb35ed3b711eaa97e70186e91833de0de600c8385ddf33452ca6d37d132"
         },
         {
           "alg" : "SHA-384",
-          "content" : "08746586ecffe8fa35edda5bbe8eac103bf057512142607517af94e3c3f5b41f14f22e2f9f885d282c3eaf2aaa8ee63c"
+          "content" : "7748f689a23b6b07eaaca632b552fd6c071096c781f9435b4a40946e2552ec33d62a289d6c48de41e8b1428ba9b91137"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "f2667ea51de50718d3850169b311517a5aeee8be5e59149f425670f37cf8f355fa0ae329c513b4d3599b22662244818e"
+          "content" : "310d7f538ae5954861d7fbeb433a33c8c4cfeef897022fae5bc92ac66cc921b737b70ccd3b3bac247fb95d9e813f16cc"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "5fb2c06c45222e5b51e4723cccd313c2188b9a2a9b27a7c8a5a49e0dc38cbc65"
+          "content" : "6c63416f016359d996e067de63a04b49fc37389361eea8ce25bc0e09da50311f"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "beeb6fc54deb5977b41ca88a5eac41fe295788c977c7f309674650e1a93f770ee3cca4760b119fb4f8835ea5acbe479f9e49fe1833cdc62aab635e06a2837145"
+          "content" : "c36abbc6221f82dd2f6f2ebe375b2b0d8e42cfd14497afd764a97b20e81a919f71ad7369ddf9f8a5e07def0911a9069f618a31c4601dbd8bce176abd245e54c2"
         }
       ],
       "licenses" : [
@@ -7319,7 +8871,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@11.0.22?type=jar",
+      "purl" : "pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@11.0.23?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -7330,43 +8882,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.apache.tomcat.embed/tomcat-embed-websocket@11.0.22?type=jar",
+      "bom-ref" : "pkg:maven/org.apache.tomcat.embed/tomcat-embed-websocket@11.0.23?type=jar",
       "group" : "org.apache.tomcat.embed",
       "name" : "tomcat-embed-websocket",
-      "version" : "11.0.22",
+      "version" : "11.0.23",
       "description" : "Core Tomcat implementation",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "f6656564ab84c4f3f5c53ce0d2bb14e7"
+          "content" : "3b64df466320826bb602c7e1fd8428db"
         },
         {
           "alg" : "SHA-1",
-          "content" : "5686ff1ad745491d981d771514027d8fc55aed4f"
+          "content" : "07c393c1d995ab72da3a4254ff5eb3bd24cdf216"
         },
         {
           "alg" : "SHA-256",
-          "content" : "210e0c7ab194a76cc7283df0be365276091b042369dae125fb477828ba67e922"
+          "content" : "ca7a58b288c7ceabb7589f0b27405fddadda61cc087ee45a91e8444d640ec05f"
         },
         {
           "alg" : "SHA-512",
-          "content" : "70f8278ec36c8c0c81606699b2af62f532a321e02dbbee43b9ae42d3c1ae63a11e6a4f4b4064ce4c4b0005cfaccdf1d4296a527af08f1712d63ec7194aa29ee1"
+          "content" : "5d7519d98d23bc870f5d961ac8602dd65c4df6b7e1fb7b862fb4319e6e0d1a8ffb9711f5aff2201e5fc5f2f592ebc427273b5c0ba897b0f24cbdbb798faaeb46"
         },
         {
           "alg" : "SHA-384",
-          "content" : "610d54c42ad2c2e12aec852c1b8b82fc556150f67e923c811d4f7f502f540f3fded95b758f6fc3389c8372e9e1dcfac1"
+          "content" : "7c904316487e38b99e5841e2e83b91835260164154d921504188dd90e112662056fcb0547d7d799796578e210f28f285"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "b198a4eade41c9e026b98eed53dfb68d2cc4b870f1c1097bba1e4a7586f9f13a35353ae001e8e664ba6cdef3b250d446"
+          "content" : "a9a5bcc16e19096b60cf792d72a2f5efd720f87382520df7c74bfaff9709a567206cd69a82ba5157b15e40ed0fe395d0"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "27e91c1ee6a1873c6bf43abb3b2452b365860d87f51c6beace36f8f16d526428"
+          "content" : "56a17b7fc7316987a2491e3e159776934c68c8d8ea838d5c5248c97878e783c7"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "df9e1868edcaa0baa3d8f9bab12dec9403f6428e7d8a8c8f2481e395a88f32e21d6efeedafa9d42e757bcc61c586b5432d53b761d0484aff1551bb06d0598142"
+          "content" : "3cbc656e6e8d36e077aee7ecb8da74061ece30a3d237e98c7d91e4e48b379214cc83772961da8c31a2b0bf3169c6e536c0e609ed3aaf9de98754bcce5808e3ca"
         }
       ],
       "licenses" : [
@@ -7376,7 +8928,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.apache.tomcat.embed/tomcat-embed-websocket@11.0.22?type=jar",
+      "purl" : "pkg:maven/org.apache.tomcat.embed/tomcat-embed-websocket@11.0.23?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -8761,7 +10313,7 @@
       "properties" : [
         {
           "name" : "cdx:maven:package:test",
-          "value" : "true"
+          "value" : "false"
         }
       ]
     },
@@ -8828,7 +10380,7 @@
       "properties" : [
         {
           "name" : "cdx:maven:package:test",
-          "value" : "true"
+          "value" : "false"
         }
       ]
     },
@@ -12785,6 +14337,150 @@
     },
     {
       "type" : "library",
+      "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-micrometer-tracing-opentelemetry@4.1.0?type=jar",
+      "publisher" : "VMware, Inc.",
+      "group" : "org.springframework.boot",
+      "name" : "spring-boot-micrometer-tracing-opentelemetry",
+      "version" : "4.1.0",
+      "description" : "Spring Boot Tracing OpenTelemetry",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "5f22c23fec30ea285fe719bcaab57dd2"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "7761ff549688772f192044f4e0a77e10b5db0df0"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "4edb74ecc38fc40ff7b1d40dff1e2a81edead2fee425b90a48833e9d29732e73"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "e8a36742423346487117c99f0a108dd6733143cdf92ad6e1046fdc7ffc5c6affeb0557e23f9c50d99986fea3d3be39849809eeb2102f51703ed46c90dca0fbe5"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "a7af6e2e7c5a8600fa3c709a388c0fed6095835a239ad9733b920007517bca8ea090d66ec1e5b3b81495a63705c24b96"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "f7c8c94d338e8a412951eeb826a528eb67aabb45b54ed81038045dc6c52b8d1ac9aa23f85f55f0ba7ab425f5b6caae4f"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "a62de89c600d4f2a32f21959f17b11aaae14475a2916edfc741ac6081ec75264"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "2e8f303ae5eb3841f9b2d40995f5d09b55f8c56f8bf82f3511019e6e50ad18cb1ee0a74c07e5c92b62f29430c16381ee6ec4a8a4e6cf0994c35896864e5314e9"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/org.springframework.boot/spring-boot-micrometer-tracing-opentelemetry@4.1.0?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "website",
+          "url" : "https://spring.io"
+        },
+        {
+          "type" : "issue-tracker",
+          "url" : "https://github.com/spring-projects/spring-boot/issues"
+        },
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/spring-projects/spring-boot"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-micrometer-tracing@4.1.0?type=jar",
+      "publisher" : "VMware, Inc.",
+      "group" : "org.springframework.boot",
+      "name" : "spring-boot-micrometer-tracing",
+      "version" : "4.1.0",
+      "description" : "Spring Boot Tracing",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "e488b26a18b85b9f637c581c7de27102"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "9effc501a80e880c97fb3ef9f795dc9e225de66a"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "3293c4a9eae75755461ba2a5391670d1dec39bbef558906488f0a8410f978494"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "6ba60331b14577267d04c05b3bd16acf71c1dd12b72a9491336d4a7187aa0e6f6ac9799514021030b50e8f2ab1df5d24955505b69510fe685f220cc9b83549b8"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "6271ef31d2b3d082a227f133260ce4d6130a25f1ec422906d62fa5d851aad2090240ebe0f36ce3a919df70f0d5d0119a"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "fe24f3aed725decd126736ae212e2f7c40c0c0aa85171f41921cd4980a789c77887bdffa09ac4794ca65b470d36c1c0a"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "bdc02fe27ee8fb7ef5a53c9734b6089833cf34b9457e3a138c709bfedf5e12cc"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "6cd5b11b926633959a90ab40d074f6e334715776cc4d2217754c9ae7e273e76b78a4f8f85a285b197374e1f44d4f9d3711d164ef1e28ed91942b9689d085e32b"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/org.springframework.boot/spring-boot-micrometer-tracing@4.1.0?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "website",
+          "url" : "https://spring.io"
+        },
+        {
+          "type" : "issue-tracker",
+          "url" : "https://github.com/spring-projects/spring-boot/issues"
+        },
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/spring-projects/spring-boot"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
       "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-netty@4.1.0?type=jar",
       "publisher" : "VMware, Inc.",
       "group" : "org.springframework.boot",
@@ -12833,6 +14529,78 @@
         }
       ],
       "purl" : "pkg:maven/org.springframework.boot/spring-boot-netty@4.1.0?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "website",
+          "url" : "https://spring.io"
+        },
+        {
+          "type" : "issue-tracker",
+          "url" : "https://github.com/spring-projects/spring-boot/issues"
+        },
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/spring-projects/spring-boot"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-opentelemetry@4.1.0?type=jar",
+      "publisher" : "VMware, Inc.",
+      "group" : "org.springframework.boot",
+      "name" : "spring-boot-opentelemetry",
+      "version" : "4.1.0",
+      "description" : "Spring Boot Open Telemetry",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "5fca623089ed965c2b8b5d74c903e97a"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "de86b5e45a6783883d54aefcb04ee2ca8d06a1bd"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "cb25db212593a48f59134e5e0adc189d6aaf3acb6bdcee736fc312c7f9494e29"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "e45a080e7bdd2f1a65b41063184c87370da1f309091f9e940711d1466359749766b864a1b868098df78c90e720711d123cc5cb9846a3de81c56e1b28b8fb0872"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "c16bad5a5bfeb20f7ac20ab10fdd65bff1ada4c1758268ac53e97adc072fe23c42329b3b36b00e825b44a9715898277a"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "e9f332ae119ca8a7e7ed3c5b08f5a94a8715efab70e7f4ffde954c66aa79d287ae7ab000a22d37e980b90b153a5a0c06"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "5b4b42212ce77d9380f1e7c1e5122c0450e3a68d11e3f96c057c741e6b6d10e0"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "16b05afc4fbc17e3059db07f41946fdaa0f35d17a42acc2d7614cca5253a57879d61a815a404e8ae731cd09b2449b862b93b81e36c3ff00bb4f85bfe4b35a790"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/org.springframework.boot/spring-boot-opentelemetry@4.1.0?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -13769,6 +15537,78 @@
         }
       ],
       "purl" : "pkg:maven/org.springframework.boot/spring-boot-starter-oauth2-client@4.1.0?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "website",
+          "url" : "https://spring.io"
+        },
+        {
+          "type" : "issue-tracker",
+          "url" : "https://github.com/spring-projects/spring-boot/issues"
+        },
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/spring-projects/spring-boot"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-starter-opentelemetry@4.1.0?type=jar",
+      "publisher" : "VMware, Inc.",
+      "group" : "org.springframework.boot",
+      "name" : "spring-boot-starter-opentelemetry",
+      "version" : "4.1.0",
+      "description" : "Starter for using OpenTelemetry",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "f7b04928c0214e48149c4abd9db2c0ee"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "f766ad77c2ee060bc67035b0cf065b55cd87930f"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "0c0a1434659ea036ee856cede4a16fb1a3e826166dbe54b5bf89f7c4c9eeb15e"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "b3be61f5fc438f8517aaf8109ebacb9ae16b2e3df1cfe33b8da746ce1255327447ca84eda55beea4dcf1b3ee32e2fc33c5662f3f3b14eac5939fe980c0b222c4"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "6e00d2c3a8b61e88645c48f4f392c39ee831b4ed6d58ee9ebae20ee7bbcac490570e7a7bad3d10dc91eaea20909277e5"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "7fa53d4fd7ccf0a89e9aa798a217b0b341537a1ec53be858889f8a9a340bd30215f13cc59b9436382b2924fdca48f616"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "5db7ffe4dc9375531bd1476cb10a62f3c68a386fa7c7637dacfbce57ef9bf224"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "305d29be30c294f525e8d9c68563837e00ef0bbdad839be50106c45e987b3bdfaa737d5a7d66f531818847ce8989c56a2c6575d0515fc5ab729e4e85ab585467"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/org.springframework.boot/spring-boot-starter-opentelemetry@4.1.0?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -18240,10 +20080,23 @@
       ]
     },
     {
+      "ref" : "pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.3.2?type=jar",
+      "dependsOn" : [
+        "pkg:maven/com.squareup.okio/okio@3.16.4?type=pom",
+        "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.21?type=jar"
+      ]
+    },
+    {
       "ref" : "pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.4.0?type=jar",
       "dependsOn" : [
         "pkg:maven/com.squareup.okio/okio@3.17.0?type=pom",
         "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.21?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/com.squareup.okhttp3/okhttp@5.3.2?type=pom",
+      "dependsOn" : [
+        "pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.3.2?type=jar"
       ]
     },
     {
@@ -18253,9 +20106,21 @@
       ]
     },
     {
+      "ref" : "pkg:maven/com.squareup.okio/okio-jvm@3.16.4?type=jar",
+      "dependsOn" : [
+        "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.21?type=jar"
+      ]
+    },
+    {
       "ref" : "pkg:maven/com.squareup.okio/okio-jvm@3.17.0?type=jar",
       "dependsOn" : [
         "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.21?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/com.squareup.okio/okio@3.16.4?type=pom",
+      "dependsOn" : [
+        "pkg:maven/com.squareup.okio/okio-jvm@3.16.4?type=jar"
       ]
     },
     {
@@ -18306,6 +20171,7 @@
         "pkg:maven/io.github.resilience4j/resilience4j-reactor@2.4.0?type=jar",
         "pkg:maven/io.github.resilience4j/resilience4j-spring-boot3@2.4.0?type=jar",
         "pkg:maven/io.micrometer/context-propagation@1.2.1?type=jar",
+        "pkg:maven/io.micrometer/micrometer-registry-prometheus@1.17.0?type=jar",
         "pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar",
         "pkg:maven/org.commonmark/commonmark@0.29.0?type=jar",
         "pkg:maven/org.jacoco/org.jacoco.agent@0.8.14?type=jar",
@@ -18320,6 +20186,7 @@
         "pkg:maven/org.springframework.boot/spring-boot-starter-cache@4.1.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-data-redis@4.1.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-oauth2-client@4.1.0?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-starter-opentelemetry@4.1.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-security@4.1.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-test@4.1.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-thymeleaf@4.1.0?type=jar",
@@ -18498,6 +20365,39 @@
       "ref" : "pkg:maven/io.micrometer/micrometer-observation@1.17.0?type=jar",
       "dependsOn" : [
         "pkg:maven/io.micrometer/micrometer-commons@1.17.0?type=jar",
+        "pkg:maven/org.jspecify/jspecify@1.0.0?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.micrometer/micrometer-registry-prometheus@1.17.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.micrometer/micrometer-core@1.17.0?type=jar",
+        "pkg:maven/io.prometheus/prometheus-metrics-core@1.5.1?type=jar",
+        "pkg:maven/io.prometheus/prometheus-metrics-exposition-formats@1.5.1?type=jar",
+        "pkg:maven/io.prometheus/prometheus-metrics-tracer-common@1.5.1?type=jar",
+        "pkg:maven/org.jspecify/jspecify@1.0.0?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.micrometer/micrometer-tracing-bridge-otel@1.7.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.micrometer/micrometer-observation@1.17.0?type=jar",
+        "pkg:maven/io.micrometer/micrometer-tracing@1.7.0?type=jar",
+        "pkg:maven/io.opentelemetry.semconv/opentelemetry-semconv@1.41.1?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-api@1.62.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-extension-trace-propagators@1.62.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.62.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.62.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk@1.62.0?type=jar",
+        "pkg:maven/org.jspecify/jspecify@1.0.0?type=jar",
+        "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.micrometer/micrometer-tracing@1.7.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.micrometer/context-propagation@1.2.1?type=jar",
+        "pkg:maven/io.micrometer/micrometer-observation@1.17.0?type=jar",
         "pkg:maven/org.jspecify/jspecify@1.0.0?type=jar"
       ]
     },
@@ -18691,6 +20591,108 @@
       ]
     },
     {
+      "ref" : "pkg:maven/io.opentelemetry.semconv/opentelemetry-semconv@1.41.1?type=jar",
+      "dependsOn" : [ ]
+    },
+    {
+      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-api@1.62.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.opentelemetry/opentelemetry-context@1.62.0?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-common@1.62.0?type=jar",
+      "dependsOn" : [ ]
+    },
+    {
+      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-context@1.62.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.opentelemetry/opentelemetry-common@1.62.0?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-common@1.62.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.opentelemetry/opentelemetry-api@1.62.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk-extension-autoconfigure-spi@1.62.0?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp-common@1.62.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.opentelemetry/opentelemetry-exporter-common@1.62.0?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp@1.62.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp-common@1.62.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-exporter-sender-okhttp@1.62.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk-extension-autoconfigure-spi@1.62.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk-logs@1.62.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk-metrics@1.62.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.62.0?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-sender-okhttp@1.62.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/com.squareup.okhttp3/okhttp@5.3.2?type=pom",
+        "pkg:maven/com.squareup.okhttp3/okhttp@5.4.0?type=pom",
+        "pkg:maven/io.opentelemetry/opentelemetry-exporter-common@1.62.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.62.0?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-extension-trace-propagators@1.62.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.opentelemetry/opentelemetry-api@1.62.0?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.62.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.opentelemetry/opentelemetry-api@1.62.0?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-extension-autoconfigure-spi@1.62.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk@1.62.0?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-logs@1.62.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.opentelemetry/opentelemetry-api@1.62.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.62.0?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-metrics@1.62.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.opentelemetry/opentelemetry-api@1.62.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.62.0?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.62.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.opentelemetry/opentelemetry-api@1.62.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.62.0?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk@1.62.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.opentelemetry/opentelemetry-api@1.62.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.62.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk-logs@1.62.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk-metrics@1.62.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.62.0?type=jar"
+      ]
+    },
+    {
       "ref" : "pkg:maven/io.projectreactor.netty/reactor-netty-core@1.3.6?type=jar",
       "dependsOn" : [
         "pkg:maven/io.netty/netty-handler-proxy@4.2.15.Final?type=jar",
@@ -18722,6 +20724,40 @@
         "pkg:maven/org.jspecify/jspecify@1.0.0?type=jar",
         "pkg:maven/org.reactivestreams/reactive-streams@1.0.4?type=jar"
       ]
+    },
+    {
+      "ref" : "pkg:maven/io.prometheus/prometheus-metrics-config@1.5.1?type=jar",
+      "dependsOn" : [ ]
+    },
+    {
+      "ref" : "pkg:maven/io.prometheus/prometheus-metrics-core@1.5.1?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.prometheus/prometheus-metrics-config@1.5.1?type=jar",
+        "pkg:maven/io.prometheus/prometheus-metrics-model@1.5.1?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.prometheus/prometheus-metrics-exposition-formats@1.5.1?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.prometheus/prometheus-metrics-exposition-textformats@1.5.1?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.prometheus/prometheus-metrics-exposition-textformats@1.5.1?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.prometheus/prometheus-metrics-config@1.5.1?type=jar",
+        "pkg:maven/io.prometheus/prometheus-metrics-model@1.5.1?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.prometheus/prometheus-metrics-model@1.5.1?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.prometheus/prometheus-metrics-config@1.5.1?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.prometheus/prometheus-metrics-tracer-common@1.5.1?type=jar",
+      "dependsOn" : [ ]
     },
     {
       "ref" : "pkg:maven/jakarta.activation/jakarta.activation-api@2.1.4?type=jar",
@@ -18900,17 +20936,17 @@
       ]
     },
     {
-      "ref" : "pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@11.0.22?type=jar",
+      "ref" : "pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@11.0.23?type=jar",
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@11.0.22?type=jar",
+      "ref" : "pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@11.0.23?type=jar",
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/org.apache.tomcat.embed/tomcat-embed-websocket@11.0.22?type=jar",
+      "ref" : "pkg:maven/org.apache.tomcat.embed/tomcat-embed-websocket@11.0.23?type=jar",
       "dependsOn" : [
-        "pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@11.0.22?type=jar"
+        "pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@11.0.23?type=jar"
       ]
     },
     {
@@ -19398,9 +21434,35 @@
       ]
     },
     {
+      "ref" : "pkg:maven/org.springframework.boot/spring-boot-micrometer-tracing-opentelemetry@4.1.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.micrometer/micrometer-tracing@1.7.0?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-micrometer-observation@4.1.0?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-micrometer-tracing@4.1.0?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-opentelemetry@4.1.0?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot@4.1.0?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/org.springframework.boot/spring-boot-micrometer-tracing@4.1.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.micrometer/micrometer-tracing@1.7.0?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-micrometer-observation@4.1.0?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot@4.1.0?type=jar"
+      ]
+    },
+    {
       "ref" : "pkg:maven/org.springframework.boot/spring-boot-netty@4.1.0?type=jar",
       "dependsOn" : [
         "pkg:maven/io.netty/netty-common@4.2.15.Final?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot@4.1.0?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/org.springframework.boot/spring-boot-opentelemetry@4.1.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.opentelemetry/opentelemetry-api@1.62.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk@1.62.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot@4.1.0?type=jar"
       ]
     },
@@ -19508,6 +21570,17 @@
       ]
     },
     {
+      "ref" : "pkg:maven/org.springframework.boot/spring-boot-starter-opentelemetry@4.1.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.micrometer/micrometer-tracing-bridge-otel@1.7.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp@1.62.0?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-micrometer-tracing-opentelemetry@4.1.0?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-opentelemetry@4.1.0?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-starter-micrometer-metrics@4.1.0?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-starter@4.1.0?type=jar"
+      ]
+    },
+    {
       "ref" : "pkg:maven/org.springframework.boot/spring-boot-starter-reactor-netty@4.1.0?type=jar",
       "dependsOn" : [
         "pkg:maven/org.springframework.boot/spring-boot-reactor-netty@4.1.0?type=jar",
@@ -19556,9 +21629,9 @@
       "ref" : "pkg:maven/org.springframework.boot/spring-boot-starter-tomcat-runtime@4.1.0?type=jar",
       "dependsOn" : [
         "pkg:maven/jakarta.annotation/jakarta.annotation-api@3.0.0?type=jar",
-        "pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@11.0.22?type=jar",
-        "pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@11.0.22?type=jar",
-        "pkg:maven/org.apache.tomcat.embed/tomcat-embed-websocket@11.0.22?type=jar",
+        "pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@11.0.23?type=jar",
+        "pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@11.0.23?type=jar",
+        "pkg:maven/org.apache.tomcat.embed/tomcat-embed-websocket@11.0.23?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-tomcat@4.1.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-web-server@4.1.0?type=jar"
       ]
@@ -19649,7 +21722,7 @@
       "ref" : "pkg:maven/org.springframework.boot/spring-boot-tomcat@4.1.0?type=jar",
       "dependsOn" : [
         "pkg:maven/jakarta.annotation/jakarta.annotation-api@3.0.0?type=jar",
-        "pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@11.0.22?type=jar",
+        "pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@11.0.23?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-web-server@4.1.0?type=jar"
       ]
     },
@@ -19664,7 +21737,7 @@
     {
       "ref" : "pkg:maven/org.springframework.boot/spring-boot-validation@4.1.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@11.0.22?type=jar",
+        "pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@11.0.23?type=jar",
         "pkg:maven/org.hibernate.validator/hibernate-validator@9.1.0.Final?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot@4.1.0?type=jar"
       ]
