@@ -62,14 +62,20 @@ public class DefaultBlueprintProvisioningTask {
    */
   @Scheduled(fixedDelayString = "${app.default-blueprints.provisioning.interval:PT1H}")
   public void ensureDefaultsForAllUsers() {
-    taskMetrics.record(ScheduledJob.DEFAULT_BLUEPRINT_PROVISIONING, this::provisionDefaults);
+    taskMetrics.recordCounting(
+        ScheduledJob.DEFAULT_BLUEPRINT_PROVISIONING, this::provisionDefaults);
   }
 
-  /** Performs the back-fill; any failure propagates to {@link TaskMetrics}. */
-  private void provisionDefaults() {
+  /**
+   * Performs the back-fill; any failure propagates to {@link TaskMetrics}.
+   *
+   * @return the number of owned-blueprint rows granted this run (the {@code items} metric)
+   */
+  private int provisionDefaults() {
     int granted = provisioningService.grantDefaultsToAllUsers();
     if (granted > 0) {
       log.info("Default-blueprint provisioning sweep granted {} owned row(s).", granted);
     }
+    return granted;
   }
 }

@@ -89,11 +89,44 @@ public class TaskMetrics {
    * @param work the job body to execute and measure
    */
   public void record(@NotNull ScheduledJob job, @NotNull ThrowingRunnable work) {
+    recordInternal(
+        job,
+        () -> {
+          work.run();
+          return null;
+        });
+  }
+
+  /**
+   * Item-counting variant of {@link #record(ScheduledJob, ThrowingRunnable)}: the same executions
+   * counter, duration timer and last-success gauge, plus {@code basetool_scheduled_job_items_total{
+   * job}} incremented by the number of items the run reports it processed (users synced,
+   * notifications purged, rows granted, …). Use this for jobs that process a countable batch; jobs
+   * without a meaningful single count use the {@link ThrowingRunnable} overload.
+   *
+   * @param job the scheduled job being instrumented
+   * @param work the job body; its return value is the item count added to the items counter on a
+   *     clean run
+   */
+  public void recordCounting(@NotNull ScheduledJob job, @NotNull ThrowingIntSupplier work) {
+    recordInternal(job, work::getAsInt);
+  }
+
+  /**
+   * Shared instrumentation core: runs {@code work}, records the executions counter, duration timer
+   * and last-success gauge, and — when the body returns a non-null count on a clean run — the items
+   * counter. Any exception is recorded as a {@code failure}, logged and swallowed.
+   *
+   * @param job the scheduled job being instrumented
+   * @param work the job body returning an optional item count ({@code null} = no count reported)
+   */
+  private void recordInternal(@NotNull ScheduledJob job, @NotNull ThrowingItemWork work) {
     AtomicLong lastSuccess = lastSuccessHolder(job);
     long startNanos = System.nanoTime();
     String outcome = MetricNames.OUTCOME_SUCCESS;
+    Integer items = null;
     try {
-      work.run();
+      items = work.run();
       lastSuccess.set(Instant.now().getEpochSecond());
     } catch (Exception e) {
       outcome = MetricNames.OUTCOME_FAILURE;
@@ -111,6 +144,11 @@ public class TaskMetrics {
               MetricNames.TAG_OUTCOME,
               outcome)
           .increment();
+      if (items != null) {
+        registry
+            .counter(MetricNames.SCHEDULED_JOB_ITEMS, MetricNames.TAG_JOB, job.label())
+            .increment(items.doubleValue());
+      }
     }
   }
 
@@ -154,5 +192,38 @@ public class TaskMetrics {
      *     it
      */
     void run() throws Exception;
+  }
+
+  /**
+   * A job body that returns the number of items it processed and may throw a checked exception, for
+   * the item-counting {@link TaskMetrics#record(ScheduledJob, ThrowingIntSupplier)} overload.
+   */
+  @FunctionalInterface
+  public interface ThrowingIntSupplier {
+
+    /**
+     * Executes the job body and reports how many items it processed.
+     *
+     * @return the number of items processed by this run
+     * @throws Exception if the body fails; the wrapper records it as a {@code failure} and swallows
+     *     it
+     */
+    int getAsInt() throws Exception;
+  }
+
+  /**
+   * Internal adapter unifying both public overloads: a body returning an optional item count
+   * ({@code null} when the caller reports none).
+   */
+  @FunctionalInterface
+  private interface ThrowingItemWork {
+
+    /**
+     * Executes the job body, optionally reporting an item count.
+     *
+     * @return the item count, or {@code null} when none is reported
+     * @throws Exception if the body fails
+     */
+    Integer run() throws Exception;
   }
 }

@@ -46,6 +46,14 @@ public final class MetricNames {
   public static final String SCHEDULED_JOB_LAST_SUCCESS =
       "basetool.scheduled.job.last.success.timestamp";
 
+  /** Counter {@code basetool_scheduled_job_items_total} — items processed, tag {@code job}. */
+  public static final String SCHEDULED_JOB_ITEMS = "basetool.scheduled.job.items";
+
+  // --- External-sync events (SyncReportService) ------------------------------------------
+
+  /** Counter {@code basetool_sync_events_total} — tags {@code source}, {@code event_type}. */
+  public static final String SYNC_EVENTS = "basetool.sync.events";
+
   // --- HTTP error rate (GlobalExceptionHandler) ------------------------------------------
 
   /** Counter {@code basetool_http_error_total} — tag {@code code} (stable RFC-7807 code). */
@@ -135,6 +143,12 @@ public final class MetricNames {
 
   /** Tag key: the bank approval-ladder tier ({@code BankRequestApprover#name()}). */
   public static final String TAG_REQUIRED_APPROVER = "required_approver";
+
+  /** Tag key: the external-sync source system ({@code SyncSourceSystem#name()}). */
+  public static final String TAG_SOURCE = "source";
+
+  /** Tag key: the external-sync event type ({@code SyncEventType#name()}). */
+  public static final String TAG_EVENT_TYPE = "event_type";
 
   // --- Bounded tag values (not an application enum) --------------------------------------
 

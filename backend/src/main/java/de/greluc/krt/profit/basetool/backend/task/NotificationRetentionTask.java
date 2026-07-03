@@ -76,13 +76,18 @@ public class NotificationRetentionTask {
    */
   @Scheduled(fixedDelayString = "${app.notifications.retention.interval:PT24H}")
   public void purgeExpiredReadNotifications() {
-    taskMetrics.record(ScheduledJob.NOTIFICATION_RETENTION, this::purgeExpired);
+    taskMetrics.recordCounting(ScheduledJob.NOTIFICATION_RETENTION, this::purgeExpired);
   }
 
-  /** Performs the retention delete; any failure propagates to {@link TaskMetrics}. */
-  private void purgeExpired() {
+  /**
+   * Performs the retention delete; any failure propagates to {@link TaskMetrics}.
+   *
+   * @return the number of notifications deleted this run (the {@code items} metric)
+   */
+  private int purgeExpired() {
     log.info("Starting scheduled notification retention sweep (max age {})...", maxAge);
     int deleted = notificationService.purgeReadOlderThan(Instant.now().minus(maxAge));
     log.info("Notification retention sweep finished — {} notification(s) deleted.", deleted);
+    return deleted;
   }
 }

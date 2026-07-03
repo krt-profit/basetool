@@ -120,6 +120,60 @@ class TaskMetricsTest {
   }
 
   @Test
+  void recordCounting_addsTheReportedItemCountToTheItemsCounterOnSuccess() {
+    taskMetrics.recordCounting(ScheduledJob.NOTIFICATION_RETENTION, () -> 7);
+
+    assertThat(
+            registry
+                .get(MetricNames.SCHEDULED_JOB_ITEMS)
+                .tag(MetricNames.TAG_JOB, ScheduledJob.NOTIFICATION_RETENTION.label())
+                .counter()
+                .count())
+        .isEqualTo(7.0d);
+    assertThat(
+            registry
+                .get(MetricNames.SCHEDULED_JOB_EXECUTIONS)
+                .tags(
+                    MetricNames.TAG_JOB,
+                    ScheduledJob.NOTIFICATION_RETENTION.label(),
+                    MetricNames.TAG_OUTCOME,
+                    MetricNames.OUTCOME_SUCCESS)
+                .counter()
+                .count())
+        .isEqualTo(1.0d);
+  }
+
+  @Test
+  void recordCounting_onFailure_countsFailureAndLeavesTheItemsCounterUnregistered() {
+    assertThatCode(
+            () ->
+                taskMetrics.recordCounting(
+                    ScheduledJob.USER_SYNC,
+                    () -> {
+                      throw new IllegalStateException("boom");
+                    }))
+        .doesNotThrowAnyException();
+
+    assertThat(
+            registry
+                .find(MetricNames.SCHEDULED_JOB_ITEMS)
+                .tag(MetricNames.TAG_JOB, ScheduledJob.USER_SYNC.label())
+                .counter())
+        .isNull();
+    assertThat(
+            registry
+                .get(MetricNames.SCHEDULED_JOB_EXECUTIONS)
+                .tags(
+                    MetricNames.TAG_JOB,
+                    ScheduledJob.USER_SYNC.label(),
+                    MetricNames.TAG_OUTCOME,
+                    MetricNames.OUTCOME_FAILURE)
+                .counter()
+                .count())
+        .isEqualTo(1.0d);
+  }
+
+  @Test
   void record_lazilyRegistersLastSuccessGaugeOnlyForJobsThatRan() {
     // Given only one job has ever been recorded
     taskMetrics.record(ScheduledJob.USER_SYNC, () -> {});

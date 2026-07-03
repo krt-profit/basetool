@@ -61,7 +61,7 @@ public class UserSyncTask {
    */
   @Scheduled(fixedDelayString = "${app.keycloak.sync.interval:PT5M}")
   public void syncUsers() {
-    taskMetrics.record(ScheduledJob.USER_SYNC, this::synchronizeFromKeycloak);
+    taskMetrics.recordCounting(ScheduledJob.USER_SYNC, this::synchronizeFromKeycloak);
   }
 
   /**
@@ -71,13 +71,15 @@ public class UserSyncTask {
    * batch. After the loop, {@link UserService#markMissingUsers(java.util.Set)} flags every local
    * user whose Keycloak id did not appear in this run. A batch-level failure (an empty-list guard
    * aside) propagates to {@link TaskMetrics}, which records it as a failed run.
+   *
+   * @return the number of users successfully synced this run (the {@code items} metric)
    */
-  private void synchronizeFromKeycloak() {
+  private int synchronizeFromKeycloak() {
     log.info("Starting scheduled user sync from Keycloak...");
     List<KeycloakUserDto> users = keycloakService.fetchUsers();
     if (users.isEmpty()) {
       log.info("No users fetched from Keycloak.");
-      return;
+      return 0;
     }
 
     int count = 0;
@@ -106,5 +108,6 @@ public class UserSyncTask {
     } catch (Exception e) {
       log.error("Bank holder reconcile failed; will retry on the next sync run.", e);
     }
+    return count;
   }
 }

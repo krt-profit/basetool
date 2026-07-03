@@ -199,12 +199,18 @@ transaction per pass) rather than per-scrape.
 **Backend.**
 
 - `basetool_scheduled_job_executions_total{job,outcome}` counter,
-  `basetool_scheduled_job_duration_seconds{job}` timer and
-  `basetool_scheduled_job_last_success_timestamp_seconds{job}` gauge for the six batch jobs
-  (`user_sync`, `notification_retention`, `default_blueprint_provisioning`,
-  `bank_ledger_integrity`, `uex_sync`, `scwiki_sync`) via `TaskMetrics`. The last-success gauge
-  is the source of the "user sync stale > 15 min" alert (`job="user_sync"`); it is registered
-  lazily so a config-gated-off job never reports a falsely-stale `0`.
+  `basetool_scheduled_job_duration_seconds{job}` timer,
+  `basetool_scheduled_job_last_success_timestamp_seconds{job}` gauge and — for the jobs that
+  process a countable batch — `basetool_scheduled_job_items_total{job}` counter for the six batch
+  jobs (`user_sync`, `notification_retention`, `default_blueprint_provisioning`,
+  `bank_ledger_integrity`, `uex_sync`, `scwiki_sync`) via `TaskMetrics` (`record` /
+  `recordCounting`). The last-success gauge is the source of the "user sync stale > 15 min" alert
+  (`job="user_sync"`); it is registered lazily so a config-gated-off job never reports a
+  falsely-stale `0`. The items counter is present only for jobs that report a count (user sync,
+  notification retention, default-blueprint provisioning).
+- `basetool_sync_events_total{source,event_type}` counter at the three `SyncReportService`
+  `log*Event` write sites (`source` = `SyncSourceSystem`, `event_type` = `SyncEventType`; both
+  bounded enums — never the external asset name/uuid/detail).
 - `basetool_http_error_total{code}` counter at the `GlobalExceptionHandler` 409/401/403 methods
   (`OPTIMISTIC_LOCK` = optimistic-locking regression indicator, `PESSIMISTIC_LOCK`,
   `UNAUTHENTICATED`, `ACCESS_DENIED`). Filter-level 401/403 re-dispatch through the same advice,

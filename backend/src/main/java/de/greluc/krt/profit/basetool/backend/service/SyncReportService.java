@@ -19,10 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.ExternalSyncReport;
 import de.greluc.krt.profit.basetool.backend.model.SyncEventType;
 import de.greluc.krt.profit.basetool.backend.model.SyncSourceSystem;
 import de.greluc.krt.profit.basetool.backend.repository.ExternalSyncReportRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -58,6 +60,7 @@ public class SyncReportService {
   public static final int RUNS_TO_KEEP = 30;
 
   private final ExternalSyncReportRepository repository;
+  private final MeterRegistry meterRegistry;
 
   /**
    * Starts a new sync cycle and returns its {@code run_id}. Every event logged for this cycle
@@ -67,6 +70,25 @@ public class SyncReportService {
    */
   public UUID beginRun() {
     return UUID.randomUUID();
+  }
+
+  /**
+   * Increments {@code basetool_sync_events_total} for one recorded external-sync finding
+   * (REQ-OBS-011). Both labels are bounded application enums — the source system and the event type
+   * — never the external asset name, uuid or the free-form detail.
+   *
+   * @param source the sync source system
+   * @param eventType the kind of finding
+   */
+  private void countSyncEvent(SyncSourceSystem source, SyncEventType eventType) {
+    meterRegistry
+        .counter(
+            MetricNames.SYNC_EVENTS,
+            MetricNames.TAG_SOURCE,
+            source.name(),
+            MetricNames.TAG_EVENT_TYPE,
+            eventType.name())
+        .increment();
   }
 
   /**
@@ -115,6 +137,7 @@ public class SyncReportService {
             .externalName(externalName)
             .detail(detail)
             .build());
+    countSyncEvent(SyncSourceSystem.SCWIKI, eventType);
   }
 
   /**
@@ -148,6 +171,7 @@ public class SyncReportService {
             .externalName(externalName)
             .detail(detail)
             .build());
+    countSyncEvent(SyncSourceSystem.UEX, eventType);
   }
 
   /**
@@ -185,6 +209,7 @@ public class SyncReportService {
             .externalName(externalName)
             .detail(detail)
             .build());
+    countSyncEvent(SyncSourceSystem.P4K, eventType);
   }
 
   /**
