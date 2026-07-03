@@ -36,12 +36,6 @@
 
 /* global noteI18n */
 
-// These top-level functions are the shared note-modal API: they are referenced not from within
-// this file but from the delegated krtEvents note bindings in inventory-my.js and inventory-admin.js
-// (classic scripts sharing one global scope). The `exported` directive documents that cross-script
-// use so per-file static analysis does not flag them as unused.
-/* exported openNoteModal, closeNoteModal, updateNoteCounter, saveNote, removeNote, showInventoryToast */
-
 let activeNoteButton = null;
 
 function openNoteModal(btn) {
@@ -227,3 +221,20 @@ function submitNoteUpdate(noteValue) {
             showInventoryToast('error', noteI18n.generic);
         });
 }
+
+// Cross-script exports — publish the shared note-modal API on `window`.
+//
+// openNoteModal / closeNoteModal / updateNoteCounter / saveNote / removeNote / showInventoryToast are
+// invoked by name from the delegated krtEvents bindings in inventory-my.js and inventory-admin.js
+// (classic scripts sharing this one global scope), never from within this file. Being classic-script
+// top-level declarations they are already reachable as bare globals, so the page modules keep calling
+// them by name unchanged; the assignments below just make that cross-file contract explicit and give
+// per-file static analysis a real reference, so the shared API is not reported as dead code. The
+// internal helper submitNoteUpdate is deliberately not exported — it is only called from within this
+// file.
+window.openNoteModal = openNoteModal;
+window.closeNoteModal = closeNoteModal;
+window.updateNoteCounter = updateNoteCounter;
+window.saveNote = saveNote;
+window.removeNote = removeNote;
+window.showInventoryToast = showInventoryToast;
