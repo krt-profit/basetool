@@ -62,10 +62,11 @@ import org.springframework.web.bind.annotation.RestController;
  * userMapper.toDto} projection every endpoint returns: {@link UserMapper} resolves the caller's
  * Staffel + capability flags through {@code OrgUnitMembershipRepository} and reads the LAZY {@code
  * user.getRoles()} collection, both of which need an open session — the write endpoints that map
- * the just-saved user rely on it too. The lazy membership-mapper coupling {@code
- * ArchitectureTest#controllersUsingTheLazyMembershipMapperMustBeTransactional} once pinned here was
- * moved into {@link OrgUnitMembershipService} (L4, #923); this {@code @Transactional} now stands
- * for {@code userMapper} alone.
+ * the just-saved user rely on it too. The membership mapping was moved into {@link
+ * OrgUnitMembershipService} (L4, #923, ADR-0067), and the two membership endpoints project through
+ * the service's own {@code …Dto} transactions without depending on this annotation — so it now
+ * stands for {@code userMapper} alone, and retiring it only requires moving the {@code UserDto}
+ * projection into the service layer as well.
  */
 @RestController
 @RequestMapping("/api/v1/users")
@@ -476,6 +477,12 @@ public class UserController {
    * {@code version}; an inconsistent batch (one row stale, the rest fresh) rolls back the whole
    * transaction and surfaces as a 409 — partial application is not exposed.
    *
+   * <p>The response is re-read and mapped through {@link
+   * OrgUnitMembershipService#findAllMembershipDtosForUser(UUID)} rather than by projecting the
+   * entities the delta call returns: the projection then runs inside the membership service's own
+   * transaction, so this endpoint does not depend on the class-level {@link Transactional} staying
+   * open across the two service calls (ADR-0067) and survives its planned retirement.
+   *
    * @param id user primary key.
    * @param request the delta to apply; never {@code null}, but both halves may be {@code null} /
    *     empty.
@@ -486,8 +493,8 @@ public class UserController {
   public MembershipDeltaResponse patchMemberships(
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid MembershipDeltaRequest request) {
-    return new MembershipDeltaResponse(
-        orgUnitMembershipService.toDtos(userService.applyMembershipDelta(id, request)));
+    userService.applyMembershipDelta(id, request);
+    return new MembershipDeltaResponse(orgUnitMembershipService.findAllMembershipDtosForUser(id));
   }
 
   /**

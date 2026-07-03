@@ -173,6 +173,7 @@ class ArchitectureTest {
           "move",
           "reset",
           "patch",
+          "toggle",
           "complete",
           "approve",
           "reject",
@@ -303,6 +304,34 @@ class ArchitectureTest {
         .because(
             "Controllers must return DTOs (or Page<Dto>/ResponseEntity<Dto>), never raw JPA"
                 + " entities.")
+        .check(CLASSES);
+  }
+
+  @Test
+  void controllersMustNotInjectTheLazyMembershipMapper() {
+    // Reasoning: OrgUnitMembershipMapper.toDto reads user.effectiveName through the LAZY user
+    // association. With open-in-view disabled, a controller that maps the entity to its DTO
+    // response after the service transaction committed throws LazyInitializationException — the
+    // write succeeds but the response 500s (the shipped /organisation/leitung "assign
+    // Kommandoleiter" regression). ADR-0067 therefore moved the membership DTO projection into
+    // OrgUnitMembershipService's own transactions; this rule pins the new invariant by keeping
+    // the mapper out of the controller layer entirely, replacing the retired
+    // controllersUsingTheLazyMembershipMapperMustBeTransactional rule (which only demanded a
+    // class-level @Transactional around controller-side mapping and became vacuous once no
+    // controller injected the mapper anymore).
+    noClasses()
+        .that()
+        .areAnnotatedWith("org.springframework.web.bind.annotation.RestController")
+        .should()
+        .dependOnClassesThat()
+        .haveFullyQualifiedName(
+            "de.greluc.krt.profit.basetool.backend.mapper.OrgUnitMembershipMapper")
+        .because(
+            "Membership DTO projection happens inside OrgUnitMembershipService (ADR-0067) — a"
+                + " controller-side mapping outside a transaction throws"
+                + " LazyInitializationException on the LAZY user association once the service"
+                + " transaction has committed (the write succeeds but the response 500s). Use the"
+                + " service's …Dto projection methods instead.")
         .check(CLASSES);
   }
 

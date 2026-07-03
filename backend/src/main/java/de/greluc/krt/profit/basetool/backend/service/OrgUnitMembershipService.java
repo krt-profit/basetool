@@ -683,7 +683,10 @@ public class OrgUnitMembershipService {
     if (request.isMissionManager() != null) {
       m.setMissionManager(request.isMissionManager());
     }
-    OrgUnitMembership saved = membershipRepository.save(m);
+    // saveAndFlush (not save): the DTO wrapper maps the response inside this transaction, and
+    // without an explicit flush the @Version bump would land at commit — after the mapping — so
+    // the client would echo the stale pre-bump version and 409 on its next edit (REQ-FE-003).
+    OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
     recordCapabilityFlagsChanged(specialCommandId, userId, saved);
     return saved;
   }
@@ -726,7 +729,9 @@ public class OrgUnitMembershipService {
     if (request.isMissionManager() != null) {
       m.setMissionManager(request.isMissionManager());
     }
-    OrgUnitMembership saved = membershipRepository.save(m);
+    // saveAndFlush (not save): flush before the DTO wrapper maps the response so the client gets
+    // the bumped @Version, not the stale pre-flush one (REQ-FE-003).
+    OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
     auditService.record(
         AuditEventType.CAPABILITY_FLAGS_CHANGED,
         squadron.getId(),
@@ -911,7 +916,9 @@ public class OrgUnitMembershipService {
     // in
     // the Phase 5 cleanup (V187). The request's isLead boolean is the API verb (promote/demote).
     m.setRole(request.isLead() ? MembershipRole.SK_LEAD : MembershipRole.MEMBER);
-    OrgUnitMembership saved = membershipRepository.save(m);
+    // saveAndFlush (not save): flush before the DTO wrapper maps the response so the client gets
+    // the bumped @Version, not the stale pre-flush one (REQ-FE-003).
+    OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
     // Mirror the SK-Leiter seat onto the descriptive chart in the same transaction (REQ-ROLE-006).
     orgChartService.mirrorSkLead(specialCommandId, userId, request.isLead());
     auditService.record(
@@ -1026,19 +1033,22 @@ public class OrgUnitMembershipService {
   }
 
   // -------------------------------------------------------------------------------------------
-  // Controller-facing DTO projections (L4, #923)
+  // Controller-facing DTO projections (L4, #923, ADR-0067)
   //
   // These map the just-persisted membership to its OrgUnitMembershipDto response *inside* the
-  // service transaction, so the membership controllers no longer need a class-level @Transactional
-  // to keep the persistence session open for the lazy user.effectiveName read the mapper performs.
-  // The entity-returning methods above stay authoritative for internal callers (UserService reuses
-  // the managed addMember row to flip flags in-place) and for the full-fidelity unit tests, because
-  // OrgUnitMembershipDto is a lossy projection (it carries only isLead, not the full role) and
-  // could
-  // not verify an assigned squadron rank. Each write wrapper is @Transactional so the
-  // (self-invoked)
-  // write + the mapping share one read-write transaction (REQ-FE-003; ArchitectureTest rule
-  // mutatingServiceMethodsInReadOnlyClassesNeedExplicitTransactional).
+  // service transaction, so the membership controllers no longer need a class-level
+  // @Transactional to keep the persistence session open for the lazy user.effectiveName read
+  // the mapper performs. The entity-returning methods above stay authoritative for internal
+  // callers (UserService reuses the managed addMember row to flip flags in-place) and for the
+  // full-fidelity unit tests, because OrgUnitMembershipDto is a lossy projection (it carries
+  // only isLead, not the full role) and could not verify an assigned squadron rank.
+  //
+  // Each write wrapper is @Transactional so the (self-invoked) write and the mapping share one
+  // read-write transaction, and the underlying entity methods persist with saveAndFlush so the
+  // mapped DTO carries the bumped @Version (REQ-FE-003). Two ArchitectureTest rules pin this
+  // seam: mutatingServiceMethodsInReadOnlyClassesNeedExplicitTransactional (write wrappers must
+  // escape the class readOnly default) and controllersMustNotInjectTheLazyMembershipMapper
+  // (DTO projection stays in this service; no controller maps the entity itself).
   // -------------------------------------------------------------------------------------------
 
   /**
@@ -1051,7 +1061,7 @@ public class OrgUnitMembershipService {
    * @throws NotFoundException if no SK matches the given id.
    */
   public List<OrgUnitMembershipDto> listMemberDtos(@NotNull UUID specialCommandId) {
-    return listMembers(specialCommandId).stream().map(orgUnitMembershipMapper::toDto).toList();
+    return toDtos(listMembers(specialCommandId));
   }
 
   /**
@@ -1192,16 +1202,16 @@ public class OrgUnitMembershipService {
   }
 
   /**
-   * Projects the given membership rows to their response DTOs. Kept on this service so the
-   * membership controllers and the {@code UserController} membership-delta endpoint can map a
-   * service-returned membership list without wiring {@link OrgUnitMembershipMapper} themselves —
-   * the mapper reads {@code user.effectiveName} through the LAZY user association, so the caller
-   * must invoke this while a persistence session is still open (L4, #923).
+   * Projects the given membership rows to their response DTOs. Deliberately {@code private}: the
+   * mapper reads {@code user.effectiveName} through the LAZY user association, so the rows must
+   * still be attached to the session that loaded them — a contract only same-transaction callers
+   * inside this service can guarantee. External callers use the public {@code …Dto} projections,
+   * which load and map inside one service transaction (L4, #923, ADR-0067).
    *
    * @param memberships the membership rows to project; never {@code null}.
    * @return the membership DTOs in the same order; never {@code null}, possibly empty.
    */
-  public List<OrgUnitMembershipDto> toDtos(@NotNull List<OrgUnitMembership> memberships) {
+  private List<OrgUnitMembershipDto> toDtos(@NotNull List<OrgUnitMembership> memberships) {
     return memberships.stream().map(orgUnitMembershipMapper::toDto).toList();
   }
 
