@@ -50,7 +50,9 @@ Coverage is **complete**, including the cross-area writers and the system/automa
   scheduled UEX method+yield sync (one summary event per run, actor `system`); owner-reassignment on
   user deletion.
 - **Mein Inventar** — create / update / delete (admin-on-behalf carries the target user).
-- **Missionen** — mission create (incl. sub-mission) / edit (core, schedule, flags) / delete;
+- **Missionen** — mission create (incl. sub-mission; any goals/steps seeded on the create form each
+  additionally record their own `MISSION_OBJECTIVE_ADDED` / `MISSION_STEP_ADDED`, REQ-MISSION-015) /
+  edit (core, schedule, flags) / delete;
   participant add / remove / edit / check-in / check-out; unit add / edit / remove; crew add / edit /
   remove; frequency change / remove (typed and custom mission-specific channels alike,
   REQ-MISSION-014); owner change; owning-org-unit reassignment (REQ-ORG-018, from/to

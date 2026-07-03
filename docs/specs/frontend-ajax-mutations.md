@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-03.
-> **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0053, ADR-0069
+> **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0053, ADR-0069, ADR-0070
 
 # Frontend AJAX mutations — krtFetch, krtCsrf & fragment swaps
 
@@ -15,7 +15,7 @@ child issues (#573–#582).
 
 The foundation lives in [`krt-fetch.js`](../../frontend/src/main/resources/static/js/krt-fetch.js),
 loaded globally from `fragments/head.html`. It exposes `window.krtFetch` (`write`, `submitForm`,
-`swap`, `syncVersion`, `sectionWrite`) and `window.krtCsrf` (`headers`, `token`, `refresh`). The toast/confirm infrastructure
+`swap`, `syncVersion`, `sectionWrite`, `serialize`) and `window.krtCsrf` (`headers`, `token`, `refresh`). The toast/confirm infrastructure
 (`showFrontendSuccessToast`, `showFrontendErrorToast`, `showKrtConfirm`) is the design-system-mandated
 replacement for native dialogs (see [`ui-design-system.md`](ui-design-system.md)).
 
@@ -683,6 +683,59 @@ converted-picker flows now drive the combobox end-to-end (open → pick → subm
 (`makeItem` + `data-search` local filter, global `enhanceWithin` on `DOMContentLoaded` + `krt:swapped`,
 `id`/`data-*` passthrough, `setValue` API, `window.krtEnhanceComboboxes`), `fragments/head.html`
 (global load + `window.krtComboboxI18n`), and the converted templates/selects · **ADR:** ADR-0053
+
+### REQ-FE-012 — A user's own back-to-back writes to one lock scope never self-collide
+
+A version-carrying write that a user can re-fire — before its response returns — against the **same**
+optimistic-lock scope (typing a Ziel title then immediately clicking "+" / the Klassifizierung
+dropdown / a ▲▼ reorder; toggling two capability flags on one bank-grant row; changing both
+association selects of one inventory row; a status change then a variant-counting toggle on one order)
+must not 409 the user against **themselves**. The old failure mode: the second interaction's
+`change`/`click` handler read the section version from the DOM and shipped it **concurrently** with
+the first, still-in-flight write; the first bumped the version server-side, the second arrived stale
+and 409'd, and "Aktuelle Werte laden" then reloaded and discarded the just-typed row. This is a
+first-party race — distinct from the genuine two-user conflict that REQ-FE-003 / the OPTIMISTIC_LOCK
+reload-confirm exist to handle.
+
+`krtFetch` closes it with **per-scope write serialization plus a lazily-resolved version**:
+
+- **`opts.serialize` (a lock-scope key).** Writes that share a key run **strictly one at a time in
+  submission order**; the primitive is also exposed as `krtFetch.serialize(key, task)` for raw-`fetch`
+  call sites. Distinct keys keep running concurrently, so a Ziele edit still never blocks a concurrent
+  Ablauf / core / schedule edit — the REQ-ORG-018 fine-grained-lock invariant is preserved.
+- **Lazy `url` / `payload`.** `opts.url` and `opts.payload` may be a value **or** a `() =>` thunk that
+  `write` / `submitForm` evaluate at **send** time — after the queue lets the write proceed. A
+  version-carrying inline write therefore reads its version from the DOM **when it is actually sent**,
+  so a queued write picks up the version the write before it bumped, not the value captured when the
+  handler first fired.
+- **Awaited `onSuccess`.** `send` awaits a thenable `onSuccess`, so a serialized chain waits for the
+  caller's fragment refresh (which rewrites the `data-*-version` holder the next write re-reads)
+  before the next queued write starts.
+
+The `sectionWrite` seam defaults `serialize` to the section key, so **every** section write (all of
+mission-detail's Ziele / Ablauf / frequency / crew / … writes) is auto-serialized by section without a
+per-call-site opt-in. A whole-payload lazy read is required where the payload carries sibling state
+the prior write may have changed (the bank-grant toggle re-reads all three flags at send time, else a
+serialized second toggle would silently revert the first).
+
+**Acceptance**
+
+- [ ] Typing a Ziel/Ablauf entry and immediately clicking add / a classification dropdown / a reorder
+  saves both in order with **no** 409 conflict prompt, and the just-typed entry is never lost.
+- [ ] The same holds for the other version-carrying inline editors swept in — the bank-grant flag
+  matrix, the inventory job/mission association selects and the note edit, the order status +
+  variant-counting toggles, and the org-structure parent select.
+- [ ] Two **different** users editing the same entity still get the genuine OPTIMISTIC_LOCK
+  reload-confirm (REQ-FE-003) — serialization only orders one client's own writes.
+- [ ] Editing two **disjoint** sections/scopes concurrently does not serialize them against each
+  other.
+
+**Enforced by:** code review + the per-area double-action e2e assertions (REQ-FE-003) extended to the
+type-then-add race · **Code:** `krt-fetch.js` (`runSerialized`, lazy `url`/`payload` in `write` /
+`submitForm`, awaited `onSuccess`, the `sectionWrite` `serialize` default, exposed `krtFetch.serialize`),
+`mission-detail.js` (`objectivesVersion` / `stepsVersion` lazy readers), `bank.js`, `inventory-my.js`,
+`inventory-admin.js`, `inventory-note-modal.js`, `orders-detail.js` (`krtOrderWrite` serialize default
++ `_orderVersion`), `admin-org-structure.js`, `leitung.js` · **ADR:** ADR-0070
 
 ## Out of scope
 

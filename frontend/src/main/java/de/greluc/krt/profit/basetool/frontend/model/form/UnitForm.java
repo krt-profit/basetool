@@ -19,16 +19,17 @@
 
 package de.greluc.krt.profit.basetool.frontend.model.form;
 
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
 /**
- * Form-binding object for Unit input. {@code name} is the optional display name (the backend
- * derives the stored name from ship / ship type when blank); {@code responsibleUserId} optionally
+ * Form-binding object for Unit input. {@code name} is the required display name of the unit (owner
+ * decision 2026-07-03 — the unit's single mandatory field); {@code responsibleUserId} optionally
  * pins an explicit responsible person; {@code note} is a free-text planning note.
  */
 public record UnitForm(
-    @Size(max = 255) String name,
+    @NotBlank(message = "{validation.name.required}") @Size(max = 255) String name,
     UUID shipTypeId,
     UUID shipId,
     Boolean highValueUnit,

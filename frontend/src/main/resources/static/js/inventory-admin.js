@@ -840,6 +840,19 @@ window.onclick = function (event) {
 
 async function updateInventoryAssociation(selectElement) {
     const id = selectElement.getAttribute('data-id');
+    // Serialize per inventory row so the row's two association selects (jobOrderId + missionId) can
+    // be changed back-to-back without the second shipping a stale version and 409-ing: the actual
+    // write (which reads the version + builds the dto) runs only after the previous same-row write
+    // settled and synced the fresh version back onto the row's data-version controls.
+    if (window.krtFetch && typeof window.krtFetch.serialize === 'function') {
+        return window.krtFetch.serialize('inv-assoc:' + id, function () {
+            return doUpdateInventoryAssociation(selectElement, id);
+        });
+    }
+    return doUpdateInventoryAssociation(selectElement, id);
+}
+
+async function doUpdateInventoryAssociation(selectElement, id) {
     const version = parseInt(selectElement.getAttribute('data-version'));
 
     const materialId = selectElement.getAttribute('data-material-id');

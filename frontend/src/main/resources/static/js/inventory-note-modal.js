@@ -108,6 +108,18 @@ function submitNoteUpdate(noteValue) {
     const btn = activeNoteButton;
     if (!btn) return;
     const id = btn.getAttribute('data-id');
+    // Serialize per inventory row so rapidly re-opening + saving the same note queues instead of
+    // racing a stale version into a 409; the version is read lazily inside runNoteUpdate at send
+    // time, after the previous save synced the fresh version onto the row's controls.
+    if (window.krtFetch && typeof window.krtFetch.serialize === 'function') {
+        return window.krtFetch.serialize('inv-note:' + id, function () {
+            return runNoteUpdate(btn, id, noteValue);
+        });
+    }
+    return runNoteUpdate(btn, id, noteValue);
+}
+
+function runNoteUpdate(btn, id, noteValue) {
     const version = btn.getAttribute('data-version');
     // #577: CSRF via the shared krtCsrf single source of truth (REQ-FE-002) with a one-shot
     // retry-on-403 (REQ-FE-004) instead of a hand-rolled meta read.
@@ -128,7 +140,7 @@ function submitNoteUpdate(noteValue) {
         });
     }
 
-    sendNote()
+    return sendNote()
         .then(function (resp) {
             // A bare 403 may be a stale CSRF token; refresh once and retry before treating it as a
             // real authorization failure.

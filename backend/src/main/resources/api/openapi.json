@@ -50283,7 +50283,7 @@
           },
           "description" : {
             "type" : "string",
-            "maxLength" : 10000,
+            "maxLength" : 20000,
             "minLength" : 0
           },
           "calendarLink" : {
@@ -50911,7 +50911,8 @@
             "maxLength" : 500,
             "minLength" : 0
           }
-        }
+        },
+        "required" : [ "name" ]
       },
       "UpdateCrewRequest" : {
         "type" : "object",
@@ -50931,7 +50932,7 @@
         "properties" : {
           "title" : {
             "type" : "string",
-            "maxLength" : 200,
+            "maxLength" : 500,
             "minLength" : 0
           },
           "meta" : {
@@ -51073,7 +51074,7 @@
         "properties" : {
           "title" : {
             "type" : "string",
-            "maxLength" : 250,
+            "maxLength" : 500,
             "minLength" : 0
           },
           "kind" : {
@@ -52589,7 +52590,7 @@
           },
           "description" : {
             "type" : "string",
-            "maxLength" : 10000,
+            "maxLength" : 20000,
             "minLength" : 0
           },
           "calendarLink" : {
@@ -52630,9 +52631,52 @@
             "type" : "string",
             "maxLength" : 200,
             "minLength" : 0
+          },
+          "objectives" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/NewObjective"
+            }
+          },
+          "steps" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/NewStep"
+            }
           }
         },
         "required" : [ "name" ]
+      },
+      "NewObjective" : {
+        "type" : "object",
+        "properties" : {
+          "title" : {
+            "type" : "string",
+            "maxLength" : 500,
+            "minLength" : 0
+          },
+          "kind" : {
+            "type" : "string",
+            "enum" : [ "PRIMARY", "SECONDARY", "NON_GOAL" ]
+          }
+        },
+        "required" : [ "kind", "title" ]
+      },
+      "NewStep" : {
+        "type" : "object",
+        "properties" : {
+          "title" : {
+            "type" : "string",
+            "maxLength" : 500,
+            "minLength" : 0
+          },
+          "meta" : {
+            "type" : "string",
+            "maxLength" : 200,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "title" ]
       },
       "AddCrewRequest" : {
         "type" : "object",
@@ -52657,7 +52701,7 @@
         "properties" : {
           "title" : {
             "type" : "string",
-            "maxLength" : 200,
+            "maxLength" : 500,
             "minLength" : 0
           },
           "meta" : {
@@ -52721,7 +52765,7 @@
         "properties" : {
           "title" : {
             "type" : "string",
-            "maxLength" : 250,
+            "maxLength" : 500,
             "minLength" : 0
           },
           "kind" : {
@@ -53925,7 +53969,7 @@
           },
           "description" : {
             "type" : "string",
-            "maxLength" : 10000,
+            "maxLength" : 20000,
             "minLength" : 0
           },
           "calendarLink" : {

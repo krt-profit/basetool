@@ -23,7 +23,9 @@
             window.location.reload();
             return;
         }
-        window.krtFetch.swap({
+        // Return the swap promise so a serialized write awaits the section refresh before the next
+        // Leitung write starts (see the serialize key in write()).
+        return window.krtFetch.swap({
             url: '/organisation/leitung?fragment=leitungSections',
             container: '#leitung-sections',
             fragmentValue: 'leitungSections',
@@ -43,6 +45,10 @@
             successMessage: opts.success,
             errorMessage: i18n.error,
             conflict: i18n.conflict,
+            // Serialize all Leitung writes so back-to-back rank / group / SK-lead actions run in
+            // order and never overlap; each success reswaps the whole section (refreshing every
+            // row's version) before the next write fires.
+            serialize: 'leitung',
             onSuccess: reswap,
         });
     }

@@ -107,9 +107,9 @@ class MissionCreateE2eTest {
         page.getByTestId("mission-start-date")
             .fill(java.time.LocalDate.now().plusDays(7).toString());
         page.getByTestId("mission-start-time").fill("12:00");
-        // The save button lives outside <form> and is bound to it via the form= attribute. The
-        // long mission form pushes it behind the position:fixed footer, so use the footer-safe
-        // submit (scroll + dispatch) instead of a coordinate click the footer would intercept.
+        // The save button is bound to the form via the form= attribute and now floats fixed at the
+        // bottom-right of the Verwaltung pane, above the fixed footer (REQ-MISSION-015). The
+        // footer-safe submit (scroll + dispatch) still submits it robustly regardless of position.
         E2eSupport.clickSubmitClearingFooter(
             page.locator("button[type='submit'][form='mission-form']"));
         page.waitForLoadState();

@@ -353,7 +353,37 @@ public class MissionService {
         mission.getName(),
         null,
         AuditDetails.of("status", mission.getStatus()));
+    applyCreateTimeline(saved, request);
     return saved;
+  }
+
+  /**
+   * Seeds the optional goals (Ziele) and steps (Ablauf) carried in the create request onto the
+   * freshly-persisted mission, each at a contiguous {@code orderIndex} in submitted order. Both
+   * lists are optional — a {@code null} or empty list seeds nothing — so the create form can lay
+   * out goals and steps in the same action instead of a follow-up per-item call, while a plain
+   * create still works unchanged. Delegates to the timeline service's {@code *AtCreate} methods,
+   * which audit each goal/step and skip the section-version guard (a just-created mission has no
+   * concurrent editor to lose a race against).
+   *
+   * @param mission the managed, already-persisted mission
+   * @param request the validated create payload carrying the optional {@code objectives}/{@code
+   *     steps} lists
+   */
+  private void applyCreateTimeline(Mission mission, CreateMissionRequest request) {
+    if (request.objectives() != null) {
+      int index = 0;
+      for (CreateMissionRequest.NewObjective objective : request.objectives()) {
+        missionTimelineService.addObjectiveAtCreate(
+            mission, objective.title(), objective.kind(), index++);
+      }
+    }
+    if (request.steps() != null) {
+      int index = 0;
+      for (CreateMissionRequest.NewStep step : request.steps()) {
+        missionTimelineService.addStepAtCreate(mission, step.title(), step.meta(), index++);
+      }
+    }
   }
 
   /**

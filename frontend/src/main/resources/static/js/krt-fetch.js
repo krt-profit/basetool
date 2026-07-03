@@ -353,6 +353,51 @@
         return s;
     }
 
+    // ---------------------------------------------- per-key write serialization
+    //
+    // Root fix for the tool-wide "self-collision" 409: a user types into an inline field and then
+    // immediately clicks +/a dropdown/reorder on the SAME section. The blur-triggered `change` write
+    // and the click write used to fire concurrently, each echoing the section version read at call
+    // time, so the second lost the optimistic-lock race against the first and 409'd — and "Aktuelle
+    // Werte laden" then reloaded, discarding the just-typed row. The user was colliding with their
+    // own sequential edits.
+    //
+    // A write may now declare `opts.serialize` — a lock-scope key. Writes sharing a key run STRICTLY
+    // ONE AT A TIME in submission order. Combined with two other properties this removes the stale
+    // version entirely:
+    //   1. write()/submitForm() resolve `opts.url` / `opts.payload` LAZILY (a value OR a `() =>`
+    //      thunk) inside the serialized task, so a queued write reads its version at the moment it is
+    //      actually sent — not when it was queued.
+    //   2. send() awaits a thenable `opts.onSuccess` (typically the caller's fragment refresh, which
+    //      rewrites the `data-*-version` holder), so the NEXT queued write re-reads the FRESH, bumped
+    //      version.
+    // Distinct keys keep running concurrently, so disjoint sections never block each other — the
+    // REQ-ORG-018 fine-grained-lock invariant is preserved (a Ziele edit still cannot stall an
+    // Ablauf / core / schedule edit).
+    const serialChains = new Map();
+    function noop() {}
+    function runSerialized(key, task) {
+        if (key == null || key === '') {
+            // No lock scope: keep the historical fire-when-called behaviour (still async).
+            return Promise.resolve().then(task);
+        }
+        const prev = serialChains.get(key) || Promise.resolve();
+        // Run `task` once `prev` SETTLES (fulfilled OR rejected) — a failed write must never stall
+        // the writes queued behind it. The caller still receives task's own result/rejection.
+        const result = prev.then(task, task);
+        const tail = result.then(noop, noop);
+        serialChains.set(key, tail);
+        // Drop the map entry once the chain drains so one-shot section keys do not leak settled
+        // promises. A later write that chained onto this tail overwrites the entry first, so the
+        // guard only deletes when this is still the current tail.
+        tail.then(function () {
+            if (serialChains.get(key) === tail) {
+                serialChains.delete(key);
+            }
+        });
+        return result;
+    }
+
     /**
      * Renders the KRT-styled feedback for a non-ok response.
      *
@@ -437,7 +482,9 @@
      *  - conflictSectionLabel already-localized error/conflict prefix (optional)
      *  - errorMessage         already-localized generic error text
      *  - conflict             localized conflict strings (see handleProblem)
-     *  - onSuccess            callback(body) run after a 2xx
+     *  - onSuccess            callback(body) run after a 2xx; if it returns a thenable it is AWAITED
+     *                         before the write resolves, so a serialized chain waits for the caller's
+     *                         fragment refresh (which rewrites the version holder) to finish
      *  - onError              optional callback(status, body, response) run on a non-ok, non-reauth
      *                         response BEFORE the default handleProblem; return a truthy value to
      *                         signal "handled" (e.g. rendering 422 field-validation errors) and skip
@@ -539,7 +586,14 @@
             }
             if (typeof opts.onSuccess === 'function') {
                 try {
-                    opts.onSuccess(body);
+                    // Await a thenable onSuccess so a serialized write does not resolve — and the
+                    // next queued same-key write does not start — until the caller's fragment
+                    // refresh has rewritten the data-*-version holder the next write will re-read
+                    // (see runSerialized). A synchronous onSuccess is unaffected.
+                    const outcome = opts.onSuccess(body);
+                    if (outcome && typeof outcome.then === 'function') {
+                        await outcome;
+                    }
                 } catch (_callbackError) {
                     /* a success callback must never break the UX */
                 }
@@ -557,24 +611,36 @@
      *
      * opts (in addition to the shared {@link send} opts):
      *  - method               HTTP method (default PATCH)
-     *  - url                  target URL
-     *  - payload              JSON payload (omitted for GET/DELETE)
+     *  - url                  target URL, OR a `() => url` thunk resolved at send time
+     *  - payload              JSON payload (omitted for GET/DELETE), OR a `() => payload` thunk
+     *  - serialize            optional lock-scope key; writes sharing it run one at a time in order
+     *                         (see runSerialized). Pair it with thunk url/payload so a queued write
+     *                         re-reads its optimistic-lock version AFTER the preceding same-key write
+     *                         refreshed the version holder — this is the fix for the self-collision
+     *                         409 where a user's own back-to-back edits shipped a stale version.
      *
      * Returns { ok, status, body }.
      */
     async function write(opts) {
         const method = opts.method || 'PATCH';
 
-        function buildInit() {
-            const headers = writeHeaders(opts.url, true);
-            const init = { method: method, headers: headers };
-            if (opts.payload !== undefined && method !== 'GET' && method !== 'DELETE') {
-                init.body = JSON.stringify(opts.payload);
+        // Resolve url + payload lazily inside the serialized task so a queued write reads them — and
+        // any version they embed — at the moment it is actually sent, not when it was queued.
+        function exec() {
+            const url = typeof opts.url === 'function' ? opts.url() : opts.url;
+            const payload = typeof opts.payload === 'function' ? opts.payload() : opts.payload;
+            function buildInit() {
+                const headers = writeHeaders(url, true);
+                const init = { method: method, headers: headers };
+                if (payload !== undefined && method !== 'GET' && method !== 'DELETE') {
+                    init.body = JSON.stringify(payload);
+                }
+                return init;
             }
-            return init;
+            return send(opts, buildInit, url);
         }
 
-        return send(opts, buildInit, opts.url);
+        return runSerialized(opts.serialize, exec);
     }
 
     /**
@@ -607,21 +673,34 @@
      */
     async function submitForm(opts) {
         const form = typeof opts.form === 'string' ? document.querySelector(opts.form) : opts.form;
-        const url = opts.url || (form ? form.getAttribute('action') : null);
-        const method = (
-            opts.method ||
-            (form ? form.getAttribute('method') : null) ||
-            'POST'
-        ).toUpperCase();
 
-        function buildInit() {
-            const headers = writeHeaders(url, false);
-            const body =
-                opts.formData !== undefined ? opts.formData : form ? new FormData(form) : undefined;
-            return { method: method, headers: headers, body: body };
+        // Resolve url + snapshot the FormData inside the serialized task so a queued form submit
+        // captures the form's hidden version input AFTER the preceding same-key write refreshed it.
+        function exec() {
+            const url =
+                (typeof opts.url === 'function' ? opts.url() : opts.url) ||
+                (form ? form.getAttribute('action') : null);
+            const method = (
+                opts.method ||
+                (form ? form.getAttribute('method') : null) ||
+                'POST'
+            ).toUpperCase();
+
+            function buildInit() {
+                const headers = writeHeaders(url, false);
+                const body =
+                    opts.formData !== undefined
+                        ? opts.formData
+                        : form
+                          ? new FormData(form)
+                          : undefined;
+                return { method: method, headers: headers, body: body };
+            }
+
+            return send(opts, buildInit, url);
         }
 
-        return send(opts, buildInit, url);
+        return runSerialized(opts.serialize, exec);
     }
 
     // ------------------------------------------------------------ fragment swap
@@ -857,6 +936,11 @@
                 const k = config.keys;
                 return write(
                     Object.assign({}, opts, {
+                        // Every section write serializes against its own section by default, so a
+                        // user's back-to-back edits of one section run in order and never 409 each
+                        // other; distinct sections keep distinct keys and stay concurrent. A caller
+                        // can override with an explicit opts.serialize (e.g. a per-row scope).
+                        serialize: opts.serialize || (key ? 'section:' + key : undefined),
                         sectionLabel: t(k.saveSectionPrefix + key, key),
                         conflictSectionLabel: t(k.conflictSectionPrefix + key, key),
                         successMessage: t(k.successKey, k.successFallback),
@@ -917,6 +1001,12 @@
         maybeReauthenticate: maybeReauthenticate,
         reauthRedirect: reauthRedirect,
         sectionWrite: sectionWrite,
+        // Exposed so a raw-fetch write (one not routed through write/submitForm) can share the same
+        // per-key serialization: krtFetch.serialize('scope:id', () => doTheWrite()) runs its task
+        // after the previous same-key task settles. Wrap the WHOLE write — including where it reads
+        // its optimistic-lock version from the DOM — so the version is re-read fresh once the prior
+        // write synced it back, killing the self-collision 409 for raw-fetch call sites too.
+        serialize: runSerialized,
         csrf: window.krtCsrf,
     };
 

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -32,6 +33,11 @@ import java.util.UUID;
  * OwnerScopeService.resolveSquadronForPickerOutput} validates it against the caller's memberships
  * and rejects Spezialkommando selections with 400 until the destructive cleanup release loosens NOT
  * NULL on the legacy {@code owning_squadron_id} column.
+ *
+ * <p>{@link #objectives} / {@link #steps} carry the optional Ziele / Ablauf rows the create form
+ * seeds together with the mission (both {@code null} when none). The write controller builds them
+ * from the form's JSON carriers; the backend maps each {@code kind} string to its {@code
+ * MissionObjectiveKind} and validates title/kind before persisting.
  */
 public record CreateMissionRequest(
     String name,
@@ -44,4 +50,26 @@ public record CreateMissionRequest(
     Boolean isInternal,
     UUID operationId,
     UUID owningOrgUnitId,
-    String meetingPoint) {}
+    String meetingPoint,
+    List<NewObjective> objectives,
+    List<NewStep> steps) {
+
+  /**
+   * A goal (Ziel) seeded together with the mission; mirrors the backend's {@code
+   * CreateMissionRequest.NewObjective}.
+   *
+   * @param title the goal text
+   * @param kind the classification enum name ("PRIMARY" / "SECONDARY" / "NON_GOAL"), mapped to the
+   *     backend's {@code MissionObjectiveKind}
+   */
+  public record NewObjective(String title, @BackendEnumAsString String kind) {}
+
+  /**
+   * A step (Ablauf-Schritt) seeded together with the mission; mirrors the backend's {@code
+   * CreateMissionRequest.NewStep}.
+   *
+   * @param title the step title
+   * @param meta the optional free-text time/place hint
+   */
+  public record NewStep(String title, String meta) {}
+}

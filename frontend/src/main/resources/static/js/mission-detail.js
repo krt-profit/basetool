@@ -426,9 +426,16 @@ document.addEventListener('krt:swapped', function (ev) {
     function mid() {
         return window.missionId || (typeof missionId !== 'undefined' ? missionId : null);
     }
-    function versionFrom(el) {
-        const holder = el && el.closest('[data-steps-version]');
-        return holder ? Number(holder.getAttribute('data-steps-version')) : null;
+    // The live steps-section version, read from the [data-steps-version] holder in the DOM at the
+    // moment of the call. The write helpers below read it LAZILY (inside the payload/url thunk that
+    // krtFetch resolves at send time) rather than baking it into the payload when the handler fires.
+    // Combined with the per-section serialization the seam applies (serialize: 'section:steps'), a
+    // user's own back-to-back edits queue and each picks up the version the previous write bumped —
+    // so typing a title and immediately clicking +/▲▼/delete no longer self-collides into a 409.
+    function stepsVersion() {
+        const holder = document.querySelector('[data-steps-version]');
+        const v = holder ? Number(holder.getAttribute('data-steps-version')) : null;
+        return v === null || Number.isNaN(v) ? null : v;
     }
     function refreshSteps() {
         if (window.krtRefreshMissionSection) {
@@ -452,20 +459,20 @@ document.addEventListener('krt:swapped', function (ev) {
 
     function toggleStep(box) {
         const sid = box.getAttribute('data-step-id');
-        const v = versionFrom(box);
-        if (!sid || v === null || Number.isNaN(v)) {
+        if (!sid || stepsVersion() === null) {
             return;
         }
         const done = box.getAttribute('data-done') !== 'true';
         writeStep({
             method: 'PATCH',
             url: '/missions/' + mid() + '/steps/' + sid + '/done/ajax',
-            payload: { done: done, stepsVersion: v },
+            payload: function () {
+                return { done: done, stepsVersion: stepsVersion() };
+            },
         });
     }
     function addStep(btn) {
-        const v = versionFrom(btn);
-        if (v === null || Number.isNaN(v)) {
+        if (stepsVersion() === null) {
             return;
         }
         const title =
@@ -473,14 +480,15 @@ document.addEventListener('krt:swapped', function (ev) {
         writeStep({
             method: 'POST',
             url: '/missions/' + mid() + '/steps/ajax',
-            payload: { title: title, meta: null, stepsVersion: v },
+            payload: function () {
+                return { title: title, meta: null, stepsVersion: stepsVersion() };
+            },
         });
     }
     function editStep(row) {
         const sid = row.getAttribute('data-step-id');
-        const v = versionFrom(row);
         const titleInput = row.querySelector('.ae-title');
-        if (!sid || v === null || Number.isNaN(v) || !titleInput) {
+        if (!sid || stepsVersion() === null || !titleInput) {
             return;
         }
         const title = titleInput.value.trim();
@@ -494,7 +502,9 @@ document.addEventListener('krt:swapped', function (ev) {
         writeStep({
             method: 'PUT',
             url: '/missions/' + mid() + '/steps/' + sid + '/ajax',
-            payload: { title: title, meta: meta, stepsVersion: v },
+            payload: function () {
+                return { title: title, meta: meta, stepsVersion: stepsVersion() };
+            },
         });
     }
     async function deleteStep(btn) {
@@ -503,8 +513,7 @@ document.addEventListener('krt:swapped', function (ev) {
             return;
         }
         const sid = row.getAttribute('data-step-id');
-        const v = versionFrom(row);
-        if (!sid || v === null || Number.isNaN(v)) {
+        if (!sid || stepsVersion() === null) {
             return;
         }
         const msg =
@@ -525,17 +534,23 @@ document.addEventListener('krt:swapped', function (ev) {
         }
         writeStep({
             method: 'DELETE',
-            url: '/missions/' + mid() + '/steps/' + sid + '/ajax?stepsVersion=' + v,
+            url: function () {
+                return (
+                    '/missions/' + mid() + '/steps/' + sid + '/ajax?stepsVersion=' + stepsVersion()
+                );
+            },
         });
     }
-    function reorder(order, v) {
-        if (v === null || Number.isNaN(v)) {
+    function reorder(order) {
+        if (stepsVersion() === null) {
             return;
         }
         writeStep({
             method: 'PUT',
             url: '/missions/' + mid() + '/steps/reorder/ajax',
-            payload: { stepIds: order, stepsVersion: v },
+            payload: function () {
+                return { stepIds: order, stepsVersion: stepsVersion() };
+            },
         });
     }
     function moveStep(btn, dir) {
@@ -543,7 +558,6 @@ document.addEventListener('krt:swapped', function (ev) {
         if (!row) {
             return;
         }
-        const v = versionFrom(row);
         const order = listOrder();
         const i = order.indexOf(row.getAttribute('data-step-id'));
         const j = i + dir;
@@ -553,7 +567,7 @@ document.addEventListener('krt:swapped', function (ev) {
         const tmp = order[i];
         order[i] = order[j];
         order[j] = tmp;
-        reorder(order, v);
+        reorder(order);
     }
 
     document.addEventListener('click', function (e) {
@@ -638,7 +652,6 @@ document.addEventListener('krt:swapped', function (ev) {
             r.classList.remove('drag-over');
         });
         if (target && target !== dragRow) {
-            const v = versionFrom(dragRow);
             const order = listOrder();
             const from = order.indexOf(dragRow.getAttribute('data-step-id'));
             order.splice(
@@ -646,7 +659,7 @@ document.addEventListener('krt:swapped', function (ev) {
                 0,
                 order.splice(from, 1)[0],
             );
-            reorder(order, v);
+            reorder(order);
         }
         dragRow = null;
     });
@@ -670,9 +683,17 @@ document.addEventListener('krt:swapped', function (ev) {
     function mid() {
         return window.missionId || (typeof missionId !== 'undefined' ? missionId : null);
     }
-    function versionFrom(el) {
-        const holder = el && el.closest('[data-objectives-version]');
-        return holder ? Number(holder.getAttribute('data-objectives-version')) : null;
+    // The live goals-section version, read from the [data-objectives-version] holder in the DOM at
+    // the moment of the call. The write helpers below read it LAZILY (inside the payload/url thunk
+    // krtFetch resolves at send time) rather than baking it in when the handler fires. Combined with
+    // the per-section serialization the seam applies (serialize: 'section:objectives'), a user's own
+    // back-to-back edits queue and each picks up the version the previous write bumped — so typing a
+    // goal and immediately clicking +/the Klassifizierung dropdown/▲▼/delete no longer self-collides
+    // into a 409 (the reported bug).
+    function objectivesVersion() {
+        const holder = document.querySelector('[data-objectives-version]');
+        const v = holder ? Number(holder.getAttribute('data-objectives-version')) : null;
+        return v === null || Number.isNaN(v) ? null : v;
     }
     function refreshObjectives() {
         if (window.krtRefreshMissionSection) {
@@ -695,8 +716,7 @@ document.addEventListener('krt:swapped', function (ev) {
     }
 
     function addObjective(btn) {
-        const v = versionFrom(btn);
-        if (v === null || Number.isNaN(v)) {
+        if (objectivesVersion() === null) {
             return;
         }
         const title =
@@ -705,18 +725,20 @@ document.addEventListener('krt:swapped', function (ev) {
         writeObjective({
             method: 'POST',
             url: '/missions/' + mid() + '/objectives/ajax',
-            payload: { title: title, kind: 'PRIMARY', objectivesVersion: v },
+            payload: function () {
+                return { title: title, kind: 'PRIMARY', objectivesVersion: objectivesVersion() };
+            },
         });
     }
     function editObjective(row) {
         const oid = row.getAttribute('data-objective-id');
-        const v = versionFrom(row);
         const titleInput = row.querySelector('.ae-title');
         const kindSelect = row.querySelector('.ae-kind');
-        if (!oid || v === null || Number.isNaN(v) || !titleInput || !kindSelect) {
+        if (!oid || objectivesVersion() === null || !titleInput || !kindSelect) {
             return;
         }
         const title = titleInput.value.trim();
+        const kind = kindSelect.value;
         // The backend requires a non-blank title; an emptied title is a no-op (restored on the
         // next swap) rather than a rejected write.
         if (!title) {
@@ -725,7 +747,9 @@ document.addEventListener('krt:swapped', function (ev) {
         writeObjective({
             method: 'PUT',
             url: '/missions/' + mid() + '/objectives/' + oid + '/ajax',
-            payload: { title: title, kind: kindSelect.value, objectivesVersion: v },
+            payload: function () {
+                return { title: title, kind: kind, objectivesVersion: objectivesVersion() };
+            },
         });
     }
     async function deleteObjective(btn) {
@@ -734,8 +758,7 @@ document.addEventListener('krt:swapped', function (ev) {
             return;
         }
         const oid = row.getAttribute('data-objective-id');
-        const v = versionFrom(row);
-        if (!oid || v === null || Number.isNaN(v)) {
+        if (!oid || objectivesVersion() === null) {
             return;
         }
         const msg =
@@ -756,17 +779,28 @@ document.addEventListener('krt:swapped', function (ev) {
         }
         writeObjective({
             method: 'DELETE',
-            url: '/missions/' + mid() + '/objectives/' + oid + '/ajax?objectivesVersion=' + v,
+            url: function () {
+                return (
+                    '/missions/' +
+                    mid() +
+                    '/objectives/' +
+                    oid +
+                    '/ajax?objectivesVersion=' +
+                    objectivesVersion()
+                );
+            },
         });
     }
-    function reorder(order, v) {
-        if (v === null || Number.isNaN(v)) {
+    function reorder(order) {
+        if (objectivesVersion() === null) {
             return;
         }
         writeObjective({
             method: 'PUT',
             url: '/missions/' + mid() + '/objectives/reorder/ajax',
-            payload: { objectiveIds: order, objectivesVersion: v },
+            payload: function () {
+                return { objectiveIds: order, objectivesVersion: objectivesVersion() };
+            },
         });
     }
     function moveObjective(btn, dir) {
@@ -774,7 +808,6 @@ document.addEventListener('krt:swapped', function (ev) {
         if (!row) {
             return;
         }
-        const v = versionFrom(row);
         const order = listOrder();
         const i = order.indexOf(row.getAttribute('data-objective-id'));
         const j = i + dir;
@@ -784,7 +817,7 @@ document.addEventListener('krt:swapped', function (ev) {
         const tmp = order[i];
         order[i] = order[j];
         order[j] = tmp;
-        reorder(order, v);
+        reorder(order);
     }
 
     document.addEventListener('click', function (e) {
@@ -858,7 +891,6 @@ document.addEventListener('krt:swapped', function (ev) {
             r.classList.remove('drag-over');
         });
         if (target && target !== dragRow) {
-            const v = versionFrom(dragRow);
             const order = listOrder();
             const from = order.indexOf(dragRow.getAttribute('data-objective-id'));
             order.splice(
@@ -866,7 +898,7 @@ document.addEventListener('krt:swapped', function (ev) {
                 0,
                 order.splice(from, 1)[0],
             );
-            reorder(order, v);
+            reorder(order);
         }
         dragRow = null;
     });
@@ -878,6 +910,187 @@ document.addEventListener('krt:swapped', function (ev) {
             });
         dragRow = null;
     });
+})();
+
+// ---- Create-form Ziele + Ablauf editors: client-side rows serialized into the mission create POST.
+// On the create page the mission has no id yet, so — unlike the Verwaltung section editors above —
+// these rows carry no id and no section version and issue NO AJAX: the user adds / removes / reorders
+// rows locally and on submit they are serialized into the hidden objectivesJson / stepsJson carriers
+// the write controller parses into CreateMissionRequest.objectives / .steps. On a validation-failure
+// re-render the rows are re-hydrated from those same carriers so nothing typed is lost. Both sections
+// are optional (empty is fine) and only present on the create page (the lists exist only there).
+(function () {
+    const objectiveList = document.getElementById('mission-create-objective-list');
+    const stepList = document.getElementById('mission-create-step-list');
+    if (!objectiveList && !stepList) {
+        return; // not the create page
+    }
+    const form = document.getElementById('mission-form');
+    const objectivesJson = document.getElementById('mission-objectives-json');
+    const stepsJson = document.getElementById('mission-steps-json');
+    const objectiveTemplate = document.getElementById('mission-create-objective-row');
+    const stepTemplate = document.getElementById('mission-create-step-row');
+
+    function renumber(list) {
+        if (!list) {
+            return;
+        }
+        Array.prototype.forEach.call(list.querySelectorAll('.ae-row'), function (row, i) {
+            const num = row.querySelector('.ae-num');
+            if (num) {
+                num.textContent = String(i + 1);
+            }
+        });
+    }
+
+    function addRow(list, template, values) {
+        if (!list || !template) {
+            return null;
+        }
+        const row = template.content.firstElementChild.cloneNode(true);
+        if (values) {
+            const title = row.querySelector('.ae-title');
+            if (title && values.title != null) {
+                title.value = values.title;
+            }
+            const kind = row.querySelector('.ae-kind');
+            if (kind && values.kind != null) {
+                kind.value = values.kind;
+            }
+            const meta = row.querySelector('.ae-meta');
+            if (meta && values.meta != null) {
+                meta.value = values.meta;
+            }
+        }
+        list.appendChild(row);
+        renumber(list);
+        return row;
+    }
+
+    function moveRow(row, dir) {
+        const list = row.parentNode;
+        if (!list) {
+            return;
+        }
+        if (dir < 0 && row.previousElementSibling) {
+            list.insertBefore(row, row.previousElementSibling);
+        } else if (dir > 0 && row.nextElementSibling) {
+            list.insertBefore(row.nextElementSibling, row);
+        }
+        renumber(list);
+    }
+
+    function focusTitle(row) {
+        if (!row) {
+            return;
+        }
+        const title = row.querySelector('.ae-title');
+        if (title) {
+            title.focus();
+        }
+    }
+
+    function hydrate(list, template, jsonInput) {
+        if (!list || !template || !jsonInput || !jsonInput.value) {
+            return;
+        }
+        let parsed;
+        try {
+            parsed = JSON.parse(jsonInput.value);
+        } catch (_e) {
+            return;
+        }
+        if (Array.isArray(parsed)) {
+            parsed.forEach(function (item) {
+                addRow(list, template, item);
+            });
+        }
+    }
+
+    // Collects the non-empty rows of a list into the payload shape the backend expects. `extraKey`
+    // is 'kind' for goals (a select) or 'meta' for steps (an optional text field), or null.
+    function serialize(list, extraKey) {
+        const out = [];
+        if (!list) {
+            return out;
+        }
+        Array.prototype.forEach.call(list.querySelectorAll('.ae-row'), function (row) {
+            const titleInput = row.querySelector('.ae-title');
+            const title = titleInput ? titleInput.value.trim() : '';
+            if (!title) {
+                return; // a blank title means an empty row — drop it
+            }
+            const entry = { title: title };
+            if (extraKey === 'kind') {
+                const kind = row.querySelector('.ae-kind');
+                entry.kind = kind ? kind.value : 'PRIMARY';
+            } else if (extraKey === 'meta') {
+                const meta = row.querySelector('.ae-meta');
+                const metaValue = meta ? meta.value.trim() : '';
+                entry.meta = metaValue ? metaValue : null;
+            }
+            out.push(entry);
+        });
+        return out;
+    }
+
+    document.addEventListener('click', function (e) {
+        const t = e.target.closest('[data-trigger]');
+        if (!t) {
+            return;
+        }
+        const trig = t.getAttribute('data-trigger');
+        if (trig === 'create-objective-add') {
+            e.preventDefault();
+            focusTitle(addRow(objectiveList, objectiveTemplate, null));
+        } else if (trig === 'create-step-add') {
+            e.preventDefault();
+            focusTitle(addRow(stepList, stepTemplate, null));
+        } else if (trig === 'create-objective-delete' || trig === 'create-step-delete') {
+            e.preventDefault();
+            const row = t.closest('.ae-row');
+            if (row) {
+                const list = row.parentNode;
+                row.remove();
+                renumber(list);
+            }
+        } else if (trig === 'create-objective-up' || trig === 'create-step-up') {
+            e.preventDefault();
+            const row = t.closest('.ae-row');
+            if (row) {
+                moveRow(row, -1);
+            }
+        } else if (trig === 'create-objective-down' || trig === 'create-step-down') {
+            e.preventDefault();
+            const row = t.closest('.ae-row');
+            if (row) {
+                moveRow(row, 1);
+            }
+        }
+    });
+
+    // Serialize into the hidden carriers before the classic create submit navigates. Capture phase,
+    // so the values are set before the browser collects the form data.
+    if (form) {
+        form.addEventListener(
+            'submit',
+            function () {
+                if (objectivesJson) {
+                    const objectives = serialize(objectiveList, 'kind');
+                    objectivesJson.value = objectives.length ? JSON.stringify(objectives) : '';
+                }
+                if (stepsJson) {
+                    const steps = serialize(stepList, 'meta');
+                    stepsJson.value = steps.length ? JSON.stringify(steps) : '';
+                }
+            },
+            true,
+        );
+    }
+
+    // Re-hydrate rows from the carriers on load (validation-failure re-render / error re-flash).
+    hydrate(objectiveList, objectiveTemplate, objectivesJson);
+    hydrate(stepList, stepTemplate, stepsJson);
 })();
 
 // ---- KRT modal helpers: open with focus, dismiss buttons, Esc, focus trap. ----
@@ -1010,6 +1223,40 @@ document.addEventListener('DOMContentLoaded', function () {
                         Array.from(eOrgUnits.options).forEach((opt) => {
                             opt.selected = selected.includes(opt.value);
                         });
+                    }
+                    // A registered member's org units come from their account and are never selected:
+                    // show them read-only and hide the picker; for a guest, keep the picker instead.
+                    const isGuest = this.getAttribute('data-guest') === 'true';
+                    const eOrgUnitsGroup = document.getElementById('edit-org-units-group');
+                    const eOrgUnitsReadonlyGroup = document.getElementById(
+                        'edit-org-units-readonly-group',
+                    );
+                    const eOrgUnitsReadonly = document.getElementById('edit-org-units-readonly');
+                    if (eOrgUnitsGroup && eOrgUnitsReadonlyGroup) {
+                        eOrgUnitsGroup.style.display = isGuest ? '' : 'none';
+                        eOrgUnitsReadonlyGroup.style.display = isGuest ? 'none' : '';
+                        if (!isGuest && eOrgUnitsReadonly) {
+                            eOrgUnitsReadonly.textContent = '';
+                            const unitNames = (this.getAttribute('data-org-unit-names') || '')
+                                .split(',')
+                                .map(function (s) {
+                                    return s.trim();
+                                })
+                                .filter(Boolean);
+                            if (unitNames.length === 0) {
+                                const none = document.createElement('span');
+                                none.className = 'squadron-badge squadron-badge-muted';
+                                none.textContent = '—';
+                                eOrgUnitsReadonly.appendChild(none);
+                            } else {
+                                unitNames.forEach(function (unitName) {
+                                    const badge = document.createElement('span');
+                                    badge.className = 'squadron-badge';
+                                    badge.textContent = unitName;
+                                    eOrgUnitsReadonly.appendChild(badge);
+                                });
+                            }
+                        }
                     }
                     eComment.value = this.getAttribute('data-comment');
 

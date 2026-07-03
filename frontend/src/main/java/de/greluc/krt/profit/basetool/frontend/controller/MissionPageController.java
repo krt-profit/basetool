@@ -569,7 +569,11 @@ public class MissionPageController {
                 mission.flagsVersion(),
                 // Edit path: owningOrgUnitId is not editable, the existing stamp survives.
                 null,
-                mission.meetingPoint()));
+                mission.meetingPoint(),
+                // Ziele / Ablauf are edited via their own AJAX section editors on the edit page,
+                // never through the create form's JSON carriers.
+                null,
+                null));
       }
       model.addAttribute("isNew", false);
       model.addAttribute("authUserId", principal != null ? principal.getSubject() : null);
@@ -827,6 +831,10 @@ public class MissionPageController {
               null,
               null,
               null,
+              null,
+              null,
+              // objectivesJson / stepsJson: empty on a fresh create form; the client fills them
+              // from the Ziele / Ablauf rows on submit.
               null,
               null));
     }
