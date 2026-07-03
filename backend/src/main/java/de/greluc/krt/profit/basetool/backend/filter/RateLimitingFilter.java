@@ -21,11 +21,13 @@ package de.greluc.krt.profit.basetool.backend.filter;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.support.RateLimitProperties;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.ConsumptionProbe;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -114,6 +116,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
   private final Map<String, Optional<PathPattern>> compiledPatterns = new ConcurrentHashMap<>();
   private final Cache<String, Bucket> bucketCache;
   private final List<IpAddressMatcher> trustedProxyMatchers;
+  private final MeterRegistry meterRegistry;
 
   /**
    * Constructs the filter with the bucket cache sized from compile-time constants ({@code 1h}
@@ -133,16 +136,19 @@ public class RateLimitingFilter extends OncePerRequestFilter {
    * @param messageSource resolves the localized 429 {@code title}/{@code detail} from the request's
    *     {@code Accept-Language}, mirroring GlobalExceptionHandler's i18n so the rate limiter is no
    *     longer the only RFC&nbsp;7807 producer emitting hardcoded English
+   * @param meterRegistry the Micrometer registry the per-bucket 429 rejection counter is bound to
    * @throws IllegalStateException when any configured rate-limit pattern is blank or not valid
    *     {@link PathPattern} syntax
    */
   public RateLimitingFilter(
       RateLimitProperties properties,
       AppProblemProperties problemProperties,
-      MessageSource messageSource) {
+      MessageSource messageSource,
+      MeterRegistry meterRegistry) {
     this.properties = properties;
     this.problemProperties = problemProperties;
     this.messageSource = messageSource;
+    this.meterRegistry = meterRegistry;
     this.bucketCache =
         Caffeine.newBuilder()
             .expireAfterAccess(BUCKET_EXPIRE_AFTER_ACCESS)
@@ -295,6 +301,13 @@ public class RateLimitingFilter extends OncePerRequestFilter {
       Bucket bucket = bucketCache.get(clientIp + "|" + slot.key(), k -> createNewBucket(slot));
       ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
       if (!probe.isConsumed()) {
+        // Per-bucket 429 rejection counter (REQ-OBS-011). The label is the bounded rule name
+        // (or `global` for the umbrella path budget) derived from the slot key — never the client
+        // IP or the request URI, both unbounded/PII.
+        meterRegistry
+            .counter(
+                MetricNames.RATELIMIT_REJECTIONS, MetricNames.TAG_BUCKET, bucketLabel(slot.key()))
+            .increment();
         long nanosToWait = probe.getNanosToWaitForRefill();
         long secondsToWait = (long) Math.ceil(nanosToWait / 1_000_000_000.0);
         // The rate limiter runs before CorrelationIdFilter, so no request-scoped correlation id
@@ -595,4 +608,23 @@ public class RateLimitingFilter extends OncePerRequestFilter {
    * @param refillPeriod time window for the {@link #refillTokens()} refill
    */
   private record BucketSlot(String key, int capacity, int refillTokens, Duration refillPeriod) {}
+
+  /**
+   * Reduces a {@link BucketSlot#key()} to the bounded {@code bucket} metric label. A {@code
+   * rule:<name>} slot yields its configured rule name (e.g. {@code mission-create}); the umbrella
+   * {@code path:/api/**} slot (and any other non-rule slot) collapses to the fixed {@link
+   * MetricNames#BUCKET_GLOBAL} literal so the label never embeds a raw path pattern. Keeping the
+   * value space to the four configured rule names plus {@code global} bounds the metric's
+   * cardinality (REQ-OBS-006).
+   *
+   * @param slotKey the {@code prefix:suffix} slot key
+   * @return the bounded rule name, or {@link MetricNames#BUCKET_GLOBAL}
+   */
+  private static String bucketLabel(String slotKey) {
+    int separator = slotKey.indexOf(':');
+    if (separator >= 0 && "rule".equals(slotKey.substring(0, separator))) {
+      return slotKey.substring(separator + 1);
+    }
+    return MetricNames.BUCKET_GLOBAL;
+  }
 }

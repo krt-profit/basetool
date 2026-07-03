@@ -19,7 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.exception;
 
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.OptimisticLockException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -103,9 +105,23 @@ public class GlobalExceptionHandler {
 
   private final AppProblemProperties problemProperties;
   private final MessageSource messageSource;
+  private final MeterRegistry meterRegistry;
 
   private URI type(String suffix) {
     return URI.create(problemProperties.getBaseUri() + suffix);
+  }
+
+  /**
+   * Increments {@code basetool_http_error_total} for a handled error, tagged by its stable RFC-7807
+   * code (REQ-OBS-011). The code is a bounded {@code CODE_*} constant, never a path or message, so
+   * the label stays low-cardinality and PII-free. Only the security/concurrency codes operators
+   * alert on are instrumented — a 409 optimistic-lock storm (contention / locking regression), 401
+   * spikes (token breakage) and 403 spikes (authorization misconfig).
+   *
+   * @param code the stable {@code CODE_*} error code to tag the increment with
+   */
+  private void countHttpError(String code) {
+    meterRegistry.counter(MetricNames.HTTP_ERROR, MetricNames.TAG_CODE, code).increment();
   }
 
   /**
@@ -264,6 +280,7 @@ public class GlobalExceptionHandler {
   })
   public ResponseEntity<ProblemDetail> handleOptimisticLockingFailure(
       Exception ex, HttpServletRequest request) {
+    countHttpError(CODE_OPTIMISTIC_LOCK);
     ProblemDetail pd =
         problem(
             HttpStatus.CONFLICT,
@@ -294,6 +311,7 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(PessimisticLockingFailureException.class)
   public ResponseEntity<ProblemDetail> handlePessimisticLocking(
       PessimisticLockingFailureException ex, HttpServletRequest request) {
+    countHttpError(CODE_PESSIMISTIC_LOCK);
     ProblemDetail pd =
         problem(
             HttpStatus.CONFLICT,
@@ -324,6 +342,7 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(AuthenticationException.class)
   public ResponseEntity<ProblemDetail> handleAuthentication(
       AuthenticationException ex, HttpServletRequest request) {
+    countHttpError(CODE_UNAUTHENTICATED);
     ProblemDetail pd =
         problem(
             HttpStatus.UNAUTHORIZED,
@@ -352,6 +371,7 @@ public class GlobalExceptionHandler {
   @ExceptionHandler({AccessDeniedException.class, AuthorizationDeniedException.class})
   public ResponseEntity<ProblemDetail> handleAccessDenied(
       Exception ex, HttpServletRequest request) {
+    countHttpError(CODE_ACCESS_DENIED);
     // Do NOT echo ex.getMessage() to clients (may contain SpEL or required-role hints) -
     // keep the user-facing detail generic and put the diagnostic info into the WARN log only.
     final ProblemDetail pd =

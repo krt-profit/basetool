@@ -24,8 +24,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.support.RateLimitProperties;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import java.io.IOException;
@@ -66,6 +69,8 @@ class RateLimitingFilterTest {
    */
   private final MessageSource messageSource = new StaticMessageSource();
 
+  private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
+
   @BeforeEach
   void setUp() {
     properties = new RateLimitProperties();
@@ -78,7 +83,7 @@ class RateLimitingFilterTest {
     problemProperties = new AppProblemProperties();
     problemProperties.setBaseUri("https://profit-base.online/problems/");
 
-    filter = new RateLimitingFilter(properties, problemProperties, messageSource);
+    filter = new RateLimitingFilter(properties, problemProperties, messageSource, meterRegistry);
   }
 
   // ---------------------------------------------------------------
@@ -193,7 +198,7 @@ class RateLimitingFilterTest {
       IllegalStateException ex =
           assertThrows(
               IllegalStateException.class,
-              () -> new RateLimitingFilter(bad, problemProperties, messageSource),
+              () -> new RateLimitingFilter(bad, problemProperties, messageSource, meterRegistry),
               "an unparseable global pattern must abort startup");
       assertTrue(
           ex.getMessage().contains("/api/**/legacy/**"),
@@ -219,7 +224,7 @@ class RateLimitingFilterTest {
       IllegalStateException ex =
           assertThrows(
               IllegalStateException.class,
-              () -> new RateLimitingFilter(bad, problemProperties, messageSource));
+              () -> new RateLimitingFilter(bad, problemProperties, messageSource, meterRegistry));
       assertTrue(
           ex.getMessage().contains("broken-rule"),
           "the failure must name the offending rule: " + ex.getMessage());
@@ -232,7 +237,7 @@ class RateLimitingFilterTest {
 
       assertThrows(
           IllegalStateException.class,
-          () -> new RateLimitingFilter(bad, problemProperties, messageSource));
+          () -> new RateLimitingFilter(bad, problemProperties, messageSource, meterRegistry));
     }
 
     @Test
@@ -250,7 +255,7 @@ class RateLimitingFilterTest {
       rule.setRefillPeriod(Duration.ofMinutes(1));
       ok.setRules(List.of(rule));
 
-      assertNotNull(new RateLimitingFilter(ok, problemProperties, messageSource));
+      assertNotNull(new RateLimitingFilter(ok, problemProperties, messageSource, meterRegistry));
     }
 
     private RateLimitProperties newValidProperties() {
@@ -508,6 +513,15 @@ class RateLimitingFilterTest {
       assertTrue(
           body.contains("\"correlationId\":\"" + correlationHeader + "\""),
           "X-Correlation-Id header must match the body correlationId");
+      // The rejection is counted once under the bounded `global` bucket label (the umbrella
+      // /api/** budget), never under the client IP or URI (REQ-OBS-011).
+      assertEquals(
+          1.0d,
+          meterRegistry
+              .get(MetricNames.RATELIMIT_REJECTIONS)
+              .tag(MetricNames.TAG_BUCKET, MetricNames.BUCKET_GLOBAL)
+              .counter()
+              .count());
     }
 
     private MockHttpServletRequest copyRequest(MockHttpServletRequest src) {

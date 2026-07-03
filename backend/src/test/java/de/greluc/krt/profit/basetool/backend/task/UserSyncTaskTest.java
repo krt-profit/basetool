@@ -21,9 +21,11 @@ package de.greluc.krt.profit.basetool.backend.task;
 
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
 import de.greluc.krt.profit.basetool.backend.service.KeycloakService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -31,6 +33,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -39,6 +42,10 @@ class UserSyncTaskTest {
   @Mock private KeycloakService keycloakService;
 
   @Mock private UserService userService;
+
+  // A real TaskMetrics (spied) so the wrapper genuinely runs the sync body; a mock would no-op it
+  // and defeat every interaction assertion below.
+  @Spy private TaskMetrics taskMetrics = new TaskMetrics(new SimpleMeterRegistry());
 
   @InjectMocks private UserSyncTask userSyncTask;
 
