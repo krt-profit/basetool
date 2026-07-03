@@ -618,10 +618,9 @@ public class MissionController {
   @Operation(
       summary = "Update a mission (full replace)",
       description =
-          "Aktualisiert den gesamten Einsatz in einem Request. Fuer eine bessere "
-              + "Multi-User-Experience wird empfohlen, stattdessen die Section-PATCH-Endpoints "
-              + "(/core, /schedule, /flags) zu verwenden, damit parallele Aenderungen an "
-              + "anderen Sektionen keine Optimistic-Lock-Konflikte ausloesen.")
+          "Replaces the entire mission in a single request. For a better multi-user experience, "
+              + "prefer the section PATCH endpoints (/core, /schedule, /flags) instead, so "
+              + "concurrent edits to other sections do not trigger optimistic-lock conflicts.")
   public MissionDto updateMission(
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid @NotNull
@@ -642,9 +641,9 @@ public class MissionController {
   @Operation(
       summary = "Patch mission core section",
       description =
-          "Aktualisiert nur die Stammdaten-Sektion (Name, Beschreibung, Kalenderlink, Status) eines"
-              + " Einsatzes. Andere Sektionen und Sub-Aggregate bleiben unberuehrt. Bei einem"
-              + " Versionskonflikt wird HTTP 409 (application/problem+json) zurueckgegeben.")
+          "Patches only the core section (name, description, calendar link, status) of a mission."
+              + " Other sections and sub-aggregates stay untouched. A version conflict returns HTTP"
+              + " 409 (application/problem+json).")
   public MissionDto patchMissionCore(
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid @NotNull
@@ -674,9 +673,9 @@ public class MissionController {
   @Operation(
       summary = "Patch mission schedule section",
       description =
-          "Aktualisiert nur die Zeitplan-Sektion (Meeting-/Planned-/Actual-Zeiten) eines "
-              + "Einsatzes. Parallele Aenderungen an Teilnehmern, Units oder Finanzen fuehren dank "
-              + "entkoppelter Sub-Collections nicht mehr zum Versionskonflikt. Zeitstempel in UTC.")
+          "Patches only the schedule section (meeting/planned/actual times) of a mission. Thanks "
+              + "to decoupled sub-collections, concurrent edits to participants, units or finances "
+              + "no longer cause a version conflict. Timestamps are in UTC.")
   public MissionDto patchMissionSchedule(
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid @NotNull
@@ -704,7 +703,7 @@ public class MissionController {
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(
       summary = "Patch mission flags section",
-      description = "Aktualisiert nur die Flags-Sektion (z.B. isInternal) eines Einsatzes.")
+      description = "Patches only the flags section (e.g. isInternal) of a mission.")
   public MissionDto patchMissionFlags(
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid @NotNull

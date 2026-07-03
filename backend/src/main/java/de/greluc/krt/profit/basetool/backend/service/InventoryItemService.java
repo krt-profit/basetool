@@ -49,6 +49,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -604,13 +605,7 @@ public class InventoryItemService {
     OptimisticLock.checkOptionalClient(
         item.getVersion(), request.version(), InventoryItem.class, id);
 
-    String normalizedNote = request.note();
-    if (normalizedNote != null) {
-      normalizedNote = normalizedNote.trim();
-      if (normalizedNote.isEmpty()) {
-        normalizedNote = null;
-      }
-    }
+    String normalizedNote = StringNormalization.trimToNull(request.note());
     item.setNote(normalizedNote);
 
     // saveAndFlush so the response carries the post-increment @Version (see updateInventoryItem) —

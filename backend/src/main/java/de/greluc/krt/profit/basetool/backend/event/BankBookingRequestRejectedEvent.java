@@ -53,10 +53,7 @@ public record BankBookingRequestRejectedEvent(
     String reason,
     @Nullable UUID requesterSub,
     @Nullable UUID actorSub)
-    implements NotificationEvent {
-
-  /** Loose entity-type tag stored on the produced notifications for deep-linking. */
-  public static final String ENTITY_TYPE = "BANK_BOOKING_REQUEST";
+    implements BankBookingRequestEvent {
 
   @Override
   public NotificationEventType eventType() {
@@ -76,11 +73,6 @@ public record BankBookingRequestRejectedEvent(
   @Override
   public UUID contextAccountId() {
     return accountId;
-  }
-
-  @Override
-  public String entityType() {
-    return ENTITY_TYPE;
   }
 
   @Override

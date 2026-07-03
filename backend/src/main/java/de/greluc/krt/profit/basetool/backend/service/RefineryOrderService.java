@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -699,7 +700,7 @@ public class RefineryOrderService {
       // amount (it overrides the originally calculated output amount of the refinery
       // order). The note is propagated to the resulting InventoryItem so the user can
       // attach storage remarks directly to the inventory item.
-      String incomingNote = normalizeNote(itemDto.note());
+      String incomingNote = StringNormalization.trimToNull(itemDto.note());
 
       // Append-only: every stored refinery output becomes its own row and is never folded into an
       // existing identical stack. Rows that share a stack identity are grouped only for display
@@ -748,14 +749,6 @@ public class RefineryOrderService {
         order.getOwner() != null ? order.getOwner().getId() : null,
         AuditDetails.of("items", dto.items().size())
             .with("status", previousStatus + "->COMPLETED"));
-  }
-
-  private static String normalizeNote(String note) {
-    if (note == null) {
-      return null;
-    }
-    String trimmed = note.trim();
-    return trimmed.isEmpty() ? null : trimmed;
   }
 
   /**

@@ -41,15 +41,6 @@ public class NormalizedStringEditor extends PropertyEditorSupport {
 
   @Override
   public void setAsText(String text) throws IllegalArgumentException {
-    if (text == null) {
-      setValue(null);
-      return;
-    }
-    String trimmed = text.trim();
-    if (emptyAsNull && trimmed.isEmpty()) {
-      setValue(null);
-      return;
-    }
-    setValue(StringNormalization.normalizeAndCap(trimmed, maxLength));
+    setValue(StringNormalization.normalize(text, maxLength, emptyAsNull));
   }
 }
