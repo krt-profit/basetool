@@ -370,6 +370,13 @@ background + top border; the Save keeps its `form="mission-form"` binding (the c
 unchanged). The rule is scoped to the **active** Verwaltung pane so it never pins on another tab, and
 the pane reserves extra `padding-bottom` so the last tile is never hidden behind the bar.
 
+**Full-width Details card on the create page.** The Verwaltung pane's two-column grid (`.pane-grid-2`)
+carries the Details card in the left column and the edit-only editors (Ziele/Ablauf/Organisation/
+Manager, all `th:if="${!isNew}"`) in the right. On the create page the right column has no content, so
+the grid collapses to a **single full-width column** (`.pane-grid--single`, applied only when `isNew`)
+and the empty right column is not rendered — the Details form spans the full page width and stays
+centred beneath the greeting header instead of being stranded in the left half.
+
 **Enforced by:** `MissionTimelineCreateSeedTest` (create-time seeders: contiguous orderIndex, no version
 bump, no re-fetch, id-only / kind-only audit) + `MissionServiceTest` /
 `MissionControllerCreatePathTest` (create request wiring) + `MissionPageControllerTest` (create form) ·

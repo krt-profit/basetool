@@ -82,6 +82,10 @@
            Re-establish the same flex column here. */
         #finance-results { display: flex; flex-direction: column; gap: 12px; }
         .pane-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+        /* Create page (isNew): the right column's panels are all edit-only (th:if="${!isNew}"),
+           so the grid carries a single Details card. Collapse to one column so that card spans
+           the full page width instead of being stranded in the left half. */
+        .pane-grid-2.pane-grid--single { grid-template-columns: 1fr; }
         .pane-grid-fin { display: grid; grid-template-columns: 1.5fr 1fr; gap: 12px; align-items: start; }
         .pane-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
         @media (max-width: 980px) { .pane-grid-2, .pane-grid-fin { grid-template-columns: 1fr; } }
@@ -890,7 +894,7 @@
         <section id="pane-verw" class="tab-pane" role="tabpanel" aria-labelledby="tab-verw"
                  th:classappend="${isNew} ? 'on'"
                  th:if="${isNew or mission.canEdit or mission.canManageManagers}">
-            <div class="pane-grid-2">
+            <div class="pane-grid-2" th:classappend="${isNew} ? 'pane-grid--single'">
                 <div class="kpanel">
                     <div class="kpanel-head" th:text="#{mission.details}">Details</div>
                     <div class="kpanel-body">
@@ -1117,7 +1121,7 @@
                     </div>
                 </div>
 
-                <div class="pane-col">
+                <div class="pane-col" th:if="${!isNew}">
                     <!-- Ziele editor (REQ-MISSION-012): classified, sortable goals. In-place AJAX swap
                          container — a goal add/edit/remove/reorder re-renders this objectivesEditor
                          fragment via ?fragment=objectives-editor AND the overview Ziele box via
