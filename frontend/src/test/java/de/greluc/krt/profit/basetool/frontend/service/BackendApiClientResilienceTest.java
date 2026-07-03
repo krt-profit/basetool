@@ -25,8 +25,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.exception.ReauthenticationRequiredException;
+import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import io.github.resilience4j.bulkhead.BulkheadFullException;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.net.ConnectException;
 import java.net.URI;
 import java.util.concurrent.TimeoutException;
@@ -60,13 +62,15 @@ class BackendApiClientResilienceTest {
 
   private WebClient webClient;
   private WebClient publicWebClient;
+  private SimpleMeterRegistry meterRegistry;
   private BackendApiClient client;
 
   @BeforeEach
   void setUp() {
     webClient = mock(WebClient.class);
     publicWebClient = mock(WebClient.class);
-    client = new BackendApiClient(webClient, publicWebClient);
+    meterRegistry = new SimpleMeterRegistry();
+    client = new BackendApiClient(webClient, publicWebClient, meterRegistry);
   }
 
   // ---------------------------------------------------------------
@@ -86,6 +90,18 @@ class BackendApiClientResilienceTest {
       assertEquals(503, ex.getStatusCode());
       assertEquals(BackendServiceException.CODE_SERVICE_UNAVAILABLE, ex.getProblemCode());
       assertEquals("Backend circuit breaker open", ex.getMessage());
+      // The failure is counted once under the bounded circuit-open reason + GET verb (REQ-OBS-011).
+      assertEquals(
+          1.0d,
+          meterRegistry
+              .get(MetricNames.BACKEND_CLIENT_ERRORS)
+              .tags(
+                  MetricNames.TAG_REASON,
+                  MetricNames.REASON_CIRCUIT_OPEN,
+                  MetricNames.TAG_METHOD,
+                  "GET")
+              .counter()
+              .count());
     }
 
     @Test

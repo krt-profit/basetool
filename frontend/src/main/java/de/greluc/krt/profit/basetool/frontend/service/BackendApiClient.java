@@ -21,8 +21,10 @@ package de.greluc.krt.profit.basetool.frontend.service;
 
 import de.greluc.krt.profit.basetool.frontend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.frontend.exception.ReauthenticationRequiredException;
+import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import io.github.resilience4j.bulkhead.BulkheadFullException;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.concurrent.TimeoutException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -68,6 +70,7 @@ public class BackendApiClient {
 
   private final WebClient webClient;
   private final WebClient publicWebClient;
+  private final MeterRegistry meterRegistry;
 
   /**
    * Dedicated ObjectMapper used exclusively to decode backend Problem+JSON bodies. Kept as an
@@ -75,6 +78,26 @@ public class BackendApiClient {
    * Boot's JacksonAutoConfiguration and therefore without a shared ObjectMapper bean.
    */
   private final ObjectMapper objectMapper = JsonMapper.builder().build();
+
+  /**
+   * Increments {@code basetool_backend_client_errors_total} for a failed backend call
+   * (REQ-OBS-011). Both labels are bounded: {@code reason} is a fixed local enumeration (never the
+   * backend's response-body code, which could be arbitrary), and {@code method} is the HTTP verb.
+   * The request URI is deliberately never a label — it embeds ids/paths and is unbounded.
+   *
+   * @param reason the bounded failure reason ({@code MetricNames.REASON_*})
+   * @param method the HTTP verb of the failed call
+   */
+  private void countBackendError(String reason, String method) {
+    meterRegistry
+        .counter(
+            MetricNames.BACKEND_CLIENT_ERRORS,
+            MetricNames.TAG_REASON,
+            reason,
+            MetricNames.TAG_METHOD,
+            method)
+        .increment();
+  }
 
   /** GET against the authenticated backend, decoded via a {@link ParameterizedTypeReference}. */
   public <T> T get(String uri, ParameterizedTypeReference<T> responseType) {
@@ -334,6 +357,11 @@ public class BackendApiClient {
           parsed.getProblemDetail(),
           parsed.getFieldErrors());
     }
+    countBackendError(
+        parsed.getStatusCode() >= 500
+            ? MetricNames.REASON_BACKEND_5XX
+            : MetricNames.REASON_BACKEND_4XX,
+        method);
     throw parsed;
   }
 
@@ -355,6 +383,7 @@ public class BackendApiClient {
     Throwable root = unwrap(e);
     if (root instanceof CallNotPermittedException) {
       log.warn("Circuit breaker open for {} {}: {}", method, uri, root.getMessage());
+      countBackendError(MetricNames.REASON_CIRCUIT_OPEN, method);
       throw new BackendServiceException(
           "Backend circuit breaker open",
           e,
@@ -366,6 +395,7 @@ public class BackendApiClient {
     }
     if (root instanceof BulkheadFullException) {
       log.warn("Bulkhead saturated for {} {}: {}", method, uri, root.getMessage());
+      countBackendError(MetricNames.REASON_BULKHEAD_FULL, method);
       throw new BackendServiceException(
           "Backend bulkhead full",
           e,
@@ -379,6 +409,7 @@ public class BackendApiClient {
         || root instanceof WebClientRequestException
         || root instanceof java.net.ConnectException) {
       log.warn("Backend timeout / connection failure on {} {}: {}", method, uri, root.getMessage());
+      countBackendError(MetricNames.REASON_TIMEOUT, method);
       throw new BackendServiceException(
           "Backend timeout",
           e,
@@ -389,6 +420,7 @@ public class BackendApiClient {
           null);
     }
     log.error("Unexpected backend error on {} {}: {}", method, uri, e.getMessage(), e);
+    countBackendError(MetricNames.REASON_UNKNOWN, method);
     throw new BackendServiceException("Error on " + method + " data from backend", e, 500);
   }
 

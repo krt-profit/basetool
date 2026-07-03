@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.service;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import okhttp3.mockwebserver.MockResponse;
@@ -67,7 +68,7 @@ class BackendApiClientHappyPathTest {
             .baseUrl(server.url("/").toString())
             .defaultHeader("X-Auth", "public")
             .build();
-    client = new BackendApiClient(webClient, publicWebClient);
+    client = new BackendApiClient(webClient, publicWebClient, new SimpleMeterRegistry());
   }
 
   @AfterEach

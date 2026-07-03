@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.websocket;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.frontend.service.MissionPresenceService;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -65,7 +66,7 @@ class MissionPresenceWebSocketHandlerTest {
 
   @BeforeEach
   void setUp() {
-    service = new MissionPresenceService();
+    service = new MissionPresenceService(new SimpleMeterRegistry());
     objectMapper = JsonMapper.builder().build();
     handler = new MissionPresenceWebSocketHandler(service, objectMapper);
   }
