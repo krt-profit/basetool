@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.task;
 
+import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
+import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.service.DefaultBlueprintProvisioningService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,17 +53,29 @@ import org.springframework.stereotype.Component;
 public class DefaultBlueprintProvisioningTask {
 
   private final DefaultBlueprintProvisioningService provisioningService;
+  private final TaskMetrics taskMetrics;
 
-  /** Grants any still-missing default blueprints to every active user. */
+  /**
+   * Grants any still-missing default blueprints to every active user, publishing the {@code
+   * default_blueprint_provisioning} job metrics. A failure is recorded and swallowed by {@link
+   * TaskMetrics} so the scheduler thread survives.
+   */
   @Scheduled(fixedDelayString = "${app.default-blueprints.provisioning.interval:PT1H}")
   public void ensureDefaultsForAllUsers() {
-    try {
-      int granted = provisioningService.grantDefaultsToAllUsers();
-      if (granted > 0) {
-        log.info("Default-blueprint provisioning sweep granted {} owned row(s).", granted);
-      }
-    } catch (Exception e) {
-      log.error("Default-blueprint provisioning sweep failed", e);
+    taskMetrics.recordCounting(
+        ScheduledJob.DEFAULT_BLUEPRINT_PROVISIONING, this::provisionDefaults);
+  }
+
+  /**
+   * Performs the back-fill; any failure propagates to {@link TaskMetrics}.
+   *
+   * @return the number of owned-blueprint rows granted this run (the {@code items} metric)
+   */
+  private int provisionDefaults() {
+    int granted = provisioningService.grantDefaultsToAllUsers();
+    if (granted > 0) {
+      log.info("Default-blueprint provisioning sweep granted {} owned row(s).", granted);
     }
+    return granted;
   }
 }

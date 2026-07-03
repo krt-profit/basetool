@@ -28,7 +28,9 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.config.ScWikiProperties;
 import de.greluc.krt.profit.basetool.backend.integration.scwiki.ScWikiClient;
+import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.service.SyncCoordinator;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -50,6 +52,9 @@ class ScWikiSchedulerTest {
 
   // A real coordinator (spied so it can be told the gate is busy); its default runs the sweep.
   @Spy private SyncCoordinator syncCoordinator = new SyncCoordinator(3_600_000);
+
+  // A real TaskMetrics (spied) so the instrumentation wrapper genuinely runs the sweep body.
+  @Spy private TaskMetrics taskMetrics = new TaskMetrics(new SimpleMeterRegistry());
 
   @InjectMocks private ScWikiScheduler scheduler;
 

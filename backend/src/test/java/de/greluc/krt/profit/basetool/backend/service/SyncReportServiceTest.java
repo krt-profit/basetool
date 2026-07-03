@@ -24,10 +24,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.ExternalSyncReport;
 import de.greluc.krt.profit.basetool.backend.model.SyncEventType;
 import de.greluc.krt.profit.basetool.backend.model.SyncSourceSystem;
 import de.greluc.krt.profit.basetool.backend.repository.ExternalSyncReportRepository;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -35,6 +38,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -46,6 +50,9 @@ import org.springframework.data.domain.Pageable;
 class SyncReportServiceTest {
 
   @Mock private ExternalSyncReportRepository repository;
+
+  // A real registry (spied) so the per-source/event sync-event counter is genuinely recorded.
+  @Spy private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
   @InjectMocks private SyncReportService service;
 
@@ -76,6 +83,18 @@ class SyncReportServiceTest {
     assertEquals("Bluemoon Fungus", row.getExternalName());
     assertEquals("no UEX match", row.getDetail());
     assertNotNull(row.getRanAt());
+    // The finding is counted once under the bounded source + event_type (REQ-OBS-011).
+    assertEquals(
+        1.0d,
+        meterRegistry
+            .get(MetricNames.SYNC_EVENTS)
+            .tags(
+                MetricNames.TAG_SOURCE,
+                SyncSourceSystem.SCWIKI.name(),
+                MetricNames.TAG_EVENT_TYPE,
+                SyncEventType.CREATED_WIKI_ONLY.name())
+            .counter()
+            .count());
   }
 
   @Test

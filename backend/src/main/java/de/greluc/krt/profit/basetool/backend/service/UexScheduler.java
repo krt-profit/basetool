@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.AsyncConfig;
+import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
+import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -77,6 +79,7 @@ public class UexScheduler {
   private final UexItemSyncService uexItemSyncService;
   private final UexItemPriceSyncService uexItemPriceSyncService;
   private final SyncCoordinator syncCoordinator;
+  private final TaskMetrics taskMetrics;
 
   /**
    * Periodic UEX sync entry point on a fixed delay, started immediately on boot ({@code
@@ -90,50 +93,48 @@ public class UexScheduler {
       fixedDelayString = "${krt.uex.scheduler-delay:86400000}",
       initialDelayString = "${krt.uex.scheduler-initial-delay:0}")
   public void scheduleCommodityPriceUpdate() {
-    syncCoordinator.runExclusively("UEX", this::runAllSyncSteps);
+    syncCoordinator.runExclusively(
+        "UEX", () -> taskMetrics.record(ScheduledJob.UEX_SYNC, this::runAllSyncSteps));
   }
 
   /**
    * Runs the full UEX sync sweep. Order matters — topology imports first so later imports can
-   * resolve parent locations. Exceptions are swallowed at the top level so a single failing service
-   * does not abort the remaining ones. Only ever invoked through {@link
-   * SyncCoordinator#runExclusively(String, Runnable)} by {@link #scheduleCommodityPriceUpdate()},
-   * so it holds the cross-scheduler lock for its whole duration — the SC Wiki sync waits behind it.
+   * resolve parent locations. A failure aborts the remaining steps (best-effort tick); the sweep is
+   * wrapped by {@link TaskMetrics} at the call site (see {@link #scheduleCommodityPriceUpdate()}),
+   * which records the run as a {@code failure} and swallows the exception so the scheduler thread
+   * survives. Only invoked through {@link SyncCoordinator#runExclusively(String, Runnable)}, so it
+   * holds the cross-scheduler lock for its full duration — the SC Wiki sync waits behind it.
    */
   private void runAllSyncSteps() {
     log.info("Running scheduled task to update UEX data...");
-    try {
-      uexUniverseSyncService.syncFactions();
-      uexUniverseSyncService.syncJurisdictions();
-      uexUniverseSyncService.syncPlanets();
-      uexUniverseSyncService.syncMoons();
-      uexUniverseSyncService.syncOrbits();
-      uexUniverseSyncService.syncCities();
-      uexUniverseSyncService.syncOutposts();
-      uexUniverseSyncService.syncPois();
-      uexUniverseSyncService.syncSpaceStations();
-      uexUniverseSyncService.syncTerminals();
+    uexUniverseSyncService.syncFactions();
+    uexUniverseSyncService.syncJurisdictions();
+    uexUniverseSyncService.syncPlanets();
+    uexUniverseSyncService.syncMoons();
+    uexUniverseSyncService.syncOrbits();
+    uexUniverseSyncService.syncCities();
+    uexUniverseSyncService.syncOutposts();
+    uexUniverseSyncService.syncPois();
+    uexUniverseSyncService.syncSpaceStations();
+    uexUniverseSyncService.syncTerminals();
 
-      uexStarSystemService.fetchAndProcessStarSystems();
-      uexCommodityService.fetchAndProcessCommoditiesPrices();
-      uexManufacturerService.syncManufacturers();
-      uexVehicleService.syncVehicles();
+    uexStarSystemService.fetchAndProcessStarSystems();
+    uexCommodityService.fetchAndProcessCommoditiesPrices();
+    uexManufacturerService.syncManufacturers();
+    uexVehicleService.syncVehicles();
 
-      // R2 — category reference + item catalogue. categoriesRef populates the table that
-      // UexItemSyncService iterates; the latter resolves manufacturers (already synced above)
-      // and linked ship types (also above), so the topological order is preserved.
-      uexCategoryRefService.syncCategories();
-      uexItemSyncService.syncItems();
+    // R2 — category reference + item catalogue. categoriesRef populates the table that
+    // UexItemSyncService iterates; the latter resolves manufacturers (already synced above)
+    // and linked ship types (also above), so the topological order is preserved.
+    uexCategoryRefService.syncCategories();
+    uexItemSyncService.syncItems();
 
-      // R7 — item prices. Runs after the item catalogue (resolves game_item) and terminals
-      // (synced in the universe phase above). Self-guards on krt.uex.item-price-sync-enabled, so
-      // this is a no-op until an operator opts in.
-      uexItemPriceSyncService.syncItemPrices();
+    // R7 — item prices. Runs after the item catalogue (resolves game_item) and terminals
+    // (synced in the universe phase above). Self-guards on krt.uex.item-price-sync-enabled, so
+    // this is a no-op until an operator opts in.
+    uexItemPriceSyncService.syncItemPrices();
 
-      uexRefinerySyncService.syncRefiningMethods();
-      uexRefinerySyncService.syncRefineryYields();
-    } catch (Exception e) {
-      log.error("Scheduled task for UEX data failed", e);
-    }
+    uexRefinerySyncService.syncRefiningMethods();
+    uexRefinerySyncService.syncRefineryYields();
   }
 }

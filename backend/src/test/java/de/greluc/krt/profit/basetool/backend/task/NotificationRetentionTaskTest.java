@@ -22,7 +22,9 @@ package de.greluc.krt.profit.basetool.backend.task;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.service.NotificationService;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -37,10 +39,13 @@ class NotificationRetentionTaskTest {
 
   @Mock private NotificationService notificationService;
 
+  private final TaskMetrics taskMetrics = new TaskMetrics(new SimpleMeterRegistry());
+
   @Test
   void purgesReadNotificationsOlderThanMaxAge() {
     Duration maxAge = Duration.ofDays(90);
-    NotificationRetentionTask task = new NotificationRetentionTask(notificationService, maxAge);
+    NotificationRetentionTask task =
+        new NotificationRetentionTask(notificationService, taskMetrics, maxAge);
     when(notificationService.purgeReadOlderThan(org.mockito.ArgumentMatchers.any())).thenReturn(3);
 
     task.purgeExpiredReadNotifications();
@@ -55,7 +60,7 @@ class NotificationRetentionTaskTest {
   @Test
   void swallowsFailuresSoSchedulerSurvives() {
     NotificationRetentionTask task =
-        new NotificationRetentionTask(notificationService, Duration.ofDays(90));
+        new NotificationRetentionTask(notificationService, taskMetrics, Duration.ofDays(90));
     when(notificationService.purgeReadOlderThan(org.mockito.ArgumentMatchers.any()))
         .thenThrow(new RuntimeException("db down"));
 

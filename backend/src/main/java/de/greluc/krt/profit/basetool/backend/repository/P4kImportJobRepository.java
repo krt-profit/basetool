@@ -33,6 +33,25 @@ import org.springframework.data.repository.query.Param;
 public interface P4kImportJobRepository extends JpaRepository<P4kImportJob, UUID> {
 
   /**
+   * Counts import jobs in the given status, backing the {@code basetool_p4k_import_job_pending_*}
+   * queue-depth gauge (REQ-OBS-011).
+   *
+   * @param status the bounded job status to count
+   * @return the number of import jobs in that status
+   */
+  long countByStatus(P4kImportJobStatus status);
+
+  /**
+   * Finds the creation timestamp of the oldest import job in the given status, for the "oldest
+   * un-picked-up import job age" gauge (REQ-OBS-011).
+   *
+   * @param status the bounded job status to scan (typically {@code PENDING})
+   * @return the earliest {@code createdAt} in that status, or {@code null} when none exists
+   */
+  @Query("SELECT MIN(j.createdAt) FROM P4kImportJob j WHERE j.status = :status")
+  Instant findOldestCreatedAtByStatus(@Param("status") P4kImportJobStatus status);
+
+  /**
    * Returns the most recent import jobs, newest first, capped for the admin job list (the table is
    * kept small by the prune sweep, so a fixed window is sufficient and avoids unbounded growth).
    *

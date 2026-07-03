@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.task;
 
+import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
+import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
 import de.greluc.krt.profit.basetool.backend.service.BankHolderReconciliationService;
 import de.greluc.krt.profit.basetool.backend.service.KeycloakService;
@@ -49,21 +51,35 @@ public class UserSyncTask {
   private final KeycloakService keycloakService;
   private final UserService userService;
   private final BankHolderReconciliationService bankHolderReconciliationService;
+  private final TaskMetrics taskMetrics;
+
+  /**
+   * Runs the Keycloak reconciliation through {@link TaskMetrics}, publishing the {@code user_sync}
+   * execution counter, duration timer and last-success gauge (the source of the "user sync stale
+   * &gt; 15 min" alert). A whole-batch failure is recorded as {@code failure} and swallowed by the
+   * wrapper so the scheduler thread survives.
+   */
+  @Scheduled(fixedDelayString = "${app.keycloak.sync.interval:PT5M}")
+  public void syncUsers() {
+    taskMetrics.recordCounting(ScheduledJob.USER_SYNC, this::synchronizeFromKeycloak);
+  }
 
   /**
    * Fetches the current Keycloak user list and reconciles it into the local table.
    *
    * <p>Failures on individual users are logged and swallowed so a single bad row does not abort the
    * batch. After the loop, {@link UserService#markMissingUsers(java.util.Set)} flags every local
-   * user whose Keycloak id did not appear in this run.
+   * user whose Keycloak id did not appear in this run. A batch-level failure (an empty-list guard
+   * aside) propagates to {@link TaskMetrics}, which records it as a failed run.
+   *
+   * @return the number of users successfully synced this run (the {@code items} metric)
    */
-  @Scheduled(fixedDelayString = "${app.keycloak.sync.interval:PT5M}")
-  public void syncUsers() {
+  private int synchronizeFromKeycloak() {
     log.info("Starting scheduled user sync from Keycloak...");
     List<KeycloakUserDto> users = keycloakService.fetchUsers();
     if (users.isEmpty()) {
       log.info("No users fetched from Keycloak.");
-      return;
+      return 0;
     }
 
     int count = 0;
@@ -92,5 +108,6 @@ public class UserSyncTask {
     } catch (Exception e) {
       log.error("Bank holder reconcile failed; will retry on the next sync run.", e);
     }
+    return count;
   }
 }

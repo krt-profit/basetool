@@ -24,6 +24,8 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import de.greluc.krt.profit.basetool.ingest.config.RateLimitProperties;
+import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 
@@ -33,6 +35,8 @@ import org.junit.jupiter.api.Test;
  * disabled cleanly when {@code app.rate-limit.enabled=false}.
  */
 class SubjectRateLimiterTest {
+
+  private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
 
   private static RateLimitProperties props(int capacity, boolean enabled) {
     RateLimitProperties p = new RateLimitProperties();
@@ -45,18 +49,26 @@ class SubjectRateLimiterTest {
 
   @Test
   void allowsUpToCapacityThenThrowsWithRetryAfter() {
-    SubjectRateLimiter limiter = new SubjectRateLimiter(props(1, true));
+    SubjectRateLimiter limiter = new SubjectRateLimiter(props(1, true), meterRegistry);
 
     limiter.requireWithinLimit("sub-a"); // consumes the only token
 
     RateLimitedException ex =
         assertThrows(RateLimitedException.class, () -> limiter.requireWithinLimit("sub-a"));
     assertThat(ex.getRetryAfterSeconds()).isPositive();
+    // The rejection is counted once under the bounded `subject` bucket, never the JWT sub.
+    assertThat(
+            meterRegistry
+                .get(MetricNames.RATELIMIT_REJECTIONS)
+                .tag(MetricNames.TAG_BUCKET, MetricNames.BUCKET_SUBJECT)
+                .counter()
+                .count())
+        .isEqualTo(1.0d);
   }
 
   @Test
   void budgetsAreIndependentPerSubject() {
-    SubjectRateLimiter limiter = new SubjectRateLimiter(props(1, true));
+    SubjectRateLimiter limiter = new SubjectRateLimiter(props(1, true), meterRegistry);
 
     limiter.requireWithinLimit("sub-a"); // exhausts sub-a only
 
@@ -66,7 +78,7 @@ class SubjectRateLimiterTest {
 
   @Test
   void disabledLimiterNeverThrows() {
-    SubjectRateLimiter limiter = new SubjectRateLimiter(props(1, false));
+    SubjectRateLimiter limiter = new SubjectRateLimiter(props(1, false), meterRegistry);
 
     assertThatCode(
             () -> {

@@ -30,7 +30,10 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.OptimisticLockException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -76,6 +79,7 @@ class GlobalExceptionHandlerTest {
 
   private GlobalExceptionHandler handler;
   private HttpServletRequest request;
+  private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
   @BeforeEach
   void setUp() {
@@ -89,7 +93,7 @@ class GlobalExceptionHandlerTest {
     messageSource.setDefaultEncoding("UTF-8");
     messageSource.setFallbackToSystemLocale(false);
     LocaleContextHolder.setLocale(Locale.ENGLISH);
-    handler = new GlobalExceptionHandler(props, messageSource);
+    handler = new GlobalExceptionHandler(props, messageSource, meterRegistry);
     request = mock(HttpServletRequest.class);
     when(request.getRequestURI()).thenReturn("/api/v1/test");
   }
@@ -114,6 +118,19 @@ class GlobalExceptionHandlerTest {
     assertTrue(((String) pd.getProperties().get("correlationId")).length() > 0);
   }
 
+  /**
+   * Asserts the handler incremented {@code basetool_http_error_total} exactly once for the given
+   * stable code (each JUnit test instance owns a fresh registry, so the expected count is 1).
+   *
+   * @param code the stable {@code CODE_*} error code the increment is tagged with
+   */
+  private void assertHttpErrorCounted(String code) {
+    assertEquals(
+        1.0d,
+        meterRegistry.get(MetricNames.HTTP_ERROR).tag(MetricNames.TAG_CODE, code).counter().count(),
+        "one basetool_http_error_total increment expected for code " + code);
+  }
+
   @Test
   void handleOptimisticLocking_springVariant_returns409WithCode() {
     ResponseEntity<ProblemDetail> resp =
@@ -122,6 +139,7 @@ class GlobalExceptionHandlerTest {
 
     assertCommon(resp, HttpStatus.CONFLICT, GlobalExceptionHandler.CODE_OPTIMISTIC_LOCK);
     assertEquals("Concurrency conflict", resp.getBody().getTitle());
+    assertHttpErrorCounted(GlobalExceptionHandler.CODE_OPTIMISTIC_LOCK);
   }
 
   @Test
@@ -147,6 +165,7 @@ class GlobalExceptionHandlerTest {
         handler.handleAuthentication(new BadCredentialsException("bad creds"), request);
 
     assertCommon(resp, HttpStatus.UNAUTHORIZED, GlobalExceptionHandler.CODE_UNAUTHENTICATED);
+    assertHttpErrorCounted(GlobalExceptionHandler.CODE_UNAUTHENTICATED);
   }
 
   @Test
@@ -155,6 +174,7 @@ class GlobalExceptionHandlerTest {
         handler.handleAccessDenied(new AccessDeniedException("Access is denied"), request);
 
     assertCommon(resp, HttpStatus.FORBIDDEN, GlobalExceptionHandler.CODE_ACCESS_DENIED);
+    assertHttpErrorCounted(GlobalExceptionHandler.CODE_ACCESS_DENIED);
   }
 
   @Test

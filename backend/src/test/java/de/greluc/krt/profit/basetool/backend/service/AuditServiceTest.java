@@ -29,12 +29,15 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.mapper.AuditEventMapper;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.AuditDomain;
 import de.greluc.krt.profit.basetool.backend.model.AuditEvent;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -43,6 +46,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -61,6 +65,9 @@ class AuditServiceTest {
   @Mock private AuthHelperService authHelperService;
   @Mock private UserRepository userRepository;
   @Mock private AuditEventMapper auditEventMapper;
+
+  // A real registry (spied) so the per-domain audit counter is genuinely recorded and assertable.
+  @Spy private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
   @InjectMocks private AuditService auditService;
 
@@ -97,6 +104,14 @@ class AuditServiceTest {
     assertEquals("Quantanium @ Port Olisar", row.getSubjectLabel());
     assertEquals("qty=5.0", row.getDetails());
     assertNotNull(row.getOccurredAt());
+    // The mutation is counted once under the bounded INVENTORY domain (REQ-OBS-011).
+    assertEquals(
+        1.0d,
+        meterRegistry
+            .get(MetricNames.AUDIT_EVENTS)
+            .tag(MetricNames.TAG_DOMAIN, AuditDomain.INVENTORY.name())
+            .counter()
+            .count());
   }
 
   @Test

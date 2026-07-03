@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
+import de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -34,6 +36,26 @@ import org.springframework.stereotype.Repository;
 /** Spring Data repository for Refinery Order. */
 @Repository
 public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UUID> {
+
+  /**
+   * Counts refinery orders in the given lifecycle status, backing the {@code
+   * basetool_refinery_order_open_*} queue-depth gauge (REQ-OBS-011).
+   *
+   * @param status the bounded lifecycle status to count
+   * @return the number of refinery orders in that status
+   */
+  long countByStatus(RefineryOrderStatus status);
+
+  /**
+   * Finds the creation timestamp of the oldest refinery order in the given status, for the "oldest
+   * open refinery order age" gauge (REQ-OBS-011).
+   *
+   * @param status the bounded lifecycle status to scan (typically {@code OPEN})
+   * @return the earliest {@code createdAt} in that status, or {@code null} when none exists
+   */
+  @Query("SELECT MIN(r.createdAt) FROM RefineryOrder r WHERE r.status = :status")
+  Instant findOldestCreatedAtByStatus(@Param("status") RefineryOrderStatus status);
+
   /**
    * Derived Spring-Data check - returns {@code true} iff at least one row matches {@code
    * LocationId}.

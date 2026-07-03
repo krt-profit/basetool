@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.service;
 
+import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -69,6 +72,21 @@ public class MissionPresenceService {
   public static final Duration ENTRY_TTL = Duration.ofSeconds(120);
 
   private final Map<UUID, Map<String, Map<String, Entry>>> byMission = new ConcurrentHashMap<>();
+
+  /**
+   * Binds the {@code basetool_mission_presence_missions} gauge to the live presence map
+   * (REQ-OBS-011) — the count of missions currently tracked with at least one live editor in this
+   * instance. The gauge is unlabelled: mission id, section key and user id are all unbounded and
+   * PII-adjacent, so none is used as a tag. Single-JVM edit-awareness (see the class note), not a
+   * global online-user roster; the closest online-user proxy is {@code basetool_active_sessions}.
+   *
+   * @param meterRegistry the Micrometer registry the presence gauge is bound to
+   */
+  public MissionPresenceService(@NotNull MeterRegistry meterRegistry) {
+    Gauge.builder(MetricNames.MISSION_PRESENCE_MISSIONS, byMission, Map::size)
+        .description("Missions with at least one live editor tracked in this frontend instance.")
+        .register(meterRegistry);
+  }
 
   /**
    * Record an editor's heartbeat (or initial focus) on a section of a mission. Replaces any

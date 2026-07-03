@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.mapper.AuditEventMapper;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.AuditDomain;
 import de.greluc.krt.profit.basetool.backend.model.AuditEvent;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
@@ -28,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.AuditEventDto;
 import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -63,6 +65,7 @@ public class AuditService {
   private final AuthHelperService authHelperService;
   private final UserRepository userRepository;
   private final AuditEventMapper auditEventMapper;
+  private final MeterRegistry meterRegistry;
 
   /**
    * Appends one audit event for the current caller within the surrounding business transaction. The
@@ -105,7 +108,15 @@ public class AuditService {
             // (an AuditDetails composer or a raw String) is stringified byte-identically.
             .details(details == null ? null : details.toString())
             .build();
-    return auditEventRepository.save(event);
+    AuditEvent saved = auditEventRepository.save(event);
+    // Per-domain audited-mutation counter (REQ-OBS-011). The domain is the bounded AuditDomain
+    // derived from the event type — never subjectLabel/details, which can carry free text/PII.
+    // Incremented after a successful save; a later rollback in the same transaction is not undone
+    // (standard for a non-transactional counter), an accepted minor drift.
+    meterRegistry
+        .counter(MetricNames.AUDIT_EVENTS, MetricNames.TAG_DOMAIN, eventType.domain().name())
+        .increment();
+    return saved;
   }
 
   /**

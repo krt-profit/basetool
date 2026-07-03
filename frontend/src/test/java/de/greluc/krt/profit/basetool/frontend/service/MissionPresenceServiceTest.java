@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.frontend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -39,14 +41,35 @@ import org.junit.jupiter.api.Test;
 class MissionPresenceServiceTest {
 
   private MissionPresenceService service;
+  private SimpleMeterRegistry meterRegistry;
   private UUID missionA;
   private UUID missionB;
 
   @BeforeEach
   void setUp() {
-    service = new MissionPresenceService();
+    meterRegistry = new SimpleMeterRegistry();
+    service = new MissionPresenceService(meterRegistry);
     missionA = UUID.randomUUID();
     missionB = UUID.randomUUID();
+  }
+
+  @Test
+  void presenceGauge_reflectsTheNumberOfMissionsWithLiveEditors() {
+    assertThat(presenceGauge()).isEqualTo(0.0d);
+
+    service.touch(missionA, "core", "user-1", "User One");
+    service.touch(missionB, "schedule", "user-2", "User Two");
+
+    // Two distinct missions currently have a live editor.
+    assertThat(presenceGauge()).isEqualTo(2.0d);
+
+    // Clearing the only editor of missionA drops it from the tracked set.
+    service.clearAll(missionA, "user-1");
+    assertThat(presenceGauge()).isEqualTo(1.0d);
+  }
+
+  private double presenceGauge() {
+    return meterRegistry.get(MetricNames.MISSION_PRESENCE_MISSIONS).gauge().value();
   }
 
   @Test

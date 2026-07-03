@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
@@ -59,6 +61,9 @@ class UexSchedulerTest {
   // A real coordinator (spied so it can be told the gate is busy) — its default behaviour runs the
   // sweep synchronously, so the existing ordering/verify tests below exercise the real steps.
   @Spy private SyncCoordinator syncCoordinator = new SyncCoordinator(3_600_000);
+
+  // A real TaskMetrics (spied) so the instrumentation wrapper genuinely runs the sweep body.
+  @Spy private TaskMetrics taskMetrics = new TaskMetrics(new SimpleMeterRegistry());
 
   @InjectMocks private UexScheduler scheduler;
 

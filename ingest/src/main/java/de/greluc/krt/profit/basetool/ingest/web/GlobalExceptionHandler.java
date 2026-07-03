@@ -19,8 +19,10 @@
 
 package de.greluc.krt.profit.basetool.ingest.web;
 
+import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.ingest.ratelimit.RateLimitedException;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -82,6 +84,23 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
    */
   private final ObjectMapper objectMapper;
 
+  private final MeterRegistry meterRegistry;
+
+  /**
+   * Increments {@code basetool_ingest_handoff_errors_total} for a failed backend relay, tagged by
+   * the bounded {@code reason} (REQ-OBS-011). Only genuine relay failures are counted here; the
+   * pre-relay rejections (validation, malformed body, rate limit) are not handoff failures. The
+   * {@link de.greluc.krt.profit.basetool.ingest.model.dto.HandoffKind} is unavailable once the
+   * controller stack has unwound, so this failure counter carries no {@code kind}.
+   *
+   * @param reason the bounded failure reason ({@code MetricNames.REASON_*})
+   */
+  private void countHandoffError(String reason) {
+    meterRegistry
+        .counter(MetricNames.INGEST_HANDOFF_ERRORS, MetricNames.TAG_REASON, reason)
+        .increment();
+  }
+
   @Override
   protected ResponseEntity<Object> handleMethodArgumentNotValid(
       @NotNull MethodArgumentNotValidException ex,
@@ -137,9 +156,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   public @NotNull ProblemDetail handleBackendResponse(@NotNull WebClientResponseException ex) {
     HttpStatusCode status = ex.getStatusCode();
     if (status.is4xxClientError()) {
+      countHandoffError(MetricNames.REASON_BACKEND_REJECT);
       return problem(status, "Backend rejected the import", CODE_BAD_REQUEST, backendDetail(ex));
     }
     log.warn("Backend relay returned {} — surfacing as 502", status.value());
+    countHandoffError(MetricNames.REASON_BACKEND_UNAVAILABLE);
     return problem(
         HttpStatus.BAD_GATEWAY,
         "Backend unavailable",
@@ -178,6 +199,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   @ExceptionHandler({WebClientRequestException.class, CallNotPermittedException.class})
   public @NotNull ProblemDetail handleBackendUnreachable(@NotNull Exception ex) {
     log.warn("Backend relay failed: {}", ex.getClass().getSimpleName());
+    countHandoffError(MetricNames.REASON_BACKEND_UNAVAILABLE);
     return problem(
         HttpStatus.BAD_GATEWAY,
         "Backend unavailable",
@@ -194,6 +216,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   @ExceptionHandler(Exception.class)
   public @NotNull ProblemDetail handleUnexpected(@NotNull Exception ex) {
     log.error("Unexpected ingest failure", ex);
+    countHandoffError(MetricNames.REASON_INTERNAL);
     return problem(
         HttpStatus.INTERNAL_SERVER_ERROR,
         "Internal error",

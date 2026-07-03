@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.config;
 import de.greluc.krt.profit.basetool.backend.filter.RateLimitingFilter;
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.support.RateLimitProperties;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -43,6 +44,7 @@ public class RateLimitingConfig {
    * @param problemProperties RFC&nbsp;7807 base URI used in the 429 problem-detail response body
    * @param messageSource resolves the localized 429 {@code title}/{@code detail} for the response
    *     body
+   * @param meterRegistry the Micrometer registry the filter's per-bucket 429 rejection counter uses
    * @return the {@link RateLimitingFilter} bean injected into the servlet container registration
    *     below
    */
@@ -50,8 +52,9 @@ public class RateLimitingConfig {
   public RateLimitingFilter rateLimitingFilter(
       RateLimitProperties properties,
       AppProblemProperties problemProperties,
-      MessageSource messageSource) {
-    return new RateLimitingFilter(properties, problemProperties, messageSource);
+      MessageSource messageSource,
+      MeterRegistry meterRegistry) {
+    return new RateLimitingFilter(properties, problemProperties, messageSource, meterRegistry);
   }
 
   /**

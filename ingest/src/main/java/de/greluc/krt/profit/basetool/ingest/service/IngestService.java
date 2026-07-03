@@ -20,10 +20,12 @@
 package de.greluc.krt.profit.basetool.ingest.service;
 
 import de.greluc.krt.profit.basetool.ingest.config.IngestProperties;
+import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.ingest.model.dto.HandoffKind;
 import de.greluc.krt.profit.basetool.ingest.model.dto.IngestResponseDto;
 import de.greluc.krt.profit.basetool.ingest.model.dto.RefineryExtractDto;
 import de.greluc.krt.profit.basetool.ingest.ratelimit.SubjectRateLimiter;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -44,6 +46,7 @@ public class IngestService {
   private final HandoffStagingService handoffStagingService;
   private final IngestProperties ingestProperties;
   private final SubjectRateLimiter subjectRateLimiter;
+  private final MeterRegistry meterRegistry;
 
   /**
    * Relays a refinery extract to the backend, stages the resulting draft, and returns the handoff.
@@ -68,6 +71,7 @@ public class IngestService {
     String draftJson =
         backendImportClient.forwardRefineryExtract(bearer, acceptLanguage, correlationId, extract);
     String handoffId = handoffStagingService.stage(sub, HandoffKind.REFINERY, draftJson);
+    countHandoff(HandoffKind.REFINERY);
     return response(handoffId, HandoffKind.REFINERY, ingestProperties.getRefineryPath());
   }
 
@@ -94,7 +98,21 @@ public class IngestService {
         backendImportClient.forwardBlueprintPreview(
             bearer, acceptLanguage, correlationId, blueprintJson);
     String handoffId = handoffStagingService.stage(sub, HandoffKind.BLUEPRINT, draftJson);
+    countHandoff(HandoffKind.BLUEPRINT);
     return response(handoffId, HandoffKind.BLUEPRINT, ingestProperties.getBlueprintPath());
+  }
+
+  /**
+   * Increments {@code basetool_ingest_handoff_total} for a successfully relayed and staged handoff,
+   * tagged by the bounded {@link HandoffKind} (REQ-OBS-011). Never tagged by the subject or the
+   * payload.
+   *
+   * @param kind the staged draft kind
+   */
+  private void countHandoff(@NotNull HandoffKind kind) {
+    meterRegistry
+        .counter(MetricNames.INGEST_HANDOFF, MetricNames.TAG_KIND, kind.name())
+        .increment();
   }
 
   /**

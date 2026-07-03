@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.task;
 
+import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
+import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.service.NotificationService;
 import java.time.Duration;
 import java.time.Instant;
@@ -47,31 +49,45 @@ import org.springframework.stereotype.Component;
 public class NotificationRetentionTask {
 
   private final NotificationService notificationService;
+  private final TaskMetrics taskMetrics;
   private final Duration maxAge;
 
   /**
    * Creates the retention task.
    *
    * @param notificationService the inbox service performing the delete
+   * @param taskMetrics the scheduled-job instrumentation wrapper
    * @param maxAge how long a read notification is retained before the sweep removes it (ISO-8601
    *     duration; default {@code P90D})
    */
   public NotificationRetentionTask(
       NotificationService notificationService,
+      TaskMetrics taskMetrics,
       @Value("${app.notifications.retention.max-age:P90D}") Duration maxAge) {
     this.notificationService = notificationService;
+    this.taskMetrics = taskMetrics;
     this.maxAge = maxAge;
   }
 
-  /** Deletes read notifications whose read timestamp is older than {@link #maxAge}. */
+  /**
+   * Deletes read notifications whose read timestamp is older than {@link #maxAge}, publishing the
+   * {@code notification_retention} job metrics. A failure is recorded and swallowed by {@link
+   * TaskMetrics} so the scheduler thread survives.
+   */
   @Scheduled(fixedDelayString = "${app.notifications.retention.interval:PT24H}")
   public void purgeExpiredReadNotifications() {
+    taskMetrics.recordCounting(ScheduledJob.NOTIFICATION_RETENTION, this::purgeExpired);
+  }
+
+  /**
+   * Performs the retention delete; any failure propagates to {@link TaskMetrics}.
+   *
+   * @return the number of notifications deleted this run (the {@code items} metric)
+   */
+  private int purgeExpired() {
     log.info("Starting scheduled notification retention sweep (max age {})...", maxAge);
-    try {
-      int deleted = notificationService.purgeReadOlderThan(Instant.now().minus(maxAge));
-      log.info("Notification retention sweep finished — {} notification(s) deleted.", deleted);
-    } catch (RuntimeException e) {
-      log.error("Notification retention sweep failed to run", e);
-    }
+    int deleted = notificationService.purgeReadOlderThan(Instant.now().minus(maxAge));
+    log.info("Notification retention sweep finished — {} notification(s) deleted.", deleted);
+    return deleted;
   }
 }

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.repository;
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestStatus;
 import jakarta.persistence.LockModeType;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -44,6 +45,25 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public interface BankBookingRequestRepository extends JpaRepository<BankBookingRequest, UUID> {
+
+  /**
+   * Counts booking requests in the given status, backing the {@code
+   * basetool_bank_booking_request_pending_*} queue-depth gauge (REQ-OBS-011).
+   *
+   * @param status the bounded request status to count (typically {@code PENDING})
+   * @return the number of requests in that status
+   */
+  long countByStatus(BankBookingRequestStatus status);
+
+  /**
+   * Finds the creation timestamp of the oldest booking request in the given status, for the "oldest
+   * pending booking request age" gauge (REQ-OBS-011).
+   *
+   * @param status the bounded request status to scan (typically {@code PENDING})
+   * @return the earliest {@code createdAt} in that status, or {@code null} when none exists
+   */
+  @Query("SELECT MIN(r.createdAt) FROM BankBookingRequest r WHERE r.status = :status")
+  Instant findOldestCreatedAtByStatus(@Param("status") BankBookingRequestStatus status);
 
   /**
    * Loads one request under a pessimistic write lock for the surrounding transaction. The decision

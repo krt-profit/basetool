@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.backend.service.scwiki;
 import de.greluc.krt.profit.basetool.backend.config.AsyncConfig;
 import de.greluc.krt.profit.basetool.backend.config.ScWikiProperties;
 import de.greluc.krt.profit.basetool.backend.integration.scwiki.ScWikiClient;
+import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
+import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.service.SyncCoordinator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -65,6 +67,7 @@ public class ScWikiScheduler {
   private final ScWikiVehicleSyncService vehicleSyncService;
   private final ScWikiManufacturerSyncService manufacturerSyncService;
   private final SyncCoordinator syncCoordinator;
+  private final TaskMetrics taskMetrics;
 
   /**
    * Periodic SC Wiki sync entry point. Runs on the {@link AsyncConfig#SCWIKI_EXECUTOR} pool so a
@@ -86,7 +89,8 @@ public class ScWikiScheduler {
       log.info("ScWikiScheduler invoked but disabled (krt.scwiki.scheduler-enabled=false) — skip.");
       return;
     }
-    syncCoordinator.runExclusively("SC Wiki", this::runAllSyncSteps);
+    syncCoordinator.runExclusively(
+        "SC Wiki", () -> taskMetrics.record(ScheduledJob.SCWIKI_SYNC, this::runAllSyncSteps));
   }
 
   /**

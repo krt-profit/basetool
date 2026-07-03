@@ -25,6 +25,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.Locale;
@@ -56,7 +57,7 @@ class GlobalExceptionHandlerNotFoundTest {
     messageSource.setDefaultEncoding("UTF-8");
     messageSource.setFallbackToSystemLocale(false);
     LocaleContextHolder.setLocale(Locale.ENGLISH);
-    handler = new GlobalExceptionHandler(props, messageSource);
+    handler = new GlobalExceptionHandler(props, messageSource, new SimpleMeterRegistry());
     request = mock(HttpServletRequest.class);
     when(request.getRequestURI()).thenReturn("/api/v1/missions/abc");
   }
