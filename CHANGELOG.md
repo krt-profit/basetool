@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **E-Mail an Administratoren bei neuer Registrierung.** Sobald eine neue Registrierung auf Freigabe wartet, erhalten jetzt alle Administratoren mit hinterlegter E-Mail-Adresse zusätzlich zur bestehenden In-App-Benachrichtigung eine E-Mail — so bemerken auch Administratoren, die gerade nicht im Tool angemeldet sind, dass eine Freigabe ansteht. Der Versand nutzt denselben wiederverwendbaren E-Mail-Kanal wie die Freigabe-/Ablehnungs-Mails und verschickt erst tatsächlich Mails, sobald ein SMTP-Server konfiguriert ist (`SPRING_MAIL_HOST`) — ohne Host bleibt er ein No-Op (REQ-NOTIF-015, ADR-0064).
+
 ## [v1.0.14](https://github.com/krt-profit/basetool/releases/tag/v1.0.14) - 2026-07-03
 
 ## [v1.0.13](https://github.com/krt-profit/basetool/releases/tag/v1.0.13) - 2026-07-03

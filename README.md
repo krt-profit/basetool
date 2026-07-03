@@ -139,10 +139,12 @@ HOST_IP=CHANGE_ME
 Compose uses `${VAR:?...}` references throughout — if any required variable
 is missing, the stack refuses to start.
 
-#### Transactional e-mail (account approval/rejection notices)
+#### Transactional e-mail (account approval/rejection + new-registration notices)
 
-The account approval/rejection e-mail (REQ-NOTIF-013/-014,
-[ADR-0064](docs/adr/0064-transactional-email-delivery-channel.md)) **ships enabled**, but sends
+The transactional e-mail channel (REQ-NOTIF-013,
+[ADR-0064](docs/adr/0064-transactional-email-delivery-channel.md)) carries two notices: the account
+approval/rejection e-mail to the decided user (REQ-NOTIF-014) and the "a new registration is awaiting
+approval" e-mail to every admin (REQ-NOTIF-015). It **ships enabled**, but sends
 nothing until you point the backend at an SMTP host — with no host it is a safe no-op, so the app is
 fully functional without SMTP. The curated Docker Compose env already forwards the variables below;
 set them in `.env` to start sending. Example for **Gmail** (needs 2-Step Verification + a 16-character

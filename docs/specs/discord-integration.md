@@ -233,7 +233,9 @@ claim, the notification fires for **every** new PENDING registration regardless 
 **or** credential). Both creation paths announce it — the interactive login (`syncUser(Jwt)`) and the
 scheduled Keycloak reconciliation (`syncUser(KeycloakUserDto)`) — each gated on `created`, so whichever
 path first materialises the row emits the event and the other stays silent: exactly one notification,
-no persisted "announced" flag, no double-fire on a scheduler-first row or a login-then-sync race.
+no persisted "announced" flag, no double-fire on a scheduler-first row or a login-then-sync race. The
+same after-commit trigger additionally e-mails every admin the same notice on a second channel
+(REQ-NOTIF-015).
 
 **Acceptance**
 
@@ -281,6 +283,51 @@ reason are **never logged** (REQ-OBS).
 (delegate + swallow) · `MessageBundleConsistencyTest` (key parity + umlaut escaping) · **Code:**
 `UserService.approveUser`/`rejectUser`, `event/UserApprovalDecidedEvent`, `service/UserApprovalMailService`,
 `service/UserApprovalMailEventListener`, `messages*.properties` (`email.*`) · **Decision:** ADR-0064 · **Issues:** #720
+
+### REQ-NOTIF-015 — Admins notified by e-mail on new PENDING registration
+
+Alongside the in-app admin notification of REQ-NOTIF-012, every admin **with an e-mail address on
+file** also receives that "a new registration is awaiting approval" notice **by e-mail** — the same
+signal on a second channel, so an admin who is not currently in the tool still learns a registration
+is waiting. It reuses the transactional e-mail channel (REQ-NOTIF-013,
+[ADR-0064](../adr/0064-transactional-email-delivery-channel.md)) as its **second consumer** after the
+account decision mail (REQ-NOTIF-014). The trigger is the **same** after-commit
+`DISCORD_REGISTRATION_PENDING` event that raises the in-app notification — fired on the PENDING
+transition itself, independent of the `discord_user_id` claim, from both the interactive
+(`syncUser(Jwt)`) and the scheduled (`syncUser(KeycloakUserDto)`) paths (each gated on `created`) — so
+the e-mail fires exactly when the in-app notification does, once per new PENDING registration
+regardless of source.
+
+Because the event carries no PII beyond the new user's display username (REQ-NOTIF-012), the mail
+service resolves the admin **recipients** itself from the DB (`UserRepository.findAllAdmins()`) and
+sends **one** localized plain-text mail per admin; admins without an address are skipped. Composition
+and delivery run after commit on the `@Async(MAIL_EXECUTOR)` pool, best-effort: a rolled-back
+registration mails nothing, and any send failure is swallowed so it never affects the registration or
+the in-app notification. Each admin is greeted by their effective name and the new registrant's
+username is interpolated into the body (a name-less variant when the event carried none); the mail is
+localized in the configured default locale (`app.mail.default-locale`). Recipient addresses, names
+and the username are **never logged** (REQ-OBS) — only the recipient count.
+
+**Acceptance**
+
+- [x] A new PENDING registration sends one pending-registration mail per admin with an e-mail on
+  file, resolved via `UserRepository.findAllAdmins()`; admins without an address are skipped, and with
+  no mailable admin nothing is sent (`PendingRegistrationMailServiceTest`).
+- [x] The mail carries the pending-registration subject and a body containing the new registrant's
+  username, or the name-less body variant when the event carried no username
+  (`PendingRegistrationMailServiceTest`).
+- [x] Composition/sending runs off-thread after commit on `MAIL_EXECUTOR`; the after-commit listener
+  swallows any mail failure so the committed registration is never affected
+  (`PendingRegistrationMailEventListenerTest`).
+- [x] The `email.pendingRegistration.*` subject/body/bodyNoName keys exist in all three backend
+  bundles (default/de/en, umlauts `\uXXXX`-escaped) (`MessageBundleConsistencyTest`).
+
+**Enforced by:** `PendingRegistrationMailServiceTest` (per-admin composition, skip-on-no-email,
+name-less body, empty-admins no-op) · `PendingRegistrationMailEventListenerTest` (delegate + swallow) ·
+`MessageBundleConsistencyTest` (key parity + umlaut escaping) · **Code:**
+`service/PendingRegistrationMailService`, `service/PendingRegistrationMailEventListener`,
+`event/DiscordRegistrationPendingEvent`, `repository/UserRepository#findAllAdmins`,
+`messages*.properties` (`email.pendingRegistration.*`) · **Decision:** ADR-0064 · **Issues:** #720
 
 ### REQ-DATA-008 — Discord guild nickname captured at login & shown at approval (admin-only)
 
