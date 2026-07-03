@@ -65,4 +65,17 @@ class MissionCreatePageTest {
         .andExpect(content().string(not(containsString("name=\"actualStartTime\""))))
         .andExpect(content().string(not(containsString("name=\"actualEndTime\""))));
   }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void testCreateMissionPage_ShouldRenderDetailsCardFullWidth() throws Exception {
+    // On the create page the Verwaltung grid's right column carries only edit-only editors
+    // (th:if="${!isNew}"), so it collapses to a single full-width column and the empty right
+    // column is not rendered — the Details card spans the full page width (REQ-MISSION-015).
+    mockMvc
+        .perform(get("/missions/new"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("pane-grid-2 pane-grid--single")))
+        .andExpect(content().string(not(containsString("class=\"pane-col\""))));
+  }
 }
