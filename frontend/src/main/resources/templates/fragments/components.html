@@ -70,6 +70,25 @@
         th:text="#{${filterHintKey}}">Filter aktiv.</span>
 </th:block>
 
+<!-- Bank account-name live filter (REQ-BANK-046) — the search box duplicated on the bank dashboard
+     and the org-unit bank. `inputId` is the input's id/label target; `filterScope` is the CSS
+     selector bank.js scopes the name filter to; `filterEmpty` is the selector of the "no matches"
+     empty-state it toggles. Reuses the shared bank.filter.* i18n keys. The caller keeps any
+     surrounding th:if / wrapper (this fragment renders the box itself, unconditionally). -->
+<div th:fragment="bankAccSearch(inputId, filterScope, filterEmpty)" class="bank-acc-search">
+  <label th:for="${inputId}" class="visually-hidden" th:text="#{bank.filter.label}"
+    >Konten nach Namen filtern</label
+  >
+  <svg class="krt-icon bank-acc-search-icon" aria-hidden="true"><use href="#krt-icon-search" /></svg>
+  <input
+    type="search"
+    th:id="${inputId}"
+    class="bank-acc-search-input"
+    autocomplete="off"
+    data-bank-acc-filter
+    th:attr="data-filter-scope=${filterScope},data-filter-empty=${filterEmpty},placeholder=#{bank.filter.placeholder},aria-label=#{bank.filter.label}" />
+</div>
+
 <!-- Data table — responsive-wrapped, uppercase orange head-rule, zebra rows. -->
 <div th:fragment="dataTable(head, body)" class="table-responsive">
     <table class="krt-table">

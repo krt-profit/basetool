@@ -39,15 +39,12 @@
              sees at least one card (bank employees included), so it is NOT under the management gate;
              the Verwaltung/Berechtigungen/Report buttons stay bank-management only. -->
         <div class="bank-head-actions">
-            <div class="bank-acc-search" th:if="${!#lists.isEmpty(cards)}">
-                <label for="bank-acc-filter" class="visually-hidden"
-                       th:text="#{bank.filter.label}">Konten nach Namen filtern</label>
-                <svg class="krt-icon bank-acc-search-icon" aria-hidden="true"><use href="#krt-icon-search"/></svg>
-                <input type="search" id="bank-acc-filter" class="bank-acc-search-input" autocomplete="off"
-                       data-bank-acc-filter data-filter-scope=".bank-acc-grid"
-                       data-filter-empty="#bank-acc-filter-empty"
-                       th:attr="placeholder=#{bank.filter.placeholder},aria-label=#{bank.filter.label}">
-            </div>
+            <!-- The account-name filter renders only when there are accounts; the th:if must sit on
+                 an outer th:block because th:replace (precedence 100) would otherwise run before the
+                 host's own th:if (300) and always emit the fragment (#906 Q14). -->
+            <th:block th:if="${!#lists.isEmpty(cards)}">
+                <th:block th:replace="~{fragments/components :: bankAccSearch('bank-acc-filter', '.bank-acc-grid', '#bank-acc-filter-empty')}"></th:block>
+            </th:block>
             <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)">
                 <a th:href="@{/bank/manage}" class="btn btn-ghost" data-testid="bank-manage-link">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-gear"/></svg>
