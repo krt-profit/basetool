@@ -47,6 +47,20 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class UserProxyController {
 
+  /**
+   * Response type for the paged user-autocomplete search ({@code /api/v1/users/search}), whose raw
+   * JSON rows are decoded as maps.
+   */
+  private static final ParameterizedTypeReference<PageResponse<Map<String, Object>>>
+      USER_SEARCH_PAGE = new ParameterizedTypeReference<>() {};
+
+  /**
+   * Response type for the per-user org-unit membership lookup ({@code
+   * /api/v1/users/{userId}/memberships}), whose raw option rows are decoded as maps.
+   */
+  private static final ParameterizedTypeReference<List<Map<String, Object>>>
+      MEMBERSHIP_OPTION_LIST = new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -68,9 +82,7 @@ public class UserProxyController {
             .queryParam("size", 1000)
             .queryParam("sort", "username,asc")
             .toUriString();
-    PageResponse<Map<String, Object>> response =
-        backendApiClient.get(
-            uri, new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {});
+    PageResponse<Map<String, Object>> response = backendApiClient.get(uri, USER_SEARCH_PAGE);
     return response != null && response.content() != null ? response.content() : List.of();
   }
 
@@ -98,8 +110,7 @@ public class UserProxyController {
                 "/api/v1/users/" + userId + "/memberships")
             .queryParam("allKinds", allKinds)
             .toUriString();
-    List<Map<String, Object>> memberships =
-        backendApiClient.get(uri, new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+    List<Map<String, Object>> memberships = backendApiClient.get(uri, MEMBERSHIP_OPTION_LIST);
     return memberships != null ? memberships : List.of();
   }
 }

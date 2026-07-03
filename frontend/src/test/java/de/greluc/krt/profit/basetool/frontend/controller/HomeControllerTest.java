@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import jakarta.servlet.http.HttpSession;
 import java.util.Collections;
 import org.junit.jupiter.api.Test;
@@ -36,7 +37,8 @@ class HomeControllerTest {
   void home_ShouldUsePreferredUsername_InsteadOfFullName() {
     // Arrange
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    HomeController controller = new HomeController(backendApiClient);
+    HomeController controller =
+        new HomeController(backendApiClient, mock(FrontendAuthHelperService.class));
     Model model = new ConcurrentModel();
     HttpSession session = mock(HttpSession.class);
     OidcUser user = mock(OidcUser.class);
@@ -63,7 +65,8 @@ class HomeControllerTest {
     // Arrange — the in-place twin (epic #571) marks the announcement read and answers 200 so the
     // home page removes the control without reloading.
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    HomeController controller = new HomeController(backendApiClient);
+    HomeController controller =
+        new HomeController(backendApiClient, mock(FrontendAuthHelperService.class));
 
     // Act
     var response = controller.markAnnouncementAsReadAjax("ann-1");
@@ -78,7 +81,8 @@ class HomeControllerTest {
     // Arrange — a failed mark-as-read must never break the page; the twin swallows the error and
     // answers 502 so the client simply leaves the control in place.
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    HomeController controller = new HomeController(backendApiClient);
+    HomeController controller =
+        new HomeController(backendApiClient, mock(FrontendAuthHelperService.class));
     doThrow(new RuntimeException("backend down"))
         .when(backendApiClient)
         .put(anyString(), any(), any());

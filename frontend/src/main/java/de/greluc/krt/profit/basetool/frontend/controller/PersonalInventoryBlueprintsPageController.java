@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintRecipeD
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.support.StringNormalization;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -87,6 +88,27 @@ public class PersonalInventoryBlueprintsPageController {
    */
   private static final int MAX_PAGES = 200;
 
+  /**
+   * Response type for the product type-ahead search ({@code /api/v1/blueprints/products/search})
+   * backing the multi-select add bar.
+   */
+  private static final ParameterizedTypeReference<List<BlueprintProductDto>>
+      BLUEPRINT_PRODUCT_LIST = new ParameterizedTypeReference<>() {};
+
+  /**
+   * Response type for the per-blueprint craftability annotation ({@code
+   * /api/v1/personal-blueprints/craftability}, #781).
+   */
+  private static final ParameterizedTypeReference<List<BlueprintCraftabilityDto>>
+      BLUEPRINT_CRAFTABILITY_LIST = new ParameterizedTypeReference<>() {};
+
+  /**
+   * Response type for one page of the caller's owned blueprints ({@code
+   * /api/v1/personal-blueprints}).
+   */
+  private static final ParameterizedTypeReference<PageResponse<PersonalBlueprintDto>>
+      PERSONAL_BLUEPRINT_PAGE = new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -135,8 +157,7 @@ public class PersonalInventoryBlueprintsPageController {
               + URLEncoder.encode(query, StandardCharsets.UTF_8)
               + "&limit="
               + effectiveLimit;
-      List<BlueprintProductDto> result =
-          backendApiClient.get(uri, new ParameterizedTypeReference<>() {});
+      List<BlueprintProductDto> result = backendApiClient.get(uri, BLUEPRINT_PRODUCT_LIST);
       return result == null ? Collections.emptyList() : result;
     } catch (Exception e) {
       log.warn("Blueprint product type-ahead failed for query='{}': {}", q, e.getMessage());
@@ -187,7 +208,7 @@ public class PersonalInventoryBlueprintsPageController {
       List<BlueprintCraftabilityDto> result =
           backendApiClient.get(
               "/api/v1/personal-blueprints/craftability?includeRefinery=" + includeRefinery,
-              new ParameterizedTypeReference<>() {});
+              BLUEPRINT_CRAFTABILITY_LIST);
       return result == null ? Collections.emptyList() : result;
     } catch (Exception e) {
       log.warn("Failed to fetch blueprint craftability: {}", e.getMessage());
@@ -257,7 +278,7 @@ public class PersonalInventoryBlueprintsPageController {
       backendApiClient.put(
           "/api/v1/personal-blueprints/" + id,
           new PersonalBlueprintUpdateRequest(
-              parseInstantOrNull(acquiredAt), emptyToNull(note), version),
+              parseInstantOrNull(acquiredAt), StringNormalization.blankToNull(note), version),
           PersonalBlueprintDto.class);
       redirectAttributes.addFlashAttribute(
           "successToast", "personalInventory.blueprints.toast.noteUpdated");
@@ -339,7 +360,9 @@ public class PersonalInventoryBlueprintsPageController {
           backendApiClient.put(
               "/api/v1/personal-blueprints/" + id,
               new PersonalBlueprintUpdateRequest(
-                  request.acquiredAt(), emptyToNull(request.note()), request.version()),
+                  request.acquiredAt(),
+                  StringNormalization.blankToNull(request.note()),
+                  request.version()),
               PersonalBlueprintDto.class);
       return ResponseEntity.ok(dto);
     } catch (BackendServiceException e) {
@@ -457,7 +480,7 @@ public class PersonalInventoryBlueprintsPageController {
     if (q != null && !q.isBlank()) {
       uri.append("&q=").append(URLEncoder.encode(q, StandardCharsets.UTF_8));
     }
-    return backendApiClient.get(uri.toString(), new ParameterizedTypeReference<>() {});
+    return backendApiClient.get(uri.toString(), PERSONAL_BLUEPRINT_PAGE);
   }
 
   /**
@@ -477,16 +500,6 @@ public class PersonalInventoryBlueprintsPageController {
       log.debug("Ignoring unparseable acquiredAt '{}'", iso);
       return null;
     }
-  }
-
-  /**
-   * Collapses a blank string to {@code null} so an empty note clears rather than stores whitespace.
-   *
-   * @param value the raw value
-   * @return the trimmed value, or {@code null} if blank
-   */
-  private static String emptyToNull(String value) {
-    return (value == null || value.isBlank()) ? null : value;
   }
 
   /**

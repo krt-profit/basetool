@@ -47,6 +47,14 @@ import org.springframework.web.util.UriComponentsBuilder;
 @RequiredArgsConstructor
 public class MaterialProxyController {
 
+  /**
+   * Response type for the raw-JSON list payloads this proxy forwards ({@code terminals} and {@code
+   * profit-calculation}). A shared static {@link ParameterizedTypeReference} is behaviourally
+   * identical to a fresh anonymous instance per call (Q10).
+   */
+  private static final ParameterizedTypeReference<List<Map<String, Object>>> MAP_LIST_TYPE =
+      new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -61,9 +69,7 @@ public class MaterialProxyController {
   @PreAuthorize("isAuthenticated()")
   public List<Map<String, Object>> getMaterialTerminals(@PathVariable UUID id) {
     List<Map<String, Object>> response =
-        backendApiClient.get(
-            "/api/v1/materials/" + id + "/terminals",
-            new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+        backendApiClient.get("/api/v1/materials/" + id + "/terminals", MAP_LIST_TYPE);
     return response != null ? response : List.of();
   }
 
@@ -96,9 +102,7 @@ public class MaterialProxyController {
     }
 
     List<Map<String, Object>> response =
-        backendApiClient.get(
-            builder.build().toUriString(),
-            new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+        backendApiClient.get(builder.build().toUriString(), MAP_LIST_TYPE);
     return response != null ? response : List.of();
   }
 }

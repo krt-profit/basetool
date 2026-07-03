@@ -57,6 +57,10 @@ import org.springframework.web.socket.server.HandshakeInterceptor;
 @RequiredArgsConstructor
 public class MissionPresenceHandshakeAuthInterceptor implements HandshakeInterceptor {
 
+  /** Response type for the authenticated {@code /api/v1/missions/{id}} access-probe read. */
+  private static final ParameterizedTypeReference<MissionDto> MISSION_TYPE =
+      new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -84,8 +88,7 @@ public class MissionPresenceHandshakeAuthInterceptor implements HandshakeInterce
     try {
       // Same authenticated read the mission-detail page performs; success means this user may see
       // the mission, so they may join its presence room.
-      backendApiClient.get(
-          "/api/v1/missions/{id}", new ParameterizedTypeReference<MissionDto>() {}, missionId);
+      backendApiClient.get("/api/v1/missions/{id}", MISSION_TYPE, missionId);
       return true;
     } catch (BackendServiceException e) {
       int status = e.getStatusCode();

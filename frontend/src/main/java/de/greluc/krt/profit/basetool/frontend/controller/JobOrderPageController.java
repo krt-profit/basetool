@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.JobOrderHandoverForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemHandoverForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.servlet.http.Cookie;
@@ -91,6 +92,7 @@ public class JobOrderPageController {
   private final BackendApiClient backendApiClient;
   private final RoleHierarchy roleHierarchy;
   private final ParallelPageLoader parallelPageLoader;
+  private final FrontendAuthHelperService authHelper;
 
   private static final List<String> VALID_STATUSES =
       List.of("OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED");
@@ -590,7 +592,7 @@ public class JobOrderPageController {
     // Anonymous guests have no org-unit context; default the responsible (processing) picker to the
     // configured intake Spezialkommando — the unit the backend routes a guest order to absent a
     // profit-eligible pick — so the form shows it up front. Authenticated callers pick their own.
-    if (principal == null) {
+    if (authHelper.isAnonymous()) {
       preselectIntakeForGuest(model);
     }
     return "orders-create";

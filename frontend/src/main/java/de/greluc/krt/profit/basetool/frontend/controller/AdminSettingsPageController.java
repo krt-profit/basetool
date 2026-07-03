@@ -93,6 +93,14 @@ public class AdminSettingsPageController {
    */
   private static final BigDecimal DEFAULT_TRANSFER_FEE_PERCENT = new BigDecimal("0.5");
 
+  /** Response type for the Spezialkommando list backing the intake-SK dropdown. */
+  private static final ParameterizedTypeReference<PageResponse<SpecialCommandDto>>
+      SPECIAL_COMMAND_PAGE_TYPE = new ParameterizedTypeReference<>() {};
+
+  /** Response type for the active-squadron list backing the promotion-toggle section. */
+  private static final ParameterizedTypeReference<PageResponse<SquadronDto>> SQUADRON_PAGE_TYPE =
+      new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
   private final MessageSource messageSource;
 
@@ -199,8 +207,7 @@ public class AdminSettingsPageController {
     try {
       PageResponse<SpecialCommandDto> page =
           backendApiClient.get(
-              "/api/v1/special-commands?size=1000&sort=name,asc",
-              new ParameterizedTypeReference<PageResponse<SpecialCommandDto>>() {});
+              "/api/v1/special-commands?size=1000&sort=name,asc", SPECIAL_COMMAND_PAGE_TYPE);
       if (page == null || page.content() == null) {
         return List.of();
       }
@@ -227,9 +234,7 @@ public class AdminSettingsPageController {
   private List<SquadronDto> fetchSquadronsForPromotionToggle() {
     try {
       PageResponse<SquadronDto> page =
-          backendApiClient.get(
-              "/api/v1/squadrons?size=1000&sort=name,asc",
-              new ParameterizedTypeReference<PageResponse<SquadronDto>>() {});
+          backendApiClient.get("/api/v1/squadrons?size=1000&sort=name,asc", SQUADRON_PAGE_TYPE);
       if (page == null || page.content() == null) {
         return List.of();
       }

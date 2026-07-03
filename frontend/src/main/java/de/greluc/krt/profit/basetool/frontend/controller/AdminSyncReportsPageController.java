@@ -58,6 +58,10 @@ public class AdminSyncReportsPageController {
 
   private static final int PAGE_SIZE = 100;
 
+  /** Response type for the paged {@code /sync-reports} listing. */
+  private static final ParameterizedTypeReference<PageResponse<SyncReportDto>>
+      SYNC_REPORT_PAGE_TYPE = new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -224,9 +228,7 @@ public class AdminSyncReportsPageController {
       uri += "&source=" + source;
     }
     try {
-      PageResponse<SyncReportDto> events =
-          backendApiClient.get(
-              uri, new ParameterizedTypeReference<PageResponse<SyncReportDto>>() {});
+      PageResponse<SyncReportDto> events = backendApiClient.get(uri, SYNC_REPORT_PAGE_TYPE);
       if (events != null) {
         model.addAttribute("events", events.content() == null ? List.of() : events.content());
         model.addAttribute("currentPage", events.page());

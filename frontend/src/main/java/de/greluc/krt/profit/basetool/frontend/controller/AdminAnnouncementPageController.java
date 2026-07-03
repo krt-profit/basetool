@@ -59,6 +59,10 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminAnnouncementPageController {
 
+  /** Response type for the raw admin-view announcement record ({@code Map<String, Object>}). */
+  private static final ParameterizedTypeReference<Map<String, Object>> STRING_OBJECT_MAP_TYPE =
+      new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -72,9 +76,7 @@ public class AdminAnnouncementPageController {
   public String showAnnouncementPage(Model model) {
     try {
       Map<String, Object> adminAnnouncement =
-          backendApiClient.get(
-              "/api/v1/announcement/admin",
-              new ParameterizedTypeReference<Map<String, Object>>() {});
+          backendApiClient.get("/api/v1/announcement/admin", STRING_OBJECT_MAP_TYPE);
       model.addAttribute("adminAnnouncement", adminAnnouncement);
     } catch (Exception e) {
       log.error("Could not fetch admin announcement", e);
@@ -151,9 +153,7 @@ public class AdminAnnouncementPageController {
       backendApiClient.put("/api/v1/announcement", body, Void.class);
 
       Map<String, Object> updated =
-          backendApiClient.get(
-              "/api/v1/announcement/admin",
-              new ParameterizedTypeReference<Map<String, Object>>() {});
+          backendApiClient.get("/api/v1/announcement/admin", STRING_OBJECT_MAP_TYPE);
       Map<String, Object> result = new LinkedHashMap<>();
       result.put("version", updated != null ? updated.get("version") : null);
       return ResponseEntity.ok(result);
