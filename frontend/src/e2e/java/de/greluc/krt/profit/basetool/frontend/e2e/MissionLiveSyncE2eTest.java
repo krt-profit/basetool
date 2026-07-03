@@ -167,4 +167,73 @@ class MissionLiveSyncE2eTest {
       }
     }
   }
+
+  /**
+   * Same two-context setup, but for the Ziele objectives editor: context A adds an objective on the
+   * Verwaltung tab; context B — a passive viewer that never reloads — must gain the new objective
+   * row in its (backgrounded) editor IN PLACE. This pins the {@code objectives} section key across
+   * the full path (broadcast → relay whitelist → receiver container map): the key was once dropped
+   * at the relay AND missing from the receiver, so peers' Ziele stayed stale until a manual reload
+   * (REQ-FE-010).
+   */
+  @Test
+  void objectiveAddByOneViewerPropagatesToAnotherViewerLive() {
+    String baseUrl = STACK.baseUrl();
+    Path storageState = E2eSupport.authenticatedStorageState(browser, baseUrl, USERNAME, PASSWORD);
+    try (BrowserContext contextA =
+            browser.newContext(
+                new Browser.NewContextOptions()
+                    .setIgnoreHTTPSErrors(true)
+                    .setStorageStatePath(storageState));
+        BrowserContext contextB =
+            browser.newContext(
+                new Browser.NewContextOptions()
+                    .setIgnoreHTTPSErrors(true)
+                    .setStorageStatePath(storageState))) {
+      Page pageA = contextA.newPage();
+      Page pageB = contextB.newPage();
+      try {
+        // A lands on the Verwaltung tab (deeplink) where the objectives editor is interactable;
+        // B stays on the default tab — its objectives container is in the DOM but backgrounded,
+        // which is exactly the state the live-sync swap must still reach.
+        E2eSupport.navigate(pageA, baseUrl + "/missions/" + missionId + "?tab=verw");
+        pageA.waitForLoadState();
+        E2eSupport.navigate(pageB, baseUrl + "/missions/" + missionId);
+        pageB.waitForLoadState();
+
+        int before = pageB.locator("#mission-objective-list .ae-row").count();
+
+        // A full reload on B would clear this marker; the live in-place swap leaves it intact.
+        pageB.evaluate("window.__krtNoReload = true;");
+
+        // Same deterministic handshake wait as the participant test: an OPEN socket implies B is
+        // registered with the relay, so A's change frame cannot race past it.
+        pageB.waitForCondition(
+            () ->
+                Boolean.TRUE.equals(
+                    pageB.evaluate(
+                        "!!(window.missionPresence && window.missionPresence.socket"
+                            + " && window.missionPresence.socket.readyState === 1)")));
+
+        // Context A adds an objective (created with the localized default title + PRIMARY kind).
+        pageA.locator("#mission-objective-add").click();
+        // A's own editor re-renders in place (sanity: the mutation succeeded).
+        assertThat(pageA.locator("#mission-objective-list .ae-row"))
+            .hasCount(before + 1, new LocatorAssertions.HasCountOptions().setTimeout(20_000));
+
+        // The assertion under test: context B — which did nothing — gains the new objective row,
+        // pushed over the presence WebSocket and applied as an in-place objectives swap.
+        assertThat(pageB.locator("#mission-objective-list .ae-row"))
+            .hasCount(before + 1, new LocatorAssertions.HasCountOptions().setTimeout(20_000));
+        assertEquals(
+            Boolean.TRUE,
+            pageB.evaluate("window.__krtNoReload === true"),
+            "the live update on the second viewer must be an in-place swap — no full-page reload");
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(pageA, "mission-livesync-objectives-a");
+        E2eSupport.dump(pageB, "mission-livesync-objectives-b");
+        throw failure;
+      }
+    }
+  }
 }

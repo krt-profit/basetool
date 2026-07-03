@@ -92,10 +92,14 @@ public class MissionPresenceWebSocketHandler extends TextWebSocketHandler {
   /**
    * Section keys the {@code changed} relay accepts and re-broadcasts. Anything else in an inbound
    * {@code sections} array is dropped, so a client can never make peers re-fetch an arbitrary URL —
-   * the keys map one-to-one onto the in-place fragment swaps wired in {@code mission-detail.html}.
+   * the keys mirror the {@code MISSION_SECTIONS} seam map in {@code mission-detail.js}, which
+   * drives both the acting client's broadcast and the peers' live-sync receiver. A key present
+   * there but missing here is silently dropped at the relay and the peers' section stays stale
+   * until a manual reload (this happened to steps/objectives/frequencies once) — keep the two in
+   * sync whenever a mission section is added.
    */
   private static final Set<String> BROADCASTABLE_SECTIONS =
-      Set.of("crew", "finance", "mgmt", "overview");
+      Set.of("crew", "finance", "mgmt", "overview", "steps", "objectives", "frequencies");
 
   /** Hard cap on the number of section keys relayed per {@code changed} frame (abuse guard). */
   private static final int MAX_CHANGED_SECTIONS = 8;

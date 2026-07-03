@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyClass;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
@@ -45,6 +46,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -553,7 +555,27 @@ class MissionPageControllerMvcTest {
         // Regression guard: the edit modal must re-sync the datetime-split widget
         // after programmatically setting the hidden value (otherwise the visible
         // date/time inputs stay empty even though startTime/endTime are present).
-        .andExpect(content().string(containsString("krtSyncDatetimeSplitGroup")));
+        // Since #924 the sync call lives in the static page module, so the page must
+        // load it and the module must still carry the call.
+        .andExpect(content().string(containsString("src=\"/js/mission-detail.js\"")));
+    assertThat(missionDetailModuleSource()).contains("krtSyncDatetimeSplitGroup");
+  }
+
+  /**
+   * Reads the mission-detail page module ({@code static/js/mission-detail.js}) from the classpath.
+   * The #924 extraction moved the page's inline JavaScript there, so script-content regression
+   * guards now assert against the module source while the MockMvc render is only expected to carry
+   * the module's loader tag.
+   *
+   * @return the full UTF-8 source of the mission-detail page module
+   * @throws IOException if the classpath resource cannot be read (build misconfiguration)
+   */
+  private static String missionDetailModuleSource() throws IOException {
+    try (var in =
+        new org.springframework.core.io.ClassPathResource("static/js/mission-detail.js")
+            .getInputStream()) {
+      return new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+    }
   }
 
   @Test
@@ -642,8 +664,11 @@ class MissionPageControllerMvcTest {
         // Pre-JS fallback is explicitly UTC-labelled (never an unlabelled, misleading local-looking
         // string).
         .andExpect(content().string(containsString("10.02.2026 11:00 UTC")))
-        // The conversion script must be present so the value becomes browser-local on load.
-        .andExpect(content().string(containsString("krtFormatLocalDateTime")));
+        // The conversion script must ship so the value becomes browser-local on load. Since #924
+        // it lives in the static page module, so the page must load the module and the module
+        // must still carry the converter.
+        .andExpect(content().string(containsString("src=\"/js/mission-detail.js\"")));
+    assertThat(missionDetailModuleSource()).contains("krtFormatLocalDateTime");
   }
 
   @Test

@@ -246,6 +246,30 @@ class MissionPresenceWebSocketHandlerTest {
   }
 
   @Test
+  void changedSignal_relaysEverySectionOfTheMissionSeamMap() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    FakeSession alice = openSession(missionId, oidcUser("user-1", "Alice"));
+    FakeSession bob = openSession(missionId, oidcUser("user-2", "Bob"));
+    bob.sent.clear();
+
+    // Every key of the MISSION_SECTIONS seam map in mission-detail.js must pass the relay
+    // whitelist — steps/objectives/frequencies were once dropped here, leaving peers' Verwaltung
+    // editors stale until a manual reload (REQ-FE-010).
+    handler.handleTextMessage(
+        alice,
+        new TextMessage(
+            "{\"type\":\"changed\",\"sections\":[\"crew\",\"finance\",\"mgmt\",\"overview\","
+                + "\"steps\",\"objectives\",\"frequencies\"]}"));
+
+    JsonNode relayed = lastBroadcast(bob);
+    List<String> sections = new ArrayList<>();
+    relayed.get("sections").forEach(node -> sections.add(node.asString()));
+    assertThat(sections)
+        .containsExactly(
+            "crew", "finance", "mgmt", "overview", "steps", "objectives", "frequencies");
+  }
+
+  @Test
   void changedSignal_withNoValidSections_relaysNothing() throws Exception {
     UUID missionId = UUID.randomUUID();
     FakeSession alice = openSession(missionId, oidcUser("user-1", "Alice"));
