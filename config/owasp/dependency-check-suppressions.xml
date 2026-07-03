@@ -54,6 +54,104 @@
   </suppress>
 
   <!--
+    The io.opentelemetry.semconv jars (opentelemetry-semconv /
+    opentelemetry-semconv-incubating, pulled by the Boot 4 OpenTelemetry
+    starter and by the Keycloak server SPI compile classpath) contain only
+    generated semantic-convention CONSTANTS - no network, parsing or
+    process-spawning code. The NVD matcher maps them onto the umbrella CPE
+    `cpe:2.3:a:opentelemetry:opentelemetry`, which aggregates the whole
+    OpenTelemetry product family across languages; every CVE filed against
+    the *Go* SDK whose version range happens to contain 1.37/1.41 then
+    lights up these Java jars. Concretely flagged in week 2026-W27:
+    CVE-2026-29181 (Go baggage-header DoS, fixed in otel-go 1.41.0),
+    CVE-2026-24051 and CVE-2026-39883 (Go macOS/BSD PATH-hijack in
+    host-resource detection, fixed in otel-go 1.40.0/1.43.0). Suppressing
+    the CPE mapping itself (not individual CVEs) is the documented
+    dependency-check remedy for CPE confusion and keeps every future
+    Go/Collector CVE from re-triggering this false positive. Real CVEs
+    against the io.opentelemetry *Java* artifacts use distinct CPEs and
+    remain visible.
+  -->
+  <suppress>
+    <notes>False positive: CPE confusion. The opentelemetry-semconv Java jars are constants-only; the umbrella cpe:/a:opentelemetry:opentelemetry attributes OpenTelemetry-Go SDK CVEs (CVE-2026-29181, CVE-2026-24051, CVE-2026-39883) to them by pure version-number overlap.</notes>
+    <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.semconv/opentelemetry-semconv.*@.*$</packageUrl>
+    <cpe>cpe:/a:opentelemetry:opentelemetry</cpe>
+  </suppress>
+
+  <!--
+    Belt-and-braces companion to the CPE suppression above: the same five
+    OpenTelemetry-GO SDK CVEs pinned by id, in case a future
+    dependency-check version changes how partial-CPE matching works. All
+    five are Go-SDK-only (baggage-header DoS and macOS/BSD PATH-hijack in
+    host-resource detection - see the notes above); none has any Java
+    counterpart. CVE-2026-39882 and CVE-2026-41178 sit below the 7.0 gate
+    but would still spam the weekly SARIF upload.
+  -->
+  <suppress>
+    <notes>False positive: CPE confusion (companion to the CPE-level entry). CVE-2026-29181, CVE-2026-24051, CVE-2026-39883, CVE-2026-39882 and CVE-2026-41178 are OpenTelemetry-Go SDK vulnerabilities attributed to the constants-only Java semconv jars.</notes>
+    <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.semconv/opentelemetry-semconv.*@.*$</packageUrl>
+    <cve>CVE-2026-29181</cve>
+    <cve>CVE-2026-24051</cve>
+    <cve>CVE-2026-39883</cve>
+    <cve>CVE-2026-39882</cve>
+    <cve>CVE-2026-41178</cve>
+  </suppress>
+
+  <!--
+    CVE-2026-53914 is an unsafe-deserialization bug in the Kotlin BUILD
+    TOOLCHAIN (< 2.4.20): malicious build-cache metadata can execute code
+    during compilation. JetBrains' own CNA vector is local/high-privilege
+    (CVSS 6.7); the NVD auto-score of 9.8 CRITICAL is what trips our gate.
+    The artifact we actually ship is the RUNTIME kotlin-stdlib jar
+    (transitive via okhttp/okio, the OTLP exporter's HTTP sender) which
+    contains no build-cache handling code, and basetool compiles zero
+    Kotlin sources - the vulnerable toolchain path cannot be reached.
+    CVE-scoped (not CPE-scoped) on purpose: a future CVE against the
+    stdlib itself must still fail the build.
+  -->
+  <suppress>
+    <notes>False positive: CVE-2026-53914 targets the Kotlin build toolchain's build-cache metadata deserialization, not the runtime kotlin-stdlib jar we ship transitively via okhttp/okio; this project compiles no Kotlin sources.</notes>
+    <packageUrl regex="true">^pkg:maven/org\.jetbrains\.kotlin/kotlin-stdlib@.*$</packageUrl>
+    <cve>CVE-2026-53914</cve>
+  </suppress>
+
+  <!--
+    CVE-2026-42582 is an allocation-DoS in the QPACK decoder of
+    netty-codec-http3 4.2.0.Alpha1 - 4.2.12 (fixed 4.2.13.Final). The
+    netty 4.1.x line does not contain the HTTP/3 codec at all - it lives
+    in the 4.2+ line - so ANY 4.1.x jar is outside the affected range;
+    the broad cpe:2.3:a:netty:netty match flags them anyway. Our 4.1.135
+    jars additionally sit only on the keycloak-spi compile classpath
+    (Keycloak server internals, container-provided at runtime); the app
+    modules resolve netty 4.2.15.Final, which is above the fixed version.
+  -->
+  <suppress>
+    <notes>False positive: CPE confusion. CVE-2026-42582 affects netty-codec-http3 in the 4.2.0-4.2.12 range; the netty 4.1.x line ships no HTTP/3 codec, and these jars are Keycloak-container-provided compile-time deps anyway.</notes>
+    <packageUrl regex="true">^pkg:maven/io\.netty/netty\-.*@4\.1\..*$</packageUrl>
+    <cve>CVE-2026-42582</cve>
+  </suppress>
+
+  <!--
+    CVE-2024-7254 (unbounded recursion -> StackOverflowError when parsing
+    untrusted nested groups, fixed in protobuf-java 3.25.5) is a REAL
+    protobuf-java CVE - but protobuf-java 3.25.1 exists exclusively on the
+    keycloak-spi module's compileOnly classpath, dragged in by the Keycloak
+    server artifacts (Infinispan/protostream) the SPI compiles against.
+    Verified via `dependencyInsight`: no basetool runtime classpath
+    (backend/frontend/ingest/keycloak-spi runtime) contains protobuf-java
+    in any version. At runtime the SPI runs inside the Keycloak container,
+    which supplies its own (Red Hat-patched) protobuf; upgrading the pin in
+    our build would change nothing that ships. Version-pinned to 3.25.1 so
+    a vulnerable protobuf appearing on a REAL classpath later still fails
+    the build.
+  -->
+  <suppress>
+    <notes>Build-time-only: protobuf-java 3.25.1 is a compileOnly transitive of the Keycloak server artifacts the keycloak-spi module compiles against; it is container-provided at runtime and absent from every basetool runtime classpath, so the CVE-2024-7254 parsing path never ships.</notes>
+    <packageUrl regex="true">^pkg:maven/com\.google\.protobuf/protobuf-java@3\.25\.1$</packageUrl>
+    <cve>CVE-2024-7254</cve>
+  </suppress>
+
+  <!--
     plexus-utils 3.3.0 is pulled in transitively by Checkstyle 13.4.2 via
     `org.apache.maven.doxia:doxia-core`/`doxia-module-xdoc` (Checkstyle's
     Javadoc/site-rendering helper), which is exclusively on the

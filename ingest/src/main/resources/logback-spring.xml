@@ -1,16 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Logging for the ingest gateway. Plain console in dev/test; structured JSON (LogstashEncoder) in
-  prod so the correlation id and other MDC fields are queryable. NEVER log tokens, names or emails
-  (REQ-OBS-*): the application code only ever logs the draft kind and the correlation id.
+  Logging for the ingest gateway. Plain console in dev/test; structured JSON in prod so the
+  correlation id and other MDC fields are queryable. NEVER log tokens, names or emails
+  (REQ-OBS-004): the application code only ever logs the draft kind and the correlation id, and the
+  PiiMaskingLogstashEncoder (mirroring backend/frontend) scrubs JWTs / e-mails / token keywords as
+  a safety net — a prerequisite for shipping this stream to Loki (epic #936, REQ-OBS-007).
 -->
 <configuration>
   <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
 
   <springProfile name="prod">
     <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
-      <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+      <encoder class="de.greluc.krt.profit.basetool.ingest.logging.PiiMaskingLogstashEncoder">
         <includeMdcKeyName>correlationId</includeMdcKeyName>
+        <!-- REQ-OBS-009 (epic #936 Phase 1b): trace correlation fields for the Grafana
+             logs<->traces links. Meaningful only while tracing is
+             enabled (MONITORING_TRACING_ENABLED=true); while disabled, at most dangling
+             bridge-fallback ids appear (see REQ-OBS-009). Absent keys are simply omitted. The correlationId
+             system above is untouched (REQ-OBS-001/-002). -->
+        <includeMdcKeyName>traceId</includeMdcKeyName>
+        <includeMdcKeyName>spanId</includeMdcKeyName>
+        <customFields>{"app":"basetool-ingest"}</customFields>
       </encoder>
     </appender>
     <root level="INFO">

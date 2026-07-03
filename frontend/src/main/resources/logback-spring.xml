@@ -97,6 +97,13 @@
             <encoder class="de.greluc.krt.profit.basetool.frontend.logging.PiiMaskingLogstashEncoder">
                 <includeMdcKeyName>correlationId</includeMdcKeyName>
                 <includeMdcKeyName>userId</includeMdcKeyName>
+                <!-- REQ-OBS-009 (epic #936 Phase 1b): trace correlation fields for the Grafana
+                     logs<->traces links. Meaningful only while tracing is
+                     enabled (MONITORING_TRACING_ENABLED=true); while disabled, at most dangling
+                     bridge-fallback ids appear (see REQ-OBS-009). Absent keys are simply omitted. The
+                     correlationId system above is untouched (REQ-OBS-001/-002). -->
+                <includeMdcKeyName>traceId</includeMdcKeyName>
+                <includeMdcKeyName>spanId</includeMdcKeyName>
                 <customFields>{"app":"basetool-frontend"}</customFields>
             </encoder>
         </appender>

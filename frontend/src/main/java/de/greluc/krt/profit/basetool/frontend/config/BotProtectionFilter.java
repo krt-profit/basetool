@@ -179,14 +179,30 @@ public class BotProtectionFilter extends OncePerRequestFilter {
 
   /**
    * URIs that look like bot/scanner targets at first glance but are in fact legitimate endpoints
-   * the application owns. They short-circuit {@link #isBotPath(String)} so the regular filter chain
-   * (and Spring Security) gets a chance to handle them.
+   * the application owns. They short-circuit {@link #isBotPath(String)} — matched
+   * case-insensitively as the exact path or any sub-path — so the regular filter chain (and Spring
+   * Security) gets a chance to handle them.
    *
-   * <p>Currently only the Spring Boot Actuator health endpoint is whitelisted — it is exposed
-   * publicly so the Docker {@code HEALTHCHECK} directive can reach it without authentication; every
-   * other {@code /actuator/...} path stays blocked.
+   * <p>Currently only the Spring Boot Actuator health endpoint (incl. its {@code /liveness} /
+   * {@code /readiness} sub-paths) lives here — it is exposed publicly so the Docker {@code
+   * HEALTHCHECK} directive can reach it without authentication. See {@link #LEGITIMATE_EXACT_PATHS}
+   * for the second, stricter whitelist; every other {@code /actuator/...} path stays blocked with
+   * 404.
    */
   static final Set<String> LEGITIMATE_PATHS = Set.of("/actuator/health");
+
+  /**
+   * Whitelist entries matched as an <b>exact, case-sensitive</b> path only — sub-paths, trailing
+   * slashes and case variants keep the bot 404. Currently only {@code /actuator/prometheus}, the
+   * monitoring scrape endpoint (REQ-OBS-005, epic #936): without this entry the filter answers 404
+   * before the dedicated basic-auth chain in {@link MonitoringScrapeSecurityConfig} ever runs. The
+   * exact-match semantics mirror that chain's {@code securityMatcher} — the endpoint has no
+   * sub-resources, so anything below it is scanner noise and must not fall through to the main
+   * OAuth2 chain (where it would trigger login redirects and request-cache churn). The path is NOT
+   * public: passing this filter only hands the request to that fail-closed chain (denyAll until the
+   * scrape credentials are configured).
+   */
+  static final Set<String> LEGITIMATE_EXACT_PATHS = Set.of("/actuator/prometheus");
 
   /**
    * Returns {@code true} if the given URI starts with a known bot/scanner path prefix.
@@ -195,6 +211,11 @@ public class BotProtectionFilter extends OncePerRequestFilter {
    * @return {@code true} if the URI matches a bot path prefix
    */
   boolean isBotPath(@NotNull String uri) {
+    // Exact, case-sensitive whitelist first: mirrors the securityMatcher of the scrape chain, so
+    // only the one real endpoint path escapes the bot 404 (sub-paths/case variants do not).
+    if (LEGITIMATE_EXACT_PATHS.contains(uri)) {
+      return false;
+    }
     String lowerUri = uri.toLowerCase();
     for (String legit : LEGITIMATE_PATHS) {
       if (lowerUri.equals(legit) || lowerUri.startsWith(legit + "/")) {
