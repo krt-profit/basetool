@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.mapper.OrgUnitMembershipMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.KommandoGroup;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
@@ -36,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.BereichLeadershipRole;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipLeadToggleRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.repository.KommandoGroupRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
@@ -99,6 +101,7 @@ public class OrgUnitMembershipService {
   private final AuditService auditService;
   private final OrgChartService orgChartService;
   private final StaffelMembershipResolver staffelMembershipResolver;
+  private final OrgUnitMembershipMapper orgUnitMembershipMapper;
 
   /**
    * Lists every active org unit (Staffel + Spezialkommando) as picker options, irrespective of
@@ -680,7 +683,10 @@ public class OrgUnitMembershipService {
     if (request.isMissionManager() != null) {
       m.setMissionManager(request.isMissionManager());
     }
-    OrgUnitMembership saved = membershipRepository.save(m);
+    // saveAndFlush (not save): the DTO wrapper maps the response inside this transaction, and
+    // without an explicit flush the @Version bump would land at commit — after the mapping — so
+    // the client would echo the stale pre-bump version and 409 on its next edit (REQ-FE-003).
+    OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
     recordCapabilityFlagsChanged(specialCommandId, userId, saved);
     return saved;
   }
@@ -723,7 +729,9 @@ public class OrgUnitMembershipService {
     if (request.isMissionManager() != null) {
       m.setMissionManager(request.isMissionManager());
     }
-    OrgUnitMembership saved = membershipRepository.save(m);
+    // saveAndFlush (not save): flush before the DTO wrapper maps the response so the client gets
+    // the bumped @Version, not the stale pre-flush one (REQ-FE-003).
+    OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
     auditService.record(
         AuditEventType.CAPABILITY_FLAGS_CHANGED,
         squadron.getId(),
@@ -908,7 +916,9 @@ public class OrgUnitMembershipService {
     // in
     // the Phase 5 cleanup (V187). The request's isLead boolean is the API verb (promote/demote).
     m.setRole(request.isLead() ? MembershipRole.SK_LEAD : MembershipRole.MEMBER);
-    OrgUnitMembership saved = membershipRepository.save(m);
+    // saveAndFlush (not save): flush before the DTO wrapper maps the response so the client gets
+    // the bumped @Version, not the stale pre-flush one (REQ-FE-003).
+    OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
     // Mirror the SK-Leiter seat onto the descriptive chart in the same transaction (REQ-ROLE-006).
     orgChartService.mirrorSkLead(specialCommandId, userId, request.isLead());
     auditService.record(
@@ -1020,6 +1030,189 @@ public class OrgUnitMembershipService {
         userId,
         AuditDetails.of("role", previousRole));
     return saved;
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // Controller-facing DTO projections (L4, #923, ADR-0067)
+  //
+  // These map the just-persisted membership to its OrgUnitMembershipDto response *inside* the
+  // service transaction, so the membership controllers no longer need a class-level
+  // @Transactional to keep the persistence session open for the lazy user.effectiveName read
+  // the mapper performs. The entity-returning methods above stay authoritative for internal
+  // callers (UserService reuses the managed addMember row to flip flags in-place) and for the
+  // full-fidelity unit tests, because OrgUnitMembershipDto is a lossy projection (it carries
+  // only isLead, not the full role) and could not verify an assigned squadron rank.
+  //
+  // Each write wrapper is @Transactional so the (self-invoked) write and the mapping share one
+  // read-write transaction, and the underlying entity methods persist with saveAndFlush so the
+  // mapped DTO carries the bumped @Version (REQ-FE-003). Two ArchitectureTest rules pin this
+  // seam: mutatingServiceMethodsInReadOnlyClassesNeedExplicitTransactional (write wrappers must
+  // escape the class readOnly default) and controllersMustNotInjectTheLazyMembershipMapper
+  // (DTO projection stays in this service; no controller maps the entity itself).
+  // -------------------------------------------------------------------------------------------
+
+  /**
+   * DTO projection of {@link #listMembers(UUID)}: lists every Spezialkommando member as its
+   * response DTO, mapped inside the read transaction so the lazy {@code user.effectiveName} read
+   * succeeds.
+   *
+   * @param specialCommandId the Spezialkommando id; never {@code null}.
+   * @return the membership DTOs in repository insertion order; never {@code null}, possibly empty.
+   * @throws NotFoundException if no SK matches the given id.
+   */
+  public List<OrgUnitMembershipDto> listMemberDtos(@NotNull UUID specialCommandId) {
+    return toDtos(listMembers(specialCommandId));
+  }
+
+  /**
+   * DTO projection of {@link #addMember(UUID, UUID)}: adds the user and returns the persisted
+   * membership as its response DTO, mapped inside the write transaction.
+   *
+   * @param specialCommandId the SK to add the user to; never {@code null}.
+   * @param userId the user to add; never {@code null}.
+   * @return the persisted membership DTO with role flags defaulted to {@code false}.
+   * @throws NotFoundException if no SK matches the given id, or no user matches the given id.
+   * @throws DuplicateEntityException if the user is already a member of this SK.
+   */
+  @Transactional
+  public OrgUnitMembershipDto addMemberDto(@NotNull UUID specialCommandId, @NotNull UUID userId) {
+    return orgUnitMembershipMapper.toDto(addMember(specialCommandId, userId));
+  }
+
+  /**
+   * DTO projection of {@link #patchFlags(UUID, UUID, MembershipFlagsPatchRequest)}: patches the SK
+   * membership's role flags and returns the persisted membership as its response DTO, mapped inside
+   * the write transaction.
+   *
+   * @param specialCommandId the SK whose membership to patch; never {@code null}.
+   * @param userId the user whose membership to patch; never {@code null}.
+   * @param request patch payload; never {@code null}.
+   * @return the persisted membership DTO with the bumped {@code @Version}.
+   * @throws NotFoundException if no SK matches the given id, or the user is not a member.
+   * @throws ObjectOptimisticLockingFailureException if the inbound version is stale.
+   */
+  @Transactional
+  public OrgUnitMembershipDto patchFlagsDto(
+      @NotNull UUID specialCommandId,
+      @NotNull UUID userId,
+      @NotNull MembershipFlagsPatchRequest request) {
+    return orgUnitMembershipMapper.toDto(patchFlags(specialCommandId, userId, request));
+  }
+
+  /**
+   * DTO projection of {@link #patchSquadronMemberFlags(UUID, UUID, MembershipFlagsPatchRequest)}:
+   * patches the Squadron membership's role flags and returns the persisted membership as its
+   * response DTO, mapped inside the write transaction.
+   *
+   * @param squadronId the Squadron whose membership to patch; never {@code null}.
+   * @param userId the user whose membership to patch; never {@code null}.
+   * @param request patch payload; never {@code null}.
+   * @return the persisted membership DTO with the bumped {@code @Version}.
+   * @throws NotFoundException if no Squadron matches the given id, or the user is not a member.
+   * @throws ObjectOptimisticLockingFailureException if the inbound version is stale.
+   */
+  @Transactional
+  public OrgUnitMembershipDto patchSquadronMemberFlagsDto(
+      @NotNull UUID squadronId,
+      @NotNull UUID userId,
+      @NotNull MembershipFlagsPatchRequest request) {
+    return orgUnitMembershipMapper.toDto(patchSquadronMemberFlags(squadronId, userId, request));
+  }
+
+  /**
+   * DTO projection of {@link #toggleLead(UUID, UUID, MembershipLeadToggleRequest)}: promotes /
+   * demotes the SK member and returns the persisted membership as its response DTO, mapped inside
+   * the write transaction.
+   *
+   * @param specialCommandId the SK whose membership to update; never {@code null}.
+   * @param userId the user whose membership to update; never {@code null}.
+   * @param request toggle payload; never {@code null}.
+   * @return the persisted membership DTO with the bumped {@code @Version}.
+   * @throws NotFoundException if no SK matches the given id, or the user is not a member.
+   * @throws BadRequestException if the user still belongs to a Staffel (REQ-ORG-017).
+   * @throws ObjectOptimisticLockingFailureException if the inbound version is stale.
+   */
+  @Transactional
+  public OrgUnitMembershipDto toggleLeadDto(
+      @NotNull UUID specialCommandId,
+      @NotNull UUID userId,
+      @NotNull MembershipLeadToggleRequest request) {
+    return orgUnitMembershipMapper.toDto(toggleLead(specialCommandId, userId, request));
+  }
+
+  /**
+   * DTO projection of {@link #assignSquadronRank(UUID, UUID, MembershipRole, UUID, Long)}: assigns
+   * the squadron rank and returns the persisted membership as its response DTO, mapped inside the
+   * write transaction.
+   *
+   * @param squadronId the Staffel; must be a {@code SQUADRON} org unit.
+   * @param userId the member to assign the rank to; must already be a member of this Staffel.
+   * @param rank the squadron rank to set; must be a squadron rank.
+   * @param kommandoGroupId the Kommandogruppe to bind, or {@code null}; constrained per the rank.
+   * @param version the optimistic-lock version of the member's row, or {@code null} to skip it.
+   * @return the persisted membership DTO with the bumped version.
+   * @throws NotFoundException if the user is not a member of this Staffel, or the group is unknown.
+   * @throws BadRequestException on a non-squadron rank, a bad group pairing, or a cardinality
+   *     breach.
+   * @throws ObjectOptimisticLockingFailureException if the inbound version is stale.
+   */
+  @Transactional
+  public OrgUnitMembershipDto assignSquadronRankDto(
+      @NotNull UUID squadronId,
+      @NotNull UUID userId,
+      @NotNull MembershipRole rank,
+      @org.jetbrains.annotations.Nullable UUID kommandoGroupId,
+      @org.jetbrains.annotations.Nullable Long version) {
+    return orgUnitMembershipMapper.toDto(
+        assignSquadronRank(squadronId, userId, rank, kommandoGroupId, version));
+  }
+
+  /**
+   * DTO projection of {@link #removeSquadronRank(UUID, UUID, Long)}: clears the member's squadron
+   * rank and returns the persisted membership as its response DTO, mapped inside the write
+   * transaction.
+   *
+   * @param squadronId the Staffel; never {@code null}.
+   * @param userId the member whose rank to clear; never {@code null}.
+   * @param version the optimistic-lock version of the member's row, or {@code null} to skip it.
+   * @return the persisted membership DTO with the bumped version.
+   * @throws NotFoundException if the user is not a member of this Staffel.
+   * @throws BadRequestException if the member holds no squadron rank.
+   * @throws ObjectOptimisticLockingFailureException if the inbound version is stale.
+   */
+  @Transactional
+  public OrgUnitMembershipDto removeSquadronRankDto(
+      @NotNull UUID squadronId,
+      @NotNull UUID userId,
+      @org.jetbrains.annotations.Nullable Long version) {
+    return orgUnitMembershipMapper.toDto(removeSquadronRank(squadronId, userId, version));
+  }
+
+  /**
+   * DTO projection of {@link #findAllMembershipsForUser(UUID)}: the user's complete membership set
+   * (Staffel + every SK) as full response DTOs, mapped inside the read transaction so the lazy
+   * {@code user.effectiveName} read succeeds. Backs {@code GET
+   * /api/v1/users/{id}/memberships/detail}.
+   *
+   * @param userId the user whose memberships to project; never {@code null}.
+   * @return the user's memberships as DTOs; never {@code null}, possibly empty.
+   */
+  public List<OrgUnitMembershipDto> findAllMembershipDtosForUser(@NotNull UUID userId) {
+    return toDtos(findAllMembershipsForUser(userId));
+  }
+
+  /**
+   * Projects the given membership rows to their response DTOs. Deliberately {@code private}: the
+   * mapper reads {@code user.effectiveName} through the LAZY user association, so the rows must
+   * still be attached to the session that loaded them — a contract only same-transaction callers
+   * inside this service can guarantee. External callers use the public {@code …Dto} projections,
+   * which load and map inside one service transaction (L4, #923, ADR-0067).
+   *
+   * @param memberships the membership rows to project; never {@code null}.
+   * @return the membership DTOs in the same order; never {@code null}, possibly empty.
+   */
+  private List<OrgUnitMembershipDto> toDtos(@NotNull List<OrgUnitMembership> memberships) {
+    return memberships.stream().map(orgUnitMembershipMapper::toDto).toList();
   }
 
   /**

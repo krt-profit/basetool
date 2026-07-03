@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
-import de.greluc.krt.profit.basetool.backend.mapper.OrgUnitMembershipMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest;
@@ -58,6 +57,16 @@ import org.springframework.web.bind.annotation.RestController;
  * REST surface for the local {@code app_user} mirror. The {@code /me} endpoints derive the user id
  * from the JWT — never from the URL — so a caller can never impersonate another user via this path.
  * {@code /attributes}, the logistician/mission-manager toggles and {@code DELETE} are admin-scoped.
+ *
+ * <p>The class-level {@link Transactional} keeps the persistence session open across the {@code
+ * userMapper.toDto} projection every endpoint returns: {@link UserMapper} resolves the caller's
+ * Staffel + capability flags through {@code OrgUnitMembershipRepository} and reads the LAZY {@code
+ * user.getRoles()} collection, both of which need an open session — the write endpoints that map
+ * the just-saved user rely on it too. The membership mapping was moved into {@link
+ * OrgUnitMembershipService} (L4, #923, ADR-0067), and the two membership endpoints project through
+ * the service's own {@code …Dto} transactions without depending on this annotation — so it now
+ * stands for {@code userMapper} alone, and retiring it only requires moving the {@code UserDto}
+ * projection into the service layer as well.
  */
 @RestController
 @RequestMapping("/api/v1/users")
@@ -71,7 +80,6 @@ public class UserController {
   private final UserMapper userMapper;
   private final AuthHelperService authHelperService;
   private final OrgUnitMembershipService orgUnitMembershipService;
-  private final OrgUnitMembershipMapper orgUnitMembershipMapper;
 
   /**
    * Paged user list. Open to every authenticated member because the participant pickers in the
@@ -469,6 +477,12 @@ public class UserController {
    * {@code version}; an inconsistent batch (one row stale, the rest fresh) rolls back the whole
    * transaction and surfaces as a 409 — partial application is not exposed.
    *
+   * <p>The response is re-read and mapped through {@link
+   * OrgUnitMembershipService#findAllMembershipDtosForUser(UUID)} rather than by projecting the
+   * entities the delta call returns: the projection then runs inside the membership service's own
+   * transaction, so this endpoint does not depend on the class-level {@link Transactional} staying
+   * open across the two service calls (ADR-0067) and survives its planned retirement.
+   *
    * @param id user primary key.
    * @param request the delta to apply; never {@code null}, but both halves may be {@code null} /
    *     empty.
@@ -479,10 +493,8 @@ public class UserController {
   public MembershipDeltaResponse patchMemberships(
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid MembershipDeltaRequest request) {
-    return new MembershipDeltaResponse(
-        userService.applyMembershipDelta(id, request).stream()
-            .map(orgUnitMembershipMapper::toDto)
-            .toList());
+    userService.applyMembershipDelta(id, request);
+    return new MembershipDeltaResponse(orgUnitMembershipService.findAllMembershipDtosForUser(id));
   }
 
   /**
@@ -500,10 +512,7 @@ public class UserController {
   @GetMapping("/{id}/memberships/detail")
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public MembershipDeltaResponse getMembershipsDetail(@PathVariable @NotNull UUID id) {
-    return new MembershipDeltaResponse(
-        orgUnitMembershipService.findAllMembershipsForUser(id).stream()
-            .map(orgUnitMembershipMapper::toDto)
-            .toList());
+    return new MembershipDeltaResponse(orgUnitMembershipService.findAllMembershipDtosForUser(id));
   }
 
   /**
