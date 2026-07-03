@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:389cb8c8-c333-4348-a7f1-23274c26e97c" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:cf5c71e7-89b7-42f0-9315-d9ea7fb50197" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-07-01T09:20:26Z</timestamp>
+    <timestamp>2026-07-03T17:24:35Z</timestamp>
     <tools>
       <components>
         <component type="application">
@@ -19,7 +19,7 @@
       <modified>false</modified>
       <externalReferences>
         <reference type="build-system">
-          <url>https://github.com/krt-profit/basetool/actions/runs/28507088864</url>
+          <url>https://github.com/krt-profit/basetool/actions/runs/28674911453</url>
         </reference>
         <reference type="vcs">
           <url>https://github.com/krt-profit/basetool</url>
@@ -2589,6 +2589,46 @@ file comparators, endian transformation classes, and much more.</description>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
+    <component type="library" bom-ref="pkg:maven/jakarta.mail/jakarta.mail-api@2.1.5?type=jar">
+      <group>jakarta.mail</group>
+      <name>jakarta.mail-api</name>
+      <version>2.1.5</version>
+      <description>${project.name} ${spec.version} Specification API</description>
+      <hashes>
+        <hash alg="MD5">a1872951f46b87594806bb01e342a468</hash>
+        <hash alg="SHA-1">be9b3b677ed6083f575c437ebc442a6a4bd2b931</hash>
+        <hash alg="SHA-256">aa493753acb7a8c45ba8f4c9cf1230a74e20237056dd5b5c8bc86c583e8cfa0e</hash>
+        <hash alg="SHA-512">f537477c3dbf81cf7112fb348221b91c0223b5dcbbac816454e88cb8f293f8c5d566b2a827f78dfdfebec1fbe5a93c909e78fb13789ed41ecbb96a86d171b267</hash>
+        <hash alg="SHA-384">0ae200a91c5879f7b50b9a07c3df864d7b7af31cb771ff2a636cf8ee76d019456e7fb541efb69ca96f90f497c597d608</hash>
+        <hash alg="SHA3-384">862bceaf42659250d354809cb2259bfd11b9d4a87cf1bcafc9c2346f134bad45e27f8f7227722905eb1c870e9314ee77</hash>
+        <hash alg="SHA3-256">9dc094cd2476872a9da6b8065878b5e5a9895dad13762caa025ac5c2656c65e7</hash>
+        <hash alg="SHA3-512">e01072fafeb8a06ca6e32bdac205189fc9dde12fa039c453cfcc9a0cbddadc466d400d117cea64066cb1d04b34b0bc7a809ef8a832b11e7adb3015abf33e34d0</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <id>EPL-2.0</id>
+        </license>
+        <license>
+          <id>GPL-2.0-with-classpath-exception</id>
+        </license>
+        <license>
+          <id>BSD-3-Clause</id>
+        </license>
+      </licenses>
+      <purl>pkg:maven/jakarta.mail/jakarta.mail-api@2.1.5?type=jar</purl>
+      <modified>false</modified>
+      <externalReferences>
+        <reference type="issue-tracker">
+          <url>https://github.com/jakartaee/mail-api/issues</url>
+        </reference>
+        <reference type="vcs">
+          <url>https://github.com/jakartaee/mail-api</url>
+        </reference>
+      </externalReferences>
+      <properties>
+        <property name="cdx:maven:package:test">false</property>
+      </properties>
+    </component>
     <component type="library" bom-ref="pkg:maven/jakarta.persistence/jakarta.persistence-api@3.2.0?type=jar">
       <group>jakarta.persistence</group>
       <name>jakarta.persistence-api</name>
@@ -4027,6 +4067,37 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
         </license>
       </licenses>
       <purl>pkg:maven/org.eclipse.angus/angus-activation@2.0.3?type=jar</purl>
+      <modified>false</modified>
+      <properties>
+        <property name="cdx:maven:package:test">false</property>
+      </properties>
+    </component>
+    <component type="library" bom-ref="pkg:maven/org.eclipse.angus/angus-mail@2.0.5?type=jar">
+      <group>org.eclipse.angus</group>
+      <name>angus-mail</name>
+      <version>2.0.5</version>
+      <hashes>
+        <hash alg="MD5">e965a2653568c0138457b4c6fc9e5d77</hash>
+        <hash alg="SHA-1">427f6d52ec0782f7efaca0c0732042e347a6cb4f</hash>
+        <hash alg="SHA-256">b4d8c30d35f455def6c7a05fe595a1e62ea2b80cac3efec1e9ccf4118b23168a</hash>
+        <hash alg="SHA-512">500985e3045a7640049aa1ebb008d675983f537150605f192d2746ca2aa8c7a1b5231f782f950dfd968cc8ca26c32c6e93008cc7de309c5da4b17af0139baff7</hash>
+        <hash alg="SHA-384">35c797fdc52800ccfbd36d7574c0919fbba1f820eafb1d236271eefb07266360c1b87c07c089f97c07d12a634e54037c</hash>
+        <hash alg="SHA3-384">9a10dd9cf09af51c29d178d2dd87c6a796121753c91ca13b8c51843b8ed737803090fa93f41ec8689469550941e12473</hash>
+        <hash alg="SHA3-256">7ac45dd92d65996c4de11701bf1a1130e393a3e33b4bc02af69bf627e54b122e</hash>
+        <hash alg="SHA3-512">b45eb356f855b9777cfdf6be94c6797c33e86fe28e8e2e7fe7311e661f07d162e8c4e46a2f3dd67b7c0f8261ab5610c85f4f62cc874e64ee2a76eca3501e2e2d</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <id>EPL-2.0</id>
+        </license>
+        <license>
+          <id>GPL-2.0-with-classpath-exception</id>
+        </license>
+        <license>
+          <id>BSD-3-Clause</id>
+        </license>
+      </licenses>
+      <purl>pkg:maven/org.eclipse.angus/angus-mail@2.0.5?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
@@ -6982,6 +7053,44 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
+    <component type="library" bom-ref="pkg:maven/org.springframework.boot/spring-boot-mail@4.1.0?type=jar">
+      <publisher>VMware, Inc.</publisher>
+      <group>org.springframework.boot</group>
+      <name>spring-boot-mail</name>
+      <version>4.1.0</version>
+      <description>Spring Boot Mail</description>
+      <hashes>
+        <hash alg="MD5">b9de6348152f02a61d28494c10cb6b51</hash>
+        <hash alg="SHA-1">b8051f1cfbd57903eaa11612f6a1e51828e6fe8c</hash>
+        <hash alg="SHA-256">9e33897373e22dc31984fc13c1319036ba696d7de83ae002203381b75007a7c0</hash>
+        <hash alg="SHA-512">00bc3cc77e724fabb92c957be1ad9228b5c2224c087fc377d4d5cfd84f3ef6e1ca2245ece395f8158fa308165d7f68842e08d7cf15d7b434bde2e298f7b90432</hash>
+        <hash alg="SHA-384">d23e67aa894de0cecd3c73325c2ee7407c916faafe2865abd1f054f6effaf4203f229050a37adff996fce134539ffbef</hash>
+        <hash alg="SHA3-384">a36f92e3cec459e0dc934084a1abb1ebc86ffa45f4fd935f728b577dcd37f910396fe16aaa731e185b583fb915683005</hash>
+        <hash alg="SHA3-256">b347fee8cc90c95cf1c4a59917a6eb7f31401ce183522300da63a88c029b53a9</hash>
+        <hash alg="SHA3-512">6bf3c9710dff2f490a1d6d13b1cb336498a01b13b4f9624a8190ab8172ccceabfa56a6c36a5d0b3b3d38d92ba52157abbea63088128cb8d0fb2d703d207e53fb</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <id>Apache-2.0</id>
+        </license>
+      </licenses>
+      <purl>pkg:maven/org.springframework.boot/spring-boot-mail@4.1.0?type=jar</purl>
+      <modified>false</modified>
+      <externalReferences>
+        <reference type="website">
+          <url>https://spring.io</url>
+        </reference>
+        <reference type="issue-tracker">
+          <url>https://github.com/spring-projects/spring-boot/issues</url>
+        </reference>
+        <reference type="vcs">
+          <url>https://github.com/spring-projects/spring-boot</url>
+        </reference>
+      </externalReferences>
+      <properties>
+        <property name="cdx:maven:package:test">false</property>
+      </properties>
+    </component>
     <component type="library" bom-ref="pkg:maven/org.springframework.boot/spring-boot-micrometer-metrics@4.1.0?type=jar">
       <publisher>VMware, Inc.</publisher>
       <group>org.springframework.boot</group>
@@ -7574,6 +7683,44 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
         </license>
       </licenses>
       <purl>pkg:maven/org.springframework.boot/spring-boot-starter-logging@4.1.0?type=jar</purl>
+      <modified>false</modified>
+      <externalReferences>
+        <reference type="website">
+          <url>https://spring.io</url>
+        </reference>
+        <reference type="issue-tracker">
+          <url>https://github.com/spring-projects/spring-boot/issues</url>
+        </reference>
+        <reference type="vcs">
+          <url>https://github.com/spring-projects/spring-boot</url>
+        </reference>
+      </externalReferences>
+      <properties>
+        <property name="cdx:maven:package:test">false</property>
+      </properties>
+    </component>
+    <component type="library" bom-ref="pkg:maven/org.springframework.boot/spring-boot-starter-mail@4.1.0?type=jar">
+      <publisher>VMware, Inc.</publisher>
+      <group>org.springframework.boot</group>
+      <name>spring-boot-starter-mail</name>
+      <version>4.1.0</version>
+      <description>Starter for using Java Mail and Spring Framework's email sending support</description>
+      <hashes>
+        <hash alg="MD5">9f1dfc308b4744e57aa68bc8aca50cb6</hash>
+        <hash alg="SHA-1">9404230e81be0a7595a014069afc61f81e63b0ed</hash>
+        <hash alg="SHA-256">f22d5b5cc88a0c68c2bbe21d09a244d5685cfa144e31e320a31598c7e63d3557</hash>
+        <hash alg="SHA-512">33491e7608278b6f168fc20a2be364b6c9f3b0903ed9a82f873fc4b06d5566c75679fb3b8c8da62d51242fb00ee8525a56608f20ecf51b3628612b14b1467282</hash>
+        <hash alg="SHA-384">c5cf506dea635015ccb66cfb7ef9634270fba8b367105fa0d126dad871e9674f5d88c2f45336db4008e08ce56b10abeb</hash>
+        <hash alg="SHA3-384">03799e94981eeb252eb53a87e5cba87c01fa1138643495d3810a3ea7bfc02f3e7df9ac4f5fba1901545c8c372919900e</hash>
+        <hash alg="SHA3-256">791438b83fe3fc1d73489610d003ad7b19924aef2a70406e6aa3e7606c4e6677</hash>
+        <hash alg="SHA3-512">83dc3b7410e2bb973356967f53c386bbe158093d39d08458ca72a2021054a374bb39988f1d603fc0df5a4a2b1f0573ad77b97fdea542f41b8bc00314a81896d1</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <id>Apache-2.0</id>
+        </license>
+      </licenses>
+      <purl>pkg:maven/org.springframework.boot/spring-boot-starter-mail@4.1.0?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="website">
@@ -9788,6 +9935,7 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-actuator@4.1.0?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-cache@4.1.0?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-data-jpa@4.1.0?type=jar"/>
+      <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-mail@4.1.0?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-oauth2-resource-server@4.1.0?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-security@4.1.0?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-test@4.1.0?type=jar"/>
@@ -9989,6 +10137,9 @@ of Jackson 3.x components maintained by FasterXML.com</description>
     <dependency ref="pkg:maven/jakarta.activation/jakarta.activation-api@2.1.4?type=jar"/>
     <dependency ref="pkg:maven/jakarta.annotation/jakarta.annotation-api@3.0.0?type=jar"/>
     <dependency ref="pkg:maven/jakarta.inject/jakarta.inject-api@2.0.1?type=jar"/>
+    <dependency ref="pkg:maven/jakarta.mail/jakarta.mail-api@2.1.5?type=jar">
+      <dependency ref="pkg:maven/jakarta.activation/jakarta.activation-api@2.1.4?type=jar"/>
+    </dependency>
     <dependency ref="pkg:maven/jakarta.persistence/jakarta.persistence-api@3.2.0?type=jar"/>
     <dependency ref="pkg:maven/jakarta.transaction/jakarta.transaction-api@2.0.1?type=jar"/>
     <dependency ref="pkg:maven/jakarta.validation/jakarta.validation-api@3.1.1?type=jar"/>
@@ -10109,6 +10260,11 @@ of Jackson 3.x components maintained by FasterXML.com</description>
     <dependency ref="pkg:maven/org.dom4j/dom4j@2.2.0?type=jar"/>
     <dependency ref="pkg:maven/org.eclipse.angus/angus-activation@2.0.3?type=jar">
       <dependency ref="pkg:maven/jakarta.activation/jakarta.activation-api@2.1.4?type=jar"/>
+    </dependency>
+    <dependency ref="pkg:maven/org.eclipse.angus/angus-mail@2.0.5?type=jar">
+      <dependency ref="pkg:maven/jakarta.activation/jakarta.activation-api@2.1.4?type=jar"/>
+      <dependency ref="pkg:maven/jakarta.mail/jakarta.mail-api@2.1.5?type=jar"/>
+      <dependency ref="pkg:maven/org.eclipse.angus/angus-activation@2.0.3?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.flywaydb/flyway-core@12.9.0?type=jar">
       <dependency ref="pkg:maven/tools.jackson.core/jackson-databind@3.1.4?type=jar"/>
@@ -10393,6 +10549,12 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-transaction@4.1.0?type=jar"/>
       <dependency ref="pkg:maven/org.springframework/spring-orm@7.0.8?type=jar"/>
     </dependency>
+    <dependency ref="pkg:maven/org.springframework.boot/spring-boot-mail@4.1.0?type=jar">
+      <dependency ref="pkg:maven/jakarta.mail/jakarta.mail-api@2.1.5?type=jar"/>
+      <dependency ref="pkg:maven/org.eclipse.angus/angus-mail@2.0.5?type=jar"/>
+      <dependency ref="pkg:maven/org.springframework.boot/spring-boot@4.1.0?type=jar"/>
+      <dependency ref="pkg:maven/org.springframework/spring-context-support@7.0.8?type=jar"/>
+    </dependency>
     <dependency ref="pkg:maven/org.springframework.boot/spring-boot-micrometer-metrics@4.1.0?type=jar">
       <dependency ref="pkg:maven/io.micrometer/micrometer-core@1.17.0?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-micrometer-observation@4.1.0?type=jar"/>
@@ -10469,6 +10631,10 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/ch.qos.logback/logback-classic@1.5.34?type=jar"/>
       <dependency ref="pkg:maven/org.apache.logging.log4j/log4j-to-slf4j@2.25.4?type=jar"/>
       <dependency ref="pkg:maven/org.slf4j/jul-to-slf4j@2.0.18?type=jar"/>
+    </dependency>
+    <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-mail@4.1.0?type=jar">
+      <dependency ref="pkg:maven/org.springframework.boot/spring-boot-mail@4.1.0?type=jar"/>
+      <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter@4.1.0?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-micrometer-metrics@4.1.0?type=jar">
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-micrometer-metrics@4.1.0?type=jar"/>
