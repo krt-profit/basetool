@@ -565,7 +565,12 @@ a client can neither target an arbitrary fetch nor amplify one frame into an unb
 whitelist, the acting client's broadcast and the peers' receiver all mirror the single
 `MISSION_SECTIONS` seam map in `mission-detail.js` — a section key present in the seam map but
 missing from the relay whitelist or the receiver leaves the peers' section stale until a manual
-reload, so the three stay in sync whenever a mission section is added. The
+reload. **Binding:** these three mirror points must be kept in sync in the **same change** whenever a
+live-synced section is **added, changed or removed** — the receiver derives its map from the seam
+map so those two cannot diverge, and the server whitelist (which cannot share the client map) must be
+edited alongside. A live-synced mutation added on one side but not propagated across all three is
+incomplete; this is the REQ-FE-010 defect that shipped when `objectives`/`frequencies` were added to
+the write seam but not the receiver or the whitelist. The
 `overview` fragment (Tab-1 + a `#overview-head-meta` carrier that patches the sticky header title /
 status pill / facts) is added by this requirement so core/schedule/status edits propagate too.
 
