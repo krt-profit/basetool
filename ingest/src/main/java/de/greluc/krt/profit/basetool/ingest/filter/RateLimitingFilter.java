@@ -20,11 +20,13 @@
 package de.greluc.krt.profit.basetool.ingest.filter;
 
 import de.greluc.krt.profit.basetool.ingest.config.RateLimitProperties;
+import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.ingest.ratelimit.RateLimitBuckets;
 import de.greluc.krt.profit.basetool.ingest.web.ProblemResponseWriter;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.ConsumptionProbe;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -72,6 +74,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
   private final Map<String, Bucket> buckets = RateLimitBuckets.boundedLru(MAX_TRACKED_IPS);
   private final RateLimitProperties properties;
   private final ObjectMapper objectMapper;
+  private final MeterRegistry meterRegistry;
 
   @Override
   protected void doFilterInternal(
@@ -82,6 +85,11 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     Bucket bucket = buckets.computeIfAbsent(clientIp(request), ip -> newBucket());
     ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
     if (!probe.isConsumed()) {
+      // Pre-auth per-IP 429 (REQ-OBS-011). Labelled by the bounded `ip` bucket literal, never the
+      // client IP itself (PII/unbounded).
+      meterRegistry
+          .counter(MetricNames.RATELIMIT_REJECTIONS, MetricNames.TAG_BUCKET, MetricNames.BUCKET_IP)
+          .increment();
       long retryAfterSeconds =
           Math.max(1, TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill()));
       response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(retryAfterSeconds));

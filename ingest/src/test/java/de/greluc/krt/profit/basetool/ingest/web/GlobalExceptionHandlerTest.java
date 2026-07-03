@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.ingest.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -38,8 +40,10 @@ import tools.jackson.databind.json.JsonMapper;
  */
 class GlobalExceptionHandlerTest {
 
+  private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+
   private final GlobalExceptionHandler handler =
-      new GlobalExceptionHandler(JsonMapper.builder().build());
+      new GlobalExceptionHandler(JsonMapper.builder().build(), meterRegistry);
 
   private static WebClientResponseException backendError(
       int status, MediaType contentType, String body) {
@@ -68,6 +72,14 @@ class GlobalExceptionHandlerTest {
 
     assertThat(problem.getStatus()).isEqualTo(400);
     assertThat(problem.getDetail()).isEqualTo("Mission is already finalized.");
+    // A backend 4xx reject is counted once under the bounded backend_reject reason (REQ-OBS-011).
+    assertThat(
+            meterRegistry
+                .get(MetricNames.INGEST_HANDOFF_ERRORS)
+                .tag(MetricNames.TAG_REASON, MetricNames.REASON_BACKEND_REJECT)
+                .counter()
+                .count())
+        .isEqualTo(1.0d);
   }
 
   @Test

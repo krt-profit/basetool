@@ -23,6 +23,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.ingest.config.IngestProperties;
 import de.greluc.krt.profit.basetool.ingest.config.RateLimitProperties;
+import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -137,7 +139,8 @@ class FiltersTest {
     properties.setCapacity(1);
     properties.setRefillTokens(1);
     properties.setRefillPeriod(Duration.ofMinutes(1));
-    RateLimitingFilter filter = new RateLimitingFilter(properties, objectMapper);
+    SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+    RateLimitingFilter filter = new RateLimitingFilter(properties, objectMapper, meterRegistry);
 
     MockFilterChain firstChain = new MockFilterChain();
     filter.doFilter(ingestRequestWithBody(10), new MockHttpServletResponse(), firstChain);
@@ -151,5 +154,13 @@ class FiltersTest {
     assertThat(blocked.getContentAsString()).contains("RATE_LIMITED");
     assertThat(blocked.getHeader("Retry-After")).isNotNull();
     assertThat(secondChain.getRequest()).isNull();
+    // The pre-auth rejection is counted once under the bounded `ip` bucket (REQ-OBS-011).
+    assertThat(
+            meterRegistry
+                .get(MetricNames.RATELIMIT_REJECTIONS)
+                .tag(MetricNames.TAG_BUCKET, MetricNames.BUCKET_IP)
+                .counter()
+                .count())
+        .isEqualTo(1.0d);
   }
 }

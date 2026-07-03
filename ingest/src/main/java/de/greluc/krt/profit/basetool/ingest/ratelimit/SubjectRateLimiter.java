@@ -20,9 +20,11 @@
 package de.greluc.krt.profit.basetool.ingest.ratelimit;
 
 import de.greluc.krt.profit.basetool.ingest.config.RateLimitProperties;
+import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.ConsumptionProbe;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
@@ -52,6 +54,7 @@ public class SubjectRateLimiter {
   static final int MAX_TRACKED_SUBJECTS = 50_000;
 
   private final RateLimitProperties properties;
+  private final MeterRegistry meterRegistry;
   private final Map<String, Bucket> buckets = RateLimitBuckets.boundedLru(MAX_TRACKED_SUBJECTS);
 
   /**
@@ -70,6 +73,12 @@ public class SubjectRateLimiter {
     Bucket bucket = buckets.computeIfAbsent(sub, key -> newBucket());
     ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
     if (!probe.isConsumed()) {
+      // Per-subject 429 (REQ-OBS-011). Labelled by the bounded `subject` bucket literal, never the
+      // JWT sub itself (PII/unbounded).
+      meterRegistry
+          .counter(
+              MetricNames.RATELIMIT_REJECTIONS, MetricNames.TAG_BUCKET, MetricNames.BUCKET_SUBJECT)
+          .increment();
       long retryAfterSeconds =
           Math.max(1, TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill()));
       throw new RateLimitedException(retryAfterSeconds);
