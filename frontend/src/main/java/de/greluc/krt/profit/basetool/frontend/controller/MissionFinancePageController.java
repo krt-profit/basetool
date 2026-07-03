@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import de.greluc.krt.profit.basetool.frontend.model.form.MissionFinanceEntryForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import jakarta.validation.Valid;
 import java.util.HashMap;
 import java.util.Map;
@@ -65,6 +66,7 @@ public class MissionFinancePageController {
 
   private final BackendApiClient backendApiClient;
   private final MissionPageController missionPageController;
+  private final FrontendAuthHelperService authHelper;
 
   /**
    * Creates a finance entry on a mission. {@code permitAll()} reflects the project's guest-mode for
@@ -99,7 +101,7 @@ public class MissionFinancePageController {
       body.put("type", form.getType());
       body.put("amount", form.getAmount());
 
-      backendApiClient.post("/api/v1/finance-entries", body, Void.class, principal == null);
+      backendApiClient.post("/api/v1/finance-entries", body, Void.class, authHelper.isAnonymous());
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Add finance entry failed", e);
@@ -187,7 +189,8 @@ public class MissionFinancePageController {
    * @param id mission id (path)
    * @param body finance-entry JSON ({@code participantId}, {@code note}, {@code type}, {@code
    *     amount}); {@code missionId} is stamped from the path
-   * @param principal OIDC user, may be {@code null} for guests
+   * @param principal OIDC user bound from the security context; guest vs. authenticated routing now
+   *     goes through {@code authHelper.isAnonymous()}
    * @return {@code 200} with the created entry, or the upstream RFC 7807 error passed through
    */
   @PostMapping(value = "/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -200,7 +203,8 @@ public class MissionFinancePageController {
     try {
       body.put("missionId", id);
       Object result =
-          backendApiClient.post("/api/v1/finance-entries", body, Object.class, principal == null);
+          backendApiClient.post(
+              "/api/v1/finance-entries", body, Object.class, authHelper.isAnonymous());
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
       log.debug("Add finance entry (AJAX) failed: status={}", e.getStatusCode());

@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.MissionListDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import jakarta.servlet.http.HttpSession;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -56,10 +57,23 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Slf4j
 public class HomeController {
 
+  /** Response type for the paged {@code /missions/search} upcoming-mission listing. */
+  private static final ParameterizedTypeReference<PageResponse<MissionListDto>> MISSION_PAGE_TYPE =
+      new ParameterizedTypeReference<>() {};
+
+  /** Response type for the {@code /users/me/org-unit-ids} direct-membership id list. */
+  private static final ParameterizedTypeReference<List<UUID>> UUID_LIST_TYPE =
+      new ParameterizedTypeReference<>() {};
+
+  /** Response type for the {@code /announcement} public-announcement map. */
+  private static final ParameterizedTypeReference<Map<String, Object>> ANNOUNCEMENT_MAP_TYPE =
+      new ParameterizedTypeReference<>() {};
+
   @Value("${app.ui.notification-duration:5000}")
   private long notificationDuration;
 
   private final BackendApiClient backendApiClient;
+  private final FrontendAuthHelperService authHelper;
 
   /**
    * Renders the home page. Pulls the upcoming missions (planned start within the next seven days)
@@ -90,10 +104,7 @@ public class HomeController {
               + horizon
               + "&sort=plannedStartTime,asc&status=PLANNED&status=ACTIVE&size=50";
       PageResponse<MissionListDto> upcomingPage =
-          backendApiClient.get(
-              searchUri,
-              new ParameterizedTypeReference<PageResponse<MissionListDto>>() {},
-              principal == null);
+          backendApiClient.get(searchUri, MISSION_PAGE_TYPE, authHelper.isAnonymous());
       List<MissionListDto> upcomingMissions =
           (upcomingPage != null && upcomingPage.content() != null)
               ? upcomingPage.content()
@@ -144,8 +155,7 @@ public class HomeController {
         }
         try {
           List<UUID> directOrgUnitIds =
-              backendApiClient.get(
-                  "/api/v1/users/me/org-unit-ids", new ParameterizedTypeReference<List<UUID>>() {});
+              backendApiClient.get("/api/v1/users/me/org-unit-ids", UUID_LIST_TYPE);
           if (directOrgUnitIds != null) {
             for (UUID id : directOrgUnitIds) {
               if (id != null) {
@@ -160,8 +170,7 @@ public class HomeController {
 
         // Fetch Public Announcement
         Map<String, Object> announcement =
-            backendApiClient.get(
-                "/api/v1/announcement", new ParameterizedTypeReference<Map<String, Object>>() {});
+            backendApiClient.get("/api/v1/announcement", ANNOUNCEMENT_MAP_TYPE);
         model.addAttribute("announcement", announcement);
 
         boolean unread = false;

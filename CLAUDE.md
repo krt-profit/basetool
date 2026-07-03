@@ -70,6 +70,19 @@ its full `krtFetch`/fragment-swap contract and the live multi-user sync live in
 success, leaves a sibling/peer view stale, or hand-rolls a `fetch`/CSRF write outside `krtFetch` is
 incomplete — extend the standard to cover it, don't fall back to a reload.
 
+**Live update and multi-user sync move with every feature — added, changed *or* removed.** Whenever
+you add, change or remove a frontend surface that participates in live update or live multi-user
+sync (a new editable section, a renamed/retired one, a new mutation on an existing section), you
+**must** update its live-update and peer-sync wiring in the **same change** — never defer it to a
+follow-up. For the multi-user sync in particular, a section key must stay consistent across **all**
+its mirror points at once: the acting client's broadcast (the page's section/seam map), the server
+relay's accept-list (`BROADCASTABLE_SECTIONS`), and the receiving client's apply map. A key present
+in one but missing from another **silently** leaves other viewers stale with no error — the
+REQ-FE-010 defect that shipped when `objectives`/`frequencies` were added to the write seam but not
+the receiver/relay. Prefer deriving these maps from a single source of truth so they cannot diverge;
+where they can't share one, changing one **requires** changing the others in the same PR, and the
+change is incomplete otherwise.
+
 ## Build, run, test
 
 Always use the Gradle wrapper. **Never** use the IDE test runner or the harness `run_test` tool — Gradle is the only sanctioned test path. This is a hard project rule and applies even when iterating on a single test.

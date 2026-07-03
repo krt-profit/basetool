@@ -64,6 +64,14 @@ public class AdminDiscordRegistrationsPageController {
 
   private static final String BACKEND_BASE = "/api/v1/admin/registrations";
 
+  /**
+   * Response type for the pending-registration queue read. A shared static {@link
+   * ParameterizedTypeReference} is behaviourally identical to a fresh anonymous instance per call
+   * (Q10).
+   */
+  private static final ParameterizedTypeReference<List<PendingRegistrationDto>>
+      PENDING_REGISTRATION_LIST_TYPE = new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -76,8 +84,7 @@ public class AdminDiscordRegistrationsPageController {
   public String list(Model model) {
     try {
       List<PendingRegistrationDto> registrations =
-          backendApiClient.get(
-              BACKEND_BASE, new ParameterizedTypeReference<List<PendingRegistrationDto>>() {});
+          backendApiClient.get(BACKEND_BASE, PENDING_REGISTRATION_LIST_TYPE);
       model.addAttribute("registrations", registrations == null ? List.of() : registrations);
     } catch (Exception e) {
       log.error("Failed to load the Discord registration queue", e);

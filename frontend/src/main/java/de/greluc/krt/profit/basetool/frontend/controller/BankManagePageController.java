@@ -53,6 +53,22 @@ import org.springframework.web.bind.annotation.RequestParam;
 @Slf4j
 public class BankManagePageController {
 
+  /** Response type for the paged {@code /bank/accounts} listing. */
+  private static final ParameterizedTypeReference<PageResponse<BankAccountDto>>
+      BANK_ACCOUNT_PAGE_TYPE = new ParameterizedTypeReference<>() {};
+
+  /** Response type for the {@code /bank/holders} holder-registry list. */
+  private static final ParameterizedTypeReference<List<BankHolderDto>> BANK_HOLDER_LIST_TYPE =
+      new ParameterizedTypeReference<>() {};
+
+  /** Response type for the {@code /org-units/active-all-kinds} org-unit option list. */
+  private static final ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>
+      ORG_UNIT_OPTION_LIST_TYPE = new ParameterizedTypeReference<>() {};
+
+  /** Response type for the {@code /users/lookup} user-reference list. */
+  private static final ParameterizedTypeReference<List<UserReferenceDto>> USER_REFERENCE_LIST_TYPE =
+      new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -82,11 +98,9 @@ public class BankManagePageController {
       Model model) {
     boolean management = hasRole(authentication, Roles.authority(Roles.BANK_MANAGEMENT));
     PageResponse<BankAccountDto> accounts =
-        backendApiClient.get(
-            "/api/v1/bank/accounts?size=500", new ParameterizedTypeReference<>() {});
+        backendApiClient.get("/api/v1/bank/accounts?size=500", BANK_ACCOUNT_PAGE_TYPE);
     List<BankHolderDto> holders =
-        backendApiClient.get(
-            "/api/v1/bank/holders", new ParameterizedTypeReference<List<BankHolderDto>>() {});
+        backendApiClient.get("/api/v1/bank/holders", BANK_HOLDER_LIST_TYPE);
     List<BankAccountDto> orderedAccounts =
         accounts == null
             ? List.<BankAccountDto>of()
@@ -133,12 +147,9 @@ public class BankManagePageController {
     // management-gated — are skipped for a plain employee (REQ-BANK-030).
     if (management) {
       List<OrgUnitMembershipOptionDto> orgUnits =
-          backendApiClient.get(
-              "/api/v1/org-units/active-all-kinds",
-              new ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>() {});
+          backendApiClient.get("/api/v1/org-units/active-all-kinds", ORG_UNIT_OPTION_LIST_TYPE);
       List<UserReferenceDto> users =
-          backendApiClient.get(
-              "/api/v1/users/lookup", new ParameterizedTypeReference<List<UserReferenceDto>>() {});
+          backendApiClient.get("/api/v1/users/lookup", USER_REFERENCE_LIST_TYPE);
       model.addAttribute(
           "orgUnits", orgUnits == null ? List.<OrgUnitMembershipOptionDto>of() : orgUnits);
       model.addAttribute("users", users == null ? List.<UserReferenceDto>of() : users);

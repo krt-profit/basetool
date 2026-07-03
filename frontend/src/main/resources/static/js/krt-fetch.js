@@ -29,6 +29,11 @@
  *  - swap — server-rendered HTML fragment swaps for lists / filters /
  *    pagination, including delegated interception of in-container pagination
  *    anchors so paging stays in-place (fixes the known full-reload regression).
+ *  - sectionWrite — a factory for pages whose aggregate is saved and
+ *    re-rendered as independent sections (#924, mission-detail): builds the
+ *    page's { write, refresh, notify } trio around write/swap from a
+ *    page-supplied config (i18n dict getter, section->container map, page-URL
+ *    getter and peer-broadcast closure, each re-evaluated per call).
  *
  * No user-visible string is hardcoded here: callers pass already-localized
  * labels/messages (e.g. mission-detail's page-local krtMissionWrite wrapper
@@ -799,6 +804,109 @@
         bindSwapAnchorInterception(container, opts);
     }
 
+    // ------------------------------------------------------------ section-write seam
+
+    /**
+     * Builds a page's section-write seam — the { write, refresh, notify } trio for pages whose
+     * aggregate is saved and re-rendered as independent sections (#924; canonical consumer:
+     * mission-detail.js, which re-publishes the trio as the window.krtMissionWrite /
+     * window.krtRefreshMissionSection / window.krtNotifyMissionChanged aliases so its ~60 call
+     * sites stay one-liners).
+     *
+     * Every page-specific lookup is LATE-BOUND — the dict getter, the pageUrl getter and the
+     * broadcast closure are re-evaluated on every call, never captured: the i18n dictionary is
+     * assigned by an inline template bootstrap and the presence client (mission) only exists after
+     * a later conditional bootstrap's DOMContentLoaded.
+     *
+     * config:
+     *  - dict()               getter for the page's already-localized i18n dictionary
+     *  - keys                 dictionary keys + fallbacks: saveSectionPrefix, conflictSectionPrefix,
+     *                         successKey/successFallback, errorKey/errorFallback,
+     *                         conflictTitleKey/conflictTitleFallback,
+     *                         reloadLabelKey/reloadLabelFallback,
+     *                         dismissLabelKey/dismissLabelFallback,
+     *                         reloadQuestionKey/reloadQuestionFallback,
+     *                         reloadDetailKey/reloadDetailFallback, refreshErrorKey
+     *  - sections             sectionKey -> { container, fragmentValue } map for refresh()
+     *  - pageUrl()            getter for the page's base URL; null while the entity has no id —
+     *                         refresh() then resolves false for that section without fetching
+     *  - broadcast(keys)      optional peer-notification closure (REQ-FE-010); called by refresh()
+     *                         unless opts.broadcast === false (i.e. the refresh itself applies a
+     *                         peer's inbound signal — broadcasting again would echo into a loop)
+     *                         and unconditionally by notify()
+     *
+     * Returns:
+     *  - write(opts)          {@link write} with the section's localized sectionLabel /
+     *                         conflictSectionLabel / successMessage / errorMessage / conflict
+     *                         strings derived from opts.sectionKey via the dict (with fallbacks)
+     *  - refresh(sectionKeys, opts)  re-renders one or more sections in place via {@link swap}
+     *                         (history:false, preserveScroll:true); accepts a single key or an
+     *                         array; returns a Promise resolving when all swaps complete so
+     *                         callers can close a modal afterwards
+     *  - notify(sectionKeys)  broadcast-only sibling of refresh() for handlers that already
+     *                         patched their own DOM surgically and need no self re-render
+     */
+    function sectionWrite(config) {
+        return {
+            write: function (opts) {
+                const dict = config.dict() || {};
+                function t(key, fallback) {
+                    return dict[key] != null && dict[key] !== '' ? dict[key] : fallback;
+                }
+                const key = opts.sectionKey || '';
+                const k = config.keys;
+                return write(
+                    Object.assign({}, opts, {
+                        sectionLabel: t(k.saveSectionPrefix + key, key),
+                        conflictSectionLabel: t(k.conflictSectionPrefix + key, key),
+                        successMessage: t(k.successKey, k.successFallback),
+                        errorMessage: t(k.errorKey, k.errorFallback),
+                        conflict: {
+                            title: t(k.conflictTitleKey, k.conflictTitleFallback),
+                            reloadLabel: t(k.reloadLabelKey, k.reloadLabelFallback),
+                            dismissLabel: t(k.dismissLabelKey, k.dismissLabelFallback),
+                            reloadQuestion: t(k.reloadQuestionKey, k.reloadQuestionFallback),
+                            reloadDetailFallback: t(k.reloadDetailKey, k.reloadDetailFallback),
+                        },
+                    }),
+                );
+            },
+            refresh: function (sectionKeys, opts) {
+                const list = Array.isArray(sectionKeys) ? sectionKeys : [sectionKeys];
+                if ((!opts || opts.broadcast !== false) && typeof config.broadcast === 'function') {
+                    config.broadcast(list);
+                }
+                return Promise.all(
+                    list.map(function (sectionKey) {
+                        const cfg = config.sections[sectionKey];
+                        const url = cfg ? config.pageUrl() : null;
+                        if (!cfg || !url || !document.querySelector(cfg.container)) {
+                            return Promise.resolve(false);
+                        }
+                        return swap({
+                            url: url,
+                            container: cfg.container,
+                            fragmentValue: cfg.fragmentValue,
+                            history: false,
+                            preserveScroll: true,
+                            // Surfaced as a toast when a swap bails on a redirect/non-OK response
+                            // (e.g. an expired session bounced to the login page): swap() then leaves
+                            // the stale section untouched rather than painting a full page into the
+                            // container.
+                            errorMessage: (config.dict() || {})[config.keys.refreshErrorKey] || '',
+                        });
+                    }),
+                );
+            },
+            notify: function (sectionKeys) {
+                const list = Array.isArray(sectionKeys) ? sectionKeys : [sectionKeys];
+                if (typeof config.broadcast === 'function') {
+                    config.broadcast(list);
+                }
+            },
+        };
+    }
+
     window.krtFetch = {
         write: write,
         submitForm: submitForm,
@@ -808,10 +916,13 @@
         handleProblem: handleProblem,
         maybeReauthenticate: maybeReauthenticate,
         reauthRedirect: reauthRedirect,
+        sectionWrite: sectionWrite,
         csrf: window.krtCsrf,
     };
 
-    // The former window.MissionSubresource alias was retired in #574; mission-detail.html now calls
-    // window.krtFetch.write directly through a small page-local krtMissionWrite wrapper, so this
-    // shared module carries no mission-specific code or strings.
+    // The former window.MissionSubresource alias was retired in #574; since #924 the page-local
+    // krtMissionWrite wrapper lives in mission-detail.js and is produced by the generic
+    // sectionWrite factory above, so this shared module still carries no mission-specific code,
+    // keys or strings — the mission dictionary, section map and presence broadcast are all
+    // supplied by the page config.
 })();

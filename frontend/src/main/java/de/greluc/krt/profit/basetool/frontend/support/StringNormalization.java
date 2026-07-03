@@ -17,31 +17,30 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.support;
+package de.greluc.krt.profit.basetool.frontend.support;
 
 import java.text.Normalizer;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Shared free-text normalization primitives for inbound string fields.
+ * Shared free-text normalization primitives for the frontend module, mirroring the backend's {@code
+ * support.StringNormalization} (#906 Q6). Holds the single authoritative free-text length cap, the
+ * NFC-normalize-and-length-check step, the full trim + empty-policy + normalize {@link
+ * #normalize(String, int, boolean) pipeline} that {@code NormalizedStringEditor} delegates to, and
+ * the {@link #blankToNull(String)} collapse the admin page controllers reuse instead of re-inlining
+ * a private {@code blankToNull}/{@code emptyToNull} at each site.
  *
- * <p>Both the JSON path ({@code NormalizedStringDeserializer}) and the form-binding path ({@code
- * NormalizedStringEditor}) must land a submitted value in the same canonical form so a JSON post
- * and a form post of the identical text reach the database identically. This class holds the pieces
- * they share — the single authoritative free-text length cap, the NFC-normalize-and-length-check
- * step, the full trim + empty-policy + normalize {@link #normalize(String, int, boolean) pipeline},
- * and the two blank-collapse primitives ({@link #blankToNull(String)}, {@link #trimToNull(String)})
- * that the service layer reuses instead of re-inlining the {@code null}/blank idiom at each note
- * field. The JSON deserializer keeps its own Unicode-blank-to-{@code null} policy inline because it
- * deliberately differs from the form editor's ASCII-empty policy.
+ * <p>The frontend keeps its own copy because the two Spring Boot modules share no library for this;
+ * the semantics are identical to the backend so a value normalizes the same regardless of which
+ * module bound it.
  */
 public final class StringNormalization {
 
   /**
-   * The single free-text length cap, matching the longest free-text column in the schema. Shared by
-   * the JSON deserializer and the form editor so the limit is declared in exactly one place instead
-   * of being repeated as a bare {@code 8000} literal at each site.
+   * The single free-text length cap, matching the backend's {@code MAX_FREE_TEXT_LENGTH} and the
+   * longest free-text column in the schema, declared once instead of as a bare {@code 8000} literal
+   * at each binding site.
    */
   public static final int MAX_FREE_TEXT_LENGTH = 8000;
 
@@ -50,16 +49,14 @@ public final class StringNormalization {
 
   /**
    * NFC-normalizes {@code value} and enforces {@code maxLength}. NFC collapses Unicode combining
-   * sequences into precomposed code points so {@code "café"} (one code point) and {@code "cafe +
-   * ́"} (two code points) canonicalize to the same string and compare equal in the database. The
-   * caller is responsible for trimming and for its own null/blank handling before calling this;
-   * {@code value} must be non-null.
+   * sequences into precomposed code points so equivalent spellings compare equal once persisted.
+   * The caller is responsible for trimming and its own null/blank handling; {@code value} must be
+   * non-null.
    *
    * @param value the already-trimmed, non-null value to canonicalize
    * @param maxLength the inclusive maximum allowed length after normalization
    * @return the NFC-normalized value
-   * @throws IllegalArgumentException when the normalized value exceeds {@code maxLength}; {@code
-   *     GlobalExceptionHandler} maps this to an HTTP 400
+   * @throws IllegalArgumentException when the normalized value exceeds {@code maxLength}
    */
   public static String normalizeAndCap(String value, int maxLength) {
     String normalized = Normalizer.normalize(value, Normalizer.Form.NFC);
@@ -73,11 +70,10 @@ public final class StringNormalization {
    * Collapses a {@code null} or blank string to {@code null}, otherwise returns it unchanged.
    *
    * <p>"Blank" is {@link String#isBlank()} — a {@link Character#isWhitespace(int)}-based test — so
-   * a value made up only of spaces, tabs or other Unicode whitespace (e.g. an em space) maps to
-   * {@code null}, whereas a non-breaking space (U+00A0, deliberately not {@code isWhitespace})
-   * counts as content. Unlike {@link #trimToNull(String)} the returned value is <em>not</em>
-   * stripped; this is the plain "empty means absent" collapse used by importer resolution code that
-   * must leave an otherwise-present value byte-for-byte intact.
+   * a value made up only of spaces, tabs or other Unicode whitespace maps to {@code null} while a
+   * non-breaking space (U+00A0, deliberately not {@code isWhitespace}) counts as content. The
+   * returned value is not stripped: this is the plain "empty means absent" collapse the alias /
+   * blueprint admin controllers apply to optional external keys, codes and notes.
    *
    * @param value the candidate value, may be {@code null}
    * @return {@code null} when {@code value} is {@code null} or blank, otherwise {@code value}
@@ -90,15 +86,13 @@ public final class StringNormalization {
 
   /**
    * Strips leading/trailing (Unicode) whitespace and collapses a {@code null} or blank result to
-   * {@code null}.
+   * {@code null} — {@code value == null || value.isBlank() ? null : value.strip()}.
    *
-   * <p>Equivalent to {@code value == null || value.isBlank() ? null : value.strip()}: a {@code
-   * null} or whitespace-only input yields {@code null}, otherwise the {@link String#strip()
-   * stripped} value. This is the canonical free-text "note" collapse. Every inbound note has
-   * already been trimmed, NFC-normalized and length-capped by the global binder ({@code
-   * NormalizedStringDeserializer} for JSON, {@code NormalizedStringEditor} for forms), so at the
-   * service layer this only re-asserts the "blank means cleared" invariant on an already-clean
-   * value — it centralizes the idiom the note setters used to inline five different ways.
+   * <p>The trim-then-empty-to-{@code null} collapse the material-alias admin form applies to its
+   * optional external key / code / note fields. Those values are already trimmed, NFC-normalized
+   * and length-capped by the global {@code NormalizedStringEditor} before the controller sees them,
+   * so this only re-asserts the "blank means cleared" invariant; standardizing on {@link
+   * String#strip()} matches the backend's {@code StringNormalization.trimToNull}.
    *
    * @param value the candidate value, may be {@code null}
    * @return the stripped value, or {@code null} when {@code value} is {@code null} or blank
@@ -114,16 +108,13 @@ public final class StringNormalization {
    * <p>Mirrors {@code NormalizedStringEditor}'s form-binding path exactly so the editor is a
    * one-line delegate: a {@code null} input stays {@code null}; the value is trimmed with {@link
    * String#trim()}; when {@code emptyAsNull} is set and the trimmed value is ASCII-empty it becomes
-   * {@code null}; otherwise it is passed through {@link #normalizeAndCap(String, int)}. The {@code
-   * emptyAsNull} flag lets a caller choose whether a blank input reads as "absent" ({@code null})
-   * or as an explicitly-cleared empty string.
+   * {@code null}; otherwise it is passed through {@link #normalizeAndCap(String, int)}.
    *
    * @param value the raw inbound value, may be {@code null}
    * @param maxLength the inclusive maximum length enforced after normalization
    * @param emptyAsNull whether a trimmed-empty value collapses to {@code null}
    * @return the trimmed, NFC-normalized, length-checked value, or {@code null}
-   * @throws IllegalArgumentException when the normalized value exceeds {@code maxLength}; {@code
-   *     GlobalExceptionHandler} maps this to an HTTP 400
+   * @throws IllegalArgumentException when the normalized value exceeds {@code maxLength}
    */
   @Contract(value = "null, _, _ -> null", pure = true)
   public static @Nullable String normalize(

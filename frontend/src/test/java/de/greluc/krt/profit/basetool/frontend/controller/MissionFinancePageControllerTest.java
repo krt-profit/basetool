@@ -35,6 +35,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.frontend.model.dto.FinanceType;
 import de.greluc.krt.profit.basetool.frontend.model.form.MissionFinanceEntryForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
@@ -61,6 +62,7 @@ class MissionFinancePageControllerTest {
 
   private BackendApiClient backendApiClient;
   private MissionPageController missionPageController;
+  private FrontendAuthHelperService authHelper;
   private MissionFinancePageController controller;
   private RedirectAttributes redirectAttributes;
   private OidcUser principal;
@@ -72,7 +74,9 @@ class MissionFinancePageControllerTest {
   void setUp() {
     backendApiClient = mock(BackendApiClient.class);
     missionPageController = mock(MissionPageController.class);
-    controller = new MissionFinancePageController(backendApiClient, missionPageController);
+    authHelper = mock(FrontendAuthHelperService.class);
+    controller =
+        new MissionFinancePageController(backendApiClient, missionPageController, authHelper);
     redirectAttributes = new RedirectAttributesModelMap();
     principal = mock(OidcUser.class);
   }
@@ -142,12 +146,14 @@ class MissionFinancePageControllerTest {
 
     @Test
     void anonymousCaller_passesIsPublicTrueToBackend() {
-      // principal == null -> isPublic=true on the backend call (anonymous
-      // user submitting from a public mission RSVP form).
+      // An anonymous request -> isPublic=true on the backend call (guest submitting from a public
+      // mission RSVP form). Since #906 Q10 the guest signal is authHelper.isAnonymous() (the
+      // SecurityContext), not the null principal parameter, so it is stubbed here.
       Model model = new ConcurrentModel();
       MissionFinanceEntryForm form = newForm(FinanceType.INCOME, BigDecimal.TEN);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
+      when(authHelper.isAnonymous()).thenReturn(true);
 
       controller.addFinanceEntry(
           MISSION_ID, form, br, model, redirectAttributes, /* principal= */ null);
@@ -318,6 +324,9 @@ class MissionFinancePageControllerTest {
 
     @Test
     void addAjax_anonymousCaller_passesIsPublicTrue() {
+      // Since #906 Q10 the guest signal is authHelper.isAnonymous() (the SecurityContext), not the
+      // null principal parameter.
+      when(authHelper.isAnonymous()).thenReturn(true);
       Map<String, Object> body = new HashMap<>();
       controller.addFinanceEntryAjax(MISSION_ID, body, /* principal= */ null);
       verify(backendApiClient)

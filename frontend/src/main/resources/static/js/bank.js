@@ -5,8 +5,9 @@
  *  - modal field priming: `data-field-*` attributes on an open-modal trigger are
  *    copied into the modal form before it opens (row-scoped id/version/name),
  *  - AJAX forms (`form.bank-ajax-form`): JSON POST/PATCH/DELETE against
- *    /api/proxy/bank/**, CSRF via the shared window.krtCsrf with retry-once-on-403,
- *    success = in-place server-fragment swap of the region named by the form's
+ *    /api/proxy/bank/** sent through the shared window.krtFetch.write (CSRF +
+ *    retry-once-on-403 + X-Reauthenticate redirect; #906 Q13 retired the former
+ *    bespoke bankWrite loop), success = in-place server-fragment swap of the region named by the form's
  *    `data-refresh` attribute (accountBody / manageBody / grantsMatrix) so balances,
  *    holder distribution, tab-counts and every @Version stay server-authoritative
  *    without a page reload (#579, REQ-FE-005); errors = localized inline message
@@ -106,41 +107,6 @@
             headers[header] = token;
         }
         return headers;
-    }
-
-    /**
-     * Sends a bank write with the shared CSRF headers and the epic's retry-once-on-403 semantics: a
-     * bare 403 means the CSRF token went stale (post-re-login session rotation, maximumSessions
-     * eviction), so the token is refreshed from GET /csrf via window.krtCsrf.refresh() and the write
-     * retried exactly once. Headers are rebuilt each attempt so the retry picks up the fresh token.
-     * Returns the final Response, or null on a network error — matching the legacy behavior so the
-     * caller's generic-error branch still fires.
-     *
-     * @param {string} url the request URL
-     * @param {RequestInit} baseInit method + optional body (headers are built here, not by the caller)
-     * @returns {Promise<Response|null>} the response, or null when the network call threw
-     */
-    async function bankWrite(url, baseInit) {
-        function withHeaders() {
-            return Object.assign({}, baseInit, { headers: csrfHeaders() });
-        }
-        let response;
-        try {
-            response = await fetch(url, withHeaders());
-            if (
-                response.status === 403 &&
-                window.krtCsrf &&
-                typeof window.krtCsrf.refresh === 'function'
-            ) {
-                const refreshed = await window.krtCsrf.refresh();
-                if (refreshed) {
-                    response = await fetch(url, withHeaders());
-                }
-            }
-        } catch {
-            response = null;
-        }
-        return response;
     }
 
     /**
@@ -384,54 +350,54 @@
                 return filled !== undefined ? encodeURIComponent(filled) : match;
             });
 
-        const init = { method: method };
-        if (method !== 'GET' && method !== 'DELETE') {
-            init.body = JSON.stringify(body);
-        }
+        // Routed through the shared window.krtFetch.write (#906 Q13): it owns the CSRF header,
+        // the retry-once-on-403 and the X-Reauthenticate 401 redirect. The submit button is the
+        // opts.submitter, so send() disables it for the round-trip and re-enables it in its finally
+        // (which runs right after onSuccess schedules handleBankSuccess's async swap, matching the
+        // former explicit early re-enable). toast:false keeps the bank's inline field-level error
+        // rendering; onError handles every non-ok branch (returning true suppresses the default
+        // toast), and onNetworkError reproduces the old null-response inline _global error.
         const submitButton = form.querySelector('button[type="submit"]');
-        if (submitButton) {
-            submitButton.disabled = true;
-        }
-        const response = await bankWrite(endpoint, init);
-        if (response && response.ok) {
-            // Re-enable before the swap: the manage/grants modals live OUTSIDE the swapped region and
-            // are reused per row, so a left-disabled submit button would break the next open. On the
-            // detail page the button sits inside the swapped accountBody and is replaced anyway.
-            if (submitButton) {
-                submitButton.disabled = false;
-            }
-            handleBankSuccess(form);
-            return;
-        }
-        if (submitButton) {
-            submitButton.disabled = false;
-        }
-        if (!response) {
-            showError(form, '_global', genericError());
-            return;
-        }
-        let payload;
-        try {
-            payload = await response.json();
-        } catch {
-            payload = null;
-        }
-        if (payload && payload.unauthenticated) {
-            window.location.reload();
-            return;
-        }
-        if (payload && Array.isArray(payload.fieldErrors) && payload.fieldErrors.length > 0) {
-            payload.fieldErrors.forEach(function (fe) {
-                showError(form, fe.field, fe.message);
-            });
-            return;
-        }
-        const message = payload && payload.message ? payload.message : genericError();
-        const field =
-            payload && payload.code && CODE_FIELD[payload.code]
-                ? CODE_FIELD[payload.code]
-                : '_global';
-        showError(form, field, message);
+        await window.krtFetch.write({
+            method: method,
+            url: endpoint,
+            payload: method !== 'GET' && method !== 'DELETE' ? body : undefined,
+            submitter: submitButton,
+            toast: false,
+            errorMessage: genericError(),
+            onSuccess: function () {
+                handleBankSuccess(form);
+            },
+            onError: function (status, payload) {
+                // A backend body flag (not the header-based 401 that krtFetch redirects on) telling
+                // us the OAuth2 session is gone: reload so the browser re-runs the login flow.
+                if (payload && payload.unauthenticated) {
+                    window.location.reload();
+                    return true;
+                }
+                if (
+                    payload &&
+                    Array.isArray(payload.fieldErrors) &&
+                    payload.fieldErrors.length > 0
+                ) {
+                    payload.fieldErrors.forEach(function (fe) {
+                        showError(form, fe.field, fe.message);
+                    });
+                    return true;
+                }
+                const message = payload && payload.message ? payload.message : genericError();
+                const field =
+                    payload && payload.code && CODE_FIELD[payload.code]
+                        ? CODE_FIELD[payload.code]
+                        : '_global';
+                showError(form, field, message);
+                return true;
+            },
+            onNetworkError: function () {
+                showError(form, '_global', genericError());
+                return true;
+            },
+        });
     }
 
     /**
@@ -859,41 +825,40 @@
         const flag = flagButton.getAttribute('data-flag');
         flags[flag] = !flags[flag];
         flags.version = Number(row.getAttribute('data-version'));
-        flagButton.disabled = true;
         const endpoint =
             '/api/proxy/bank/grants/' +
             encodeURIComponent(row.getAttribute('data-user-id')) +
             '/' +
             encodeURIComponent(row.getAttribute('data-account-id'));
-        const response = await bankWrite(endpoint, {
+        // Routed through window.krtFetch.write (#906 Q13): flagButton is the submitter (disabled
+        // for the round-trip, re-enabled in send()'s finally); applyGrantFlagResult receives the
+        // parsed success body. toast:false + an explicit onError preserve the bank's payload.message
+        // error toast — krtFetch's default error toast reads a problem+json `detail`, but the bank
+        // grant error body carries `message`, so the default would downgrade it to the generic text.
+        await window.krtFetch.write({
             method: 'PATCH',
-            body: JSON.stringify(flags),
-        });
-        flagButton.disabled = false;
-        if (response && response.ok) {
-            let payload = null;
-            try {
-                payload = await response.json();
-            } catch {
-                // a malformed/empty body leaves payload null; applyGrantFlagResult tolerates it
-            }
-            applyGrantFlagResult(flagButton, row, flag, flags[flag], payload);
-            return;
-        }
-        let message = genericError();
-        if (response) {
-            try {
-                const payload = await response.json();
-                if (payload && payload.message) {
-                    message = payload.message;
+            url: endpoint,
+            payload: flags,
+            submitter: flagButton,
+            toast: false,
+            errorMessage: genericError(),
+            onSuccess: function (payload) {
+                applyGrantFlagResult(flagButton, row, flag, flags[flag], payload);
+            },
+            onError: function (status, payload) {
+                const message = payload && payload.message ? payload.message : genericError();
+                if (typeof window.showFrontendErrorToast === 'function') {
+                    window.showFrontendErrorToast(message);
                 }
-            } catch {
-                // keep the generic message
-            }
-        }
-        if (typeof window.showFrontendErrorToast === 'function') {
-            window.showFrontendErrorToast(message);
-        }
+                return true;
+            },
+            onNetworkError: function () {
+                if (typeof window.showFrontendErrorToast === 'function') {
+                    window.showFrontendErrorToast(genericError());
+                }
+                return true;
+            },
+        });
     });
 
     /** Grants filter selects: navigate to the chosen grouping/entity on change. */

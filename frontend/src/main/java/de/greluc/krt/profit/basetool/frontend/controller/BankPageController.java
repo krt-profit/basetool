@@ -57,6 +57,38 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Slf4j
 public class BankPageController {
 
+  /** Response type for the bank-wide holder registry ({@code /api/v1/bank/holders}). */
+  private static final ParameterizedTypeReference<List<BankHolderDto>> BANK_HOLDER_LIST =
+      new ParameterizedTypeReference<>() {};
+
+  /**
+   * Response type for the paged transfer-target account list ({@code
+   * /api/v1/bank/accounts?size=500}) that fills the transfer-destination select.
+   */
+  private static final ParameterizedTypeReference<PageResponse<BankAccountDto>> BANK_ACCOUNT_PAGE =
+      new ParameterizedTypeReference<>() {};
+
+  /**
+   * Response type for the deposit/withdrawal counterparty picker lookup ({@code
+   * /api/v1/users/lookup}, REQ-BANK-044).
+   */
+  private static final ParameterizedTypeReference<List<UserReferenceDto>> USER_REFERENCE_LIST =
+      new ParameterizedTypeReference<>() {};
+
+  /**
+   * Response type for one page of an account's booking history ({@code
+   * /api/v1/bank/accounts/{id}/transactions}).
+   */
+  private static final ParameterizedTypeReference<PageResponse<BankBookingDto>> BANK_BOOKING_PAGE =
+      new ParameterizedTypeReference<>() {};
+
+  /**
+   * Response type for one page of a holder's custody history ({@code
+   * /api/v1/bank/holders/{id}/transactions}).
+   */
+  private static final ParameterizedTypeReference<PageResponse<BankHolderBookingDto>>
+      BANK_HOLDER_BOOKING_PAGE = new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -128,12 +160,9 @@ public class BankPageController {
     BankAccountDetailDto detail =
         backendApiClient.get("/api/v1/bank/accounts/" + id, BankAccountDetailDto.class);
     PageResponse<BankBookingDto> bookings = fetchBookings(id, effectivePage);
-    List<BankHolderDto> holders =
-        backendApiClient.get(
-            "/api/v1/bank/holders", new ParameterizedTypeReference<List<BankHolderDto>>() {});
+    List<BankHolderDto> holders = backendApiClient.get("/api/v1/bank/holders", BANK_HOLDER_LIST);
     PageResponse<BankAccountDto> accounts =
-        backendApiClient.get(
-            "/api/v1/bank/accounts?size=500", new ParameterizedTypeReference<>() {});
+        backendApiClient.get("/api/v1/bank/accounts?size=500", BANK_ACCOUNT_PAGE);
 
     model.addAttribute("detail", detail);
     model.addAttribute("bookings", bookings);
@@ -160,8 +189,7 @@ public class BankPageController {
     // (REQ-BANK-041) — they are configured only in the org-unit bank — so the lookup no longer
     // feeds a limit editor here.
     List<UserReferenceDto> lookup =
-        backendApiClient.get(
-            "/api/v1/users/lookup", new ParameterizedTypeReference<List<UserReferenceDto>>() {});
+        backendApiClient.get("/api/v1/users/lookup", USER_REFERENCE_LIST);
     model.addAttribute("users", lookup == null ? List.<UserReferenceDto>of() : lookup);
     // The in-game transfer-fee rate (ADR-0052, REQ-BANK-033) drives the live "Gebühr / wird
     // abgebucht" preview in the withdraw/transfer modals (bank.js). It rides on <main>, which
@@ -215,7 +243,7 @@ public class BankPageController {
             .queryParam("page", page)
             .queryParam("size", 20)
             .toUriString(),
-        new ParameterizedTypeReference<>() {});
+        BANK_BOOKING_PAGE);
   }
 
   /**
@@ -292,7 +320,7 @@ public class BankPageController {
             .queryParam("page", page)
             .queryParam("size", 20)
             .toUriString(),
-        new ParameterizedTypeReference<>() {});
+        BANK_HOLDER_BOOKING_PAGE);
   }
 
   /**

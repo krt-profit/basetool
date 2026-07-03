@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.HashSet;
@@ -146,7 +147,7 @@ public class MissionStructureService {
 
     missionUnit.setName(resolveUnitName(name, missionUnit));
     missionUnit.setResponsibleUser(resolveResponsibleUser(responsibleUserId));
-    missionUnit.setNote(normalizeUnitNote(note));
+    missionUnit.setNote(StringNormalization.trimToNull(note));
     missionUnit.setHighValueUnit(highValueUnit);
 
     if (frequency != null) {
@@ -214,17 +215,6 @@ public class MissionStructureService {
   }
 
   /**
-   * Normalises a unit note: trims surrounding whitespace and collapses blank input to {@code null}
-   * so the column stays empty instead of storing whitespace-only strings.
-   *
-   * @param note the caller-submitted note (nullable)
-   * @return the trimmed note or {@code null}
-   */
-  private static String normalizeUnitNote(String note) {
-    return note == null || note.isBlank() ? null : note.trim();
-  }
-
-  /**
    * Updates a unit's name and the assigned ship. Per-unit optimistic lock — concurrent unit edits
    * across the mission don't collide.
    */
@@ -252,7 +242,7 @@ public class MissionStructureService {
 
     missionUnit.setHighValueUnit(highValueUnit);
     missionUnit.setResponsibleUser(resolveResponsibleUser(responsibleUserId));
-    missionUnit.setNote(normalizeUnitNote(note));
+    missionUnit.setNote(StringNormalization.trimToNull(note));
 
     if (shipTypeId != null) {
       ShipType shipType =

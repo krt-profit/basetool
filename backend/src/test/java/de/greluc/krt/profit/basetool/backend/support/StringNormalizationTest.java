@@ -20,15 +20,20 @@
 package de.greluc.krt.profit.basetool.backend.support;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
 
 /**
  * Unit tests for {@link StringNormalization}, the shared NFC-normalize-and-length-cap step
- * extracted from {@code NormalizedStringDeserializer} and {@code NormalizedStringEditor}. The
- * accent code points are built via {@link Character#toString(int)} rather than literals or escaped
- * unicode, so the decomposed-vs-precomposed distinction the tests hinge on is unambiguous.
+ * extracted from {@code NormalizedStringDeserializer} and {@code NormalizedStringEditor} plus the
+ * blank-collapse primitives ({@link StringNormalization#blankToNull(String)}, {@link
+ * StringNormalization#trimToNull(String)}) and the full {@link
+ * StringNormalization#normalize(String, int, boolean) normalize} pipeline the service layer and
+ * form editor reuse. The accent code points are built via {@link Character#toString(int)} rather
+ * than literals or escaped unicode, so the decomposed-vs-precomposed distinction the tests hinge on
+ * is unambiguous.
  */
 class StringNormalizationTest {
 
@@ -40,6 +45,22 @@ class StringNormalizationTest {
 
   /** Precomposed "e-acute" (U+00E9): the single-code-unit NFC form the sequence collapses to. */
   private static final String PRECOMPOSED_E_ACUTE = Character.toString(0x00E9);
+
+  /**
+   * Em space (U+2003): a Unicode whitespace code point that {@link String#isBlank()} and {@link
+   * String#strip()} recognise (via {@link Character#isWhitespace(int)}) but {@link String#trim()}
+   * does NOT (trim only removes code points {@code <= U+0020}). It is the operative distinction
+   * between the strip-based collapse and the old trim-based note idioms.
+   */
+  private static final String EM_SPACE = Character.toString(0x2003);
+
+  /**
+   * Non-breaking space (U+00A0): a space character that is deliberately NOT {@link
+   * Character#isWhitespace(int)}, so {@code isBlank()} treats it as content and {@code strip()}
+   * leaves it in place — the edge that proves the collapse keys on {@code isWhitespace}, not on
+   * "looks like a space".
+   */
+  private static final String NBSP = Character.toString(0x00A0);
 
   @Test
   void normalizeAndCap_collapsesCombiningSequenceToNfc() {
@@ -87,5 +108,63 @@ class StringNormalizationTest {
     // does not — Then the guard must use the post-normalization length and accept it
     String result = StringNormalization.normalizeAndCap(input, 10);
     assertEquals(PRECOMPOSED_E_ACUTE.repeat(10), result);
+  }
+
+  @Test
+  void blankToNull_collapsesNullAndIsWhitespaceBlankButLeavesContentUnstripped() {
+    // Null / empty / ASCII-whitespace / isWhitespace-only (em space) all collapse to null
+    assertNull(StringNormalization.blankToNull(null));
+    assertNull(StringNormalization.blankToNull(""));
+    assertNull(StringNormalization.blankToNull("   "));
+    assertNull(StringNormalization.blankToNull(EM_SPACE));
+
+    // A non-breaking space is NOT isWhitespace, so it counts as content and is kept
+    assertEquals(NBSP, StringNormalization.blankToNull(NBSP));
+
+    // A value with content is returned byte-for-byte — surrounding whitespace is NOT stripped
+    assertEquals("  x  ", StringNormalization.blankToNull("  x  "));
+    assertEquals("hello", StringNormalization.blankToNull("hello"));
+  }
+
+  @Test
+  void trimToNull_collapsesBlankAndStripsIsWhitespaceFromContent() {
+    // Null / empty / ASCII-whitespace / isWhitespace-only (em space) all collapse to null
+    assertNull(StringNormalization.trimToNull(null));
+    assertNull(StringNormalization.trimToNull(""));
+    assertNull(StringNormalization.trimToNull("   "));
+    assertNull(StringNormalization.trimToNull(EM_SPACE));
+
+    // Content is stripped of ASCII and Unicode edge whitespace (em space), interior kept
+    assertEquals("note", StringNormalization.trimToNull("  note  "));
+    assertEquals("note", StringNormalization.trimToNull(EM_SPACE + "note" + EM_SPACE));
+    assertEquals("a b", StringNormalization.trimToNull(" a b "));
+
+    // A non-breaking space is NOT isWhitespace: strip() leaves it, so it survives as content
+    assertEquals(NBSP + "note" + NBSP, StringNormalization.trimToNull(NBSP + "note" + NBSP));
+  }
+
+  @Test
+  void normalize_trimsAppliesEmptyPolicyThenNfcAndCaps() {
+    // Null stays null regardless of the flag
+    assertNull(StringNormalization.normalize(null, 10, true));
+    assertNull(StringNormalization.normalize(null, 10, false));
+
+    // emptyAsNull=true collapses a trimmed-empty (ASCII) value to null; the NBSP survives trim so
+    // it is NOT collapsed (mirrors NormalizedStringEditor's ASCII-only empty policy)
+    assertNull(StringNormalization.normalize("   ", 10, true));
+    assertEquals(NBSP, StringNormalization.normalize(NBSP, 10, true));
+
+    // emptyAsNull=false keeps a trimmed-empty value as the empty string
+    assertEquals("", StringNormalization.normalize("   ", 10, false));
+
+    // Content is trimmed, NFC-normalized and length-checked
+    assertEquals(
+        "caf" + PRECOMPOSED_E_ACUTE,
+        StringNormalization.normalize("  caf" + DECOMPOSED_E_ACUTE + "  ", 10, true));
+
+    // The cap is enforced on the post-trim, post-NFC length
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> StringNormalization.normalize("a".repeat(11), 10, true));
   }
 }

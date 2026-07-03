@@ -65,6 +65,14 @@ public class ShipDataPageController {
 
   private final BackendApiClient backendApiClient;
 
+  /** Response type for the manufacturer catalog page fetch (includes hidden entries). */
+  private static final ParameterizedTypeReference<PageResponse<ManufacturerDto>>
+      MANUFACTURER_PAGE_TYPE = new ParameterizedTypeReference<>() {};
+
+  /** Response type for the ship-type catalog page fetch (includes hidden entries). */
+  private static final ParameterizedTypeReference<PageResponse<ShipTypeDto>> SHIP_TYPE_PAGE_TYPE =
+      new ParameterizedTypeReference<>() {};
+
   /**
    * Loads the manufacturer and ship-type catalogs (size=1000, including hidden) and seeds empty
    * forms when not already in the model. Both lists are sorted case-insensitively by name. A
@@ -87,7 +95,7 @@ public class ShipDataPageController {
       PageResponse<ManufacturerDto> manufacturersPage =
           backendApiClient.get(
               "/api/v1/manufacturers?size=1000&sort=name,asc&includeHidden=true",
-              new ParameterizedTypeReference<PageResponse<ManufacturerDto>>() {});
+              MANUFACTURER_PAGE_TYPE);
 
       List<ManufacturerDto> manufacturers = new ArrayList<>();
       if (manufacturersPage != null && manufacturersPage.content() != null) {
@@ -99,8 +107,7 @@ public class ShipDataPageController {
 
       PageResponse<ShipTypeDto> shipTypesPage =
           backendApiClient.get(
-              "/api/v1/ship-types?size=1000&sort=name,asc&includeHidden=true",
-              new ParameterizedTypeReference<PageResponse<ShipTypeDto>>() {});
+              "/api/v1/ship-types?size=1000&sort=name,asc&includeHidden=true", SHIP_TYPE_PAGE_TYPE);
 
       List<ShipTypeDto> shipTypes = new ArrayList<>();
       if (shipTypesPage != null && shipTypesPage.content() != null) {

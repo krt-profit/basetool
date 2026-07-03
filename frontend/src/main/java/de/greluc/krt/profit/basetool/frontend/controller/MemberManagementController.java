@@ -76,6 +76,15 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class MemberManagementController {
 
+  /** Response type for the paged {@code /users} and {@code /users/search} member listings. */
+  private static final ParameterizedTypeReference<PageResponse<UserDto>> USER_PAGE_TYPE =
+      new ParameterizedTypeReference<>() {};
+
+  /** Response type for the {@code /users/{id}/memberships} org-unit membership-option list. */
+  private static final ParameterizedTypeReference<
+          List<de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto>>
+      MEMBERSHIP_OPTION_LIST_TYPE = new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
   private final MessageSource messageSource;
 
@@ -117,8 +126,7 @@ public class MemberManagementController {
       uriBuilder.queryParam("sort", "username,asc");
 
       PageResponse<UserDto> pageResponse =
-          backendApiClient.get(
-              uriBuilder.toUriString(), new ParameterizedTypeReference<PageResponse<UserDto>>() {});
+          backendApiClient.get(uriBuilder.toUriString(), USER_PAGE_TYPE);
       List<UserDto> users = pageResponse == null ? null : pageResponse.content();
       model.addAttribute("users", users);
       model.addAttribute("usersPage", pageResponse);
@@ -139,8 +147,7 @@ public class MemberManagementController {
           try {
             List<de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto> all =
                 backendApiClient.get(
-                    "/api/v1/users/" + u.id() + "/memberships",
-                    new org.springframework.core.ParameterizedTypeReference<>() {});
+                    "/api/v1/users/" + u.id() + "/memberships", MEMBERSHIP_OPTION_LIST_TYPE);
             if (all == null) {
               skMemberships.put(u.id(), java.util.Collections.emptyList());
               continue;
@@ -181,8 +188,7 @@ public class MemberManagementController {
             .queryParam("size", 1000)
             .queryParam("sort", "username,asc")
             .toUriString();
-    PageResponse<UserDto> page =
-        backendApiClient.get(uri, new ParameterizedTypeReference<PageResponse<UserDto>>() {});
+    PageResponse<UserDto> page = backendApiClient.get(uri, USER_PAGE_TYPE);
     return page == null ? null : page.content();
   }
 
@@ -218,8 +224,7 @@ public class MemberManagementController {
         List<de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto>
             memberships =
                 backendApiClient.get(
-                    "/api/v1/users/" + id + "/memberships",
-                    new org.springframework.core.ParameterizedTypeReference<>() {});
+                    "/api/v1/users/" + id + "/memberships", MEMBERSHIP_OPTION_LIST_TYPE);
         model.addAttribute(
             "memberMemberships",
             memberships != null

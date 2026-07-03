@@ -77,6 +77,10 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 public class AdminMissionDataPageController {
 
+  /** Captured generic type for decoding a paged raw-{@code Map} catalog response. */
+  private static final ParameterizedTypeReference<PageResponse<Map<String, Object>>> MAP_PAGE =
+      new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
   private final ParallelPageLoader parallelPageLoader;
 
@@ -178,7 +182,7 @@ public class AdminMissionDataPageController {
     PageResponse<Map<String, Object>> page =
         backendApiClient.get(
             "/api/v1/job-types?size=1000&sort=name,asc&includeInactive=" + includeInactive,
-            new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {});
+            MAP_PAGE);
     if (page == null || page.content() == null) {
       return null;
     }
@@ -212,7 +216,7 @@ public class AdminMissionDataPageController {
     PageResponse<Map<String, Object>> page =
         backendApiClient.get(
             "/api/v1/squadrons?size=1000&sort=name,asc&includeInactive=" + includeInactive,
-            new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {});
+            MAP_PAGE);
     if (page == null || page.content() == null) {
       return null;
     }
@@ -246,7 +250,7 @@ public class AdminMissionDataPageController {
         backendApiClient.get(
             "/api/v1/frequency-types?size=1000&sort=sortIndex,asc"
                 + (includeInactive ? "" : "&active=true"),
-            new ParameterizedTypeReference<PageResponse<Map<String, Object>>>() {});
+            MAP_PAGE);
     return page != null ? page.content() : null;
   }
 
