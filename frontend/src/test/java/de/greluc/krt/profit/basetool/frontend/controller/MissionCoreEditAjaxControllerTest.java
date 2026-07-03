@@ -57,8 +57,8 @@ import org.springframework.web.context.WebApplicationContext;
 
 /**
  * MVC tests for the #589 in-place mission core-edit twin {@link
- * MissionPageController#updateMissionAjax}: the success path returns the four fresh versions (incl.
- * the schedule version re-read after the PLANNED→ACTIVE auto-bump), an unedited microsecond
+ * MissionWriteController#updateMissionAjax}: the success path returns the four fresh versions
+ * (incl. the schedule version re-read after the PLANNED→ACTIVE auto-bump), an unedited microsecond
  * zoneless schedule time round-trips through the schedule PATCH instead of being nulled, a
  * {@code @Valid} failure returns a {@code 422} {@code {field: message}} map (messages resolved
  * exactly as {@code th:errors}) with no backend call, a backend {@code 409} is propagated as {@code

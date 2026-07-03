@@ -52,11 +52,13 @@ class InventoryPageControllerTest {
 
   private BackendApiClient backendApiClient;
   private InventoryPageController controller;
+  private InventoryWriteController writeController;
 
   @BeforeEach
   void setUp() {
     backendApiClient = mock(BackendApiClient.class);
     controller = new InventoryPageController(backendApiClient, PARALLEL);
+    writeController = new InventoryWriteController(backendApiClient, controller);
   }
 
   @Test
@@ -259,7 +261,8 @@ class InventoryPageControllerTest {
         .thenReturn(expectedDto);
 
     String view =
-        controller.addInventoryItem(form, bindingResult, new ConcurrentModel(), redirectAttributes);
+        writeController.addInventoryItem(
+            form, bindingResult, new ConcurrentModel(), redirectAttributes);
 
     assertEquals("redirect:/inventory", view);
     assertTrue(redirectAttributes.getFlashAttributes().containsKey("successToast"));
@@ -273,7 +276,8 @@ class InventoryPageControllerTest {
     RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
 
     String view =
-        controller.addInventoryItem(form, bindingResult, new ConcurrentModel(), redirectAttributes);
+        writeController.addInventoryItem(
+            form, bindingResult, new ConcurrentModel(), redirectAttributes);
 
     // After the render-instead-redirect refactor a validation error renders the
     // input view inline rather than redirecting; BindingResult stays request-scoped
@@ -292,7 +296,8 @@ class InventoryPageControllerTest {
         .thenThrow(new RuntimeException("Error"));
 
     String view =
-        controller.addInventoryItem(form, bindingResult, new ConcurrentModel(), redirectAttributes);
+        writeController.addInventoryItem(
+            form, bindingResult, new ConcurrentModel(), redirectAttributes);
 
     assertEquals("redirect:/inventory/input", view);
     assertTrue(redirectAttributes.getFlashAttributes().containsKey("errorToast"));
@@ -312,7 +317,7 @@ class InventoryPageControllerTest {
     when(backendApiClient.post(anyString(), any(), eq(Void.class))).thenReturn(null);
 
     String view =
-        controller.bookOutInventoryItem(
+        writeController.bookOutInventoryItem(
             id, form, bindingResult, new ConcurrentModel(), redirectAttributes, "/inventory/all");
 
     assertEquals("redirect:/inventory/all", view);
@@ -332,7 +337,7 @@ class InventoryPageControllerTest {
         .thenThrow(new RuntimeException("Update error"));
 
     String view =
-        controller.bookOutInventoryItem(
+        writeController.bookOutInventoryItem(
             id, form, bindingResult, new ConcurrentModel(), redirectAttributes, "/inventory/all");
 
     assertEquals("redirect:/inventory/all", view);
@@ -355,7 +360,7 @@ class InventoryPageControllerTest {
     String referer =
         "https://example.org/inventory/my?materialIds=11111111-1111-1111-1111-111111111111&minQuality=50&jobOrderIds=22222222-2222-2222-2222-222222222222&fragment=true";
     String view =
-        controller.bookOutInventoryItem(
+        writeController.bookOutInventoryItem(
             id, form, bindingResult, new ConcurrentModel(), redirectAttributes, referer);
 
     assertEquals(
@@ -379,7 +384,7 @@ class InventoryPageControllerTest {
         "https://example.org/inventory/all?missionIds=33333333-3333-3333-3333-333333333333&page=2";
     ConcurrentModel renderModel = new ConcurrentModel();
     String view =
-        controller.bookOutInventoryItem(
+        writeController.bookOutInventoryItem(
             id, form, bindingResult, renderModel, redirectAttributes, referer);
 
     // After the render-instead-redirect refactor a validation error during book-out
@@ -394,20 +399,20 @@ class InventoryPageControllerTest {
   void buildInventoryRedirectFromReferer_shouldHandleNullAndEmptyReferer() {
     assertEquals(
         "/inventory/my",
-        de.greluc.krt.profit.basetool.frontend.controller.InventoryPageController
+        de.greluc.krt.profit.basetool.frontend.controller.InventoryWriteController
             .buildInventoryRedirectFromReferer("/inventory/my", null));
     assertEquals(
         "/inventory/my",
-        de.greluc.krt.profit.basetool.frontend.controller.InventoryPageController
+        de.greluc.krt.profit.basetool.frontend.controller.InventoryWriteController
             .buildInventoryRedirectFromReferer("/inventory/my", ""));
     assertEquals(
         "/inventory/my",
-        de.greluc.krt.profit.basetool.frontend.controller.InventoryPageController
+        de.greluc.krt.profit.basetool.frontend.controller.InventoryWriteController
             .buildInventoryRedirectFromReferer(
                 "/inventory/my", "https://example.org/inventory/my"));
     assertEquals(
         "/inventory/all",
-        de.greluc.krt.profit.basetool.frontend.controller.InventoryPageController
+        de.greluc.krt.profit.basetool.frontend.controller.InventoryWriteController
             .buildInventoryRedirectFromReferer(
                 "/inventory/all", "https://example.org/inventory/all?fragment=true"));
   }
@@ -422,7 +427,7 @@ class InventoryPageControllerTest {
     when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class))).thenReturn(null);
 
     org.springframework.http.ResponseEntity<InventoryItemDto> response =
-        controller.updateAssociations(id, dto);
+        writeController.updateAssociations(id, dto);
 
     assertEquals(200, response.getStatusCode().value());
     verify(backendApiClient)
@@ -442,7 +447,7 @@ class InventoryPageControllerTest {
     when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class))).thenThrow(exception);
 
     org.springframework.http.ResponseEntity<InventoryItemDto> response =
-        controller.updateAssociations(id, dto);
+        writeController.updateAssociations(id, dto);
 
     assertEquals(409, response.getStatusCode().value());
   }
@@ -458,7 +463,7 @@ class InventoryPageControllerTest {
         .thenThrow(new RuntimeException("Generic error"));
 
     org.springframework.http.ResponseEntity<InventoryItemDto> response =
-        controller.updateAssociations(id, dto);
+        writeController.updateAssociations(id, dto);
 
     assertEquals(500, response.getStatusCode().value());
   }
@@ -478,7 +483,7 @@ class InventoryPageControllerTest {
 
     // When
     org.springframework.http.ResponseEntity<InventoryItemDto> response =
-        controller.updateInventoryItemNote(id, request);
+        writeController.updateInventoryItemNote(id, request);
 
     // Then
     assertEquals(200, response.getStatusCode().value());
@@ -497,7 +502,7 @@ class InventoryPageControllerTest {
 
     // When
     org.springframework.http.ResponseEntity<InventoryItemDto> response =
-        controller.updateInventoryItemNote(id, request);
+        writeController.updateInventoryItemNote(id, request);
 
     // Then: must be 409, NOT 500, so the JS modal can react (toast + reload) instead of
     // treating the response as a generic server error.
@@ -514,7 +519,7 @@ class InventoryPageControllerTest {
     when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class))).thenThrow(ex);
 
     org.springframework.http.ResponseEntity<InventoryItemDto> response =
-        controller.updateInventoryItemNote(id, request);
+        writeController.updateInventoryItemNote(id, request);
 
     assertEquals(403, response.getStatusCode().value());
   }
@@ -527,7 +532,7 @@ class InventoryPageControllerTest {
         .thenThrow(new RuntimeException("boom"));
 
     org.springframework.http.ResponseEntity<InventoryItemDto> response =
-        controller.updateInventoryItemNote(id, request);
+        writeController.updateInventoryItemNote(id, request);
 
     assertEquals(500, response.getStatusCode().value());
   }

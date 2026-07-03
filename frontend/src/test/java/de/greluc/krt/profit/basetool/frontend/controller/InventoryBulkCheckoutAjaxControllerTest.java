@@ -47,11 +47,11 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC tests for the #577 part-2 bulk-checkout proxy {@link InventoryPageController#bulkCheckout}: a
- * valid request forwards the ids to the backend and answers {@code 204}, a backend optimistic-lock
- * failure is propagated as {@code problem+json} with its {@code code} (so the client can drive the
- * reload-confirm), and an empty id list is rejected up front with {@code 422} {@code problem+json}
- * (code {@code VALIDATION}) without ever calling the backend.
+ * MVC tests for the #577 part-2 bulk-checkout proxy {@link InventoryWriteController#bulkCheckout}:
+ * a valid request forwards the ids to the backend and answers {@code 204}, a backend
+ * optimistic-lock failure is propagated as {@code problem+json} with its {@code code} (so the
+ * client can drive the reload-confirm), and an empty id list is rejected up front with {@code 422}
+ * {@code problem+json} (code {@code VALIDATION}) without ever calling the backend.
  */
 @SpringBootTest
 class InventoryBulkCheckoutAjaxControllerTest {
