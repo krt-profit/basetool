@@ -638,26 +638,88 @@ services:
       - net-proxy-keycloak
       - net-proxy-ingest
 
+# Every bridge network is pinned to a fixed /24 under 172.28.0.0/16 instead of
+# being left to Docker's dynamic address pool. This is deliberate, not cosmetic:
+# a `docker compose down` (or any network re-create) otherwise reassigns each
+# bridge a fresh subnet from the pool, so its gateway `.1` changes across
+# restarts.
+#
+# That gateway IP is load-bearing. The Keycloak Admin Console is exposed on the
+# public `keycloak.profit-base.online` vhost but locked to an SSH tunnel via an
+# nginx `allow … / deny all` on the `/admin` location in NPM. Host-origin traffic
+# (the operator's `ssh -N -L 443:127.0.0.1:443 …` tunnel hitting NPM's published
+# 443 through the host loopback) is SNAT'd by Docker to the gateway of whichever
+# net-proxy-* bridge the published-port DNAT targets — so the allow-list matches
+# a Docker gateway, not the operator's real IP. External clients keep their real
+# source IP and stay blocked by `deny all`. With dynamic subnets that gateway
+# moved on every restart and silently locked the admin console out (the exact
+# breakage this pinning prevents). See docs/deployment.md → "Keycloak Admin
+# Console via SSH tunnel" for the matching NPM `/admin` block.
+#
+# 172.28.0.0/16 sits outside Docker's default bridge (172.17.0.0/16) and is a
+# single-purpose host, so collision risk is nil. The three NPM-facing bridges
+# (net-proxy-frontend/-keycloak/-ingest) are grouped in .3/.4/.7 so the admin
+# allow-list is a short, explicit list of their gateways.
 networks:
   net-db-backend:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
+          gateway: 172.28.0.1
   net-db-keycloak:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.1.0/24
+          gateway: 172.28.1.1
   net-backend-frontend:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.2.0/24
+          gateway: 172.28.2.1
   net-proxy-frontend:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.3.0/24
+          gateway: 172.28.3.1
   net-proxy-keycloak:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.4.0/24
+          gateway: 172.28.4.1
   net-backend-keycloak:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.5.0/24
+          gateway: 172.28.5.1
   net-redis-frontend:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.6.0/24
+          gateway: 172.28.6.1
   # Ingest gateway (epic #639): proxy → ingest (the only new internet-facing edge),
   # ingest → backend, ingest → redis. backend stays OFF net-proxy-ingest.
   net-proxy-ingest:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.7.0/24
+          gateway: 172.28.7.1
   net-backend-ingest:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.8.0/24
+          gateway: 172.28.8.1
   net-redis-ingest:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.9.0/24
+          gateway: 172.28.9.1

@@ -13,6 +13,8 @@
 - **Frontend: Caffeine-Cache erfasst jetzt Trefferstatistiken.** Der `staticData`-Cache liefert damit Hit-Ratio-Werte an den Metrik-Endpunkt; zuvor wären die Cache-Panels des künftigen Monitorings dauerhaft leer geblieben (Epic #936).
 - **Ingest: Prod-Logs werden jetzt PII-maskiert.** Der Ingest-Dienst nutzt wie Backend und Frontend den maskierenden JSON-Encoder (JWTs, E-Mail-Adressen, Token-Schlüsselwörter); zuvor war er der letzte unmaskierte Log-Ausgang (REQ-OBS-004).
 
+## [v1.0.14](https://github.com/krt-profit/basetool/releases/tag/v1.0.14) - 2026-07-03
+
 ## [v1.0.13](https://github.com/krt-profit/basetool/releases/tag/v1.0.13) - 2026-07-03
 
 ### Added
