@@ -26,7 +26,7 @@ phase checklists. This ADR records the architectural decisions and their trade-o
    OSS (the only UI), Loki (logs, 31 days), Tempo (traces, 14 days, monolithic mode — no
    Kafka), Grafana Alloy (log shipper + OTLP collector; Promtail is EOL), Alertmanager
    (e-mail via the owner's SMTP provider), plus node_exporter, cAdvisor, postgres_exporter
-   ×2, redis_exporter, blackbox_exporter, a docker-socket-proxy and a github-exporter.
+   ×2, redis_exporter, blackbox_exporter and a docker-socket-proxy.
    Latest stable versions, digest-pinned, Dependabot-maintained (owner version directive).
 2. **Separate compose project** (`docker-compose.monitoring.yml`), not a profile of the
    main file: fully decoupled from the 5-minute deploy loop — no `--remove-orphans` risk,

@@ -432,32 +432,6 @@ services:
       - net-monitoring-core
       - net-monitoring-scrape
 
-  # ------------------------------------------------------------------------------------------
-  # github-exporter (promhippie) — development metrics (stars/forks/issues + Actions workflow runs)
-  # for the tracked repos. Fine-grained read-only PAT from a host file; long scrape interval. Egress.
-  # ------------------------------------------------------------------------------------------
-  github-exporter:
-    <<: *mon-base
-    container_name: github-exporter
-    image: quay.io/promhippie/github-exporter:15.0.1
-    cap_drop: [ALL]
-    environment:
-      GITHUB_EXPORTER_WEB_ADDRESS: "0.0.0.0:9504"
-      GITHUB_EXPORTER_TOKEN: "file:///run/secrets/github_token"
-      GITHUB_EXPORTER_REPOS: "krt-profit/basetool,krt-profit/basetool-sc-extractor,krt-profit/design-system"
-      GITHUB_EXPORTER_COLLECTOR_REPOS: "true"
-      GITHUB_EXPORTER_COLLECTOR_WORKFLOW_RUNS: "true"
-    volumes:
-      - /var/iri/monitoring/secrets/github_token:/run/secrets/github_token:ro
-    deploy:
-      resources:
-        limits:
-          memory: 64M
-          pids: 512
-    networks:
-      - net-monitoring-core
-      - net-monitoring-scrape
-
 networks:
   # Shared boundary net, created and owned by the app stack (docker-compose.yml); referenced here by
   # its fixed name. Prometheus scrapes the apps + keycloak here and Alloy receives their OTLP spans.
@@ -471,8 +445,8 @@ networks:
     external: true
     name: net-proxy-grafana
   # Monitoring-only backbone (Prometheus/Alertmanager/Loki/Tempo/Grafana/exporters). App containers
-  # are NEVER members. Not `internal` because alertmanager (SMTP + healthchecks.io), blackbox and
-  # github-exporter need internet egress.
+  # are NEVER members. Not `internal` because alertmanager (SMTP + healthchecks.io) and blackbox
+  # need internet egress.
   net-monitoring-core:
     name: net-monitoring-core
     driver: bridge

@@ -136,13 +136,6 @@ scrape_configs:
     static_configs:
       - targets: ["alloy:12345"]
 
-  # --- GitHub development metrics (promhippie/github_exporter), long interval -------------
-  - job_name: github
-    scrape_interval: 15m
-    scrape_timeout: 1m
-    static_configs:
-      - targets: ["github-exporter:9504"]
-
   # --- Blackbox external probes: TLS + status of the public endpoints --------------------
   # Produces probe_success + probe_ssl_earliest_cert_expiry per target.
   - job_name: blackbox-http

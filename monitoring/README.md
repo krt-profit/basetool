@@ -46,7 +46,6 @@ to the realm role `Admin`. There is no other exposed monitoring surface.
 | redis_exporter       | `oliver006/redis_exporter`                      | v1.86.0 |
 | blackbox_exporter    | `prom/blackbox-exporter`                        | v0.28.0 |
 | docker-socket-proxy  | `tecnativa/docker-socket-proxy`                 | v0.4.2  |
-| github_exporter      | `quay.io/promhippie/github-exporter`            | 15.0.1  |
 
 ## Config tree map
 
@@ -70,7 +69,7 @@ to the realm role `Admin`. There is no other exposed monitoring surface.
   via `envsubst` at deploy time. The rendered `alertmanager.yml` is **not**
   committed (it carries secrets).
 - **`grafana/provisioning/{datasources,dashboards}`** + **`grafana/dashboards/*.json`**
-  — 13 dashboards, provisioned **read-only** (see the sandbox-export workflow
+  — 12 dashboards, provisioned **read-only** (see the sandbox-export workflow
   below).
 
 ## Privacy / retention at a glance
