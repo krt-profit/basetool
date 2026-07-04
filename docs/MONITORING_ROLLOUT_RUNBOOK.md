@@ -424,7 +424,7 @@ sudo grep -oP '(?<=>)[^ ]+' /var/iri/redis/users.acl   # this is REDIS_EXPORTER_
 
 > Note `+@read` combined with `-keys` and `sanitize-payload`: the exporter can run `INFO`/`SLOWLOG`/
 > `MEMORY` etc. but **cannot** list keys or dump arbitrary key values. After the stack is up, verify
-> the exporter authenticated cleanly: `docker logs iri-monitoring-redis-exporter-1 2>&1 | tail`.
+> the exporter authenticated cleanly: `docker logs redis-exporter 2>&1 | tail`.
 > `IRI_REDIS_ACL_HOST_PATH=/var/iri/redis/users.acl` is set in `.env` (Phase 5) so the app compose
 > mounts it and passes `--aclfile`.
 

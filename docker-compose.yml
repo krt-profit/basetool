@@ -414,6 +414,7 @@ services:
   redis:
     <<: *redis-template
     profiles: ["prod"]
+    container_name: redis
     # Prod overrides the template command to add the monitoring ACL file (epic #936). The
     # redis_exporter (monitoring stack) connects as a dedicated ACL user restricted to read-only
     # monitoring commands (no key access), so the session store holding OAuth2 refresh tokens stays
@@ -447,6 +448,7 @@ services:
   db-backend:
     <<: *db-backend-template
     profiles: ["prod"]
+    container_name: db-backend
     networks:
       - net-db-backend
 
@@ -463,6 +465,7 @@ services:
   db-keycloak:
     <<: *db-keycloak-template
     profiles: ["prod"]
+    container_name: db-keycloak
     networks:
       - net-db-keycloak
 
@@ -479,6 +482,7 @@ services:
   keycloak:
     <<: *keycloak-template
     profiles: ["prod"]
+    container_name: keycloak
     # Prod serves HTTPS ONLY. NPM re-encrypts the public host to https://keycloak:18443 (NPM upstream
     # scheme https, upstream-cert verification OFF for the shared self-signed cert) and the backend
     # admin client reaches the SAME connector over the internal net-backend-keycloak network. Plain
@@ -544,6 +548,7 @@ services:
   backend:
     <<: *backend-template
     profiles: ["prod"]
+    container_name: backend
     depends_on:
       db-backend:
         condition: service_healthy
@@ -584,6 +589,7 @@ services:
   frontend:
     <<: *frontend-template
     profiles: ["prod"]
+    container_name: frontend
     depends_on:
       backend:
         condition: service_healthy
@@ -628,6 +634,7 @@ services:
   ingest:
     <<: *ingest-template
     profiles: ["prod"]
+    container_name: ingest
     depends_on:
       backend:
         condition: service_healthy
@@ -666,6 +673,7 @@ services:
     # do not move back to `:latest` (silent upstream changes are a supply-chain risk
     # and break reproducibility). Consider appending @sha256:<digest> as well.
     image: jc21/nginx-proxy-manager:2.15.1@sha256:52b2c59994f3d36acfcf70a1626f29734df0ed8c71bacc0269f78b6f939858bb
+    container_name: npm
     restart: unless-stopped
     logging: *default-logging
     ports:

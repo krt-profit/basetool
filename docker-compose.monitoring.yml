@@ -42,6 +42,7 @@ services:
   # ------------------------------------------------------------------------------------------
   prometheus:
     <<: *mon-base
+    container_name: prometheus
     image: prom/prometheus:v3.13.0
     cap_drop: [ALL]
     command:
@@ -74,6 +75,7 @@ services:
   # ------------------------------------------------------------------------------------------
   grafana:
     <<: *mon-base
+    container_name: grafana
     image: grafana/grafana-oss:13.0.2
     cap_drop: [ALL]
     environment:
@@ -145,6 +147,7 @@ services:
   # ------------------------------------------------------------------------------------------
   loki:
     <<: *mon-base
+    container_name: loki
     image: grafana/loki:3.7.3
     cap_drop: [ALL]
     command: -config.file=/etc/loki/loki-config.yml
@@ -172,6 +175,7 @@ services:
   # ------------------------------------------------------------------------------------------
   tempo:
     <<: *mon-base
+    container_name: tempo
     image: grafana/tempo:2.10.7
     cap_drop: [ALL]
     command: ["-target=all", "-config.file=/etc/tempo/tempo.yaml"]
@@ -197,6 +201,7 @@ services:
   # ------------------------------------------------------------------------------------------
   alloy:
     <<: *mon-base
+    container_name: alloy
     image: grafana/alloy:v1.17.1
     # Runs as root to reach its own storage dir and read privileged host logs, but with ALL caps
     # dropped. Instead of restoring CAP_DAC_OVERRIDE we grant two supplementary groups (least
@@ -236,6 +241,7 @@ services:
   # ------------------------------------------------------------------------------------------
   alertmanager:
     <<: *mon-base
+    container_name: alertmanager
     image: quay.io/prometheus/alertmanager:v0.33.0
     cap_drop: [ALL]
     command:
@@ -264,6 +270,7 @@ services:
   # ------------------------------------------------------------------------------------------
   node-exporter:
     <<: *mon-base
+    container_name: node-exporter
     image: quay.io/prometheus/node-exporter:v1.11.1
     pid: host
     command:
@@ -293,6 +300,7 @@ services:
   # ------------------------------------------------------------------------------------------
   cadvisor:
     <<: *mon-base
+    container_name: cadvisor
     image: ghcr.io/google/cadvisor:v0.60.3
     command:
       - --docker=tcp://socket-proxy:2375
@@ -320,6 +328,7 @@ services:
   # ------------------------------------------------------------------------------------------
   socket-proxy:
     <<: *mon-base
+    container_name: socket-proxy
     image: tecnativa/docker-socket-proxy:v0.4.2
     environment:
       CONTAINERS: "1"
@@ -350,6 +359,7 @@ services:
   # ------------------------------------------------------------------------------------------
   postgres-exporter-backend:
     <<: *mon-base
+    container_name: postgres-exporter-backend
     image: quay.io/prometheuscommunity/postgres-exporter:v0.20.0
     cap_drop: [ALL]
     environment:
@@ -365,6 +375,7 @@ services:
 
   postgres-exporter-keycloak:
     <<: *mon-base
+    container_name: postgres-exporter-keycloak
     image: quay.io/prometheuscommunity/postgres-exporter:v0.20.0
     cap_drop: [ALL]
     environment:
@@ -384,6 +395,7 @@ services:
   # ------------------------------------------------------------------------------------------
   redis-exporter:
     <<: *mon-base
+    container_name: redis-exporter
     image: oliver006/redis_exporter:v1.86.0
     cap_drop: [ALL]
     environment:
@@ -404,6 +416,7 @@ services:
   # ------------------------------------------------------------------------------------------
   blackbox-exporter:
     <<: *mon-base
+    container_name: blackbox-exporter
     image: prom/blackbox-exporter:v0.28.0
     cap_drop: [ALL]
     command:
@@ -425,6 +438,7 @@ services:
   # ------------------------------------------------------------------------------------------
   github-exporter:
     <<: *mon-base
+    container_name: github-exporter
     image: quay.io/promhippie/github-exporter:15.0.1
     cap_drop: [ALL]
     environment:
