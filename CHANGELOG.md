@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.1.0](https://github.com/krt-profit/basetool/releases/tag/v1.1.0) - 2026-07-04
+
 ### Added
 
 - **Monitoring-Stack: Prometheus, Grafana, Loki, Tempo und Alloy für Host, Container und Anwendungen.** Der Produktions-Host betreibt jetzt ein vollständiges, ausschließlich für Administratoren zugängliches Betriebs-Monitoring (Metriken mit 180-Tage-Archiv, Logs, verteilte Traces) mit E-Mail-Alarmen inklusive Totmann-Schalter. Grafana ist die einzige Oberfläche, angebunden über Keycloak-OIDC und beschränkt auf die Realm-Rolle „Admin“; die übrigen Komponenten sind nur in isolierten Docker-Netzen erreichbar. Umfasst 13 Dashboards (u. a. Host, Container, Spring-Boot-Apps inkl. Caffeine-Trefferquoten, PostgreSQL, Redis, Keycloak-Anmeldungen, Aufträge/Freigaben/Warteschlangen, Edge/NPM, SSH-Anmeldungen, Logs, Deploy-/Backup-/Restore-Automatisierung, GitHub) sowie Alarme zu Ausfällen, Fehlerraten, Sicherheitsvorfällen und Datenintegrität (Epic #936, ADR-0072).
