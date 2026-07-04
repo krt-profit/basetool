@@ -337,10 +337,12 @@ if [[ "$(date -u +%u)" == "7" ]] && [[ -f "${MON_COMPOSE}" ]] && docker network 
       -sS -u "grafana:${PROM_PW}" -XPOST http://prometheus:9090/api/v1/admin/tsdb/snapshot 2>/dev/null || true)"
     snap_name="$(printf '%s' "${snap_json}" | sed -n 's/.*"name":"\([^"]*\)".*/\1/p')"
     if [[ -n "${snap_name}" && -d "${MON_DATA}/data/prometheus/snapshots/${snap_name}" ]]; then
-      docker run --rm -v "${MON_DATA}/data/prometheus/snapshots/${snap_name}:/src:ro" "${HELPER_IMAGE}" \
-        sh -c 'tar -C /src -cz .' > "${STAGING}/monitoring/prometheus-tsdb-snapshot.tar.gz" 2>/dev/null \
-        && log "captured Prometheus TSDB snapshot ${snap_name}" \
-        || log "WARN: could not archive the Prometheus TSDB snapshot"
+      if docker run --rm -v "${MON_DATA}/data/prometheus/snapshots/${snap_name}:/src:ro" "${HELPER_IMAGE}" \
+           sh -c 'tar -C /src -cz .' > "${STAGING}/monitoring/prometheus-tsdb-snapshot.tar.gz" 2>/dev/null; then
+        log "captured Prometheus TSDB snapshot ${snap_name}"
+      else
+        log "WARN: could not archive the Prometheus TSDB snapshot"
+      fi
       rm -rf "${MON_DATA}/data/prometheus/snapshots/${snap_name}" 2>/dev/null || true
     else
       log "WARN: Prometheus TSDB snapshot failed or dir missing (name='${snap_name:-}')"

@@ -52,6 +52,7 @@ fail() { log "FATAL: $*"; exit 1; }
 # Writes the restore-drill textfile metric atomically. last_success bumps only when BOTH DB dumps
 # restored (the drill's core recoverability proof); a failed run preserves the previous last_success
 # so it reads as staleness/artifact_ok=0 rather than the metric vanishing (reserved for "never ran").
+# shellcheck disable=SC2317,SC2329  # invoked indirectly via the EXIT trap (cleanup), like cleanup() below
 write_drill_metrics() {
   local now dur prev tmp
   now="$(date +%s)"
