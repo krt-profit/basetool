@@ -35,7 +35,7 @@ to the realm role `Admin`. There is no other exposed monitoring surface.
 |      Component       |                      Image                      | Version |
 |----------------------|-------------------------------------------------|---------|
 | Prometheus           | `prom/prometheus`                               | v3.13.0 |
-| Grafana (OSS)        | `grafana/grafana-oss`                           | 13.1.0  |
+| Grafana (OSS)        | `grafana/grafana-oss`                           | 13.0.2  |
 | Loki                 | `grafana/loki`                                  | 3.7.3   |
 | Tempo                | `grafana/tempo`                                 | 2.10.7  |
 | Alloy                | `grafana/alloy`                                 | v1.17.1 |
@@ -45,8 +45,7 @@ to the realm role `Admin`. There is no other exposed monitoring surface.
 | postgres_exporter ×2 | `quay.io/prometheuscommunity/postgres-exporter` | v0.20.0 |
 | redis_exporter       | `oliver006/redis_exporter`                      | v1.86.0 |
 | blackbox_exporter    | `prom/blackbox-exporter`                        | v0.28.0 |
-| docker-socket-proxy  | `tecnativa/docker-socket-proxy`                 | 0.4.2   |
-| github_exporter      | `ghcr.io/promhippie/github_exporter`            | v15.0.1 |
+| docker-socket-proxy  | `tecnativa/docker-socket-proxy`                 | v0.4.2  |
 
 ## Config tree map
 
@@ -70,16 +69,16 @@ to the realm role `Admin`. There is no other exposed monitoring surface.
   via `envsubst` at deploy time. The rendered `alertmanager.yml` is **not**
   committed (it carries secrets).
 - **`grafana/provisioning/{datasources,dashboards}`** + **`grafana/dashboards/*.json`**
-  — 13 dashboards, provisioned **read-only** (see the sandbox-export workflow
+  — 12 dashboards, provisioned **read-only** (see the sandbox-export workflow
   below).
 
 ## Privacy / retention at a glance
 
 - **Metrics — 180d.** No PII; bounded labels only (REQ-OBS-006).
-- **Logs — 31d.** The NPM-access, NPM-admin, and SSH-host-auth streams retain
-  client IPs / usernames (owner-approved, covered by the privacy policy —
-  REQ-OBS-010). The Keycloak file log is masked in the shipper before it reaches
-  Loki.
+- **Logs — 31d.** The NPM-access, NPM-admin, SSH-host-auth, host-auditd (config /
+  authorized_keys tamper) and host-fail2ban (SSH-jail bans) streams retain client
+  IPs / usernames (owner-approved, covered by the privacy policy — REQ-OBS-010).
+  The Keycloak file log is masked in the shipper before it reaches Loki.
 - **Loki is excluded from backups**, so its retention window cannot be extended
   by restoring an old snapshot.
 - **Traces — 14d.**
@@ -115,6 +114,7 @@ Keep triage fast: confirm the signal in the matching Grafana dashboard, then act
 | **EdgeActuatorDenyBroken**                                         | **CRITICAL.** A public app host no longer answers 404 on `/actuator/*` — the NPM proxy-host deny drifted (ADR-0072 compensating control). Re-add `location /actuator { return 404; }` in the host's Advanced config. |
 | **EdgeForceSslRedirectBroken**                                     | Port 80 of a public vhost stopped redirecting to HTTPS. Re-enable the Force SSL toggle on the NPM proxy host.                                                                                                        |
 | **EdgeHstsHeaderMissing**                                          | The frontend's first response lost its Strict-Transport-Security header. Check the frontend security config and the NPM proxy host for a header-stripping change.                                                    |
+| **AuditdSshTamper**                                                | `sshd_config`(.d) or a root `authorized_keys` was modified (auditd). Confirm the acting user (`auid`) was you; an unexpected change may be a backdoor key or a security downgrade.                                   |
 | **DeployRolledBack / DeployFailed**                                | A promoted release did not ship. Check `deploy.sh` logs on the host; determine why it failed/rolled back before re-promoting.                                                                                        |
 | **DeployConfigBlocked**                                            | A deploy was blocked on a stateful-infra guard. Run the documented stateful-infra upgrade, then re-run `deploy.sh --force`.                                                                                          |
 | **BackupStaleOrMissing**                                           | The backup job is overdue or failed. Check the backup cron/logs and destination; run a manual backup once fixed.                                                                                                     |

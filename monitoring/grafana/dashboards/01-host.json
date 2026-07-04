@@ -64,6 +64,7 @@
       "targets": [
         {
           "expr": "node_load1",
+          "legendFormat": "{{instance}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -160,6 +161,7 @@
       "targets": [
         {
           "expr": "(1-(node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay\"}/node_filesystem_size_bytes{fstype!~\"tmpfs|overlay\"}))*100",
+          "legendFormat": "{{mountpoint}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -192,6 +194,7 @@
       "targets": [
         {
           "expr": "(1-(node_filesystem_files_free/node_filesystem_files))*100",
+          "legendFormat": "{{mountpoint}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -224,6 +227,7 @@
       "targets": [
         {
           "expr": "rate(node_network_receive_bytes_total[5m])",
+          "legendFormat": "{{device}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -256,6 +260,7 @@
       "targets": [
         {
           "expr": "rate(node_network_transmit_bytes_total[5m])",
+          "legendFormat": "{{device}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",

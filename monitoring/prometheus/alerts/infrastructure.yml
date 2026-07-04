@@ -12,10 +12,11 @@ groups:
           summary: "Scrape target down: {{ $labels.job }}"
           description: "Prometheus cannot scrape {{ $labels.job }} / {{ $labels.instance }} for 3 minutes. For scratch-image monitoring services this is their only liveness signal."
 
-      # Scoped to the liveness job: the deny/posture jobs (blackbox-edge-deny/-force-ssl/-hsts,
-      # REQ-OBS-012) have their own alerts below and must not double-page through this one.
+      # Scoped to the two liveness jobs (blackbox-http + the 401-accepting blackbox-http-auth):
+      # the deny/posture jobs (blackbox-edge-deny/-force-ssl/-hsts, REQ-OBS-012) have their own
+      # alerts below and must not double-page through this one.
       - alert: BlackboxProbeFailed
-        expr: probe_success{job="blackbox-http"} == 0
+        expr: probe_success{job=~"blackbox-http|blackbox-http-auth"} == 0
         for: 3m
         labels:
           severity: critical

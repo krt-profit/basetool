@@ -70,6 +70,7 @@
       "targets": [
         {
           "expr": "basetool_deploy_last_success_timestamp",
+          "legendFormat": "success",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -78,6 +79,7 @@
         },
         {
           "expr": "basetool_deploy_last_rollback_timestamp",
+          "legendFormat": "rollback",
           "refId": "B",
           "datasource": {
             "type": "prometheus",
@@ -86,6 +88,7 @@
         },
         {
           "expr": "basetool_deploy_last_failure_timestamp",
+          "legendFormat": "failure",
           "refId": "C",
           "datasource": {
             "type": "prometheus",
@@ -94,6 +97,7 @@
         },
         {
           "expr": "basetool_deploy_last_blocked_timestamp",
+          "legendFormat": "blocked",
           "refId": "D",
           "datasource": {
             "type": "prometheus",

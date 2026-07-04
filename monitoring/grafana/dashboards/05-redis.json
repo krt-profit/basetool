@@ -78,6 +78,7 @@
       "targets": [
         {
           "expr": "redis_memory_used_bytes",
+          "legendFormat": "used",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -86,6 +87,7 @@
         },
         {
           "expr": "redis_memory_max_bytes",
+          "legendFormat": "max",
           "refId": "B",
           "datasource": {
             "type": "prometheus",

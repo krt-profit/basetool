@@ -163,7 +163,10 @@ x-keycloak: &keycloak-template
     # prod keycloak service joins net-monitoring-scrape.
     KC_METRICS_ENABLED: ${KC_METRICS_ENABLED:-false}
     KC_EVENT_METRICS_USER_ENABLED: ${KC_EVENT_METRICS_USER_ENABLED:-false}
-    KC_EVENT_METRICS_USER_EVENTS: ${KC_EVENT_METRICS_USER_EVENTS:-login,login_error,logout,register,code_to_token,refresh_token,identity_provider_login,identity_provider_first_login,identity_provider_post_login}
+    # Base event names only — Keycloak REJECTS error variants like `login_error` at startup ("Invalid
+    # value for option 'KC_EVENT_METRICS_USER_EVENTS'"). A failed login is the `login` event carrying the
+    # built-in `error` label on keycloak_user_events_total (that label is automatic, NOT a USER_TAGS value).
+    KC_EVENT_METRICS_USER_EVENTS: ${KC_EVENT_METRICS_USER_EVENTS:-login,logout,register,code_to_token,refresh_token,identity_provider_login,identity_provider_first_login,identity_provider_post_login}
     KC_EVENT_METRICS_USER_TAGS: ${KC_EVENT_METRICS_USER_TAGS:-realm,idp}
     KC_TRACING_ENABLED: ${KC_TRACING_ENABLED:-false}
     KC_TRACING_ENDPOINT: ${KC_TRACING_ENDPOINT:-http://alloy:4317}
@@ -411,6 +414,7 @@ services:
   redis:
     <<: *redis-template
     profiles: ["prod"]
+    container_name: redis
     # Prod overrides the template command to add the monitoring ACL file (epic #936). The
     # redis_exporter (monitoring stack) connects as a dedicated ACL user restricted to read-only
     # monitoring commands (no key access), so the session store holding OAuth2 refresh tokens stays
@@ -444,6 +448,7 @@ services:
   db-backend:
     <<: *db-backend-template
     profiles: ["prod"]
+    container_name: db-backend
     networks:
       - net-db-backend
 
@@ -460,6 +465,7 @@ services:
   db-keycloak:
     <<: *db-keycloak-template
     profiles: ["prod"]
+    container_name: db-keycloak
     networks:
       - net-db-keycloak
 
@@ -476,6 +482,7 @@ services:
   keycloak:
     <<: *keycloak-template
     profiles: ["prod"]
+    container_name: keycloak
     # Prod serves HTTPS ONLY. NPM re-encrypts the public host to https://keycloak:18443 (NPM upstream
     # scheme https, upstream-cert verification OFF for the shared self-signed cert) and the backend
     # admin client reaches the SAME connector over the internal net-backend-keycloak network. Plain
@@ -541,6 +548,7 @@ services:
   backend:
     <<: *backend-template
     profiles: ["prod"]
+    container_name: backend
     depends_on:
       db-backend:
         condition: service_healthy
@@ -581,6 +589,7 @@ services:
   frontend:
     <<: *frontend-template
     profiles: ["prod"]
+    container_name: frontend
     depends_on:
       backend:
         condition: service_healthy
@@ -625,6 +634,7 @@ services:
   ingest:
     <<: *ingest-template
     profiles: ["prod"]
+    container_name: ingest
     depends_on:
       backend:
         condition: service_healthy
@@ -663,6 +673,7 @@ services:
     # do not move back to `:latest` (silent upstream changes are a supply-chain risk
     # and break reproducibility). Consider appending @sha256:<digest> as well.
     image: jc21/nginx-proxy-manager:2.15.1@sha256:52b2c59994f3d36acfcf70a1626f29734df0ed8c71bacc0269f78b6f939858bb
+    container_name: npm
     restart: unless-stopped
     logging: *default-logging
     ports:
@@ -727,6 +738,9 @@ services:
       - net-proxy-frontend
       - net-proxy-keycloak
       - net-proxy-ingest
+      # NPM re-encrypts the public grafana.profit-base.online host to grafana:3000 over this dedicated
+      # net (Grafana joins it from docker-compose.monitoring.yml). Keeps NPM OFF net-monitoring-core.
+      - net-proxy-grafana
 
 # Every bridge network is pinned to a fixed /24 under 172.28.0.0/16 instead of
 # being left to Docker's dynamic address pool. This is deliberate, not cosmetic:
@@ -840,3 +854,14 @@ networks:
       config:
         - subnet: 172.28.10.0/24
           gateway: 172.28.10.1
+  # Dedicated NPM<->Grafana proxy net (epic #936): NPM re-encrypts the public grafana.profit-base.online
+  # host to grafana:3000 here so NPM never joins the closed net-monitoring-core. Grafana joins it from
+  # docker-compose.monitoring.yml (external ref by this fixed name). Subnet continues the pinned block
+  # (.11); the gateway is NOT load-bearing (net-proxy-grafana is not in the Keycloak-admin allow-list).
+  net-proxy-grafana:
+    name: net-proxy-grafana
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.11.0/24
+          gateway: 172.28.11.1

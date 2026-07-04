@@ -42,6 +42,7 @@ services:
   # ------------------------------------------------------------------------------------------
   prometheus:
     <<: *mon-base
+    container_name: prometheus
     image: prom/prometheus:v3.13.0
     cap_drop: [ALL]
     command:
@@ -74,7 +75,8 @@ services:
   # ------------------------------------------------------------------------------------------
   grafana:
     <<: *mon-base
-    image: grafana/grafana-oss:13.1.0
+    container_name: grafana
+    image: grafana/grafana-oss:13.0.2
     cap_drop: [ALL]
     environment:
       GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-https://grafana.profit-base.online/}
@@ -128,16 +130,24 @@ services:
     deploy:
       resources:
         limits:
-          memory: 192M
+          # Grafana 13 grows to ~500 MB+ under active dashboard use (bleve full-text indexes for
+          # folders/dashboards/playlists/repositories + OIDC sessions + bundled-plugin processes).
+          # 192M AND 512M both OOM-cycled it on the production host (95%+ usage -> SIGKILL -> restart
+          # loop, ~every 5 min). 1G gives real headroom on the 16 GB host.
+          memory: 1024M
           pids: 512
     networks:
       - net-monitoring-core
+      # Reachable by NPM for the public grafana.profit-base.online host WITHOUT joining NPM to the
+      # closed net-monitoring-core: a dedicated proxy net shared by ONLY NPM (app stack) + Grafana.
+      - net-proxy-grafana
 
   # ------------------------------------------------------------------------------------------
   # Loki — log store (31d, compactor retention). Ruler pushes log-based alerts to Alertmanager.
   # ------------------------------------------------------------------------------------------
   loki:
     <<: *mon-base
+    container_name: loki
     image: grafana/loki:3.7.3
     cap_drop: [ALL]
     command: -config.file=/etc/loki/loki-config.yml
@@ -145,12 +155,9 @@ services:
       - ./monitoring/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
       - ./monitoring/loki/rules:/etc/loki/rules:ro
       - /var/iri/monitoring/data/loki:/loki
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:3100/ready || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 40s
+    # No Docker healthcheck: the Loki image is distroless (no shell/wget), so a CMD-SHELL probe can
+    # never run and would pin the container to (unhealthy) despite a healthy process. Liveness comes
+    # from the Prometheus `up` metric on the loki scrape target (meta-monitoring), per the design note.
     deploy:
       resources:
         limits:
@@ -168,22 +175,22 @@ services:
   # ------------------------------------------------------------------------------------------
   tempo:
     <<: *mon-base
+    container_name: tempo
     image: grafana/tempo:2.10.7
     cap_drop: [ALL]
     command: ["-target=all", "-config.file=/etc/tempo/tempo.yaml"]
     volumes:
       - ./monitoring/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
       - /var/iri/monitoring/data/tempo:/var/tempo
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:3200/ready || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 40s
+    # No Docker healthcheck: the Tempo image is distroless (no shell/wget) — same rationale as Loki.
+    # Liveness = the Prometheus `up` metric on the tempo scrape target (meta-monitoring).
     deploy:
       resources:
         limits:
-          memory: 256M
+          # Under active trace ingestion (Keycloak OTLP spans) the monolithic Tempo grew past its
+          # former 256M cap and OOM-cycled every ~minute on the production host (RSS ~326 MB). 512M
+          # holds with headroom on the 16 GB host (data-driven fine-tune tracked in #937).
+          memory: 512M
           pids: 512
     networks:
       - net-monitoring-core
@@ -194,8 +201,15 @@ services:
   # ------------------------------------------------------------------------------------------
   alloy:
     <<: *mon-base
+    container_name: alloy
     image: grafana/alloy:v1.17.1
+    # Runs as root to reach its own storage dir and read privileged host logs, but with ALL caps
+    # dropped. Instead of restoring CAP_DAC_OVERRIDE we grant two supplementary groups (least
+    # privilege, no capability bypass): GID 473 = the image's `alloy` group that owns /var/lib/alloy
+    # (mode 0770) so root can traverse into the mounted data subdir; GID 4 = `adm` so it can read the
+    # syslog:adm-owned /var/log/auth.log. Re-verify both GIDs if the alloy base image ever changes.
     cap_drop: [ALL]
+    group_add: ["473", "4"]
     command:
       - run
       - --server.http.listen-addr=0.0.0.0:12345
@@ -227,6 +241,7 @@ services:
   # ------------------------------------------------------------------------------------------
   alertmanager:
     <<: *mon-base
+    container_name: alertmanager
     image: quay.io/prometheus/alertmanager:v0.33.0
     cap_drop: [ALL]
     command:
@@ -255,6 +270,7 @@ services:
   # ------------------------------------------------------------------------------------------
   node-exporter:
     <<: *mon-base
+    container_name: node-exporter
     image: quay.io/prometheus/node-exporter:v1.11.1
     pid: host
     command:
@@ -275,9 +291,16 @@ services:
   # ------------------------------------------------------------------------------------------
   # cAdvisor — per-container metrics via the GET-only docker socket proxy (never the raw socket).
   # No cap_drop: ALL — it reads host cgroup/sys state and needs broader access than the exporters.
+  # The Docker container factory ALSO opens a direct containerd client (Docker delegates runtime
+  # state to containerd), so it needs /run/containerd/containerd.sock mounted: without it the
+  # factory fails to register and, under --docker_only, cAdvisor emits ZERO name-labelled series —
+  # every Container-dashboard panel then reads "No data". The socket-proxy speaks only the Docker
+  # REST API, not containerd's gRPC, so it cannot cover this. The containerd socket is
+  # root-equivalent; the security trade-off is recorded in ADR-0072 §6 (owner-approved, PR #982).
   # ------------------------------------------------------------------------------------------
   cadvisor:
     <<: *mon-base
+    container_name: cadvisor
     image: ghcr.io/google/cadvisor:v0.60.3
     command:
       - --docker=tcp://socket-proxy:2375
@@ -288,6 +311,7 @@ services:
     volumes:
       - /:/rootfs:ro
       - /sys:/sys:ro
+      - /run/containerd/containerd.sock:/run/containerd/containerd.sock:ro
     deploy:
       resources:
         limits:
@@ -299,13 +323,16 @@ services:
 
   # ------------------------------------------------------------------------------------------
   # docker-socket-proxy — GET-only Docker API for cAdvisor + Alloy. POST/EXEC/AUTH/SECRETS stay
-  # denied (defaults); CONTAINERS/IMAGES/INFO enabled for container discovery + log streaming.
+  # denied (defaults); CONTAINERS/IMAGES/INFO/NETWORKS enabled for container discovery + log
+  # streaming (Alloy's discovery.docker reads /networks to compute per-container network labels).
   # ------------------------------------------------------------------------------------------
   socket-proxy:
     <<: *mon-base
-    image: tecnativa/docker-socket-proxy:0.4.2
+    container_name: socket-proxy
+    image: tecnativa/docker-socket-proxy:v0.4.2
     environment:
       CONTAINERS: "1"
+      NETWORKS: "1"
       IMAGES: "1"
       INFO: "1"
       EVENTS: "1"
@@ -332,6 +359,7 @@ services:
   # ------------------------------------------------------------------------------------------
   postgres-exporter-backend:
     <<: *mon-base
+    container_name: postgres-exporter-backend
     image: quay.io/prometheuscommunity/postgres-exporter:v0.20.0
     cap_drop: [ALL]
     environment:
@@ -347,6 +375,7 @@ services:
 
   postgres-exporter-keycloak:
     <<: *mon-base
+    container_name: postgres-exporter-keycloak
     image: quay.io/prometheuscommunity/postgres-exporter:v0.20.0
     cap_drop: [ALL]
     environment:
@@ -366,6 +395,7 @@ services:
   # ------------------------------------------------------------------------------------------
   redis-exporter:
     <<: *mon-base
+    container_name: redis-exporter
     image: oliver006/redis_exporter:v1.86.0
     cap_drop: [ALL]
     environment:
@@ -386,6 +416,7 @@ services:
   # ------------------------------------------------------------------------------------------
   blackbox-exporter:
     <<: *mon-base
+    container_name: blackbox-exporter
     image: prom/blackbox-exporter:v0.28.0
     cap_drop: [ALL]
     command:
@@ -401,40 +432,21 @@ services:
       - net-monitoring-core
       - net-monitoring-scrape
 
-  # ------------------------------------------------------------------------------------------
-  # github-exporter (promhippie) — development metrics (stars/forks/issues + Actions workflow runs)
-  # for the tracked repos. Fine-grained read-only PAT from a host file; long scrape interval. Egress.
-  # ------------------------------------------------------------------------------------------
-  github-exporter:
-    <<: *mon-base
-    image: ghcr.io/promhippie/github_exporter:v15.0.1
-    cap_drop: [ALL]
-    environment:
-      GITHUB_EXPORTER_WEB_ADDRESS: "0.0.0.0:9504"
-      GITHUB_EXPORTER_TOKEN: "file:///run/secrets/github_token"
-      GITHUB_EXPORTER_REPOS: "krt-profit/basetool,krt-profit/basetool-sc-extractor,krt-profit/design-system"
-      GITHUB_EXPORTER_COLLECTOR_REPOS: "true"
-      GITHUB_EXPORTER_COLLECTOR_WORKFLOW_RUNS: "true"
-    volumes:
-      - /var/iri/monitoring/secrets/github_token:/run/secrets/github_token:ro
-    deploy:
-      resources:
-        limits:
-          memory: 64M
-          pids: 512
-    networks:
-      - net-monitoring-core
-      - net-monitoring-scrape
-
 networks:
   # Shared boundary net, created and owned by the app stack (docker-compose.yml); referenced here by
   # its fixed name. Prometheus scrapes the apps + keycloak here and Alloy receives their OTLP spans.
   net-monitoring-scrape:
     external: true
     name: net-monitoring-scrape
+  # Dedicated NPM<->Grafana proxy net, created and owned by the app stack (docker-compose.yml, where
+  # NPM lives). Lets NPM re-encrypt the public grafana.profit-base.online host to grafana:3000 without
+  # ever joining the closed net-monitoring-core.
+  net-proxy-grafana:
+    external: true
+    name: net-proxy-grafana
   # Monitoring-only backbone (Prometheus/Alertmanager/Loki/Tempo/Grafana/exporters). App containers
-  # are NEVER members. Not `internal` because alertmanager (SMTP + healthchecks.io), blackbox and
-  # github-exporter need internet egress.
+  # are NEVER members. Not `internal` because alertmanager (SMTP + healthchecks.io) and blackbox
+  # need internet egress.
   net-monitoring-core:
     name: net-monitoring-core
     driver: bridge

@@ -8,9 +8,10 @@
 //      docker-socket-proxy (tcp://socket-proxy:2375), never the raw docker socket.
 //
 // Per-stream privacy (REQ-OBS-007): app JSON is PII-masked AT SOURCE (no shipper masking); the
-// Keycloak file log is masked HERE (username= / ipAddress=); NPM access/error and host auth.log are
-// ingested WITH client IPs/usernames (the deliberate, owner-approved 31-day retention). Stream labels
-// stay low-cardinality: app (+ level for the JSON apps).
+// Keycloak file log is masked HERE (username= / ipAddress=); NPM access/error, host auth.log and the
+// host security logs (auditd file-integrity, fail2ban bans) are ingested WITH client IPs/usernames
+// (the deliberate, owner-approved 31-day retention). Stream labels stay low-cardinality: app (+ level
+// for the JSON apps).
 
 logging {
 	level  = "info"
@@ -59,7 +60,7 @@ local.file_match "backend" {
 }
 
 loki.source.file "backend" {
-	targets    = local.file_match.backend.data
+	targets    = local.file_match.backend.targets
 	forward_to = [loki.process.app_json.receiver]
 }
 
@@ -68,7 +69,7 @@ local.file_match "frontend" {
 }
 
 loki.source.file "frontend" {
-	targets    = local.file_match.frontend.data
+	targets    = local.file_match.frontend.targets
 	forward_to = [loki.process.app_json.receiver]
 }
 
@@ -90,7 +91,7 @@ local.file_match "keycloak" {
 }
 
 loki.source.file "keycloak" {
-	targets    = local.file_match.keycloak.data
+	targets    = local.file_match.keycloak.targets
 	forward_to = [loki.process.keycloak_mask.receiver]
 }
 
@@ -114,7 +115,7 @@ local.file_match "npm_access" {
 }
 
 loki.source.file "npm_access" {
-	targets    = local.file_match.npm_access.data
+	targets    = local.file_match.npm_access.targets
 	forward_to = [loki.write.default.receiver]
 }
 
@@ -123,7 +124,7 @@ local.file_match "npm_error" {
 }
 
 loki.source.file "npm_error" {
-	targets    = local.file_match.npm_error.data
+	targets    = local.file_match.npm_error.targets
 	forward_to = [loki.write.default.receiver]
 }
 
@@ -133,7 +134,32 @@ local.file_match "host_auth" {
 }
 
 loki.source.file "host_auth" {
-	targets    = local.file_match.host_auth.data
+	targets    = local.file_match.host_auth.targets
+	forward_to = [loki.write.default.receiver]
+}
+
+// --- Host auditd log (sshd_config / authorized_keys tamper watches; carries the acting auid + paths,
+// retained 31d). Under the /var/log:/hostlog mount this is /hostlog/audit/audit.log. PRECONDITION:
+// audit.log must be readable by Alloy's supplementary `adm` group — set `log_group = adm` in
+// /etc/audit/auditd.conf and make /var/log/audit traversable (0750 root:adm); the default root:root
+// 0600 is unreadable and the stream would stay silently empty. ---
+local.file_match "host_auditd" {
+	path_targets = [{__path__ = "/hostlog/audit/audit.log", app = "host-auditd"}]
+}
+
+loki.source.file "host_auditd" {
+	targets    = local.file_match.host_auditd.targets
+	forward_to = [loki.write.default.receiver]
+}
+
+// --- Host fail2ban log (SSH-jail bans/unbans; carries banned client IPs, retained 31d). Debian/Ubuntu
+// ship /var/log/fail2ban.log as 0640 root:adm, so Alloy's adm group reads it under /hostlog. ---
+local.file_match "host_fail2ban" {
+	path_targets = [{__path__ = "/hostlog/fail2ban.log", app = "host-fail2ban"}]
+}
+
+loki.source.file "host_fail2ban" {
+	targets    = local.file_match.host_fail2ban.targets
 	forward_to = [loki.write.default.receiver]
 }
 

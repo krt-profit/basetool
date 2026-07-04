@@ -96,6 +96,7 @@
       "targets": [
         {
           "expr": "sum by (event) (rate(keycloak_user_events_total[5m]))",
+          "legendFormat": "{{event}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -160,6 +161,7 @@
       "targets": [
         {
           "expr": "sum by (event) (rate(keycloak_user_events_total{event=~\"identity_provider.*\"}[5m]))",
+          "legendFormat": "{{event}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -192,6 +194,7 @@
       "targets": [
         {
           "expr": "sum by (idp) (rate(keycloak_user_events_total[5m]))",
+          "legendFormat": "{{idp}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
