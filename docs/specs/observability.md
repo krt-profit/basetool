@@ -78,7 +78,9 @@ scrape (epic #936, ADR-0072). The endpoint is **never public**:
   reachable from the internal scrape network. This is also the compensating control for the
   per-request BCrypt cost of basic auth — without the edge deny, an internet client could
   drive unthrottled credential guesses / CPU load against the endpoint (residual-risk record
-  in ADR-0072).
+  in ADR-0072). The deny returns HTTP **404** (not 403) so it does not reveal that the
+  Actuator endpoints exist behind the edge; any future blackbox probe asserting the deny
+  must expect 404.
 - Every meter carries the common tag `application=basetool-{backend,frontend,ingest}` so
   dashboards can select the module.
 
