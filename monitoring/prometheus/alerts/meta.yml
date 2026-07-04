@@ -1,0 +1,44 @@
+# Meta-monitoring: the monitoring plane watching itself, plus the dead-man's switch (Watchdog).
+# Epic #936 alert catalog.
+groups:
+  - name: meta-watchdog
+    rules:
+      # Dead-man's switch: this alert ALWAYS fires and is routed by Alertmanager to the external
+      # heartbeat (healthchecks.io). If Prometheus/Alertmanager/the host dies, the heartbeat stops
+      # and the external service alerts — something an in-host blackbox by construction cannot see.
+      - alert: Watchdog
+        expr: vector(1)
+        labels:
+          severity: none
+        annotations:
+          summary: "Monitoring watchdog — always firing"
+          description: "This alert is always firing. Its purpose is to keep the external dead-man's-switch heartbeat green; if it stops arriving, the monitoring stack or the host is down."
+
+  - name: meta-warning
+    rules:
+      - alert: PrometheusTsdbApproachingCap
+        expr: prometheus_tsdb_storage_blocks_bytes > 36 * 1000 * 1000 * 1000
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus TSDB approaching the 40GB cap"
+          description: "On-disk TSDB block size exceeded 36 GB (90% of the 40 GB retention.size cap). Old data will be evicted before the 180-day target — investigate cardinality/retention."
+
+      - alert: AlertmanagerNotificationsFailing
+        expr: rate(alertmanager_notifications_failed_total[15m]) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Alertmanager notification delivery failing ({{ $labels.integration }})"
+          description: "Alertmanager failed to deliver notifications (e.g. SMTP) in the last 15 minutes — alerts may be silently lost."
+
+      - alert: LokiDiscardingLines
+        expr: sum by (reason) (rate(loki_discarded_samples_total[10m])) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Loki is discarding log lines ({{ $labels.reason }})"
+          description: "Loki dropped log lines in the last 10 minutes (reason: {{ $labels.reason }}) — likely a rate-cap or stream-limit hit."

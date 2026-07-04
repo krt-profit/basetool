@@ -1,0 +1,456 @@
+# =============================================================================================
+# Profit Basetool — operations monitoring stack (epic #936, ADR-0072, REQ-OBS-005..011).
+#
+# A DEDICATED compose project, deliberately NOT a profile of docker-compose.yml: this fully
+# decouples monitoring from the 5-minute app-deploy loop (no --remove-orphans risk; a flapping
+# monitoring healthcheck can never trigger an app-stack rollback). deploy.sh brings it up with a
+# NON-GATING step (IRI_MONITORING_ENABLED=true) AFTER the app stack is healthy — a monitoring
+# failure logs but never rolls back the apps.
+#
+# Image pins are the latest stable lines verified 2026-07 against the official release pages (owner
+# version directive); Dependabot's docker-compose ecosystem (directory /) maintains the pins and
+# adds @sha256 digests afterwards. Contains ZERO secrets — every credential is a host-side file
+# under /var/iri/monitoring/secrets/ or an .env value, provisioned by
+# docs/MONITORING_ROLLOUT_RUNBOOK.md.
+#
+# Transport (REQ-OBS-008): the apps are scraped over HTTPS with the pinned public CA; everything
+# else inside the isolated monitoring networks is plain HTTP by the owner-approved carve-out.
+# =============================================================================================
+
+x-mon-logging: &mon-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+# Shared hardening (epic #936): drop privilege escalation, cap the pid table, and set a POSITIVE
+# oom_score_adj so the kernel sacrifices monitoring BEFORE the apps/DBs under memory pressure.
+# read_only rootfs is deferred to Phase-3 per-image tuning (verified on the test stack) to avoid
+# startup regressions here. cap_drop is applied per-service (cAdvisor/socket-proxy need more access).
+x-mon-base: &mon-base
+  restart: unless-stopped
+  logging: *mon-logging
+  security_opt:
+    - no-new-privileges:true
+  oom_score_adj: 500
+
+services:
+  # ------------------------------------------------------------------------------------------
+  # Prometheus — metrics DB. 180d retention + 40GB cap; admin API (for the weekly TSDB snapshot)
+  # behind web.config basic auth. No Docker healthcheck: the web server is auth-protected, so the
+  # self-scrape `up` metric + the TargetDown alert are its liveness signal.
+  # ------------------------------------------------------------------------------------------
+  prometheus:
+    <<: *mon-base
+    image: prom/prometheus:v3.13.0
+    cap_drop: [ALL]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=180d
+      - --storage.tsdb.retention.size=40GB
+      - --web.enable-admin-api
+      - --web.config.file=/etc/prometheus/web.yml
+      - --web.enable-lifecycle
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alerts:/etc/prometheus/alerts:ro
+      - /var/iri/monitoring/secrets/prometheus-web.yml:/etc/prometheus/web.yml:ro
+      - /var/iri/monitoring/secrets/scrape_password:/etc/prometheus/secrets/scrape_password:ro
+      - /var/iri/monitoring/secrets/prometheus_web_password:/etc/prometheus/secrets/web_password:ro
+      - /var/iri/monitoring/certs/basetool-ca.crt:/etc/prometheus/certs/basetool-ca.crt:ro
+      - /var/iri/monitoring/data/prometheus:/prometheus
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          pids: 512
+    networks:
+      - net-monitoring-core
+      - net-monitoring-scrape
+
+  # ------------------------------------------------------------------------------------------
+  # Grafana — the ONLY monitoring UI. Own TLS cert, Keycloak OIDC (realm role Admin), hardened.
+  # ------------------------------------------------------------------------------------------
+  grafana:
+    <<: *mon-base
+    image: grafana/grafana-oss:13.1.0
+    cap_drop: [ALL]
+    environment:
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-https://grafana.profit-base.online/}
+      GF_SERVER_PROTOCOL: https
+      GF_SERVER_CERT_FILE: /etc/grafana/certs/grafana.crt
+      GF_SERVER_CERT_KEY: /etc/grafana/certs/grafana.key
+      # Hardening: basic auth / anonymous / sign-up off; secure cookies; no gravatar/telemetry.
+      GF_AUTH_BASIC_ENABLED: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SECURITY_COOKIE_SECURE: "true"
+      GF_SECURITY_COOKIE_SAMESITE: lax
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+      GF_SNAPSHOTS_EXTERNAL_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_FEEDBACK_LINKS_ENABLED: "false"
+      # Break-glass admin — seeds ONLY on first boot (empty DB); rotate via `grafana cli` (runbook).
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD must be set for the monitoring stack}
+      # Keycloak OIDC (PKCE). role_attribute_strict denies login without the Admin realm role.
+      # Needs the "User Realm Role" mapper with "Add to ID token" ON (runbook + realm-config).
+      GF_AUTH_GENERIC_OAUTH_ENABLED: "true"
+      GF_AUTH_GENERIC_OAUTH_NAME: Keycloak
+      GF_AUTH_GENERIC_OAUTH_CLIENT_ID: ${GRAFANA_OAUTH_CLIENT_ID:-grafana}
+      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET: ${GRAFANA_OAUTH_CLIENT_SECRET:?GRAFANA_OAUTH_CLIENT_SECRET must be set for the monitoring stack}
+      GF_AUTH_GENERIC_OAUTH_SCOPES: "openid email profile"
+      GF_AUTH_GENERIC_OAUTH_AUTH_URL: https://keycloak.profit-base.online/realms/iri/protocol/openid-connect/auth
+      GF_AUTH_GENERIC_OAUTH_TOKEN_URL: https://keycloak.profit-base.online/realms/iri/protocol/openid-connect/token
+      GF_AUTH_GENERIC_OAUTH_API_URL: https://keycloak.profit-base.online/realms/iri/protocol/openid-connect/userinfo
+      GF_AUTH_GENERIC_OAUTH_USE_PKCE: "true"
+      GF_AUTH_GENERIC_OAUTH_EMAIL_ATTRIBUTE_PATH: email
+      GF_AUTH_GENERIC_OAUTH_LOGIN_ATTRIBUTE_PATH: preferred_username
+      GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH: "contains(realm_access.roles[*], 'Admin') && 'GrafanaAdmin' || ''"
+      GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_STRICT: "true"
+      GF_AUTH_GENERIC_OAUTH_ALLOW_ASSIGN_GRAFANA_ADMIN: "true"
+      # Consumed by the provisioned Prometheus datasource (basic auth to the auth-protected API).
+      PROMETHEUS_WEB_PASSWORD: ${PROMETHEUS_WEB_PASSWORD:?PROMETHEUS_WEB_PASSWORD must be set for the monitoring stack}
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - /var/iri/monitoring/certs/grafana.crt:/etc/grafana/certs/grafana.crt:ro
+      - /var/iri/monitoring/certs/grafana.key:/etc/grafana/certs/grafana.key:ro
+      - /var/iri/monitoring/data/grafana:/var/lib/grafana
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null --no-check-certificate https://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+          pids: 512
+    networks:
+      - net-monitoring-core
+
+  # ------------------------------------------------------------------------------------------
+  # Loki — log store (31d, compactor retention). Ruler pushes log-based alerts to Alertmanager.
+  # ------------------------------------------------------------------------------------------
+  loki:
+    <<: *mon-base
+    image: grafana/loki:3.7.3
+    cap_drop: [ALL]
+    command: -config.file=/etc/loki/loki-config.yml
+    volumes:
+      - ./monitoring/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - ./monitoring/loki/rules:/etc/loki/rules:ro
+      - /var/iri/monitoring/data/loki:/loki
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:3100/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+          pids: 512
+    networks:
+      - net-monitoring-core
+
+  # ------------------------------------------------------------------------------------------
+  # Tempo — trace store (14d), monolithic (-target=all, no Kafka).
+  # Pinned to the latest 2.x LTS line (2.10.7), NOT 3.0.x: Tempo 3.0 is a breaking architecture
+  # rewrite (backend-scheduler/worker/block-builder) whose monolithic config could not be
+  # config-verified for this deployment, whereas the 2.10.x config below passes `tempo -config.verify`
+  # and still needs no Kafka. Revisit 3.x with a verified 3.0 config as a follow-up (#937-adjacent).
+  # ------------------------------------------------------------------------------------------
+  tempo:
+    <<: *mon-base
+    image: grafana/tempo:2.10.7
+    cap_drop: [ALL]
+    command: ["-target=all", "-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ./monitoring/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - /var/iri/monitoring/data/tempo:/var/tempo
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:3200/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          pids: 512
+    networks:
+      - net-monitoring-core
+
+  # ------------------------------------------------------------------------------------------
+  # Alloy — log shipper + OTLP collector. Receives app/Keycloak spans on the scrape net, forwards
+  # to Tempo on the core net; ships logs to Loki. Reads container logs via the socket proxy only.
+  # ------------------------------------------------------------------------------------------
+  alloy:
+    <<: *mon-base
+    image: grafana/alloy:v1.17.1
+    cap_drop: [ALL]
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    volumes:
+      - ./monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/iri/monitoring/data/alloy:/var/lib/alloy/data
+      # Log sources (read-only). App JSON is masked at source; NPM access + host auth.log keep IPs.
+      - /var/iri/backend/log:/logs/backend:ro
+      - /var/iri/frontend/log:/logs/frontend:ro
+      - /var/iri/keycloak/log:/logs/keycloak:ro
+      - /var/iri/npm/data/logs:/logs/npm:ro
+      - /var/log:/hostlog:ro
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+          pids: 512
+    networks:
+      - net-monitoring-core
+      - net-monitoring-scrape
+      - net-docker-proxy
+
+  # ------------------------------------------------------------------------------------------
+  # Alertmanager — SMTP routing + the Watchdog heartbeat to healthchecks.io. The config is rendered
+  # from alertmanager.yml.tmpl by the runbook (Alertmanager does not expand env vars) to
+  # /var/iri/monitoring/secrets/alertmanager.yml.
+  # ------------------------------------------------------------------------------------------
+  alertmanager:
+    <<: *mon-base
+    image: quay.io/prometheus/alertmanager:v0.33.0
+    cap_drop: [ALL]
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    volumes:
+      - /var/iri/monitoring/secrets/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - /var/iri/monitoring/data/alertmanager:/alertmanager
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:9093/-/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 48M
+          pids: 512
+    networks:
+      - net-monitoring-core
+
+  # ------------------------------------------------------------------------------------------
+  # node_exporter — host metrics + systemd collector + textfile collector (ops-automation metrics).
+  # Needs the host namespaces, so it is intentionally the least-isolated monitoring service.
+  # ------------------------------------------------------------------------------------------
+  node-exporter:
+    <<: *mon-base
+    image: quay.io/prometheus/node-exporter:v1.11.1
+    pid: host
+    command:
+      - --path.rootfs=/host
+      - --collector.systemd
+      - --collector.textfile.directory=/host/var/iri/monitoring/textfile
+      - --no-collector.wifi
+    volumes:
+      - /:/host:ro,rslave
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+          pids: 512
+    networks:
+      - net-monitoring-scrape
+
+  # ------------------------------------------------------------------------------------------
+  # cAdvisor — per-container metrics via the GET-only docker socket proxy (never the raw socket).
+  # No cap_drop: ALL — it reads host cgroup/sys state and needs broader access than the exporters.
+  # ------------------------------------------------------------------------------------------
+  cadvisor:
+    <<: *mon-base
+    image: ghcr.io/google/cadvisor:v0.60.3
+    command:
+      - --docker=tcp://socket-proxy:2375
+      - --docker_only
+      - --housekeeping_interval=30s
+      - --listen_ip=0.0.0.0
+      - --port=8080
+    volumes:
+      - /:/rootfs:ro
+      - /sys:/sys:ro
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          pids: 512
+    networks:
+      - net-monitoring-scrape
+      - net-docker-proxy
+
+  # ------------------------------------------------------------------------------------------
+  # docker-socket-proxy — GET-only Docker API for cAdvisor + Alloy. POST/EXEC/AUTH/SECRETS stay
+  # denied (defaults); CONTAINERS/IMAGES/INFO enabled for container discovery + log streaming.
+  # ------------------------------------------------------------------------------------------
+  socket-proxy:
+    <<: *mon-base
+    image: tecnativa/docker-socket-proxy:0.4.2
+    environment:
+      CONTAINERS: "1"
+      IMAGES: "1"
+      INFO: "1"
+      EVENTS: "1"
+      PING: "1"
+      VERSION: "1"
+      POST: "0"
+      EXEC: "0"
+      AUTH: "0"
+      SECRETS: "0"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+          pids: 512
+    networks:
+      - net-docker-proxy
+
+  # ------------------------------------------------------------------------------------------
+  # postgres_exporter ×2 — one per DB, dedicated pg_monitor-only user. Each bridges into the app
+  # data net to reach its DB AND the scrape net so Prometheus can scrape it (keeps the DBs off the
+  # broad scrape net — no new lateral path). sslmode=disable: the DBs serve plain on isolated nets.
+  # ------------------------------------------------------------------------------------------
+  postgres-exporter-backend:
+    <<: *mon-base
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.0
+    cap_drop: [ALL]
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${PG_EXPORTER_USER:-monitoring}:${PG_EXPORTER_BACKEND_PASSWORD:?PG_EXPORTER_BACKEND_PASSWORD must be set}@db-backend:15432/${POSTGRES_DB:?POSTGRES_DB must be set}?sslmode=disable"
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+          pids: 512
+    networks:
+      - net-monitoring-scrape
+      - net-db-backend
+
+  postgres-exporter-keycloak:
+    <<: *mon-base
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.0
+    cap_drop: [ALL]
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${PG_EXPORTER_USER:-monitoring}:${PG_EXPORTER_KEYCLOAK_PASSWORD:?PG_EXPORTER_KEYCLOAK_PASSWORD must be set}@db-keycloak:15433/${KC_POSTGRES_DB:?KC_POSTGRES_DB must be set}?sslmode=disable"
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+          pids: 512
+    networks:
+      - net-monitoring-scrape
+      - net-db-keycloak
+
+  # ------------------------------------------------------------------------------------------
+  # redis_exporter — dedicated ACL user (read-only monitoring commands, no key access — the session
+  # store with OAuth2 refresh tokens stays unreadable). Bridges into net-redis-frontend to reach it.
+  # ------------------------------------------------------------------------------------------
+  redis-exporter:
+    <<: *mon-base
+    image: oliver006/redis_exporter:v1.86.0
+    cap_drop: [ALL]
+    environment:
+      REDIS_ADDR: redis://redis:6379
+      REDIS_USER: ${REDIS_EXPORTER_USER:-monitoring}
+      REDIS_PASSWORD: ${REDIS_EXPORTER_PASSWORD:?REDIS_EXPORTER_PASSWORD must be set}
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+          pids: 512
+    networks:
+      - net-monitoring-scrape
+      - net-redis-frontend
+
+  # ------------------------------------------------------------------------------------------
+  # blackbox_exporter — HTTPS probes + certificate expiry for the public endpoints. Needs egress.
+  # ------------------------------------------------------------------------------------------
+  blackbox-exporter:
+    <<: *mon-base
+    image: prom/blackbox-exporter:v0.28.0
+    cap_drop: [ALL]
+    command:
+      - --config.file=/etc/blackbox/blackbox.yml
+    volumes:
+      - ./monitoring/blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+          pids: 512
+    networks:
+      - net-monitoring-core
+      - net-monitoring-scrape
+
+  # ------------------------------------------------------------------------------------------
+  # github-exporter (promhippie) — development metrics (stars/forks/issues + Actions workflow runs)
+  # for the tracked repos. Fine-grained read-only PAT from a host file; long scrape interval. Egress.
+  # ------------------------------------------------------------------------------------------
+  github-exporter:
+    <<: *mon-base
+    image: ghcr.io/promhippie/github_exporter:v15.0.1
+    cap_drop: [ALL]
+    environment:
+      GITHUB_EXPORTER_WEB_ADDRESS: "0.0.0.0:9504"
+      GITHUB_EXPORTER_TOKEN: "file:///run/secrets/github_token"
+      GITHUB_EXPORTER_REPOS: "krt-profit/basetool,krt-profit/basetool-sc-extractor,krt-profit/design-system"
+      GITHUB_EXPORTER_COLLECTOR_REPOS: "true"
+      GITHUB_EXPORTER_COLLECTOR_WORKFLOW_RUNS: "true"
+    volumes:
+      - /var/iri/monitoring/secrets/github_token:/run/secrets/github_token:ro
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          pids: 512
+    networks:
+      - net-monitoring-core
+      - net-monitoring-scrape
+
+networks:
+  # Shared boundary net, created and owned by the app stack (docker-compose.yml); referenced here by
+  # its fixed name. Prometheus scrapes the apps + keycloak here and Alloy receives their OTLP spans.
+  net-monitoring-scrape:
+    external: true
+    name: net-monitoring-scrape
+  # Monitoring-only backbone (Prometheus/Alertmanager/Loki/Tempo/Grafana/exporters). App containers
+  # are NEVER members. Not `internal` because alertmanager (SMTP + healthchecks.io), blackbox and
+  # github-exporter need internet egress.
+  net-monitoring-core:
+    name: net-monitoring-core
+    driver: bridge
+  # cAdvisor/Alloy ↔ socket-proxy only. Internal: no internet path is needed here.
+  net-docker-proxy:
+    name: net-docker-proxy
+    driver: bridge
+    internal: true
+  # App-owned data nets (created by docker-compose.yml), referenced so the exporters reach the
+  # DBs/Redis without putting them on the broad scrape net.
+  net-db-backend:
+    external: true
+    name: net-db-backend
+  net-db-keycloak:
+    external: true
+    name: net-db-keycloak
+  net-redis-frontend:
+    external: true
+    name: net-redis-frontend

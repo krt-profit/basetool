@@ -1,0 +1,164 @@
+# Prometheus scrape + alerting configuration for the Profit Basetool monitoring plane.
+# Epic #936, ADR-0072, REQ-OBS-005..011. Prometheus 3.13.x (verified 2026-07 latest LTS).
+#
+# Contains ZERO secrets. The scrape basic-auth password and the admin-API web.config
+# basic-auth hash live in host-side files under /var/iri/monitoring/secrets/ (mounted
+# read-only, provisioned by docs/MONITORING_ROLLOUT_RUNBOOK.md); the exported public CA
+# for the apps' self-signed HTTPS lives under /var/iri/monitoring/certs/. Retention
+# (180d + 40GB cap) and the admin API are set via command-line flags in
+# docker-compose.monitoring.yml, not here.
+#
+# Transport model (REQ-OBS-008): the three apps are scraped over HTTPS with the pinned
+# public CA (no insecure_skip_verify); everything else on the isolated monitoring networks
+# is plain HTTP by the owner-approved carve-out.
+
+global:
+  scrape_interval: 30s
+  scrape_timeout: 10s
+  evaluation_interval: 30s
+  external_labels:
+    monitor: basetool-prod
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+rule_files:
+  - /etc/prometheus/alerts/*.yml
+
+scrape_configs:
+  # --- Prometheus self-monitoring -------------------------------------------------------
+  # Prometheus's own web server is basic-auth protected (--web.config.file) because
+  # --web.enable-admin-api exposes deletion endpoints (ADR-0072), so the self-scrape must
+  # authenticate as well. The plaintext web password is provisioned on the host by the runbook;
+  # Grafana and the backup snapshot use the same credential (user "grafana").
+  - job_name: prometheus
+    basic_auth:
+      username: grafana
+      password_file: /etc/prometheus/secrets/web_password
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # --- Spring Boot apps: HTTPS scrape with pinned public CA + basic auth -----------------
+  # username is fixed to "monitoring" (not a secret) and MUST equal MONITORING_SCRAPE_USER
+  # in the prod .env; the password comes from the mounted secret file (fail-closed if the
+  # app has no MONITORING_SCRAPE_* set — the endpoint then denies every request).
+  - job_name: basetool-backend
+    metrics_path: /actuator/prometheus
+    scheme: https
+    basic_auth:
+      username: monitoring
+      password_file: /etc/prometheus/secrets/scrape_password
+    tls_config:
+      ca_file: /etc/prometheus/certs/basetool-ca.crt
+      server_name: backend
+    static_configs:
+      - targets: ["backend:11261"]
+        labels:
+          application: basetool-backend
+
+  - job_name: basetool-frontend
+    metrics_path: /actuator/prometheus
+    scheme: https
+    basic_auth:
+      username: monitoring
+      password_file: /etc/prometheus/secrets/scrape_password
+    tls_config:
+      ca_file: /etc/prometheus/certs/basetool-ca.crt
+      server_name: frontend
+    static_configs:
+      - targets: ["frontend:18081"]
+        labels:
+          application: basetool-frontend
+
+  - job_name: basetool-ingest
+    metrics_path: /actuator/prometheus
+    scheme: https
+    basic_auth:
+      username: monitoring
+      password_file: /etc/prometheus/secrets/scrape_password
+    tls_config:
+      ca_file: /etc/prometheus/certs/basetool-ca.crt
+      server_name: ingest
+    static_configs:
+      - targets: ["ingest:11262"]
+        labels:
+          application: basetool-ingest
+
+  # --- Keycloak: management port 9000, plain HTTP (carve-out) ----------------------------
+  - job_name: keycloak
+    metrics_path: /metrics
+    scheme: http
+    static_configs:
+      - targets: ["keycloak:9000"]
+
+  # --- Infrastructure exporters (plain HTTP inside the monitoring plane) -----------------
+  - job_name: node
+    static_configs:
+      - targets: ["node-exporter:9100"]
+
+  - job_name: cadvisor
+    static_configs:
+      - targets: ["cadvisor:8080"]
+
+  - job_name: postgres-backend
+    static_configs:
+      - targets: ["postgres-exporter-backend:9187"]
+        labels:
+          database: basetool-backend
+
+  - job_name: postgres-keycloak
+    static_configs:
+      - targets: ["postgres-exporter-keycloak:9187"]
+        labels:
+          database: keycloak
+
+  - job_name: redis
+    static_configs:
+      - targets: ["redis-exporter:9121"]
+
+  # --- Monitoring-plane self health ------------------------------------------------------
+  - job_name: alertmanager
+    static_configs:
+      - targets: ["alertmanager:9093"]
+
+  - job_name: loki
+    static_configs:
+      - targets: ["loki:3100"]
+
+  - job_name: tempo
+    static_configs:
+      - targets: ["tempo:3200"]
+
+  - job_name: alloy
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["alloy:12345"]
+
+  # --- GitHub development metrics (promhippie/github_exporter), long interval -------------
+  - job_name: github
+    scrape_interval: 15m
+    scrape_timeout: 1m
+    static_configs:
+      - targets: ["github-exporter:9504"]
+
+  # --- Blackbox external probes: TLS + status of the public endpoints --------------------
+  # Produces probe_success + probe_ssl_earliest_cert_expiry per target.
+  - job_name: blackbox-http
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - https://profit-base.online
+          - https://ingest.profit-base.online
+          - https://grafana.profit-base.online
+          - https://keycloak.profit-base.online/realms/iri/.well-known/openid-configuration
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115

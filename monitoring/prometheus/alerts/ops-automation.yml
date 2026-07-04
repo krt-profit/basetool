@@ -1,0 +1,72 @@
+# Ops-automation alerts driven by node_exporter textfile metrics written by deploy.sh, backup.sh,
+# restore-drill.sh and docker-cleanup.sh (ADR-0072). These are the ONLY monitoring signal for
+# cron-driven cleanup (invisible to the systemd collector) and let alerts distinguish
+# "failed" / "stale" / "never ran" via absent()-guards. Textfile names are defined by the scripts.
+groups:
+  - name: ops-automation-critical
+    rules:
+      # A rollback or a failure that is newer than the last success = a promoted release did not ship.
+      - alert: DeployRolledBack
+        expr: basetool_deploy_last_rollback_timestamp > basetool_deploy_last_success_timestamp
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Deploy rolled back (health gate reverted a promoted release)"
+          description: "The last deploy outcome was a rollback newer than the last successful deploy — the health gate reverted a promoted release."
+
+      - alert: DeployFailed
+        expr: basetool_deploy_last_failure_timestamp > basetool_deploy_last_success_timestamp
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Deploy failed (newer than last success)"
+          description: "The last deploy attempt failed and is newer than the last successful deploy."
+
+      - alert: DeployConfigBlocked
+        expr: basetool_deploy_config_blocked == 1
+        for: 6h
+        labels:
+          severity: critical
+        annotations:
+          summary: "Deploy stuck on a gated config change (>6h)"
+          description: "A postgres/Keycloak image change is operator-gated (config-blocked.marker) and has not been cleared for 6 hours — deploys are silently stuck."
+
+      - alert: BackupStaleOrMissing
+        expr: (time() - basetool_backup_last_success_timestamp) > 26 * 3600 or absent(basetool_backup_last_success_timestamp)
+        for: 30m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backup stale >26h or metric absent"
+          description: "The nightly backup last succeeded more than 26 hours ago, or the backup metric is absent (never ran)."
+
+      - alert: RestoreDrillStaleOrMissing
+        expr: (time() - basetool_restore_drill_last_success_timestamp) > 35 * 24 * 3600 or absent(basetool_restore_drill_last_success_timestamp)
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "Restore drill stale >35d or metric absent"
+          description: "The monthly restore drill last succeeded more than 35 days ago, or the metric is absent (never ran)."
+
+      - alert: RestoreDrillArtifactNotRestorable
+        expr: basetool_restore_drill_artifact_ok == 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Restore drill: artifact not restorable ({{ $labels.artifact }})"
+          description: "The last restore drill could not restore/verify artifact '{{ $labels.artifact }}'."
+
+  - name: ops-automation-warning
+    rules:
+      - alert: DockerCleanupStaleOrMissing
+        expr: (time() - basetool_docker_cleanup_last_success_timestamp) > 8 * 24 * 3600 or absent(basetool_docker_cleanup_last_success_timestamp)
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "docker-cleanup stale >8d or metric absent"
+          description: "The cron docker-cleanup last succeeded more than 8 days ago, or its metric is absent — an early disk-fill indicator."

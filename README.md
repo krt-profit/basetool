@@ -371,7 +371,42 @@ repository password + Nextcloud app password) live host-only in `/etc/iri/backup
 in git or the config bundle. Setup, the secured-Nextcloud-target guide, and the full restore
 procedure are in [`docs/backup.md`](docs/backup.md); the binding requirements are in
 [`docs/specs/backup-recovery.md`](docs/specs/backup-recovery.md) (`REQ-OPS-008..012`,
-ADR-0056).
+ADR-0056). When the monitoring stack is deployed (§3.6) the backup additionally captures the
+Grafana SQLite DB, the rendered monitoring secrets/certs, the Alertmanager state and a weekly
+Prometheus TSDB snapshot; the Loki log store is **deliberately excluded** so its GFS retention
+cannot extend the approved 31-day IP retention (ADR-0072).
+
+---
+
+### 3.6 Monitoring & alerting
+
+The production host runs a full, **admin-only** operations-monitoring stack (epic
+[#936](https://github.com/krt-profit/basetool/issues/936), ADR-0072) as a **dedicated compose
+project** (`docker-compose.monitoring.yml`), fully decoupled from the 5-minute app-deploy loop.
+It comprises **Prometheus** (metrics, 180-day retention + 40 GB cap), **Grafana** (the only UI),
+**Loki** (logs, 31 d), **Tempo** (traces, 14 d), **Grafana Alloy** (log shipper + OTLP collector),
+**Alertmanager** (e-mail alerts + a healthchecks.io dead-man's switch), plus node/cAdvisor/Postgres
+×2/Redis/blackbox exporters, a GET-only docker-socket-proxy and a GitHub exporter — 14 containers,
+image-pinned and Dependabot-maintained. They live on three **isolated** Docker networks; app
+containers are never on the monitoring core network, so a compromised app cannot silence alerts,
+read/forge logs or touch the trace store.
+
+- **Access:** Grafana is published via NPM and authenticated through **Keycloak OIDC restricted to
+  the realm role `Admin`** ([`ROLES_AND_PERMISSIONS.md`](ROLES_AND_PERMISSIONS.md)). No other
+  monitoring component exposes a host port or public route.
+- **Privacy:** metrics carry only bounded, non-PII labels (180 d); the NPM-access / NPM-admin /
+  SSH-host-auth log streams retain client IPs for **31 days** as a deliberate, owner-approved,
+  privacy-policy-covered decision (`REQ-OBS-010`); Keycloak's file log is masked in the shipper;
+  traces are admin-only and short-lived.
+- **App instrumentation** (Phases 1/1b/1c, already shipped): `/actuator/prometheus` behind
+  fail-closed basic auth, env-gated OpenTelemetry tracing, and the `basetool_*` business metrics —
+  see the `MONITORING_*` env vars in [§5.3](#53-configuration-environment-variables) and
+  [`docs/specs/observability.md`](docs/specs/observability.md) (`REQ-OBS-005..011`).
+- **Config, alert-response runbook and validation:** [`monitoring/README.md`](monitoring/README.md).
+- **Operator rollout (secrets, DB/Redis users, NPM denies, Keycloak client, canary, rollback):**
+  [`docs/MONITORING_ROLLOUT_RUNBOOK.md`](docs/MONITORING_ROLLOUT_RUNBOOK.md). The stack is activated
+  by `IRI_MONITORING_ENABLED=true`; `deploy.sh` then applies it **non-gating** after the app stack
+  is healthy — a monitoring failure never rolls back the apps.
 
 ---
 

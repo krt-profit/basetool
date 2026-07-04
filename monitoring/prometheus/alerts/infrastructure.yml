@@ -1,0 +1,123 @@
+# Infrastructure alerts: host, containers, PostgreSQL, Redis, blackbox probes, certificates.
+# Epic #936 alert catalog. Thresholds are the initial values; Phase 3 (#937 baseline week) tunes them.
+groups:
+  - name: infrastructure-critical
+    rules:
+      - alert: TargetDown
+        expr: up == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Scrape target down: {{ $labels.job }}"
+          description: "Prometheus cannot scrape {{ $labels.job }} / {{ $labels.instance }} for 3 minutes. For scratch-image monitoring services this is their only liveness signal."
+
+      - alert: BlackboxProbeFailed
+        expr: probe_success == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Public endpoint probe failing: {{ $labels.instance }}"
+          description: "The blackbox HTTPS probe for {{ $labels.instance }} has failed for 3 minutes."
+
+      - alert: HostDiskCritical
+        expr: (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"})) > 0.90
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Disk >90% on {{ $labels.mountpoint }}"
+          description: "Filesystem {{ $labels.mountpoint }} is over 90% full. The monitoring stores share /var/iri with both PGDATA dirs — an overrun must never ENOSPC the databases."
+
+      - alert: HostInodesCritical
+        expr: (1 - (node_filesystem_files_free{fstype!~"tmpfs|overlay"} / node_filesystem_files{fstype!~"tmpfs|overlay"})) > 0.90
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Inodes >90% on {{ $labels.mountpoint }}"
+          description: "Filesystem {{ $labels.mountpoint }} has used over 90% of its inodes."
+
+      - alert: SystemdUnitFailed
+        expr: node_systemd_unit_state{state="failed"} == 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "systemd unit failed: {{ $labels.name }}"
+          description: "The systemd unit {{ $labels.name }} is in the failed state (e.g. iri-deploy / iri-backup / iri-restore-drill)."
+
+      - alert: ContainerRestartLoop
+        expr: increase(container_start_time_seconds{name=~".+"}[15m]) > 3
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container restart loop: {{ $labels.name }}"
+          description: "Container {{ $labels.name }} restarted more than 3 times in 15 minutes."
+
+      - alert: PostgresConnectionsCritical
+        expr: sum by (database) (pg_stat_activity_count) / on(database) pg_settings_max_connections > 0.80
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL connections >80% ({{ $labels.database }})"
+          description: "PostgreSQL {{ $labels.database }} is using more than 80% of its 100 connection slots."
+
+      - alert: RedisRdbStale
+        expr: (time() - redis_rdb_last_save_timestamp_seconds) > 3600
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis RDB snapshot older than 1h"
+          description: "The last Redis RDB save was more than an hour ago — the session-loss window (OAuth2 refresh tokens) is growing."
+
+      - alert: CertificateExpiringSoon
+        expr: (probe_ssl_earliest_cert_expiry - time()) < 14 * 24 * 3600
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "TLS certificate for {{ $labels.instance }} expires in <14 days"
+          description: "The certificate served at {{ $labels.instance }} expires in under 14 days."
+
+  - name: infrastructure-warning
+    rules:
+      - alert: HostDiskWarning
+        expr: (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"})) > 0.80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk >80% on {{ $labels.mountpoint }}"
+          description: "Filesystem {{ $labels.mountpoint }} is over 80% full."
+
+      - alert: ContainerWorkingSetHigh
+        expr: (container_memory_working_set_bytes{name=~".+"} / container_spec_memory_limit_bytes{name=~".+"}) > 0.90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container working set >90% of limit: {{ $labels.name }}"
+          description: "Container {{ $labels.name }} is within 10% of its memory limit — OOM early warning."
+
+      - alert: RedisEvictions
+        expr: increase(redis_evicted_keys_total[15m]) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis is evicting keys"
+          description: "Redis evicted keys in the last 15 minutes — the 256 MB limit may be too small for the session set."
+
+      - alert: PostgresDeadlocks
+        expr: increase(pg_stat_database_deadlocks{datname!~"template.*"}[15m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL deadlocks detected ({{ $labels.datname }})"
+          description: "PostgreSQL recorded deadlocks in the last 15 minutes."

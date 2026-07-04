@@ -32,6 +32,7 @@ x-db-backend: &db-backend-template
     -c work_mem=8MB
     -c maintenance_work_mem=64MB
     -c max_connections=100
+    -c log_error_verbosity=terse
   environment:
     POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set in .env}
     POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set in .env}
@@ -75,6 +76,7 @@ x-db-keycloak: &db-keycloak-template
     -c work_mem=4MB
     -c maintenance_work_mem=32MB
     -c max_connections=100
+    -c log_error_verbosity=terse
   environment:
     POSTGRES_DB: ${KC_POSTGRES_DB:?KC_POSTGRES_DB must be set in .env}
     POSTGRES_USER: ${KC_POSTGRES_USER:?KC_POSTGRES_USER must be set in .env}
@@ -151,6 +153,20 @@ x-keycloak: &keycloak-template
     KRT_DISCORD_SPI_SHARED_SECRET: ${KRT_DISCORD_SPI_SHARED_SECRET:-}
     KRT_BACKEND_TRUSTSTORE_PATH: ${KRT_BACKEND_TRUSTSTORE_PATH:-}
     KRT_BACKEND_TRUSTSTORE_PASSWORD: ${KRT_BACKEND_TRUSTSTORE_PASSWORD:-}
+    # Monitoring plane (epic #936, REQ-OBS-005/-009). Prometheus scrapes the management endpoint on
+    # port 9000 (plain HTTP, isolated-network carve-out — REQ-OBS-008) and Keycloak pushes OTLP login
+    # spans to Alloy. All gates default OFF so keycloak-dev and the e2e stack stay inert; the prod .env
+    # sets KC_METRICS_ENABLED=true, KC_EVENT_METRICS_USER_ENABLED=true, KC_TRACING_ENABLED=true and the
+    # Alloy OTLP endpoint. The default event list covers the local login flow AND the Discord IdP
+    # broker path (the primary login route); the `realm,idp` tags stay bounded (REQ-OBS-006). The
+    # values only take effect once their gate is on, so listing them here is inert for dev. Only the
+    # prod keycloak service joins net-monitoring-scrape.
+    KC_METRICS_ENABLED: ${KC_METRICS_ENABLED:-false}
+    KC_EVENT_METRICS_USER_ENABLED: ${KC_EVENT_METRICS_USER_ENABLED:-false}
+    KC_EVENT_METRICS_USER_EVENTS: ${KC_EVENT_METRICS_USER_EVENTS:-login,login_error,logout,register,code_to_token,refresh_token,identity_provider_login,identity_provider_first_login,identity_provider_post_login}
+    KC_EVENT_METRICS_USER_TAGS: ${KC_EVENT_METRICS_USER_TAGS:-realm,idp}
+    KC_TRACING_ENABLED: ${KC_TRACING_ENABLED:-false}
+    KC_TRACING_ENDPOINT: ${KC_TRACING_ENDPOINT:-http://alloy:4317}
   # The Keycloak Quarkus image is built on `ubi9-micro` and ships neither curl
   # nor wget, so the readiness probe uses bash's `/dev/tcp` virtual filesystem to
   # open a TCP connection to the management port and reads back the HTTP status
@@ -231,6 +247,17 @@ x-backend: &backend-template
     APP_MAIL_ENABLED: ${APP_MAIL_ENABLED:-true}
     APP_MAIL_FROM_ADDRESS: ${APP_MAIL_FROM_ADDRESS:-no-reply@profit-base.online}
     APP_MAIL_FROM_NAME: ${APP_MAIL_FROM_NAME:-Profit Basetool}
+    # Monitoring plane (epic #936, REQ-OBS-005/-009). Every value defaults OFF/empty so dev, test,
+    # e2e and a prod host without the monitoring stack stay inert: /actuator/prometheus denies every
+    # request until MONITORING_SCRAPE_* is set, and tracing exports nothing until
+    # MONITORING_TRACING_ENABLED is true. The prod .env sets the real scrape credentials and
+    # MONITORING_TRACING_ENABLED=true (Phase-2 rollout); only the prod service joins
+    # net-monitoring-scrape, where Prometheus scrapes it over HTTPS and Alloy receives its OTLP spans.
+    MONITORING_SCRAPE_USER: ${MONITORING_SCRAPE_USER:-}
+    MONITORING_SCRAPE_PASSWORD: ${MONITORING_SCRAPE_PASSWORD:-}
+    MONITORING_TRACING_ENABLED: ${MONITORING_TRACING_ENABLED:-false}
+    MONITORING_OTLP_ENDPOINT: ${MONITORING_OTLP_ENDPOINT:-http://alloy:4318/v1/traces}
+    MONITORING_TRACING_SAMPLING_PROBABILITY: ${MONITORING_TRACING_SAMPLING_PROBABILITY:-1.0}
     # The keystore lives on the host filesystem (bind-mounted below) and is
     # explicitly NOT packaged into the GHCR image. Both backend and frontend
     # share the same PKCS12 file because the cert's SAN covers the Docker
@@ -311,6 +338,14 @@ x-frontend: &frontend-template
     KEYCLOAK_ISSUER_URI: https://keycloak.profit-base.online/realms/iri
     BACKEND_URL: https://backend:11261
     REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
+    # Monitoring plane (epic #936, REQ-OBS-005/-009) — see the backend template for the full
+    # rationale. Everything defaults OFF/empty so dev/test/e2e stay inert; the prod .env supplies the
+    # real scrape credentials and enables tracing. Only the prod service joins net-monitoring-scrape.
+    MONITORING_SCRAPE_USER: ${MONITORING_SCRAPE_USER:-}
+    MONITORING_SCRAPE_PASSWORD: ${MONITORING_SCRAPE_PASSWORD:-}
+    MONITORING_TRACING_ENABLED: ${MONITORING_TRACING_ENABLED:-false}
+    MONITORING_OTLP_ENDPOINT: ${MONITORING_OTLP_ENDPOINT:-http://alloy:4318/v1/traces}
+    MONITORING_TRACING_SAMPLING_PROBABILITY: ${MONITORING_TRACING_SAMPLING_PROBABILITY:-1.0}
     SERVER_SSL_KEY_STORE: file:/run/secrets/keystore.p12
     SERVER_SSL_KEY_STORE_PASSWORD: ${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}
     JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0
@@ -353,6 +388,14 @@ x-ingest: &ingest-template
     # has BOTH the extractor and frontend tokens carrying aud=basetool-backend. Only then set this to
     # basetool-backend — enabling it earlier rejects every frontend token and breaks the app.
     APP_SECURITY_JWT_EXPECTED_AUDIENCES: ${IRI_INGEST_EXPECTED_AUDIENCES:-}
+    # Monitoring plane (epic #936, REQ-OBS-005/-009) — see the backend template for the full
+    # rationale. Everything defaults OFF/empty so dev/test/e2e stay inert; the prod .env supplies the
+    # real scrape credentials and enables tracing. Only the prod service joins net-monitoring-scrape.
+    MONITORING_SCRAPE_USER: ${MONITORING_SCRAPE_USER:-}
+    MONITORING_SCRAPE_PASSWORD: ${MONITORING_SCRAPE_PASSWORD:-}
+    MONITORING_TRACING_ENABLED: ${MONITORING_TRACING_ENABLED:-false}
+    MONITORING_OTLP_ENDPOINT: ${MONITORING_OTLP_ENDPOINT:-http://alloy:4318/v1/traces}
+    MONITORING_TRACING_SAMPLING_PROBABILITY: ${MONITORING_TRACING_SAMPLING_PROBABILITY:-1.0}
     # Same keystore + password the other modules use. These bind BOTH the server connector
     # (`server.ssl.*`, enabled in ingest application.yml so the gateway serves HTTPS on 11262) AND the
     # `spring.ssl.bundle.backend-trust` truststore that validates the backend's self-signed cert. NPM
@@ -368,6 +411,19 @@ services:
   redis:
     <<: *redis-template
     profiles: ["prod"]
+    # Prod overrides the template command to add the monitoring ACL file (epic #936). The
+    # redis_exporter (monitoring stack) connects as a dedicated ACL user restricted to read-only
+    # monitoring commands (no key access), so the session store holding OAuth2 refresh tokens stays
+    # unreadable. `--requirepass` still governs the `default` user the apps authenticate as, so the
+    # ACL file (provisioned on the host by the Phase-2 runbook BEFORE this deploy) MUST NOT define a
+    # `default` user. A missing/empty ACL file makes redis exit at startup, which the deploy
+    # health-gate turns into a clean rollback rather than a silent breakage. Untouched for redis-dev.
+    command: redis-server --save "300 1 60 1000" --appendonly no --loglevel notice --aclfile /etc/redis/users.acl --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
+    # A service-level `volumes:` replaces the merged template value, so the data volume is re-listed
+    # alongside the read-only ACL mount.
+    volumes:
+      - /var/iri/redis:/data
+      - ${IRI_REDIS_ACL_HOST_PATH:-/var/iri/redis/users.acl}:/etc/redis/users.acl:ro
     networks:
       - net-redis-frontend
       - net-redis-ingest
@@ -458,6 +514,9 @@ services:
       - net-db-keycloak
       - net-proxy-keycloak
       - net-backend-keycloak
+      # Prometheus scrapes keycloak:9000/metrics (plain HTTP mgmt port) and Keycloak pushes OTLP login
+      # spans to Alloy here (epic #936). Only the prod keycloak joins the monitoring plane.
+      - net-monitoring-scrape
 
   keycloak-dev:
     <<: *keycloak-template
@@ -492,6 +551,8 @@ services:
       - net-backend-frontend
       - net-backend-keycloak
       - net-backend-ingest
+      # Prometheus scrapes /actuator/prometheus (HTTPS) and Alloy receives OTLP spans here (epic #936).
+      - net-monitoring-scrape
 
   backend-dev:
     <<: *backend-template
@@ -532,6 +593,8 @@ services:
       - net-proxy-frontend
       - net-backend-keycloak
       - net-redis-frontend
+      # Prometheus scrapes /actuator/prometheus (HTTPS) and Alloy receives OTLP spans here (epic #936).
+      - net-monitoring-scrape
 
   frontend-dev:
     <<: *frontend-template
@@ -571,6 +634,8 @@ services:
       - net-proxy-ingest
       - net-backend-ingest
       - net-redis-ingest
+      # Prometheus scrapes /actuator/prometheus (HTTPS) and Alloy receives OTLP spans here (epic #936).
+      - net-monitoring-scrape
 
   ingest-dev:
     <<: *ingest-template
@@ -661,13 +726,21 @@ services:
 # (net-proxy-frontend/-keycloak/-ingest) are grouped in .3/.4/.7 so the admin
 # allow-list is a short, explicit list of their gateways.
 networks:
+  # Explicit `name:` (below and on net-redis-frontend) so the separate docker-compose.monitoring.yml
+  # project can reference these as `external` by a deterministic name: the postgres/redis exporters
+  # bridge into these existing data nets to reach the DBs/Redis, which keeps the databases OFF the
+  # broad monitoring-scrape net (no new lateral path such as keycloak→db-backend). The subnet/gateway
+  # are unchanged, so the NPM SSH-tunnel admin allow-list (which matches net-proxy-* gateways) is
+  # unaffected.
   net-db-backend:
+    name: net-db-backend
     driver: bridge
     ipam:
       config:
         - subnet: 172.28.0.0/24
           gateway: 172.28.0.1
   net-db-keycloak:
+    name: net-db-keycloak
     driver: bridge
     ipam:
       config:
@@ -698,6 +771,7 @@ networks:
         - subnet: 172.28.5.0/24
           gateway: 172.28.5.1
   net-redis-frontend:
+    name: net-redis-frontend
     driver: bridge
     ipam:
       config:
@@ -723,3 +797,21 @@ networks:
       config:
         - subnet: 172.28.9.0/24
           gateway: 172.28.9.1
+  # Monitoring plane — scrape/OTLP boundary (epic #936, ADR-0072). This is the ONE monitoring network
+  # the app stack owns and creates: the three apps + the prod keycloak join it so Prometheus can scrape
+  # their metrics (HTTPS for the apps, keycloak:9000 plain HTTP) and Alloy can receive their OTLP spans.
+  # The separate `docker-compose.monitoring.yml` project references it as `external` under the fixed
+  # `name:` below (so the cross-project lookup does not depend on the compose project name). The other
+  # two monitoring networks (net-monitoring-core, net-docker-proxy) have NO app-stack member and are
+  # therefore owned by the monitoring project itself — declaring them here would leave them uncreated
+  # (Compose only creates top-level networks a started service references). The DB/Redis exporters
+  # deliberately do NOT put the databases/redis on this network; they bridge into the existing
+  # net-db-*/net-redis-frontend nets instead, so no new lateral path (e.g. keycloak→db-backend) opens.
+  # Subnet continues the pinned 172.28.0.0/16 block (.10); the gateway is not load-bearing here.
+  net-monitoring-scrape:
+    name: net-monitoring-scrape
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.10.0/24
+          gateway: 172.28.10.1

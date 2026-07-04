@@ -19,8 +19,14 @@
 #     letsencrypt) — proxy topology, access lists, certs
 #   * host secrets needed to stand the stack up     (.env, keystore.p12,
 #     realm-export.json, keycloak/providers)
-#   NOT captured by design: Redis (sessions just re-login), logs, and the
-#   WireGuard wg0.conf key (the operator backs that up out-of-band — REQ-OPS-010).
+#   * the monitoring plane (epic #936, ADR-0072)     — Grafana SQLite (consistent
+#     copy), the rendered monitoring secrets/certs, the Alertmanager state, and a
+#     WEEKLY Prometheus TSDB snapshot (admin API) protecting the 180-day archive
+#   NOT captured by design: Redis (sessions just re-login), logs, the WireGuard
+#     wg0.conf key (operator backs that up out-of-band — REQ-OPS-010), and — a
+#     DELIBERATE data-protection decision (ADR-0072) — the Loki log store, whose
+#     GFS retention would silently extend the approved 31-day IP retention; Tempo
+#     traces and exporter/textfile data (regenerable) are excluded too.
 #
 # CONSISTENCY (REQ-OPS-009): pg_dump alone is already a transactionally
 # consistent snapshot, but to obtain one globally quiescent instant we briefly
@@ -69,6 +75,15 @@ KEEP_MONTHLY="${IRI_KEEP_MONTHLY:-6}"
 # (the deploy user cannot read it directly; a container running as root can).
 # Defaults to the Postgres image, which is always present on the host.
 HELPER_IMAGE="${IRI_BACKUP_HELPER_IMAGE:-postgres:18-alpine}"
+
+# Monitoring-plane backup (epic #936, ADR-0072). Best-effort and fully guarded so a host WITHOUT the
+# monitoring stack is unaffected. Loki data is deliberately EXCLUDED (its GFS retention would silently
+# extend the approved 31-day IP retention); Tempo + exporter/textfile data are excluded too (ADR-0072).
+MON_COMPOSE="${COMPOSE_DIR}/docker-compose.monitoring.yml"
+MON_DATA="${IRI_MONITORING_DIR:-/var/iri/monitoring}"
+TEXTFILE_DIR="${IRI_MONITORING_TEXTFILE_DIR:-/var/iri/monitoring/textfile}"
+CURL_IMAGE="${IRI_BACKUP_CURL_IMAGE:-curlimages/curl:8.11.1}"
+START_EPOCH="$(date +%s)"
 
 QUIESCE=true
 SKIP_UPLOAD=false
@@ -120,6 +135,32 @@ read_env() {
 
 # docker compose wrapper pinned to the prod profile, run from the compose dir.
 dc() { docker compose --profile "${PROFILE}" "$@"; }
+
+# docker compose wrapper for the SEPARATE monitoring project.
+dcm() { docker compose -f "${MON_COMPOSE}" "$@"; }
+
+# Writes the backup outcome textfile metric (node_exporter textfile collector; epic #936). Only
+# called after a fully successful upload + restic check, so age>26h or absent() reliably means the
+# backup missed or failed (ADR-0072 alert wiring).
+write_backup_metrics() {
+  local now dur tmp
+  now="$(date +%s)"; dur=$(( now - START_EPOCH ))
+  install -d -m 0755 "${TEXTFILE_DIR}" 2>/dev/null || true
+  tmp="${TEXTFILE_DIR}/backup.prom.$$"
+  if {
+    echo "# HELP basetool_backup_last_success_timestamp Unix time of the last successful off-site backup."
+    echo "# TYPE basetool_backup_last_success_timestamp gauge"
+    echo "basetool_backup_last_success_timestamp ${now}"
+    echo "# HELP basetool_backup_duration_seconds Runtime of the last successful backup in seconds."
+    echo "# TYPE basetool_backup_duration_seconds gauge"
+    echo "basetool_backup_duration_seconds ${dur}"
+  } > "${tmp}" 2>/dev/null; then
+    mv -f "${tmp}" "${TEXTFILE_DIR}/backup.prom" 2>/dev/null || true
+  else
+    log "WARN: could not write backup textfile metric (${TEXTFILE_DIR})"
+    rm -f "${tmp}" 2>/dev/null || true
+  fi
+}
 
 # --- Pre-flight -------------------------------------------------------------
 [[ -f "${COMPOSE_DIR}/docker-compose.yml" ]] || fail "missing ${COMPOSE_DIR}/docker-compose.yml"
@@ -236,14 +277,78 @@ if [[ -d "${COMPOSE_DIR}/keycloak/providers" ]]; then
     || log "WARN: could not archive keycloak/providers — skipped"
 fi
 
-# --- Restart writers BEFORE the slow upload, then release the deploy lock ----
+# --- Restart writers BEFORE the slow upload -------------------------------
 if [[ "${QUIESCED}" == "true" ]]; then
   log "dumps captured — restarting writers (${WRITER_SERVICES[*]})"
   dc start "${WRITER_SERVICES[@]}"
   QUIESCED=false
 fi
+
+# --- Capture the monitoring plane (epic #936, ADR-0072) ---------------------
+# Grafana SQLite (consistent copy via a brief graceful stop — a clean shutdown checkpoints the WAL,
+# so a plain copy of grafana.db is complete), the rendered secrets/certs (host-rebuild = restore, not
+# re-provisioning), and the Alertmanager state (silences + notification log). Done while still holding
+# the deploy lock so a concurrent deploy-monitoring `up` cannot restart Grafana mid-copy. Fully guarded
+# and best-effort: a monitoring failure never fails the DB backup.
+if [[ -f "${MON_COMPOSE}" ]] && docker ps --format '{{.Names}}' | grep -q 'grafana'; then
+  mkdir -p "${STAGING}/monitoring"
+  log "capturing Grafana SQLite (brief grafana stop for a consistent copy)"
+  grafana_stopped=false
+  if dcm stop -t 20 grafana >/dev/null 2>&1; then
+    grafana_stopped=true
+  else
+    log "WARN: could not stop grafana; copying its SQLite live (may be inconsistent)"
+  fi
+  if [[ -f "${MON_DATA}/data/grafana/grafana.db" ]]; then
+    docker run --rm -v "${MON_DATA}/data/grafana:/src:ro" "${HELPER_IMAGE}" \
+      cat /src/grafana.db > "${STAGING}/monitoring/grafana.db" 2>/dev/null \
+      || log "WARN: could not capture grafana.db"
+  else
+    log "WARN: grafana.db not found under ${MON_DATA}/data/grafana"
+  fi
+  [[ "${grafana_stopped}" == "true" ]] && { dcm start grafana >/dev/null 2>&1 || log "WARN: failed to restart grafana"; }
+  log "capturing monitoring secrets + certs"
+  docker run --rm -v "${MON_DATA}:/src:ro" "${HELPER_IMAGE}" \
+    sh -c 'tar -C /src -cz secrets certs 2>/dev/null || true' > "${STAGING}/monitoring/secrets.tar.gz" 2>/dev/null \
+    || log "WARN: could not archive monitoring secrets/certs"
+  log "capturing Alertmanager state (silences + notification log)"
+  docker run --rm -v "${MON_DATA}/data/alertmanager:/src:ro" "${HELPER_IMAGE}" \
+    sh -c 'tar -C /src -cz . 2>/dev/null || true' > "${STAGING}/monitoring/alertmanager.tar.gz" 2>/dev/null \
+    || log "WARN: could not archive alertmanager state"
+else
+  log "monitoring stack not present/running — skipping monitoring artifact capture"
+fi
+
+# --- Release the deploy lock; the slow upload runs while fully live ----------
 flock -u 200 || true
 log "deploy lock released; the rest runs while fully live"
+
+# --- Weekly (Sunday) Prometheus TSDB snapshot into the backup ---------------
+# Protects the 180-day metric archive + the #937 baseline against host/disk loss (ADR-0072). Uses the
+# admin API (enabled ONLY together with basic auth) via a throwaway curl container on the core net —
+# the host has no published Prometheus port by design. Best-effort; the snapshot dir is cleaned after
+# staging so the prometheus volume does not grow unbounded.
+if [[ "$(date -u +%u)" == "7" ]] && [[ -f "${MON_COMPOSE}" ]] && docker network inspect net-monitoring-core >/dev/null 2>&1; then
+  PROM_PW="$(read_env PROMETHEUS_WEB_PASSWORD)"
+  if [[ -n "${PROM_PW}" ]]; then
+    mkdir -p "${STAGING}/monitoring"
+    log "weekly Prometheus TSDB snapshot via admin API"
+    snap_json="$(docker run --rm --network net-monitoring-core "${CURL_IMAGE}" \
+      -sS -u "grafana:${PROM_PW}" -XPOST http://prometheus:9090/api/v1/admin/tsdb/snapshot 2>/dev/null || true)"
+    snap_name="$(printf '%s' "${snap_json}" | sed -n 's/.*"name":"\([^"]*\)".*/\1/p')"
+    if [[ -n "${snap_name}" && -d "${MON_DATA}/data/prometheus/snapshots/${snap_name}" ]]; then
+      if docker run --rm -v "${MON_DATA}/data/prometheus/snapshots/${snap_name}:/src:ro" "${HELPER_IMAGE}" \
+           sh -c 'tar -C /src -cz .' > "${STAGING}/monitoring/prometheus-tsdb-snapshot.tar.gz" 2>/dev/null; then
+        log "captured Prometheus TSDB snapshot ${snap_name}"
+      else
+        log "WARN: could not archive the Prometheus TSDB snapshot"
+      fi
+      rm -rf "${MON_DATA}/data/prometheus/snapshots/${snap_name}" 2>/dev/null || true
+    else
+      log "WARN: Prometheus TSDB snapshot failed or dir missing (name='${snap_name:-}')"
+    fi
+  fi
+fi
 
 if [[ "${SKIP_UPLOAD}" == "true" ]]; then
   log "--skip-upload: dumps staged at ${STAGING} (will be removed on exit); not pushing to restic"
@@ -266,5 +371,8 @@ restic forget --tag basetool \
 
 log "verifying repository integrity (restic check)"
 restic check
+
+# Monitoring signal: record the successful backup for the "backup >26h or absent" alert (epic #936).
+write_backup_metrics
 
 log "backup complete"

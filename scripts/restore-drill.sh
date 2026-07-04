@@ -31,11 +31,62 @@ READY_TIMEOUT="${IRI_DRILL_READY_TIMEOUT:-60}"
 MIN_BACKEND_TABLES="${IRI_DRILL_MIN_BACKEND_TABLES:-20}"
 MIN_KEYCLOAK_TABLES="${IRI_DRILL_MIN_KEYCLOAK_TABLES:-20}"
 
+# Monitoring textfile metrics (epic #936). The drill writes its own outcome so Prometheus can alert
+# on drill failure, on any single non-restorable artifact, on staleness (>35d) AND on the metric
+# being absent (never ran) — the systemd failed-unit signal alone cannot tell "failed" from "never
+# ran". Per-artifact status (0=not restorable, 1=ok); the DB pair drives last-success, the monitoring
+# artifacts are reported independently so a missing Grafana/secrets artifact alerts on its own.
+TEXTFILE_DIR="${IRI_MONITORING_TEXTFILE_DIR:-/var/iri/monitoring/textfile}"
+START_EPOCH="$(date +%s)"
+OK_DB_BACKEND=0
+OK_DB_KEYCLOAK=0
+OK_GRAFANA_SQLITE=0
+OK_MONITORING_SECRETS=0
+
 KEEP=false
 [[ "${1:-}" == "--keep" ]] && KEEP=true
 
 log() { printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
 fail() { log "FATAL: $*"; exit 1; }
+
+# Writes the restore-drill textfile metric atomically. last_success bumps only when BOTH DB dumps
+# restored (the drill's core recoverability proof); a failed run preserves the previous last_success
+# so it reads as staleness/artifact_ok=0 rather than the metric vanishing (reserved for "never ran").
+# shellcheck disable=SC2317,SC2329  # invoked indirectly via the EXIT trap (cleanup), like cleanup() below
+write_drill_metrics() {
+  local now dur prev tmp
+  now="$(date +%s)"
+  dur=$(( now - START_EPOCH ))
+  prev=0
+  if [[ -f "${TEXTFILE_DIR}/restore_drill.prom" ]]; then
+    prev="$(awk '/^basetool_restore_drill_last_success_timestamp /{print $2}' "${TEXTFILE_DIR}/restore_drill.prom" 2>/dev/null || echo 0)"
+    [[ "${prev}" =~ ^[0-9]+$ ]] || prev=0
+  fi
+  if (( OK_DB_BACKEND == 1 && OK_DB_KEYCLOAK == 1 )); then
+    prev="${now}"
+  fi
+  install -d -m 0755 "${TEXTFILE_DIR}" 2>/dev/null || true
+  tmp="${TEXTFILE_DIR}/restore_drill.prom.$$"
+  if {
+    echo "# HELP basetool_restore_drill_last_success_timestamp Unix time of the last fully-successful DB restore drill."
+    echo "# TYPE basetool_restore_drill_last_success_timestamp gauge"
+    echo "basetool_restore_drill_last_success_timestamp ${prev}"
+    echo "# HELP basetool_restore_drill_duration_seconds Runtime of the last restore drill in seconds."
+    echo "# TYPE basetool_restore_drill_duration_seconds gauge"
+    echo "basetool_restore_drill_duration_seconds ${dur}"
+    echo "# HELP basetool_restore_drill_artifact_ok Whether each backup artifact was restorable (1) or not (0)."
+    echo "# TYPE basetool_restore_drill_artifact_ok gauge"
+    echo "basetool_restore_drill_artifact_ok{artifact=\"db_backend\"} ${OK_DB_BACKEND}"
+    echo "basetool_restore_drill_artifact_ok{artifact=\"db_keycloak\"} ${OK_DB_KEYCLOAK}"
+    echo "basetool_restore_drill_artifact_ok{artifact=\"grafana_sqlite\"} ${OK_GRAFANA_SQLITE}"
+    echo "basetool_restore_drill_artifact_ok{artifact=\"monitoring_secrets\"} ${OK_MONITORING_SECRETS}"
+  } > "${tmp}" 2>/dev/null; then
+    mv -f "${tmp}" "${TEXTFILE_DIR}/restore_drill.prom" 2>/dev/null || true
+  else
+    log "WARN: could not write restore-drill textfile metric (${TEXTFILE_DIR})"
+    rm -f "${tmp}" 2>/dev/null || true
+  fi
+}
 
 # --- Pre-flight -------------------------------------------------------------
 [[ -f "${BACKUP_ENV}" ]] || fail "missing ${BACKUP_ENV}"
@@ -62,6 +113,9 @@ chmod 700 "${WORK}"
 cleanup() {
   local rc=$?
   docker rm -f "${CONTAINER}" >/dev/null 2>&1 || true
+  # Always emit the outcome metric — on success AND on any failure path — so absent() means "never
+  # ran", not "failed once".
+  write_drill_metrics
   if [[ "${KEEP}" == "true" && "${rc}" -eq 0 ]]; then
     log "--keep: leaving restored dumps at ${WORK}"
   else
@@ -75,6 +129,7 @@ trap cleanup EXIT
 log "restoring latest snapshot dumps from ${RESTIC_REPOSITORY}"
 restic restore latest --tag basetool \
   --include '*/krt_basetool.dump' --include '*/keycloak.dump' \
+  --include '*/monitoring/grafana.db' --include '*/monitoring/secrets.tar.gz' \
   --target "${WORK}" \
   || fail "restic restore failed"
 
@@ -122,12 +177,42 @@ KEYCLOAK_TABLES="$(q keycloak "select count(*) from information_schema.tables wh
 log "verification: flyway_schema_history rows=${FLYWAY_ROWS}, backend public tables=${BACKEND_TABLES}, keycloak public tables=${KEYCLOAK_TABLES}"
 
 ok=true
-[[ "${FLYWAY_ROWS}" =~ ^[0-9]+$ && "${FLYWAY_ROWS}" -gt 0 ]] || { log "FAIL: flyway_schema_history empty or missing"; ok=false; }
-[[ "${BACKEND_TABLES}" =~ ^[0-9]+$ && "${BACKEND_TABLES}" -ge "${MIN_BACKEND_TABLES}" ]] || { log "FAIL: backend public tables < ${MIN_BACKEND_TABLES}"; ok=false; }
-[[ "${KEYCLOAK_TABLES}" =~ ^[0-9]+$ && "${KEYCLOAK_TABLES}" -ge "${MIN_KEYCLOAK_TABLES}" ]] || { log "FAIL: keycloak public tables < ${MIN_KEYCLOAK_TABLES}"; ok=false; }
+if [[ "${FLYWAY_ROWS}" =~ ^[0-9]+$ && "${FLYWAY_ROWS}" -gt 0 \
+      && "${BACKEND_TABLES}" =~ ^[0-9]+$ && "${BACKEND_TABLES}" -ge "${MIN_BACKEND_TABLES}" ]]; then
+  OK_DB_BACKEND=1
+else
+  log "FAIL: backend restore incomplete (flyway rows=${FLYWAY_ROWS}, public tables=${BACKEND_TABLES} < ${MIN_BACKEND_TABLES})"
+  ok=false
+fi
+if [[ "${KEYCLOAK_TABLES}" =~ ^[0-9]+$ && "${KEYCLOAK_TABLES}" -ge "${MIN_KEYCLOAK_TABLES}" ]]; then
+  OK_DB_KEYCLOAK=1
+else
+  log "FAIL: keycloak public tables < ${MIN_KEYCLOAK_TABLES}"
+  ok=false
+fi
+
+# --- Monitoring artifacts (epic #936): are the Grafana SQLite DB + the monitoring secrets archive
+# restorable? These are reported independently (their own artifact_ok metric + alert) and do NOT gate
+# the DB-recoverability proof, so a not-yet-captured monitoring artifact never masks a DB failure and
+# vice versa. Absent from the snapshot (e.g. the first drill before the monitoring stack's first
+# backup) reads as artifact_ok=0 — the runbook sequences a backup before the first post-rollout drill.
+GRAFANA_DB="$(find "${WORK}" -name grafana.db -print -quit 2>/dev/null || true)"
+if [[ -s "${GRAFANA_DB:-}" ]] && head -c 16 "${GRAFANA_DB}" 2>/dev/null | grep -q "SQLite format 3"; then
+  OK_GRAFANA_SQLITE=1
+  log "verification: grafana.db restored ($(du -h "${GRAFANA_DB}" | cut -f1), valid SQLite header)"
+else
+  log "WARN: grafana.db missing from snapshot or not a valid SQLite file (artifact_ok=0)"
+fi
+SECRETS_TAR="$(find "${WORK}" -name 'secrets.tar.gz' -print -quit 2>/dev/null || true)"
+if [[ -s "${SECRETS_TAR:-}" ]] && tar tzf "${SECRETS_TAR}" >/dev/null 2>&1; then
+  OK_MONITORING_SECRETS=1
+  log "verification: monitoring secrets archive restored and readable"
+else
+  log "WARN: monitoring secrets archive missing from snapshot or unreadable (artifact_ok=0)"
+fi
 
 if [[ "${ok}" == "true" ]]; then
-  log "RESTORE DRILL PASSED — the off-site backup is recoverable"
+  log "RESTORE DRILL PASSED — the off-site DB backup is recoverable (monitoring artifacts: grafana=${OK_GRAFANA_SQLITE}, secrets=${OK_MONITORING_SECRETS})"
   exit 0
 fi
 fail "RESTORE DRILL FAILED — the latest backup did not restore cleanly (investigate immediately)"
