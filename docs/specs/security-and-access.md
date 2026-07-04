@@ -459,9 +459,23 @@ shared bind-mounted `keystore.p12` — so neither edge that reaches it is cleart
 
 The management/health interface (port 9000) is exempt: it stays HTTP via
 `--http-management-scheme=http` because the Quarkus image ships no TLS-capable CLI client for the
-container healthcheck, and the port is container-loopback only (never published, never on a proxy
-network). Dev/test are exempt (Keycloak stays HTTP; the admin URL is plain HTTP and no
+container healthcheck. The port is never published on the host and never on an NPM proxy network;
+since the monitoring rollout (epic #936, ADR-0072) the **prod** Keycloak additionally joins the
+isolated `net-monitoring-scrape` network so **Prometheus scrapes `http://keycloak:9000/metrics` in
+plain HTTP** there. Dev/test are exempt (Keycloak stays HTTP; the admin URL is plain HTTP and no
 `keycloak-trust` bundle is defined, so `KeycloakService` falls back to the default client).
+
+**Monitoring-plane cleartext carve-out (owner-approved amendment, 2026-07-02).** The HTTPS-only edge
+posture above still holds for every app/Keycloak/NPM edge. It is deliberately amended for traffic that
+stays **inside the isolated monitoring Docker networks** (`net-monitoring-scrape` /
+`net-monitoring-core` / `net-docker-proxy`): Prometheus→exporters, Grafana→datasources,
+Alloy→Loki/Tempo, the app/Keycloak OTLP span push to Alloy, and the `keycloak:9000` metrics scrape run
+in plain HTTP. These networks carry no host ports, no public route and no user payload; Prometheus
+still scrapes the three **apps** over HTTPS with the pinned public CA (no `insecure_skip_verify`), and
+Grafana gets its own self-signed certificate so the shared `keystore.p12` private key never leaves the
+four existing services. Approval of epic #936 by @greluc is the owner approval this amendment requires;
+the rationale, residual risk and the binding rules live in `REQ-OBS-008` (`observability.md`) and
+ADR-0072.
 
 **Acceptance**
 

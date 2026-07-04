@@ -61,6 +61,57 @@
   },
   "clients": [
     {
+      "_comment": "Grafana OIDC client for the monitoring UI (epic #936, ADR-0072). Confidential + PKCE; login is restricted to the realm role 'Admin' via Grafana's role_attribute_path with role_attribute_strict. The realm-roles mapper below MUST set id.token.claim=true: Grafana reads role_attribute_path from the ID token, but the built-in realm-roles mapper only writes to the ACCESS token, which would lock EVERYONE out under strict mode. Set the secret at deploy time (GRAFANA_OAUTH_CLIENT_SECRET) and adjust the host if not profit-base.online.",
+      "clientId": "grafana",
+      "name": "Grafana (monitoring)",
+      "description": "Confidential OIDC client for the Grafana monitoring UI; realm role Admin only.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": true,
+      "secret": "__SET_AT_DEPLOY__",
+      "redirectUris": [
+        "https://grafana.profit-base.online/login/generic_oauth"
+      ],
+      "webOrigins": [
+        "https://grafana.profit-base.online"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "https://grafana.profit-base.online/*"
+      },
+      "protocolMappers": [
+        {
+          "_comment": "User Realm Role mapper — 'Add to ID token' (id.token.claim=true) is load-bearing (see the client _comment).",
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "realm_access.roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "usermodel.realmRoleMapping.rolePrefix": "",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ],
+      "defaultClientScopes": [
+        "web-origins",
+        "roles",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "offline_access"
+      ]
+    },
+    {
       "clientId": "basetool-frontend",
       "name": "IRIDIUM Basetool Frontend",
       "description": "Frontend Application for IRIDIUM Basetool",

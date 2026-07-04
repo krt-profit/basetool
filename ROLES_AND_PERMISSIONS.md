@@ -189,6 +189,17 @@ every `BANK_EMPLOYEE` check (REQ-BANK-007).
 checked by any endpoint (effectively inert — all member-management endpoints have
 been `hasRole('ADMIN')` since the Phase-4 lockdown).
 
+### Monitoring UI (Grafana) — realm role `Admin` only
+
+The operations-monitoring UI (epic [#936](https://github.com/krt-profit/basetool/issues/936),
+ADR-0072) is a **separate, admin-only surface** — the only monitoring component with a public route.
+It is published via NPM and authenticated through **Keycloak OIDC**, and login is granted **only** to
+holders of the realm role `Admin`: Grafana's `role_attribute_path` maps that realm role to Grafana's
+server-admin and `role_attribute_strict` denies everyone else (an Officer or KRT Member cannot reach
+it). The app-authority table above does **not** apply to Grafana — access is purely the realm-role
+gate. All other monitoring components (Prometheus, Alertmanager, Loki, Tempo, exporters) have no
+public route at all. See [`docs/specs/observability.md`](docs/specs/observability.md) REQ-OBS-008.
+
 ### Contextual roles from OrgUnit memberships
 
 `LOGISTICIAN` and `MISSION_MANAGER` are **not** Keycloak roles, but **flags per

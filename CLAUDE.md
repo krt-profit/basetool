@@ -27,6 +27,16 @@ in its [`INDEX.md`](docs/specs/INDEX.md)), and architecture/design decisions in
   unified viewer's per-area event-type filter and the DE/EN i18n labels, and reconcile the
   REQ-AUDIT-001 coverage list. A new mutation in an audited area with no matching audit event is
   incomplete.
+- **Every change to the tool keeps the monitoring in sync.** Whenever you add, change, or remove a
+  feature, endpoint, scheduled job, status enum, security gate, or external integration, evaluate the
+  monitoring impact **in the same PR**: extend or adjust the business metrics (`basetool_*`, naming +
+  bounded-label rules per REQ-OBS-011), the Prometheus alert rules and Grafana dashboards under
+  [`monitoring/`](monitoring/), the Alloy/Loki pipelines when a new log stream or format appears, the
+  blackbox targets when a new public endpoint ships, and the tracing instrumentation for new outbound
+  calls. A new scheduled job without task metrics, a new audited area without its audit-event counter,
+  a new status enum without its queue gauge, a renamed/removed metric that breaks a dashboard or alert
+  rule, or a new public surface without a probe is **incomplete**
+  ([`docs/specs/observability.md`](docs/specs/observability.md), REQ-OBS-005…011).
 - **Every architecturally significant or design decision is recorded as an ADR**
   ([`docs/adr/README.md`](docs/adr/README.md)) before or with the change that implements it.
 - **README, the role matrix and the user wiki move with the change.** Whenever a change affects

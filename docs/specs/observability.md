@@ -172,13 +172,38 @@ Tracing on the OTel SDK) behind a hard master gate:
 - Trace retention is short (14 days, Tempo, Phase 2) and access is admin-only via Grafana
   (REQ-OBS-008).
 
-### REQ-OBS-010 — NPM access-log IP retention (reserved, Phase 2/3)
+### REQ-OBS-010 — Edge / host-auth log streams: 31-day IP retention + privacy-policy linkage
 
-Reserved for the deliberate, owner-approved decision to ingest the NPM edge access logs
-(client IPs, 31-day retention) as a documented data-protection trade-off (epic
-[#936](https://github.com/krt-profit/basetool/issues/936), ADR-0072). Not implemented in the
-Phase-1 app instrumentation; the requirement is recorded here so the REQ-OBS numbering stays
-continuous and the decision has a home before the Phase-2 stack rollout.
+The monitoring plane ingests three log streams **including client IPs / usernames** at a
+**31-day retention** — a deliberate, owner-approved data-protection trade-off (2026-07-02, epic
+[#936](https://github.com/krt-profit/basetool/issues/936), ADR-0072) for security monitoring and
+abuse detection:
+
+- **NPM edge access logs** — all public proxy hosts, client IPs (edge 4xx/5xx rates, scan/probe
+  detection, per-host traffic).
+- **NPM admin-UI stdout** — the loopback-only admin UI; any failed login implies a host-local actor
+  or tunnel (high-signal).
+- **SSH / host-auth logs** — `/var/log/auth.log` (or the journal per distro): failed-auth spikes,
+  invalid users, sudo failures, and a successful password login on a key-only host.
+
+Binding conditions on this retention:
+
+- **31 days, then automatic deletion**, enforced by the Loki compactor (`retention_period: 744h`);
+  Loki is **deliberately excluded from backups** so restic's GFS retention cannot silently extend the
+  31 days (ADR-0072).
+- **Admin-only access** — these streams are readable only through Grafana behind Keycloak OIDC
+  restricted to the realm role `Admin` (REQ-OBS-008).
+- **Privacy-policy linkage (mandatory):** the decision is conditioned on the privacy policy covering
+  the temporary IP storage. `frontend/src/main/resources/templates/privacy.html` §3.8 plus the
+  `privacy.h2_3_8` / `privacy.p_3_8_1` / `privacy.p_3_8_2` keys in the DE/EN bundles document the
+  streams, the 31-day retention, the purpose (security monitoring / abuse detection) and the
+  admin-only access. A change that widens these streams or their retention must update the privacy
+  policy in the same PR.
+- Keycloak's own file log is masked in the shipper (`username=` / `ipAddress=`, REQ-OBS-007); the
+  IP-bearing streams above are the app/edge/host layers, not the Keycloak file log.
+
+The metrics/dashboards derived from these streams carry **no** per-user labels (REQ-OBS-006) — only
+aggregated counts and bounded `app`/`host` labels.
 
 ### REQ-OBS-011 — Business metrics (`basetool_*`)
 
