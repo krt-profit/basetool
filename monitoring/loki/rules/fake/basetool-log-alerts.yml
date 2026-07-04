@@ -10,15 +10,34 @@
 groups:
   - name: log-alerts-critical
     rules:
-      # A successful password SSH login on a key-only host implies a compromise or misconfig.
+      # A successful password OR keyboard-interactive SSH login on a key-only host implies a
+      # compromise or misconfig. keyboard-interactive is the PAM password back door on UsePAM hosts
+      # (logs as "Accepted keyboard-interactive/pam"); a bare "Accepted password" matcher misses it.
       - alert: SshPasswordLoginOnKeyOnlyHost
-        expr: sum(rate({app="host-auth"} |~ "Accepted password" [5m])) > 0
+        expr: sum(rate({app="host-auth"} |~ "Accepted (password|keyboard-interactive)" [5m])) > 0
         for: 0m
         labels:
           severity: critical
         annotations:
-          summary: "Successful password SSH login on a key-only host"
-          description: "auth.log shows an 'Accepted password' login. The host is key-only — investigate immediately."
+          summary: "Successful password/keyboard-interactive SSH login on a key-only host"
+          description: "auth.log shows an 'Accepted password' or 'Accepted keyboard-interactive' login. The host is key-only — investigate immediately."
+
+      # High-signal theft detection: a SUCCESSFUL login from outside the operator's known networks.
+      # DISABLED by default — it needs the operator's real egress prefix(es); with the example
+      # placeholders it would fire on every legitimate login. To enable: replace the example
+      # prefixes with your stable egress CIDR/prefix(es) (RE2 line filter on the logged source IP)
+      # and uncomment. LogQL cannot restrict by IP structurally, so this is a negative line filter.
+      # - alert: SshAcceptedFromUnexpectedIp
+      #   expr: |
+      #     sum(count_over_time(
+      #       {app="host-auth"} |~ "Accepted " !~ "from (203\.0\.113\.|198\.51\.100\.)" [5m]
+      #     )) > 0
+      #   for: 0m
+      #   labels:
+      #     severity: critical
+      #   annotations:
+      #     summary: "SSH login accepted from an unexpected source network"
+      #     description: "A successful SSH login originated outside the operator's known networks — possible key theft. Verify it was you."
 
       - alert: PostgresFatalOrPanic
         expr: sum(rate({app=~"postgres-.+"} |~ "FATAL|PANIC" [5m])) > 0
@@ -50,6 +69,29 @@ groups:
         annotations:
           summary: "SSH failed-auth spike"
           description: "auth.log shows an elevated rate of failed SSH authentications / invalid users."
+
+      # Every successful root login. root is the operator's admin/tunnel path and there is no other
+      # SSH-capable account, so each login should be attributable — this fires on the operator's OWN
+      # logins by design (an attributable audit trail); narrow to (password|keyboard-interactive) or
+      # scope by source IP if the mail volume is unwanted.
+      - alert: SshRootLoginAccepted
+        expr: sum(rate({app="host-auth"} |~ "Accepted (publickey|password|keyboard-interactive) for root " [5m])) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Successful SSH root login"
+          description: "auth.log shows a successful root login. Expected only for operator admin/tunnel sessions — verify it was you."
+
+      # The only non-root account (deploy) is nologin with no sudo, so any sudo failure is anomalous.
+      - alert: SudoAuthFailure
+        expr: sum(rate({app="host-auth"} |~ "sudo:.*(authentication failure|NOT in sudoers|command not allowed)" [10m])) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "sudo authentication failure on the host"
+          description: "auth.log shows a sudo failure. The only non-root account has no sudo, so a failure implies an unexpected actor — investigate."
 
       - alert: NpmAdminLoginFailure
         expr: sum(rate({app="npm"} |~ "(?i)(invalid|failed).*(login|password|token)" [10m])) > 0

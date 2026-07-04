@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Monitoring: zusätzliche SSH-Sicherheitsalarme.** Neue Loki-Alarme für erfolgreiche Root-Anmeldungen (`SshRootLoginAccepted`) und fehlgeschlagene `sudo`-Aufrufe (`SudoAuthFailure`) auf dem Host-Auth-Log. Der bestehende Key-only-Alarm schlägt jetzt auch bei erfolgreichen `keyboard-interactive`-Anmeldungen an (dem PAM-Passwortpfad), nicht nur bei `Accepted password`. Ergänzt um eine auskommentierte Vorlage `SshAcceptedFromUnexpectedIp`, die nach Eintragen der eigenen Egress-Netze aktiviert wird (REQ-OBS-010).
+
 ## [v1.1.0](https://github.com/krt-profit/basetool/releases/tag/v1.1.0) - 2026-07-04
 
 ### Added
