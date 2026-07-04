@@ -32,6 +32,7 @@
       "targets": [
         {
           "expr": "container_memory_working_set_bytes{name=~\".+\"}/container_spec_memory_limit_bytes{name=~\".+\"}*100",
+          "legendFormat": "{{name}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -64,6 +65,7 @@
       "targets": [
         {
           "expr": "container_memory_working_set_bytes{name=~\".+\"}",
+          "legendFormat": "{{name}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -96,6 +98,7 @@
       "targets": [
         {
           "expr": "rate(container_cpu_usage_seconds_total{name=~\".+\"}[5m])",
+          "legendFormat": "{{name}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -128,6 +131,7 @@
       "targets": [
         {
           "expr": "rate(container_cpu_cfs_throttled_seconds_total{name=~\".+\"}[5m])",
+          "legendFormat": "{{name}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -160,6 +164,7 @@
       "targets": [
         {
           "expr": "changes(container_start_time_seconds{name=~\".+\"}[1h])",
+          "legendFormat": "{{name}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -191,7 +196,8 @@
       },
       "targets": [
         {
-          "expr": "rate(container_network_receive_bytes_total{name=~\".+\"}[5m])",
+          "expr": "sum by (name) (rate(container_network_receive_bytes_total{name=~\".+\"}[5m]))",
+          "legendFormat": "{{name}} RX",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -199,7 +205,8 @@
           }
         },
         {
-          "expr": "rate(container_network_transmit_bytes_total{name=~\".+\"}[5m])",
+          "expr": "sum by (name) (rate(container_network_transmit_bytes_total{name=~\".+\"}[5m]))",
+          "legendFormat": "{{name}} TX",
           "refId": "B",
           "datasource": {
             "type": "prometheus",

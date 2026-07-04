@@ -207,6 +207,28 @@ off the stale local `:stable` tag against a V201-migrated database crash-looped 
 
 **Enforced by:** `scripts/deploy.sh` (`running_stack_drift`, idempotence check) · `scripts/deploy.test.sh` (self-tests, run by `.github/workflows/deploy-script.yml`) · **Runbook:** `docs/deployment.md` → *What happens on the server*, *Restarting the stack manually*
 
+### REQ-OPS-014 — Edge-proxy container runs with a hardened runtime baseline
+
+The `npm` (nginx-proxy-manager) service is the most internet-exposed container on the host and
+must run with the same runtime-hardening baseline the monitoring stack applies:
+`security_opt: no-new-privileges`, `cap_drop: [ALL]` with an explicit, minimal `cap_add`
+list, and a `pids` limit. The capability add-back set is not documented by upstream (the image
+boots as root under s6-overlay), so it is defined empirically and **must be re-verified on every
+image bump** before the bump is promoted: a clean boot (including the s6 prepare `sed` pass over
+`/data/nginx`), a passing `/usr/bin/check-health`, a working `nginx -s reload`, and a clean
+container restart. A read-only root filesystem is explicitly **out** of this baseline — the s6
+prepare step writes across the filesystem and the container refuses to boot with EROFS (the same
+constraint that keeps the two custom `.conf` bind mounts writable).
+
+**Acceptance**
+
+- [ ] The `npm` service in `docker-compose.yml` sets `no-new-privileges`, `cap_drop: [ALL]` plus
+  a commented `cap_add` allow-list, and a `pids` limit.
+- [ ] An `npm` image bump is only promoted after the capability set has been re-verified against
+  the new image (boot + check-health + reload + restart).
+
+**Enforced by:** `docker-compose.yml` (`npm` service) · verification recipe in the service comment
+
 ## Out of scope
 
 - The deploy script (`deploy.sh`) and the systemd units themselves are **not** delivered via

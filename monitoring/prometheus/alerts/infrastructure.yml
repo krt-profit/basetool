@@ -12,14 +12,30 @@ groups:
           summary: "Scrape target down: {{ $labels.job }}"
           description: "Prometheus cannot scrape {{ $labels.job }} / {{ $labels.instance }} for 3 minutes. For scratch-image monitoring services this is their only liveness signal."
 
+      # Scoped to the two liveness jobs (blackbox-http + the 401-accepting blackbox-http-auth):
+      # the deny/posture jobs (blackbox-edge-deny/-force-ssl/-hsts, REQ-OBS-012) have their own
+      # alerts below and must not double-page through this one.
       - alert: BlackboxProbeFailed
-        expr: probe_success == 0
+        expr: probe_success{job=~"blackbox-http|blackbox-http-auth"} == 0
         for: 3m
         labels:
           severity: critical
         annotations:
           summary: "Public endpoint probe failing: {{ $labels.instance }}"
           description: "The blackbox HTTPS probe for {{ $labels.instance }} has failed for 3 minutes."
+
+      # The `and on()` guard suppresses the posture alert while the edge itself is down — that
+      # case is already paged by BlackboxProbeFailed and the deny probe carries no signal then.
+      - alert: EdgeActuatorDenyBroken
+        expr: >-
+          probe_success{job="blackbox-edge-deny"} == 0
+          and on() (probe_success{job="blackbox-http", instance="https://profit-base.online"} == 1)
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Edge /actuator deny broken: {{ $labels.instance }}"
+          description: "{{ $labels.instance }} no longer answers 404 — the `location /actuator` deny on the NPM proxy host has drifted (ADR-0072 compensating control). Re-add it in the proxy host's Advanced config."
 
       - alert: HostDiskCritical
         expr: (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"})) > 0.90
@@ -121,3 +137,26 @@ groups:
         annotations:
           summary: "PostgreSQL deadlocks detected ({{ $labels.datname }})"
           description: "PostgreSQL recorded deadlocks in the last 15 minutes."
+
+      # Posture assertions (REQ-OBS-012). Same `and on()` outage guard as EdgeActuatorDenyBroken.
+      - alert: EdgeForceSslRedirectBroken
+        expr: >-
+          probe_success{job="blackbox-force-ssl"} == 0
+          and on() (probe_success{job="blackbox-http", instance="https://profit-base.online"} == 1)
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HTTP→HTTPS redirect broken: {{ $labels.instance }}"
+          description: "Port 80 on {{ $labels.instance }} no longer answers with a 301/308 to https:// — the Force SSL toggle on the NPM proxy host is off or drifted."
+
+      - alert: EdgeHstsHeaderMissing
+        expr: >-
+          probe_success{job="blackbox-hsts"} == 0
+          and on() (probe_success{job="blackbox-http", instance="https://profit-base.online"} == 1)
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HSTS header missing: {{ $labels.instance }}"
+          description: "The first response from {{ $labels.instance }} no longer carries Strict-Transport-Security (app-side HSTS, audit finding H-9) — check the frontend security config and the edge forwarding."
