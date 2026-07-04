@@ -687,10 +687,11 @@ docker run --rm --network net-monitoring-core --entrypoint amtool \
 ### 8.5 One NPM access line + one host auth line visible in Loki
 
 > **UI click-path (verified against Grafana 13.x):**
-> Grafana → **Explore** → datasource **Loki** → run `{job="npm"}` (NPM access log) and
-> `{job="hostauth"}` (or the label your `config.alloy` assigns to `/hostlog/auth.log`) → confirm at
-> least one recent line each. (If the host uses journald not `auth.log` — see Phase 2 — confirm the
-> journald-sourced label instead.)
+> Grafana → **Explore** → datasource **Loki** → run `{app="npm-access"}` (NPM access log; NPM
+> error log is `{app="npm-error"}`, NPM container stdout is `{app="npm"}`) and `{app="host-auth"}`
+> (the label `config.alloy` assigns to `/hostlog/auth.log`) → confirm at least one recent line
+> each. (If the host uses journald not `auth.log` — see Phase 2 — confirm the label of the
+> journald-sourced Alloy variant instead.)
 
 ### 8.6 Grafana OIDC login: Admin in, non-Admin denied
 
