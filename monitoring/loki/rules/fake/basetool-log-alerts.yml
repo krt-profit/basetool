@@ -69,6 +69,18 @@ groups:
           summary: "Edge (NPM) 5xx spike"
           description: "The NPM access logs show an elevated 5xx rate at the edge — catches upstream failures app metrics cannot see."
 
+      # 429s come from the edge limiter (REQ-SEC-023, limit_req/limit_conn in the custom
+      # server_proxy.conf snippet) or the backend Bucket4j limiter passing through the edge —
+      # either way a sustained rate means someone is flooding or brute-forcing.
+      - alert: EdgeRateLimitSpike
+        expr: sum(rate({app="npm-access"} |~ " 429 " [5m])) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Edge rate limiter engaged"
+          description: "The NPM access logs show a sustained 429 rate — the edge per-IP limiter (or the backend rate limiter) is rejecting a flood. Check source IPs in the npm-access stream."
+
       # sshd_config / authorized_keys tamper: auditd emits a watch event (with the acting auid) on any
       # write to the sshd config or a root authorized_keys. Fires on the operator's OWN edits too (rare)
       # — each event carries the auid, so it stays attributable; raise to critical once the config is

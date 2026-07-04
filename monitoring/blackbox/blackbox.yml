@@ -2,6 +2,13 @@
 # The http_2xx module terminates TLS on the https:// targets, so probe_ssl_earliest_cert_expiry is
 # emitted for the certificate-expiry alert. fail_if_not_ssl stays false so a handshake still returns
 # metrics rather than failing outright.
+#
+# The deny/posture modules below (REQ-OBS-012) assert edge configuration that lives only in the NPM
+# admin DB and would otherwise drift invisibly. Deliberately NOT covered here: the Keycloak /admin
+# allow-list — probes from this exporter hairpin through the host and are SNAT'd to the Docker
+# bridge gateways, which are exactly the allow-listed sources, so from this vantage point /admin
+# always looks reachable. That assertion runs externally instead
+# (.github/workflows/edge-deny-probe.yml).
 modules:
   http_2xx:
     prober: http
@@ -21,7 +28,7 @@ modules:
   # Auth-protected public endpoints (the ingest gateway answers 401 on its probed path). A 401 still
   # proves the endpoint is reachable AND the TLS cert is valid — exactly what this probe checks. A real
   # outage (timeout / connection error / 5xx) is NOT in the valid list and still fails the probe, so
-  # probe_success flips to 0 and the BlackboxProbeFailed alert (probe_success == 0) still catches it.
+  # probe_success flips to 0 and the BlackboxProbeFailed alert still catches it.
   http_2xx_or_401:
     prober: http
     timeout: 10s
@@ -30,6 +37,61 @@ modules:
       valid_status_codes: [200, 401]
       method: GET
       follow_redirects: true
+      fail_if_ssl: false
+      fail_if_not_ssl: false
+      preferred_ip_protocol: "ip4"
+      ip_protocol_fallback: false
+      tls_config:
+        insecure_skip_verify: false
+
+  # Succeeds ONLY on exactly 404 — the /actuator edge deny (ADR-0072 compensating control). The
+  # live block is `location /actuator { return 404; }`; if it drifts, the Spring apps answer the
+  # probed /actuator/prometheus path with 401 (fail-closed basic auth) and the probe fails.
+  http_deny_404:
+    prober: http
+    timeout: 10s
+    http:
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      valid_status_codes: [404]
+      method: GET
+      follow_redirects: false
+      fail_if_ssl: false
+      fail_if_not_ssl: false
+      preferred_ip_protocol: "ip4"
+      ip_protocol_fallback: false
+      tls_config:
+        insecure_skip_verify: false
+
+  # Succeeds ONLY when plain-HTTP port 80 answers with a redirect to https:// — the per-host
+  # "Force SSL" toggle in NPM. follow_redirects stays false so the first response is asserted.
+  http_force_ssl_redirect:
+    prober: http
+    timeout: 10s
+    http:
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      valid_status_codes: [301, 308]
+      method: GET
+      follow_redirects: false
+      fail_if_header_not_matches:
+        - header: Location
+          regexp: "^https://"
+      preferred_ip_protocol: "ip4"
+      ip_protocol_fallback: false
+
+  # Succeeds ONLY when the FIRST response already carries Strict-Transport-Security (app-side HSTS
+  # per security-audit finding H-9, forwarded through the edge). follow_redirects stays false —
+  # following would assert the redirect target's (Keycloak's) headers instead of the probed host's.
+  http_2xx_hsts:
+    prober: http
+    timeout: 10s
+    http:
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      valid_status_codes: [200, 301, 302, 303, 307, 308]
+      method: GET
+      follow_redirects: false
+      fail_if_header_not_matches:
+        - header: Strict-Transport-Security
+          regexp: "max-age=\\d+"
       fail_if_ssl: false
       fail_if_not_ssl: false
       preferred_ip_protocol: "ip4"

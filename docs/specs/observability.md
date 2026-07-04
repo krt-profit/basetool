@@ -285,3 +285,47 @@ status queue without a gauge, or a renamed metric that silently breaks a dashboa
 incomplete (epic [#936](https://github.com/krt-profit/basetool/issues/936); the binding
 "monitoring moves with every feature" rule ships with the Phase-2 stack).
 
+### REQ-OBS-012 — Edge posture assertions (deny / redirect / HSTS probes)
+
+Security-relevant edge configuration lives only in the NPM admin database (per-host toggles and
+Advanced snippets under `/var/iri/npm/data`), not in git — a UI misclick or a proxy-host recreate
+could silently undo it. The monitoring plane therefore **asserts** that posture continuously
+instead of trusting the one-time rollout verification:
+
+- **`/actuator` edge deny** — the `blackbox-edge-deny` job probes `/actuator/prometheus` on both
+  public app hosts with the `http_deny_404` module: probe success means the edge answers exactly
+  404 (the live deny). If the block drifts, the request reaches the fail-closed app endpoint
+  (401) and `EdgeActuatorDenyBroken` (critical) fires — the continuous version of the ADR-0072
+  compensating control.
+- **Force-SSL redirect** — the `blackbox-force-ssl` job probes plain-HTTP port 80 of all four
+  public vhosts with `http_force_ssl_redirect` (301/308 + `Location: https://…`, redirects not
+  followed); `EdgeForceSslRedirectBroken` (warning) fires on drift.
+- **HSTS** — the `blackbox-hsts` job asserts `Strict-Transport-Security` on the **first**
+  response of `https://profit-base.online` (app-side HSTS, security-audit finding H-9);
+  `EdgeHstsHeaderMissing` (warning). Extended to the keycloak/grafana/ingest vhosts once their
+  header posture is verified in the NPM UI.
+- **Keycloak `/admin` allow-list** — asserted **externally** by the daily
+  `.github/workflows/edge-deny-probe.yml` run. The internal blackbox exporter cannot carry this
+  signal: its hairpinned probe traffic is SNAT'd to the Docker bridge gateways, which are exactly
+  the allow-listed sources, so from inside the console always looks reachable. The workflow also
+  re-asserts the `/actuator` 404 from outside.
+
+The posture jobs are separate from the `blackbox-http` liveness job; `BlackboxProbeFailed` is
+scoped to liveness, and every posture alert carries an `and on()` guard on the main-page probe so
+a full edge outage pages once (liveness), not once per posture assertion.
+
+**Acceptance**
+
+- [ ] `EdgeActuatorDenyBroken` fires when a public app host stops answering 404 on
+  `/actuator/prometheus` while the edge itself is up, and stays silent during a full edge outage.
+- [ ] `EdgeForceSslRedirectBroken` fires when port 80 of a public vhost stops redirecting to
+  `https://`; `EdgeHstsHeaderMissing` fires when the frontend's first response drops the header.
+- [ ] The scheduled `edge-deny-probe` workflow fails when
+  `https://keycloak.profit-base.online/admin/` answers 2xx/3xx from a GitHub runner or the
+  `/actuator` paths stop answering 404 externally.
+
+**Enforced by:** `monitoring/blackbox/blackbox.yml` (`http_deny_404` / `http_force_ssl_redirect` /
+`http_2xx_hsts`) · `monitoring/prometheus/prometheus.yml` (the three posture jobs) ·
+`monitoring/prometheus/alerts/infrastructure.yml` (`EdgeActuatorDenyBroken`,
+`EdgeForceSslRedirectBroken`, `EdgeHstsHeaderMissing`, scoped `BlackboxProbeFailed`) ·
+`.github/workflows/edge-deny-probe.yml`

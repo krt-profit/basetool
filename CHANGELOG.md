@@ -6,6 +6,14 @@
 
 - **Monitoring: Host-Sicherheits-Logs (auditd, fail2ban) in Loki + Tamper-Alarm.** Alloy schickt jetzt zwei zusätzliche Host-Streams nach Loki: `host-auditd` (auditd-Wachregeln auf `sshd_config`/`authorized_keys`) und `host-fail2ban` (Sperren des SSH-Jails). Der neue Alarm `AuditdSshTamper` schlägt an, wenn die SSH-Konfiguration oder eine `authorized_keys`-Datei geändert wird. Beide Streams enthalten IP-Adressen/Benutzernamen (31 Tage, nur für Administratoren) — die Datenschutzerklärung wurde entsprechend erweitert (REQ-OBS-007/-010).
 
+### Security
+
+- **Edge-Proxy-Container (nginx-proxy-manager) gehärtet.** Der Reverse-Proxy läuft jetzt ohne Privilegien-Eskalation (`no-new-privileges`), mit minimalem Capability-Set (`cap_drop: ALL` plus dokumentierter Allow-List) und einem Prozess-Limit — als exponiertester Container des Hosts erhält er damit dieselbe Härtungs-Baseline wie der Monitoring-Stack (REQ-OPS-014).
+
+- **Rate-Limiting am Edge.** Jeder öffentliche Proxy-Host begrenzt jetzt pro Client-IP die Anfragerate (20 r/s, Burst 80) und die gleichzeitigen Verbindungen (60) — ein versioniertes Sicherheitsnetz gegen Fluten und Brute-Force, das legitime Seitenaufrufe nicht berührt; Ablehnungen antworten mit 429 und lösen bei anhaltender Rate den neuen Alarm `EdgeRateLimitSpike` aus (REQ-SEC-023).
+
+- **Monitoring: Edge-Konfiguration wird jetzt dauerhaft verifiziert statt einmalig.** Neue Blackbox-Proben schlagen Alarm, wenn die `/actuator`-Sperre am Edge, die HTTP→HTTPS-Umleitung oder der HSTS-Header eines öffentlichen Hosts wegdriftet; die Erreichbarkeits-Sperre der Keycloak-Admin-Konsole prüft täglich ein externer GitHub-Actions-Lauf, da sie von innen prinzipbedingt nicht messbar ist (REQ-OBS-012).
+
 ### Removed
 
 - **Monitoring-Stack: GitHub-Dashboard + github-exporter entfernt (Epic #936).** Das Dashboard „Development / GitHub“ und der komplette `github-exporter` (Compose-Service, Prometheus-Scrape-Job, `github_token`-Secret) sind entfernt. Die Repo-Kennzahlen (Stars/Forks/Issues) funktionierten, aber die Workflow-Run-Panels blieben „No data“: dieser Collector ist webhook-getrieben und hätte einen öffentlichen `/github`-Endpunkt plus Secret und persistenten Store gebraucht — zu viel neue Angriffsfläche für ein Dev-Dashboard.

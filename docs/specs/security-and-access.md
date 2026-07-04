@@ -660,6 +660,44 @@ members) and `MissionControllerSlimEndpointsTest` for the `addParticipantSlim` o
 **ADR:** [ADR-0034](../adr/0034-anonymous-outsider-mission-visibility.md). **Security audit:**
 finding L3.
 
+### REQ-SEC-023 — Edge per-IP rate limiting (version-controlled safety net)
+
+(REQ-SEC-022 — the Discord account-existence precheck — lives in
+[`discord-integration.md`](discord-integration.md); this requirement continues the series at the
+next free number.)
+
+Every public proxy host behind nginx-proxy-manager carries a **version-controlled** per-IP safety
+net at the edge: `limit_req` (20 r/s sustained, burst 80, `nodelay`) and `limit_conn` (60
+concurrent connections) keyed on `$binary_remote_addr`, delivered through the custom snippets the
+repo already injects into NPM (`docker/maintenance/nginx/http.conf` defines the zones,
+`server_proxy.conf` applies them in every proxy host's `server` block). The values are
+flood/brute-force **ceilings**, not fairness limits — a legitimate worst-case page load fits
+inside the burst. Two invariants:
+
+- **Rejections answer 429, never 503.** The nginx defaults would route rejected requests into the
+  maintenance-page `error_page 502 503 504` intercept, serving a flooding client the maintenance
+  page with `Retry-After` semantics that are wrong for rate limiting.
+- **Engagement is observable.** Rejected requests land in the per-host access logs (plus
+  `limit_req_log_level warn` in the error log) and a sustained 429 rate raises the
+  `EdgeRateLimitSpike` Loki alert.
+
+Stricter per-endpoint limits (e.g. the Keycloak login/token paths) may reference the same zones
+from a proxy host's Advanced tab in the NPM UI; that is unversioned host state and out of this
+requirement's scope. The backend's application-level Bucket4j limiter (REQ-SEC-009 family) is
+unchanged and remains the precise, per-subject layer behind this coarse edge net.
+
+**Acceptance**
+
+- [ ] A burst above rate+burst from one IP receives 429 responses (not the maintenance page, not
+  503) while other client IPs are unaffected.
+- [ ] A normal page load (asset fan-out within the burst) is never limited.
+- [ ] A sustained 429 rate at the edge raises `EdgeRateLimitSpike`.
+
+**Enforced by:** `docker/maintenance/nginx/http.conf` (zones) ·
+`docker/maintenance/nginx/server_proxy.conf` (per-host application, 429 statuses) ·
+`monitoring/loki/rules/fake/basetool-log-alerts.yml` (`EdgeRateLimitSpike`) · **Runbook:**
+`docs/deployment.md` → *Edge rate limiting*
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the
