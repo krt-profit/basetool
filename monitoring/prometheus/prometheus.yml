@@ -152,9 +152,26 @@ scrape_configs:
     static_configs:
       - targets:
           - https://profit-base.online
-          - https://ingest.profit-base.online
           - https://grafana.profit-base.online
           - https://keycloak.profit-base.online/realms/iri/.well-known/openid-configuration
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # Auth-protected endpoint: the ingest gateway answers 401 on its root, which still proves it is
+  # reachable with a valid cert. Uses the http_2xx_or_401 module so a healthy (401) ingest reads as up;
+  # a real outage (timeout/5xx/connection error) still yields probe_success == 0 and alerts.
+  - job_name: blackbox-http-auth
+    metrics_path: /probe
+    params:
+      module: [http_2xx_or_401]
+    static_configs:
+      - targets:
+          - https://ingest.profit-base.online
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target

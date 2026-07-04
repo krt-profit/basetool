@@ -82,15 +82,18 @@ groups:
           summary: "Oldest pending bank booking request >48h"
           description: "A bank booking request has been awaiting approval for more than 48 hours."
 
-      # Audit silence: backend up for 6h but zero audited mutations recorded — REQ-AUDIT-001 signal.
+      # Audit silence: backend up but zero audited mutations recorded across a 5-DAY window — a
+      # REQ-AUDIT-001 signal that audit logging may be broken. 5d (not hours) so ordinary quiet periods
+      # (weekends, maintenance windows) never trip it; only a genuine multi-day silence does. Resolves
+      # on the first audited action and stays quiet as long as one lands within any 5-day window.
       - alert: AuditSilenceAnomaly
-        expr: (sum(increase(basetool_audit_events_total[6h])) == 0) and on() (up{job="basetool-backend"} == 1)
+        expr: (sum(increase(basetool_audit_events_total[5d])) == 0) and on() (up{job="basetool-backend"} == 1)
         for: 30m
         labels:
           severity: warning
         annotations:
-          summary: "No audit events recorded in 6h while backend is up"
-          description: "The backend has been up but recorded zero audit events for 6 hours — possible audit-logging regression (REQ-AUDIT-001)."
+          summary: "No audit events recorded in 5d while backend is up"
+          description: "The backend has been up but recorded zero audit events for 5 days — possible audit-logging regression (REQ-AUDIT-001)."
 
       # Frontend → backend call failures (bounded reason/method), sustained.
       - alert: BackendCallFailureSustained

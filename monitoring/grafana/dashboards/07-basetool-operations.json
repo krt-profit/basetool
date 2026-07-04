@@ -585,7 +585,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (job) (rate(basetool_scheduled_job_executions_total{outcome=\"failure\"}[15m]))",
+          "expr": "sum by (job) (rate(basetool_scheduled_job_executions_total{outcome=\"failure\"}[15m])) or vector(0)",
           "refId": "A",
           "legendFormat": "{{job}}",
           "datasource": {
@@ -643,7 +643,7 @@
       },
       "targets": [
         {
-          "expr": "rate(basetool_http_error_total{code=\"OPTIMISTIC_LOCK\"}[5m])",
+          "expr": "rate(basetool_http_error_total{code=\"OPTIMISTIC_LOCK\"}[5m]) or vector(0)",
           "refId": "A",
           "legendFormat": "OPTIMISTIC_LOCK",
           "datasource": {
@@ -739,7 +739,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (application, bucket) (rate(basetool_ratelimit_rejections_total[5m]))",
+          "expr": "sum by (application, bucket) (rate(basetool_ratelimit_rejections_total[5m])) or vector(0)",
           "refId": "A",
           "legendFormat": "{{application}} / {{bucket}}",
           "datasource": {

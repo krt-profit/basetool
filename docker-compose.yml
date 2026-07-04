@@ -705,6 +705,9 @@ services:
       - net-proxy-frontend
       - net-proxy-keycloak
       - net-proxy-ingest
+      # NPM re-encrypts the public grafana.profit-base.online host to grafana:3000 over this dedicated
+      # net (Grafana joins it from docker-compose.monitoring.yml). Keeps NPM OFF net-monitoring-core.
+      - net-proxy-grafana
 
 # Every bridge network is pinned to a fixed /24 under 172.28.0.0/16 instead of
 # being left to Docker's dynamic address pool. This is deliberate, not cosmetic:
@@ -818,3 +821,14 @@ networks:
       config:
         - subnet: 172.28.10.0/24
           gateway: 172.28.10.1
+  # Dedicated NPM<->Grafana proxy net (epic #936): NPM re-encrypts the public grafana.profit-base.online
+  # host to grafana:3000 here so NPM never joins the closed net-monitoring-core. Grafana joins it from
+  # docker-compose.monitoring.yml (external ref by this fixed name). Subnet continues the pinned block
+  # (.11); the gateway is NOT load-bearing (net-proxy-grafana is not in the Keycloak-admin allow-list).
+  net-proxy-grafana:
+    name: net-proxy-grafana
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.11.0/24
+          gateway: 172.28.11.1

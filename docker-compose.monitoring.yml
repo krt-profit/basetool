@@ -128,10 +128,17 @@ services:
     deploy:
       resources:
         limits:
-          memory: 192M
+          # Grafana 13 grows to ~500 MB+ under active dashboard use (bleve full-text indexes for
+          # folders/dashboards/playlists/repositories + OIDC sessions + bundled-plugin processes).
+          # 192M AND 512M both OOM-cycled it on the production host (95%+ usage -> SIGKILL -> restart
+          # loop, ~every 5 min). 1G gives real headroom on the 16 GB host.
+          memory: 1024M
           pids: 512
     networks:
       - net-monitoring-core
+      # Reachable by NPM for the public grafana.profit-base.online host WITHOUT joining NPM to the
+      # closed net-monitoring-core: a dedicated proxy net shared by ONLY NPM (app stack) + Grafana.
+      - net-proxy-grafana
 
   # ------------------------------------------------------------------------------------------
   # Loki — log store (31d, compactor retention). Ruler pushes log-based alerts to Alertmanager.
@@ -176,7 +183,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          # Under active trace ingestion (Keycloak OTLP spans) the monolithic Tempo grew past its
+          # former 256M cap and OOM-cycled every ~minute on the production host (RSS ~326 MB). 512M
+          # holds with headroom on the 16 GB host (data-driven fine-tune tracked in #937).
+          memory: 512M
           pids: 512
     networks:
       - net-monitoring-core
@@ -433,6 +443,12 @@ networks:
   net-monitoring-scrape:
     external: true
     name: net-monitoring-scrape
+  # Dedicated NPM<->Grafana proxy net, created and owned by the app stack (docker-compose.yml, where
+  # NPM lives). Lets NPM re-encrypt the public grafana.profit-base.online host to grafana:3000 without
+  # ever joining the closed net-monitoring-core.
+  net-proxy-grafana:
+    external: true
+    name: net-proxy-grafana
   # Monitoring-only backbone (Prometheus/Alertmanager/Loki/Tempo/Grafana/exporters). App containers
   # are NEVER members. Not `internal` because alertmanager (SMTP + healthchecks.io), blackbox and
   # github-exporter need internet egress.
