@@ -158,6 +158,7 @@
       "targets": [
         {
           "expr": "prometheus_tsdb_storage_blocks_bytes",
+          "legendFormat": "{{instance}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -188,6 +189,7 @@
       "targets": [
         {
           "expr": "prometheus_tsdb_head_series",
+          "legendFormat": "{{instance}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -218,6 +220,7 @@
       "targets": [
         {
           "expr": "rate(alertmanager_notifications_failed_total[15m])",
+          "legendFormat": "{{integration}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",

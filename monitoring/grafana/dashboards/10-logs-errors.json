@@ -37,6 +37,7 @@
       "targets": [
         {
           "expr": "sum by (app) (rate({level=\"error\"}[5m]))",
+          "legendFormat": "{{app}}",
           "refId": "A",
           "datasource": {
             "type": "loki",
@@ -157,6 +158,7 @@
       "targets": [
         {
           "expr": "sum by (app) (rate({app=~\".+\"}[5m]))",
+          "legendFormat": "{{app}}",
           "refId": "A",
           "datasource": {
             "type": "loki",

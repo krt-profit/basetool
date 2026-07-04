@@ -125,6 +125,7 @@
       "targets": [
         {
           "expr": "sum(pg_stat_activity_count{database=\"$database\"})",
+          "legendFormat": "active connections",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -133,6 +134,7 @@
         },
         {
           "expr": "pg_settings_max_connections{database=\"$database\"}",
+          "legendFormat": "max connections",
           "refId": "B",
           "datasource": {
             "type": "prometheus",
@@ -165,6 +167,7 @@
       "targets": [
         {
           "expr": "rate(pg_stat_database_xact_commit{database=\"$database\"}[5m])",
+          "legendFormat": "commits {{datname}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -173,6 +176,7 @@
         },
         {
           "expr": "rate(pg_stat_database_xact_rollback{database=\"$database\"}[5m])",
+          "legendFormat": "rollbacks {{datname}}",
           "refId": "B",
           "datasource": {
             "type": "prometheus",
@@ -239,6 +243,7 @@
       "targets": [
         {
           "expr": "rate(pg_stat_database_deadlocks{database=\"$database\"}[15m])",
+          "legendFormat": "{{datname}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",

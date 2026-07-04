@@ -83,6 +83,7 @@
       "targets": [
         {
           "expr": "rate(jvm_gc_pause_seconds_sum{application=\"$application\"}[5m])",
+          "legendFormat": "{{action}} / {{cause}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -147,6 +148,7 @@
       "targets": [
         {
           "expr": "sum by (status) (rate(http_server_requests_seconds_count{application=\"$application\"}[5m]))",
+          "legendFormat": "{{status}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -243,6 +245,7 @@
       "targets": [
         {
           "expr": "hikaricp_connections_active{application=\"$application\"}",
+          "legendFormat": "active {{pool}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -251,6 +254,7 @@
         },
         {
           "expr": "hikaricp_connections_pending{application=\"$application\"}",
+          "legendFormat": "pending {{pool}}",
           "refId": "B",
           "datasource": {
             "type": "prometheus",
@@ -315,6 +319,7 @@
       "targets": [
         {
           "expr": "sum by (cache) (rate(cache_gets_total{application=\"$application\",result=\"hit\"}[5m])) / sum by (cache) (rate(cache_gets_total{application=\"$application\"}[5m]))",
+          "legendFormat": "{{cache}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -349,6 +354,7 @@
       "targets": [
         {
           "expr": "resilience4j_circuitbreaker_state{application=\"$application\"}",
+          "legendFormat": "{{name}} {{state}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
