@@ -284,6 +284,12 @@ services:
   # ------------------------------------------------------------------------------------------
   # cAdvisor — per-container metrics via the GET-only docker socket proxy (never the raw socket).
   # No cap_drop: ALL — it reads host cgroup/sys state and needs broader access than the exporters.
+  # The Docker container factory ALSO opens a direct containerd client (Docker delegates runtime
+  # state to containerd), so it needs /run/containerd/containerd.sock mounted: without it the
+  # factory fails to register and, under --docker_only, cAdvisor emits ZERO name-labelled series —
+  # every Container-dashboard panel then reads "No data". The socket-proxy speaks only the Docker
+  # REST API, not containerd's gRPC, so it cannot cover this. The containerd socket is
+  # root-equivalent; the security trade-off is recorded in ADR-0072 §6 (owner-approved, PR #982).
   # ------------------------------------------------------------------------------------------
   cadvisor:
     <<: *mon-base
@@ -297,6 +303,7 @@ services:
     volumes:
       - /:/rootfs:ro
       - /sys:/sys:ro
+      - /run/containerd/containerd.sock:/run/containerd/containerd.sock:ro
     deploy:
       resources:
         limits:

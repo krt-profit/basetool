@@ -539,7 +539,7 @@
         {
           "expr": "time() - basetool_scheduled_job_last_success_timestamp_seconds",
           "refId": "A",
-          "legendFormat": "{{job}}",
+          "legendFormat": "{{exported_job}}",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -585,9 +585,9 @@
       },
       "targets": [
         {
-          "expr": "sum by (job) (rate(basetool_scheduled_job_executions_total{outcome=\"failure\"}[15m])) or vector(0)",
+          "expr": "sum by (exported_job) (rate(basetool_scheduled_job_executions_total{outcome=\"failure\"}[15m])) or vector(0)",
           "refId": "A",
-          "legendFormat": "{{job}}",
+          "legendFormat": "{{exported_job}}",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"

@@ -16,9 +16,15 @@ groups:
 
   - name: business-warning
     rules:
+      # NOTE: the backend tags basetool_scheduled_job_* with a `job` label (ScheduledJob.label()),
+      # which COLLIDES with Prometheus's own scrape `job` label (basetool-backend). On collision
+      # Prometheus keeps the scrape value and exposes the app value as `exported_job`, so the
+      # scheduled-job name must be matched on `exported_job` here, not `job` (which is always
+      # "basetool-backend"). Matching on `job` silently never fired. (Root-cause fix = rename the
+      # backend tag off the reserved `job` name; until then these use exported_job.)
       # Role drift vs. Keycloak: the user sync last succeeded > 15 min ago (it runs every 5 min).
       - alert: UserSyncStale
-        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{job="user_sync"}) > 900
+        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{exported_job="user_sync"}) > 900
         for: 1m
         labels:
           severity: warning
@@ -27,7 +33,7 @@ groups:
           description: "The Keycloak user sync last succeeded more than 15 minutes ago — local roles/accounts may drift from Keycloak."
 
       - alert: ExternalSyncStale
-        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{job=~"uex_sync|scwiki_sync"}) > 172800
+        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{exported_job=~"uex_sync|scwiki_sync"}) > 172800
         for: 10m
         labels:
           severity: warning
