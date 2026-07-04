@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Security
+
+- **Edge-Proxy-Container (nginx-proxy-manager) gehärtet.** Der Reverse-Proxy läuft jetzt ohne Privilegien-Eskalation (`no-new-privileges`), mit minimalem Capability-Set (`cap_drop: ALL` plus dokumentierter Allow-List) und einem Prozess-Limit — als exponiertester Container des Hosts erhält er damit dieselbe Härtungs-Baseline wie der Monitoring-Stack (REQ-OPS-014).
+
 ## [v1.1.0](https://github.com/krt-profit/basetool/releases/tag/v1.1.0) - 2026-07-04
 
 ### Added

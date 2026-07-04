@@ -465,7 +465,14 @@ until you either promote a different version or force it. To take the upgrade:
    target; the app images in the same promotion are applied along with it.
 
 redis and npm image bumps are **not** gated — they auto-apply as in the previous
-section.
+section. For an **npm** bump, verify the hardened capability set before merging the
+bump PR (REQ-OPS-014): boot the new image once with the `security_opt`/`cap_drop`/
+`cap_add`/`pids` values from the `npm` service in `docker-compose.yml` and confirm a
+clean boot, a passing `/usr/bin/check-health`, a working `nginx -s reload`, and a
+clean container restart. The jc21 image does not officially support a reduced
+capability set, so an upstream change (e.g. a new s6 prepare step) can silently
+require an additional capability — catching that in review is cheaper than a
+rolled-back deploy.
 
 ---
 

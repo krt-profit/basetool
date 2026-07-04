@@ -671,13 +671,38 @@ services:
       - "127.0.0.1:10081:81"     # NGINX Proxy Manager Admin Web UI (loopback-only)
     environment:
       DB_SQLITE_FILE: "/data/database.sqlite"
+    # Runtime hardening (REQ-OPS-014) — the edge proxy is the most internet-exposed container
+    # on the host, so it gets the baseline the monitoring stack already applies. The jc21 image
+    # boots as root under s6-overlay and documents no reduced capability set, so the add-back
+    # list is the empirically verified minimum on 2.15.1 (clean boot incl. the /data/nginx sed
+    # pass, check-health OK, `nginx -s reload` OK, container restart OK): NET_BIND_SERVICE
+    # (nginx binds 80/443), CHOWN/FOWNER/DAC_OVERRIDE (s6 prepare chowns /data +
+    # /etc/letsencrypt and sed-rewrites *.conf files it does not own), SETUID/SETGID (s6 and
+    # the nginx master drop to the npm user), KILL (nginx master signals workers across uid
+    # boundaries on reload). read_only rootfs stays OFF — the s6 prepare step must write across
+    # the fs (same EROFS constraint as the .conf mounts below). Re-verify the set on every
+    # image bump before promoting it.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    cap_add:
+      - NET_BIND_SERVICE
+      - CHOWN
+      - SETUID
+      - SETGID
+      - FOWNER
+      - DAC_OVERRIDE
+      - KILL
     # Nginx + the SQLite-backed admin UI is feather-light; 256 MB / 0.5 vCPU is
-    # ample for HTTP/HTTPS proxying at our request volume.
+    # ample for HTTP/HTTPS proxying at our request volume. The pids cap bounds a
+    # fork bomb / worker leak in the exposed container (same 512 as the monitoring
+    # stack; normal operation runs ~45 processes).
     deploy:
       resources:
         limits:
           memory: 256M
           cpus: '0.5'
+          pids: 512
     volumes:
       - /var/iri/npm/data:/data
       - /var/iri/npm/letsencrypt:/etc/letsencrypt
