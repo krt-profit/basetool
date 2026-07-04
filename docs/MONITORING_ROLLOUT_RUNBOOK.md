@@ -222,18 +222,13 @@ Prometheus's `--web.config.file` needs a **bcrypt** hash (not the plaintext). Th
 `grafana` (that is what the datasource and the self-scrape authenticate as).
 
 ```bash
-# Option A — htpasswd (from apache2-utils / httpd-tools). -B = bcrypt, -C 10 = cost 10.
-# htpasswd -nBC 10 "" prints ":$2y$10$...."; strip the leading ':' and any newline.
-BCRYPT="$(htpasswd -nBC 10 "" <<<"${WEB_PW}"$'\n'"${WEB_PW}" | tr -d ':\n' | sed 's/^\$2y/\$2y/')"
-# (htpasswd -n prompts twice on stdin; the here-string feeds the password twice.)
+# Option A (installation-free, recommended): run htpasswd from a throwaway container — no host
+# package needed. -b takes the password as an arg from the ${WEB_PW} VARIABLE (so the plaintext is
+# NOT echoed into shell history); -B = bcrypt, -C 10 = cost. Output is ":$2y$10$..."; strip the ':'.
+BCRYPT="$(docker run --rm httpd:2.4-alpine htpasswd -nbBC 10 "" "${WEB_PW}" | tr -d ':\n')"
 
-# Option B — python bcrypt (if htpasswd is unavailable). Prometheus accepts $2b$ hashes.
-#   pip install bcrypt   # once, in a throwaway venv
-BCRYPT="$(python3 - "$WEB_PW" <<'PY'
-import sys, bcrypt
-print(bcrypt.hashpw(sys.argv[1].encode(), bcrypt.gensalt(rounds=10)).decode())
-PY
-)"
+# Option B (if you'd rather install a host tool): apt install -y apache2-utils, then:
+#   BCRYPT="$(htpasswd -nBC 10 "" | tr -d ':\n')"   # prompts twice; enter ${WEB_PW} both times
 
 # Write the web config. Note the exact YAML shape Prometheus expects:
 sudo tee /var/iri/monitoring/secrets/prometheus-web.yml >/dev/null <<EOF
@@ -302,15 +297,16 @@ sudo chmod 600 /var/iri/monitoring/secrets/github_token
 Prometheus validates the apps' self-signed HTTPS against this CA (no `insecure_skip_verify`). Export
 the **public** cert only from the shared `keystore.p12` at `/var/iri/secrets/keystore.p12`.
 
-```bash
-# Find the alias (there is usually one).
-sudo keytool -list -keystore /var/iri/secrets/keystore.p12 -storepass '<keystore pw>' | grep -i 'alias'
+`openssl` reads PKCS12 directly, so **no `keytool`/JRE install** is needed. It prompts for the
+keystore password — do **not** pass it on the command line (`-storepass` / `-passin pass:` would leak
+it into shell history). The `openssl x509` pipe strips the PKCS12 bag attributes to clean PEM.
 
-# Export the PUBLIC cert in PEM (-rfc) form. Replace <alias> and <keystore pw>.
-sudo keytool -exportcert -rfc \
-  -alias <alias> \
-  -keystore /var/iri/secrets/keystore.p12 -storepass '<keystore pw>' \
-  -file /var/iri/monitoring/certs/basetool-ca.crt
+```bash
+openssl pkcs12 -in /var/iri/secrets/keystore.p12 -clcerts -nokeys \
+  | openssl x509 -out /var/iri/monitoring/certs/basetool-ca.crt
+# Prompt: "Enter Import Password:" -> type the keystore password.
+# If OpenSSL 3.x rejects the keytool-made p12 ("error:0308010C ... unsupported"), add -legacy:
+#   openssl pkcs12 -legacy -in /var/iri/secrets/keystore.p12 -clcerts -nokeys | openssl x509 -out /var/iri/monitoring/certs/basetool-ca.crt
 sudo chmod 644 /var/iri/monitoring/certs/basetool-ca.crt
 
 # Sanity: it is a certificate and carries the app SANs (backend/frontend/ingest).
@@ -784,12 +780,13 @@ sudo cat /var/iri/monitoring/textfile/restore_drill.prom
 auto-update, and a rotation will then **silently break every app scrape (Prometheus TLS handshake) and
 Grafana's TLS**. Add these two steps to the keystore-rotation runbook in `docs/deployment.md`:
 
-1. **Re-export the public CA** consumed by Prometheus:
+1. **Re-export the public CA** consumed by Prometheus (openssl prompts for the password; do not put
+   it on the command line):
 
    ```bash
-   sudo keytool -exportcert -rfc -alias <alias> \
-     -keystore /var/iri/secrets/keystore.p12 -storepass '<new pw>' \
-     -file /var/iri/monitoring/certs/basetool-ca.crt
+   openssl pkcs12 -in /var/iri/secrets/keystore.p12 -clcerts -nokeys \
+     | openssl x509 -out /var/iri/monitoring/certs/basetool-ca.crt
+   # add -legacy after `pkcs12` if OpenSSL 3.x rejects the keytool-made p12
    ```
 2. **Re-issue the Grafana self-signed cert** if its SANs/validity changed (Phase 3.8), keeping
    `chown 472:472`.
