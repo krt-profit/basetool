@@ -440,14 +440,18 @@ only path to `/actuator/prometheus` is the internal scrape net.
 > block below, **Save**. Repeat for `ingest.profit-base.online`.
 
 ```nginx
-location /actuator { return 403; }
+location /actuator { return 404; }
 ```
 
-Verify from an external network (not the host) that both return 403:
+> The deny deliberately returns **404**, not 403: a 403 would confirm to an external scanner that
+> the Actuator endpoints exist behind the edge, while a 404 is indistinguishable from any other
+> unknown path. Any future blackbox probe asserting this deny must expect **404**.
+
+Verify from an external network (not the host) that both return 404:
 
 ```bash
-curl -s -o /dev/null -w '%{http_code}\n' https://profit-base.online/actuator/health          # expect 403
-curl -s -o /dev/null -w '%{http_code}\n' https://ingest.profit-base.online/actuator/health   # expect 403
+curl -s -o /dev/null -w '%{http_code}\n' https://profit-base.online/actuator/health          # expect 404
+curl -s -o /dev/null -w '%{http_code}\n' https://ingest.profit-base.online/actuator/health   # expect 404
 ```
 
 ### 4.4 NPM — new proxy host `grafana.profit-base.online`
@@ -823,7 +827,7 @@ deployed.
 | Keycloak user-event metrics (`keycloak_user_events_total`, tags event/error/realm; `--metrics-enabled`/`--event-metrics-user-enabled`; management port 9000) (4.6)             | Keycloak 26.x                   | keycloak.org "Monitoring user activities with event metrics"                                                                                                                                                                                                                                                            | Verified (live)                                          |
 | Grafana Explore → Tempo Search / TraceQL; Loki queries (8.4/8.5)                                                                                                               | Grafana 13.x / Tempo            | grafana.com Tempo "visualize/query traces in Grafana" docs                                                                                                                                                                                                                                                              | Verified (live)                                          |
 | Hetzner rescale: power off first, Rescaling tab, pick plan, "CPU and RAM only" toggle, disk-growth permanent (Phase 1)                                                         | Hetzner Cloud Console (current) | Hetzner official rescaling doc URL returned **HTTP 404**; verified against Hetzner community/how-to sources (bizanosa, cloudtally) — **confirm against the live console before executing**                                                                                                                              | Partial — official page unreachable                      |
-| NPM proxy-host Advanced tab → Custom Nginx Configuration `location /actuator { return 403; }`; Add Proxy Host Details/SSL tabs, Block Common Exploits, Let's Encrypt (4.3/4.4) | NPM 2.15.1                      | nginxproxymanager.com advanced-config + guide pages (file-based config confirmed; the exact **Details/SSL/Advanced** modal tab labels + "Custom Nginx Configuration" text-area name are **not spelled out on the official page** — corroborated by NPM GitHub issues/discussions) — **confirm against the live NPM UI** | Partial — official page does not name the modal tabs     |
+| NPM proxy-host Advanced tab → Custom Nginx Configuration `location /actuator { return 404; }`; Add Proxy Host Details/SSL tabs, Block Common Exploits, Let's Encrypt (4.3/4.4) | NPM 2.15.1                      | nginxproxymanager.com advanced-config + guide pages (file-based config confirmed; the exact **Details/SSL/Advanced** modal tab labels + "Custom Nginx Configuration" text-area name are **not spelled out on the official page** — corroborated by NPM GitHub issues/discussions) — **confirm against the live NPM UI** | Partial — official page does not name the modal tabs     |
 | healthchecks.io: Add Check on the Checks page, copy Ping URL, free tier 20 checks (4.7)                                                                                        | healthchecks.io (current)       | healthchecks.io/docs (concepts + free-tier limit confirmed; the exact **"Add Check"** button label / copy affordance are **not described** in the docs) — **confirm against the live UI**                                                                                                                               | Partial — official docs don't describe the UI affordance |
 | GitHub fine-grained PAT: Settings → Developer settings → Fine-grained tokens → Generate, resource owner, per-repo read-only perms (3.6)                                        | GitHub (current)                | GitHub fine-grained PAT UI (well-established; not re-fetched live this session)                                                                                                                                                                                                                                         | Not re-verified live                                     |
 | DNS A record for `grafana` (4.5)                                                                                                                                               | Registrar-specific              | Generic; verify against your provider's console                                                                                                                                                                                                                                                                         | N/A (generic)                                            |
