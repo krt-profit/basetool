@@ -480,11 +480,14 @@ dig +short grafana.profit-base.online A     # must return the host's public IP
 > **UI click-path (verified against Keycloak 26.6 admin console):**
 > Admin console → select realm **`iri`** (top-left realm switcher) → **Clients** → **Create client**.
 > - **General settings**: **Client type** = **OpenID Connect**; **Client ID** = `grafana`. Next.
-> - **Capability config**: **Client authentication** = **On** (confidential); enable **Standard flow**;
-> turn on **PKCE** by setting the **Advanced → Proof Key for Code Exchange Code Challenge Method** =
-> **S256** (set on the **Advanced** tab after creation). Next.
+> - **Capability config**: **Client authentication** = **On** (confidential); enable **Standard flow**. Next.
 > - **Login settings**: **Valid redirect URIs** = `https://grafana.profit-base.online/login/generic_oauth`;
 > **Web origins** = `+`. Save.
+> - **PKCE (optional hardening):** on the client's **Advanced** tab, **scroll down to the `Advanced
+> settings` section** (it sits *below* `Fine grain OpenID Connect configuration`) → set **Proof Key
+> for Code Exchange Code Challenge Method** = **S256** → **Save**. This only *enforces* PKCE — Grafana
+> already sends it (`GF_AUTH_GENERIC_OAUTH_USE_PKCE=true`) and Keycloak honours S256 by default, so the
+> login works even if you skip this. Verified against Keycloak 26.6.
 > - **Credentials** tab → copy the **Client secret** → this is `GRAFANA_OAUTH_CLIENT_SECRET` (Phase 5).
 
 **Role mapper — CRUCIAL** (without it every user is locked out under `role_attribute_strict`):
