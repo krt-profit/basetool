@@ -465,7 +465,14 @@ until you either promote a different version or force it. To take the upgrade:
    target; the app images in the same promotion are applied along with it.
 
 redis and npm image bumps are **not** gated — they auto-apply as in the previous
-section.
+section. For an **npm** bump, verify the hardened capability set before merging the
+bump PR (REQ-OPS-014): boot the new image once with the `security_opt`/`cap_drop`/
+`cap_add`/`pids` values from the `npm` service in `docker-compose.yml` and confirm a
+clean boot, a passing `/usr/bin/check-health`, a working `nginx -s reload`, and a
+clean container restart. The jc21 image does not officially support a reduced
+capability set, so an upstream change (e.g. a new s6 prepare step) can silently
+require an additional capability — catching that in review is cheaper than a
+rolled-back deploy.
 
 ---
 
@@ -576,6 +583,43 @@ The page is intentionally not scoped per virtual host — any proxy host behind
 NPM (including `keycloak.profit-base.online`) will fall back to the same screen if
 its upstream ever serves a `5xx`. The wording is kept generic ("System
 maintenance") so it reads correctly for both.
+
+---
+
+## Edge rate limiting
+
+The same two custom snippets carry a version-controlled per-IP safety net
+(REQ-SEC-023) that applies to **every** proxy host:
+
+- `docker/maintenance/nginx/http.conf` defines the shared-memory zones
+  (`krt_req_perip`, `krt_conn_perip`, keyed on `$binary_remote_addr`).
+- `docker/maintenance/nginx/server_proxy.conf` applies them in each proxy
+  host's `server { }` block: **20 r/s** sustained with **burst 80** (`nodelay`)
+  and at most **60 concurrent connections** per client IP.
+
+These are flood/brute-force ceilings, not fairness limits — a worst-case page
+load (~40 uncached asset requests at once) fits inside the burst, while
+hammering the Keycloak login form or an API endpoint does not. Rejections use
+status **429** on purpose: the nginx default (503) would be intercepted by the
+maintenance-page `error_page` wiring above and a flooding client would receive
+the maintenance page with the wrong semantics. Rejected requests appear in the
+per-host access logs (and via `limit_req_log_level warn` in the error log), so
+a sustained flood raises the `EdgeRateLimitSpike` Loki alert.
+
+Stricter per-endpoint limits (e.g. on the Keycloak token/login paths) remain
+possible per proxy host in the NPM UI's Advanced tab, referencing the same
+zones — those are unversioned host state and deliberately not part of the
+baseline.
+
+Verification after changing the limits (same flow as the maintenance page —
+restart NPM, `nginx -t`, then exercise it):
+
+```bash
+# a burst above rate+burst must yield 429s, not the maintenance page
+for i in $(seq 1 120); do
+  curl -s -o /dev/null -w '%{http_code}\n' https://profit-base.online/ &
+done | sort | uniq -c        # expect a mix of 200s and 429s, no 503
+```
 
 ---
 

@@ -1,0 +1,55 @@
+# External deny assertions for the public edge (REQ-OBS-012).
+#
+# Why a GitHub Action and not the blackbox exporter: the Keycloak /admin lockdown is an nginx
+# allow-list matching the pinned Docker bridge gateways (docs/deployment.md → "Keycloak Admin
+# Console via SSH tunnel"). Probe traffic from the internal blackbox exporter hairpins through
+# the host and is SNAT'd to exactly those gateways, so from inside the console ALWAYS looks
+# reachable — only a genuinely external vantage point (a GitHub-hosted runner) can assert the
+# deny. The /actuator check duplicates the internal blackbox-edge-deny probe from outside as a
+# cross-check. A failing run notifies the repository owner via GitHub's workflow-failure e-mail.
+name: Edge deny probe
+
+on:
+  schedule:
+    - cron: "17 5 * * *" # daily, off the full hour to dodge scheduler congestion
+  workflow_dispatch:
+
+permissions:
+  contents: none
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Keycloak /admin must not be reachable from the internet
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 --retry 2 --retry-delay 10 \
+            https://keycloak.profit-base.online/admin/ || true)
+          echo "GET /admin/ -> HTTP ${code:-000}"
+          case "$code" in
+            2*|3*)
+              echo "::error::Keycloak Admin Console answered ${code} from the internet — the NPM /admin allow-list is broken (docs/deployment.md → Keycloak Admin Console via SSH tunnel)."
+              exit 1
+              ;;
+            *)
+              echo "Locked down (deny or connection closed)."
+              ;;
+          esac
+
+      - name: Actuator edge deny must answer 404 from the internet
+        run: |
+          fail=0
+          for url in \
+            https://profit-base.online/actuator/prometheus \
+            https://ingest.profit-base.online/actuator/prometheus
+          do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 --retry 2 --retry-delay 10 \
+              "$url" || true)
+            echo "GET $url -> HTTP ${code:-000}"
+            if [ "$code" != "404" ]; then
+              echo "::error::$url answered ${code:-000} instead of 404 — the /actuator edge deny drifted (ADR-0072 compensating control), or the edge is unreachable from this runner."
+              fail=1
+            fi
+          done
+          exit $fail

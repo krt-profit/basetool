@@ -386,7 +386,7 @@ project** (`docker-compose.monitoring.yml`), fully decoupled from the 5-minute a
 It comprises **Prometheus** (metrics, 180-day retention + 40 GB cap), **Grafana** (the only UI),
 **Loki** (logs, 31 d), **Tempo** (traces, 14 d), **Grafana Alloy** (log shipper + OTLP collector),
 **Alertmanager** (e-mail alerts + a healthchecks.io dead-man's switch), plus node/cAdvisor/Postgres
-×2/Redis/blackbox exporters, a GET-only docker-socket-proxy and a GitHub exporter — 14 containers,
+×2/Redis/blackbox exporters and a GET-only docker-socket-proxy — 13 containers,
 image-pinned and Dependabot-maintained. They live on three **isolated** Docker networks; app
 containers are never on the monitoring core network, so a compromised app cannot silence alerts,
 read/forge logs or touch the trace store.

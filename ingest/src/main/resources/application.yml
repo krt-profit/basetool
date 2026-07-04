@@ -1,4 +1,9 @@
 server:
+  # Enable the Tomcat MBean registry so Micrometer's TomcatMetrics binder publishes
+  # tomcat_threads_* (busy/current/max) for the "Spring Boot apps" dashboard (epic #936).
+  tomcat:
+    mbeanregistry:
+      enabled: true
   port: 11262
   # Behind nginx-proxy-manager (TLS terminated at the proxy). `native` routes X-Forwarded-* through
   # Tomcat's RemoteIpValve, which only honours the header from a TRUSTED internal proxy (its default
@@ -116,6 +121,16 @@ management:
       # Common tag on every meter; the Grafana "Spring Boot apps" dashboard selects the
       # module through this `application` label (epic #936 dashboard set).
       application: basetool-ingest
+    distribution:
+      # Publish latency histogram buckets for http.server.requests so the "HTTP p95 Latency"
+      # dashboard panel can compute histogram_quantile (Spring Boot emits no buckets by
+      # default). Bounded to 5ms..10s to keep the per-URI bucket cardinality in check (epic #936).
+      percentiles-histogram:
+        "[http.server.requests]": true
+      minimum-expected-value:
+        "[http.server.requests]": 5ms
+      maximum-expected-value:
+        "[http.server.requests]": 10s
   tracing:
     export:
       otlp:

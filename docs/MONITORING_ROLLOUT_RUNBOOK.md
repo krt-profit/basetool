@@ -49,7 +49,7 @@ every 5 minutes. The monitoring apply is **env-gated and non-gating**: once
 |      Component      |                      Image                      |  Version  |
 |---------------------|-------------------------------------------------|-----------|
 | Prometheus          | `prom/prometheus`                               | `v3.13.0` |
-| Grafana OSS         | `grafana/grafana-oss`                           | `13.1.0`  |
+| Grafana OSS         | `grafana/grafana-oss`                           | `13.0.2`  |
 | Loki                | `grafana/loki`                                  | `3.7.3`   |
 | Tempo               | `grafana/tempo`                                 | `2.10.7`  |
 | Alloy               | `grafana/alloy`                                 | `v1.17.1` |
@@ -59,8 +59,7 @@ every 5 minutes. The monitoring apply is **env-gated and non-gating**: once
 | postgres_exporter   | `quay.io/prometheuscommunity/postgres-exporter` | `v0.20.0` |
 | redis_exporter      | `oliver006/redis_exporter`                      | `v1.86.0` |
 | blackbox_exporter   | `prom/blackbox-exporter`                        | `v0.28.0` |
-| docker-socket-proxy | `tecnativa/docker-socket-proxy`                 | `0.4.2`   |
-| github_exporter     | `ghcr.io/promhippie/github_exporter`            | `v15.0.1` |
+| docker-socket-proxy | `tecnativa/docker-socket-proxy`                 | `v0.4.2`  |
 
 **Adjacent products** (UI click-paths verified against these): **Keycloak 26.6**, **NPM 2.15.1**,
 Grafana 13.x, Hetzner Cloud Console (current), healthchecks.io (current). Realm: `iri`. Public hosts:
@@ -277,24 +276,7 @@ unset SMTP_SMARTHOST SMTP_FROM SMTP_AUTH_USERNAME SMTP_AUTH_PASSWORD ALERT_EMAIL
 > If `amtool check-config` fails, do **not** ship — a bad config means alerts silently do not route.
 > Grep the rendered file for a stray `${` to catch an env var you forgot to export.
 
-### 3.6 `github_token` — fine-grained read-only GitHub PAT
-
-A **fine-grained** PAT, read-only, scoped to exactly the three tracked repos, no write scopes.
-
-> **UI click-path (verified against GitHub fine-grained PAT UI, current):**
-> GitHub → your avatar → **Settings** → **Developer settings** → **Personal access tokens** →
-> **Fine-grained tokens** → **Generate new token**. Set **Resource owner** to `krt-profit`,
-> **Repository access → Only select repositories** → pick `krt-profit/basetool`,
-> `krt-profit/basetool-sc-extractor`, `krt-profit/design-system`. Under **Repository permissions**
-> grant **read-only**: *Metadata* (Read), *Issues* (Read), *Pull requests* (Read),
-> *Actions* (Read). Grant **no** write permissions. Generate and copy the token once.
-
-```bash
-printf '%s' 'github_pat_...' | sudo tee /var/iri/monitoring/secrets/github_token >/dev/null
-sudo chmod 600 /var/iri/monitoring/secrets/github_token
-```
-
-### 3.7 `certs/basetool-ca.crt` — public cert exported from the shared keystore
+### 3.6 `certs/basetool-ca.crt` — public cert exported from the shared keystore
 
 Prometheus validates the apps' self-signed HTTPS against this CA (no `insecure_skip_verify`). Export
 the **public** cert only from the shared `keystore.p12` at `/var/iri/secrets/keystore.p12`.
@@ -315,7 +297,7 @@ sudo chmod 644 /var/iri/monitoring/certs/basetool-ca.crt
 openssl x509 -in /var/iri/monitoring/certs/basetool-ca.crt -noout -subject -ext subjectAltName
 ```
 
-### 3.8 `certs/grafana.crt` + `grafana.key` — Grafana's OWN self-signed cert
+### 3.7 `certs/grafana.crt` + `grafana.key` — Grafana's OWN self-signed cert
 
 NPM terminates the public Let's Encrypt cert and re-encrypts upstream to Grafana over HTTPS; NPM does
 not verify the upstream cert, so a self-signed one with `SAN dns:grafana` is fine.
@@ -333,12 +315,12 @@ sudo chmod 640 grafana.key
 sudo chmod 644 grafana.crt
 ```
 
-### 3.9 Verify the deposit
+### 3.8 Verify the deposit
 
 ```bash
 sudo ls -la /var/iri/monitoring/secrets /var/iri/monitoring/certs
 # Expect exactly:
-#   secrets/ : scrape_password  prometheus_web_password  prometheus-web.yml  alertmanager.yml  github_token
+#   secrets/ : scrape_password  prometheus_web_password  prometheus-web.yml  alertmanager.yml
 #   certs/   : basetool-ca.crt  grafana.crt  grafana.key
 ```
 
@@ -424,7 +406,7 @@ sudo grep -oP '(?<=>)[^ ]+' /var/iri/redis/users.acl   # this is REDIS_EXPORTER_
 
 > Note `+@read` combined with `-keys` and `sanitize-payload`: the exporter can run `INFO`/`SLOWLOG`/
 > `MEMORY` etc. but **cannot** list keys or dump arbitrary key values. After the stack is up, verify
-> the exporter authenticated cleanly: `docker logs iri-monitoring-redis-exporter-1 2>&1 | tail`.
+> the exporter authenticated cleanly: `docker logs redis-exporter 2>&1 | tail`.
 > `IRI_REDIS_ACL_HOST_PATH=/var/iri/redis/users.acl` is set in `.env` (Phase 5) so the app compose
 > mounts it and passes `--aclfile`.
 
@@ -619,8 +601,7 @@ echo "deploy exit: ${PIPESTATUS[0]}"     # MUST be 0
 docker compose -p iri-monitoring -f /var/iri/code/docker-compose.monitoring.yml ps
 # Expect every service present and Up (Prometheus has NO healthcheck by design — its liveness is the
 # self-scrape `up` metric): prometheus grafana loki tempo alloy alertmanager node-exporter cadvisor
-# socket-proxy postgres-exporter-backend postgres-exporter-keycloak redis-exporter blackbox-exporter
-# github-exporter.
+# socket-proxy postgres-exporter-backend postgres-exporter-keycloak redis-exporter blackbox-exporter.
 
 # Tail the deploy log for the non-gating monitoring apply lines:
 grep -E 'monitoring:|monitoring stack' /tmp/iri-deploy-monitoring.log
@@ -801,7 +782,7 @@ Grafana's TLS**. Add these two steps to the keystore-rotation runbook in `docs/d
      | openssl x509 -out /var/iri/monitoring/certs/basetool-ca.crt
    # add -legacy after `pkcs12` if OpenSSL 3.x rejects the keytool-made p12
    ```
-2. **Re-issue the Grafana self-signed cert** if its SANs/validity changed (Phase 3.8), keeping
+2. **Re-issue the Grafana self-signed cert** if its SANs/validity changed (Phase 3.7), keeping
    `chown 472:472`.
 3. Restart the affected monitoring services so they reload the new files:
 
@@ -829,7 +810,6 @@ deployed.
 | Hetzner rescale: power off first, Rescaling tab, pick plan, "CPU and RAM only" toggle, disk-growth permanent (Phase 1)                                                         | Hetzner Cloud Console (current) | Hetzner official rescaling doc URL returned **HTTP 404**; verified against Hetzner community/how-to sources (bizanosa, cloudtally) — **confirm against the live console before executing**                                                                                                                              | Partial — official page unreachable                      |
 | NPM proxy-host Advanced tab → Custom Nginx Configuration `location /actuator { return 404; }`; Add Proxy Host Details/SSL tabs, Block Common Exploits, Let's Encrypt (4.3/4.4) | NPM 2.15.1                      | nginxproxymanager.com advanced-config + guide pages (file-based config confirmed; the exact **Details/SSL/Advanced** modal tab labels + "Custom Nginx Configuration" text-area name are **not spelled out on the official page** — corroborated by NPM GitHub issues/discussions) — **confirm against the live NPM UI** | Partial — official page does not name the modal tabs     |
 | healthchecks.io: Add Check on the Checks page, copy Ping URL, free tier 20 checks (4.7)                                                                                        | healthchecks.io (current)       | healthchecks.io/docs (concepts + free-tier limit confirmed; the exact **"Add Check"** button label / copy affordance are **not described** in the docs) — **confirm against the live UI**                                                                                                                               | Partial — official docs don't describe the UI affordance |
-| GitHub fine-grained PAT: Settings → Developer settings → Fine-grained tokens → Generate, resource owner, per-repo read-only perms (3.6)                                        | GitHub (current)                | GitHub fine-grained PAT UI (well-established; not re-fetched live this session)                                                                                                                                                                                                                                         | Not re-verified live                                     |
 | DNS A record for `grafana` (4.5)                                                                                                                                               | Registrar-specific              | Generic; verify against your provider's console                                                                                                                                                                                                                                                                         | N/A (generic)                                            |
 
 **Could NOT verify against a live official source (documented inline above, confirm against the live
@@ -842,5 +822,4 @@ labels or the **"Custom Nginx Configuration"** text-area name; these are corrobo
 and GitHub issue sources.
 - **healthchecks.io** — official docs confirm the concepts and the 20-check free tier but do **not**
 describe the **"Add Check"** button / Ping-URL copy affordance.
-- **GitHub fine-grained PAT** click-path — well-established and stable, but not re-fetched from a live
 source in this authoring session.
