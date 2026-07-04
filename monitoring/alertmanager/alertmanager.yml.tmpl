@@ -1,0 +1,61 @@
+# Alertmanager configuration TEMPLATE. Alertmanager 0.33.x (verified 2026-07). Epic #936, ADR-0072.
+#
+# Alertmanager does NOT expand environment variables, so this is a TEMPLATE: the rollout runbook
+# renders it with `envsubst` to /var/iri/monitoring/secrets/alertmanager.yml and runs
+# `amtool check-config` against the RENDERED file. The ${...} placeholders below come from the host
+# .env (SMTP credentials + healthchecks.io ping URL). Alert e-mails never contain user data.
+#
+# SMTP: 587 STARTTLS, smtp_require_tls enforced. The Watchdog alert (always firing) is routed to the
+# external heartbeat receiver — the dead-man's switch: if this stack or the host dies, the pings stop
+# and healthchecks.io alerts.
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: '${SMTP_SMARTHOST}'
+  smtp_from: '${SMTP_FROM}'
+  smtp_auth_username: '${SMTP_AUTH_USERNAME}'
+  smtp_auth_password: '${SMTP_AUTH_PASSWORD}'
+  smtp_require_tls: true
+
+route:
+  receiver: 'email'
+  group_by: ['alertname', 'job']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    # The always-firing Watchdog goes only to the external heartbeat, never to e-mail.
+    - matchers:
+        - alertname = "Watchdog"
+      receiver: 'heartbeat'
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 1m
+      continue: false
+    # Critical alerts page immediately and repeat more often.
+    - matchers:
+        - severity = "critical"
+      receiver: 'email'
+      group_wait: 0s
+      repeat_interval: 1h
+      continue: false
+
+receivers:
+  - name: 'email'
+    email_configs:
+      - to: '${ALERT_EMAIL_TO}'
+        send_resolved: true
+
+  # Dead-man's switch: forwards the Watchdog to healthchecks.io. When Alertmanager/Prometheus/the
+  # host dies, these pings stop arriving and healthchecks.io fires its own external alert.
+  - name: 'heartbeat'
+    webhook_configs:
+      - url: '${HEARTBEAT_URL}'
+        send_resolved: false
+
+inhibit_rules:
+  # A critical alert on a target suppresses its warning-level siblings for the same alertname/job.
+  - source_matchers:
+      - severity = "critical"
+    target_matchers:
+      - severity = "warning"
+    equal: ['alertname', 'job']

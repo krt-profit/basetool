@@ -1,0 +1,58 @@
+# Grafana datasource provisioning. Grafana OSS 13.1.x (verified 2026-07). Epic #936, REQ-OBS-008/-009.
+# Grafana expands ${ENV} from the container environment in provisioning files; a literal $ is $$.
+apiVersion: 1
+
+datasources:
+  # Prometheus is protected by web.config.file basic auth (the admin API includes deletion
+  # endpoints), so Grafana authenticates. Username fixed to "grafana"; password from the container env.
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    basicAuth: true
+    basicAuthUser: grafana
+    jsonData:
+      httpMethod: POST
+    secureJsonData:
+      basicAuthPassword: ${PROMETHEUS_WEB_PASSWORD}
+    editable: false
+
+  - name: Loki
+    type: loki
+    uid: loki
+    access: proxy
+    url: http://loki:3100
+    jsonData:
+      maxLines: 1000
+      # Logs↔traces: link a JSON log line's traceId to the Tempo trace (REQ-OBS-009).
+      derivedFields:
+        - name: TraceID
+          datasourceUid: tempo
+          matcherRegex: '"traceId":"(\w+)"'
+          url: '$${__value.raw}'
+          urlDisplayLabel: 'View trace'
+    editable: false
+
+  - name: Tempo
+    type: tempo
+    uid: tempo
+    access: proxy
+    url: http://tempo:3200
+    basicAuth: false
+    jsonData:
+      # Traces↔logs: jump from a span back to the correlated Loki log lines.
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: '-1h'
+        spanEndTimeShift: '1h'
+        filterByTraceID: true
+        tags:
+          - key: 'service.name'
+            value: 'application'
+      serviceMap:
+        datasourceUid: prometheus
+      nodeGraph:
+        enabled: true
+    editable: false

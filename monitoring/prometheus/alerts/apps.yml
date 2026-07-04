@@ -1,0 +1,81 @@
+# Application (JVM / Spring Boot) alerts for the three modules. Micrometer standard meters.
+# Epic #936 alert catalog. Thresholds are initial; Phase 3 tunes them from the baseline week.
+groups:
+  - name: apps-warning
+    rules:
+      - alert: Http5xxRateHigh
+        expr: |
+          sum by (application) (rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+            / sum by (application) (rate(http_server_requests_seconds_count[5m])) > 0.01
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "5xx rate >1% ({{ $labels.application }})"
+          description: "More than 1% of requests to {{ $labels.application }} returned 5xx over the last 5 minutes."
+
+      - alert: BackendAuthFailureSpike
+        expr: rate(basetool_http_error_total{application="basetool-backend",code="UNAUTHENTICATED"}[5m]) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "401 spike on backend (possible JWT brute force)"
+          description: "The backend is rejecting authentication at an elevated rate — possible credential/JWT guessing."
+
+      - alert: IngestAuthFailureSpike
+        expr: rate(http_server_requests_seconds_count{application="basetool-ingest",status="401"}[5m]) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "401 spike on ingest (possible JWT brute force)"
+          description: "The ingest gateway is rejecting authentication at an elevated rate."
+
+      - alert: JvmHeapHigh
+        expr: |
+          sum by (application) (jvm_memory_used_bytes{area="heap"})
+            / sum by (application) (jvm_memory_max_bytes{area="heap"}) > 0.90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "JVM heap >90% ({{ $labels.application }})"
+          description: "{{ $labels.application }} has used more than 90% of its max heap for 10 minutes."
+
+      - alert: HikariPoolPending
+        expr: hikaricp_connections_pending > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HikariCP has pending connection requests ({{ $labels.application }})"
+          description: "Threads are waiting for a DB connection in {{ $labels.application }} — the pool may be undersized or a query is slow."
+
+      - alert: LogbackErrorSpike
+        expr: sum by (application) (rate(logback_events_total{level="error"}[5m])) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ERROR log spike ({{ $labels.application }})"
+          description: "{{ $labels.application }} is logging errors at an elevated rate."
+
+      - alert: CircuitBreakerOpen
+        expr: resilience4j_circuitbreaker_state{state="open"} == 1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Circuit breaker OPEN ({{ $labels.application }}/{{ $labels.name }})"
+          description: "Resilience4j circuit breaker {{ $labels.name }} in {{ $labels.application }} is open — a downstream dependency is failing."
+
+      - alert: HttpLatencyP95High
+        expr: |
+          histogram_quantile(0.95, sum by (application, le) (rate(http_server_requests_seconds_bucket[5m]))) > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p95 request latency >2s ({{ $labels.application }})"
+          description: "The 95th-percentile request latency for {{ $labels.application }} exceeded 2 seconds for 10 minutes."

@@ -1,0 +1,35 @@
+# Tempo trace store, monolithic mode. Tempo 2.10.x LTS (config verified via `tempo -config.verify`;
+# NOT 3.0.x — that major is a breaking architecture rewrite whose monolithic config differs). #936.
+#
+# Monolithic (`-target=all`, the default) runs all components in one process — NO Kafka (Kafka is
+# a microservices-only requirement in 3.0). Trace retention is short (14 days) and local-only; the
+# store is deliberately excluded from backups (ephemeral diagnostics, ADR-0072). The OTLP receivers
+# MUST bind 0.0.0.0 explicitly — Tempo defaults them to localhost, which Alloy could not reach.
+server:
+  http_listen_port: 3200
+  grpc_listen_port: 9095
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: "0.0.0.0:4317"
+        http:
+          endpoint: "0.0.0.0:4318"
+
+ingester:
+  max_block_duration: 5m
+
+compactor:
+  compaction:
+    # 14-day retention (336h). Blocks older than this are deleted by the compactor.
+    block_retention: 336h
+
+storage:
+  trace:
+    backend: local
+    local:
+      path: /var/tempo/blocks
+    wal:
+      path: /var/tempo/wal

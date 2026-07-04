@@ -1,0 +1,19 @@
+# Blackbox exporter probe modules. blackbox_exporter 0.28.x (verified 2026-07). Epic #936.
+# The http_2xx module terminates TLS on the https:// targets, so probe_ssl_earliest_cert_expiry is
+# emitted for the certificate-expiry alert. fail_if_not_ssl stays false so a handshake still returns
+# metrics rather than failing outright.
+modules:
+  http_2xx:
+    prober: http
+    timeout: 10s
+    http:
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      valid_status_codes: []  # defaults to 2xx
+      method: GET
+      follow_redirects: true
+      fail_if_ssl: false
+      fail_if_not_ssl: false
+      preferred_ip_protocol: "ip4"
+      ip_protocol_fallback: false
+      tls_config:
+        insecure_skip_verify: false

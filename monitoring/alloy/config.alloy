@@ -1,0 +1,183 @@
+// Grafana Alloy config for the Basetool monitoring plane. Alloy 1.17.x (verified 2026-07).
+// Epic #936, REQ-OBS-007 (per-stream log-privacy) / REQ-OBS-009 (OTLP trace collector), ADR-0072.
+//
+// Two responsibilities:
+//   1. Receive app/Keycloak OTLP spans on the scrape net and forward them to Tempo on the core net
+//      (apps never reach the trace store directly — the span push is funnelled through Alloy).
+//   2. Ship logs to Loki with the per-stream masking rules. Container logs are read via the GET-only
+//      docker-socket-proxy (tcp://socket-proxy:2375), never the raw docker socket.
+//
+// Per-stream privacy (REQ-OBS-007): app JSON is PII-masked AT SOURCE (no shipper masking); the
+// Keycloak file log is masked HERE (username= / ipAddress=); NPM access/error and host auth.log are
+// ingested WITH client IPs/usernames (the deliberate, owner-approved 31-day retention). Stream labels
+// stay low-cardinality: app (+ level for the JSON apps).
+
+logging {
+	level  = "info"
+	format = "logfmt"
+}
+
+// =============================================================================================
+// 1) OTLP trace collector: receive spans (scrape net) -> forward to Tempo (core net)
+// =============================================================================================
+otelcol.receiver.otlp "default" {
+	grpc {
+		endpoint = "0.0.0.0:4317"
+	}
+
+	http {
+		endpoint = "0.0.0.0:4318"
+	}
+
+	output {
+		traces = [otelcol.exporter.otlp.tempo.input]
+	}
+}
+
+otelcol.exporter.otlp "tempo" {
+	client {
+		endpoint = "tempo:4317"
+
+		tls {
+			insecure = true
+		}
+	}
+}
+
+// =============================================================================================
+// 2) Log shipping to Loki
+// =============================================================================================
+loki.write "default" {
+	endpoint {
+		url = "http://loki:3100/loki/api/v1/push"
+	}
+}
+
+// --- App JSON logs (already PII-masked at source; no shipper masking) -------------------------
+local.file_match "backend" {
+	path_targets = [{__path__ = "/logs/backend/backend.json", app = "backend"}]
+}
+
+loki.source.file "backend" {
+	targets    = local.file_match.backend.data
+	forward_to = [loki.process.app_json.receiver]
+}
+
+local.file_match "frontend" {
+	path_targets = [{__path__ = "/logs/frontend/frontend.json", app = "frontend"}]
+}
+
+loki.source.file "frontend" {
+	targets    = local.file_match.frontend.data
+	forward_to = [loki.process.app_json.receiver]
+}
+
+loki.process "app_json" {
+	forward_to = [loki.write.default.receiver]
+
+	stage.json {
+		expressions = {level = "level"}
+	}
+
+	stage.labels {
+		values = {level = ""}
+	}
+}
+
+// --- Keycloak file log: masked in the shipper (username= / ipAddress=) ------------------------
+local.file_match "keycloak" {
+	path_targets = [{__path__ = "/logs/keycloak/keycloak.log", app = "keycloak"}]
+}
+
+loki.source.file "keycloak" {
+	targets    = local.file_match.keycloak.data
+	forward_to = [loki.process.keycloak_mask.receiver]
+}
+
+loki.process "keycloak_mask" {
+	forward_to = [loki.write.default.receiver]
+
+	stage.replace {
+		expression = "(username=)(\\S+)"
+		replace    = "${1}***"
+	}
+
+	stage.replace {
+		expression = "(ipAddress=)(\\S+)"
+		replace    = "${1}***"
+	}
+}
+
+// --- NPM access + error logs (client IPs retained 31d — owner-approved, REQ-OBS-007/-010) -----
+local.file_match "npm_access" {
+	path_targets = [{__path__ = "/logs/npm/*_access.log", app = "npm-access"}]
+}
+
+loki.source.file "npm_access" {
+	targets    = local.file_match.npm_access.data
+	forward_to = [loki.write.default.receiver]
+}
+
+local.file_match "npm_error" {
+	path_targets = [{__path__ = "/logs/npm/*_error.log", app = "npm-error"}]
+}
+
+loki.source.file "npm_error" {
+	targets    = local.file_match.npm_error.data
+	forward_to = [loki.write.default.receiver]
+}
+
+// --- Host auth log (SSH/sudo; usernames+IPs retained 31d). Journal variant: see the runbook. --
+local.file_match "host_auth" {
+	path_targets = [{__path__ = "/hostlog/auth.log", app = "host-auth"}]
+}
+
+loki.source.file "host_auth" {
+	targets    = local.file_match.host_auth.data
+	forward_to = [loki.write.default.receiver]
+}
+
+// --- Container logs via the GET-only docker-socket-proxy -------------------------------------
+// Selected by the compose service label so it is independent of the project-prefixed container name.
+discovery.docker "containers" {
+	host = "tcp://socket-proxy:2375"
+}
+
+discovery.relabel "containers" {
+	targets = discovery.docker.containers.targets
+
+	// Keep only the container streams we ingest via the docker API (NPM stdout = admin-UI logins;
+	// ingest JSON is masked at source; postgres runs with log_error_verbosity=terse).
+	rule {
+		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+		regex         = "ingest|npm|redis|db-backend|db-keycloak"
+		action        = "keep"
+	}
+	// Map the compose service to a stable, low-cardinality app label.
+	rule {
+		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+		regex         = "db-backend"
+		target_label  = "app"
+		replacement   = "postgres-backend"
+	}
+
+	rule {
+		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+		regex         = "db-keycloak"
+		target_label  = "app"
+		replacement   = "postgres-keycloak"
+	}
+
+	rule {
+		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+		regex         = "(ingest|npm|redis)"
+		target_label  = "app"
+		replacement   = "$1"
+	}
+}
+
+loki.source.docker "containers" {
+	host       = "tcp://socket-proxy:2375"
+	targets    = discovery.relabel.containers.output
+	forward_to = [loki.write.default.receiver]
+}

@@ -1,0 +1,15 @@
+# Grafana dashboard provisioning. Grafana OSS 13.1.x (verified 2026-07). Epic #936.
+# Dashboards are read-only in the UI (allowUiUpdates: false); changes go through the JSON files
+# under monitoring/grafana/dashboards/ and ship via the config bundle. A sandbox-export workflow for
+# editing is documented in monitoring/README.md.
+apiVersion: 1
+
+providers:
+  - name: basetool
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

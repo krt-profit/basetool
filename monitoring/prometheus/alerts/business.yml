@@ -1,0 +1,113 @@
+# Business-metric alerts (basetool_*, REQ-OBS-011). Metric names are the exact rendered names
+# from the shipped Phase-1c code (metrics/MetricNames.java in each module) — DO NOT rename a metric
+# without updating these rules in the same PR (the "monitoring moves with the change" rule).
+groups:
+  - name: business-critical
+    rules:
+      # The ledger broke an invariant — data corruption. Any category > 0 is critical.
+      - alert: BankLedgerIntegrityViolation
+        expr: basetool_bank_ledger_integrity_violations > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Bank ledger integrity violation: {{ $labels.category }}"
+          description: "The hourly integrity sweep found {{ $value }} rows in category '{{ $labels.category }}'. A bank ledger invariant is broken — investigate before any further bank mutation."
+
+  - name: business-warning
+    rules:
+      # Role drift vs. Keycloak: the user sync last succeeded > 15 min ago (it runs every 5 min).
+      - alert: UserSyncStale
+        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{job="user_sync"}) > 900
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "User sync stale >15 min"
+          description: "The Keycloak user sync last succeeded more than 15 minutes ago — local roles/accounts may drift from Keycloak."
+
+      - alert: ExternalSyncStale
+        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{job=~"uex_sync|scwiki_sync"}) > 172800
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "External sync stale >48h ({{ $labels.job }})"
+          description: "The {{ $labels.job }} catalogue sync last succeeded more than 48 hours ago."
+
+      - alert: ScheduledJobFailureStreak
+        expr: increase(basetool_scheduled_job_executions_total{outcome="failure"}[1h]) >= 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Scheduled job failing repeatedly ({{ $labels.job }})"
+          description: "Job '{{ $labels.job }}' recorded {{ $value }} failed runs in the last hour."
+
+      # Historical optimistic-locking regression indicator (the project's canonical 409 signal).
+      - alert: OptimisticLockConflictSpike
+        expr: rate(basetool_http_error_total{code="OPTIMISTIC_LOCK"}[5m]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "409 optimistic-lock conflict spike"
+          description: "The backend is returning 409 optimistic-lock conflicts at an elevated rate — a likely locking/version-propagation regression."
+
+      - alert: RateLimitRejectionSpike
+        expr: sum by (application) (rate(basetool_ratelimit_rejections_total[5m])) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Rate-limit rejection spike ({{ $labels.application }})"
+          description: "{{ $labels.application }} is rejecting requests via the rate limiter at an elevated rate."
+
+      # Registration approvals (Discord) and bank booking requests waiting too long.
+      - alert: RegistrationApprovalOverdue
+        expr: basetool_registration_pending_oldest_age_seconds > 172800
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Oldest pending registration >48h"
+          description: "A user registration has been awaiting approval for more than 48 hours."
+
+      - alert: BankBookingApprovalOverdue
+        expr: basetool_bank_booking_request_pending_oldest_age_seconds > 172800
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Oldest pending bank booking request >48h"
+          description: "A bank booking request has been awaiting approval for more than 48 hours."
+
+      # Audit silence: backend up for 6h but zero audited mutations recorded — REQ-AUDIT-001 signal.
+      - alert: AuditSilenceAnomaly
+        expr: (sum(increase(basetool_audit_events_total[6h])) == 0) and on() (up{job="basetool-backend"} == 1)
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No audit events recorded in 6h while backend is up"
+          description: "The backend has been up but recorded zero audit events for 6 hours — possible audit-logging regression (REQ-AUDIT-001)."
+
+      # Frontend → backend call failures (bounded reason/method), sustained.
+      - alert: BackendCallFailureSustained
+        expr: sum(rate(basetool_backend_client_errors_total[5m])) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Sustained frontend→backend call failures"
+          description: "The frontend's backend-call failure rate has been elevated for 10 minutes ({{ $value }}/s)."
+
+      # Keycloak login errors / Discord IdP broker error spike (primary login path).
+      - alert: KeycloakLoginErrorSpike
+        expr: rate(keycloak_user_events_total{event=~"login_error|identity_provider_login_error"}[5m]) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Keycloak login-error spike"
+          description: "Keycloak is emitting login_error / IdP-error events at an elevated rate."
