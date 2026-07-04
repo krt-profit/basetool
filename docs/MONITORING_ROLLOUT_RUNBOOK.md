@@ -483,11 +483,13 @@ dig +short grafana.profit-base.online A     # must return the host's public IP
 > - **Capability config**: **Client authentication** = **On** (confidential); enable **Standard flow**. Next.
 > - **Login settings**: **Valid redirect URIs** = `https://grafana.profit-base.online/login/generic_oauth`;
 > **Web origins** = `+`. Save.
-> - **PKCE (optional hardening):** on the client's **Advanced** tab, **scroll down to the `Advanced
-> settings` section** (it sits *below* `Fine grain OpenID Connect configuration`) → set **Proof Key
-> for Code Exchange Code Challenge Method** = **S256** → **Save**. This only *enforces* PKCE — Grafana
-> already sends it (`GF_AUTH_GENERIC_OAUTH_USE_PKCE=true`) and Keycloak honours S256 by default, so the
-> login works even if you skip this. Verified against Keycloak 26.6.
+> - **PKCE — nothing to do here; skip it.** The per-client "Proof Key for Code Exchange Code Challenge
+> Method" field is **only shown for public clients** (Client authentication = Off) in current Keycloak
+> 26.x. This `grafana` client is **confidential** (Client authentication = On), so the field is
+> **absent from its Advanced tab** — that is expected, not a bug. PKCE still applies: Grafana initiates
+> it (`GF_AUTH_GENERIC_OAUTH_USE_PKCE=true`) and Keycloak honours S256 PKCE by default, so the
+> authorization-code flow is PKCE-protected regardless. (Enforcing PKCE on a confidential client would
+> require a client policy, which is unnecessary here.) Verified against the Keycloak 26.x admin console.
 > - **Credentials** tab → copy the **Client secret** → this is `GRAFANA_OAUTH_CLIENT_SECRET` (Phase 5).
 
 **Role mapper — CRUCIAL** (without it every user is locked out under `role_attribute_strict`):
