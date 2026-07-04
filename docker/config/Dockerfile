@@ -21,8 +21,15 @@
 # deploy.sh re-asserts their absence before applying. deploy.sh and the systemd
 # units are deliberately left OUT so a promoted bundle can never overwrite the
 # running deployer (self-update hazard) — they stay a manual bootstrap concern.
+#
+# The monitoring compose + config tree (epic #936, ADR-0072) ride the same channel so a promoted
+# release ships updated dashboards/alert rules to the host. They carry NO secrets (every credential
+# is a host-side file under /var/iri/monitoring/secrets/ or an .env value); deploy.sh's
+# assert_no_secrets guard still runs over the whole bundle.
 FROM scratch
 
 COPY docker-compose.yml /config/docker-compose.yml
+COPY docker-compose.monitoring.yml /config/docker-compose.monitoring.yml
 COPY docker/maintenance /config/docker/maintenance
 COPY keycloak-theme /config/keycloak-theme
+COPY monitoring /config/monitoring

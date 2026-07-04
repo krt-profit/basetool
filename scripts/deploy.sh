@@ -262,6 +262,12 @@ snapshot_config_tree() {
   fi
   [[ -d "${COMPOSE_DIR}/keycloak-theme" ]] \
     && cp -a "${COMPOSE_DIR}/keycloak-theme" "${dst}/keycloak-theme"
+  # Monitoring compose + config tree (epic #936). Carries no secrets; snapshotted so a rollback
+  # restores the exact monitoring config the previous release shipped.
+  [[ -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" ]] \
+    && cp -a "${COMPOSE_DIR}/docker-compose.monitoring.yml" "${dst}/docker-compose.monitoring.yml"
+  [[ -d "${COMPOSE_DIR}/monitoring" ]] \
+    && cp -a "${COMPOSE_DIR}/monitoring" "${dst}/monitoring"
   return 0
 }
 
@@ -273,6 +279,16 @@ apply_config_tree() {
   local src="$1" dst="$2"
   install -m 0644 "${src}/docker-compose.yml" "${dst}/.docker-compose.yml.tmp"
   mv -f "${dst}/.docker-compose.yml.tmp" "${dst}/docker-compose.yml"
+  # Monitoring compose (atomic replace) + config tree (epic #936). Only present in bundles built
+  # after Phase 2; the guards keep an older bundle (no monitoring/) applying cleanly.
+  if [[ -f "${src}/docker-compose.monitoring.yml" ]]; then
+    install -m 0644 "${src}/docker-compose.monitoring.yml" "${dst}/.docker-compose.monitoring.yml.tmp"
+    mv -f "${dst}/.docker-compose.monitoring.yml.tmp" "${dst}/docker-compose.monitoring.yml"
+  fi
+  if [[ -d "${src}/monitoring" ]]; then
+    install -d "${dst}/monitoring"
+    mirror_dir "${src}/monitoring" "${dst}/monitoring"
+  fi
   if [[ -d "${src}/docker/maintenance" ]]; then
     install -d "${dst}/docker"
     mirror_dir "${src}/docker/maintenance" "${dst}/docker/maintenance"
@@ -354,6 +370,67 @@ CONFIG_BLOCKED_FILE="${STATE_DIR}/config-blocked.marker"
 # rollback snapshot of it taken before a provider-JAR swap.
 KEYCLOAK_SPI_JAR="${COMPOSE_DIR}/keycloak/providers/keycloak-spi.jar"
 KEYCLOAK_SPI_PREVIOUS_JAR="${STATE_DIR}/keycloak-spi-previous.jar"
+
+# --- Monitoring textfile metrics (epic #936, ADR-0072) ----------------------
+# Per-outcome timestamps so the alert catalog can tell success / rollback / failure / blocked apart:
+# a rollback or failure NEWER than the last success is CRITICAL (a promoted release did not ship).
+# The four outcome timestamps persist across runs (each write updates only its own and preserves the
+# others); config_blocked mirrors the presence of the config-blocked marker. Written to the
+# node_exporter textfile dir (already inside the systemd unit's ReadWritePaths=/var/iri).
+TEXTFILE_DIR="${IRI_MONITORING_TEXTFILE_DIR:-/var/iri/monitoring/textfile}"
+DEPLOY_METRIC_FILE="${TEXTFILE_DIR}/deploy.prom"
+START_EPOCH="$(date +%s)"
+
+# write_deploy_metric <success|rollback|failure|blocked>
+write_deploy_metric() {
+  local outcome="$1" now dur f v blocked tmp
+  now="$(date +%s)"; dur=$(( now - START_EPOCH ))
+  f="${DEPLOY_METRIC_FILE}"
+  local prev_success=0 prev_rollback=0 prev_failure=0 prev_blocked=0
+  if [[ -f "${f}" ]]; then
+    prev_success="$(awk '/^basetool_deploy_last_success_timestamp /{print $2}' "${f}" 2>/dev/null || echo 0)"
+    prev_rollback="$(awk '/^basetool_deploy_last_rollback_timestamp /{print $2}' "${f}" 2>/dev/null || echo 0)"
+    prev_failure="$(awk '/^basetool_deploy_last_failure_timestamp /{print $2}' "${f}" 2>/dev/null || echo 0)"
+    prev_blocked="$(awk '/^basetool_deploy_last_blocked_timestamp /{print $2}' "${f}" 2>/dev/null || echo 0)"
+  fi
+  for v in prev_success prev_rollback prev_failure prev_blocked; do
+    [[ "${!v}" =~ ^[0-9]+$ ]] || printf -v "${v}" '%s' 0
+  done
+  case "${outcome}" in
+    success)  prev_success="${now}" ;;
+    rollback) prev_rollback="${now}" ;;
+    failure)  prev_failure="${now}" ;;
+    blocked)  prev_blocked="${now}" ;;
+  esac
+  blocked=0; [[ -f "${CONFIG_BLOCKED_FILE}" ]] && blocked=1
+  install -d -m 0755 "${TEXTFILE_DIR}" 2>/dev/null || true
+  tmp="${f}.$$"
+  if {
+    echo "# HELP basetool_deploy_last_success_timestamp Unix time of the last successful deploy."
+    echo "# TYPE basetool_deploy_last_success_timestamp gauge"
+    echo "basetool_deploy_last_success_timestamp ${prev_success}"
+    echo "# HELP basetool_deploy_last_rollback_timestamp Unix time of the last deploy rollback (health gate reverted a release)."
+    echo "# TYPE basetool_deploy_last_rollback_timestamp gauge"
+    echo "basetool_deploy_last_rollback_timestamp ${prev_rollback}"
+    echo "# HELP basetool_deploy_last_failure_timestamp Unix time of the last deploy failure."
+    echo "# TYPE basetool_deploy_last_failure_timestamp gauge"
+    echo "basetool_deploy_last_failure_timestamp ${prev_failure}"
+    echo "# HELP basetool_deploy_last_blocked_timestamp Unix time of the last operator-gated (config-blocked) deploy."
+    echo "# TYPE basetool_deploy_last_blocked_timestamp gauge"
+    echo "basetool_deploy_last_blocked_timestamp ${prev_blocked}"
+    echo "# HELP basetool_deploy_duration_seconds Runtime of the last deploy invocation in seconds."
+    echo "# TYPE basetool_deploy_duration_seconds gauge"
+    echo "basetool_deploy_duration_seconds ${dur}"
+    echo "# HELP basetool_deploy_config_blocked Whether a postgres/Keycloak image change is operator-gated (1) or not (0)."
+    echo "# TYPE basetool_deploy_config_blocked gauge"
+    echo "basetool_deploy_config_blocked ${blocked}"
+  } > "${tmp}" 2>/dev/null; then
+    mv -f "${tmp}" "${f}" 2>/dev/null || true
+  else
+    log "WARN: could not write deploy textfile metric (${TEXTFILE_DIR})"
+    rm -f "${tmp}" 2>/dev/null || true
+  fi
+}
 
 # --- Lock -------------------------------------------------------------------
 exec 200>"${LOCKFILE}"
@@ -626,6 +703,7 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
     log "  old: $(printf '%s' "${OLD_INFRA}" | tr '\n' ' ')"
     log "  new: $(printf '%s' "${NEW_INFRA}" | tr '\n' ' ')"
     log "  perform the documented manual upgrade (docs/deployment.md → Stateful-infra upgrades), then: deploy.sh --force"
+    write_deploy_metric blocked
     exit 3
   fi
   rm -f "${CONFIG_BLOCKED_FILE}"
@@ -718,6 +796,7 @@ if docker compose \
       fi
       printf '%s %d %d\n' "${EXPECTED_MARKER}" "${FAIL_COUNT}" "$(date +%s)" > "${FAILED_FILE}"
       log "recorded keycloak-spi health-check failure #${FAIL_COUNT} for this target"
+      write_deploy_metric failure
       exit 1
     fi
     log "keycloak-spi provider JAR applied"
@@ -726,6 +805,25 @@ if docker compose \
   echo "${EXPECTED_MARKER}" > "${LAST_DEPLOYED_FILE}"
   rm -f "${FAILED_FILE}" "${CONFIG_BLOCKED_FILE}"
   log "deploy successful"
+  write_deploy_metric success
+
+  # --- Non-gating monitoring apply (epic #936, ADR-0072) ---------------------
+  # Reconcile the SEPARATE monitoring project AFTER the app stack is verified healthy — this NEVER
+  # gates the app deploy. The app `up` above already (re)created the shared net-monitoring-scrape and
+  # the data nets the monitoring project references as external, so they resolve here. Monitoring
+  # config changes (new dashboards/alert rules) arrive via the config bundle, so they land on this
+  # path; crashed monitoring containers recover on their own restart policy. Any failure only logs —
+  # the app deploy stays successful. Gated on IRI_MONITORING_ENABLED=true (unset on a host without
+  # the stack). pipefail makes the `if` observe compose's real exit through the sed pipe.
+  if [[ "${IRI_MONITORING_ENABLED:-false}" == "true" && -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" ]]; then
+    log "applying monitoring stack (non-gating)"
+    if docker compose -p iri-monitoring --project-directory "${COMPOSE_DIR}" \
+         -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" up -d 2>&1 | sed 's/^/  monitoring: /'; then
+      log "monitoring stack reconciled"
+    else
+      log "WARN: monitoring stack apply failed — app deploy stays successful (non-gating)"
+    fi
+  fi
 
   # Best-effort prune of dangling images older than 30 days. Restricted via
   # `until=720h` to avoid wiping the just-pulled images we may still need to
@@ -760,6 +858,7 @@ fi
 
 if [[ ! -f "${PIN_FILE_PREVIOUS}" ]]; then
   log "no previous pin available — manual intervention required"
+  write_deploy_metric failure
   exit 2
 fi
 
@@ -780,5 +879,7 @@ else
 fi
 
 # Either way, this run failed → non-zero exit so the systemd unit reports
-# `failed`, journalctl flags it, and any OnFailure= hook fires.
+# `failed`, journalctl flags it, and any OnFailure= hook fires. A rollback newer than the last
+# success is the "promoted release did not ship" signal (epic #936 alert catalog).
+write_deploy_metric rollback
 exit 1

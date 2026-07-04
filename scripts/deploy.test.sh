@@ -222,6 +222,7 @@ run_deploy() {
       PATH="${T_FAKE_BIN}:${PATH}" \
       IRI_COMPOSE_DIR="${T_COMPOSE_DIR}" \
       IRI_STATE_DIR="${T_STATE_DIR}" \
+      IRI_MONITORING_TEXTFILE_DIR="${T_STATE_DIR}/textfile" \
       IRI_LOCKFILE="${T_LOCK}" \
       IRI_GHCR_TOKEN_FILE="${T_TOKEN}" \
       FAKE_DOCKER_LOG="${T_DOCKER_LOG}" \
