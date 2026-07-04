@@ -68,3 +68,17 @@ groups:
         annotations:
           summary: "Edge (NPM) 5xx spike"
           description: "The NPM access logs show an elevated 5xx rate at the edge — catches upstream failures app metrics cannot see."
+
+      # sshd_config / authorized_keys tamper: auditd emits a watch event (with the acting auid) on any
+      # write to the sshd config or a root authorized_keys. Fires on the operator's OWN edits too (rare)
+      # — each event carries the auid, so it stays attributable; raise to critical once the config is
+      # stable. Needs the host-auditd stream (auditd installed + log_group=adm). Verify the raw-log key=
+      # format once on the test stack (auditd hex-encodes keys with special chars; these two do not).
+      - alert: AuditdSshTamper
+        expr: 'sum(count_over_time({app="host-auditd"} |~ `key="(sshd-config|sshd-authkeys)"` [5m])) > 0'
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "SSH config / authorized_keys modified (auditd)"
+          description: "auditd recorded a write to sshd_config(.d) or a root authorized_keys file. Confirm the acting user (auid) was you; an unexpected change may be a backdoor key or a security downgrade."

@@ -76,10 +76,10 @@ to the realm role `Admin`. There is no other exposed monitoring surface.
 ## Privacy / retention at a glance
 
 - **Metrics — 180d.** No PII; bounded labels only (REQ-OBS-006).
-- **Logs — 31d.** The NPM-access, NPM-admin, and SSH-host-auth streams retain
-  client IPs / usernames (owner-approved, covered by the privacy policy —
-  REQ-OBS-010). The Keycloak file log is masked in the shipper before it reaches
-  Loki.
+- **Logs — 31d.** The NPM-access, NPM-admin, SSH-host-auth, host-auditd (config /
+  authorized_keys tamper) and host-fail2ban (SSH-jail bans) streams retain client
+  IPs / usernames (owner-approved, covered by the privacy policy — REQ-OBS-010).
+  The Keycloak file log is masked in the shipper before it reaches Loki.
 - **Loki is excluded from backups**, so its retention window cannot be extended
   by restoring an old snapshot.
 - **Traces — 14d.**
@@ -111,6 +111,7 @@ Keep triage fast: confirm the signal in the matching Grafana dashboard, then act
 | **SshFailedAuthSpike**                                             | Failed SSH auth surge. Check source IPs; confirm fail2ban/firewall are active and consider blocking.                                                                                     |
 | **NpmAdminLoginFailure**                                           | Failed logins against the NPM admin UI. Confirm it is not exposed publicly; review source IPs.                                                                                           |
 | **EdgeServerErrorSpike**                                           | 5xx spike at the edge (NPM). Check upstream app health and NPM logs; correlate with recent deploys.                                                                                      |
+| **AuditdSshTamper**                                                | `sshd_config`(.d) or a root `authorized_keys` was modified (auditd). Confirm the acting user (`auid`) was you; an unexpected change may be a backdoor key or a security downgrade.       |
 | **DeployRolledBack / DeployFailed**                                | A promoted release did not ship. Check `deploy.sh` logs on the host; determine why it failed/rolled back before re-promoting.                                                            |
 | **DeployConfigBlocked**                                            | A deploy was blocked on a stateful-infra guard. Run the documented stateful-infra upgrade, then re-run `deploy.sh --force`.                                                              |
 | **BackupStaleOrMissing**                                           | The backup job is overdue or failed. Check the backup cron/logs and destination; run a manual backup once fixed.                                                                         |

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Monitoring: Host-Sicherheits-Logs (auditd, fail2ban) in Loki + Tamper-Alarm.** Alloy schickt jetzt zwei zusätzliche Host-Streams nach Loki: `host-auditd` (auditd-Wachregeln auf `sshd_config`/`authorized_keys`) und `host-fail2ban` (Sperren des SSH-Jails). Der neue Alarm `AuditdSshTamper` schlägt an, wenn die SSH-Konfiguration oder eine `authorized_keys`-Datei geändert wird. Beide Streams enthalten IP-Adressen/Benutzernamen (31 Tage, nur für Administratoren) — die Datenschutzerklärung wurde entsprechend erweitert (REQ-OBS-007/-010).
+
 ### Fixed
 
 - **Monitoring-Stack: Rollout-Korrekturen (Epic #936).** Mehrere den Start blockierende Fehler im v1.1.0-Monitoring-Stack behoben: korrigierte Container-Image-Referenzen (Grafana 13.0.2, `docker-socket-proxy` `v0.4.2`, `github-exporter` auf Quay `15.0.1`), lauffähiges Alloy (Storage- und `auth.log`-Zugriff über Gruppenrechte statt Capability, korrigierte `.targets`-Referenzen, `NETWORKS`-Freigabe am Docker-Socket-Proxy), ein Keycloak-Absturz beim Aktivieren der Nutzer-Ereignis-Metriken (ungültiger Ereigniswert `login_error` entfernt) sowie der für die distroless-Images ungeeignete Docker-Healthcheck von Loki und Tempo.
