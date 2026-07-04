@@ -4,6 +4,7 @@
 
 ### Added
 
+- **Monitoring: zusätzliche SSH-Sicherheitsalarme.** Neue Loki-Alarme für erfolgreiche Root-Anmeldungen (`SshRootLoginAccepted`) und fehlgeschlagene `sudo`-Aufrufe (`SudoAuthFailure`) auf dem Host-Auth-Log. Der bestehende Key-only-Alarm schlägt jetzt auch bei erfolgreichen `keyboard-interactive`-Anmeldungen an (dem PAM-Passwortpfad), nicht nur bei `Accepted password`. Ergänzt um eine auskommentierte Vorlage `SshAcceptedFromUnexpectedIp`, die nach Eintragen der eigenen Egress-Netze aktiviert wird (REQ-OBS-010).
 - **Monitoring: Host-Sicherheits-Logs (auditd, fail2ban) in Loki + Tamper-Alarm.** Alloy schickt jetzt zwei zusätzliche Host-Streams nach Loki: `host-auditd` (auditd-Wachregeln auf `sshd_config`/`authorized_keys`) und `host-fail2ban` (Sperren des SSH-Jails). Der neue Alarm `AuditdSshTamper` schlägt an, wenn die SSH-Konfiguration oder eine `authorized_keys`-Datei geändert wird. Beide Streams enthalten IP-Adressen/Benutzernamen (31 Tage, nur für Administratoren) — die Datenschutzerklärung wurde entsprechend erweitert (REQ-OBS-007/-010).
 
 ### Security

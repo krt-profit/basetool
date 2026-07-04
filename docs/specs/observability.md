@@ -187,7 +187,8 @@ abuse detection:
 - **NPM admin-UI stdout** — the loopback-only admin UI; any failed login implies a host-local actor
   or tunnel (high-signal).
 - **SSH / host-auth logs** — `/var/log/auth.log` (or the journal per distro): failed-auth spikes,
-  invalid users, sudo failures, and a successful password login on a key-only host.
+  invalid users, sudo failures, successful root logins, and a successful password/keyboard-interactive
+  login on a key-only host.
 - **Host auditd log** — `/var/log/audit/audit.log`: file-integrity watch events on `sshd_config`(.d)
   and root `authorized_keys` (the acting `auid` + path; catches a smuggled key or a security
   downgrade). Ingested unmasked so the acting user stays attributable.
