@@ -162,3 +162,62 @@ scrape_configs:
         target_label: instance
       - target_label: __address__
         replacement: blackbox-exporter:9115
+
+  # --- Blackbox deny/posture assertions (REQ-OBS-012) ------------------------------------
+  # These jobs assert edge configuration that lives only in the NPM admin DB: probe_success == 1
+  # means the deny/redirect/header posture HOLDS; the matching alerts fire on == 0. They are
+  # deliberately separate jobs so BlackboxProbeFailed (liveness, job="blackbox-http") never
+  # overlaps with the posture alerts. The Keycloak /admin allow-list is asserted externally by
+  # .github/workflows/edge-deny-probe.yml — from inside, hairpinned probe traffic is SNAT'd to
+  # the allow-listed Docker bridge gateways and /admin always looks reachable.
+  - job_name: blackbox-edge-deny
+    metrics_path: /probe
+    params:
+      module: [http_deny_404]
+    static_configs:
+      - targets:
+          - https://profit-base.online/actuator/prometheus
+          - https://ingest.profit-base.online/actuator/prometheus
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  - job_name: blackbox-force-ssl
+    metrics_path: /probe
+    params:
+      module: [http_force_ssl_redirect]
+    static_configs:
+      - targets:
+          - http://profit-base.online
+          - http://ingest.profit-base.online
+          - http://grafana.profit-base.online
+          - http://keycloak.profit-base.online
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # HSTS asserted only where the header source is version-controlled (app-side HSTS on the
+  # frontend, audit finding H-9). Extend to the keycloak/grafana/ingest vhosts once their
+  # header posture is verified/enabled in the NPM UI (per-host state, not in git).
+  - job_name: blackbox-hsts
+    metrics_path: /probe
+    params:
+      module: [http_2xx_hsts]
+    static_configs:
+      - targets:
+          - https://profit-base.online
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115

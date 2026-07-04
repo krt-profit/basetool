@@ -6,6 +6,10 @@
 
 - **Edge-Proxy-Container (nginx-proxy-manager) gehärtet.** Der Reverse-Proxy läuft jetzt ohne Privilegien-Eskalation (`no-new-privileges`), mit minimalem Capability-Set (`cap_drop: ALL` plus dokumentierter Allow-List) und einem Prozess-Limit — als exponiertester Container des Hosts erhält er damit dieselbe Härtungs-Baseline wie der Monitoring-Stack (REQ-OPS-014).
 
+- **Rate-Limiting am Edge.** Jeder öffentliche Proxy-Host begrenzt jetzt pro Client-IP die Anfragerate (20 r/s, Burst 80) und die gleichzeitigen Verbindungen (60) — ein versioniertes Sicherheitsnetz gegen Fluten und Brute-Force, das legitime Seitenaufrufe nicht berührt; Ablehnungen antworten mit 429 und lösen bei anhaltender Rate den neuen Alarm `EdgeRateLimitSpike` aus (REQ-SEC-023).
+
+- **Monitoring: Edge-Konfiguration wird jetzt dauerhaft verifiziert statt einmalig.** Neue Blackbox-Proben schlagen Alarm, wenn die `/actuator`-Sperre am Edge, die HTTP→HTTPS-Umleitung oder der HSTS-Header eines öffentlichen Hosts wegdriftet; die Erreichbarkeits-Sperre der Keycloak-Admin-Konsole prüft täglich ein externer GitHub-Actions-Lauf, da sie von innen prinzipbedingt nicht messbar ist (REQ-OBS-012).
+
 ## [v1.1.0](https://github.com/krt-profit/basetool/releases/tag/v1.1.0) - 2026-07-04
 
 ### Added
