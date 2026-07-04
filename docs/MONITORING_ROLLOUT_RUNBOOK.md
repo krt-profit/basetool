@@ -356,8 +356,12 @@ Use psql's `\password` so the password never lands in shell history or the Postg
 
 ```bash
 # --- backend DB ---
+# Wrap in `sh -c '...'` with SINGLE quotes so $POSTGRES_USER/$POSTGRES_DB expand INSIDE the container
+# (where they are set), not in your host shell (where .env is not loaded — it would fall back to the
+# OS user "root" and fail with `role "root" does not exist`).
 cd /var/iri/code
-docker compose exec db-backend psql -U "<POSTGRES_USER>" -d "<POSTGRES_DB>"
+docker compose --profile prod exec db-backend \
+  sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -p 15432'
 ```
 
 ```sql
@@ -370,7 +374,10 @@ GRANT pg_monitor TO monitoring;
 
 ```bash
 # --- keycloak DB (different container / db / port) ---
-docker compose exec db-keycloak psql -U "<KC_POSTGRES_USER>" -d "<KC_POSTGRES_DB>"
+# Inside the db-keycloak container the superuser vars are STILL named POSTGRES_USER/POSTGRES_DB
+# (the compose maps KC_POSTGRES_* onto them), so the same single-quoted form works.
+docker compose --profile prod exec db-keycloak \
+  sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -p 15433'
 ```
 
 ```sql
