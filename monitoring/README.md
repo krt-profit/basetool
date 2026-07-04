@@ -35,7 +35,7 @@ to the realm role `Admin`. There is no other exposed monitoring surface.
 |      Component       |                      Image                      | Version |
 |----------------------|-------------------------------------------------|---------|
 | Prometheus           | `prom/prometheus`                               | v3.13.0 |
-| Grafana (OSS)        | `grafana/grafana-oss`                           | 13.1.0  |
+| Grafana (OSS)        | `grafana/grafana-oss`                           | 13.0.2  |
 | Loki                 | `grafana/loki`                                  | 3.7.3   |
 | Tempo                | `grafana/tempo`                                 | 2.10.7  |
 | Alloy                | `grafana/alloy`                                 | v1.17.1 |
@@ -45,8 +45,8 @@ to the realm role `Admin`. There is no other exposed monitoring surface.
 | postgres_exporter ×2 | `quay.io/prometheuscommunity/postgres-exporter` | v0.20.0 |
 | redis_exporter       | `oliver006/redis_exporter`                      | v1.86.0 |
 | blackbox_exporter    | `prom/blackbox-exporter`                        | v0.28.0 |
-| docker-socket-proxy  | `tecnativa/docker-socket-proxy`                 | 0.4.2   |
-| github_exporter      | `ghcr.io/promhippie/github_exporter`            | v15.0.1 |
+| docker-socket-proxy  | `tecnativa/docker-socket-proxy`                 | v0.4.2  |
+| github_exporter      | `quay.io/promhippie/github-exporter`            | 15.0.1  |
 
 ## Config tree map
 

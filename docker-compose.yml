@@ -163,7 +163,10 @@ x-keycloak: &keycloak-template
     # prod keycloak service joins net-monitoring-scrape.
     KC_METRICS_ENABLED: ${KC_METRICS_ENABLED:-false}
     KC_EVENT_METRICS_USER_ENABLED: ${KC_EVENT_METRICS_USER_ENABLED:-false}
-    KC_EVENT_METRICS_USER_EVENTS: ${KC_EVENT_METRICS_USER_EVENTS:-login,login_error,logout,register,code_to_token,refresh_token,identity_provider_login,identity_provider_first_login,identity_provider_post_login}
+    # Base event names only — Keycloak REJECTS error variants like `login_error` at startup ("Invalid
+    # value for option 'KC_EVENT_METRICS_USER_EVENTS'"). A failed login is the `login` event carrying the
+    # built-in `error` label on keycloak_user_events_total (that label is automatic, NOT a USER_TAGS value).
+    KC_EVENT_METRICS_USER_EVENTS: ${KC_EVENT_METRICS_USER_EVENTS:-login,logout,register,code_to_token,refresh_token,identity_provider_login,identity_provider_first_login,identity_provider_post_login}
     KC_EVENT_METRICS_USER_TAGS: ${KC_EVENT_METRICS_USER_TAGS:-realm,idp}
     KC_TRACING_ENABLED: ${KC_TRACING_ENABLED:-false}
     KC_TRACING_ENDPOINT: ${KC_TRACING_ENDPOINT:-http://alloy:4317}

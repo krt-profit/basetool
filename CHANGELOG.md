@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Monitoring-Stack: Rollout-Korrekturen (Epic #936).** Mehrere den Start blockierende Fehler im v1.1.0-Monitoring-Stack behoben: korrigierte Container-Image-Referenzen (Grafana 13.0.2, `docker-socket-proxy` `v0.4.2`, `github-exporter` auf Quay `15.0.1`), lauffähiges Alloy (Storage- und `auth.log`-Zugriff über Gruppenrechte statt Capability, korrigierte `.targets`-Referenzen, `NETWORKS`-Freigabe am Docker-Socket-Proxy), ein Keycloak-Absturz beim Aktivieren der Nutzer-Ereignis-Metriken (ungültiger Ereigniswert `login_error` entfernt) sowie der für die distroless-Images ungeeignete Docker-Healthcheck von Loki und Tempo.
+
 ## [v1.1.0](https://github.com/krt-profit/basetool/releases/tag/v1.1.0) - 2026-07-04
 
 ### Added

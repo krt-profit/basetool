@@ -1,4 +1,4 @@
-# Grafana datasource provisioning. Grafana OSS 13.1.x (verified 2026-07). Epic #936, REQ-OBS-008/-009.
+# Grafana datasource provisioning. Grafana OSS 13.0.x (verified 2026-07). Epic #936, REQ-OBS-008/-009.
 # Grafana expands ${ENV} from the container environment in provisioning files; a literal $ is $$.
 apiVersion: 1
 

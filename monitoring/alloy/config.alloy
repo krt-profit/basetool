@@ -59,7 +59,7 @@ local.file_match "backend" {
 }
 
 loki.source.file "backend" {
-	targets    = local.file_match.backend.data
+	targets    = local.file_match.backend.targets
 	forward_to = [loki.process.app_json.receiver]
 }
 
@@ -68,7 +68,7 @@ local.file_match "frontend" {
 }
 
 loki.source.file "frontend" {
-	targets    = local.file_match.frontend.data
+	targets    = local.file_match.frontend.targets
 	forward_to = [loki.process.app_json.receiver]
 }
 
@@ -90,7 +90,7 @@ local.file_match "keycloak" {
 }
 
 loki.source.file "keycloak" {
-	targets    = local.file_match.keycloak.data
+	targets    = local.file_match.keycloak.targets
 	forward_to = [loki.process.keycloak_mask.receiver]
 }
 
@@ -114,7 +114,7 @@ local.file_match "npm_access" {
 }
 
 loki.source.file "npm_access" {
-	targets    = local.file_match.npm_access.data
+	targets    = local.file_match.npm_access.targets
 	forward_to = [loki.write.default.receiver]
 }
 
@@ -123,7 +123,7 @@ local.file_match "npm_error" {
 }
 
 loki.source.file "npm_error" {
-	targets    = local.file_match.npm_error.data
+	targets    = local.file_match.npm_error.targets
 	forward_to = [loki.write.default.receiver]
 }
 
@@ -133,7 +133,7 @@ local.file_match "host_auth" {
 }
 
 loki.source.file "host_auth" {
-	targets    = local.file_match.host_auth.data
+	targets    = local.file_match.host_auth.targets
 	forward_to = [loki.write.default.receiver]
 }
 

@@ -74,7 +74,7 @@ services:
   # ------------------------------------------------------------------------------------------
   grafana:
     <<: *mon-base
-    image: grafana/grafana-oss:13.1.0
+    image: grafana/grafana-oss:13.0.2
     cap_drop: [ALL]
     environment:
       GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-https://grafana.profit-base.online/}
@@ -145,12 +145,9 @@ services:
       - ./monitoring/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
       - ./monitoring/loki/rules:/etc/loki/rules:ro
       - /var/iri/monitoring/data/loki:/loki
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:3100/ready || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 40s
+    # No Docker healthcheck: the Loki image is distroless (no shell/wget), so a CMD-SHELL probe can
+    # never run and would pin the container to (unhealthy) despite a healthy process. Liveness comes
+    # from the Prometheus `up` metric on the loki scrape target (meta-monitoring), per the design note.
     deploy:
       resources:
         limits:
@@ -174,12 +171,8 @@ services:
     volumes:
       - ./monitoring/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
       - /var/iri/monitoring/data/tempo:/var/tempo
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:3200/ready || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 40s
+    # No Docker healthcheck: the Tempo image is distroless (no shell/wget) — same rationale as Loki.
+    # Liveness = the Prometheus `up` metric on the tempo scrape target (meta-monitoring).
     deploy:
       resources:
         limits:
@@ -195,7 +188,13 @@ services:
   alloy:
     <<: *mon-base
     image: grafana/alloy:v1.17.1
+    # Runs as root to reach its own storage dir and read privileged host logs, but with ALL caps
+    # dropped. Instead of restoring CAP_DAC_OVERRIDE we grant two supplementary groups (least
+    # privilege, no capability bypass): GID 473 = the image's `alloy` group that owns /var/lib/alloy
+    # (mode 0770) so root can traverse into the mounted data subdir; GID 4 = `adm` so it can read the
+    # syslog:adm-owned /var/log/auth.log. Re-verify both GIDs if the alloy base image ever changes.
     cap_drop: [ALL]
+    group_add: ["473", "4"]
     command:
       - run
       - --server.http.listen-addr=0.0.0.0:12345
@@ -299,13 +298,15 @@ services:
 
   # ------------------------------------------------------------------------------------------
   # docker-socket-proxy — GET-only Docker API for cAdvisor + Alloy. POST/EXEC/AUTH/SECRETS stay
-  # denied (defaults); CONTAINERS/IMAGES/INFO enabled for container discovery + log streaming.
+  # denied (defaults); CONTAINERS/IMAGES/INFO/NETWORKS enabled for container discovery + log
+  # streaming (Alloy's discovery.docker reads /networks to compute per-container network labels).
   # ------------------------------------------------------------------------------------------
   socket-proxy:
     <<: *mon-base
-    image: tecnativa/docker-socket-proxy:0.4.2
+    image: tecnativa/docker-socket-proxy:v0.4.2
     environment:
       CONTAINERS: "1"
+      NETWORKS: "1"
       IMAGES: "1"
       INFO: "1"
       EVENTS: "1"
@@ -407,7 +408,7 @@ services:
   # ------------------------------------------------------------------------------------------
   github-exporter:
     <<: *mon-base
-    image: ghcr.io/promhippie/github_exporter:v15.0.1
+    image: quay.io/promhippie/github-exporter:15.0.1
     cap_drop: [ALL]
     environment:
       GITHUB_EXPORTER_WEB_ADDRESS: "0.0.0.0:9504"
