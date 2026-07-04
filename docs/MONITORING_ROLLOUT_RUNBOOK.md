@@ -249,14 +249,16 @@ Alertmanager does **not** expand environment variables, so the committed
 rendered on the host. Alert e-mails never contain user data. SMTP is 587 STARTTLS with
 `smtp_require_tls: true`.
 
+> **Order note:** this render needs two inputs you obtain later — the SMTP credentials and the **healthchecks.io ping URL** created in [Phase 4.7](#47-healthchecksio--watchdog-heartbeat-check). Create that check first, or come back and **re-run this render** once you have the URL. If the monitoring stack is already running, restart Alertmanager afterwards so it reloads the file: `docker compose -p iri-monitoring -f /var/iri/code/docker-compose.monitoring.yml up -d --force-recreate alertmanager`.
+
 ```bash
-# Fill these from your SMTP provider + the healthchecks.io ping URL (created in Phase 4.6).
+# Fill these from your SMTP provider + the healthchecks.io ping URL (created in Phase 4.7).
 export SMTP_SMARTHOST='smtp.example.net:587'
 export SMTP_FROM='monitoring@profit-base.online'
 export SMTP_AUTH_USERNAME='monitoring@profit-base.online'
 export SMTP_AUTH_PASSWORD='<smtp app password>'
 export ALERT_EMAIL_TO='ops@profit-base.online'
-export HEARTBEAT_URL='https://hc-ping.com/<your-check-uuid>'   # from Phase 4.6
+export HEARTBEAT_URL='https://hc-ping.com/<your-check-uuid>'   # from Phase 4.7
 
 envsubst < /var/iri/code/monitoring/alertmanager/alertmanager.yml.tmpl \
   | sudo tee /var/iri/monitoring/secrets/alertmanager.yml >/dev/null
