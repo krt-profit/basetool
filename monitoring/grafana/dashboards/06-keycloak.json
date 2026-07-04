@@ -128,7 +128,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(keycloak_user_events_total{event=\"login_error\"}[5m]))",
+          "expr": "sum(rate(keycloak_user_events_total{event=\"login\",error!=\"\"}[5m])) or vector(0)",
           "refId": "A",
           "datasource": {
             "type": "prometheus",

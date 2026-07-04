@@ -64,7 +64,7 @@
     {
       "id": 2,
       "type": "timeseries",
-      "title": "Memory Used vs Max",
+      "title": "Memory Used vs Limit",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -86,8 +86,8 @@
           }
         },
         {
-          "expr": "redis_memory_max_bytes",
-          "legendFormat": "max",
+          "expr": "max(container_spec_memory_limit_bytes{name=\"redis\"})",
+          "legendFormat": "limit",
           "refId": "B",
           "datasource": {
             "type": "prometheus",
@@ -119,7 +119,7 @@
       },
       "targets": [
         {
-          "expr": "redis_memory_used_bytes/redis_memory_max_bytes*100",
+          "expr": "100 * redis_memory_used_bytes / scalar(max(container_spec_memory_limit_bytes{name=\"redis\"}))",
           "refId": "A",
           "datasource": {
             "type": "prometheus",

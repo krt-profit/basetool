@@ -278,7 +278,7 @@
     },
     {
       "id": 9,
-      "type": "table",
+      "type": "stat",
       "title": "Failed systemd Units",
       "gridPos": {
         "h": 8,
@@ -292,7 +292,7 @@
       },
       "targets": [
         {
-          "expr": "node_systemd_unit_state{state=\"failed\"}==1",
+          "expr": "count(node_systemd_unit_state{state=\"failed\"} == 1) or vector(0)",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -301,7 +301,22 @@
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
         "overrides": []
       },
       "options": {}
