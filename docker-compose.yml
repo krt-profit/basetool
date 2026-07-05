@@ -19,6 +19,21 @@ x-db-backend: &db-backend-template
   image: postgres:18-alpine@sha256:1b1689b20d16a014a3d195653381cf2caa75a41a92d93b255a9d6ea29fd353aa
   restart: unless-stopped
   logging: *default-logging
+  # Runtime-hardening baseline (REQ-OPS-014). The official postgres entrypoint boots as root to
+  # chown PGDATA and then drops to the `postgres` user via gosu, so it keeps the minimal caps that
+  # requires — CHOWN/DAC_OVERRIDE/FOWNER (chown the data dir) + SETUID/SETGID (gosu drops privileges).
+  # no-new-privileges still holds: gosu drops via the CAP_SETUID syscall, not a setuid binary, so
+  # lowering the uid is unaffected. A wrong cap set fails the container at start, which the deploy
+  # health-gate turns into a clean rollback — re-verify the set on every postgres image bump.
+  security_opt:
+    - no-new-privileges:true
+  cap_drop: [ALL]
+  cap_add:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
   # Container-aware memory tuning. The default Postgres settings (128 kB work_mem,
   # 128 MB shared_buffers) target a 4 GB host — at our 768 MB container limit the
   # buffer pool stays warm and join/sort operations spill to disk far less often.
@@ -58,6 +73,9 @@ x-db-backend: &db-backend-template
       limits:
         memory: 768M
         cpus: '1.5'
+        # Fork-bomb / runaway-backend ceiling. max_connections=100 caps live backends at ~100 +
+        # background workers, so 512 is generous headroom, not a tight limit.
+        pids: 512
   volumes:
     - /var/iri/db-backend:/var/lib/postgresql/data
 
@@ -66,6 +84,16 @@ x-db-keycloak: &db-keycloak-template
   image: postgres:18-alpine@sha256:1b1689b20d16a014a3d195653381cf2caa75a41a92d93b255a9d6ea29fd353aa
   restart: unless-stopped
   logging: *default-logging
+  # Runtime-hardening baseline (REQ-OPS-014) — same cap set + rationale as db-backend.
+  security_opt:
+    - no-new-privileges:true
+  cap_drop: [ALL]
+  cap_add:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
   # Smaller tuning than db-backend (512 MB limit vs 768 MB). Keycloak's working
   # set is realm config + user records + sessions — easily fits in 128 MB
   # shared_buffers for our member count.
@@ -97,6 +125,7 @@ x-db-keycloak: &db-keycloak-template
       limits:
         memory: 512M
         cpus: '1.0'
+        pids: 512
   volumes:
     - /var/iri/db-keycloak:/var/lib/postgresql/data
 
@@ -107,6 +136,14 @@ x-keycloak: &keycloak-template
   command: start --proxy-headers xforwarded --cache=local --log=console,file --log-file=/var/log/keycloak/keycloak.log
   restart: unless-stopped
   logging: *default-logging
+  # Runtime-hardening baseline (REQ-OPS-014). The Keycloak (Quarkus/ubi9) image already runs as the
+  # non-root uid 1000 and binds only high ports (18443/9000), so it needs NO capabilities — drop them
+  # all. `start` re-runs the provider build into 1000-owned dirs, so no cap is required for that
+  # either. Re-verify on every Keycloak image bump (a wrong set fails start → deploy health-gate
+  # rollback).
+  security_opt:
+    - no-new-privileges:true
+  cap_drop: [ALL]
   stop_grace_period: 30s
   # Quarkus-based Keycloak with local cache + JWT signing + the realm import is
   # the second-biggest RAM consumer behind the backend. 1.5 GB matches the
@@ -116,6 +153,9 @@ x-keycloak: &keycloak-template
       limits:
         memory: 1536M
         cpus: '2.0'
+        # JVM threads count as tasks toward this ceiling; 2048 is generous headroom over Keycloak's
+        # working thread set, so it is a runaway ceiling rather than a limit hit under normal load.
+        pids: 2048
   environment:
     KC_HOSTNAME: keycloak.profit-base.online
     KC_HOSTNAME_STRICT: "true"
@@ -207,6 +247,12 @@ x-backend: &backend-template
   image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-backend:${IRI_BASETOOL_VERSION:-stable}
   restart: always
   logging: *default-logging
+  # Runtime-hardening baseline (REQ-OPS-014). The image runs as the fixed non-root uid 10001 and
+  # binds only a high port (11261), so the JVM needs NO Linux capabilities — drop them all and forbid
+  # privilege escalation. Cheap, high-value defence-in-depth on the service that runs the most code.
+  security_opt:
+    - no-new-privileges:true
+  cap_drop: [ALL]
   stop_grace_period: 30s
   # Biggest workload on the host: every API call goes through this JVM, Flyway
   # runs at startup, and Hibernate caches L1/L2 + Caffeine caches live here.
@@ -219,6 +265,9 @@ x-backend: &backend-template
       limits:
         memory: 1536M
         cpus: '2.0'
+        # JVM threads count as tasks toward this ceiling; 2048 is generous headroom over Tomcat +
+        # Hikari + scheduler + GC/JIT threads, so it is a runaway ceiling, not a limit hit under load.
+        pids: 2048
   environment:
     SPRING_PROFILES_ACTIVE: prod
     SERVER_PORT: 11261
@@ -302,6 +351,19 @@ x-redis: &redis-template
   command: redis-server --save "300 1 60 1000" --appendonly no --loglevel notice --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
   restart: unless-stopped
   logging: *default-logging
+  # Runtime-hardening baseline (REQ-OPS-014). The official redis entrypoint boots as root to chown
+  # /data and then drops to the `redis` user via gosu, so it keeps the minimal caps that requires —
+  # CHOWN/DAC_OVERRIDE/FOWNER (chown the data dir) + SETUID/SETGID (privilege drop). no-new-privileges
+  # still holds (gosu drops via CAP_SETUID, not a setuid binary). Re-verify on every redis image bump.
+  security_opt:
+    - no-new-privileges:true
+  cap_drop: [ALL]
+  cap_add:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
   stop_grace_period: 30s
   # Only stores Spring sessions (OidcUser / OAuth2AuthorizedClient + flash
   # attributes). 256 MB is generous for our active-user count plus the
@@ -311,6 +373,9 @@ x-redis: &redis-template
       limits:
         memory: 256M
         cpus: '0.5'
+        # Redis is effectively single-process (plus a few bg threads + a transient RDB fork); 512 is
+        # a fork-bomb ceiling with wide headroom.
+        pids: 512
   healthcheck:
     test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:?}", "--no-auth-warning", "ping"]
     interval: 5s
@@ -325,6 +390,10 @@ x-frontend: &frontend-template
   image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-frontend:${IRI_BASETOOL_VERSION:-stable}
   restart: always
   logging: *default-logging
+  # Runtime-hardening baseline (REQ-OPS-014). Non-root uid 10001, high port (18081) only → no caps.
+  security_opt:
+    - no-new-privileges:true
+  cap_drop: [ALL]
   stop_grace_period: 30s
   # Thymeleaf SSR + WebClient proxy to the backend; no JPA, no business logic,
   # so the working set is well below the backend's. 768 MB → ~576 MB heap with
@@ -335,6 +404,8 @@ x-frontend: &frontend-template
       limits:
         memory: 768M
         cpus: '1.0'
+        # JVM thread ceiling — generous headroom (see the backend template).
+        pids: 2048
   environment:
     SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
     SERVER_PORT: 18081
@@ -368,6 +439,12 @@ x-ingest: &ingest-template
   image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-ingest:${IRI_BASETOOL_VERSION:-stable}
   restart: always
   logging: *default-logging
+  # Runtime-hardening baseline (REQ-OPS-014). Non-root uid 10001, high port (11262) only → no caps.
+  # This is the only new internet-reachable service, so dropping caps + forbidding escalation here is
+  # the highest-value application of the baseline after npm.
+  security_opt:
+    - no-new-privileges:true
+  cap_drop: [ALL]
   stop_grace_period: 30s
   # Lightweight: a JWT-validating relay + Redis staging, no JPA, no business logic. 512 MB →
   # ~384 MB heap with MaxRAMPercentage=75 covers Tomcat, the reactive WebClient and Lettuce.
@@ -376,6 +453,8 @@ x-ingest: &ingest-template
       limits:
         memory: 512M
         cpus: '1.0'
+        # JVM thread ceiling — generous headroom (see the backend template).
+        pids: 2048
   environment:
     SPRING_PROFILES_ACTIVE: prod
     SERVER_PORT: 11262

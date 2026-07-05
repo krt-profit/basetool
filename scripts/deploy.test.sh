@@ -174,6 +174,19 @@ FAKE
   printf '#!/usr/bin/env bash\nexit 0\n' > "${T_FAKE_BIN}/flock"
   chmod +x "${T_FAKE_BIN}/flock"
 
+  # Stub cosign for the host-side signature gate (REQ-OPS-015). Records the
+  # invocation and exits FAKE_COSIGN_RC (default 0 = signature trusted); a
+  # scenario sets FAKE_COSIGN_RC=1 to model a verification failure (a :stable
+  # tag moved to an untrusted digest). Placed first on PATH like `docker` so the
+  # real cosign (absent on the test runner) is never exercised.
+  cat > "${T_FAKE_BIN}/cosign" <<'FAKE'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'cosign %s\n' "$*" >> "${FAKE_DOCKER_LOG}"
+exit "${FAKE_COSIGN_RC:-0}"
+FAKE
+  chmod +x "${T_FAKE_BIN}/cosign"
+
   # MSYS/NTFS hosts (noacl mounts, e.g. Git Bash on Windows) cannot chmod,
   # which makes coreutils `install -m` fail. Mode bits are irrelevant to the
   # decision logic under test, so on such hosts only, shim `install` to drop
@@ -344,6 +357,7 @@ scenario_converged_noop() {
   assert_contains "(running stack verified)" "the fast exit states the stack was verified"
   assert_no_docker " pull " "nothing is pulled"
   assert_no_docker " up " "nothing is restarted"
+  assert_no_docker "cosign verify" "no signature verification on the steady-state no-op"
   rm -rf "${tmp}"
 }
 
@@ -445,6 +459,8 @@ scenario_check_only_drift() {
   run_deploy --check-only -- "${fake[@]}" "FAKE_PS_backend=" || rc=$?
   assert_exit 0 "$rc" "check-only exits 0"
   assert_contains "check-only: would re-apply" "check-only reports the pending drift re-apply"
+  assert_docker "cosign verify" "check-only runs the signature preflight"
+  assert_contains "all signatures verified OK" "check-only reports the signatures verified"
   assert_no_docker " pull " "check-only pulls nothing"
   assert_no_docker " up " "check-only restarts nothing"
   rm -rf "${tmp}"
@@ -620,6 +636,159 @@ scenario_monitoring_reload_gated_on_config_change() {
   rm -rf "${tmp}"
 }
 
+# ---------------------------------------------------------------------------
+# Scenario 13: a normal promotion (marker differs) must cosign-verify every
+# resolved digest against the release-images signature BEFORE it pulls or applies
+# (REQ-OPS-015), and only then proceed.
+# ---------------------------------------------------------------------------
+scenario_signature_verified_on_apply() {
+  echo "Scenario: promotion verifies signatures before applying"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_marker "sha256:backend-old|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" || rc=$?
+  assert_exit 0 "$rc" "verified promotion succeeds"
+  assert_contains "verifying image signatures" "the verification step runs"
+  assert_docker "cosign verify" "cosign verify is invoked for the resolved digests"
+  assert_contains "backend: signature OK" "the backend signature is reported OK"
+  assert_docker " up -d" "the stack is applied after verification"
+  rm -rf "${tmp}"
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 14: a resolved digest whose signature does NOT verify (a :stable tag
+# moved out-of-band to an untrusted digest) must abort the deploy before any
+# pull / up, record a failure metric, and exit non-zero (REQ-OPS-015).
+# ---------------------------------------------------------------------------
+scenario_signature_failure_aborts() {
+  echo "Scenario: a failed signature verification aborts before pull/apply"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_marker "sha256:backend-old|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" "FAKE_COSIGN_RC=1" || rc=$?
+  assert_exit 1 "$rc" "an untrusted digest fails the deploy"
+  assert_contains "cosign signature verification failed" "the security abort is reported"
+  assert_no_docker " pull " "nothing is pulled from an untrusted target"
+  assert_no_docker " up " "the stack is not recreated on an untrusted target"
+  if grep -q 'basetool_deploy_last_failure_timestamp [1-9]' \
+       "${T_STATE_DIR}/textfile/deploy.prom" 2>/dev/null; then
+    record 1 "a deploy-failure metric is written for the verification failure"
+  else
+    record 0 "a deploy-failure metric is written for the verification failure"
+  fi
+  rm -rf "${tmp}"
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 15: break-glass IRI_COSIGN_VERIFY=false rides out a Sigstore outage —
+# the deploy proceeds without verifying, but says so loudly and invokes no cosign.
+# ---------------------------------------------------------------------------
+scenario_break_glass_skips_verify() {
+  echo "Scenario: IRI_COSIGN_VERIFY=false skips verification (loudly) and still applies"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_marker "sha256:backend-old|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" "IRI_COSIGN_VERIFY=false" || rc=$?
+  assert_exit 0 "$rc" "break-glass deploy succeeds"
+  assert_contains "signature verification DISABLED" "the disabled gate is logged loudly"
+  assert_no_docker "cosign verify" "cosign is not invoked when the gate is disabled"
+  assert_docker " up -d" "the stack is still applied under break-glass"
+  rm -rf "${tmp}"
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 16: the GHCR token-expiry gauge is emitted on EVERY tick — including
+# the idempotence no-op — so the GhcrPullTokenExpiring alert never goes stale.
+# ---------------------------------------------------------------------------
+scenario_token_expiry_metric() {
+  echo "Scenario: GHCR token-expiry gauge is written even on the no-op tick"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_marker "${MARKER}"
+  printf '2026-10-01\n' > "${T_TOKEN}.expiry"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" || rc=$?
+  assert_exit 0 "$rc" "no-op tick with a token expiry file exits 0"
+  assert_contains "no change" "the tick is still the idempotence no-op"
+  if grep -q '^basetool_ghcr_token_expiry_timestamp [1-9]' \
+       "${T_STATE_DIR}/textfile/ghcr-token.prom" 2>/dev/null; then
+    record 1 "the token-expiry gauge is written on the no-op tick"
+  else
+    record 0 "the token-expiry gauge is written on the no-op tick"
+  fi
+  rm -rf "${tmp}"
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 17: a --force apply of a gated stateful-infra change whose health gate
+# FAILS must leave the config-blocked marker in place (it is cleared only on a
+# SUCCESSFUL apply), so the next automatic tick quietly skips instead of
+# re-firing the CARVE-OUT alert. Regression guard for the pre-apply marker delete.
+# ---------------------------------------------------------------------------
+scenario_forced_gated_rollback_keeps_marker() {
+  echo "Scenario: a rolled-back --force stateful-infra apply keeps the block marker"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  # Live compose carries a postgres pin; the promoted bundle bumps it → a gated
+  # stateful-infra change (infra_image_pins differ).
+  printf 'services:\n  db-backend:\n    image: postgres:18-alpine\n' \
+    > "${T_COMPOSE_DIR}/docker-compose.yml"
+  local bundle="${tmp}/bundle"
+  mkdir -p "${bundle}"
+  printf 'services:\n  db-backend:\n    image: postgres:19-alpine\n' \
+    > "${bundle}/docker-compose.yml"
+  write_marker "${MARKER}"
+  # A prior non-force tick already gated this target and wrote the marker.
+  echo "${DIG_BACKEND}|${DIG_FRONTEND}|${DIG_INGEST}|sha256:config-next|${DIG_KCSPI}" \
+    > "${T_STATE_DIR}/config-blocked.marker"
+  echo "services: {}" > "${T_STATE_DIR}/current-digest-pin.yml"
+  mapfile -t fake < <(converged_env)
+  run_deploy --force -- "${fake[@]}" \
+    "FAKE_CONFIG_BUNDLE=${bundle}" "FAKE_REMOTE_CONFIG=sha256:config-next" "FAKE_UP_RC=1" || rc=$?
+  assert_exit 1 "$rc" "the failed forced apply exits non-zero"
+  assert_contains "stateful-infra upgrade forced" "the --force path through the gate is taken"
+  assert_contains "health check failed" "the apply fails its health gate and rolls back"
+  if [[ -f "${T_STATE_DIR}/config-blocked.marker" ]]; then
+    record 1 "the block marker survives a rolled-back forced apply"
+  else
+    record 0 "the block marker survives a rolled-back forced apply"
+  fi
+  rm -rf "${tmp}"
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 18: a promoted config bundle that smuggles in a secret-shaped file
+# (here a *.pem — a pattern the CI assert catches but the host gate used to miss)
+# must be rejected before anything is applied (widened assert_no_secrets).
+# ---------------------------------------------------------------------------
+scenario_config_bundle_secret_rejected() {
+  echo "Scenario: a config bundle carrying a *.pem is rejected before apply"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  local bundle="${tmp}/bundle"
+  mkdir -p "${bundle}"
+  echo "# dummy compose" > "${bundle}/docker-compose.yml"
+  echo "-----BEGIN PRIVATE KEY-----" > "${bundle}/leaked.pem"
+  write_marker "${MARKER}"
+  echo "services: {}" > "${T_STATE_DIR}/current-digest-pin.yml"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" \
+    "FAKE_CONFIG_BUNDLE=${bundle}" "FAKE_REMOTE_CONFIG=sha256:config-next" || rc=$?
+  assert_exit 1 "$rc" "a secret-carrying bundle aborts the deploy"
+  assert_contains "forbidden secret-shaped file" "the widened secret gate rejects the .pem"
+  assert_no_docker " up -d" "nothing is applied when the bundle carries a secret"
+  rm -rf "${tmp}"
+}
+
 scenario_converged_noop
 scenario_stale_image_drift
 scenario_unhealthy_drift
@@ -632,6 +801,61 @@ scenario_oneoff_ignored
 scenario_starting_grace
 scenario_monitoring_config_reload
 scenario_monitoring_reload_gated_on_config_change
+scenario_signature_verified_on_apply
+scenario_signature_failure_aborts
+scenario_break_glass_skips_verify
+# ---------------------------------------------------------------------------
+# Scenario 19: --check-only over a CONVERGED stack still runs the signature
+# preflight (it does not take the plain no-op fast exit), reporting "no change"
+# AND verifying — so `deploy.sh --check-only` is a repeatable signature check.
+# ---------------------------------------------------------------------------
+scenario_check_only_noop_verifies() {
+  echo "Scenario: --check-only over a converged stack still verifies signatures"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_marker "${MARKER}"
+  mapfile -t fake < <(converged_env)
+  run_deploy --check-only -- "${fake[@]}" || rc=$?
+  assert_exit 0 "$rc" "check-only over a converged stack exits 0"
+  assert_contains "check-only: no change" "it reports the no-op"
+  assert_docker "cosign verify" "it still runs the signature preflight"
+  assert_contains "all signatures verified OK" "the signatures verify"
+  assert_no_docker " up " "nothing is applied"
+  rm -rf "${tmp}"
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 20: --check-only with a signature that does NOT verify must exit
+# non-zero and report the failure, but must NOT write a deploy-failure metric
+# (a dry-run must not trip DeployFailed).
+# ---------------------------------------------------------------------------
+scenario_check_only_verify_fail() {
+  echo "Scenario: --check-only with a bad signature exits non-zero, writes no metric"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_marker "${MARKER}"
+  mapfile -t fake < <(converged_env)
+  run_deploy --check-only -- "${fake[@]}" "FAKE_COSIGN_RC=1" || rc=$?
+  assert_exit 1 "$rc" "check-only exits non-zero on a failed verification"
+  assert_contains "SIGNATURE VERIFICATION FAILED" "the failure is reported"
+  assert_no_docker " up " "nothing is applied"
+  if [[ ! -f "${T_STATE_DIR}/textfile/deploy.prom" ]] \
+     || ! grep -q 'basetool_deploy_last_failure_timestamp [1-9]' \
+            "${T_STATE_DIR}/textfile/deploy.prom" 2>/dev/null; then
+    record 1 "no deploy-failure metric is written for a dry-run verification failure"
+  else
+    record 0 "no deploy-failure metric is written for a dry-run verification failure"
+  fi
+  rm -rf "${tmp}"
+}
+
+scenario_token_expiry_metric
+scenario_forced_gated_rollback_keeps_marker
+scenario_config_bundle_secret_rejected
+scenario_check_only_noop_verifies
+scenario_check_only_verify_fail
 
 echo
 if [[ "$tests_failed" -eq 0 ]]; then

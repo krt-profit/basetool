@@ -92,10 +92,42 @@ sudo apt update
 sudo apt install --no-install-recommends \
     docker.io docker-compose-v2 \
     logrotate \
+    acl \
     curl ca-certificates
 ```
 
+`acl` provides `setfacl`, used below to grant the keystore to two container uids
+without making it world-readable.
+
 Docker Engine ≥ 23.x is required for `docker compose up --wait`.
+
+**cosign** is required for the host-side signature gate (REQ-OPS-015 — `deploy.sh`
+verifies every image before it runs it). It is not in Ubuntu's default repos, so
+install the pinned release binary and verify its checksum before installing:
+
+```bash
+COSIGN_VERSION=v3.1.1
+arch=$(dpkg --print-architecture)          # amd64 or arm64
+curl -fsSLo /tmp/cosign        "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-${arch}"
+curl -fsSLo /tmp/cosign_checksums.txt "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign_checksums.txt"
+# Verify the download against the published checksum, then install:
+( cd /tmp && grep " cosign-linux-${arch}\$" cosign_checksums.txt | sha256sum -c - )
+sudo install -m 0755 /tmp/cosign /usr/local/bin/cosign
+rm -f /tmp/cosign /tmp/cosign_checksums.txt
+cosign version
+```
+
+> **Use cosign 3.x, and never a lower major than the CI signs with.** The CI signs
+> images with the cosign that `sigstore/cosign-installer@v4.1.2` pins — currently
+> **cosign 3.0.6** — and **cosign 2.x cannot verify cosign 3.x keyless signatures**
+> (3.x verifies 3.x and 2.x; 2.x does not verify 3.x). A host on cosign 2.x would
+> therefore fail this gate on every deploy (fail-closed). Keep the host on the
+> current 3.x release (3.1.1 verifies the CI's 3.0.6 signatures), and when the CI's
+> `cosign-installer` pin is bumped, keep the host **≥** that cosign version. Already
+> installed an older cosign? See [Updating cosign](#updating-cosign).
+
+`deploy.sh` fails its pre-flight if `cosign` is missing while the gate is enabled
+(`IRI_COSIGN_VERIFY=true`, the default) — see *Signature verification (cosign)*.
 
 ### 2. Dedicated `deploy` user
 
@@ -148,7 +180,10 @@ sudo cp -r scripts/             /var/iri/code/
 sudo cp -r keycloak-theme/      /var/iri/code/
 sudo cp -r docker/              /var/iri/code/   # maintenance page assets
 sudo chown -R deploy:docker     /var/iri/code
-sudo chmod 0755                 /var/iri/code/scripts/deploy.sh
+# 0750 (rwx owner deploy, rx group docker, none for other) — consistent with
+# docker-cleanup.sh below. systemd and the manual `sudo -u deploy` invocations run
+# as the owner, so world-exec is unnecessary.
+sudo chmod 0750                 /var/iri/code/scripts/deploy.sh
 ```
 
 This is a **one-time bootstrap**. After the first `:stable` promotion, the
@@ -187,16 +222,24 @@ serves or trusts the internal cert — backend, frontend, ingest **and**
 Keycloak:
 
 ```bash
-sudo install -m 0644 -o root -g 10001 /path/to/keystore.p12 /var/iri/secrets/keystore.p12
+sudo install -m 0640 -o root -g 10001 /path/to/keystore.p12 /var/iri/secrets/keystore.p12
+# The backend/frontend/ingest images run as uid 10001 (covered by the group), but
+# the Keycloak (Quarkus) image runs as uid 1000, which no single owner/group can
+# also cover. Grant uid 1000 read via a POSIX ACL instead of widening the mode to
+# world-readable 0644 — so the private-key material is NOT readable by `other`:
+sudo setfacl -m u:1000:r /var/iri/secrets/keystore.p12
+# Verify: user::rw-, group::r--, user:1000:r--, other::--- (no world read).
+getfacl /var/iri/secrets/keystore.p12
 ```
 
-It must be **world-readable (`0644`)**: the backend/frontend/ingest images
-run as uid `10001`, but the Keycloak (Quarkus) image runs as uid `1000`, so
-no single owner/group covers both — a stricter `0640` makes Keycloak fail to
-start with `AccessDeniedException /run/secrets/keystore.p12`. Owner root keeps
-the deploy user from rewriting it; rotation is a deliberate sudo action.
-(Acceptable exposure: a self-signed internal cert on a single-purpose host;
-the public Let's Encrypt cert lives in NPM, not here.)
+The two container uids read it (10001 via the group, 1000 via the ACL entry); the
+bind mount preserves the host inode's ACL, and the images run at those literal
+host uids (no userns-remap). A plain `0640` without the ACL makes Keycloak fail to
+start with `AccessDeniedException /run/secrets/keystore.p12`; the old `0644` made
+it readable by every account on the box. Owner root keeps the deploy user from
+rewriting it; rotation is a deliberate sudo action. (The cert here is a self-signed
+*internal* cert on a single-purpose host — the public Let's Encrypt cert lives in
+NPM, not here — but not being world-readable is cheap defence-in-depth.)
 
 #### 5.3 Keycloak realm export
 
@@ -209,14 +252,21 @@ sudo install -m 0640 -o deploy -g docker /path/to/realm-export.json /var/iri/cod
 Generate a fine-grained PAT in GitHub:
 - Repository access: `krt-profit/basetool` only
 - Permissions: `Packages: Read` (no other scopes)
-- Expiry: 90 days (calendar a rotation reminder)
+- Expiry: 90 days
 
 ```bash
-sudo install -m 0600 -o deploy -g deploy /dev/stdin /etc/iri/ghcr-pull-token <<< 'ghp_xxxxxxxx'
+# Fine-grained PATs are prefixed `github_pat_` (NOT the classic `ghp_`).
+sudo install -m 0600 -o deploy -g deploy /dev/stdin /etc/iri/ghcr-pull-token <<< 'github_pat_xxxxxxxx'
+
+# Record the PAT's expiry date so the deploy loop can warn ~2 weeks ahead instead
+# of failing on expiry day (deploy.sh emits basetool_ghcr_token_expiry_timestamp;
+# the GhcrPullTokenExpiring alert reads it). Use the same date you set in GitHub:
+sudo install -m 0640 -o deploy -g deploy /dev/stdin /etc/iri/ghcr-pull-token.expiry <<< '2026-10-01'
 ```
 
 The token file is owner-only readable. The deploy user uses `cat` against
-it (via the systemd unit), nothing else touches it.
+it (via the systemd unit), nothing else touches it. The `.expiry` sidecar holds
+only the (non-secret) rotation date.
 
 ### 6. Install the systemd timer
 
@@ -358,6 +408,24 @@ gh workflow run promote.yml -f version=1.4.3
 (or use the GitHub Actions UI: *Actions → Promote to stable → Run
 workflow → version `1.4.3`*)
 
+The promotion passes three gates before it flips `:stable` (REQ-OPS-002):
+
+1. **Approval.** The `promote` job is bound to the `production` GitHub
+   Environment. A configured **required reviewer** must approve the run in the
+   Actions UI before any `:stable` flip happens — so workflow_dispatch alone does
+   not reach prod. *One-time setup:* **Settings → Environments → `production` →
+   Required reviewers** (add the operator[s]). Until that is configured the
+   environment reference is a harmless no-op.
+2. **Signature.** cosign-verify of the exact digest against the release-images
+   identity (the same identity the host re-verifies — REQ-OPS-015).
+3. **Vulnerability.** A Trivy scan of the exact digest fails the promotion on a
+   fixable HIGH/CRITICAL (the production vuln gate `release-images.yml` defers
+   to). For a deliberate hotfix whose CVE is unrelated to the fix, override it:
+
+   ```bash
+   gh workflow run promote.yml -f version=1.4.3 -f skip_vuln_gate=true
+   ```
+
 This re-tags the existing 1.4.3 image digest as `:stable` in GHCR. No
 rebuild. Same digest, two tags.
 
@@ -376,8 +444,10 @@ whose RepoDigest equals the target digest. A converged stack exits 0
 ("no change"); any divergence — a manually-started outdated build, a crash
 loop, a half-down stack — is logged as `drift: <service>: <reason>` and
 re-applied (REQ-OPS-013).
-3. If different (or the running stack drifted): writes `current-digest-pin.yml`
-with the new app digest set.
+3. If different (or the running stack drifted): **cosign-verifies every resolved
+digest** against the release-images signature (REQ-OPS-015) — a verification
+failure aborts here, before anything is pulled or applied — then writes
+`current-digest-pin.yml` with the new app digest set.
 If the **config** digest moved, it also extracts the promoted bundle, asserts it
 carries no secrets, snapshots the live config tree into `config-previous/`, and
 copies the new `docker-compose.yml` + maintenance/theme trees into
@@ -496,14 +566,19 @@ until you either promote a different version or force it. To take the upgrade:
    target; the app images in the same promotion are applied along with it.
 
 redis and npm image bumps are **not** gated — they auto-apply as in the previous
-section. For an **npm** bump, verify the hardened capability set before merging the
-bump PR (REQ-OPS-014): boot the new image once with the `security_opt`/`cap_drop`/
-`cap_add`/`pids` values from the `npm` service in `docker-compose.yml` and confirm a
-clean boot, a passing `/usr/bin/check-health`, a working `nginx -s reload`, and a
-clean container restart. The jc21 image does not officially support a reduced
-capability set, so an upstream change (e.g. a new s6 prepare step) can silently
-require an additional capability — catching that in review is cheaper than a
-rolled-back deploy.
+section. Every `prod` service runs the hardened runtime baseline (REQ-OPS-014:
+`no-new-privileges` + `cap_drop: [ALL]` + a minimal `cap_add` + a `pids` ceiling),
+and the third-party images (`postgres`, `redis`, `npm`) do not officially document a
+reduced capability set — so when you bump one of them, **re-verify its `cap_add` set
+against the new image before merging the bump PR**: boot the new image once with the
+`security_opt`/`cap_drop`/`cap_add`/`pids` values from that service in
+`docker-compose.yml` and confirm a clean boot and a passing healthcheck (for **npm**
+additionally the s6 `/data/nginx` sed pass, `/usr/bin/check-health`, a working
+`nginx -s reload`, and a clean restart). An upstream change (e.g. a new s6 prepare
+step, or a changed privilege-drop path in the postgres/redis entrypoint) can silently
+require an additional capability. The deploy health-gate is the backstop — a wrong cap
+set fails the container at start and rolls back — but catching it in review is cheaper
+than a rolled-back deploy.
 
 ---
 
@@ -708,11 +783,12 @@ sudo docker run --rm --user 0 --entrypoint keytool -v /var/iri/secrets:/work "$I
   -dname "CN=basetool, OU=IRIDIUM, O=DAS KARTELL, C=DE" \
   -ext "san=dns:localhost,ip:127.0.0.1,dns:backend,dns:frontend,dns:ingest,dns:keycloak"
 
-# World-readable (0644) so BOTH the uid-10001 JVM services AND the uid-1000
-# Keycloak image can read it (see "5.2 PKCS12 keystore"). 0640 makes Keycloak
-# crash with AccessDeniedException.
+# Readable by BOTH the uid-10001 JVM services (via the group) AND the uid-1000
+# Keycloak image (via a POSIX ACL), WITHOUT world-read (see "5.2 PKCS12 keystore").
+# A plain 0640 with no ACL makes Keycloak crash with AccessDeniedException.
 sudo chown root:10001 /var/iri/secrets/keystore.p12
-sudo chmod 0644        /var/iri/secrets/keystore.p12
+sudo chmod 0640        /var/iri/secrets/keystore.p12
+sudo setfacl -m u:1000:r /var/iri/secrets/keystore.p12
 
 # Confirm the SAN carries dns:keycloak before restarting anything.
 sudo docker run --rm --entrypoint keytool -v /var/iri/secrets:/work "$IMG" \
@@ -922,8 +998,11 @@ durable.
 sudo -u deploy /var/iri/code/scripts/deploy.sh --check-only
 ```
 
-Resolves the digest the next deploy would target and prints it. No
-restarts.
+Resolves the digest the next deploy would target **and cosign-verifies every
+resolved digest** against the release-images identity (REQ-OPS-015), reporting
+per artifact. No restarts, no metric written. Exits non-zero if any signature
+does not verify — so this doubles as the repeatable signature preflight (it runs
+cosign as the `deploy` user, exactly as a real deploy would).
 
 ### Force a fresh pull regardless of digest match
 
@@ -975,41 +1054,167 @@ sudo systemctl start iri-deploy.timer     # after the maintenance window
 
 ---
 
+## Signature verification (cosign)
+
+Every image the host is about to run is cosign-verified on the box before it is
+pulled, extracted or applied (REQ-OPS-015, [ADR-0075](adr/0075-host-side-cosign-signature-verification.md)).
+This is the **host half** of the supply-chain seam; `promote.yml`'s pre-flight
+verify is the CI half. The host re-resolves `:stable` independently on every
+timer tick, so the CI verify alone does not bind what `:stable` points at when
+the host later pulls it — a `:stable` tag moved out-of-band (a leaked
+`packages:write` credential retagging an arbitrary digest, bypassing
+`promote.yml`) would otherwise be pulled and run unverified.
+
+What `deploy.sh` does, once a tick is committed to applying (past the idempotence
+no-op, `--check-only` and the bad-digest backoff) and **before** the first
+`pull` / `docker create` / `docker cp` / `up`:
+
+```
+verifying image signatures (cosign keyless)
+  backend: signature OK
+  frontend: signature OK
+  ingest: signature OK
+  config: signature OK
+  keycloak-spi: signature OK
+```
+
+Each `image@digest` is verified against the **release-images** workflow identity
+`…/release-images.yml@refs/(heads/main|tags/v.+)` and the GitHub OIDC issuer —
+the same identity `promote.yml` uses. The `@refs/` pin accepts only main-branch
+and tagged builds, so an image built by a `workflow_dispatch` run of
+`release-images` off an arbitrary feature branch is **not** trusted for prod.
+
+- **Fail-closed.** A verification failure aborts the tick non-zero, records a
+  deploy-failure metric (so the `DeployFailed` alert fires), and applies nothing.
+  A moved `:stable` is a supply-chain incident, not a silent skip.
+- cosign reads the registry credential from the same `DOCKER_CONFIG` the
+  `docker login` writes; keyless verify additionally reaches the Sigstore
+  public-good Fulcio/Rekor roots over the outbound HTTPS the host already uses.
+- **Break-glass.** `IRI_COSIGN_VERIFY=false` disables the gate for a run — use it
+  **only** to ride out a Sigstore public-good outage that is blocking every
+  deploy; every skipped verification is logged as a `WARNING`. Re-enable it the
+  moment Sigstore recovers:
+
+  ```bash
+  # emergency only — Sigstore outage
+  sudo -u deploy IRI_COSIGN_VERIFY=false /var/iri/code/scripts/deploy.sh --force
+  ```
+
+The trusted identity is overridable for a fork via `IRI_COSIGN_REPO` /
+`IRI_COSIGN_IDENTITY_REGEXP` / `IRI_COSIGN_OIDC_ISSUER` (see `deploy.sh --help`);
+the defaults match this repository's `release-images.yml`.
+
+### Updating cosign
+
+cosign is a single static binary, so an update is an in-place replace with the
+**same download + checksum-verify pattern** used at bootstrap, pointing at the new
+version. No service restart is needed — the next `iri-deploy.timer` tick picks up
+the new `/usr/local/bin/cosign`. To go from an older cosign (e.g. a 2.x install) to
+the current 3.x:
+
+```bash
+COSIGN_VERSION=v3.1.1
+arch=$(dpkg --print-architecture)
+curl -fsSLo /tmp/cosign               "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-${arch}"
+curl -fsSLo /tmp/cosign_checksums.txt "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign_checksums.txt"
+( cd /tmp && grep " cosign-linux-${arch}\$" cosign_checksums.txt | sha256sum -c - )
+sudo install -m 0755 /tmp/cosign /usr/local/bin/cosign   # overwrites the old binary
+rm -f /tmp/cosign /tmp/cosign_checksums.txt
+cosign version                                            # expect 3.1.1
+```
+
+Then **prove the host can verify a real CI-signed image** before relying on the
+gate — verify the live `:stable` against the release-images identity (any artifact;
+backend shown). cosign reads the registry credential from your docker login:
+
+```bash
+# Authenticate to GHCR (reuse the deploy pull token, or your own read:packages PAT):
+sudo cat /etc/iri/ghcr-pull-token | docker login ghcr.io -u deploy-bot --password-stdin
+
+cosign verify ghcr.io/krt-profit/basetool-backend:stable \
+  --certificate-identity-regexp 'https://github.com/krt-profit/basetool/\.github/workflows/release-images\.yml@refs/(heads/main|tags/v.+)' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+A clean verify (the certificate + Rekor details print, exit 0) confirms the host
+cosign validates the CI's signatures — this is exactly the check `deploy.sh` runs
+internally (REQ-OPS-015). If it instead errors with a bundle/format complaint, the
+host cosign is **older** than the version the CI signed with — bump it further.
+Run `sudo -u deploy /var/iri/code/scripts/deploy.sh --check-only` as a final smoke
+test — it cosign-verifies the current `:stable` as the `deploy` user without
+applying anything, and exits non-zero if verification fails.
+
+## Docker access hardening
+
+`iri-deploy.service` runs as the unprivileged `deploy` user, but that user is in
+the `docker` group so it can drive `docker compose`. Be clear-eyed about what that
+bounds: **docker-group membership is effectively root on the host** — the group
+can `docker run -v /:/host …` and read or overwrite anything. So the `deploy`
+user is not a hard privilege boundary against a *fully compromised* `deploy.sh`.
+
+What actually contains the risk today:
+
+- **The host-side signature gate (REQ-OPS-015).** `deploy.sh` refuses to run any
+  image not signed by our `release-images` identity, so a moved `:stable` tag or a
+  stolen GHCR pull token cannot get attacker-controlled code onto the box in the
+  first place — which is the realistic threat, not the operator's own script
+  turning malicious.
+- **The systemd sandbox** on the unit (`NoNewPrivileges`, `ProtectSystem=strict`,
+  the seccomp `SystemCallFilter=@system-service`, an empty `CapabilityBoundingSet`,
+  a narrow `ReadWritePaths`, restricted address families) confines the `deploy.sh`
+  *process* itself.
+
+**Deferred, would shrink the docker-group surface itself** (a larger change, not
+yet done): put a **read-restricted docker-socket-proxy**
+(`tecnativa/docker-socket-proxy`) in front of the daemon and point `deploy.sh` at
+it via `DOCKER_HOST`, exposing only the API verbs the deploy needs; or move to
+**rootless Docker**. Both re-architect how `deploy.sh` reaches the daemon and need
+host validation, so they are tracked separately rather than bundled here.
+
 ## Token rotation
 
 GHCR pull tokens are scoped to the basetool repo with `Packages: Read`
-only. Rotate every 90 days, or immediately on any suspicion of leak:
+only. Rotate every 90 days, or immediately on any suspicion of leak. You do not
+have to watch the calendar: `deploy.sh` publishes the recorded expiry as
+`basetool_ghcr_token_expiry_timestamp`, and the **GhcrPullTokenExpiring** alert
+warns ~2 weeks out (**GhcrPullTokenExpired** is critical). Rotate on that alert:
 
 ```bash
 # 1. Generate a new fine-grained PAT in GitHub (same scopes as before).
 
-# 2. Replace the file atomically.
-sudo install -m 0600 -o deploy -g deploy /dev/stdin /etc/iri/ghcr-pull-token.new <<< 'ghp_new_token'
+# 2. Replace the token file atomically, and update the expiry sidecar.
+sudo install -m 0600 -o deploy -g deploy /dev/stdin /etc/iri/ghcr-pull-token.new <<< 'github_pat_new_token'
 sudo mv /etc/iri/ghcr-pull-token.new /etc/iri/ghcr-pull-token
+echo '2027-01-01' | sudo install -m 0640 -o deploy -g deploy /dev/stdin /etc/iri/ghcr-pull-token.expiry
 
-# 3. Force a deploy run to verify the new token works.
+# 3. Force a deploy run to verify the new token works (and refresh the metric).
 sudo systemctl start iri-deploy.service
 journalctl -u iri-deploy.service -n 50
 
 # 4. Revoke the old token in GitHub's PAT page only AFTER step 3 succeeded.
 ```
 
+> A GitHub App installation token (auto-refreshing, no 90-day cliff) could replace
+> the PAT entirely, but a pull-only host has no clean way to run the App-token
+> exchange without adding a credential-refresh service — deferred as a larger
+> change. The expiry alert makes the PAT's cliff non-silent in the meantime.
+
 ---
 
 ## Troubleshooting
 
-|                         Symptom                          |                        Where to look                        |                                                                                                        Common cause                                                                                                        |
-|----------------------------------------------------------|-------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Timer fires but image never updates                      | `journalctl -u iri-deploy.service`                          | `:stable` not yet promoted. Run `gh workflow run promote.yml -f version=...`.                                                                                                                                              |
-| `docker login` fails                                     | `/var/log/iri-deploy.log`                                   | Expired or revoked PAT. See *Token rotation*.                                                                                                                                                                              |
-| Health check times out                                   | `docker compose ps`, `docker logs <service>`                | New version broken; the script auto-rolls back. Inspect the rolled-back container's logs for the root cause.                                                                                                               |
-| Service stays "unhealthy" after rollback                 | `docker logs db-backend` etc.                               | Infrastructure-side problem (disk full, DB corruption). Not caused by the deploy.                                                                                                                                          |
-| Keystore mount fails / Keycloak `AccessDeniedException`  | `docker compose logs keycloak`, `ls -la /var/iri/secrets`   | Keystore missing or mode too strict. It must be `0644` — the JVM services run as uid 10001 but Keycloak runs as uid 1000, so `0640` denies Keycloak. `chmod 0644 /var/iri/secrets/keystore.p12`.                           |
-| `IRI_KEYSTORE_HOST_PATH` referenced but file not present | `.env`                                                      | Sync `.env` and `/var/iri/secrets/keystore.p12` between path and contents.                                                                                                                                                 |
-| Compose pulls but does not restart                       | journald log                                                | All target digests match the last-deployed digests **and** the running stack was verified against them — that is the idempotent no-op path. Force-clear `/var/lib/iri/last-deployed.digests` if you want a forced restart. |
-| Stack comes back up on its own after a manual `down`     | journald log (`drift: <service>: no container`)             | The drift verification (REQ-OPS-013) self-heals a down/drifted stack on the next tick. For planned downtime, `systemctl stop iri-deploy.timer` first and wait for an in-flight run. See *Restarting the stack manually*.   |
-| `CARVE-OUT: postgres/Keycloak image pin changed`         | `journalctl -u iri-deploy.service`, `config-blocked.marker` | A promoted bundle bumps a Postgres/Keycloak image. Auto-apply is gated by design. Do the manual upgrade (see *Stateful-infra upgrades*), then `deploy.sh --force`.                                                         |
-| Redis pin bump on `main` never reaches prod              | `journalctl -u iri-deploy.service`                          | Not yet promoted. Cut a release and run `promote.yml` — the new compose ships as `basetool-config` and applies on the next tick. See *Infra / host-config bumps*.                                                          |
+|                         Symptom                          |                              Where to look                              |                                                                                                                                  Common cause                                                                                                                                   |
+|----------------------------------------------------------|-------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Timer fires but image never updates                      | `journalctl -u iri-deploy.service`                                      | `:stable` not yet promoted. Run `gh workflow run promote.yml -f version=...`.                                                                                                                                                                                                   |
+| `docker login` fails                                     | `/var/log/iri-deploy.log`                                               | Expired or revoked PAT. See *Token rotation*.                                                                                                                                                                                                                                   |
+| Health check times out                                   | `docker compose ps`, `docker logs <service>`                            | New version broken; the script auto-rolls back. Inspect the rolled-back container's logs for the root cause.                                                                                                                                                                    |
+| Service stays "unhealthy" after rollback                 | `docker logs db-backend` etc.                                           | Infrastructure-side problem (disk full, DB corruption). Not caused by the deploy.                                                                                                                                                                                               |
+| Keystore mount fails / Keycloak `AccessDeniedException`  | `docker compose logs keycloak`, `getfacl /var/iri/secrets/keystore.p12` | Keystore missing, or the uid-1000 ACL entry is gone. The file is `0640 root:10001` (JVM services read via the group) plus `user:1000:r--` for Keycloak. Re-add it: `sudo setfacl -m u:1000:r /var/iri/secrets/keystore.p12`. A rewrite that dropped the ACL is the usual cause. |
+| `IRI_KEYSTORE_HOST_PATH` referenced but file not present | `.env`                                                                  | Sync `.env` and `/var/iri/secrets/keystore.p12` between path and contents.                                                                                                                                                                                                      |
+| Compose pulls but does not restart                       | journald log                                                            | All target digests match the last-deployed digests **and** the running stack was verified against them — that is the idempotent no-op path. Force-clear `/var/lib/iri/last-deployed.digests` if you want a forced restart.                                                      |
+| Stack comes back up on its own after a manual `down`     | journald log (`drift: <service>: no container`)                         | The drift verification (REQ-OPS-013) self-heals a down/drifted stack on the next tick. For planned downtime, `systemctl stop iri-deploy.timer` first and wait for an in-flight run. See *Restarting the stack manually*.                                                        |
+| `CARVE-OUT: postgres/Keycloak image pin changed`         | `journalctl -u iri-deploy.service`, `config-blocked.marker`             | A promoted bundle bumps a Postgres/Keycloak image. Auto-apply is gated by design. Do the manual upgrade (see *Stateful-infra upgrades*), then `deploy.sh --force`.                                                                                                              |
+| Redis pin bump on `main` never reaches prod              | `journalctl -u iri-deploy.service`                                      | Not yet promoted. Cut a release and run `promote.yml` — the new compose ships as `basetool-config` and applies on the next tick. See *Infra / host-config bumps*.                                                                                                               |
 
 ---
 
@@ -1026,6 +1231,16 @@ A few decisions worth keeping in mind when you touch any of the pieces:
   into a compose override, and applies *that*. A `:stable` flip in GHCR mid-deploy cannot
   partially apply a half-promoted release; it would only be picked up by
   the next timer tick.
+- **Verify before apply (host-side signature gate).** Resolving `:stable` to a
+  digest is not the same as trusting it. `deploy.sh` cosign-verifies every
+  resolved digest against the `release-images` keyless signature before it pulls
+  or applies anything ([REQ-OPS-015](specs/deployment-delivery.md), [ADR-0075](adr/0075-host-side-cosign-signature-verification.md)) —
+  so a `:stable` tag moved out-of-band to an untrusted digest (a leaked
+  `packages:write` credential, not the operator running `promote.yml`) is
+  rejected on the box, not deployed. `promote.yml`'s CI verify and this host
+  verify are the two halves of one seam; the host half closes the TOCTOU between
+  "verified at promote time" and "re-resolved on the next tick". See *Signature
+  verification (cosign)*.
 - **Health gate + auto-rollback.** `docker compose up --wait
   --wait-timeout 180` exits non-zero if any service is not healthy in
   three minutes. The script holds the previous digest pin **and** a snapshot of
@@ -1043,8 +1258,9 @@ A few decisions worth keeping in mind when you touch any of the pieces:
 - **No image holds the keystore.** This is checked twice — by
   `.gitignore` (CI's checkout never has the file) and by `.dockerignore`
   (no local `docker build` accidentally bakes it in). The production
-  keystore lives only on the server, in a root-owned `0644` file
-  (world-readable so both the uid-10001 JVM services and the uid-1000
-  Keycloak image can read the shared self-signed cert; root ownership still
-  blocks the deploy user from rewriting it).
+  keystore lives only on the server, in a root-owned `0640` file with a POSIX
+  ACL granting read to the two container uids (10001 via the group, 1000 via
+  `setfacl -m u:1000:r`) — so both the JVM services and the Keycloak image read
+  the shared self-signed cert without it being world-readable; root ownership
+  still blocks the deploy user from rewriting it.
 

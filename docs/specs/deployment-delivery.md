@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-02.
-> **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md)
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-05.
+> **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md)
 
 # Deployment delivery & promotion
 
@@ -44,14 +44,28 @@ existing, already-validated digest to `:stable`. The app images, the `basetool-c
 and the `basetool-keycloak-spi` provider-JAR bundle are promoted **in lock-step**, so the compose
 file, the Keycloak provider JAR and the image versions the host applies always match each other.
 
+A promotion passes three gates before it flips `:stable`: (1) a **human-approval** gate — the
+`promote` job is bound to the `production` GitHub Environment, so a repo-configured required reviewer
+must approve the run (workflow_dispatch alone lets anyone with Actions-write reach prod); (2) the
+**signature** gate — cosign-verify the source digest against the release-images identity; and (3) the
+**vulnerability** gate — a Trivy scan of the exact digest fails the promotion on a fixable
+HIGH/CRITICAL, so a known-vulnerable image cannot reach `:stable` by accident. `release-images.yml`
+scans on build but does not block the push (an urgent build must not be starved of an image); the
+gate lives at promotion. A `skip_vuln_gate` input is the deliberate hotfix escape hatch.
+
 **Acceptance**
 
 - [ ] `release-images.yml` never writes the `:stable` tag for any artifact (backend/frontend/
   ingest/config/keycloak-spi).
 - [ ] `promote.yml` is `workflow_dispatch`-only and promotes `backend`, `frontend`, `ingest`,
   `config` and `keycloak-spi` together (`fail-fast: true`).
+- [ ] The `promote` job declares `environment: production`, so a required reviewer configured on
+  that environment gates the run before any `:stable` flip.
+- [ ] The `promote` job runs a Trivy scan (HIGH/CRITICAL, `ignore-unfixed`, `exit-code: 1`) of the
+  resolved digest for the app images before re-tagging; a fixable HIGH/CRITICAL fails the promotion
+  unless `skip_vuln_gate` is set. The `config` + `keycloak-spi` (`FROM scratch`) bundles are exempt.
 
-**Enforced by:** `.github/workflows/release-images.yml` · `.github/workflows/promote.yml` · **Runbook:** `docs/deployment.md` → *Promoting to production*
+**Enforced by:** `.github/workflows/release-images.yml` · `.github/workflows/promote.yml` (`environment`, Trivy gate) · **Runbook:** `docs/deployment.md` → *Promoting to production*
 
 ### REQ-OPS-003 — Digest pin + health gate + auto-rollback
 
@@ -226,27 +240,135 @@ off the stale local `:stable` tag against a V201-migrated database crash-looped 
 
 **Enforced by:** `scripts/deploy.sh` (`running_stack_drift`, idempotence check) · `scripts/deploy.test.sh` (self-tests, run by `.github/workflows/deploy-script.yml`) · **Runbook:** `docs/deployment.md` → *What happens on the server*, *Restarting the stack manually*
 
-### REQ-OPS-014 — Edge-proxy container runs with a hardened runtime baseline
+### REQ-OPS-014 — Every prod service runs with a hardened runtime baseline
 
-The `npm` (nginx-proxy-manager) service is the most internet-exposed container on the host and
-must run with the same runtime-hardening baseline the monitoring stack applies:
-`security_opt: no-new-privileges`, `cap_drop: [ALL]` with an explicit, minimal `cap_add`
-list, and a `pids` limit. The capability add-back set is not documented by upstream (the image
-boots as root under s6-overlay), so it is defined empirically and **must be re-verified on every
-image bump** before the bump is promoted: a clean boot (including the s6 prepare `sed` pass over
-`/data/nginx`), a passing `/usr/bin/check-health`, a working `nginx -s reload`, and a clean
-container restart. A read-only root filesystem is explicitly **out** of this baseline — the s6
-prepare step writes across the filesystem and the container refuses to boot with EROFS (the same
-constraint that keeps the two custom `.conf` bind mounts writable).
+**Every** `prod`-profile container runs with the runtime-hardening baseline, not just the edge
+proxy: `security_opt: no-new-privileges:true`, `cap_drop: [ALL]` with an explicit, minimal
+`cap_add` allow-list, and a `pids` ceiling. The intent is defence-in-depth against a
+container-escape or in-container compromise — a service that cannot escalate privileges and holds no
+capabilities it does not need is a far smaller blast radius, and it matters most on the two
+internet-reachable edges (`npm`, `ingest`).
+
+The capability add-back set is **per service**, defined by what each image's entrypoint actually
+needs:
+
+- **App services (`backend`, `frontend`, `ingest`) and `keycloak`** run as a fixed non-root uid
+  (10001 for the JVM apps, 1000 for Keycloak/Quarkus) and bind only high ports, so they need **no**
+  capabilities — `cap_drop: [ALL]` with an empty add-back.
+- **`postgres` (db-backend, db-keycloak) and `redis`** boot as root to chown their data dir and then
+  drop to their service user via gosu, so they keep exactly `CHOWN`/`DAC_OVERRIDE`/`FOWNER` +
+  `SETGID`/`SETUID`. `no-new-privileges` still holds because gosu drops via the `CAP_SETUID` syscall,
+  not a setuid binary.
+- **`npm`** keeps its empirically-verified s6-overlay set (`NET_BIND_SERVICE`, `CHOWN`, `SETUID`,
+  `SETGID`, `FOWNER`, `DAC_OVERRIDE`, `KILL`).
+
+Because the add-back set is not upstream-documented for the third-party images, it **must be
+re-verified on every image bump** of that service before the bump is promoted (a clean boot, its
+healthcheck passing, and — for `npm` — a working `nginx -s reload`). The deploy health-gate is the
+safety net: a wrong cap set fails the container at start and is rolled back rather than shipped. A
+read-only root filesystem is explicitly **out** of this baseline (the `npm` s6 prepare step and the
+JVM/DB working dirs write across the filesystem).
 
 **Acceptance**
 
-- [ ] The `npm` service in `docker-compose.yml` sets `no-new-privileges`, `cap_drop: [ALL]` plus
-  a commented `cap_add` allow-list, and a `pids` limit.
-- [ ] An `npm` image bump is only promoted after the capability set has been re-verified against
-  the new image (boot + check-health + reload + restart).
+- [ ] Every `prod`-profile service in `docker-compose.yml` (backend, frontend, ingest, keycloak,
+  redis, db-backend, db-keycloak, npm) sets `no-new-privileges:true`, `cap_drop: [ALL]` with an
+  explicit (possibly empty) `cap_add`, and a `pids` ceiling.
+- [ ] `backend`/`frontend`/`ingest`/`keycloak` carry no `cap_add`; `postgres`/`redis` carry only the
+  chown + privilege-drop set; `npm` carries only its verified s6 set.
+- [ ] An image bump for any of these services is only promoted after its capability set has been
+  re-verified against the new image (boot + healthcheck [+ `nginx -s reload` for npm]).
 
-**Enforced by:** `docker-compose.yml` (`npm` service) · verification recipe in the service comment
+**Enforced by:** `docker-compose.yml` (all `prod` services) · verification recipe in the service comments
+
+### REQ-OPS-015 — Host-side signature verification before apply
+
+The production host **cryptographically verifies** every artifact it is about to run. Before
+`deploy.sh` pulls, extracts or applies any resolved digest — the three app images and, when
+present, the `basetool-config` and `basetool-keycloak-spi` bundles — it `cosign verify`s that
+`image@digest` against the **release-images** workflow's keyless (Fulcio/OIDC) signature. This is
+the **host half** of the supply-chain seam; `promote.yml`'s pre-flight verify (REQ-OPS-002) is the
+CI half. Neither alone is sufficient: `promote.yml` verifies at promotion time in CI, but the host
+re-resolves `:stable` independently on every tick, so a `:stable` tag moved out-of-band — a leaked
+`packages:write` credential retagging an arbitrary digest, or a registry-side tag manipulation —
+would otherwise be pulled and run **unverified** (and the deploy user is in the `docker` group, i.e.
+root-equivalent). The host gate closes that TOCTOU: the tag verified at promote time is no longer
+assumed to be the artifact the host pulls later.
+
+The trusted signer identity is pinned to `…/release-images.yml@refs/(heads/main|tags/v.+)` — a
+main-branch or tagged build only, never a `workflow_dispatch` build off an arbitrary branch — and
+the **same** identity is used by `promote.yml` and by `deploy.sh` so the two halves cannot diverge.
+The gate is **fail-closed**: a host without `cosign` (with verification enabled) aborts the tick
+rather than falling back to trusting an unverified image. A single break-glass override
+(`IRI_COSIGN_VERIFY=false`) exists **only** to ride out a Sigstore public-good outage that is
+blocking every deploy; it is logged loudly on every skipped verification.
+
+**Version compatibility.** cosign is not backward-compatible across majors: cosign 3.x verifies
+both 2.x and 3.x keyless signatures, but cosign 2.x **cannot** verify 3.x signatures. The CI signs
+with the cosign that `sigstore/cosign-installer` pins (currently 3.0.6 via `@v4.1.2`), so the host
+cosign must be **≥ that version and never a lower major** — otherwise the fail-closed gate blocks
+every deploy. The host tracks the current 3.x release (3.1.1); when the CI installer pin is bumped,
+the host is kept ≥ it.
+
+**Acceptance**
+
+- [ ] `deploy.sh` runs `cosign verify` (identity `…/release-images.yml@refs/(heads/main|tags/v.+)`,
+  issuer `token.actions.githubusercontent.com`) against every resolved `image@digest` — backend,
+  frontend, ingest, and the config + keycloak-spi bundles when resolved — **before** the first
+  `pull`/`docker create`/`docker cp`/`up`, and aborts the tick non-zero on any verification failure.
+- [ ] A `:stable` digest that is unsigned or signed by any other identity is never pulled, extracted
+  onto the host, or applied; the failure records a deploy-failure metric (surfacing `DeployFailed`).
+- [ ] Verification does not run on the steady-state idempotence no-op tick (on the apply path it
+  runs only once the tick is committed to applying, past the no-op and the bad-digest backoff).
+- [ ] `deploy.sh --check-only` verifies every resolved digest as a dry-run signature preflight —
+  reporting per artifact and exiting non-zero on failure — **without** writing a deploy metric or
+  applying anything (so it does not trip `DeployFailed`); it runs even over a converged no-op stack.
+- [ ] `cosign` missing on the host with `IRI_COSIGN_VERIFY=true` fails the pre-flight; the sole
+  documented override is `IRI_COSIGN_VERIFY=false` for a Sigstore outage.
+- [ ] `promote.yml` verifies against the identical `@refs/(heads/main|tags/v.+)` identity regexp.
+- [ ] The host `cosign` is a major **≥** the cosign the CI signs with (`cosign-installer` pin, 3.x);
+  a host on cosign 2.x cannot verify the 3.x signatures and is a mis-bootstrap, not a supported mode.
+
+**Enforced by:** `scripts/deploy.sh` (`verify_signature`, `verify_digest_or_die`, cosign pre-flight)
+· `scripts/deploy.test.sh` (signature-gate self-tests) · `.github/workflows/promote.yml` (pinned
+identity) · **Runbook:** `docs/deployment.md` → *Signature verification (cosign)* · **Decision:** ADR-0075
+
+### REQ-OPS-016 — Deploy host runtime hardening
+
+The deploy path is hardened at the host layer, beyond running as an unprivileged user:
+
+- **Systemd sandbox.** `iri-deploy.service` confines the `deploy.sh` process with a defence-in-depth
+  baseline: `NoNewPrivileges`, `ProtectSystem=strict`, `ProtectHome`, `PrivateTmp`, `PrivateDevices`,
+  `ProtectKernelTunables`/`Modules`/`Logs`, `ProtectControlGroups`, `ProtectClock`, `ProtectHostname`,
+  `ProtectProc=invisible`, `RestrictNamespaces`, `RestrictRealtime`, `RestrictSUIDSGID`, `RemoveIPC`,
+  `LockPersonality`, an **empty** `CapabilityBoundingSet`, `RestrictAddressFamilies` limited to
+  AF_UNIX/AF_INET/AF_INET6/AF_NETLINK, `SystemCallArchitectures=native`, and a
+  `SystemCallFilter=@system-service` seccomp allow-list. `ReadWritePaths` is the **narrow** set the
+  script actually writes (`/var/lib/iri /var/log /var/lock /var/iri/code /var/iri/monitoring`) — NOT
+  the whole `/var/iri`, whose DB/redis/npm bind mounts are written by the containers via the root
+  daemon, out-of-band from this sandbox. It is understood that docker-group membership remains
+  root-equivalent (a socket-proxy / rootless-Docker reduction is deferred, documented in the runbook).
+- **Keystore not world-readable.** The shared `keystore.p12` is delivered `0640 root:10001` with a
+  POSIX ACL granting read to uid 1000 (`setfacl -m u:1000:r`) — so both container uids read it (10001
+  via group, 1000 via ACL) without the private-key material being readable by `other`. The previous
+  `0644` made it readable by every account on the host.
+- **Token expiry is monitored.** `deploy.sh` emits `basetool_ghcr_token_expiry_timestamp` from an
+  operator-recorded `${TOKEN_FILE}.expiry` on every tick (incl. the no-op); `GhcrPullTokenExpiring`
+  (warning, <14 d or absent) and `GhcrPullTokenExpired` (critical) alert before/at the lapse of the
+  90-day PAT, whose expiry silently stops all deploys.
+
+**Acceptance**
+
+- [ ] `iri-deploy.service` sets the sandbox baseline above, an empty `CapabilityBoundingSet`, a
+  seccomp `SystemCallFilter`, and a `ReadWritePaths` that excludes the DB/redis/npm bind mounts.
+- [ ] The keystore is `0640` with a `user:1000:r` ACL, not world-readable `0644`; the runbook +
+  restore procedure re-apply the ACL.
+- [ ] `deploy.sh` writes `basetool_ghcr_token_expiry_timestamp` when `${TOKEN_FILE}.expiry` exists,
+  and `ops-automation.yml` alerts on <14 d / absent / expired.
+
+**Enforced by:** `scripts/iri-deploy.service` (sandbox) · `scripts/deploy.sh` (`write_token_expiry_metric`,
+`HOME` for the cosign cache) · `monitoring/prometheus/alerts/ops-automation.yml` (token alerts) ·
+**Runbook:** `docs/deployment.md` → *5.2 PKCS12 keystore*, *Docker access hardening*, *Token rotation*
 
 ## Out of scope
 
