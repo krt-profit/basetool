@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.form.RefineryGoodForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.RefineryOrderForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -117,7 +118,7 @@ class RefineryOrderCreateImportRenderTest {
             0L);
     PageResponse<MaterialDto> materials =
         new PageResponse<>(List.of(raw, suggested), 0, 1000, 2, 1, Collections.emptyList());
-    when(backendApiClient.getCached(eq("/api/v1/materials?size=1000"), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS), anyTypeRef(), eq(true)))
         .thenReturn(materials);
   }
 

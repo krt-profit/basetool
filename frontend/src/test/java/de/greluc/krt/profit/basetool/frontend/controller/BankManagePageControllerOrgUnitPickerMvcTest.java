@@ -31,6 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.util.List;
 import java.util.UUID;
 import org.hamcrest.Matchers;
@@ -85,7 +86,8 @@ class BankManagePageControllerOrgUnitPickerMvcTest {
     // The accounts / holders / users fetches may return null; the controller defaults them to empty
     // lists. Only the org-unit catalog needs a concrete option to assert the picker label.
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
-    when(backendApiClient.getCached(eq(ACTIVE_URI), anyTypeRef())).thenReturn(List.of(staffel));
+    when(backendApiClient.getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef()))
+        .thenReturn(List.of(staffel));
 
     mockMvc
         .perform(get("/bank/manage"))

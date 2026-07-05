@@ -36,6 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitNodeDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -177,7 +178,7 @@ class AdminOrgStructurePageControllerMvcTest {
                 .content("{\"name\":\"Profit\",\"shorthand\":\"PRF\"}"))
         .andExpect(status().isOk());
 
-    verify(backendApiClient).clearStaticDataCache();
+    verify(backendApiClient).evict(CacheDomain.ORG_UNIT);
   }
 
   @Test
@@ -195,7 +196,7 @@ class AdminOrgStructurePageControllerMvcTest {
                 .content("{\"name\":\"Kartellleitung\",\"shorthand\":\"OL\"}"))
         .andExpect(status().isOk());
 
-    verify(backendApiClient).clearStaticDataCache();
+    verify(backendApiClient).evict(CacheDomain.ORG_UNIT);
   }
 
   @Test
@@ -214,6 +215,6 @@ class AdminOrgStructurePageControllerMvcTest {
                     "{\"parentOrgUnitId\":\"00000000-0000-0000-0000-000000000003\",\"version\":0}"))
         .andExpect(status().isOk());
 
-    verify(backendApiClient).clearStaticDataCache();
+    verify(backendApiClient).evict(CacheDomain.ORG_UNIT);
   }
 }

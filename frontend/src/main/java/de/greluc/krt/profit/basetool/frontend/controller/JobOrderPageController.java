@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.JobOrderHandoverForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemHandoverForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
@@ -319,7 +320,7 @@ public class JobOrderPageController {
       try {
         SystemSettingDto yellowSetting =
             backendApiClient.getCached(
-                "/api/v1/settings/job_order.age_yellow_days", SystemSettingDto.class);
+                CachedCatalog.SETTING_JOB_ORDER_AGE_YELLOW, SystemSettingDto.class);
         yellowDays = Integer.parseInt(yellowSetting.value());
       } catch (Exception e) {
         log.warn("Could not fetch yellow days setting, using default");
@@ -327,7 +328,7 @@ public class JobOrderPageController {
       try {
         SystemSettingDto redSetting =
             backendApiClient.getCached(
-                "/api/v1/settings/job_order.age_red_days", SystemSettingDto.class);
+                CachedCatalog.SETTING_JOB_ORDER_AGE_RED, SystemSettingDto.class);
         redDays = Integer.parseInt(redSetting.value());
       } catch (Exception e) {
         log.warn("Could not fetch red days setting, using default");
@@ -460,7 +461,7 @@ public class JobOrderPageController {
       try {
         SystemSettingDto yellowSetting =
             backendApiClient.getCached(
-                "/api/v1/settings/job_order.age_yellow_days", SystemSettingDto.class);
+                CachedCatalog.SETTING_JOB_ORDER_AGE_YELLOW, SystemSettingDto.class);
         yellowDays = Integer.parseInt(yellowSetting.value());
       } catch (Exception e) {
         log.warn("Could not fetch yellow days setting, using default");
@@ -468,7 +469,7 @@ public class JobOrderPageController {
       try {
         SystemSettingDto redSetting =
             backendApiClient.getCached(
-                "/api/v1/settings/job_order.age_red_days", SystemSettingDto.class);
+                CachedCatalog.SETTING_JOB_ORDER_AGE_RED, SystemSettingDto.class);
         redDays = Integer.parseInt(redSetting.value());
       } catch (Exception e) {
         log.warn("Could not fetch red days setting, using default");
@@ -827,7 +828,7 @@ public class JobOrderPageController {
   private List<MaterialDto> fetchMaterials() {
     try {
       List<MaterialDto> list =
-          backendApiClient.getCached("/api/v1/materials/job-order", LIST_OF_MATERIAL, true);
+          backendApiClient.getCached(CachedCatalog.MATERIALS_JOB_ORDER, LIST_OF_MATERIAL, true);
       if (list != null) {
         return new ArrayList<>(list);
       }
@@ -851,10 +852,7 @@ public class JobOrderPageController {
   private boolean hasOrderableItems() {
     try {
       PageResponse<GameItemReferenceDto> page =
-          backendApiClient.getCached(
-              "/api/v1/orders/item-catalog?size=1&sort=name,asc",
-              PAGE_OF_GAME_ITEM_REFERENCE,
-              true);
+          backendApiClient.getCached(CachedCatalog.ITEM_CATALOG, PAGE_OF_GAME_ITEM_REFERENCE, true);
       return page == null || page.content() == null || !page.content().isEmpty();
     } catch (Exception e) {
       log.error("Failed to probe orderable items", e);
@@ -915,8 +913,7 @@ public class JobOrderPageController {
   private List<SquadronDto> fetchSquadrons() {
     try {
       PageResponse<SquadronDto> p =
-          backendApiClient.getCached(
-              "/api/v1/squadrons?size=1000&sort=name,asc", PAGE_OF_SQUADRON, true);
+          backendApiClient.getCached(CachedCatalog.SQUADRONS, PAGE_OF_SQUADRON, true);
       if (p != null && p.content() != null) {
         return new ArrayList<>(p.content());
       }
@@ -943,7 +940,7 @@ public class JobOrderPageController {
     try {
       List<OrgUnitMembershipOptionDto> options =
           backendApiClient.getCached(
-              "/api/v1/org-units/active", LIST_OF_ORG_UNIT_MEMBERSHIP_OPTION, true);
+              CachedCatalog.ORG_UNITS_ACTIVE, LIST_OF_ORG_UNIT_MEMBERSHIP_OPTION, true);
       return options != null ? options : List.of();
     } catch (Exception e) {
       log.warn("Failed to fetch active org units for Job Order owner-picker", e);
@@ -971,7 +968,7 @@ public class JobOrderPageController {
     try {
       List<OrgUnitMembershipOptionDto> options =
           backendApiClient.getCached(
-              "/api/v1/org-units/active-all-kinds", LIST_OF_ORG_UNIT_MEMBERSHIP_OPTION);
+              CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS, LIST_OF_ORG_UNIT_MEMBERSHIP_OPTION);
       return options != null ? options : fetchActiveOrgUnitOptions();
     } catch (Exception e) {
       log.warn(

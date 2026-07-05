@@ -38,6 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -228,7 +229,7 @@ class AdminSpecialCommandsPageControllerMvcTest {
                 .param("version", "0"))
         .andExpect(status().is3xxRedirection());
 
-    verify(backendApiClient).clearStaticDataCache();
+    verify(backendApiClient).evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
   }
 
   @Test
@@ -248,7 +249,7 @@ class AdminSpecialCommandsPageControllerMvcTest {
                 .param("version", "0"))
         .andExpect(status().isOk());
 
-    verify(backendApiClient).clearStaticDataCache();
+    verify(backendApiClient).evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
   }
 
   @Test
@@ -269,7 +270,7 @@ class AdminSpecialCommandsPageControllerMvcTest {
                 .param("version", "0"))
         .andExpect(status().isOk());
 
-    verify(backendApiClient).clearStaticDataCache();
+    verify(backendApiClient).evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
   }
 
   @Test
@@ -285,7 +286,7 @@ class AdminSpecialCommandsPageControllerMvcTest {
                 .with(csrf()))
         .andExpect(status().isOk());
 
-    verify(backendApiClient).clearStaticDataCache();
+    verify(backendApiClient).evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
   }
 
   @Test
@@ -301,7 +302,7 @@ class AdminSpecialCommandsPageControllerMvcTest {
                 .with(csrf()))
         .andExpect(status().isOk());
 
-    verify(backendApiClient).clearStaticDataCache();
+    verify(backendApiClient).evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
   }
 
   // REQ-DATA-007 — a member-roster mutation does NOT change the SK catalogue's
@@ -322,6 +323,6 @@ class AdminSpecialCommandsPageControllerMvcTest {
                 .param("version", "0"))
         .andExpect(status().isOk());
 
-    verify(backendApiClient, never()).clearStaticDataCache();
+    verify(backendApiClient, never()).evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
   }
 }

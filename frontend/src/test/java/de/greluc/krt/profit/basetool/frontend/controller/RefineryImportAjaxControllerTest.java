@@ -47,6 +47,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Collections;
@@ -102,7 +103,7 @@ class RefineryImportAjaxControllerTest {
             2,
             1,
             Collections.emptyList());
-    when(backendApiClient.getCached(eq("/api/v1/materials?size=1000"), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS), anyTypeRef(), eq(true)))
         .thenReturn(materials);
   }
 

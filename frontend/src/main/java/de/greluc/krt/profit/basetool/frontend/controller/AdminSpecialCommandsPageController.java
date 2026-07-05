@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.MembershipFlagsForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.SpecialCommandForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.validation.Valid;
 import java.time.Instant;
@@ -727,7 +728,7 @@ public class AdminSpecialCommandsPageController {
    * not touch the catalogue fields, so they deliberately do not evict.
    */
   private void evictOrgUnitCatalogueCache() {
-    backendApiClient.clearStaticDataCache();
+    backendApiClient.evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
   }
 
   // ---------- helper fetchers for the detail page ---------------------------------

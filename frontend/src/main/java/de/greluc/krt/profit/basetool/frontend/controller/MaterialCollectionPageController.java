@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialCollectionEntryD
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -116,7 +117,7 @@ public class MaterialCollectionPageController {
 
     try {
       locations =
-          backendApiClient.getCached("/api/v1/locations/lookup", LOCATION_REFERENCE_LIST_TYPE);
+          backendApiClient.getCached(CachedCatalog.LOCATIONS_LOOKUP, LOCATION_REFERENCE_LIST_TYPE);
     } catch (BackendServiceException e) {
       log.warn("Could not load locations: {}", e.getMessage());
     }

@@ -46,6 +46,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
@@ -121,7 +122,7 @@ class MissionPageControllerMvcTest {
 
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
         .thenReturn(mission);
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
     // OFFICER is a member, so the member-only finance ledger fetch now runs (REQ-SEC-013); stub it
     // empty so the page renders without exercising the entry-row template here.
@@ -155,7 +156,7 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
         .thenReturn(minimalMission(missionId));
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
     stubEmptyFinance(missionId);
 
@@ -177,7 +178,7 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), eq(true)))
         .thenReturn(minimalMission(missionId));
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), eq(true)))
         .thenReturn(Collections.emptyList());
 
     mockMvc.perform(get("/missions/" + missionId)).andExpect(status().isOk());
@@ -203,7 +204,7 @@ class MissionPageControllerMvcTest {
 
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
         .thenReturn(missionWithSteps(missionId, java.util.List.of(step1, step2)));
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
     stubEmptyFinance(missionId);
 
@@ -241,7 +242,7 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
         .thenReturn(minimalMission(missionId, "**Briefing** folgt."));
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
     stubEmptyFinance(missionId);
 
@@ -467,7 +468,7 @@ class MissionPageControllerMvcTest {
             null);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
         .thenReturn(mission);
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -542,7 +543,7 @@ class MissionPageControllerMvcTest {
             null);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
         .thenReturn(mission);
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -655,7 +656,7 @@ class MissionPageControllerMvcTest {
             null);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
         .thenReturn(mission);
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -768,7 +769,7 @@ class MissionPageControllerMvcTest {
             null);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
         .thenReturn(mission);
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -839,7 +840,7 @@ class MissionPageControllerMvcTest {
             null);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), eq(true)))
         .thenReturn(mission);
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), eq(true)))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -1721,9 +1722,9 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), eq(false)))
         .thenReturn(mission);
     when(backendApiClient.getCached(
-            anyString(), anyTypeRef(), org.mockito.ArgumentMatchers.anyBoolean()))
+            any(CachedCatalog.class), anyTypeRef(), org.mockito.ArgumentMatchers.anyBoolean()))
         .thenReturn(emptyPage);
-    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(emptyPage);
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyTypeRef(), eq(false))).thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyClass(), eq(false))).thenReturn(null);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), eq(false)))
@@ -1842,9 +1843,9 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), eq(false)))
         .thenReturn(mission);
     when(backendApiClient.getCached(
-            anyString(), anyTypeRef(), org.mockito.ArgumentMatchers.anyBoolean()))
+            any(CachedCatalog.class), anyTypeRef(), org.mockito.ArgumentMatchers.anyBoolean()))
         .thenReturn(emptyPage2);
-    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(emptyPage2);
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage2);
     when(backendApiClient.get(anyString(), anyTypeRef(), eq(false))).thenReturn(emptyPage2);
     when(backendApiClient.get(anyString(), anyClass(), eq(false))).thenReturn(null);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), eq(false)))
@@ -2041,9 +2042,9 @@ class MissionPageControllerMvcTest {
         new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
             Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList());
     when(backendApiClient.getCached(
-            anyString(), anyTypeRef(), org.mockito.ArgumentMatchers.anyBoolean()))
+            any(CachedCatalog.class), anyTypeRef(), org.mockito.ArgumentMatchers.anyBoolean()))
         .thenReturn(emptyPage);
-    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(emptyPage);
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyTypeRef(), eq(false))).thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyClass(), eq(false))).thenReturn(null);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), eq(false)))
@@ -2211,9 +2212,9 @@ class MissionPageControllerMvcTest {
         new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
             Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList());
     when(backendApiClient.getCached(
-            anyString(), anyTypeRef(), org.mockito.ArgumentMatchers.anyBoolean()))
+            any(CachedCatalog.class), anyTypeRef(), org.mockito.ArgumentMatchers.anyBoolean()))
         .thenReturn(emptyPage);
-    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(emptyPage);
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyTypeRef(), eq(false))).thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyClass(), eq(false))).thenReturn(null);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), eq(false)))
@@ -2350,16 +2351,14 @@ class MissionPageControllerMvcTest {
                 Collections.emptyList());
 
     when(backendApiClient.getCached(
-            anyString(), anyTypeRef(), org.mockito.ArgumentMatchers.anyBoolean()))
+            any(CachedCatalog.class), anyTypeRef(), org.mockito.ArgumentMatchers.anyBoolean()))
         .thenReturn(emptyPage);
-    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(emptyPage);
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyTypeRef(), eq(false))).thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyClass(), eq(false))).thenReturn(null);
     // The active frequency types feed the central rows; specific stub AFTER the generic getCached.
     when(backendApiClient.getCached(
-            eq("/api/v1/frequency-types?size=1000&active=true&sort=sortIndex,asc"),
-            anyTypeRef(),
-            eq(true)))
+            eq(CachedCatalog.FREQUENCY_TYPES_ACTIVE), anyTypeRef(), eq(true)))
         .thenReturn(freqTypesPage);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), eq(false)))
         .thenReturn(mission);
@@ -2462,16 +2461,14 @@ class MissionPageControllerMvcTest {
         new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
             Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList());
     when(backendApiClient.getCached(
-            anyString(), anyTypeRef(), org.mockito.ArgumentMatchers.anyBoolean()))
+            any(CachedCatalog.class), anyTypeRef(), org.mockito.ArgumentMatchers.anyBoolean()))
         .thenReturn(emptyPage);
-    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(emptyPage);
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyTypeRef(), eq(false))).thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyClass(), eq(false))).thenReturn(null);
     // The frequency-types fetch fails -> the controller swallows it and never sets frequencyTypes.
     when(backendApiClient.getCached(
-            eq("/api/v1/frequency-types?size=1000&active=true&sort=sortIndex,asc"),
-            anyTypeRef(),
-            eq(true)))
+            eq(CachedCatalog.FREQUENCY_TYPES_ACTIVE), anyTypeRef(), eq(true)))
         .thenThrow(new RuntimeException("frequency types unavailable"));
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), eq(false)))
         .thenReturn(mission);
@@ -2584,9 +2581,9 @@ class MissionPageControllerMvcTest {
             Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList());
     // Broad stubs first so unrelated detail-page fetches never NPE; specific overrides win below.
     when(backendApiClient.getCached(
-            anyString(), anyTypeRef(), org.mockito.ArgumentMatchers.anyBoolean()))
+            any(CachedCatalog.class), anyTypeRef(), org.mockito.ArgumentMatchers.anyBoolean()))
         .thenReturn(emptyPage);
-    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(emptyPage);
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyTypeRef(), eq(false))).thenReturn(emptyPage);
     when(backendApiClient.get(anyString(), anyClass(), eq(false))).thenReturn(null);
     // An authenticated OIDC principal fetches the mission with the public flag = false.
@@ -2706,7 +2703,7 @@ class MissionPageControllerMvcTest {
 
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), eq(true)))
         .thenReturn(mission);
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), eq(true)))
         .thenReturn(Collections.emptyList());
     // The chip-select options are rendered from the CREW job-type lookup; without this stub the
     // generic emptyList answer above throws on .content() and the options list stays empty.
@@ -2719,8 +2716,7 @@ class MissionPageControllerMvcTest {
                 1,
                 1,
                 Collections.emptyList());
-    when(backendApiClient.getCached(
-            eq("/api/v1/job-types?archetype=CREW&size=1000"), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(eq(CachedCatalog.JOB_TYPES_CREW), anyTypeRef(), eq(true)))
         .thenReturn(crewJobTypesPage);
 
     mockMvc
@@ -2795,7 +2791,7 @@ class MissionPageControllerMvcTest {
 
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
         .thenReturn(mission);
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -2856,7 +2852,7 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
         .thenReturn(editableMission(missionId));
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -2875,7 +2871,7 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
         .thenReturn(editableMission(missionId));
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -2893,7 +2889,7 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
         .thenReturn(editableMission(missionId));
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
 
     mockMvc

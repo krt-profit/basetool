@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.Map;
 import java.util.UUID;
@@ -67,7 +68,7 @@ public class SpecialCommandAdminProxyController {
     // isProfitEligible is carried on the cached org-units owner-picker options and the admin
     // switcher's SK catalogue, so the toggle must evict STATIC_DATA_CACHE to keep them truthful
     // (REQ-DATA-007 — same eviction gate as SquadronAdminProxyController).
-    backendApiClient.clearStaticDataCache();
+    backendApiClient.evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
     return ResponseEntity.noContent().build();
   }
 }

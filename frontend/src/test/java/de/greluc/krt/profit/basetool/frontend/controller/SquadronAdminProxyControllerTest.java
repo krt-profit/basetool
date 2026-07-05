@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -66,7 +67,7 @@ class SquadronAdminProxyControllerTest {
     inOrder
         .verify(backendApiClient)
         .patch(eq("/api/v1/squadrons/" + id + "/promotion-enabled"), eq(body), eq(Void.class));
-    inOrder.verify(backendApiClient).clearStaticDataCache();
+    inOrder.verify(backendApiClient).evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
     inOrder.verifyNoMoreInteractions();
   }
 
@@ -85,7 +86,7 @@ class SquadronAdminProxyControllerTest {
     inOrder
         .verify(backendApiClient)
         .patch(eq("/api/v1/squadrons/" + id + "/profit-eligible"), eq(body), eq(Void.class));
-    inOrder.verify(backendApiClient).clearStaticDataCache();
+    inOrder.verify(backendApiClient).evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
     inOrder.verifyNoMoreInteractions();
   }
 }

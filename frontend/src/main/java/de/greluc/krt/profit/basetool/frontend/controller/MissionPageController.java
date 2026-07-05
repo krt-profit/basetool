@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.MissionForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ParticipantForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.UnitForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import java.util.List;
@@ -586,7 +587,7 @@ public class MissionPageController {
       try {
         PageResponse<Map<String, Object>> jobTypesPage =
             backendApiClient.getCached(
-                "/api/v1/job-types?archetype=MISSION&size=1000", STRING_OBJECT_MAP_PAGE, true);
+                CachedCatalog.JOB_TYPES_MISSION, STRING_OBJECT_MAP_PAGE, true);
         model.addAttribute("jobTypes", jobTypesPage.content());
       } catch (Exception e) {
         // Ignore if job types fail
@@ -595,8 +596,7 @@ public class MissionPageController {
       // Fetch Crew JobTypes
       try {
         PageResponse<Map<String, Object>> crewJobTypesPage =
-            backendApiClient.getCached(
-                "/api/v1/job-types?archetype=CREW&size=1000", STRING_OBJECT_MAP_PAGE, true);
+            backendApiClient.getCached(CachedCatalog.JOB_TYPES_CREW, STRING_OBJECT_MAP_PAGE, true);
         model.addAttribute("crewJobTypes", crewJobTypesPage.content());
       } catch (Exception e) {
         // Ignore
@@ -605,7 +605,8 @@ public class MissionPageController {
       // Fetch Squadrons
       try {
         PageResponse<Map<String, Object>> squadronsPage =
-            backendApiClient.getCached("/api/v1/squadrons?size=1000", STRING_OBJECT_MAP_PAGE, true);
+            backendApiClient.getCached(
+                CachedCatalog.SQUADRONS_UNSORTED, STRING_OBJECT_MAP_PAGE, true);
         model.addAttribute("squadrons", squadronsPage.content());
       } catch (Exception e) {
         // Ignore
@@ -619,7 +620,7 @@ public class MissionPageController {
         try {
           List<OrgUnitMembershipOptionDto> orgUnits =
               backendApiClient.getCached(
-                  "/api/v1/org-units/active", ORG_UNIT_MEMBERSHIP_OPTION_LIST);
+                  CachedCatalog.ORG_UNITS_ACTIVE, ORG_UNIT_MEMBERSHIP_OPTION_LIST);
           model.addAttribute("orgUnits", orgUnits != null ? orgUnits : List.of());
         } catch (Exception e) {
           model.addAttribute("orgUnits", List.of());
@@ -632,9 +633,7 @@ public class MissionPageController {
       try {
         PageResponse<Map<String, Object>> freqTypesPage =
             backendApiClient.getCached(
-                "/api/v1/frequency-types?size=1000&active=true&sort=sortIndex,asc",
-                STRING_OBJECT_MAP_PAGE,
-                true);
+                CachedCatalog.FREQUENCY_TYPES_ACTIVE, STRING_OBJECT_MAP_PAGE, true);
         model.addAttribute("frequencyTypes", freqTypesPage.content());
       } catch (Exception e) {
         // Ignore
@@ -660,7 +659,7 @@ public class MissionPageController {
 
         try {
           PageResponse<ShipTypeDto> allShipTypesPage =
-              backendApiClient.getCached("/api/v1/ship-types?size=1000", SHIP_TYPE_PAGE);
+              backendApiClient.getCached(CachedCatalog.SHIP_TYPES, SHIP_TYPE_PAGE);
           model.addAttribute("allShipTypes", allShipTypesPage.content());
         } catch (Exception e) {
           // Ignore, e.g. if user has no HANGAR_READ or other issue

@@ -70,7 +70,12 @@ class BackendApiClientResilienceTest {
     webClient = mock(WebClient.class);
     publicWebClient = mock(WebClient.class);
     meterRegistry = new SimpleMeterRegistry();
-    client = new BackendApiClient(webClient, publicWebClient, meterRegistry);
+    client =
+        new BackendApiClient(
+            webClient,
+            publicWebClient,
+            meterRegistry,
+            new org.springframework.cache.support.NoOpCacheManager());
   }
 
   // ---------------------------------------------------------------

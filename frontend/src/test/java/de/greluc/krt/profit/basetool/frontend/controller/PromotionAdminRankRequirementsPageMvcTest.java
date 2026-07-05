@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionTopicDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RankRequirementDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -121,7 +122,7 @@ class PromotionAdminRankRequirementsPageMvcTest {
         .thenReturn(squadronPage);
     // availableSquadrons() reads the catalogue through the STATIC_DATA_CACHE (getCached) now
     // (REQ-DATA-007); stub that path too or the officer's promotion-feature flag resolves empty.
-    when(backendApiClient.getCached(contains("/api/v1/squadrons"), anyTypeRef()))
+    when(backendApiClient.getCached(eq(CachedCatalog.SQUADRONS), anyTypeRef()))
         .thenReturn(squadronPage);
     when(backendApiClient.get(
             eq("/api/v1/me/active-org-unit"),

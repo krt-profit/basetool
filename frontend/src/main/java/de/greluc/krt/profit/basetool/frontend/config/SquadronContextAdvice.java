@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -224,7 +225,7 @@ public class SquadronContextAdvice {
       // squadron mutations) so this advice does not re-fetch it on every authenticated render and
       // shares the cached entry with the admin switcher's identical call below (REQ-DATA-007).
       PageResponse<SquadronDto> page =
-          backendApiClient.getCached("/api/v1/squadrons?size=1000&sort=name,asc", SQUADRON_PAGE);
+          backendApiClient.getCached(CachedCatalog.SQUADRONS, SQUADRON_PAGE);
       return page != null && page.content() != null ? page.content() : List.of();
     } catch (Exception ex) {
       log.debug("Failed to load squadron list for sidebar dropdown", ex);
@@ -278,7 +279,7 @@ public class SquadronContextAdvice {
       // Cached global catalogue — same URI (and therefore same STATIC_DATA_CACHE entry) as
       // availableSquadrons() above, so the admin render no longer double-fetches the squadron list.
       PageResponse<SquadronDto> squadrons =
-          backendApiClient.getCached("/api/v1/squadrons?size=1000&sort=name,asc", SQUADRON_PAGE);
+          backendApiClient.getCached(CachedCatalog.SQUADRONS, SQUADRON_PAGE);
       if (squadrons != null && squadrons.content() != null) {
         for (SquadronDto s : squadrons.content()) {
           combined.add(
@@ -298,8 +299,7 @@ public class SquadronContextAdvice {
       // every
       // admin render.
       PageResponse<SquadronDto> specialCommands =
-          backendApiClient.getCached(
-              "/api/v1/special-commands?size=1000&sort=name,asc", SQUADRON_PAGE);
+          backendApiClient.getCached(CachedCatalog.SPECIAL_COMMANDS, SQUADRON_PAGE);
       if (specialCommands != null && specialCommands.content() != null) {
         for (SquadronDto sk : specialCommands.content()) {
           combined.add(

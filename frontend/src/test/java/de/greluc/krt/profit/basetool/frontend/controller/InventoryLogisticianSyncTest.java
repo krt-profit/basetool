@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -33,6 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
@@ -99,7 +101,8 @@ class InventoryLogisticianSyncTest {
             false);
     when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(userDto);
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
-    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
 
     Map<String, Object> claims = new HashMap<>();
     claims.put(IdTokenClaimNames.SUB, "test-sub");
@@ -143,7 +146,8 @@ class InventoryLogisticianSyncTest {
             false);
     when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(userDto);
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
-    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
 
     Map<String, Object> claims = new HashMap<>();
     claims.put(IdTokenClaimNames.SUB, "test-sub");
@@ -187,7 +191,8 @@ class InventoryLogisticianSyncTest {
             false);
     when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(userDto);
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
-    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
 
     Map<String, Object> claims = new HashMap<>();
     claims.put(IdTokenClaimNames.SUB, "test-sub");

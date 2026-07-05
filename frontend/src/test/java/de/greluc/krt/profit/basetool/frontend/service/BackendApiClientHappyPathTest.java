@@ -68,7 +68,12 @@ class BackendApiClientHappyPathTest {
             .baseUrl(server.url("/").toString())
             .defaultHeader("X-Auth", "public")
             .build();
-    client = new BackendApiClient(webClient, publicWebClient, new SimpleMeterRegistry());
+    client =
+        new BackendApiClient(
+            webClient,
+            publicWebClient,
+            new SimpleMeterRegistry(),
+            new org.springframework.cache.support.NoOpCacheManager());
   }
 
   @AfterEach
@@ -169,7 +174,7 @@ class BackendApiClientHappyPathTest {
   void getCached_withClassResponseType_parsesBody() {
     server.enqueue(jsonOk("cached"));
 
-    String result = client.getCached("/api/v1/cached", String.class);
+    String result = client.getCached(CachedCatalog.SQUADRONS, String.class);
 
     assertEquals("cached", result);
   }
@@ -178,7 +183,7 @@ class BackendApiClientHappyPathTest {
   void getCached_withClassResponseType_andIsPublicTrue_usesPublicClient() throws Exception {
     server.enqueue(jsonOk("ok"));
 
-    client.getCached("/api/v1/cached", String.class, true);
+    client.getCached(CachedCatalog.SQUADRONS, String.class, true);
 
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertEquals("public", req.getHeader("X-Auth"));
@@ -189,7 +194,7 @@ class BackendApiClientHappyPathTest {
     server.enqueue(jsonOk("[1,2,3]"));
 
     List<Integer> result =
-        client.getCached("/api/v1/cached-list", new ParameterizedTypeReference<>() {});
+        client.getCached(CachedCatalog.SQUADRONS, new ParameterizedTypeReference<>() {});
 
     assertEquals(List.of(1, 2, 3), result);
   }
@@ -199,7 +204,7 @@ class BackendApiClientHappyPathTest {
     server.enqueue(jsonOk("[]"));
 
     client.getCached(
-        "/api/v1/cached-list", new ParameterizedTypeReference<List<Integer>>() {}, true);
+        CachedCatalog.SQUADRONS, new ParameterizedTypeReference<List<Integer>>() {}, true);
 
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertEquals("public", req.getHeader("X-Auth"));

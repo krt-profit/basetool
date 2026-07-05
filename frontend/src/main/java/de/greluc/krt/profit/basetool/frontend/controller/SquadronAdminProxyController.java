@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.Map;
 import java.util.UUID;
@@ -70,7 +71,7 @@ public class SquadronAdminProxyController {
     // The flag lives on the cached SquadronDto that SquadronContextAdvice reads on every render, so
     // a toggle must evict STATIC_DATA_CACHE or the sidebar/title gate stays stale up to the TTL
     // (REQ-DATA-007 — squadron-catalogue cacheability is gated on every admin mutation evicting).
-    backendApiClient.clearStaticDataCache();
+    backendApiClient.evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
     return ResponseEntity.noContent().build();
   }
 
@@ -90,7 +91,7 @@ public class SquadronAdminProxyController {
     backendApiClient.patch("/api/v1/squadrons/" + id + "/profit-eligible", body, Void.class);
     // Same reason as setPromotionEnabled: isProfitEligible is part of the cached SquadronDto, so
     // evict STATIC_DATA_CACHE on the toggle to keep the cached catalogue truthful (REQ-DATA-007).
-    backendApiClient.clearStaticDataCache();
+    backendApiClient.evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
     return ResponseEntity.noContent().build();
   }
 }

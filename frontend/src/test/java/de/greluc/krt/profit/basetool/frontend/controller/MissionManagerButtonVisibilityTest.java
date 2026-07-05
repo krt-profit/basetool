@@ -23,6 +23,7 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -31,6 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.util.Collections;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -69,7 +71,7 @@ class MissionManagerButtonVisibilityTest {
         .thenReturn(
             new PageResponse<>(Collections.emptyList(), 0, 10, 0, 0, Collections.emptyList()));
 
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -85,7 +87,7 @@ class MissionManagerButtonVisibilityTest {
         .thenReturn(
             new PageResponse<>(Collections.emptyList(), 0, 10, 0, 0, Collections.emptyList()));
 
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -100,7 +102,7 @@ class MissionManagerButtonVisibilityTest {
         .thenReturn(
             new PageResponse<>(Collections.emptyList(), 0, 10, 0, 0, Collections.emptyList()));
 
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
 
     mockMvc

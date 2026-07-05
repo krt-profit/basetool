@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionD
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -148,7 +149,7 @@ public class BankManagePageController {
     if (management) {
       List<OrgUnitMembershipOptionDto> orgUnits =
           backendApiClient.getCached(
-              "/api/v1/org-units/active-all-kinds", ORG_UNIT_OPTION_LIST_TYPE);
+              CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS, ORG_UNIT_OPTION_LIST_TYPE);
       List<UserReferenceDto> users =
           backendApiClient.get("/api/v1/users/lookup", USER_REFERENCE_LIST_TYPE);
       model.addAttribute(

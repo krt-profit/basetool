@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitParentUpdateReque
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrganisationsleitungCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.Comparator;
 import java.util.List;
@@ -169,7 +170,7 @@ public class AdminOrgStructurePageController {
       Object created = backendApiClient.post(BACKEND_BEREICHE, request, Object.class);
       // A new Bereich appears in the cached /org-units/active-all-kinds picker, so evict the shared
       // catalogue cache or that picker stays stale up to the TTL (REQ-DATA-007 eviction gate).
-      backendApiClient.clearStaticDataCache();
+      backendApiClient.evict(CacheDomain.ORG_UNIT);
       return ResponseEntity.ok(created);
     } catch (BackendServiceException e) {
       return propagateBackendError(e);
@@ -192,7 +193,7 @@ public class AdminOrgStructurePageController {
     try {
       Object created = backendApiClient.post(BACKEND_OL, request, Object.class);
       // The Organisationsleitung appears in the cached /org-units/active-all-kinds picker → evict.
-      backendApiClient.clearStaticDataCache();
+      backendApiClient.evict(CacheDomain.ORG_UNIT);
       return ResponseEntity.ok(created);
     } catch (BackendServiceException e) {
       return propagateBackendError(e);
@@ -221,7 +222,7 @@ public class AdminOrgStructurePageController {
       // Re-parenting changes the org-unit tree the cached /org-units/active-all-kinds picker
       // renders
       // (a unit can move under a different Bereich), so evict the shared catalogue cache.
-      backendApiClient.clearStaticDataCache();
+      backendApiClient.evict(CacheDomain.ORG_UNIT);
       return ResponseEntity.ok(updated);
     } catch (BackendServiceException e) {
       return propagateBackendError(e);
