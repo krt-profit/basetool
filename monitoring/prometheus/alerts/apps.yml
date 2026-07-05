@@ -79,3 +79,29 @@ groups:
         annotations:
           summary: "p95 request latency >2s ({{ $labels.application }})"
           description: "The 95th-percentile request latency for {{ $labels.application }} exceeded 2 seconds for 10 minutes."
+
+  - name: caches
+    # Caffeine cache health. recordStats() is enabled on every cache (backend + frontend
+    # CacheConfig), so Micrometer exports cache_gets_total{result}, cache_evictions_total{cause}
+    # and cache_size with a bounded (application, cache) label set (REQ-OBS-005/-006, CACHE-OBS-1).
+    rules:
+      - alert: CacheSizeEvictionsHigh
+        expr: sum by (application, cache) (rate(cache_evictions_total{cause="SIZE"}[10m])) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Cache at size cap evicting live entries ({{ $labels.application }}/{{ $labels.cache }})"
+          description: "Cache {{ $labels.cache }} in {{ $labels.application }} is evicting entries because it reached maximumSize — raise the cap or investigate key explosion (e.g. an unbounded pageable-keyed cache), otherwise the hit ratio collapses and the DB/backend is re-hit."
+
+      - alert: CacheHitRatioLow
+        expr: |
+          sum by (application, cache) (rate(cache_gets_total{result="hit"}[30m]))
+            / sum by (application, cache) (rate(cache_gets_total[30m])) < 0.5
+            and sum by (application, cache) (rate(cache_gets_total[30m])) > 0.1
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Cache hit ratio <50% ({{ $labels.application }}/{{ $labels.cache }})"
+          description: "Cache {{ $labels.cache }} in {{ $labels.application }} served <50% hits over 30m at non-trivial traffic (>0.1 gets/s) — it may be thrashing its size cap or mis-keyed. The >0.1 gets/s guard suppresses noise from idle/rarely-read caches (e.g. the short-TTL roles cache under light load)."
