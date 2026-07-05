@@ -6,11 +6,14 @@
 
 - **Deploy: geänderte Netz-Topologie wird sauber neu erstellt statt in-place.** Ändert eine promotete `docker-compose.yml` die `networks:`-Definition (neu gepinntes Subnetz, Netz hinzugefügt/entfernt), kann ein in-place `up` das nicht auf laufende Container anwenden – die Namensauflösung strandet (`keycloak`<->`backend`/`db`, Vorfall vom 05.07.). `deploy.sh` erkennt das jetzt und fährt Stack + Monitoring für die Anwendung sauber herunter (`down` + prune + `up`), im Vorwärts- und Rollback-Pfad – kurze Vollausfallzeit, aber nur bei echter Netz-Änderung; normale Config-Bumps bleiben in-place (#974).
 - **Frontend: erwartete Backend-4xx fluten nicht mehr das Fehler-Log.** 33 Controller loggten relayte Backend-Fehler zusätzlich auf ERROR – auch bei Client-4xx (Validierung 400, Konflikt 409). Diese 88 redundanten Logs sind auf DEBUG gesenkt (der `BackendApiClient`-Boundary loggt ohnehin einmal korrekt: 5xx→ERROR, 4xx→WARN), sodass normale Nutzereingabe-Fehler nicht mehr fälschlich `LogbackErrorSpike` auslösen (REQ-OBS-001).
+- **Frontend: KRT-Modals bleiben beim Laden zuverlässig geschlossen.** Der globale `.krt-modal-overlay`-Standard in `styles.css` war `display:flex` und wurde nur durch das seitenspezifische `bank.css` auf `display:none` überschrieben – schlug dessen Laden fehl (etwa ein WebKit-HTTP/2-Stream-Reset unter Last), erschienen alle Modals ohne Inline-Style offen auf der Seite. Der globale Standard ist jetzt `display:none`; ein Modal wird ausschließlich per Inline-`display:flex` geöffnet (REQ-UI-013).
 
 ### Changed
 
 - **Bank – Buchungsanträge-Übersicht mit parallelen Status-Filtern.** Die Anträge stehen jetzt in einer Tabelle mit unabhängig schaltbaren Filtern (Ausstehend/Bestätigt/Abgelehnt/Zurückgezogen); standardmäßig ist nur „Ausstehend" aktiv. Die Auswahl wird pro Nutzer gespeichert, und Begründung sowie Notiz eines Antrags lassen sich je Zeile ausklappen (#995).
 - **Frontend: Spezialkommando-Katalog wird jetzt gecacht.** Der SK-Katalog des Admin-Umschalters läuft wie der Staffel-Katalog über den 10-Minuten-`STATIC_DATA_CACHE` statt bei jedem Admin-Render neu geladen zu werden. Jede SK-Lebenszyklus-Änderung (Anlegen/Bearbeiten/Löschen/Reaktivieren sowie das Auftragsbearbeitung-Flag) leert den Cache, sodass die Änderung sofort sichtbar bleibt (REQ-DATA-007).
+
+- **Bank – Kontoübersicht mit Kachel-/Tabellen- und Bereichsansicht.** Die Kartellbank-Übersicht lässt sich jetzt zwischen Kachel- und Tabellenansicht umschalten und wahlweise nach Bereichen gruppieren – zuerst KRT und KRT-Bank, dann je Bereich (mit Bereichs-, Staffel- und SK-Konten) in der Bereichsfarbe, am Ende Sonderkonten und geschlossene Konten. Ansicht und Gruppierung werden pro Nutzer gespeichert; Kacheln und A-Z bleiben Standard (#996).
 
 
 ## [v1.1.3](https://github.com/krt-profit/basetool/releases/tag/v1.1.3) - 2026-07-05

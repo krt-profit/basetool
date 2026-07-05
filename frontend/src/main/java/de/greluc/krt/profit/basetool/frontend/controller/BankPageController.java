@@ -32,11 +32,18 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -103,17 +110,49 @@ public class BankPageController {
       BankDashboardAccountDto account, String sparklinePoints, boolean flat) {}
 
   /**
-   * Renders the bank dashboard (REQ-BANK-016): one KPI card per visible account plus the
-   * management-only totals strip. The cards are sorted alphabetically (case-insensitive) by account
-   * name regardless of the order the backend returns, so the grid reads the same for both the
-   * management (all accounts) and employee (granted accounts) perspectives.
+   * One vertical group of the by-Bereich dashboard view (REQ-BANK-016): a coloured header plus the
+   * cards that belong to it. Fixed groups (KRT rubric, Sonderkonten, Ohne Bereich, Geschlossen)
+   * carry an i18n {@code titleKey}; a Bereich group carries the live {@code bereichName} and a
+   * {@code deptClass} (its Bereichsfarbe token class), both {@code null} for the fixed groups.
    *
+   * @param key stable DOM/testing key ({@code krt} / {@code bereich:<id>} / {@code special} /
+   *     {@code ungrouped} / {@code closed})
+   * @param titleKey the i18n key for a fixed group's heading, or {@code null} for a Bereich group
+   * @param bereichName the Bereich's display name for a Bereich group, or {@code null}
+   * @param deptClass the Bereich department colour class ({@code bank-dept--<dept>}), or {@code
+   *     null}
+   * @param cards the group's cards, ordered
+   */
+  public record BankDashboardGroupView(
+      String key,
+      String titleKey,
+      String bereichName,
+      String deptClass,
+      List<BankDashboardCardView> cards) {}
+
+  /**
+   * Renders the bank dashboard (REQ-BANK-016). Two per-user view options ride on the query string
+   * and are persisted client-side by {@code bank.js}: a {@code layout} (card grid vs. table) and a
+   * {@code group} mode (alphabetical vs. by Bereich). The cards are always sorted A→Z by name; the
+   * by-Bereich view additionally chunks them into coloured vertical groups (KRT rubric → Bereich
+   * groups → Sonderkonten → Ohne Bereich → Geschlossen). A {@code bankGrid} fragment request
+   * re-renders just the switchable grid for the in-place toggle swap (REQ-FE-005).
+   *
+   * @param layout {@code table} for the tabular view, otherwise the default card grid
+   * @param group {@code bereich} for the grouped view, otherwise the default alphabetical view
+   * @param fragment when {@code "bankGrid"} only the switchable grid is re-rendered (toggle swap)
    * @param model Spring MVC model
-   * @return the dashboard template
+   * @return the dashboard template, or its {@code bankGrid} fragment view
    */
   @GetMapping("/bank")
   @PreAuthorize("hasRole('" + Roles.BANK_EMPLOYEE + "')")
-  public String dashboard(Model model) {
+  public String dashboard(
+      @RequestParam(required = false) String layout,
+      @RequestParam(required = false) String group,
+      @RequestParam(required = false) String fragment,
+      Model model) {
+    String effectiveLayout = "table".equals(layout) ? "table" : "card";
+    String effectiveGroup = "bereich".equals(group) ? "bereich" : "alpha";
     BankDashboardDto dashboard =
         backendApiClient.get("/api/v1/bank/dashboard", BankDashboardDto.class);
     List<BankDashboardCardView> cards =
@@ -124,8 +163,119 @@ public class BankPageController {
                 card -> card.account().name());
     model.addAttribute("dashboard", dashboard);
     model.addAttribute("cards", cards);
+    model.addAttribute("layout", effectiveLayout);
+    model.addAttribute("group", effectiveGroup);
+    model.addAttribute("groups", "bereich".equals(effectiveGroup) ? buildGroups(cards) : List.of());
     model.addAttribute("now", java.time.Instant.now().toString());
+    if ("bankGrid".equals(fragment)) {
+      return "bank-dashboard :: bankGrid";
+    }
     return "bank-dashboard";
+  }
+
+  /**
+   * Chunks the A→Z card list into the by-Bereich groups (REQ-BANK-016), in display order: the KRT
+   * rubric (CARTEL + KRT-bank), one group per Bereich (A→Z by Bereich name, each holding its AREA
+   * account first then its Staffel/SK accounts A→Z), the Sonderkonten, the "Ohne Bereich" bucket
+   * for org-unit accounts with no Bereich, and finally every closed account. Only non-empty groups
+   * are emitted. The input order (A→Z by account name) is preserved within the KRT / Sonderkonten /
+   * closed buckets.
+   *
+   * @param cards the account cards, already ordered A→Z by name
+   * @return the ordered, non-empty groups for the by-Bereich view
+   */
+  private static List<BankDashboardGroupView> buildGroups(List<BankDashboardCardView> cards) {
+    List<BankDashboardCardView> krt = new ArrayList<>();
+    List<BankDashboardCardView> special = new ArrayList<>();
+    List<BankDashboardCardView> ungrouped = new ArrayList<>();
+    List<BankDashboardCardView> closed = new ArrayList<>();
+    Map<UUID, List<BankDashboardCardView>> byBereich = new LinkedHashMap<>();
+    Map<UUID, BankDashboardCardView> bereichMeta = new HashMap<>();
+    for (BankDashboardCardView card : cards) {
+      BankDashboardAccountDto account = card.account();
+      if ("CLOSED".equals(account.status())) {
+        closed.add(card);
+        continue;
+      }
+      switch (account.type()) {
+        case "CARTEL", "CARTEL_BANK" -> krt.add(card);
+        case "SPECIAL" -> special.add(card);
+        default -> {
+          if (account.bereichId() != null) {
+            byBereich.computeIfAbsent(account.bereichId(), k -> new ArrayList<>()).add(card);
+            bereichMeta.putIfAbsent(account.bereichId(), card);
+          } else {
+            ungrouped.add(card);
+          }
+        }
+      }
+    }
+    List<BankDashboardGroupView> groups = new ArrayList<>();
+    if (!krt.isEmpty()) {
+      groups.add(new BankDashboardGroupView("krt", "bank.dashboard.group.krt", null, null, krt));
+    }
+    byBereich.entrySet().stream()
+        .sorted(
+            Comparator.comparing(
+                entry -> bereichNameOf(bereichMeta.get(entry.getKey())),
+                String.CASE_INSENSITIVE_ORDER))
+        .forEach(
+            entry -> {
+              BankDashboardCardView meta = bereichMeta.get(entry.getKey());
+              List<BankDashboardCardView> groupCards = new ArrayList<>(entry.getValue());
+              groupCards.sort(
+                  Comparator.<BankDashboardCardView, Integer>comparing(
+                          card -> "AREA".equals(card.account().type()) ? 0 : 1)
+                      .thenComparing(card -> card.account().name(), String.CASE_INSENSITIVE_ORDER));
+              groups.add(
+                  new BankDashboardGroupView(
+                      "bereich:" + entry.getKey(),
+                      null,
+                      meta.account().bereichName(),
+                      deptClass(meta.account().bereichDepartment()),
+                      groupCards));
+            });
+    if (!special.isEmpty()) {
+      groups.add(
+          new BankDashboardGroupView(
+              "special", "bank.dashboard.group.special", null, null, special));
+    }
+    if (!ungrouped.isEmpty()) {
+      groups.add(
+          new BankDashboardGroupView(
+              "ungrouped", "bank.dashboard.group.ungrouped", null, null, ungrouped));
+    }
+    if (!closed.isEmpty()) {
+      groups.add(
+          new BankDashboardGroupView("closed", "bank.dashboard.group.closed", null, null, closed));
+    }
+    return groups;
+  }
+
+  /**
+   * The Bereich name of a card, or an empty string when absent — the sort key for ordering the
+   * Bereich groups so a null name never trips the case-insensitive comparator.
+   *
+   * @param card any card of the Bereich group
+   * @return the Bereich display name, or {@code ""} when unknown
+   */
+  private static String bereichNameOf(@Nullable BankDashboardCardView card) {
+    String name = card == null ? null : card.account().bereichName();
+    return name == null ? "" : name;
+  }
+
+  /**
+   * Maps a Bereich department enum name to its design-system colour class ({@code
+   * bank-dept--<dept>} over the {@code --color-dept-*} tokens), mirroring the org chart's {@code
+   * oc-dept--*} convention.
+   *
+   * @param department the Bereich's department enum name, or {@code null}
+   * @return the colour class, or {@code null} when the Bereich has no department
+   */
+  private static String deptClass(@Nullable String department) {
+    return department == null
+        ? null
+        : "bank-dept--" + department.toLowerCase(Locale.ROOT).replace('_', '-');
   }
 
   /**

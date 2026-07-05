@@ -152,12 +152,18 @@ through the `body` fragment expression (`~{::selector}`) so rendering stays iden
 with `data-trigger="open-modal-display"` and **close with the single standardized trigger
 `data-trigger="close-modal-display"` + `data-modal-id`** (common-handlers.js) — the former
 `data-modal-dismiss` convention is being migrated onto it. The overlay's hidden default comes from
-CSS (`.krt-modal-overlay { display:none }` in bank.css), so the fragment injects no inline style.
+the **global** `.krt-modal-overlay { display:none }` in `styles.css` (loaded on every page;
+`bank.css` duplicates it as defense-in-depth), so the fragment injects no inline style. A modal is
+made visible only by an inline `display:flex` (`open-modal-display`, or a server-rendered
+`th:style`); the global default must never be `display:flex`, or a page whose scoped stylesheet
+fails to load would render every no-inline-style modal open on load (#1003 WebKit flake).
 
 **Acceptance**
 
 - [ ] A new/migrated `.krt-modal-overlay` modal renders through `modal-wrapper :: modal(...)` with
   its body projected exactly once and closes via `close-modal-display` (no `data-modal-dismiss`).
+- [ ] `.krt-modal-overlay` is `display:none` by default in the global `styles.css` (not only in a
+  page-scoped stylesheet); a modal is shown solely via an inline `display:flex`.
 
 **Enforced by:** per-screen render MvcTest (shell + single-projection assertion) + e2e smoke.
 

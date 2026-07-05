@@ -77,7 +77,10 @@ class BankDashboardFilterMvcTest {
         "ACTIVE",
         new BigDecimal("1000"),
         BigDecimal.ZERO,
-        List.of());
+        List.of(),
+        null,
+        null,
+        null);
   }
 
   @Test
@@ -96,8 +99,13 @@ class BankDashboardFilterMvcTest {
         // The live-filter search box + its scope/empty wiring render.
         .andExpect(content().string(Matchers.containsString("id=\"bank-acc-filter\"")))
         .andExpect(content().string(Matchers.containsString("data-bank-acc-filter")))
+        // The card/table + alphabetical/by-Bereich view toggles render for every viewer with cards.
+        .andExpect(content().string(Matchers.containsString("data-bank-view-toggles")))
+        .andExpect(content().string(Matchers.containsString("data-bank-view-layout=\"table\"")))
+        .andExpect(content().string(Matchers.containsString("data-bank-view-group=\"bereich\"")))
+        // The filter now scopes the whole switchable grid so it works across every view.
         .andExpect(
-            content().string(Matchers.containsString("data-filter-scope=\".bank-acc-grid\"")))
+            content().string(Matchers.containsString("data-filter-scope=\"#bank-grid-results\"")))
         .andExpect(
             content()
                 .string(Matchers.containsString("data-filter-empty=\"#bank-acc-filter-empty\"")))
