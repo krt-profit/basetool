@@ -104,7 +104,7 @@ public class ScWikiScheduler {
    * <p>After the steps run, the master-data caches this sweep can make stale are evicted in a
    * {@code finally} ({@link MasterDataCacheEvictionService#evictScWikiSyncedMasterData()}) so
    * synced commodity / vehicle / manufacturer / blueprint-family changes are visible on the next
-   * read rather than lagging the 30-minute TTL (CACHE-SYNC-EVICT-001, CACHE-DIST-03).
+   * read rather than lagging the 12-hour TTL (CACHE-SYNC-EVICT-001, CACHE-DIST-03).
    */
   private void runAllSyncSteps() {
     log.debug("Running scheduled SC Wiki sync against {}", scWikiClient.getClass().getSimpleName());

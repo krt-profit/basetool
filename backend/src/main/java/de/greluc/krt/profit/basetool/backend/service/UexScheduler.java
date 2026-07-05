@@ -108,7 +108,7 @@ public class UexScheduler {
    *
    * <p>The sweep evicts the master-data caches it can make stale in a {@code finally} ({@link
    * MasterDataCacheEvictionService#evictUexSyncedMasterData()}), so a freshly-synced catalogue is
-   * visible on the next read instead of lagging the 30-minute TTL (CACHE-SYNC-EVICT-001) — and
+   * visible on the next read instead of lagging the 12-hour TTL (CACHE-SYNC-EVICT-001) — and
    * committed steps are still reconciled when a later step aborts the sweep.
    */
   private void runAllSyncSteps() {
