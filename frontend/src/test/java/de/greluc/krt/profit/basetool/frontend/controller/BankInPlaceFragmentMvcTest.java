@@ -180,15 +180,17 @@ class BankInPlaceFragmentMvcTest {
         // Field hints are inline "?" tooltip markers, not sub-field text.
         .andExpect(content().string(Matchers.containsString("field-hint-marker")))
         // The fee-inclusive toggle (REQ-BANK-033, #999) renders in the modal, hidden by default
-        // (bank.js reveals it only for a fee-bearing withdrawal/transfer) and is now CHECKED by
-        // default — the fee-inclusive mode is the flipped default.
+        // (bank.js reveals it only for a fee-bearing withdrawal/transfer) and is unchecked by
+        // default: on-top is the default mode, fee-inclusive is opt-in.
         .andExpect(
             content()
                 .string(Matchers.containsString("data-testid=\"bank-movement-fee-inclusive\"")))
         .andExpect(content().string(Matchers.containsString("data-fee-inclusive-row")))
         .andExpect(
             content()
-                .string(Matchers.containsString("name=\"feeInclusive\" value=\"true\" checked")))
+                .string(
+                    Matchers.not(
+                        Matchers.containsString("name=\"feeInclusive\" value=\"true\" checked"))))
         // The external-counterparty toggle + free-text name + shared all-org-units source render
         // (REQ-BANK-044, #994); the "kein Tool-Account" toggle now sits AFTER the
         // Einzahler/Empfaenger

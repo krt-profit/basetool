@@ -116,16 +116,15 @@
                     </p>
                 </div>
 
-                <!-- Fee mode toggle (REQ-BANK-033, #999): default ON = the entered amount is the gross
-                     debited and the recipient gets amount - fee; OFF = fee added on top (the entered
-                     amount arrives, source debited amount + fee). Only meaningful when a fee applies
+                <!-- Fee mode toggle (REQ-BANK-033, #999): default OFF = fee added on top (the entered
+                     amount arrives, source debited amount + fee); ON = the entered amount is the gross
+                     debited and the recipient gets amount - fee. Only meaningful when a fee applies
                      (withdrawal / holder-changing transfer); bank.js (updateFeePreview) reveals +
-                     enables it there (re-applying the checked-by-default on a fresh enable) and hides
-                     + resets it for fee-free deposits / same-holder transfers, so it is omitted from
-                     those bodies. -->
+                     enables it there and hides + resets it for fee-free deposits / same-holder
+                     transfers, so it is omitted from those bodies. -->
                 <div class="bank-form-row" data-fee-inclusive-row hidden>
                     <label class="bank-check-label">
-                        <input type="checkbox" name="feeInclusive" value="true" checked disabled
+                        <input type="checkbox" name="feeInclusive" value="true" disabled
                                data-testid="bank-movement-fee-inclusive">
                         <span th:text="#{bank.field.feeInclusive}">Geb&uuml;hr im Betrag enthalten</span>
                         <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.field.feeInclusive.hint')}"></th:block>
