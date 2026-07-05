@@ -185,6 +185,12 @@ class BankInPlaceFragmentMvcTest {
             content()
                 .string(Matchers.containsString("data-testid=\"bank-movement-fee-inclusive\"")))
         .andExpect(content().string(Matchers.containsString("data-fee-inclusive-row")))
+        // The external-counterparty toggle + free-text name + shared all-org-units source render
+        // (REQ-BANK-044, #994).
+        .andExpect(
+            content().string(Matchers.containsString("data-role=\"bank-cp-external-toggle\"")))
+        .andExpect(content().string(Matchers.containsString("name=\"counterpartyExternalName\"")))
+        .andExpect(content().string(Matchers.containsString("data-bank-all-orgunits")))
         .andExpect(
             content().string(Matchers.not(Matchers.containsString("id=\"bank-deposit-modal\""))));
   }

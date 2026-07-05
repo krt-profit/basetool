@@ -53083,6 +53083,11 @@
           },
           "feeInclusive" : {
             "type" : "boolean"
+          },
+          "counterpartyExternalName" : {
+            "type" : "string",
+            "maxLength" : 100,
+            "minLength" : 0
           }
         },
         "required" : [ "accountId", "amount", "holderId" ]
@@ -53353,6 +53358,11 @@
           "counterpartyOrgUnitId" : {
             "type" : "string",
             "format" : "uuid"
+          },
+          "counterpartyExternalName" : {
+            "type" : "string",
+            "maxLength" : 100,
+            "minLength" : 0
           },
           "splitConfigConsistent" : {
             "type" : "boolean"

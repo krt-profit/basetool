@@ -206,57 +206,21 @@
                     <span class="bank-field-error" data-error-for="destinationHolderId"></span>
                 </div>
 
-                <!-- Counterparty (Einzahler / Empfaenger, REQ-BANK-044), both optional; one row per
-                     type so the label matches. The org-unit select is disabled until a user is chosen;
-                     bank.js fills it from that user's memberships. -->
-                <div class="bank-form-row" data-movement-types="DEPOSIT">
-                    <label for="bank-mv-deposit-cp">
-                        <span th:text="#{bank.field.counterparty.depositor}">Einzahler</span>
-                        <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.field.counterparty.depositor.hint')}"></th:block>
-                    </label>
-                    <select id="bank-mv-deposit-cp" name="counterpartyUserId"
-                            data-testid="bank-movement-deposit-counterparty"
-                            data-counterparty-user data-orgunit-target="bank-mv-deposit-cp-ou">
-                        <option value="" th:text="#{bank.field.counterparty.placeholder}">Person w&auml;hlen &hellip;</option>
-                        <option th:each="u : ${users}" th:value="${u.id()}" th:text="${u.effectiveName()}">carol</option>
-                    </select>
-                    <span class="bank-field-error" data-error-for="counterpartyUserId"></span>
-                </div>
-                <div class="bank-form-row" data-movement-types="DEPOSIT">
-                    <label for="bank-mv-deposit-cp-ou">
-                        <span th:text="#{bank.field.counterparty.orgUnit}">Einheit</span>
-                        <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.field.counterparty.orgUnit.hint')}"></th:block>
-                    </label>
-                    <select id="bank-mv-deposit-cp-ou" name="counterpartyOrgUnitId"
-                            data-testid="bank-movement-deposit-counterparty-orgunit" data-counterparty-orgunit disabled>
-                        <option value="" th:text="#{bank.field.counterparty.orgUnit.placeholder}">Einheit w&auml;hlen &hellip;</option>
-                    </select>
-                    <span class="bank-field-error" data-error-for="counterpartyOrgUnitId"></span>
-                </div>
-                <div class="bank-form-row" data-movement-types="WITHDRAWAL" hidden>
-                    <label for="bank-mv-withdraw-cp">
-                        <span th:text="#{bank.field.counterparty.recipient}">Empf&auml;nger</span>
-                        <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.field.counterparty.recipient.hint')}"></th:block>
-                    </label>
-                    <select id="bank-mv-withdraw-cp" name="counterpartyUserId" disabled
-                            data-testid="bank-movement-withdraw-counterparty"
-                            data-counterparty-user data-orgunit-target="bank-mv-withdraw-cp-ou">
-                        <option value="" th:text="#{bank.field.counterparty.placeholder}">Person w&auml;hlen &hellip;</option>
-                        <option th:each="u : ${users}" th:value="${u.id()}" th:text="${u.effectiveName()}">dave</option>
-                    </select>
-                    <span class="bank-field-error" data-error-for="counterpartyUserId"></span>
-                </div>
-                <div class="bank-form-row" data-movement-types="WITHDRAWAL" hidden>
-                    <label for="bank-mv-withdraw-cp-ou">
-                        <span th:text="#{bank.field.counterparty.orgUnit}">Einheit</span>
-                        <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.field.counterparty.orgUnit.hint')}"></th:block>
-                    </label>
-                    <select id="bank-mv-withdraw-cp-ou" name="counterpartyOrgUnitId" disabled
-                            data-testid="bank-movement-withdraw-counterparty-orgunit" data-counterparty-orgunit>
-                        <option value="" th:text="#{bank.field.counterparty.orgUnit.placeholder}">Einheit w&auml;hlen &hellip;</option>
-                    </select>
-                    <span class="bank-field-error" data-error-for="counterpartyOrgUnitId"></span>
-                </div>
+                <!-- Counterparty (Einzahler / Empfaenger, REQ-BANK-044/#994), both optional; one block
+                     per type so the label matches. Each block's "kein Tool-Account" toggle swaps the
+                     tool-user lookup for a free-text name and widens the unit picklist to all org
+                     units. -->
+                <th:block th:replace="~{fragments/bank-counterparty :: counterpartyBlock('DEPOSIT', 'bank-mv-cp-deposit', 'bank.field.counterparty.depositor', 'bank.field.counterparty.depositor.hint')}"></th:block>
+                <th:block th:replace="~{fragments/bank-counterparty :: counterpartyBlock('WITHDRAWAL', 'bank-mv-cp-withdraw', 'bank.field.counterparty.recipient', 'bank.field.counterparty.recipient.hint')}"></th:block>
+
+                <!-- Shared all-active-org-units option source (#994): bank.js clones these options into
+                     a counterparty unit picklist when its external toggle is on. Carries no name, so it
+                     is never submitted; rendered only when the caller has the org-unit list. -->
+                <select data-bank-all-orgunits hidden aria-hidden="true" tabindex="-1"
+                        th:if="${allOrgUnits != null}">
+                    <option th:each="o : ${allOrgUnits}" th:value="${o.orgUnitId()}"
+                            th:text="${o.orgUnitName()} + (${o.orgUnitShorthand() != null} ? ' (' + ${o.orgUnitShorthand()} + ')' : '')">Bereich</option>
+                </select>
 
                 <!-- Begruendung (REQ-BANK-045): WITHDRAWAL / TRANSFER only; disabled while hidden so a
                      deposit omits it. Required is set by bank.js from the (fixed or chosen) source

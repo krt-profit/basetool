@@ -21,6 +21,8 @@
 
 - **Bank – Option „Gebühr im Betrag enthalten" bei gebührenpflichtigen Buchungen.** Neue Auswahl im Kontobewegungs-Fenster (Auszahlung/Transfer, standardmäßig aus): ist sie aktiv, gilt der eingegebene Betrag als abgebuchter Betrag und der Empfänger erhält den Betrag abzüglich Gebühr (z. B. 500.000 abgebucht → 497.500 kommen an); aus (Standard) bleibt es wie bisher, die Gebühr kommt oben drauf. Die Live-Vorschau zeigt „wird abgebucht" und „kommt an"; ein Betrag, der die Gebühr nicht übersteigt, wird abgelehnt (#999).
 
+- **Bank – Einzahler/Empfänger ohne Tool-Account erfassbar.** Beim Ein- und Auszahlen kann die Gegenpartei jetzt per Schalter „Kein Tool-Account" als freier Name eingetragen werden; die Einheit wird dann aus der vollständigen Org-Einheiten-Liste gewählt (statt nur aus den Mitgliedschaften eines Tool-Nutzers). Der bisherige Weg über einen Tool-Nutzer bleibt unverändert. Name und Einheit erscheinen wie gewohnt in der Kontohistorie und den PDFs (#994).
+
 
 ## [v1.1.3](https://github.com/krt-profit/basetool/releases/tag/v1.1.3) - 2026-07-05
 
