@@ -34,22 +34,24 @@ import org.springframework.context.annotation.Configuration;
  * caches have very different freshness requirements:
  *
  * <ul>
- *   <li><b>Master data (30 min)</b> — cities, materials (list + by-id), ship types, locations,
+ *   <li><b>Master data (12 h)</b> — cities, materials (list + by-id), ship types, locations,
  *       frequency types, job types, manufacturers, refining methods, star systems, material
  *       categories, and the blueprint variant-family index (rebuilt from the active blueprint
  *       master; no per-write evict hook of its own). Quasi-static: editor flows already trigger
  *       {@code @CacheEvict (allEntries=true)} on writes, and the periodic UEX / SC Wiki sync sweeps
  *       evict the caches they rewrite on completion (via {@code MasterDataCacheEvictionService},
  *       CACHE-SYNC-EVICT-001), so a stale entry only survives until the next admin write, the next
- *       sync sweep, or the 30 min lapse — whichever comes first. The previous 2 min global TTL kept
- *       paying the underlying DB-hit cost 15× per hour for data that almost never changes.
- *   <li><b>Squadrons (10 min)</b> — slower than master data because admins toggle the active
- *       squadron mid-session via the {@code X-Active-Org-Unit-Id} header, but the squadron entity
- *       itself rarely changes. {@code SquadronService} already evicts on writes.
- *   <li><b>Roles (2 min)</b> — kept short. A Keycloak role change should propagate quickly so a
- *       freshly-elevated officer does not stare at a 30 min cached "you don't have permission"
- *       page; 2 min is the audit's recommended fast-propagation floor for permission-sensitive
- *       data.
+ *       sync sweep, or the 12 h lapse — whichever comes first. Because freshness comes from the
+ *       eviction and not the TTL, the TTL is a long backstop that avoids re-querying data which
+ *       almost never changes (the sync runs at most daily; admin edits are rare).
+ *   <li><b>Squadrons (6 h)</b> — org-structure, changed only by admin lifecycle actions that evict.
+ *       {@code SquadronService} evicts on writes; the long backstop applies for the same reason as
+ *       the master data. Kept a notch shorter than master data because the squadron catalogue also
+ *       drives the active-squadron switcher.
+ *   <li><b>Roles (2 min)</b> — kept short deliberately. A Keycloak role/permission change should
+ *       propagate quickly so a freshly-elevated officer does not stare at a stale "you don't have
+ *       permission" page; 2 min is the fast-propagation floor for permission-sensitive data and
+ *       stays short even though the master-data caches were lengthened.
  * </ul>
  *
  * <p>All caches share the same Caffeine sizing ({@code maximumSize=1000}, statistics on) and the
@@ -66,13 +68,26 @@ public class CacheConfig {
   /** Default cache size in entries — the same value historically used for every cache. */
   private static final long MAX_CACHE_SIZE = 1000;
 
-  /** TTL for quasi-static master data; explicit {@code @CacheEvict} on writes handles updates. */
-  private static final Duration MASTER_DATA_TTL = Duration.ofMinutes(30);
+  /**
+   * TTL for quasi-static master data. Only a backstop: admin editors trigger {@code @CacheEvict}
+   * and the UEX / SC Wiki sync sweeps evict on completion (REQ-DATA-011), so freshness comes from
+   * the eviction, not the TTL — which lets it be long (12 h) to avoid re-querying data that almost
+   * never changes.
+   */
+  private static final Duration MASTER_DATA_TTL = Duration.ofHours(12);
 
-  /** TTL for squadron context — slower than master data, still infrequently changing. */
-  private static final Duration SQUADRONS_TTL = Duration.ofMinutes(10);
+  /**
+   * TTL for squadron context — org-structure, changed only by admin lifecycle actions that evict.
+   * Long backstop (6 h) for the same reason as the master data, kept a notch shorter because the
+   * squadron catalogue also drives the active-squadron switcher.
+   */
+  private static final Duration SQUADRONS_TTL = Duration.ofHours(6);
 
-  /** TTL for permission-sensitive data; Keycloak role changes must propagate quickly. */
+  /**
+   * TTL for permission-sensitive data; kept deliberately short. A Keycloak role/permission change
+   * must propagate quickly, so this stays the fast-propagation floor even though the master-data
+   * caches were lengthened.
+   */
   private static final Duration ROLES_TTL = Duration.ofMinutes(2);
 
   /** Cache name for the city reference catalogue. */

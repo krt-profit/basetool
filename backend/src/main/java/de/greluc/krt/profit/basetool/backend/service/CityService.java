@@ -39,7 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
  * cached against {@link CacheConfig#CITIES_CACHE}; the override mutators evict the whole cache, and
  * the periodic {@link UexUniverseSyncService} sweep evicts it on completion (via {@code
  * MasterDataCacheEvictionService}, CACHE-SYNC-EVICT-001), so background-sync writes are visible on
- * the next read; the 30-minute master-data TTL is only the backstop.
+ * the next read; the 12-hour master-data TTL is only the backstop.
  */
 @Service
 @RequiredArgsConstructor

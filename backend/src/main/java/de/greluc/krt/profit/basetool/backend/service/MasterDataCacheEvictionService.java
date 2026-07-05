@@ -35,7 +35,7 @@ import org.springframework.stereotype.Service;
  * <p>The admin CRUD services (e.g. {@link MaterialService}, {@code ManufacturerService}) evict
  * their own cache on every user-facing write, but the {@code Uex*SyncService} / {@code
  * ScWiki*SyncService} background jobs write directly to the repositories and therefore bypass those
- * {@code @CacheEvict} hooks. Before this service the only reconciliation was the 30-minute
+ * {@code @CacheEvict} hooks. Before this service the only reconciliation was the 12-hour
  * master-data TTL (REQ-DATA-007, CACHE-SYNC-EVICT-001), so a freshly-synced
  * material/manufacturer/ship-type/star-system/refining-method could stay invisible for up to the
  * TTL. Each scheduler now calls the matching {@code evict…} method once its sweep has finished (in
