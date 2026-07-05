@@ -133,6 +133,10 @@ logging:
     org.springframework.web: INFO
     org.springframework.security: INFO
     io.github.resilience4j: INFO
+    # REQ-OBS-013: a telemetry-sink outage is not an application fault. The OTLP span exporter logs a
+    # failed export batch at ERROR by default; demote it to WARN so an unreachable Alloy/Tempo does
+    # not inflate logback_events_total{level="error"} and falsely trip the LogbackErrorSpike alert.
+    io.opentelemetry.exporter: WARN
 app:
   logging:
     correlation-id-header: X-Correlation-Id

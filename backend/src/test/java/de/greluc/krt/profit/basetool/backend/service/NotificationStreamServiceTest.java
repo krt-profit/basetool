@@ -118,4 +118,23 @@ class NotificationStreamServiceTest {
     verify(service.emitter).send(captor.capture());
     assertTrue(render(captor.getValue()).contains("event:notification"));
   }
+
+  @Test
+  void onTimeout_completesEmitter_soSpringRecordsCleanCompletionNotPhantom503() {
+    // Given a subscribed emitter, capture the timeout callback the registry registered on it.
+    CapturingStreamService service = new CapturingStreamService();
+    service.subscribe(UUID.randomUUID());
+    ArgumentCaptor<Runnable> timeoutCallback = ArgumentCaptor.forClass(Runnable.class);
+    verify(service.emitter).onTimeout(timeoutCallback.capture());
+
+    // When the 30-minute SSE timeout fires
+    timeoutCallback.getValue().run();
+
+    // Then the emitter is completed, so Spring MVC finalizes the async request as a NORMAL
+    // completion
+    // instead of raising AsyncRequestTimeoutException — which Micrometer would otherwise book as a
+    // phantom 503 on http.server.requests even though the client had a clean stream
+    // (REQ-NOTIF-010).
+    verify(service.emitter).complete();
+  }
 }

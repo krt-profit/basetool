@@ -168,6 +168,12 @@ public class BasetoolErrorController implements ErrorController {
               "problem.method_not_allowed.detail",
               "method-not-allowed",
               "METHOD_NOT_ALLOWED");
+      case SERVICE_UNAVAILABLE ->
+          new ProblemMapping(
+              "problem.service_unavailable.title",
+              "problem.service_unavailable.detail",
+              "service-unavailable",
+              "SERVICE_UNAVAILABLE");
       default ->
           status.is5xxServerError()
               ? new ProblemMapping(

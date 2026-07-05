@@ -20,10 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.KeycloakSyncProperties;
+import de.greluc.krt.profit.basetool.backend.config.KeycloakTrustSupport;
 import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
-import java.net.http.HttpClient;
-import java.security.GeneralSecurityException;
-import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -32,18 +30,13 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManagerFactory;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.boot.ssl.NoSuchSslBundleException;
-import org.springframework.boot.ssl.SslBundle;
 import org.springframework.boot.ssl.SslBundles;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.ClientHttpRequestFactory;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -96,7 +89,7 @@ public class KeycloakService {
   private final KeycloakSyncProperties properties;
 
   /**
-   * Pre-built request factory whose JDK {@link HttpClient} trusts only the {@link
+   * Pre-built request factory pinned (via {@link KeycloakTrustSupport}) to trust only the {@link
    * #KEYCLOAK_TRUST_BUNDLE} truststore, or {@code null} when that bundle is not configured for the
    * active profile. {@code null} makes {@link #adminClient()} fall back to the default {@link
    * RestClient}, which trusts the JVM {@code cacerts} and is what the dev/test plain-HTTP admin URL
@@ -118,12 +111,11 @@ public class KeycloakService {
   }
 
   /**
-   * Builds a {@link ClientHttpRequestFactory} backed by a JDK {@link HttpClient} whose trust set is
-   * pinned to the {@link #KEYCLOAK_TRUST_BUNDLE} truststore, or returns {@code null} when no such
-   * bundle is registered for the active profile. Hostname verification is intentionally left at the
-   * JDK default ({@code HTTPS}) — unlike the frontend/ingest WebClients it is NOT disabled here,
-   * because the synchronous JDK {@link HttpClient} cannot disable it reliably per-client; the
-   * pinned certificate must therefore carry {@code dns:keycloak} in its SAN.
+   * Resolves the truststore-pinned {@link ClientHttpRequestFactory} for the Keycloak Admin API by
+   * delegating to {@link KeycloakTrustSupport#trustedRequestFactory}, and logs a debug line when
+   * the {@link #KEYCLOAK_TRUST_BUNDLE} bundle is absent (dev/test plain-HTTP admin URL) so the
+   * fallback to the default {@link RestClient} is visible. Hostname verification stays at the JDK
+   * default, so the pinned certificate must carry {@code dns:keycloak} in its SAN.
    *
    * @param sslBundles the registered Spring SSL bundles
    * @return a truststore-pinned request factory, or {@code null} to fall back to the default {@link
@@ -132,24 +124,14 @@ public class KeycloakService {
    */
   @Nullable
   private static ClientHttpRequestFactory buildTrustedRequestFactory(SslBundles sslBundles) {
-    try {
-      SslBundle bundle = sslBundles.getBundle(KEYCLOAK_TRUST_BUNDLE);
-      KeyStore truststore = bundle.getStores().getTrustStore();
-      TrustManagerFactory tmf =
-          TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-      tmf.init(truststore);
-      SSLContext sslContext = SSLContext.getInstance("TLS");
-      sslContext.init(null, tmf.getTrustManagers(), null);
-      HttpClient httpClient = HttpClient.newBuilder().sslContext(sslContext).build();
-      return new JdkClientHttpRequestFactory(httpClient);
-    } catch (NoSuchSslBundleException ex) {
+    ClientHttpRequestFactory factory =
+        KeycloakTrustSupport.trustedRequestFactory(sslBundles, KEYCLOAK_TRUST_BUNDLE);
+    if (factory == null) {
       log.debug(
           "No '{}' SSL bundle configured; using the default Keycloak admin client",
           KEYCLOAK_TRUST_BUNDLE);
-      return null;
-    } catch (GeneralSecurityException ex) {
-      throw new IllegalStateException("Failed to build the Keycloak admin TLS trust context", ex);
     }
+    return factory;
   }
 
   /**

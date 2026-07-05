@@ -217,7 +217,16 @@ and the client runs a liveness watchdog: if no SSE traffic (`heartbeat`/`notific
 within ~3× the heartbeat interval, the stream is treated as **half-open** (still "connected" but
 dead, so it never fires `error`) and the poll falls back to the fast cadence without waiting for an
 `error`; a later event re-promotes it. The registry is single-backend-instance; multi-instance
-fan-out via Redis pub/sub remains a follow-up.
+fan-out via Redis pub/sub remains a follow-up. When the 30-minute emitter timeout elapses the
+backend **completes** the emitter rather than leaving Spring MVC to raise
+`AsyncRequestTimeoutException` — which Micrometer would otherwise book as a phantom `503` on
+`http.server.requests` even though the client received a clean stream and simply reconnects. A
+normal 30-minute stream is thus recorded as a `200` completion, keeping best-effort push off the 5xx
+rate. On the client side the frontend relay likewise completes its browser-facing emitter **cleanly**
+on any dropped/unavailable backend stream rather than `completeWithError` — which would re-dispatch
+the error through the MVC `@ExceptionHandler` and log a spurious ERROR per drop — so a best-effort
+stream failure never inflates the frontend error log (the dominant frontend ERROR source during a
+backend/Keycloak blip); the browser reconnects and the poll keeps the badge fresh.
 
 **Acceptance**
 
@@ -227,9 +236,11 @@ fan-out via Redis pub/sub remains a follow-up.
 - [x] The keepalive is a **named** `heartbeat` event (not a comment) so the client can observe it.
 - [x] A half-open stream (connected but silent) demotes the poll to the fast cadence via the client
   liveness watchdog, without waiting for an `error`.
+- [x] The 30-minute emitter timeout completes the emitter cleanly, so the stream is recorded as a
+  normal completion and never as a phantom `503` on `http.server.requests`.
 
 **Enforced by:** `NotificationStreamServiceTest` (named `connected`/`heartbeat`/`notification`
-events), full build (bean wiring), frontend lint gate · **Code:**
+events + clean timeout completion), full build (bean wiring), frontend lint gate · **Code:**
 `service/NotificationStreamService`, `controller/NotificationController#stream`, frontend
 `controller/NotificationPageController#stream`, `config/WebClientConfig#sseWebClient`,
 `static/js/notifications.js`

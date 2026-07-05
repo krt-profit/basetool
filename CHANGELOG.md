@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Backend + Ingest: JWKS-Bezug vom internen Keycloak (opt-in).** Neue Umgebungsvariable `KEYCLOAK_JWK_SET_URI`: ist sie gesetzt, holen die JWT-Resource-Server (Backend und Ingest-Gateway) die Signierschlüssel direkt vom internen Keycloak (`https://keycloak:18443`, über das `keycloak-trust`-Bundle) statt über den öffentlichen Edge. Leer (Standard) = unverändertes Verhalten (REQ-SEC-024).
+
+### Fixed
+
+- **Backend + Ingest: Keycloak-Ausfall liefert 503 statt 500.** Scheitert der JWKS-Abruf am Identity Provider (Timeout, 5xx, DNS-Ausfall), antworten authentifizierte Endpunkte jetzt mit einem retrybaren `503` (Problem+JSON, `Retry-After`) statt eines undurchsichtigen `500`. Ein kurzer Keycloak-Aussetzer sieht damit nicht mehr wie ein App-Absturz aus, und das Frontend zeigt seine „vorübergehend nicht verfügbar“-Seite (REQ-SEC-024).
+- **Backend: Benachrichtigungs-Stream bucht keinen Phantom-503 mehr.** Der SSE-Emitter wird beim 30-Minuten-Timeout jetzt sauber abgeschlossen; zuvor verbuchte Spring den Ablauf als `AsyncRequestTimeoutException`/503, obwohl der Client einen intakten Stream hatte – was die 5xx-Rate künstlich anhob (REQ-NOTIF-010).
+- **Frontend: Benachrichtigungs-Stream flutet das Fehler-Log nicht mehr.** Bricht der Backend-Stream ab oder ist er kurz nicht erreichbar (Best-Effort-Push; der Poll ist der garantierte Fallback), schließt das Frontend den Relay-Emitter jetzt sauber statt über `completeWithError`. Das verhinderte bisher, dass pro abgebrochenem Stream ein ERROR über den MVC-`@ExceptionHandler` geloggt wurde – die Hauptquelle des Frontend-ERROR-Rauschens während eines Keycloak-Aussetzers. Der Browser verbindet neu, der Poll hält den Zähler aktuell (REQ-NOTIF-010).
+- **Monitoring: OTLP-Export-Fehler zählen nicht mehr als App-Fehler.** Der OpenTelemetry-Span-Exporter loggt fehlgeschlagene Exporte jetzt auf WARN statt ERROR, sodass ein nicht erreichbares Alloy/Tempo die Fehlerrate `logback_events_total{level="error"}` nicht mehr aufbläht und den Alarm `LogbackErrorSpike` nicht fehlauslöst (REQ-OBS-013).
+
+
 ## [v1.1.2](https://github.com/krt-profit/basetool/releases/tag/v1.1.2) - 2026-07-05
 
 ### Added
