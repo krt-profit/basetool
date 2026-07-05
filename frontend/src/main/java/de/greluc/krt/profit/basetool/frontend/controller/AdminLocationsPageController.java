@@ -130,7 +130,7 @@ public class AdminLocationsPageController {
       backendApiClient.put("/api/v1/locations/" + id, body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
-      log.error("Toggle location visibility failed", e);
+      log.debug("Toggle location visibility failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
       } else {
@@ -178,7 +178,7 @@ public class AdminLocationsPageController {
       backendApiClient.put("/api/v1/locations/" + id, body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
-      log.error("Toggle home-location failed", e);
+      log.debug("Toggle home-location failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
       } else {
@@ -221,7 +221,7 @@ public class AdminLocationsPageController {
       backendApiClient.put("/api/v1/locations/" + id, body, Void.class);
       return ResponseEntity.ok(backendApiClient.get("/api/v1/locations/" + id, LocationDto.class));
     } catch (BackendServiceException e) {
-      log.error("Toggle location visibility (ajax) failed", e);
+      log.debug("Toggle location visibility (ajax) failed", e);
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Toggle location visibility (ajax) failed", e);
@@ -255,7 +255,7 @@ public class AdminLocationsPageController {
       backendApiClient.put("/api/v1/locations/" + id, body, Void.class);
       return ResponseEntity.ok(backendApiClient.get("/api/v1/locations/" + id, LocationDto.class));
     } catch (BackendServiceException e) {
-      log.error("Toggle home-location (ajax) failed", e);
+      log.debug("Toggle home-location (ajax) failed", e);
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Toggle home-location (ajax) failed", e);

@@ -453,7 +453,7 @@ public class OperationPageController {
               false);
       return ResponseEntity.ok(updated);
     } catch (BackendServiceException e) {
-      log.error(
+      log.debug(
           "Update payout paid-out flag failed with status {}: {}",
           e.getStatusCode(),
           e.getMessage());
@@ -534,7 +534,7 @@ public class OperationPageController {
       backendApiClient.post("/api/v1/operations", form, Void.class);
       return ResponseEntity.ok().build();
     } catch (BackendServiceException e) {
-      log.error("Create operation (ajax) failed: {}", e.getMessage());
+      log.debug("Create operation (ajax) failed: {}", e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Create operation (ajax) failed", e);
@@ -573,7 +573,7 @@ public class OperationPageController {
       result.put("status", updated.status());
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
-      log.error("Update operation (ajax) failed for {}: {}", id, e.getMessage());
+      log.debug("Update operation (ajax) failed for {}: {}", id, e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Update operation (ajax) failed for {}", id, e);
@@ -600,7 +600,7 @@ public class OperationPageController {
       backendApiClient.delete("/api/v1/operations/" + id, Void.class);
       return ResponseEntity.ok().build();
     } catch (BackendServiceException e) {
-      log.error("Delete operation (ajax) failed for {}: {}", id, e.getMessage());
+      log.debug("Delete operation (ajax) failed for {}: {}", id, e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Delete operation (ajax) failed for {}", id, e);

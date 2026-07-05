@@ -294,7 +294,7 @@ public class AdminMissionDataPageController {
       backendApiClient.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
-      log.error("Create JobType failed", e);
+      log.debug("Create JobType failed", e);
       if (e.getStatusCode() == 409) {
         redirectAttributes.addFlashAttribute("errorToast", "error.duplicate.jobtype");
         return "redirect:/admin/mission-data";
@@ -347,7 +347,7 @@ public class AdminMissionDataPageController {
       backendApiClient.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
-      log.error("Update JobType failed", e);
+      log.debug("Update JobType failed", e);
       if (e.getStatusCode() == 409) {
         if ("concurrency-conflict".equals(e.getProblemType())) {
           redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
@@ -381,7 +381,7 @@ public class AdminMissionDataPageController {
       backendApiClient.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
-      log.error("Delete JobType failed", e);
+      log.debug("Delete JobType failed", e);
       if (e.getStatusCode() == 409) {
         redirectAttributes.addFlashAttribute("errorToast", "error.delete.jobtype.in_use");
         return "redirect:/admin/mission-data";
@@ -411,7 +411,7 @@ public class AdminMissionDataPageController {
       backendApiClient.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
-      log.error("Activate JobType failed", e);
+      log.debug("Activate JobType failed", e);
       return "redirect:/admin/mission-data?error=ActivateJobTypeFailed";
     } catch (Exception e) {
       log.error("Activate JobType failed", e);
@@ -448,7 +448,7 @@ public class AdminMissionDataPageController {
       backendApiClient.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
-      log.error("Create Squadron failed", e);
+      log.debug("Create Squadron failed", e);
       if (e.getStatusCode() == 409) {
         redirectAttributes.addFlashAttribute("errorToast", "error.duplicate.squadron");
         return "redirect:/admin/mission-data";
@@ -499,7 +499,7 @@ public class AdminMissionDataPageController {
       backendApiClient.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
-      log.error("Update Squadron failed", e);
+      log.debug("Update Squadron failed", e);
       if (e.getStatusCode() == 409) {
         if ("concurrency-conflict".equals(e.getProblemType())) {
           redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
@@ -531,7 +531,7 @@ public class AdminMissionDataPageController {
       backendApiClient.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
-      log.error("Delete Squadron failed", e);
+      log.debug("Delete Squadron failed", e);
       if (e.getStatusCode() == 409) {
         redirectAttributes.addFlashAttribute("errorToast", "error.delete.squadron.in_use");
         return "redirect:/admin/mission-data";
@@ -638,7 +638,7 @@ public class AdminMissionDataPageController {
       backendApiClient.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
-      log.error("Update FrequencyType failed", e);
+      log.debug("Update FrequencyType failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
       } else {
@@ -667,7 +667,7 @@ public class AdminMissionDataPageController {
       backendApiClient.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
-      log.error("Delete FrequencyType failed", e);
+      log.debug("Delete FrequencyType failed", e);
       if (e.getStatusCode() == 409) {
         redirectAttributes.addFlashAttribute("errorToast", "error.delete.frequency_type.in_use");
         return "redirect:/admin/mission-data";
@@ -1007,7 +1007,7 @@ public class AdminMissionDataPageController {
       backendApiClient.clearStaticDataCache();
       return ResponseEntity.ok().build();
     } catch (BackendServiceException e) {
-      log.error("Mission-data write (ajax) failed", e);
+      log.debug("Mission-data write (ajax) failed", e);
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Mission-data write (ajax) failed", e);

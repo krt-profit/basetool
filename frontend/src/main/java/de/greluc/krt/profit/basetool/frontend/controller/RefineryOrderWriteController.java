@@ -427,7 +427,7 @@ public class RefineryOrderWriteController {
       return org.springframework.http.ResponseEntity.ok(
           java.util.Map.of("targetUrl", "/refinery-orders"));
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException bse) {
-      log.error("Failed to update refinery order {} (ajax): {}", id, bse.getMessage());
+      log.debug("Failed to update refinery order {} (ajax): {}", id, bse.getMessage());
       return propagateBackendError(bse);
     } catch (Exception e) {
       log.error("Failed to update refinery order {} (ajax)", id, e);
@@ -463,7 +463,7 @@ public class RefineryOrderWriteController {
       return org.springframework.http.ResponseEntity.ok(
           java.util.Map.of("targetUrl", "/refinery-orders"));
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException bse) {
-      log.error("Failed to store refinery order {} (ajax): {}", id, bse.getMessage());
+      log.debug("Failed to store refinery order {} (ajax): {}", id, bse.getMessage());
       return propagateBackendError(bse);
     } catch (Exception e) {
       log.error("Failed to store refinery order {} (ajax)", id, e);
@@ -491,7 +491,7 @@ public class RefineryOrderWriteController {
       return org.springframework.http.ResponseEntity.ok(
           java.util.Map.of("targetUrl", "/refinery-orders"));
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException bse) {
-      log.error("Failed to cancel refinery order {} (ajax): {}", id, bse.getMessage());
+      log.debug("Failed to cancel refinery order {} (ajax): {}", id, bse.getMessage());
       return propagateBackendError(bse);
     } catch (Exception e) {
       log.error("Failed to cancel refinery order {} (ajax)", id, e);
@@ -530,7 +530,7 @@ public class RefineryOrderWriteController {
       return org.springframework.http.ResponseEntity.ok(
           java.util.Map.of("targetUrl", "/refinery-orders"));
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException bse) {
-      log.error("Failed to create refinery order (ajax): {}", bse.getMessage());
+      log.debug("Failed to create refinery order (ajax): {}", bse.getMessage());
       return propagateBackendError(bse);
     } catch (Exception e) {
       log.error("Failed to create refinery order (ajax)", e);

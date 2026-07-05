@@ -108,7 +108,7 @@ public class AdminAnnouncementPageController {
       backendApiClient.put("/api/v1/announcement", body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
-      log.error("Update announcement failed", e);
+      log.debug("Update announcement failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
       } else {
@@ -158,7 +158,7 @@ public class AdminAnnouncementPageController {
       result.put("version", updated != null ? updated.get("version") : null);
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
-      log.error("Update announcement (ajax) failed", e);
+      log.debug("Update announcement (ajax) failed", e);
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Update announcement (ajax) failed", e);
@@ -199,7 +199,7 @@ public class AdminAnnouncementPageController {
       backendApiClient.delete("/api/v1/announcement", Void.class);
       return ResponseEntity.ok().build();
     } catch (BackendServiceException e) {
-      log.error("Delete announcement (ajax) failed", e);
+      log.debug("Delete announcement (ajax) failed", e);
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Delete announcement (ajax) failed", e);

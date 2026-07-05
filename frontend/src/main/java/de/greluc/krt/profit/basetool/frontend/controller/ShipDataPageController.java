@@ -218,7 +218,7 @@ public class ShipDataPageController {
       backendApiClient.post("/api/v1/hangar/ships/reset-fitted", null, Void.class);
       return ResponseEntity.noContent().build();
     } catch (BackendServiceException e) {
-      log.error("Reset all fitted failed (ajax): {}", e.getMessage());
+      log.debug("Reset all fitted failed (ajax): {}", e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Reset all fitted failed (ajax)", e);
@@ -245,7 +245,7 @@ public class ShipDataPageController {
           "/api/v1/ship-types/" + id + "/visibility?hidden=" + hidden, null, Void.class);
       return ResponseEntity.noContent().build();
     } catch (BackendServiceException e) {
-      log.error("Update ShipType visibility failed (ajax): {}", e.getMessage());
+      log.debug("Update ShipType visibility failed (ajax): {}", e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Update ShipType visibility failed (ajax)", e);
@@ -274,7 +274,7 @@ public class ShipDataPageController {
           "/api/v1/manufacturers/" + id + "/visibility?hidden=" + hidden, null, Void.class);
       return ResponseEntity.noContent().build();
     } catch (BackendServiceException e) {
-      log.error("Update Manufacturer visibility failed (ajax): {}", e.getMessage());
+      log.debug("Update Manufacturer visibility failed (ajax): {}", e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Update Manufacturer visibility failed (ajax)", e);

@@ -112,7 +112,7 @@ public class AdminDiscordRegistrationsPageController {
           backendApiClient.post(
               BACKEND_BASE + "/" + id + "/approve", body, PendingRegistrationDto.class));
     } catch (BackendServiceException e) {
-      log.error("Approve registration {} failed", id, e);
+      log.debug("Approve registration {} failed", id, e);
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Approve registration {} failed", id, e);
@@ -137,7 +137,7 @@ public class AdminDiscordRegistrationsPageController {
           backendApiClient.post(
               BACKEND_BASE + "/" + id + "/reject", body, PendingRegistrationDto.class));
     } catch (BackendServiceException e) {
-      log.error("Reject registration {} failed", id, e);
+      log.debug("Reject registration {} failed", id, e);
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Reject registration {} failed", id, e);

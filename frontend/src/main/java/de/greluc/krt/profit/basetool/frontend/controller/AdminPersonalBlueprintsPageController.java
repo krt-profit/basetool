@@ -347,7 +347,7 @@ public class AdminPersonalBlueprintsPageController {
       return ResponseEntity.ok(
           result == null ? new PersonalBlueprintBulkDeleteResultDto(0) : result);
     } catch (BackendServiceException e) {
-      log.error("Admin failed to clear all users' blueprints (ajax): {}", e.getMessage());
+      log.debug("Admin failed to clear all users' blueprints (ajax): {}", e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Admin failed to clear all users' blueprints (ajax)", e);

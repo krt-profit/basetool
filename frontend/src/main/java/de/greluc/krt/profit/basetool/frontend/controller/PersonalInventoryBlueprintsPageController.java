@@ -366,7 +366,7 @@ public class PersonalInventoryBlueprintsPageController {
               PersonalBlueprintDto.class);
       return ResponseEntity.ok(dto);
     } catch (BackendServiceException e) {
-      log.error("Failed to update blueprint note {} (ajax): {}", id, e.getMessage());
+      log.debug("Failed to update blueprint note {} (ajax): {}", id, e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Failed to update blueprint note {} (ajax)", id, e);
@@ -391,7 +391,7 @@ public class PersonalInventoryBlueprintsPageController {
       backendApiClient.delete("/api/v1/personal-blueprints/" + id, Void.class);
       return ResponseEntity.noContent().build();
     } catch (BackendServiceException e) {
-      log.error("Failed to remove blueprint {} (ajax): {}", id, e.getMessage());
+      log.debug("Failed to remove blueprint {} (ajax): {}", id, e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Failed to remove blueprint {} (ajax)", id, e);
@@ -419,7 +419,7 @@ public class PersonalInventoryBlueprintsPageController {
       return ResponseEntity.ok(
           result == null ? new PersonalBlueprintBulkDeleteResultDto(0) : result);
     } catch (BackendServiceException e) {
-      log.error("Failed to clear all owned blueprints (ajax): {}", e.getMessage());
+      log.debug("Failed to clear all owned blueprints (ajax): {}", e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Failed to clear all owned blueprints (ajax)", e);

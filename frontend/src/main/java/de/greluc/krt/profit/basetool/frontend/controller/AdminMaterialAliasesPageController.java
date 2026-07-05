@@ -268,7 +268,7 @@ public class AdminMaterialAliasesPageController {
       return ResponseEntity.ok(
           backendApiClient.post(BACKEND_BASE, body, MaterialExternalAliasDto.class));
     } catch (BackendServiceException e) {
-      log.error("Create alias (ajax) failed", e);
+      log.debug("Create alias (ajax) failed", e);
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Create alias (ajax) failed", e);
@@ -305,7 +305,7 @@ public class AdminMaterialAliasesPageController {
       return ResponseEntity.ok(
           backendApiClient.put(BACKEND_BASE + "/" + id, body, MaterialExternalAliasDto.class));
     } catch (BackendServiceException e) {
-      log.error("Update alias {} (ajax) failed", id, e);
+      log.debug("Update alias {} (ajax) failed", id, e);
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Update alias {} (ajax) failed", id, e);
@@ -327,7 +327,7 @@ public class AdminMaterialAliasesPageController {
       backendApiClient.delete(BACKEND_BASE + "/" + id, Void.class);
       return ResponseEntity.ok().build();
     } catch (BackendServiceException e) {
-      log.error("Delete alias {} (ajax) failed", id, e);
+      log.debug("Delete alias {} (ajax) failed", id, e);
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Delete alias {} (ajax) failed", id, e);

@@ -200,7 +200,7 @@ public class MissionWriteController {
           "/api/v1/missions/" + id + "/participants/add", body, Void.class, isPublic);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
-      log.error("Add participant failed with status {}: {}", e.getStatusCode(), e.getMessage());
+      log.debug("Add participant failed with status {}: {}", e.getStatusCode(), e.getMessage());
       // 409 Conflict = backend found more than one registered member matching the free-text name
       // -> show a dedicated, localized hint that the user should pick an entry from the
       // autocomplete.
@@ -252,7 +252,7 @@ public class MissionWriteController {
       backendApiClient.put("/api/v1/missions/" + id + "/party-lead", body, Void.class, false);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
-      log.error("Set party lead failed with status {}: {}", e.getStatusCode(), e.getMessage());
+      log.debug("Set party lead failed with status {}: {}", e.getStatusCode(), e.getMessage());
       // 409 = either an ambiguous free-text name (matches more than one member) or a stale
       // partyLeadVersion (someone else changed it meanwhile); a single conflict toast covers both
       // and the reload below shows the current value.
@@ -385,7 +385,7 @@ public class MissionWriteController {
               isPublic);
       return org.springframework.http.ResponseEntity.ok(updatedMission);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
-      log.error(
+      log.debug(
           "Update payout preference failed with status {}: {}", e.getStatusCode(), e.getMessage());
       if (e.getStatusCode() == 403 || e.getStatusCode() == 401) {
         return org.springframework.http.ResponseEntity.status(
@@ -451,7 +451,7 @@ public class MissionWriteController {
       MissionDto refreshed = backendApiClient.get("/api/v1/missions/" + id, MissionDto.class);
       return org.springframework.http.ResponseEntity.ok(refreshed);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
-      log.error("Update actual time failed with status {}: {}", e.getStatusCode(), e.getMessage());
+      log.debug("Update actual time failed with status {}: {}", e.getStatusCode(), e.getMessage());
       org.springframework.http.HttpStatus status;
       switch (e.getStatusCode()) {
         case 409 -> status = org.springframework.http.HttpStatus.CONFLICT;
@@ -1014,7 +1014,7 @@ public class MissionWriteController {
       versions.put("flagsVersion", refreshed.flagsVersion());
       return org.springframework.http.ResponseEntity.ok(versions);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
-      log.error("Update mission (ajax) failed for {}: {}", id, e.getMessage());
+      log.debug("Update mission (ajax) failed for {}: {}", id, e.getMessage());
       return MissionPageController.propagateBackendError(e);
     } catch (Exception e) {
       log.error("Update mission (ajax) failed for {}", id, e);

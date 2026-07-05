@@ -255,7 +255,7 @@ public class PersonalInventoryPageController {
       backendApiClient.post("/api/v1/personal-inventory", request, PersonalInventoryItemDto.class);
       return ResponseEntity.noContent().build();
     } catch (BackendServiceException e) {
-      log.error("Failed to create personal inventory item (ajax): {}", e.getMessage());
+      log.debug("Failed to create personal inventory item (ajax): {}", e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Failed to create personal inventory item (ajax)", e);
@@ -292,7 +292,7 @@ public class PersonalInventoryPageController {
           "/api/v1/personal-inventory/" + id, request, PersonalInventoryItemDto.class);
       return ResponseEntity.noContent().build();
     } catch (BackendServiceException e) {
-      log.error("Failed to update personal inventory item {} (ajax): {}", id, e.getMessage());
+      log.debug("Failed to update personal inventory item {} (ajax): {}", id, e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Failed to update personal inventory item {} (ajax)", id, e);
@@ -315,7 +315,7 @@ public class PersonalInventoryPageController {
       backendApiClient.delete("/api/v1/personal-inventory/" + id, Void.class);
       return ResponseEntity.noContent().build();
     } catch (BackendServiceException e) {
-      log.error("Failed to delete personal inventory item {} (ajax): {}", id, e.getMessage());
+      log.debug("Failed to delete personal inventory item {} (ajax): {}", id, e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Failed to delete personal inventory item {} (ajax)", id, e);
