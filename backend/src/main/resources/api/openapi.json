@@ -57544,6 +57544,17 @@
             "items" : {
               "type" : "number"
             }
+          },
+          "bereichId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "bereichName" : {
+            "type" : "string"
+          },
+          "bereichDepartment" : {
+            "type" : "string",
+            "enum" : [ "PROFIT", "SUB_RADAR", "RAUMUEBERLEGENHEIT", "FORSCHUNG", "MARINEKORPS", "SEARCH_RESCUE" ]
           }
         }
       },

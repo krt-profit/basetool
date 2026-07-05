@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--
+  Reusable account-rendering fragments for the bank dashboard (REQ-BANK-016): the card grid, the
+  table, and the by-Bereich-group wrapper that composes them. Kept in a dedicated fragments file so a
+  full-page render never processes them inline with unbound parameters. The card/row markup is
+  inlined in accGrid/accTable (each is the sole place a card/row renders), so there is no bare <tr>
+  at body level and no leaf-fragment parameter passing. Each expects a list of
+  BankPageController.BankDashboardCardView, or the group wrapper a BankDashboardGroupView + layout.
+-->
+
+<!-- A grid of account cards. Each card carries data-filter-name for the live name filter. -->
+<div th:fragment="accGrid(cards)" class="bank-acc-grid mt-2">
+    <a th:each="card : ${cards}" class="kpi-card"
+       th:classappend="${card.account().status() == 'CLOSED'} ? ' kpi-card--closed' : ''"
+       th:href="@{'/bank/accounts/' + ${card.account().id()}}"
+       data-testid="bank-account-card"
+       th:attr="data-account-no=${card.account().accountNo()},data-filter-name=${card.account().name()}">
+        <div class="kpi-card-top">
+            <div>
+                <div class="kpi-title" th:text="${card.account().name()}">Staffel IRIDIUM</div>
+                <div class="kpi-sub" th:text="${card.account().accountNo()}">KB-0001</div>
+            </div>
+            <span class="chip" style="font-size: 0.55rem;"
+                  th:classappend="${card.account().status() == 'CLOSED'} ? ' chip--muted' : ''"
+                  th:text="${card.account().status() == 'CLOSED'} ? #{bank.account.status.CLOSED} : #{'bank.account.type.' + ${card.account().type()}}">Staffel</span>
+        </div>
+        <div class="kpi-value"
+             th:text="${#numbers.formatInteger(@moneyFormat.round(card.account().balance()), 1, 'POINT')} + ' aUEC'">1.850.000 aUEC</div>
+        <div class="kpi-card-foot">
+            <span class="kpi-delta"
+                  th:classappend="${card.account().delta30d().signum() > 0} ? ' kpi-delta--pos' : (${card.account().delta30d().signum() < 0} ? ' kpi-delta--neg' : ' kpi-delta--flat')"
+                  th:text="${card.account().delta30d().signum() > 0 ? '&#9650; +' : (card.account().delta30d().signum() < 0 ? '&#9660; ' : '&#177; ')} + ${#numbers.formatInteger(@moneyFormat.round(card.account().delta30d()), 1, 'POINT')} + ' ' + #{bank.dashboard.delta30}">&#9650; +420.000 / 30 T</span>
+            <svg th:if="${card.sparklinePoints() != null}" width="96" height="26" viewBox="0 0 96 26" aria-hidden="true">
+                <polyline th:attr="points=${card.sparklinePoints()}"
+                          th:classappend="${card.flat()} ? ' kpi-sparkline--flat' : ''"
+                          class="kpi-sparkline" fill="none" stroke-width="1.5"/>
+            </svg>
+        </div>
+    </a>
+</div>
+
+<!-- A table of account rows. Each row carries data-filter-name for the live name filter. -->
+<div th:fragment="accTable(cards)" class="table-responsive mt-2">
+    <table class="data-table bank-acc-table" data-testid="bank-account-table">
+        <thead>
+        <tr>
+            <th th:text="#{bank.dashboard.col.account}">Konto</th>
+            <th th:text="#{bank.dashboard.col.type}">Typ</th>
+            <th class="text-right" th:text="#{bank.dashboard.col.balance}">Saldo</th>
+            <th th:text="#{bank.dashboard.col.delta}">30 T</th>
+            <th th:text="#{bank.dashboard.col.trend}">Trend</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="card : ${cards}" data-testid="bank-account-row"
+            th:classappend="${card.account().status() == 'CLOSED'} ? ' bank-row--closed' : ''"
+            th:attr="data-account-no=${card.account().accountNo()},data-filter-name=${card.account().name()}">
+            <td>
+                <a th:href="@{'/bank/accounts/' + ${card.account().id()}}" th:text="${card.account().name()}">Staffel IRIDIUM</a>
+                <br>
+                <span class="text-muted" style="font-size: 0.8rem;" th:text="${card.account().accountNo()}">KB-0001</span>
+            </td>
+            <td>
+                <span class="chip"
+                      th:classappend="${card.account().status() == 'CLOSED'} ? ' chip--muted' : ''"
+                      th:text="${card.account().status() == 'CLOSED'} ? #{bank.account.status.CLOSED} : #{'bank.account.type.' + ${card.account().type()}}">Staffel</span>
+            </td>
+            <td class="text-right"
+                th:text="${#numbers.formatInteger(@moneyFormat.round(card.account().balance()), 1, 'POINT')} + ' aUEC'">1.850.000 aUEC</td>
+            <td>
+                <span class="kpi-delta"
+                      th:classappend="${card.account().delta30d().signum() > 0} ? ' kpi-delta--pos' : (${card.account().delta30d().signum() < 0} ? ' kpi-delta--neg' : ' kpi-delta--flat')"
+                      th:text="${card.account().delta30d().signum() > 0 ? '&#9650; +' : (card.account().delta30d().signum() < 0 ? '&#9660; ' : '&#177; ')} + ${#numbers.formatInteger(@moneyFormat.round(card.account().delta30d()), 1, 'POINT')}">&#9650; +420.000</span>
+            </td>
+            <td>
+                <svg th:if="${card.sparklinePoints() != null}" width="96" height="26" viewBox="0 0 96 26" aria-hidden="true">
+                    <polyline th:attr="points=${card.sparklinePoints()}"
+                              th:classappend="${card.flat()} ? ' kpi-sparkline--flat' : ''"
+                              class="kpi-sparkline" fill="none" stroke-width="1.5"/>
+                </svg>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- One by-Bereich group: a colour-marked header (its Bereichsfarbe) plus the group's accounts in
+     the chosen layout. Fixed groups use an i18n title key; a Bereich group uses its live name. -->
+<section th:fragment="accGroup(group, layout)" class="bank-acc-group"
+         th:attr="data-bank-acc-group=${group.key()}" data-testid="bank-acc-group">
+    <h2 class="bank-acc-group-head"
+        th:classappend="${group.deptClass() != null} ? ' ' + ${group.deptClass()} : ''"
+        th:text="${group.titleKey() != null} ? #{__${group.titleKey()}__} : ${group.bereichName()}">Bereich</h2>
+    <th:block th:if="${layout == 'table'}"
+              th:replace="~{fragments/bank-account-views :: accTable(${group.cards()})}"></th:block>
+    <th:block th:unless="${layout == 'table'}"
+              th:replace="~{fragments/bank-account-views :: accGrid(${group.cards()})}"></th:block>
+</section>
+</body>
+</html>

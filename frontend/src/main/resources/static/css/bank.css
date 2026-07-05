@@ -279,6 +279,9 @@ tr.is-inert td {
 }
 
 /* ---- KRT modal frame (formalized head/body/foot) + type-to-confirm ---- */
+/* Mirrors the global `.krt-modal-overlay` in styles.css (same hidden default).
+   Kept as defense-in-depth so the overlay stays hidden even if only one of the two
+   stylesheets loads; both must agree on `display: none`. */
 .krt-modal-overlay {
     position: fixed;
     inset: 0;
@@ -1166,4 +1169,76 @@ tr.is-inert td {
     margin: 0 0 8px;
     font-size: 0.78rem;
     color: var(--color-warning);
+}
+
+/* ===== Dashboard view options (REQ-BANK-016): card/table layout + by-Bereich grouping ===== */
+
+/* Two segmented toggle controls (layout, grouping) in the dashboard header. */
+.bank-view-toggles {
+    display: inline-flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.bank-seg {
+    display: inline-flex;
+    gap: 0;
+}
+
+.bank-seg .bank-view-btn {
+    border-radius: 0;
+}
+
+.bank-seg .bank-view-btn + .bank-view-btn {
+    margin-left: -1px;
+}
+
+/* Tabular account view — reuses the shared .data-table look; keep the trend cell compact. */
+.bank-acc-table td .kpi-sparkline {
+    stroke: var(--color-primary);
+}
+
+.bank-row--closed {
+    opacity: 0.55;
+}
+
+/* A by-Bereich group: a coloured header rule over its accounts, stacked vertically. */
+.bank-acc-group {
+    margin-top: 1.25rem;
+}
+
+.bank-acc-group-head {
+    margin: 0 0 0.5rem;
+    padding: 0.35rem 0 0.35rem 0.75rem;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-left: 4px solid var(--bank-dept, var(--color-primary));
+    color: var(--color-text);
+}
+
+/* Bereich department colour classes — mirror the org chart's oc-dept--* over the shared
+   --color-dept-* tokens so both surfaces read from one design-system source (REQ-ORG-018). */
+.bank-dept--profit {
+    --bank-dept: var(--color-dept-profit);
+}
+
+.bank-dept--sub-radar {
+    --bank-dept: var(--color-dept-sub-radar);
+}
+
+.bank-dept--raumueberlegenheit {
+    --bank-dept: var(--color-dept-raumueberlegenheit);
+}
+
+.bank-dept--forschung {
+    --bank-dept: var(--color-dept-forschung);
+}
+
+.bank-dept--marinekorps {
+    --bank-dept: var(--color-dept-marinekorps);
+}
+
+.bank-dept--search-rescue {
+    --bank-dept: var(--color-dept-search-rescue);
 }
