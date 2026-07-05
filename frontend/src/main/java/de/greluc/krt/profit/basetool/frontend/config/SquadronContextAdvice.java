@@ -290,13 +290,16 @@ public class SquadronContextAdvice {
       log.debug("Failed to load Squadron catalogue for admin switcher", ex);
     }
     try {
-      // NOT cached (REQ-DATA-007): unlike the squadron catalogue, special-command admin mutations
-      // (AdminSpecialCommandsPageController create/update/delete/activate) do not evict
-      // STATIC_DATA_CACHE, so caching this URI would leave the admin switcher's SK list stale for
-      // the cache TTL after an SK lifecycle change. This call is admin-switcher-only (not every
-      // render), so a plain fetch is the safe trade-off until SK mutations wire eviction.
+      // Cached global catalogue (REQ-DATA-007): the SK catalogue is now cacheable because every SK
+      // lifecycle mutation evicts STATIC_DATA_CACHE — AdminSpecialCommandsPageController
+      // create/update/delete/activate (+ AJAX twins) and SpecialCommandAdminProxyController's
+      // profit-eligible flip all call clearStaticDataCache(). Same URI-keyed entry the admin
+      // switcher shares, so the SK list is fetched at most once per TTL app-wide instead of on
+      // every
+      // admin render.
       PageResponse<SquadronDto> specialCommands =
-          backendApiClient.get("/api/v1/special-commands?size=1000&sort=name,asc", SQUADRON_PAGE);
+          backendApiClient.getCached(
+              "/api/v1/special-commands?size=1000&sort=name,asc", SQUADRON_PAGE);
       if (specialCommands != null && specialCommands.content() != null) {
         for (SquadronDto sk : specialCommands.content()) {
           combined.add(

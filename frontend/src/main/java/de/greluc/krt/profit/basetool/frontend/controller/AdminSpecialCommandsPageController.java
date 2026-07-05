@@ -203,6 +203,7 @@ public class AdminSpecialCommandsPageController {
           new SpecialCommandDto(
               null, form.name(), form.shorthand(), form.description(), true, false, 0L);
       backendApiClient.post("/api/v1/special-commands", body, Void.class);
+      evictOrgUnitCatalogueCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       log.debug("Create SpecialCommand failed", e);
@@ -246,6 +247,7 @@ public class AdminSpecialCommandsPageController {
           new SpecialCommandDto(
               id, form.name(), form.shorthand(), form.description(), true, false, form.version());
       backendApiClient.put("/api/v1/special-commands/" + id, body, Void.class);
+      evictOrgUnitCatalogueCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       log.debug("Update SpecialCommand failed", e);
@@ -279,6 +281,7 @@ public class AdminSpecialCommandsPageController {
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
       backendApiClient.delete("/api/v1/special-commands/" + id, Void.class);
+      evictOrgUnitCatalogueCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
       log.debug("Delete SpecialCommand failed", e);
@@ -306,6 +309,7 @@ public class AdminSpecialCommandsPageController {
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
       backendApiClient.post("/api/v1/special-commands/" + id + "/activate", null, Void.class);
+      evictOrgUnitCatalogueCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Activate SpecialCommand failed", e);
@@ -527,12 +531,14 @@ public class AdminSpecialCommandsPageController {
       return ResponseEntity.status(422).build();
     }
     return okOrRelay(
-        () ->
-            backendApiClient.post(
-                "/api/v1/special-commands",
-                new SpecialCommandDto(
-                    null, form.name(), form.shorthand(), form.description(), true, false, 0L),
-                Void.class));
+        () -> {
+          backendApiClient.post(
+              "/api/v1/special-commands",
+              new SpecialCommandDto(
+                  null, form.name(), form.shorthand(), form.description(), true, false, 0L),
+              Void.class);
+          evictOrgUnitCatalogueCache();
+        });
   }
 
   /**
@@ -554,18 +560,20 @@ public class AdminSpecialCommandsPageController {
       return ResponseEntity.status(422).build();
     }
     return okOrRelay(
-        () ->
-            backendApiClient.put(
-                "/api/v1/special-commands/" + id,
-                new SpecialCommandDto(
-                    id,
-                    form.name(),
-                    form.shorthand(),
-                    form.description(),
-                    true,
-                    false,
-                    form.version()),
-                Void.class));
+        () -> {
+          backendApiClient.put(
+              "/api/v1/special-commands/" + id,
+              new SpecialCommandDto(
+                  id,
+                  form.name(),
+                  form.shorthand(),
+                  form.description(),
+                  true,
+                  false,
+                  form.version()),
+              Void.class);
+          evictOrgUnitCatalogueCache();
+        });
   }
 
   /**
@@ -577,7 +585,11 @@ public class AdminSpecialCommandsPageController {
   @ResponseBody
   @PostMapping(value = "/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> deleteSpecialCommandAjax(@PathVariable @NotNull UUID id) {
-    return okOrRelay(() -> backendApiClient.delete("/api/v1/special-commands/" + id, Void.class));
+    return okOrRelay(
+        () -> {
+          backendApiClient.delete("/api/v1/special-commands/" + id, Void.class);
+          evictOrgUnitCatalogueCache();
+        });
   }
 
   /**
@@ -590,9 +602,10 @@ public class AdminSpecialCommandsPageController {
   @PostMapping(value = "/{id}/activate", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> activateSpecialCommandAjax(@PathVariable @NotNull UUID id) {
     return okOrRelay(
-        () ->
-            backendApiClient.post(
-                "/api/v1/special-commands/" + id + "/activate", null, Void.class));
+        () -> {
+          backendApiClient.post("/api/v1/special-commands/" + id + "/activate", null, Void.class);
+          evictOrgUnitCatalogueCache();
+        });
   }
 
   /**
@@ -701,6 +714,20 @@ public class AdminSpecialCommandsPageController {
       log.error("SpecialCommand write (ajax) failed", e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
+  }
+
+  /**
+   * Evicts {@code STATIC_DATA_CACHE} after an SK <b>lifecycle</b> change (create / update /
+   * soft-delete / re-activate / profit-eligible flip). The SK name, shorthand, active flag and
+   * {@code isProfitEligible} feed the cached org-units owner-pickers ({@code GET
+   * /api/v1/org-units/active…}) and the admin switcher's SK catalogue that {@code
+   * SquadronContextAdvice} reads, so every catalogue-changing mutation must drop the shared cache
+   * or those surfaces stay stale up to the 10-minute TTL. This is the eviction that REQ-DATA-007
+   * gates SK-catalogue cacheability on. Member-roster mutations (add / remove / flags / lead) do
+   * not touch the catalogue fields, so they deliberately do not evict.
+   */
+  private void evictOrgUnitCatalogueCache() {
+    backendApiClient.clearStaticDataCache();
   }
 
   // ---------- helper fetchers for the detail page ---------------------------------

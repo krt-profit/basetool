@@ -193,18 +193,25 @@ Invariants that must hold:
   AJAX twin, in a `finally` around the per-setting PUTs so even a **partial save** (an early setting PUT
   lands, a later one throws) still drops the cache rather than stranding the persisted threshold until
   the TTL. Caching them is therefore allowed under the eviction gate above.
-- **The SpecialCommand catalogue (`/api/v1/special-commands?…`) stays an uncached plain `get`** because
-  `AdminSpecialCommandsPageController` does **not** yet evict `STATIC_DATA_CACHE`; caching it without
-  that wiring would leave the admin switcher's SK list stale for the cache TTL after an SK lifecycle
-  change. Caching it is blocked on wiring SK-mutation eviction first.
+- **The SpecialCommand catalogue (`/api/v1/special-commands?…`) is cached** now that every SK lifecycle
+  mutation evicts `STATIC_DATA_CACHE`: `AdminSpecialCommandsPageController`'s
+  create / update / soft-delete / re-activate (classic **and** AJAX twins) and
+  `SpecialCommandAdminProxyController`'s profit-eligible flip all call `clearStaticDataCache()`.
+  `SquadronContextAdvice`'s admin switcher therefore reads the SK catalogue through `getCached`, at most
+  once per TTL app-wide instead of on every admin render. Member-roster mutations (add / remove / flags /
+  lead) do not change the catalogue's name / shorthand / active / profit-eligible fields, so they
+  deliberately do **not** evict.
 - **Per-principal calls are never URI-cached.** `/api/v1/users/me`, `/api/v1/me/capabilities`, and
   `/api/v1/me/active-org-unit` share a URI across users; a URI-keyed cache would cross-contaminate
   them, so they remain plain `get(...)`.
 
 **Acceptance** (`SquadronContextAdviceTest`): both `availableSquadrons()` and the admin switcher route
-the squadron catalogue through `getCached`, never a plain `get`; the SpecialCommand catalogue stays a
-plain `get`. (`AdminSettingsPageControllerMvcTest`): every successful settings save — classic and AJAX,
-including a partial save where a later PUT throws — evicts `STATIC_DATA_CACHE`.
+the squadron catalogue through `getCached`, never a plain `get`; the admin switcher also routes the
+SpecialCommand catalogue through `getCached`. (`AdminSpecialCommandsPageControllerMvcTest`,
+`SpecialCommandAdminProxyControllerTest`): every SK lifecycle mutation — create / update / delete /
+activate (classic and AJAX) and the profit-eligible flip — evicts `STATIC_DATA_CACHE`, while a
+member-roster mutation does not. (`AdminSettingsPageControllerMvcTest`): every successful settings save —
+classic and AJAX, including a partial save where a later PUT throws — evicts `STATIC_DATA_CACHE`.
 
 ### REQ-DATA-008 — User deletion reassigns or clears every `app_user` FK that lacks an `ON DELETE` clause
 

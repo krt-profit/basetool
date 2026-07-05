@@ -142,12 +142,12 @@ class SquadronContextAdviceTest {
   }
 
   @Test
-  void adminSwitcher_routesSquadronCatalogueThroughCache_notPlainGet() {
-    // REQ-DATA-007: the admin switcher's squadron catalogue goes through getCached (the same
-    // URI-keyed STATIC_DATA_CACHE entry availableSquadrons() uses), never a plain GET. This pins
-    // the routing precondition for the cross-call de-dup; the actual single-fetch is the shared
-    // URI-keyed cache (Caffeine), not exercised here since backendApiClient is mocked.
-    // Special-commands stays a plain GET (admin-only, intentionally uncached — see REQ-DATA-007).
+  void adminSwitcher_routesSquadronAndSpecialCommandCataloguesThroughCache_notPlainGet() {
+    // REQ-DATA-007: the admin switcher's squadron AND special-command catalogues both go through
+    // getCached (URI-keyed STATIC_DATA_CACHE), never a plain GET. The SK catalogue became cacheable
+    // once every SK lifecycle mutation wired clearStaticDataCache()
+    // (AdminSpecialCommandsPageController
+    // + SpecialCommandAdminProxyController); this pins that both are cached now.
     when(authHelper.isAuthenticated()).thenReturn(true);
     when(authHelper.isAdmin()).thenReturn(true);
 
@@ -157,6 +157,10 @@ class SquadronContextAdviceTest {
         .getCached(eq("/api/v1/squadrons?size=1000&sort=name,asc"), anyTypeRef());
     verify(backendApiClient, never())
         .get(eq("/api/v1/squadrons?size=1000&sort=name,asc"), anyTypeRef());
+    verify(backendApiClient)
+        .getCached(eq("/api/v1/special-commands?size=1000&sort=name,asc"), anyTypeRef());
+    verify(backendApiClient, never())
+        .get(eq("/api/v1/special-commands?size=1000&sort=name,asc"), anyTypeRef());
   }
 
   @Test

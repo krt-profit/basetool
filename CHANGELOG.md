@@ -10,6 +10,7 @@
 ### Changed
 
 - **Bank – Buchungsanträge-Übersicht mit parallelen Status-Filtern.** Die Anträge stehen jetzt in einer Tabelle mit unabhängig schaltbaren Filtern (Ausstehend/Bestätigt/Abgelehnt/Zurückgezogen); standardmäßig ist nur „Ausstehend" aktiv. Die Auswahl wird pro Nutzer gespeichert, und Begründung sowie Notiz eines Antrags lassen sich je Zeile ausklappen (#995).
+- **Frontend: Spezialkommando-Katalog wird jetzt gecacht.** Der SK-Katalog des Admin-Umschalters läuft wie der Staffel-Katalog über den 10-Minuten-`STATIC_DATA_CACHE` statt bei jedem Admin-Render neu geladen zu werden. Jede SK-Lebenszyklus-Änderung (Anlegen/Bearbeiten/Löschen/Reaktivieren sowie das Auftragsbearbeitung-Flag) leert den Cache, sodass die Änderung sofort sichtbar bleibt (REQ-DATA-007).
 
 
 ## [v1.1.3](https://github.com/krt-profit/basetool/releases/tag/v1.1.3) - 2026-07-05
