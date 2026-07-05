@@ -80,6 +80,7 @@ public class UexScheduler {
   private final UexItemPriceSyncService uexItemPriceSyncService;
   private final SyncCoordinator syncCoordinator;
   private final TaskMetrics taskMetrics;
+  private final MasterDataCacheEvictionService masterDataCacheEvictionService;
 
   /**
    * Periodic UEX sync entry point on a fixed delay, started immediately on boot ({@code
@@ -104,37 +105,46 @@ public class UexScheduler {
    * which records the run as a {@code failure} and swallows the exception so the scheduler thread
    * survives. Only invoked through {@link SyncCoordinator#runExclusively(String, Runnable)}, so it
    * holds the cross-scheduler lock for its full duration — the SC Wiki sync waits behind it.
+   *
+   * <p>The sweep evicts the master-data caches it can make stale in a {@code finally} ({@link
+   * MasterDataCacheEvictionService#evictUexSyncedMasterData()}), so a freshly-synced catalogue is
+   * visible on the next read instead of lagging the 30-minute TTL (CACHE-SYNC-EVICT-001) — and
+   * committed steps are still reconciled when a later step aborts the sweep.
    */
   private void runAllSyncSteps() {
     log.info("Running scheduled task to update UEX data...");
-    uexUniverseSyncService.syncFactions();
-    uexUniverseSyncService.syncJurisdictions();
-    uexUniverseSyncService.syncPlanets();
-    uexUniverseSyncService.syncMoons();
-    uexUniverseSyncService.syncOrbits();
-    uexUniverseSyncService.syncCities();
-    uexUniverseSyncService.syncOutposts();
-    uexUniverseSyncService.syncPois();
-    uexUniverseSyncService.syncSpaceStations();
-    uexUniverseSyncService.syncTerminals();
+    try {
+      uexUniverseSyncService.syncFactions();
+      uexUniverseSyncService.syncJurisdictions();
+      uexUniverseSyncService.syncPlanets();
+      uexUniverseSyncService.syncMoons();
+      uexUniverseSyncService.syncOrbits();
+      uexUniverseSyncService.syncCities();
+      uexUniverseSyncService.syncOutposts();
+      uexUniverseSyncService.syncPois();
+      uexUniverseSyncService.syncSpaceStations();
+      uexUniverseSyncService.syncTerminals();
 
-    uexStarSystemService.fetchAndProcessStarSystems();
-    uexCommodityService.fetchAndProcessCommoditiesPrices();
-    uexManufacturerService.syncManufacturers();
-    uexVehicleService.syncVehicles();
+      uexStarSystemService.fetchAndProcessStarSystems();
+      uexCommodityService.fetchAndProcessCommoditiesPrices();
+      uexManufacturerService.syncManufacturers();
+      uexVehicleService.syncVehicles();
 
-    // R2 — category reference + item catalogue. categoriesRef populates the table that
-    // UexItemSyncService iterates; the latter resolves manufacturers (already synced above)
-    // and linked ship types (also above), so the topological order is preserved.
-    uexCategoryRefService.syncCategories();
-    uexItemSyncService.syncItems();
+      // R2 — category reference + item catalogue. categoriesRef populates the table that
+      // UexItemSyncService iterates; the latter resolves manufacturers (already synced above)
+      // and linked ship types (also above), so the topological order is preserved.
+      uexCategoryRefService.syncCategories();
+      uexItemSyncService.syncItems();
 
-    // R7 — item prices. Runs after the item catalogue (resolves game_item) and terminals
-    // (synced in the universe phase above). Self-guards on krt.uex.item-price-sync-enabled, so
-    // this is a no-op until an operator opts in.
-    uexItemPriceSyncService.syncItemPrices();
+      // R7 — item prices. Runs after the item catalogue (resolves game_item) and terminals
+      // (synced in the universe phase above). Self-guards on krt.uex.item-price-sync-enabled, so
+      // this is a no-op until an operator opts in.
+      uexItemPriceSyncService.syncItemPrices();
 
-    uexRefinerySyncService.syncRefiningMethods();
-    uexRefinerySyncService.syncRefineryYields();
+      uexRefinerySyncService.syncRefiningMethods();
+      uexRefinerySyncService.syncRefineryYields();
+    } finally {
+      masterDataCacheEvictionService.evictUexSyncedMasterData();
+    }
   }
 }

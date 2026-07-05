@@ -41,6 +41,7 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -129,13 +130,18 @@ public class MaterialService {
   }
 
   /**
-   * Returns the material.
+   * Returns the material. Cached in the dedicated {@link CacheConfig#MATERIAL_BY_ID_CACHE} (not the
+   * list catalogue) so a by-id lookup and a paged-list read cannot evict each other under a shared
+   * size budget. The returned entity is cache-shared — callers must treat it read-only and map it
+   * to a DTO before returning; the write paths re-load a managed instance via Spring
+   * self-invocation (which bypasses this cache proxy) so they never re-save this cached copy
+   * (L4/CACHE-03).
    *
    * @param id material primary key
    * @return the material
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no match
    */
-  @Cacheable(cacheNames = CacheConfig.MATERIALS_CACHE)
+  @Cacheable(cacheNames = CacheConfig.MATERIAL_BY_ID_CACHE)
   public Material getMaterial(@NotNull UUID id) {
     return materialRepository
         .findById(id)
@@ -210,7 +216,11 @@ public class MaterialService {
    *     that does not exist
    */
   @Transactional
-  @CacheEvict(cacheNames = CacheConfig.MATERIALS_CACHE, allEntries = true)
+  @Caching(
+      evict = {
+        @CacheEvict(cacheNames = CacheConfig.MATERIALS_CACHE, allEntries = true),
+        @CacheEvict(cacheNames = CacheConfig.MATERIAL_BY_ID_CACHE, allEntries = true)
+      })
   public Material createMaterial(@NotNull MaterialCreateDto dto) {
     MaterialType type;
     try {
@@ -281,7 +291,11 @@ public class MaterialService {
    *     version is stale
    */
   @Transactional
-  @CacheEvict(cacheNames = CacheConfig.MATERIALS_CACHE, allEntries = true)
+  @Caching(
+      evict = {
+        @CacheEvict(cacheNames = CacheConfig.MATERIALS_CACHE, allEntries = true),
+        @CacheEvict(cacheNames = CacheConfig.MATERIAL_BY_ID_CACHE, allEntries = true)
+      })
   public Material updateMaterial(@NotNull UUID id, @NotNull Material materialDetails) {
     Material material = getMaterial(id);
 
@@ -327,7 +341,11 @@ public class MaterialService {
    * @param id material primary key
    */
   @Transactional
-  @CacheEvict(cacheNames = CacheConfig.MATERIALS_CACHE, allEntries = true)
+  @Caching(
+      evict = {
+        @CacheEvict(cacheNames = CacheConfig.MATERIALS_CACHE, allEntries = true),
+        @CacheEvict(cacheNames = CacheConfig.MATERIAL_BY_ID_CACHE, allEntries = true)
+      })
   public void deleteMaterial(@NotNull UUID id) {
     Material material = getMaterial(id);
     materialRepository.delete(material);

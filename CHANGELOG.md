@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **Backend: frisch synchronisierte Stammdaten erscheinen sofort statt mit bis zu 30 Minuten Verzögerung.** Die periodischen UEX-/SC-Wiki-Syncs schreiben direkt in die Tabellen hinter den Caffeine-Caches (Materialien, Hersteller, Schiffstypen, Sternensysteme, Städte, Raffinerie-Methoden, Blueprint-Familienindex) und umgingen bisher deren `@CacheEvict`, sodass neue Daten bis zum TTL-Ablauf unsichtbar blieben. Jeder Sync-Durchlauf leert die von ihm betroffenen Caches nach Abschluss (REQ-DATA-011).
+
 - **Frontend: erwartete Backend-4xx fluten nicht mehr das Fehler-Log.** 33 Controller loggten relayte Backend-Fehler zusätzlich auf ERROR – auch bei Client-4xx (Validierung 400, Konflikt 409). Diese 88 redundanten Logs sind auf DEBUG gesenkt (der `BackendApiClient`-Boundary loggt ohnehin einmal korrekt: 5xx→ERROR, 4xx→WARN), sodass normale Nutzereingabe-Fehler nicht mehr fälschlich `LogbackErrorSpike` auslösen (REQ-OBS-001).
 
 

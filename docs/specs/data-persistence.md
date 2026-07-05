@@ -326,6 +326,44 @@ because the wire behaviour is unchanged.
 **Code:** `backend/src/main/java/.../backend/repository/LookupTableRepository.java`,
 `backend/src/main/java/.../backend/repository/ScopeSpecifications.java`
 
+### REQ-DATA-011 — Background sync sweeps evict the master-data caches they rewrite (CACHE-SYNC-EVICT-001)
+
+The backend serves quasi-static reference data from per-cache Caffeine caches (backend `CacheConfig`,
+master-data TTL 30 min). The admin CRUD services evict their own cache on every user-facing write, but
+the periodic **UEX** (`UexScheduler`) and **SC Wiki** (`ScWikiScheduler`) sync sweeps bulk-write
+directly to the repositories behind those caches — bypassing the `@CacheEvict` hooks — so before this
+rule a freshly-synced material / manufacturer / ship-type / star-system / city / refining-method / the
+blueprint variant-family index stayed invisible for up to the TTL (the window the 2 min→30 min TTL bump
+widened 15×).
+
+Each sweep therefore evicts the caches it can make stale **on completion**, through
+`MasterDataCacheEvictionService`:
+
+- The eviction runs in a `finally` around the sweep body, so every step that **did** commit is
+  reconciled even when a later step aborts the sweep (UEX is fail-fast; SC Wiki swallows per step).
+- The two per-sweep cache-name sets (`UEX_SYNCED_CACHES`, `SCWIKI_SYNCED_CACHES`) are the **single
+  source of truth** for "a sync can make these stale". **A new cache added over a synced table MUST be
+  added to the matching set**, or it silently lags the TTL again after a sync. The 30 min TTL is only
+  the backstop, never the primary freshness mechanism for synced data.
+- This is also the sole evict hook for `BLUEPRINT_FAMILY_INDEX_CACHE`, which has no per-write hook of
+  its own (CACHE-DIST-03); it is rebuilt only by the SC Wiki blueprint sync, so evicting it at sweep
+  completion is both necessary and sufficient.
+
+Related, the material caches are split so a paged-list read and a single-entity read cannot evict each
+other under a shared size budget (**CACHE-02**): `getMaterial(id)` caches in `MATERIAL_BY_ID_CACHE`
+while the list reads stay in `MATERIALS_CACHE`; **every material write and every sync sweep evicts
+both**, so a single-entity entry can never survive a rename/delete while the list entry is dropped.
+
+**Acceptance**: `MasterDataCacheEvictionServiceTest` (each sweep clears exactly its cache set; a missing
+cache is tolerated; the sets are pinned so a synced-table cache cannot be silently dropped);
+`UexSchedulerTest` / `ScWikiSchedulerTest` (the sweep evicts on completion **and** after a mid-sweep
+failure, and does not evict when the cross-scheduler gate skips the sweep); `MaterialServiceCachingTest`
+(`getMaterial` populates only the by-id cache, the list reads only the list cache, and a write evicts
+both).
+
+**Enforced by:** `MasterDataCacheEvictionService`, `UexScheduler.runAllSyncSteps`,
+`ScWikiScheduler.runAllSyncSteps`, `MaterialService` (split `@Cacheable` + dual `@CacheEvict`).
+
 ## Out of scope
 
 **Material-amount SCU-scale storage and rounding** (the `@PrePersist`/`@PreUpdate` HALF_UP-to-three-
