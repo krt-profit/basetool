@@ -34,14 +34,15 @@ import org.springframework.context.annotation.Configuration;
  * caches have very different freshness requirements:
  *
  * <ul>
- *   <li><b>Master data (30 min)</b> — cities, materials, ship types, locations, frequency types,
- *       job types, manufacturers, refining methods, star systems, mission lead types, material
+ *   <li><b>Master data (30 min)</b> — cities, materials (list + by-id), ship types, locations,
+ *       frequency types, job types, manufacturers, refining methods, star systems, material
  *       categories, and the blueprint variant-family index (rebuilt from the active blueprint
- *       master; no write-evict hook — it lags the periodic SC Wiki sync by at most the TTL).
- *       Quasi-static: editor flows already trigger {@code @CacheEvict (allEntries=true)} on writes,
- *       so a stale entry only survives until the next admin write or the 30 min lapse — whichever
- *       comes first. The previous 2 min global TTL kept paying the underlying DB-hit cost 15× per
- *       hour for data that almost never changes.
+ *       master; no per-write evict hook of its own). Quasi-static: editor flows already trigger
+ *       {@code @CacheEvict (allEntries=true)} on writes, and the periodic UEX / SC Wiki sync sweeps
+ *       evict the caches they rewrite on completion (via {@code MasterDataCacheEvictionService},
+ *       CACHE-SYNC-EVICT-001), so a stale entry only survives until the next admin write, the next
+ *       sync sweep, or the 30 min lapse — whichever comes first. The previous 2 min global TTL kept
+ *       paying the underlying DB-hit cost 15× per hour for data that almost never changes.
  *   <li><b>Squadrons (10 min)</b> — slower than master data because admins toggle the active
  *       squadron mid-session via the {@code X-Active-Org-Unit-Id} header, but the squadron entity
  *       itself rarely changes. {@code SquadronService} already evicts on writes.
@@ -98,8 +99,14 @@ public class CacheConfig {
   /** Cache name for the material reference catalogue. */
   public static final String MATERIALS_CACHE = "materials";
 
-  /** Cache name for the mission-lead-type reference catalogue. */
-  public static final String MISSION_LEAD_TYPES_CACHE = "missionLeadTypes";
+  /**
+   * Cache name for single-material by-id lookups. Kept separate from {@link #MATERIALS_CACHE} so
+   * the unbounded per-{@code Pageable} list entries of the list catalogue cannot evict a hot
+   * single-entity lookup (and vice-versa) when they share one {@code maximumSize} budget
+   * (CACHE-02). Both caches are evicted together on every material write and on the UEX / SC Wiki
+   * sync sweep.
+   */
+  public static final String MATERIAL_BY_ID_CACHE = "materialById";
 
   /** Cache name for the refining-method reference catalogue. */
   public static final String REFINING_METHODS_CACHE = "refiningMethods";
@@ -142,7 +149,7 @@ public class CacheConfig {
     register(manager, MANUFACTURERS_CACHE, MASTER_DATA_TTL);
     register(manager, MATERIAL_CATEGORIES_CACHE, MASTER_DATA_TTL);
     register(manager, MATERIALS_CACHE, MASTER_DATA_TTL);
-    register(manager, MISSION_LEAD_TYPES_CACHE, MASTER_DATA_TTL);
+    register(manager, MATERIAL_BY_ID_CACHE, MASTER_DATA_TTL);
     register(manager, REFINING_METHODS_CACHE, MASTER_DATA_TTL);
     register(manager, SHIP_TYPES_CACHE, MASTER_DATA_TTL);
     register(manager, STAR_SYSTEMS_CACHE, MASTER_DATA_TTL);
