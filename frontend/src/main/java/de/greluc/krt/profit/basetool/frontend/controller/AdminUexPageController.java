@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.SpaceStationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.TerminalDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -226,6 +227,10 @@ public class AdminUexPageController {
               current.uexSyncedAt(),
               hidden);
       backendApiClient.put("/api/v1/terminals/" + id, body, Void.class);
+      // Flipping a terminal's hidden flag changes the cached terminal catalogue (the
+      // profit-calculator
+      // star-system dropdown reads it), so evict the TERMINAL domain (REQ-DATA-007).
+      backendApiClient.evict(CacheDomain.TERMINAL);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Toggle terminal visibility failed", e);
@@ -313,6 +318,7 @@ public class AdminUexPageController {
               current.uexSyncedAt(),
               !current.hidden());
       backendApiClient.put("/api/v1/terminals/" + id, body, Void.class);
+      backendApiClient.evict(CacheDomain.TERMINAL);
       return ResponseEntity.ok().build();
     } catch (BackendServiceException e) {
       log.debug("Toggle terminal visibility (ajax) failed", e);

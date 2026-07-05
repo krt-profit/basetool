@@ -23,8 +23,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.P4kImportJobDto;
+import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
@@ -52,13 +56,15 @@ class AdminP4kImportPageControllerTest {
 
   private MockWebServer server;
   private AdminP4kImportPageController controller;
+  private BackendApiClient backendApiClient;
 
   @BeforeEach
   void setUp() throws Exception {
     server = new MockWebServer();
     server.start();
     WebClient webClient = WebClient.builder().baseUrl(server.url("/").toString()).build();
-    controller = new AdminP4kImportPageController(webClient);
+    backendApiClient = mock(BackendApiClient.class);
+    controller = new AdminP4kImportPageController(webClient, backendApiClient);
   }
 
   @AfterEach
@@ -176,6 +182,15 @@ class AdminP4kImportPageControllerTest {
     assertNotNull(req);
     assertEquals("POST", req.getMethod());
     assertEquals("/api/v1/admin/import/p4k/jobs/" + id + "/apply?seedNew=true", req.getPath());
+
+    // An apply rewrites the master-data catalogues the frontend caches, so the affected domains are
+    // evicted at apply-enqueue time (F6).
+    verify(backendApiClient)
+        .evict(
+            CacheDomain.MATERIAL,
+            CacheDomain.MANUFACTURER,
+            CacheDomain.SHIP_TYPE,
+            CacheDomain.ITEM_CATALOG);
   }
 
   @Test

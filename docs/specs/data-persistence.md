@@ -192,9 +192,11 @@ lists, …). Each `CacheDomain` (`squadronCatalogue`, `orgUnitCatalogue`, `mater
 `terminalCatalogue`, …) is its own named Caffeine cache, routed by `CatalogCacheResolver`; a mutation
 calls `backendApiClient.evict(CacheDomain…)` with the domain(s) it changed, so eviction blast-radius is
 one domain, not all. The shared `AdminMissionDataPageController.okOrRelay` AJAX helper and the
-material/settings writers keep the coarse `clearStaticDataCache()` (→ `evictAllCatalogues()`) fallback:
-where the changed domain set is not cleanly known at the call site, **over-eviction is always safe,
-whereas a wrong narrow evict would strand stale data**. Every domain cache keeps `recordStats()`, so the
+settings writer keep the coarse `clearStaticDataCache()` (→ `evictAllCatalogues()`) fallback: where the
+changed domain set is not cleanly known at the call site, **over-eviction is always safe, whereas a
+wrong narrow evict would strand stale data**. Single-domain admin writers whose changed domain _is_
+cleanly known (material, location, terminal, P4K-import apply, …) instead call the precise
+`evict(CacheDomain…)`. Every domain cache keeps `recordStats()`, so the
 `cache_*` Prometheus meters and monitoring panels light up per domain (REQ-OBS-005/-006). Each domain
 carries its **own** `expireAfterWrite` TTL (`CacheDomain.getTtl()`): **6 h** for pure reference
 catalogues (materials, locations, ship types, terminals, …) and **2 h** for the org-structure catalogues
@@ -237,6 +239,18 @@ Invariants that must hold:
   (`AdminSpecialCommandsPageController` / `SpecialCommandAdminProxyController`) **and** Bereich/OL writes
   (`AdminOrgStructurePageController` create-Bereich / create-OL / re-parent) all call
   `clearStaticDataCache()`, so a picker never shows an org unit more stale than the last mutation.
+- **The reference catalogues cached for the pickers evict their own domain on every admin write.** Each
+  single-purpose admin write path calls the precise `evict(CacheDomain…)` for the one domain it changes,
+  so a stale list never survives the mutation: `AdminMaterialsPageController`'s create and field-edit AJAX
+  writers evict `MATERIAL` **unconditionally on every `updateType`** — a former `updateType` guard skipped
+  `CATEGORY` / `REFINED` / `QUANTITY_TYPE` edits and stranded those lists until the TTL;
+  `AdminLocationsPageController`'s visibility / home-location toggles (classic **and** AJAX) evict
+  `LOCATION`; `AdminUexPageController`'s terminal-visibility toggle (classic **and** AJAX) evicts
+  `TERMINAL`. The async P4K import (`AdminP4kImportPageController.applyJob`) evicts the four domains its
+  apply rewrites — `evict(MATERIAL, MANUFACTURER, SHIP_TYPE, ITEM_CATALOG)` — at **apply-enqueue** time:
+  the apply runs as an async backend job, so the eviction is deliberately eager; the brief window in which
+  a concurrent read could re-cache pre-apply data is bounded by the domain TTL and the action is rare and
+  admin-only.
 - **Per-principal calls are never URI-cached.** `/api/v1/users/me`, `/api/v1/me/capabilities`, and
   `/api/v1/me/active-org-unit` share a URI across users; a URI-keyed cache would cross-contaminate
   them, so they remain plain `get(...)`.
@@ -259,6 +273,12 @@ SpecialCommand catalogue through `getCached`. (`AdminSpecialCommandsPageControll
 activate (classic and AJAX) and the profit-eligible flip — evicts `STATIC_DATA_CACHE`, while a
 member-roster mutation does not. (`AdminSettingsPageControllerMvcTest`): every successful settings save —
 classic and AJAX, including a partial save where a later PUT throws — evicts `STATIC_DATA_CACHE`.
+(`AdminMaterialsPageControllerTest`): a material create and a field-edit AJAX write — including a
+`QUANTITY_TYPE` edit that the former `updateType` guard skipped — evict `MATERIAL`, while a rejected
+create does not. (`AdminLocationsPageControllerTest`): the visibility / home-location toggles evict
+`LOCATION`. (`AdminUexPageControllerTest`): the terminal-visibility toggle (classic and AJAX) evicts
+`TERMINAL`. (`AdminP4kImportPageControllerTest`): an apply evicts
+`MATERIAL, MANUFACTURER, SHIP_TYPE, ITEM_CATALOG`.
 
 ### REQ-DATA-008 — User deletion reassigns or clears every `app_user` FK that lacks an `ON DELETE` clause
 

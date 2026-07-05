@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SpaceStationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.TerminalDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -44,6 +45,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
+import org.springframework.http.ResponseEntity;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
@@ -186,6 +188,42 @@ class AdminUexPageControllerTest {
     controller.updateTerminalAutoLoadOverride(id, "uex", attrs);
 
     verify(client).delete("/api/v1/terminals/" + id + "/auto-load-override", Void.class);
+  }
+
+  // ---------------------------------------------------------------------
+  // Terminal visibility toggle: evicts the TERMINAL cache domain
+  // ---------------------------------------------------------------------
+
+  @Test
+  void toggleTerminalVisibility_evictsTerminalDomainAfterWrite() {
+    BackendApiClient client = mock(BackendApiClient.class);
+    AdminUexPageController controller = new AdminUexPageController(client);
+    RedirectAttributesModelMap attrs = new RedirectAttributesModelMap();
+    UUID id = UUID.randomUUID();
+    when(client.get("/api/v1/terminals/" + id, TerminalDto.class))
+        .thenReturn(terminalIn("Lorville TDD", "Stanton", "Lorville", null));
+
+    String view = controller.toggleTerminalVisibility(id, true, attrs);
+
+    assertEquals("redirect:/admin/uex-data", view);
+    verify(client).put(eq("/api/v1/terminals/" + id), any(), eq(Void.class));
+    verify(client).evict(CacheDomain.TERMINAL);
+  }
+
+  @Test
+  void toggleTerminalVisibilityAjax_evictsTerminalDomainAfterWrite() {
+    BackendApiClient client = mock(BackendApiClient.class);
+    AdminUexPageController controller = new AdminUexPageController(client);
+    UUID id = UUID.randomUUID();
+    when(client.get("/api/v1/terminals/" + id, TerminalDto.class))
+        .thenReturn(terminalIn("Area 18 TDD", "Stanton", "Area 18", null));
+
+    ResponseEntity<Object> response = controller.toggleTerminalVisibilityAjax(id);
+
+    assertTrue(
+        response.getStatusCode().is2xxSuccessful(), "ajax toggle must return 2xx on success");
+    verify(client).put(eq("/api/v1/terminals/" + id), any(), eq(Void.class));
+    verify(client).evict(CacheDomain.TERMINAL);
   }
 
   // ---------------------------------------------------------------------
