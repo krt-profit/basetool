@@ -15,6 +15,8 @@
 
 - **Bank – Kontoübersicht mit Kachel-/Tabellen- und Bereichsansicht.** Die Kartellbank-Übersicht lässt sich jetzt zwischen Kachel- und Tabellenansicht umschalten und wahlweise nach Bereichen gruppieren – zuerst KRT und KRT-Bank, dann je Bereich (mit Bereichs-, Staffel- und SK-Konten) in der Bereichsfarbe, am Ende Sonderkonten und geschlossene Konten. Ansicht und Gruppierung werden pro Nutzer gespeichert; Kacheln und A-Z bleiben Standard (#996).
 
+- **Bank – ein „Kontobewegung"-Button statt Einzahlen/Auszahlen/Transfer.** Die drei getrennten Buttons auf der Kontoseite sind zu einem „Kontobewegung"-Button zusammengefasst; die Art wird im Modal ausgewählt. Denselben Button gibt es jetzt auch in der Buchungsanträge-Übersicht, wo Bankmitarbeiter direkt gegen ein gewähltes Konto buchen. Die Feld-Hinweise im Buchungsfenster stehen nicht mehr klein unter den Feldern, sondern erscheinen als „?"-Tooltip beim Überfahren – auch die Optionalitäts-Hinweise. Endpunkte, Auditierung und Monitoring bleiben unverändert (#997).
+
 
 ## [v1.1.3](https://github.com/krt-profit/basetool/releases/tag/v1.1.3) - 2026-07-05
 

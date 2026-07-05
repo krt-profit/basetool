@@ -441,6 +441,17 @@ tr.is-inert td {
     align-items: center;
 }
 
+/* Requests overview header right side (#997): the direct-booking "Kontobewegung" CTA sits above the
+   parallel status-filter chip group; both align to the right edge and wrap onto their own line on
+   narrow viewports. */
+.bank-requests-head-right {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    justify-content: flex-end;
+}
+
 /* ---- Account-name live filter (REQ-BANK-046): dashboard cards + org-unit account list ---- */
 /*
  * The filter hides non-matching items via the `hidden` attribute. The card / row author rules set

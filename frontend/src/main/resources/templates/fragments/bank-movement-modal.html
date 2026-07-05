@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--
+  Unified "Kontobewegung" modal (#997, REQ-BANK-017/-023): one modal whose movement-type selector
+  (Einzahlung / Auszahlung / Transfer) switches the type-specific fields and routes the submit to the
+  correct backend endpoint (/deposits, /withdrawals, /transfers) — replacing the former three
+  separate deposit/withdraw/transfer modals. bank.js (syncMovementRows) drives the show/hide +
+  enable/disable of every [data-movement-types] row, the endpoint + account-id-field switch, the
+  submit-button label and the live fee/split/justification helpers; disabling a gated-off control
+  keeps it out of the submitted JSON (submitBankForm skips disabled fields), so only the active type's
+  fields are ever sent. Every field hint is an inline "?" tooltip (fragments/scu-hint :: fieldHint),
+  not sub-field text.
+
+  Used by both the account-detail page (fixed source account) and the booking-request overview
+  (source-account selector). Reads the catalog lists activeHolders / holders / users / transferTargets
+  from the surrounding model; the source-selector variant additionally reads movementAccounts.
+
+  Parameters:
+    - modalId              : DOM id of the overlay.
+    - refreshTarget        : the data-refresh fragment re-rendered on success (accountBody on the
+                             detail page, requestQueue on the requests overview).
+    - accountId            : the fixed source-account id (detail page); null when accountSelectable.
+    - accountSelectable    : true renders a source-account <select> (requests overview); false pins
+                             the source account via data-account-id (detail page).
+    - justificationRequired: for the fixed-account case, whether the account type mandates a
+                             Begruendung on a withdrawal/transfer (CARTEL / CARTEL_BANK / SPECIAL).
+                             Ignored when accountSelectable (bank.js derives it per chosen account).
+    - canDeposit / canWithdraw / canTransfer: which movement types the type selector offers.
+-->
+<div th:fragment="movementModal(modalId, refreshTarget, accountId, accountSelectable, justificationRequired, canDeposit, canWithdraw, canTransfer)"
+     class="krt-modal-overlay" th:id="${modalId}">
+    <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.movement.title}">
+        <div class="krt-modal-head">
+            <h3 th:text="#{bank.modal.movement.title}">Kontobewegung</h3>
+            <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
+                    th:attr="data-modal-id=${modalId}" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
+        </div>
+        <!-- The endpoint + account-id-field default to the first available type; bank.js resets both
+             on open (primeModal -> syncMovementRows) and on every type change. data-account-id pins
+             the fixed source account (detail); the selectable variant syncs it from the source
+             select. data-justification-required carries the fixed account's reason-mandate flag. -->
+        <form class="bank-ajax-form no-track" data-method="POST"
+              th:with="initEndpoint=${canDeposit} ? '/api/proxy/bank/deposits' : (${canWithdraw} ? '/api/proxy/bank/withdrawals' : '/api/proxy/bank/transfers'),initAccountField=${canDeposit or canWithdraw} ? 'accountId' : 'sourceAccountId'"
+              th:attr="data-refresh=${refreshTarget},data-account-id=${accountId},data-justification-required=${justificationRequired},data-endpoint=${initEndpoint},data-account-id-field=${initAccountField}">
+            <div class="krt-modal-body">
+
+                <!-- Movement type: only the permitted types are offered; the first is the default. -->
+                <div class="bank-form-row">
+                    <label for="bank-mv-type" th:text="#{bank.request.field.type}">Vorgang</label>
+                    <select id="bank-mv-type" data-role="bank-movement-type"
+                            data-testid="bank-movement-type">
+                        <option th:if="${canDeposit}" value="DEPOSIT" th:text="#{bank.request.type.DEPOSIT}">Einzahlung</option>
+                        <option th:if="${canWithdraw}" value="WITHDRAWAL" th:text="#{bank.request.type.WITHDRAWAL}">Auszahlung</option>
+                        <option th:if="${canTransfer}" value="TRANSFER" th:text="#{bank.request.type.TRANSFER}">Transfer</option>
+                    </select>
+                </div>
+
+                <!-- Source account (requests overview only): the account the movement books against.
+                     Carries no name — bank.js copies its value into data-account-id under the
+                     type-specific field name. Each option marks whether its type mandates a reason so
+                     the Begruendung's required flag can follow the chosen account. -->
+                <div class="bank-form-row" th:if="${accountSelectable}">
+                    <label for="bank-mv-source-account">
+                        <span th:text="#{bank.movement.field.sourceAccount}">Quellkonto</span>
+                        <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.movement.field.sourceAccount.hint')}"></th:block>
+                    </label>
+                    <select id="bank-mv-source-account" data-role="bank-movement-source" required
+                            data-testid="bank-movement-source-account">
+                        <option value="" th:text="#{bank.movement.field.sourceAccount.placeholder}">Konto w&auml;hlen &hellip;</option>
+                        <option th:each="a : ${movementAccounts}" th:value="${a.id()}"
+                                th:attr="data-requires-justification=${a.type() == 'CARTEL' or a.type() == 'CARTEL_BANK' or a.type() == 'SPECIAL'}"
+                                th:text="${a.name()} + ' (' + ${a.accountNo()} + ')'">Staffel IRIDIUM (KB-0001)</option>
+                    </select>
+                    <span class="bank-field-error" data-error-for="accountId"></span>
+                    <span class="bank-field-error" data-error-for="sourceAccountId"></span>
+                </div>
+
+                <!-- Transfer destination (TRANSFER only). -->
+                <div class="bank-form-row" data-movement-types="TRANSFER" hidden>
+                    <label for="bank-mv-target" th:text="#{bank.field.targetAccount}">Zielkonto</label>
+                    <select id="bank-mv-target" name="destinationAccountId" disabled
+                            data-testid="bank-movement-target">
+                        <option value="" th:text="#{bank.field.targetAccount.placeholder}">Konto w&auml;hlen &hellip;</option>
+                        <option th:each="t : ${transferTargets}" th:value="${t.id()}"
+                                th:text="${t.accountNo()} + ' &#8212; ' + ${t.name()}">KB-0002 &#8212; Staffel PHOENIX</option>
+                    </select>
+                    <span class="bank-field-error" data-error-for="destinationAccountId"></span>
+                </div>
+
+                <!-- Amount (all types) + live fee preview (REQ-BANK-033, ADR-0052). The preview is
+                     hidden for a deposit (no fee) and for a same-holder transfer (fee-free); bank.js
+                     fills the on-top fee and the gross debited (amount + fee). -->
+                <div class="bank-form-row">
+                    <label for="bank-mv-amount">
+                        <span th:text="#{bank.field.amount}">Betrag (aUEC)</span>
+                        <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.field.amount.hint')}"></th:block>
+                    </label>
+                    <input type="number" id="bank-mv-amount" name="amount" min="1" step="1" required
+                           data-testid="bank-movement-amount" th:placeholder="#{bank.field.amount.placeholder}">
+                    <span class="bank-field-error" data-error-for="amount"></span>
+                    <p class="bank-field-hint bank-fee-preview" data-fee-preview hidden
+                       data-testid="bank-movement-fee-preview">
+                        <span th:text="#{bank.fee.label}">Geb&uuml;hr</span>:
+                        <span data-fee-value>0</span> aUEC &middot;
+                        <span th:text="#{bank.fee.debited.label}">wird abgebucht</span>:
+                        <span data-fee-debit>0</span> aUEC
+                    </p>
+                </div>
+
+                <!-- Split deposit (REQ-BANK-043): DEPOSIT only. -->
+                <div data-movement-types="DEPOSIT" data-split-deposit-only hidden>
+                    <div class="bank-form-row">
+                        <label class="bank-check-label">
+                            <input type="checkbox" name="splitEnabled" value="true" disabled
+                                   data-role="bank-split-toggle" data-testid="bank-movement-split-toggle">
+                            <span th:text="#{bank.split.toggle}">Anteil auf alle Staffelkonten verteilen</span>
+                        </label>
+                    </div>
+                    <div class="bank-form-row" data-split-row hidden>
+                        <label for="bank-mv-split-percent">
+                            <span th:text="#{bank.split.percent}">Prozentsatz (%)</span>
+                            <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.split.hint')}"></th:block>
+                        </label>
+                        <input type="number" id="bank-mv-split-percent" name="splitPercent"
+                               min="1" max="100" step="1" disabled
+                               data-testid="bank-movement-split-percent" th:placeholder="#{bank.split.percent.placeholder}">
+                        <p class="bank-field-hint bank-split-preview" data-split-preview hidden
+                           data-testid="bank-movement-split-preview">
+                            <span th:text="#{bank.split.preview.label}">Aufteilung:</span>
+                            <span data-split-slice>0</span>
+                            <span th:text="#{bank.split.preview.toSquadrons}">aUEC auf die Staffelkonten,</span>
+                            <span data-split-remainder>0</span>
+                            <span th:text="#{bank.split.preview.remainder}">aUEC verbleiben auf dem Zielkonto.</span>
+                        </p>
+                        <span class="bank-field-error" data-error-for="splitPercent"></span>
+                    </div>
+                </div>
+
+                <!-- Holder pickers. Each type carries its own holder row (only one is enabled at a
+                     time), so the field-name collision (deposit/withdraw both submit holderId) is
+                     harmless and the option sets stay type-correct: deposit + transfer-destination
+                     only active holders; withdraw + transfer-source all holders (may go negative). -->
+                <div class="bank-form-row" data-movement-types="DEPOSIT">
+                    <label for="bank-mv-deposit-holder" th:text="#{bank.field.holder}">Halter</label>
+                    <select id="bank-mv-deposit-holder" name="holderId" required data-krt-combobox
+                            data-testid="bank-movement-deposit-holder">
+                        <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
+                        <option th:each="h : ${activeHolders}" th:value="${h.id()}" th:text="${h.handle()}">greluc</option>
+                    </select>
+                    <span class="bank-field-error" data-error-for="holderId"></span>
+                </div>
+                <div class="bank-form-row" data-movement-types="WITHDRAWAL" hidden>
+                    <label for="bank-mv-withdraw-holder">
+                        <span th:text="#{bank.field.holder.payer}">Von Halter</span>
+                        <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.field.holder.payer.hint')}"></th:block>
+                    </label>
+                    <select id="bank-mv-withdraw-holder" name="holderId" required disabled data-krt-combobox
+                            data-testid="bank-movement-withdraw-holder">
+                        <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
+                        <option th:each="h : ${holders}" th:value="${h.id()}"
+                                th:text="${h.handle()} + (${!h.active()} ? ' (' + #{bank.holder.inactive} + ')' : '')">greluc</option>
+                    </select>
+                    <span class="bank-field-error" data-error-for="holderId"></span>
+                </div>
+                <div class="bank-form-row" data-movement-types="TRANSFER" hidden>
+                    <label for="bank-mv-source-holder">
+                        <span th:text="#{bank.field.holder.source}">Von Halter</span>
+                        <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.field.holder.payer.hint')}"></th:block>
+                    </label>
+                    <select id="bank-mv-source-holder" name="sourceHolderId" required disabled data-krt-combobox
+                            data-testid="bank-movement-source-holder">
+                        <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
+                        <option th:each="h : ${holders}" th:value="${h.id()}"
+                                th:text="${h.handle()} + (${!h.active()} ? ' (' + #{bank.holder.inactive} + ')' : '')">greluc</option>
+                    </select>
+                    <span class="bank-field-error" data-error-for="sourceHolderId"></span>
+                </div>
+                <div class="bank-form-row" data-movement-types="TRANSFER" hidden>
+                    <label for="bank-mv-dest-holder">
+                        <span th:text="#{bank.field.holder.target}">An Halter (Zielkonto)</span>
+                        <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.field.holder.target.hint')}"></th:block>
+                    </label>
+                    <select id="bank-mv-dest-holder" name="destinationHolderId" required disabled data-krt-combobox
+                            data-testid="bank-movement-dest-holder">
+                        <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
+                        <option th:each="h : ${activeHolders}" th:value="${h.id()}" th:text="${h.handle()}">greluc</option>
+                    </select>
+                    <span class="bank-field-error" data-error-for="destinationHolderId"></span>
+                </div>
+
+                <!-- Counterparty (Einzahler / Empfaenger, REQ-BANK-044), both optional; one row per
+                     type so the label matches. The org-unit select is disabled until a user is chosen;
+                     bank.js fills it from that user's memberships. -->
+                <div class="bank-form-row" data-movement-types="DEPOSIT">
+                    <label for="bank-mv-deposit-cp">
+                        <span th:text="#{bank.field.counterparty.depositor}">Einzahler</span>
+                        <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.field.counterparty.depositor.hint')}"></th:block>
+                    </label>
+                    <select id="bank-mv-deposit-cp" name="counterpartyUserId"
+                            data-testid="bank-movement-deposit-counterparty"
+                            data-counterparty-user data-orgunit-target="bank-mv-deposit-cp-ou">
+                        <option value="" th:text="#{bank.field.counterparty.placeholder}">Person w&auml;hlen &hellip;</option>
+                        <option th:each="u : ${users}" th:value="${u.id()}" th:text="${u.effectiveName()}">carol</option>
+                    </select>
+                    <span class="bank-field-error" data-error-for="counterpartyUserId"></span>
+                </div>
+                <div class="bank-form-row" data-movement-types="DEPOSIT">
+                    <label for="bank-mv-deposit-cp-ou">
+                        <span th:text="#{bank.field.counterparty.orgUnit}">Einheit</span>
+                        <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.field.counterparty.orgUnit.hint')}"></th:block>
+                    </label>
+                    <select id="bank-mv-deposit-cp-ou" name="counterpartyOrgUnitId"
+                            data-testid="bank-movement-deposit-counterparty-orgunit" data-counterparty-orgunit disabled>
+                        <option value="" th:text="#{bank.field.counterparty.orgUnit.placeholder}">Einheit w&auml;hlen &hellip;</option>
+                    </select>
+                    <span class="bank-field-error" data-error-for="counterpartyOrgUnitId"></span>
+                </div>
+                <div class="bank-form-row" data-movement-types="WITHDRAWAL" hidden>
+                    <label for="bank-mv-withdraw-cp">
+                        <span th:text="#{bank.field.counterparty.recipient}">Empf&auml;nger</span>
+                        <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.field.counterparty.recipient.hint')}"></th:block>
+                    </label>
+                    <select id="bank-mv-withdraw-cp" name="counterpartyUserId" disabled
+                            data-testid="bank-movement-withdraw-counterparty"
+                            data-counterparty-user data-orgunit-target="bank-mv-withdraw-cp-ou">
+                        <option value="" th:text="#{bank.field.counterparty.placeholder}">Person w&auml;hlen &hellip;</option>
+                        <option th:each="u : ${users}" th:value="${u.id()}" th:text="${u.effectiveName()}">dave</option>
+                    </select>
+                    <span class="bank-field-error" data-error-for="counterpartyUserId"></span>
+                </div>
+                <div class="bank-form-row" data-movement-types="WITHDRAWAL" hidden>
+                    <label for="bank-mv-withdraw-cp-ou">
+                        <span th:text="#{bank.field.counterparty.orgUnit}">Einheit</span>
+                        <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.field.counterparty.orgUnit.hint')}"></th:block>
+                    </label>
+                    <select id="bank-mv-withdraw-cp-ou" name="counterpartyOrgUnitId" disabled
+                            data-testid="bank-movement-withdraw-counterparty-orgunit" data-counterparty-orgunit>
+                        <option value="" th:text="#{bank.field.counterparty.orgUnit.placeholder}">Einheit w&auml;hlen &hellip;</option>
+                    </select>
+                    <span class="bank-field-error" data-error-for="counterpartyOrgUnitId"></span>
+                </div>
+
+                <!-- Begruendung (REQ-BANK-045): WITHDRAWAL / TRANSFER only; disabled while hidden so a
+                     deposit omits it. Required is set by bank.js from the (fixed or chosen) source
+                     account's reason-mandate flag. -->
+                <div class="bank-form-row" data-movement-types="WITHDRAWAL TRANSFER" hidden>
+                    <label for="bank-mv-justification">
+                        <span th:text="#{bank.field.justification}">Begr&uuml;ndung</span>
+                        <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.field.justification.hint')}"></th:block>
+                    </label>
+                    <input type="text" id="bank-mv-justification" name="justification" maxlength="500" disabled
+                           data-testid="bank-movement-justification" th:placeholder="#{bank.field.justification.placeholder}">
+                    <span class="bank-field-error" data-error-for="justification"></span>
+                </div>
+
+                <!-- Note (all types), optional. -->
+                <div class="bank-form-row">
+                    <label for="bank-mv-note" th:text="#{bank.field.note}">Notiz</label>
+                    <input type="text" id="bank-mv-note" name="note" maxlength="500"
+                           th:placeholder="#{bank.field.note.placeholder}">
+                </div>
+                <span class="bank-field-error" data-error-for="_global"></span>
+            </div>
+            <div class="krt-modal-foot">
+                <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                        th:attr="data-modal-id=${modalId}" th:text="#{general.cancel}">Abbrechen</button>
+                <!-- The submit label follows the chosen type (bank.js swaps it from these keys). -->
+                <button type="submit" class="btn btn--cta" data-testid="bank-movement-submit"
+                        th:attr="data-label-deposit=#{bank.action.deposit},data-label-withdrawal=#{bank.action.withdraw},data-label-transfer=#{bank.action.transfer}"
+                        th:text="#{bank.action.deposit}">Einzahlen</button>
+            </div>
+        </form>
+    </div>
+</div>
+</body>
+</html>
