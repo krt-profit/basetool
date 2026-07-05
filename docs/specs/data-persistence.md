@@ -404,39 +404,51 @@ because the wire behaviour is unchanged.
 
 The backend serves quasi-static reference data from per-cache Caffeine caches (backend `CacheConfig`,
 master-data TTL 12 h). The admin CRUD services evict their own cache on every user-facing write, but
-the periodic **UEX** (`UexScheduler`) and **SC Wiki** (`ScWikiScheduler`) sync sweeps bulk-write
-directly to the repositories behind those caches — bypassing the `@CacheEvict` hooks — so before this
-rule a freshly-synced material / manufacturer / ship-type / star-system / city / refining-method / the
-blueprint variant-family index stayed invisible for up to the TTL — a window the deliberately long
-master-data TTL makes large, which is exactly why the sync must **evict** rather than rely on the TTL.
+three background writers bulk-write directly to the repositories behind those caches — bypassing the
+`@CacheEvict` hooks: the periodic **UEX** (`UexScheduler`) and **SC Wiki** (`ScWikiScheduler`) sync
+sweeps, and the async **P4K catalog apply** (`P4kImportJobRunner`, off the request thread on the import
+executor). Before this rule a freshly-synced material / manufacturer / ship-type / star-system / city /
+location / terminal / POI / outpost / refining-method / the blueprint variant-family index stayed
+invisible for up to the TTL — a window the deliberately long master-data TTL makes large, which is
+exactly why these writers must **evict** rather than rely on the TTL.
 
-Each sweep therefore evicts the caches it can make stale **on completion**, through
+Each writer therefore evicts the caches it can make stale **on completion**, through
 `MasterDataCacheEvictionService`:
 
-- The eviction runs in a `finally` around the sweep body, so every step that **did** commit is
-  reconciled even when a later step aborts the sweep (UEX is fail-fast; SC Wiki swallows per step).
-- The two per-sweep cache-name sets (`UEX_SYNCED_CACHES`, `SCWIKI_SYNCED_CACHES`) are the **single
-  source of truth** for "a sync can make these stale". **A new cache added over a synced table MUST be
-  added to the matching set**, or it silently lags the TTL again after a sync. The 12 h TTL is only
-  the backstop, never the primary freshness mechanism for synced data.
-- This is also the sole evict hook for `BLUEPRINT_FAMILY_INDEX_CACHE`, which has no per-write hook of
-  its own (CACHE-DIST-03); it is rebuilt only by the SC Wiki blueprint sync, so evicting it at sweep
-  completion is both necessary and sufficient.
+- The eviction runs in a `finally` around the work, so every step that **did** commit is reconciled
+  even when a later step aborts (UEX is fail-fast; SC Wiki swallows per step). The P4K apply gates its
+  eviction on the reconcile transaction having actually committed (`appliedMasterData`), so a
+  rolled-back apply and every PREVIEW run correctly evict nothing.
+- The three per-writer cache-name sets (`UEX_SYNCED_CACHES`, `SCWIKI_SYNCED_CACHES`, `P4K_SYNCED_CACHES`)
+  are the **single source of truth** for "this writer can make these stale". **A new cache added over a
+  written table MUST be added to the matching set(s)**, or it silently lags the TTL again after a
+  sync / apply. The 12 h TTL is only the backstop, never the primary freshness mechanism for synced
+  data. (The UEX set covers the universe catalogues it rewrites — cities, star systems, locations,
+  terminals, POIs, outposts — alongside the commodity / manufacturer / ship-type / refining-method
+  caches; the P4K set covers the material / manufacturer / ship-type / blueprint-family caches its
+  apply reconciles.)
+- This is also the sole scheduler evict hook for `BLUEPRINT_FAMILY_INDEX_CACHE`, which has no per-write
+  hook of its own (CACHE-DIST-03); it is rebuilt by the SC Wiki blueprint sync and the P4K blueprint
+  apply, so evicting it on their completion is both necessary and sufficient.
 
 Related, the material caches are split so a paged-list read and a single-entity read cannot evict each
 other under a shared size budget (**CACHE-02**): `getMaterial(id)` caches in `MATERIAL_BY_ID_CACHE`
 while the list reads stay in `MATERIALS_CACHE`; **every material write and every sync sweep evicts
 both**, so a single-entity entry can never survive a rename/delete while the list entry is dropped.
 
-**Acceptance**: `MasterDataCacheEvictionServiceTest` (each sweep clears exactly its cache set; a missing
-cache is tolerated; the sets are pinned so a synced-table cache cannot be silently dropped);
+**Acceptance**: `MasterDataCacheEvictionServiceTest` (each writer clears exactly its cache set; a missing
+cache is tolerated; the three sets are pinned so a written-table cache cannot be silently dropped);
 `UexSchedulerTest` / `ScWikiSchedulerTest` (the sweep evicts on completion **and** after a mid-sweep
-failure, and does not evict when the cross-scheduler gate skips the sweep); `MaterialServiceCachingTest`
-(`getMaterial` populates only the by-id cache, the list reads only the list cache, and a write evicts
-both).
+failure, and does not evict when the cross-scheduler gate skips the sweep); `P4kImportJobRunnerTest`
+(a committed APPLY evicts the P4K set, a PREVIEW and a rolled-back APPLY evict nothing);
+`MaterialServiceCachingTest` (`getMaterial` populates only the by-id cache, the list reads only the list
+cache, and a write evicts both); `TerminalServiceCachingTest` / `PoiServiceCachingTest` /
+`OutpostServiceCachingTest` (each read populates its cache and every override mutator evicts it).
 
 **Enforced by:** `MasterDataCacheEvictionService`, `UexScheduler.runAllSyncSteps`,
-`ScWikiScheduler.runAllSyncSteps`, `MaterialService` (split `@Cacheable` + dual `@CacheEvict`).
+`ScWikiScheduler.runAllSyncSteps`, `P4kImportJobRunner.run` (APPLY-committed evict),
+`MaterialService` / `TerminalService` / `PoiService` / `OutpostService` (`@Cacheable` reads + `@CacheEvict`
+mutators).
 
 ## Out of scope
 

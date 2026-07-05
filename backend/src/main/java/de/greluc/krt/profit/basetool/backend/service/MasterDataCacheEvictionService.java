@@ -53,12 +53,17 @@ public class MasterDataCacheEvictionService {
 
   /**
    * Caches the UEX sweep ({@code UexScheduler}) can make stale: it rewrites cities, star systems,
-   * the commodity/material catalogue, manufacturers, ship types (vehicles) and refining methods.
+   * locations, terminals, points of interest, outposts, the commodity/material catalogue,
+   * manufacturers, ship types (vehicles) and refining methods.
    */
   static final List<String> UEX_SYNCED_CACHES =
       List.of(
           CacheConfig.CITIES_CACHE,
           CacheConfig.STAR_SYSTEMS_CACHE,
+          CacheConfig.LOCATIONS_CACHE,
+          CacheConfig.TERMINALS_CACHE,
+          CacheConfig.POIS_CACHE,
+          CacheConfig.OUTPOSTS_CACHE,
           CacheConfig.MATERIALS_CACHE,
           CacheConfig.MATERIAL_BY_ID_CACHE,
           CacheConfig.MANUFACTURERS_CACHE,
@@ -78,6 +83,22 @@ public class MasterDataCacheEvictionService {
           CacheConfig.MANUFACTURERS_CACHE,
           CacheConfig.BLUEPRINT_FAMILY_INDEX_CACHE);
 
+  /**
+   * Caches a P4K catalog apply ({@code P4kImportJobRunner}, APPLY kind) can make stale: it
+   * reconciles the material catalogue, manufacturers, ship types and the blueprint master that
+   * backs the blueprint variant-family index. Unlike the UEX / SC Wiki sweeps this runs on the
+   * async import executor rather than a scheduler, so it carries its own evict hook
+   * (CACHE-SYNC-EVICT-001). The apply also writes {@code game_item} rows, but no backend cache is
+   * registered over that table.
+   */
+  static final List<String> P4K_SYNCED_CACHES =
+      List.of(
+          CacheConfig.MATERIALS_CACHE,
+          CacheConfig.MATERIAL_BY_ID_CACHE,
+          CacheConfig.MANUFACTURERS_CACHE,
+          CacheConfig.SHIP_TYPES_CACHE,
+          CacheConfig.BLUEPRINT_FAMILY_INDEX_CACHE);
+
   private final CacheManager cacheManager;
 
   /** Evicts every cache the UEX sync sweep can make stale. Call after a UEX sweep completes. */
@@ -88,6 +109,11 @@ public class MasterDataCacheEvictionService {
   /** Evicts every cache the SC Wiki sync sweep can make stale. Call after an SC Wiki sweep. */
   public void evictScWikiSyncedMasterData() {
     evict(SCWIKI_SYNCED_CACHES, "SC Wiki");
+  }
+
+  /** Evicts every cache a P4K catalog apply can make stale. Call after a successful APPLY run. */
+  public void evictP4kSyncedMasterData() {
+    evict(P4K_SYNCED_CACHES, "P4K import");
   }
 
   /**

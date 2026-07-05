@@ -19,19 +19,26 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.model.Terminal;
 import de.greluc.krt.profit.basetool.backend.repository.TerminalRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Read service plus visibility toggle for the terminal catalog. The records themselves are owned by
- * {@link UexUniverseSyncService}; this service only exposes the read API and the admin-only {@code
- * hidden} flag flip.
+ * Read service plus visibility / loading-dock / auto-load overrides for the terminal catalog. The
+ * records themselves are owned by {@link UexUniverseSyncService}; this service only exposes the
+ * read API and the admin-only flag flips. Read methods are cached against {@link
+ * CacheConfig#TERMINALS_CACHE}; every mutator evicts the whole cache, and the periodic {@link
+ * UexUniverseSyncService} sweep evicts it on completion (via {@code
+ * MasterDataCacheEvictionService}, CACHE-SYNC-EVICT-001), so background-sync writes are visible on
+ * the next read; the 12-hour master-data TTL is only the backstop.
  */
 @Service
 @RequiredArgsConstructor
@@ -46,6 +53,7 @@ public class TerminalService {
    * @param pageable page request
    * @return paged terminal list (includes hidden — frontend filters via {@code includeHidden})
    */
+  @Cacheable(cacheNames = CacheConfig.TERMINALS_CACHE)
   public Page<Terminal> getAllTerminals(Pageable pageable) {
     return terminalRepository.findAll(pageable);
   }
@@ -58,6 +66,7 @@ public class TerminalService {
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no terminal
    *     matches
    */
+  @Cacheable(cacheNames = CacheConfig.TERMINALS_CACHE)
   public Terminal getTerminal(UUID id) {
     return terminalRepository
         .findById(id)
@@ -75,6 +84,7 @@ public class TerminalService {
    * @return the persisted terminal
    */
   @Transactional
+  @CacheEvict(cacheNames = CacheConfig.TERMINALS_CACHE, allEntries = true)
   public Terminal updateTerminalVisibility(UUID id, boolean hidden) {
     Terminal terminal = getTerminal(id);
     terminal.setHidden(hidden);
@@ -90,6 +100,7 @@ public class TerminalService {
    * @return the persisted terminal
    */
   @Transactional
+  @CacheEvict(cacheNames = CacheConfig.TERMINALS_CACHE, allEntries = true)
   public Terminal setLoadingDockOverride(UUID id, boolean value) {
     Terminal terminal = getTerminal(id);
     terminal.setHasLoadingDock(value);
@@ -112,6 +123,7 @@ public class TerminalService {
    * @return the persisted terminal
    */
   @Transactional
+  @CacheEvict(cacheNames = CacheConfig.TERMINALS_CACHE, allEntries = true)
   public Terminal clearLoadingDockOverride(UUID id) {
     Terminal terminal = getTerminal(id);
     terminal.setHasLoadingDockOverridden(false);
@@ -128,6 +140,7 @@ public class TerminalService {
    * @return the persisted terminal
    */
   @Transactional
+  @CacheEvict(cacheNames = CacheConfig.TERMINALS_CACHE, allEntries = true)
   public Terminal setAutoLoadOverride(UUID id, boolean value) {
     Terminal terminal = getTerminal(id);
     terminal.setIsAutoLoad(value);
@@ -150,6 +163,7 @@ public class TerminalService {
    * @return the persisted terminal
    */
   @Transactional
+  @CacheEvict(cacheNames = CacheConfig.TERMINALS_CACHE, allEntries = true)
   public Terminal clearAutoLoadOverride(UUID id) {
     Terminal terminal = getTerminal(id);
     terminal.setIsAutoLoadOverridden(false);

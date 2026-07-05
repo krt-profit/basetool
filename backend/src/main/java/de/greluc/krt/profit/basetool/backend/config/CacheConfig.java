@@ -34,16 +34,17 @@ import org.springframework.context.annotation.Configuration;
  * caches have very different freshness requirements:
  *
  * <ul>
- *   <li><b>Master data (12 h)</b> — cities, materials (list + by-id), ship types, locations,
- *       frequency types, job types, manufacturers, refining methods, star systems, material
- *       categories, and the blueprint variant-family index (rebuilt from the active blueprint
- *       master; no per-write evict hook of its own). Quasi-static: editor flows already trigger
- *       {@code @CacheEvict (allEntries=true)} on writes, and the periodic UEX / SC Wiki sync sweeps
- *       evict the caches they rewrite on completion (via {@code MasterDataCacheEvictionService},
- *       CACHE-SYNC-EVICT-001), so a stale entry only survives until the next admin write, the next
- *       sync sweep, or the 12 h lapse — whichever comes first. Because freshness comes from the
- *       eviction and not the TTL, the TTL is a long backstop that avoids re-querying data which
- *       almost never changes (the sync runs at most daily; admin edits are rare).
+ *   <li><b>Master data (12 h)</b> — cities, terminals, points of interest, outposts, materials
+ *       (list + by-id), ship types, locations, frequency types, job types, manufacturers, refining
+ *       methods, star systems, material categories, and the blueprint variant-family index (rebuilt
+ *       from the active blueprint master; no per-write evict hook of its own). Quasi-static: editor
+ *       flows already trigger {@code @CacheEvict (allEntries=true)} on writes, and the periodic UEX
+ *       / SC Wiki sync sweeps evict the caches they rewrite on completion (via {@code
+ *       MasterDataCacheEvictionService}, CACHE-SYNC-EVICT-001), so a stale entry only survives
+ *       until the next admin write, the next sync sweep, or the 12 h lapse — whichever comes first.
+ *       Because freshness comes from the eviction and not the TTL, the TTL is a long backstop that
+ *       avoids re-querying data which almost never changes (the sync runs at most daily; admin
+ *       edits are rare).
  *   <li><b>Squadrons (6 h)</b> — org-structure, changed only by admin lifecycle actions that evict.
  *       {@code SquadronService} evicts on writes; the long backstop applies for the same reason as
  *       the master data. Kept a notch shorter than master data because the squadron catalogue also
@@ -105,6 +106,28 @@ public class CacheConfig {
   /** Cache name for the location reference catalogue. */
   public static final String LOCATIONS_CACHE = "locations";
 
+  /**
+   * Cache name for the terminal reference catalogue (the large ~10 000-row price-matrix source,
+   * read on the UEX-overrides admin page and the profit calculator). Both the paged list and the
+   * by-id lookup share this cache; every admin visibility / loading-dock / auto-load mutator evicts
+   * it, and the periodic UEX sweep evicts it on completion (REQ-DATA-011).
+   */
+  public static final String TERMINALS_CACHE = "terminals";
+
+  /**
+   * Cache name for the point-of-interest reference catalogue. Both the paged list and the by-id
+   * lookup share this cache; the admin loading-dock override mutators evict it, and the periodic
+   * UEX sweep evicts it on completion (REQ-DATA-011).
+   */
+  public static final String POIS_CACHE = "pois";
+
+  /**
+   * Cache name for the outpost reference catalogue. Both the paged list and the by-id lookup share
+   * this cache; the admin loading-dock override mutators evict it, and the periodic UEX sweep
+   * evicts it on completion (REQ-DATA-011).
+   */
+  public static final String OUTPOSTS_CACHE = "outposts";
+
   /** Cache name for the manufacturer reference catalogue. */
   public static final String MANUFACTURERS_CACHE = "manufacturers";
 
@@ -158,6 +181,9 @@ public class CacheConfig {
     manager.setAllowNullValues(false);
 
     register(manager, CITIES_CACHE, MASTER_DATA_TTL);
+    register(manager, TERMINALS_CACHE, MASTER_DATA_TTL);
+    register(manager, POIS_CACHE, MASTER_DATA_TTL);
+    register(manager, OUTPOSTS_CACHE, MASTER_DATA_TTL);
     register(manager, FREQUENCY_TYPES_CACHE, MASTER_DATA_TTL);
     register(manager, JOB_TYPES_CACHE, MASTER_DATA_TTL);
     register(manager, LOCATIONS_CACHE, MASTER_DATA_TTL);

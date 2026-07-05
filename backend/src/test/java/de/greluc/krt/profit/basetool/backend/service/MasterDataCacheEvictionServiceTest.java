@@ -71,12 +71,25 @@ class MasterDataCacheEvictionServiceTest {
   }
 
   @Test
+  void evictP4kSyncedMasterData_clearsEveryCacheAP4kApplyCanMakeStale() {
+    when(cacheManager.getCache(anyString())).thenReturn(cache);
+
+    service.evictP4kSyncedMasterData();
+
+    for (String name : MasterDataCacheEvictionService.P4K_SYNCED_CACHES) {
+      verify(cacheManager).getCache(name);
+    }
+    verify(cache, times(MasterDataCacheEvictionService.P4K_SYNCED_CACHES.size())).clear();
+  }
+
+  @Test
   void evict_toleratesAnUnregisteredCacheWithoutThrowing() {
     // A name that resolves to null (not registered) must not abort the sweep-completion eviction.
     when(cacheManager.getCache(anyString())).thenReturn(null);
 
     assertDoesNotThrow(service::evictUexSyncedMasterData);
     assertDoesNotThrow(service::evictScWikiSyncedMasterData);
+    assertDoesNotThrow(service::evictP4kSyncedMasterData);
   }
 
   @Test
@@ -85,6 +98,10 @@ class MasterDataCacheEvictionServiceTest {
         List.of(
             CacheConfig.CITIES_CACHE,
             CacheConfig.STAR_SYSTEMS_CACHE,
+            CacheConfig.LOCATIONS_CACHE,
+            CacheConfig.TERMINALS_CACHE,
+            CacheConfig.POIS_CACHE,
+            CacheConfig.OUTPOSTS_CACHE,
             CacheConfig.MATERIALS_CACHE,
             CacheConfig.MATERIAL_BY_ID_CACHE,
             CacheConfig.MANUFACTURERS_CACHE,
@@ -106,5 +123,19 @@ class MasterDataCacheEvictionServiceTest {
         MasterDataCacheEvictionService.SCWIKI_SYNCED_CACHES,
         "a new cache over an SC-Wiki-synced table must be added here or it lags the TTL after a"
             + " sync");
+  }
+
+  @Test
+  void p4kSyncedSet_isExactlyTheP4kWrittenMasterDataCaches() {
+    assertEquals(
+        List.of(
+            CacheConfig.MATERIALS_CACHE,
+            CacheConfig.MATERIAL_BY_ID_CACHE,
+            CacheConfig.MANUFACTURERS_CACHE,
+            CacheConfig.SHIP_TYPES_CACHE,
+            CacheConfig.BLUEPRINT_FAMILY_INDEX_CACHE),
+        MasterDataCacheEvictionService.P4K_SYNCED_CACHES,
+        "a new cache over a P4K-applied table must be added here or it lags the TTL after an"
+            + " apply");
   }
 }

@@ -9,10 +9,12 @@
 
 Both modules cache slow-changing data in **Caffeine, which is per-JVM**:
 
-- the frontend `STATIC_DATA_CACHE` (URI-keyed, 10 min), evicted app-wide by `clearStaticDataCache()`
-  on admin mutations (REQ-DATA-007);
-- the backend master-data caches (30 min), evicted by each service's `@CacheEvict` on writes and by the
-  sync sweeps on completion (REQ-DATA-011).
+- the frontend per-domain catalogue caches (`CacheDomain`, 6 h for reference data / 2 h for
+  org-structure and settings), evicted per-domain by `evict(CacheDomain…)` — or app-wide by
+  `clearStaticDataCache()` — on admin mutations (REQ-DATA-007);
+- the backend master-data caches (12 h), evicted by each service's `@CacheEvict` on writes and by the
+  UEX / SC Wiki sync sweeps and the P4K catalog apply on completion (REQ-DATA-011). This set now also
+  includes the terminal, POI and outpost catalogues.
 
 REQ-DATA-007's guarantee — *"no user sees a list more stale than the last mutation"* — is airtight
 **only because there is exactly one frontend JVM and one backend JVM**. An eviction on replica A does
@@ -63,9 +65,9 @@ replacing the eviction-sensitive caches with a shared/broadcast eviction scheme.
   *when* there is more than one replica, but pure added surface (subscriber, delivery-failure handling,
   monitoring) until then.
 - **Shorten the TTLs to paper over multi-instance staleness.** Rejected: it does not make eviction reach
-  peers, re-incurs the DB-hit cost the 30 min TTL was chosen to avoid (REQ-DATA-011 context), and would
-  be solving the wrong problem — freshness at single instance is a TTL/eviction-hook question, not a
-  distribution one.
+  peers, re-incurs the DB-hit cost the long (12 h) master-data TTL was chosen to avoid (REQ-DATA-011
+  context), and would be solving the wrong problem — freshness at single instance is a TTL/eviction-hook
+  question, not a distribution one.
 - **Leave the single-instance assumption undocumented.** Rejected: every other place with the same
   hazard already documents it (the live-sync relay, token single-flight, ADR-0019); REQ-DATA-007 was the
   lone silent carrier, so CACHE-DIST-01 closes a consistency gap.
