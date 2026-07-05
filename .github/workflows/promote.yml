@@ -11,13 +11,23 @@ name: Promote to stable
 # host applies always match each other (see ADR-0049, ADR-0055).
 #
 # Trigger: workflow_dispatch only. Promotion is an intentional human decision,
-# never automatic from a CI build.
+# never automatic from a CI build. The promote job is additionally bound to the
+# `production` GitHub Environment, so a repo-configured required reviewer approves
+# the run before any :stable flip happens — workflow_dispatch alone would let
+# anyone with Actions-write reach prod (REQ-OPS-002).
 #
-# Pre-flight gate: cosign-verifies the source image's keyless signature
-# against this repository's release-images workflow identity. A tag that was
-# not produced by our own CI cannot be promoted, even if the registry contains
-# one (e.g. someone pushed manually with a leaked PAT). This is the supply
-# chain seam that makes the host's blind `:stable` pull safe.
+# Three gates guard a promotion, in order:
+#   1. cosign-verify the source digest's keyless signature against this repo's
+#      release-images workflow identity (pinned to @refs/heads/main | tags/v.+).
+#      A tag not produced by our own CI cannot be promoted even if the registry
+#      contains one (e.g. someone pushed manually with a leaked PAT). This is the
+#      CI half of the supply-chain seam; scripts/deploy.sh re-verifies the same
+#      identity on the host before it applies (REQ-OPS-015), so the seam holds
+#      even if :stable is later moved out-of-band.
+#   2. Trivy vulnerability gate: a fixable HIGH/CRITICAL in the exact digest fails
+#      the promotion (the production vuln gate release-images defers to). Skippable
+#      via the skip_vuln_gate input for a deliberate hotfix.
+#   3. Re-tag the (verified, scanned) digest as :stable.
 
 on:
   workflow_dispatch:
@@ -26,6 +36,11 @@ on:
         description: 'Image tag to promote (e.g. "1.4.3", "sha-abc1234"). NOT "stable" itself.'
         required: true
         type: string
+      skip_vuln_gate:
+        description: 'Hotfix escape hatch: promote even if the image has fixable HIGH/CRITICAL CVEs.'
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   # Serialise promotions globally so two simultaneous flips cannot leave the
@@ -65,6 +80,15 @@ jobs:
     needs: validate-inputs
     runs-on: ubuntu-latest
     timeout-minutes: 10
+
+    # Human-approval gate. Promotion is the ONLY path to prod (REQ-OPS-002), and
+    # workflow_dispatch alone lets anyone with Actions-write flip :stable. Binding
+    # the job to the `production` GitHub Environment means a repo-configured
+    # *required reviewer* must approve the run before ANY promote matrix job
+    # proceeds (one approval covers the whole environment for the run). Configure
+    # the reviewer under Settings → Environments → production → Required reviewers;
+    # without that config the environment reference is a harmless no-op.
+    environment: production
 
     strategy:
       # If one promotion fails, do NOT carry on with the others — otherwise we
@@ -117,13 +141,39 @@ jobs:
         # identity to that exact workflow file rejects images signed by any
         # other workflow in the org (or by anyone with stolen credentials who
         # never had access to fire our release pipeline in the first place).
+        #
+        # The `@refs/` suffix is pinned to `heads/main` (main-branch :edge/:sha
+        # builds) or `tags/v.+` (release builds) — NOT the broad `refs/.+`. That
+        # rejects an image built by a workflow_dispatch run of release-images off
+        # an arbitrary feature branch, so only a main-branch or tagged build is
+        # ever promotable. The host-side gate in scripts/deploy.sh
+        # (verify_signature, REQ-OPS-015) verifies against the SAME identity.
         run: |
           set -euo pipefail
           cosign verify "${IMAGE_REF}" \
-            --certificate-identity-regexp "https://github.com/${REPO}/\\.github/workflows/release-images\\.yml@refs/.+" \
+            --certificate-identity-regexp "https://github.com/${REPO}/\\.github/workflows/release-images\\.yml@refs/(heads/main|tags/v.+)" \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
             > /dev/null
           echo "Signature OK"
+
+      # The production vulnerability gate. release-images.yml scans on build but
+      # does NOT block the push (a CVE-bearing image is preferable to no image on
+      # an urgent build); promotion is where the scan becomes a GATE. A fixable
+      # HIGH/CRITICAL in the exact digest being promoted fails the promotion, so a
+      # known-vulnerable image cannot reach :stable by accident. Only the app
+      # images carry OS packages — the config + keycloak-spi bundles are
+      # `FROM scratch`, so the scan is skipped for them. `skip_vuln_gate` is the
+      # deliberate hotfix escape hatch when the CVE is unrelated to the fix and
+      # shipping now matters more (promotion is already a human decision).
+      - name: Vulnerability gate (Trivy — production promotion gate)
+        if: ${{ !inputs.skip_vuln_gate && contains(fromJSON('["backend","frontend","ingest"]'), matrix.module) }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}@${{ steps.resolve.outputs.digest }}
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
 
       - name: Re-tag digest as :stable
         env:

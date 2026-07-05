@@ -173,7 +173,10 @@ token already in place — that is the [`docs/deployment.md`](deployment.md) boo
    ```
 2. **Restore host config** from `…/restore/.../config/`: place `dotenv` → `/var/iri/code/.env`,
    `keystore.p12` → `/var/iri/secrets/keystore.p12`, `realm-export.json` → `/var/iri/code/`, and
-   extract `providers.tar.gz` → `/var/iri/code/keycloak/`.
+   extract `providers.tar.gz` → `/var/iri/code/keycloak/`. Re-apply the keystore's mode + uid-1000
+   ACL (restic may not carry POSIX ACLs): `sudo chown root:10001 /var/iri/secrets/keystore.p12 &&
+   sudo chmod 0640 /var/iri/secrets/keystore.p12 && sudo setfacl -m u:1000:r
+   /var/iri/secrets/keystore.p12` (see [`docs/deployment.md`](deployment.md) → *5.2 PKCS12 keystore*).
 3. **Restore NPM:** extract `npm.tar.gz` into `/var/iri/npm/` (recreates `data` + `letsencrypt`).
 4. **Start the databases only**, then restore each dump into its database:
 
@@ -191,6 +194,23 @@ token already in place — that is the [`docs/deployment.md`](deployment.md) boo
 5. **Bring the rest up:** `docker compose --profile prod up -d`.
 6. **WireGuard:** restore your out-of-band `wg0.conf` to `/etc/wireguard/wg0.conf` and
    `wg-quick up wg0` (not in this backup — see exclusions).
+
+### Rotate secrets after a compromise-driven restore
+
+The host-config archive restores the **live secrets** (`.env`, `keystore.p12`, `realm-export.json`,
+the provider JARs). If this restore is the recovery from a **suspected host compromise**
+(ransomware, intrusion — as opposed to hardware loss or an accidental delete), those secrets must be
+assumed exposed: **rotate them once the stack is back up** (REQ-OPS-010). At minimum —
+
+- the backend/Keycloak **database passwords** (`POSTGRES_PASSWORD`, `KC_POSTGRES_PASSWORD`) and the
+  **Redis password** (`REDIS_PASSWORD`) in `/var/iri/code/.env`, applied to the DBs/Redis;
+- the **Keycloak admin** bootstrap password and the **OIDC client secrets**
+  (`KEYCLOAK_ADMIN_CLIENT_SECRET`) and the **SPI shared secret** (`KRT_DISCORD_SPI_SHARED_SECRET`);
+- the internal **`keystore.p12`** (regenerate per [`docs/deployment.md`](deployment.md) → *Keycloak
+  behind NPM* — it carries `dns:keycloak`) and re-apply its ACL;
+- the **GHCR pull token** and the **backup** repo password + Nextcloud app password (REQ-OPS-012).
+
+A restore with **no** compromise suspected keeps the restored secrets as-is.
 
 ## Routine operations
 

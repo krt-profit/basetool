@@ -13,11 +13,19 @@
 ;   systemctl status iri-deploy.timer
 ;   journalctl -u iri-deploy.service -f
 ;
-; The unit deliberately runs as a dedicated `deploy` user (member of the
-; `docker` group, no shell, no sudo) — not as root. Reason: anything the
-; deploy script can do is bounded by what that user can already do via
-; `docker compose`. A compromised GHCR pull token cannot escalate further
-; than rerunning images that already live in the registry.
+; The unit deliberately runs as a dedicated `deploy` user (no shell, no sudo) —
+; not as root. It is a member of the `docker` group so it can invoke
+; `docker compose` without sudo. Be honest about what that bounds: docker-group
+; membership is effectively root-equivalent on the host (the group can bind-mount
+; `/` into a container and escape), so the `deploy` user is NOT a hard privilege
+; boundary against a fully-compromised deploy.sh. What DOES bound the blast radius
+; is: (1) the host-side cosign signature gate (REQ-OPS-015) — deploy.sh refuses to
+; run an image not signed by our release-images identity, so a moved `:stable` tag
+; or a compromised GHCR pull token cannot get attacker code executed here; and
+; (2) the systemd sandbox below, which confines deploy.sh's own process.
+; Further hardening deferred (would reduce the docker-group surface itself):
+; routing docker access through a read-restricted docker-socket-proxy, or moving
+; to rootless Docker. See docs/deployment.md → "Docker access hardening".
 
 [Unit]
 Description=Profit Basetool — pull and apply latest GHCR images
@@ -55,20 +63,47 @@ PrivateTmp=true
 PrivateDevices=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
+ProtectKernelLogs=true
 ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
 RestrictNamespaces=true
 RestrictRealtime=true
+RestrictSUIDSGID=true
+RemoveIPC=true
 LockPersonality=true
-# The script needs to write to:
-#   /var/lib/iri/    — state files (digest pins, last-deployed marker, and the
-;                      config-stage/ + config-previous/ dirs and the
-;                      config-blocked.marker the config-bundle delivery uses)
-#   /var/log/        — append to iri-deploy.log
-#   /var/lock/       — flock file
-;   /var/iri/        — Docker volume hierarchy AND /var/iri/code, where the
-;                      config bundle is applied (docker-compose.yml + the
-;                      maintenance/theme trees). Already covered by /var/iri.
-ReadWritePaths=/var/lib/iri /var/log /var/lock /var/iri
+# The deploy user is unprivileged, so the capability bounding set can be emptied
+# outright — deploy.sh needs no capability (it talks to the docker socket, which
+# the root daemon acts on out-of-band).
+CapabilityBoundingSet=
+# The script talks to the docker socket over AF_UNIX and makes outbound HTTPS
+# (GHCR pulls + cosign's Sigstore reach) over AF_INET/AF_INET6; AF_NETLINK covers
+# routing/interface lookups the CLIs do at startup. Everything else is denied.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+SystemCallArchitectures=native
+# Confine to the syscall set a normal service needs (blocks @obsolete, @privileged,
+# raw @swap/@reboot/@mount etc.). docker CLI, cosign and the coreutils/bash the
+# script drives all fall inside @system-service. If a future tool trips this,
+# `deploy.sh --check-only` surfaces it before a real deploy — widen or comment it
+# out then, do not weaken the rest of the sandbox.
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+# The script writes ONLY to these paths (everything else is read-only under
+# ProtectSystem=strict). Deliberately NOT the whole /var/iri: the DB / redis / npm
+# bind mounts under /var/iri are written by the containers via the root daemon,
+# out-of-band from this sandbox, so deploy.sh needs no write access to them.
+#   /var/lib/iri/       — state files (digest pins, last-deployed marker, the
+#                         config-stage/ + config-previous/ dirs, config-blocked.marker,
+#                         the DOCKER_CONFIG credential + the $HOME/.sigstore cosign cache)
+#   /var/log/           — append to iri-deploy.log
+#   /var/lock/          — flock file
+#   /var/iri/code/      — where the config bundle is applied (docker-compose.yml +
+#                         maintenance/theme trees) and the keycloak provider JAR is staged
+#   /var/iri/monitoring — the node_exporter textfile dir deploy.sh writes metrics into
+#                         (absent on a host without monitoring → the metric write
+#                         degrades to a best-effort no-op)
+ReadWritePaths=/var/lib/iri /var/log /var/lock /var/iri/code /var/iri/monitoring
 
 # Hard memory and CPU caps so a runaway script cannot starve the production
 ; stack of resources during a deploy. Generous on purpose — the actual work

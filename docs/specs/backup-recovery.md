@@ -80,6 +80,13 @@ design:** Redis (sessions transparently re-login), logs, and the WireGuard `wg0.
 operator backs that key up **out-of-band** (it is irreplaceable but must not ride the same
 channel as the application data, by owner decision).
 
+Because the host-config archive carries the live secrets (`.env`, `keystore.p12`, `realm-export.json`,
+the `keycloak/providers` JARs), a restore that follows a **suspected host compromise** (ransomware is
+a named DR driver, above) restores *potentially-exposed* secrets. Such a restore must therefore be
+followed by **rotation** of the restored secrets — the DB/Redis/Keycloak-admin passwords, the OIDC
+client secrets, the SPI shared secret, the internal keystore, and the GHCR pull token — not treated
+as clean. A restore for hardware loss / accidental deletion (no compromise suspected) does not.
+
 **Acceptance**
 
 - [ ] A backup contains both database dumps, the NPM archive, and the host-config archive.
@@ -87,8 +94,10 @@ channel as the application data, by owner decision).
   operator's out-of-band responsibility for `wg0.conf`.
 - [ ] The Keycloak DB dump — not `realm-export.json` — is the documented restore source for
   realm/users/clients.
+- [ ] The restore runbook documents that a **compromise-driven** restore must be followed by
+  rotating the restored secrets; a non-compromise restore need not.
 
-**Enforced by:** `scripts/backup.sh` (capture list) · **Runbook:** [`docs/backup.md`](../backup.md) → *What is and isn't backed up*
+**Enforced by:** `scripts/backup.sh` (capture list) · **Runbook:** [`docs/backup.md`](../backup.md) → *What is and isn't backed up*, *Rotate secrets after a compromise-driven restore*
 
 ### REQ-OPS-011 — Recoverability is proven, not assumed
 

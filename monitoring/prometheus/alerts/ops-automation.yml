@@ -60,8 +60,26 @@ groups:
           summary: "Restore drill: artifact not restorable ({{ $labels.artifact }})"
           description: "The last restore drill could not restore/verify artifact '{{ $labels.artifact }}'."
 
+      - alert: GhcrPullTokenExpired
+        expr: basetool_ghcr_token_expiry_timestamp < time()
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "GHCR pull token expired — deploys are failing"
+          description: "The production GHCR pull token's recorded expiry is in the past; `docker login` fails and no promotion can deploy. Rotate the token (docs/deployment.md → Token rotation) and update its .expiry file."
+
   - name: ops-automation-warning
     rules:
+      - alert: GhcrPullTokenExpiring
+        expr: (basetool_ghcr_token_expiry_timestamp - time()) < 14 * 24 * 3600 or absent(basetool_ghcr_token_expiry_timestamp)
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "GHCR pull token expiring <14d or expiry unknown"
+          description: "The production GHCR pull token expires in under 14 days, or its expiry gauge is absent (record the rotation date in the token's .expiry file — docs/deployment.md → Token rotation). A lapsed token silently stops all deploys."
+
       - alert: DockerCleanupStaleOrMissing
         expr: (time() - basetool_docker_cleanup_last_success_timestamp) > 8 * 24 * 3600 or absent(basetool_docker_cleanup_last_success_timestamp)
         for: 1h
