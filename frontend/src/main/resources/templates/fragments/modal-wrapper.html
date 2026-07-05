@@ -19,10 +19,10 @@
                (the `.krt-modal-body` / `.krt-modal-foot`, or a <form> wrapping them),
                inserted verbatim so each modal keeps its bespoke body/footer markup.
 
-  The overlay's hidden default comes from CSS (`.krt-modal-overlay { display:none }` in
-  bank.css) — every current `.krt-modal-overlay` modal loads bank.css and is opened by
-  `open-modal-display` flipping the inline `display`; the fragment therefore adds no
-  inline style, so the rendered shell is byte-identical to the hand-written markup.
+  The overlay's hidden default comes from the GLOBAL `.krt-modal-overlay { display:none }`
+  in styles.css (loaded on every page; bank.css duplicates it as defense-in-depth) — the
+  modal is opened by `open-modal-display` flipping the inline `display`, so the fragment
+  adds no inline style and the rendered shell is byte-identical to the hand-written markup.
   Modals that need a server-driven open state (a th:style/th:if on the overlay) keep
   their bespoke overlay inline for now — this fragment targets the JS-toggled ones.
 -->

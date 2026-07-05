@@ -279,6 +279,9 @@ tr.is-inert td {
 }
 
 /* ---- KRT modal frame (formalized head/body/foot) + type-to-confirm ---- */
+/* Mirrors the global `.krt-modal-overlay` in styles.css (same hidden default).
+   Kept as defense-in-depth so the overlay stays hidden even if only one of the two
+   stylesheets loads; both must agree on `display: none`. */
 .krt-modal-overlay {
     position: fixed;
     inset: 0;

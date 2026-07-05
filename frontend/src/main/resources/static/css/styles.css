@@ -4631,7 +4631,17 @@ textarea:focus-visible,
     inset: 0;
     background: rgb(0 0 0 / 80%);
     backdrop-filter: blur(2px);
-    display: flex;
+    /* Hidden by default. A modal is opened by setting inline `display: flex`
+       (common-handlers.js `open-modal-display`, or a server-rendered `th:style`);
+       the `align-items`/`justify-content` below only take effect once that inline
+       value activates flex layout. This GLOBAL default must stay `none`: styles.css
+       is loaded on every page, so making the hidden default live here (not only in
+       the page-scoped bank.css, which duplicates it) means a `.krt-modal-overlay`
+       modal stays closed even if a page-specific stylesheet fails to load. It was
+       `display: flex` here, relying on bank.css to override it to `none` — so a
+       dropped bank.css (e.g. a WebKit HTTP/2 stream reset under CI load) left every
+       no-inline-style modal rendered open on load. */
+    display: none;
     align-items: center;
     justify-content: center;
     padding: 20px;
