@@ -560,9 +560,11 @@ overdraft. When the bank sends money in-game on a member's behalf, the **in-game
 **on top** and borne by the debited account: it applies to `WITHDRAWAL` and a holder-changing
 `TRANSFER` — the source is debited the gross (amount + fee), the destination/recipient gets the
 **full** entered amount, and the account-overdraft guard runs against the gross (a booking that
-cannot cover amount + fee is refused, so a fee never drives an account negative). `DEPOSIT`,
-same-holder transfers and the internal holder-to-holder Umbuchung (`HOLDER_TRANSFER`) are
-**fee-free** — for the Umbuchung the bank staff bear the in-game fee personally
+cannot cover amount + fee is refused, so a fee never drives an account negative). `DEPOSIT` and
+same-holder transfers are **fee-free**. The internal holder-to-holder Umbuchung (`HOLDER_TRANSFER`)
+**bears the fee on the KRT (`CARTEL`) account** (REQ-BANK-031, #998): the source holder's custody is
+reduced by the fee and the fee is debited from the KRT account (a missing/closed KRT or a fee it
+cannot cover rejects the Umbuchung); a tiny amount whose fee rounds to 0 stays fee-free
 (REQ-BANK-033, ADR-0052). **All bank
 employees and Bank Management members are
 automatically registered as holders** (REQ-BANK-029, ADR-0040); if someone loses all

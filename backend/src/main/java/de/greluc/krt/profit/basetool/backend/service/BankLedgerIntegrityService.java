@@ -143,7 +143,8 @@ public class BankLedgerIntegrityService {
     }
     for (UUID transactionId : unbalancedTransfers) {
       log.error(
-          "Bank integrity violation: transfer transaction {} account legs do not sum to zero",
+          "Bank integrity violation: transfer/Umbuchung transaction {} account legs do not net to"
+              + " -transfer_fee",
           transactionId);
     }
     for (UUID transactionId : unbalancedHolderMovements) {
