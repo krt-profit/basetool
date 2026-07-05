@@ -28,6 +28,7 @@ import static org.mockito.Mockito.*;
 import de.greluc.krt.profit.basetool.frontend.model.form.MissionForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ParticipantForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import java.util.Collections;
@@ -509,7 +510,7 @@ class MissionPageControllerTest {
 
     when(backendApiClient.get(eq("/api/v1/missions/" + id), anyTypeRef(), eq(true)))
         .thenReturn(mission);
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), eq(true)))
         .thenReturn(Collections.emptyList());
 
     // Act
@@ -518,11 +519,10 @@ class MissionPageControllerTest {
     // Assert
     assertEquals("mission-detail", view);
     verify(backendApiClient).get(eq("/api/v1/missions/" + id), anyTypeRef(), eq(true));
+    verify(backendApiClient).getCached(eq(CachedCatalog.JOB_TYPES_MISSION), anyTypeRef(), eq(true));
+    verify(backendApiClient).getCached(eq(CachedCatalog.JOB_TYPES_CREW), anyTypeRef(), eq(true));
     verify(backendApiClient)
-        .getCached(eq("/api/v1/job-types?archetype=MISSION&size=1000"), anyTypeRef(), eq(true));
-    verify(backendApiClient)
-        .getCached(eq("/api/v1/job-types?archetype=CREW&size=1000"), anyTypeRef(), eq(true));
-    verify(backendApiClient).getCached(eq("/api/v1/squadrons?size=1000"), anyTypeRef(), eq(true));
+        .getCached(eq(CachedCatalog.SQUADRONS_UNSORTED), anyTypeRef(), eq(true));
   }
 
   @Test
@@ -583,8 +583,9 @@ class MissionPageControllerTest {
         .thenReturn(
             new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
                 Collections.emptyList(), 0, 10, 0, 0, Collections.emptyList()));
-    when(backendApiClient.getCached(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
 
     // Act
@@ -658,7 +659,7 @@ class MissionPageControllerTest {
 
     when(backendApiClient.get(eq("/api/v1/missions/" + id), anyTypeRef(), eq(true)))
         .thenReturn(mission);
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), eq(true)))
         .thenReturn(Collections.emptyList());
     when(backendApiClient.get(
             eq("/api/v1/missions/" + id + "/finance-entries?size=1000"), anyTypeRef(), eq(false)))

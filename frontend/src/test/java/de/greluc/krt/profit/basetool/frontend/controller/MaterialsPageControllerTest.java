@@ -24,7 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -35,6 +34,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialPriceOverviewDto
 import de.greluc.krt.profit.basetool.frontend.model.dto.MatrixGridDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.Collections;
@@ -196,7 +196,7 @@ class MaterialsPageControllerTest {
     MaterialsPageController controller = new MaterialsPageController(backendApiClient);
     Model model = new ConcurrentModel();
 
-    when(backendApiClient.getCached(eq("/api/v1/materials/matrix?size=100000"), anyTypeRef()))
+    when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_MATRIX), anyTypeRef()))
         .thenReturn(matrixPage());
 
     // Act — the shell endpoint only derives the filter source lists; the grid loads separately.
@@ -219,7 +219,7 @@ class MaterialsPageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MaterialsPageController controller = new MaterialsPageController(backendApiClient);
 
-    when(backendApiClient.getCached(eq("/api/v1/materials/matrix?size=100000"), anyTypeRef()))
+    when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_MATRIX), anyTypeRef()))
         .thenReturn(matrixPage());
 
     // Act
@@ -249,7 +249,7 @@ class MaterialsPageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     MaterialsPageController controller = new MaterialsPageController(backendApiClient);
 
-    when(backendApiClient.getCached(startsWith("/api/v1/materials/matrix"), anyTypeRef()))
+    when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_MATRIX), anyTypeRef()))
         .thenThrow(new RuntimeException("backend down"));
 
     // Act
@@ -268,7 +268,7 @@ class MaterialsPageControllerTest {
     MaterialsPageController controller = new MaterialsPageController(backendApiClient);
     Model model = new ConcurrentModel();
 
-    when(backendApiClient.getCached(startsWith("/api/v1/materials/matrix"), anyTypeRef()))
+    when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_MATRIX), anyTypeRef()))
         .thenThrow(new RuntimeException("backend down"));
 
     // Act

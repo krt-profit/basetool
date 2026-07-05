@@ -89,15 +89,16 @@ class MonitoringScrapeSecurityConfigTest {
 
   @Test
   void shouldServeMetricsWithValidBasicCredentials() throws Exception {
-    // Given / When / Then: the payload carries the module tag and the Caffeine `staticData` cache
-    // meters — proof both that the BotProtectionFilter whitelist works and that the cache now
-    // records statistics (recordStats(), the epic's original trigger).
+    // Given / When / Then: the payload carries the module tag and the per-domain Caffeine cache
+    // meters — proof both that the BotProtectionFilter whitelist works and that the caches record
+    // statistics (recordStats(), the epic's original trigger). Since FE-CACHE-2 split the single
+    // staticData cache into per-domain named caches, assert one of them (squadronCatalogue).
     mockMvc
         .perform(get(PROMETHEUS).with(httpBasic("metrics-scraper", "test-scrape-password")))
         .andExpect(status().isOk())
         .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE))
         .andExpect(content().string(containsString("application=\"basetool-frontend\"")))
-        .andExpect(content().string(containsString("cache=\"staticData\"")));
+        .andExpect(content().string(containsString("cache=\"squadronCatalogue\"")));
   }
 
   @Test

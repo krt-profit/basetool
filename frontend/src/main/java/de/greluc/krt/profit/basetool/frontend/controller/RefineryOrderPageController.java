@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.RefineryOrderStoreForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.RefineryOrderStoreItemForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.service.IngestHandoffService;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
@@ -705,7 +706,7 @@ public class RefineryOrderPageController {
   private List<MaterialDto> fetchMaterials() {
     try {
       PageResponse<MaterialDto> p =
-          backendApiClient.getCached("/api/v1/materials?size=1000", MATERIAL_PAGE, true);
+          backendApiClient.getCached(CachedCatalog.MATERIALS, MATERIAL_PAGE, true);
       if (p != null && p.content() != null) {
         return new ArrayList<>(p.content());
       }
@@ -718,8 +719,7 @@ public class RefineryOrderPageController {
   private List<RefiningMethodDto> fetchMethods() {
     try {
       PageResponse<RefiningMethodDto> p =
-          backendApiClient.getCached(
-              "/api/v1/refining-methods?size=1000", REFINING_METHOD_PAGE, true);
+          backendApiClient.getCached(CachedCatalog.REFINING_METHODS, REFINING_METHOD_PAGE, true);
       if (p != null && p.content() != null) {
         return new ArrayList<>(p.content());
       }
@@ -732,7 +732,7 @@ public class RefineryOrderPageController {
   private List<LocationDto> fetchAllLocations() {
     try {
       PageResponse<LocationDto> p =
-          backendApiClient.getCached("/api/v1/locations?size=1000", LOCATION_PAGE);
+          backendApiClient.getCached(CachedCatalog.LOCATIONS, LOCATION_PAGE);
       if (p != null && p.content() != null) {
         return new ArrayList<>(p.content());
       }
@@ -745,7 +745,7 @@ public class RefineryOrderPageController {
   private List<LocationDto> fetchLocations() {
     try {
       List<LocationDto> locs =
-          backendApiClient.getCached("/api/v1/locations/refineries", LOCATION_LIST);
+          backendApiClient.getCached(CachedCatalog.LOCATIONS_REFINERIES, LOCATION_LIST);
       if (locs != null) {
         return locs;
       }

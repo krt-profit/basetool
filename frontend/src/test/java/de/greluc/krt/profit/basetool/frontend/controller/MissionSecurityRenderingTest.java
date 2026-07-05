@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -33,6 +34,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.util.Collections;
 import java.util.Set;
 import java.util.UUID;
@@ -161,7 +163,7 @@ class MissionSecurityRenderingTest {
             anyBoolean()))
         .thenReturn(mission);
     when(backendApiClient.getCached(
-            anyString(),
+            any(CachedCatalog.class),
             org.mockito.ArgumentMatchers
                 .<org.springframework.core.ParameterizedTypeReference<Object>>any(),
             anyBoolean()))
@@ -271,7 +273,7 @@ class MissionSecurityRenderingTest {
             anyBoolean()))
         .thenReturn(mission);
     when(backendApiClient.getCached(
-            anyString(),
+            any(CachedCatalog.class),
             org.mockito.ArgumentMatchers
                 .<org.springframework.core.ParameterizedTypeReference<Object>>any(),
             anyBoolean()))
@@ -374,7 +376,7 @@ class MissionSecurityRenderingTest {
             anyBoolean()))
         .thenReturn(mission);
     when(backendApiClient.getCached(
-            anyString(),
+            any(CachedCatalog.class),
             org.mockito.ArgumentMatchers
                 .<org.springframework.core.ParameterizedTypeReference<Object>>any(),
             anyBoolean()))
@@ -487,7 +489,7 @@ class MissionSecurityRenderingTest {
             anyBoolean()))
         .thenReturn(mission);
     when(backendApiClient.getCached(
-            anyString(),
+            any(CachedCatalog.class),
             org.mockito.ArgumentMatchers
                 .<org.springframework.core.ParameterizedTypeReference<Object>>any(),
             anyBoolean()))

@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.InventoryForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.ArrayList;
@@ -721,7 +722,7 @@ public class InventoryPageController {
         new ArrayList<>();
     try {
       List<de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto> content =
-          backendApiClient.getCached("/api/v1/materials/lookup", MATERIAL_REFERENCE_LIST);
+          backendApiClient.getCached(CachedCatalog.MATERIALS_LOOKUP, MATERIAL_REFERENCE_LIST);
       if (content != null) {
         materials.addAll(content);
       }
@@ -737,7 +738,7 @@ public class InventoryPageController {
         new ArrayList<>();
     try {
       List<de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto> content =
-          backendApiClient.getCached("/api/v1/locations/lookup", LOCATION_REFERENCE_LIST);
+          backendApiClient.getCached(CachedCatalog.LOCATIONS_LOOKUP, LOCATION_REFERENCE_LIST);
       if (content != null) {
         locations.addAll(content);
       }

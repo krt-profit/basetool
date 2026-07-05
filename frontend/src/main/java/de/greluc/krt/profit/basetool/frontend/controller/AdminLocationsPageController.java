@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -128,6 +129,9 @@ public class AdminLocationsPageController {
               currentLocation.homeLocation(),
               currentLocation.version());
       backendApiClient.put("/api/v1/locations/" + id, body, Void.class);
+      // A visibility / home-location toggle changes the cached location catalogues (list, lookup,
+      // refineries, home-locations), so evict the LOCATION domain (REQ-DATA-007).
+      backendApiClient.evict(CacheDomain.LOCATION);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       log.debug("Toggle location visibility failed", e);
@@ -176,6 +180,9 @@ public class AdminLocationsPageController {
               homeLocation,
               currentLocation.version());
       backendApiClient.put("/api/v1/locations/" + id, body, Void.class);
+      // A visibility / home-location toggle changes the cached location catalogues (list, lookup,
+      // refineries, home-locations), so evict the LOCATION domain (REQ-DATA-007).
+      backendApiClient.evict(CacheDomain.LOCATION);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       log.debug("Toggle home-location failed", e);
@@ -219,6 +226,7 @@ public class AdminLocationsPageController {
               current.homeLocation(),
               current.version());
       backendApiClient.put("/api/v1/locations/" + id, body, Void.class);
+      backendApiClient.evict(CacheDomain.LOCATION);
       return ResponseEntity.ok(backendApiClient.get("/api/v1/locations/" + id, LocationDto.class));
     } catch (BackendServiceException e) {
       log.debug("Toggle location visibility (ajax) failed", e);
@@ -253,6 +261,7 @@ public class AdminLocationsPageController {
               !current.homeLocation(),
               current.version());
       backendApiClient.put("/api/v1/locations/" + id, body, Void.class);
+      backendApiClient.evict(CacheDomain.LOCATION);
       return ResponseEntity.ok(backendApiClient.get("/api/v1/locations/" + id, LocationDto.class));
     } catch (BackendServiceException e) {
       log.debug("Toggle home-location (ajax) failed", e);

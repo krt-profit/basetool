@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -54,7 +55,7 @@ class MaterialCollectionPageControllerTest {
 
     when(backendApiClient.get(contains("/material-collection"), anyTypeRef())).thenReturn(entries);
     when(backendApiClient.get(contains("/users/lookup"), anyTypeRef())).thenReturn(users);
-    when(backendApiClient.getCached(contains("/locations/lookup"), anyTypeRef()))
+    when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
         .thenReturn(locations);
 
     // When
@@ -80,7 +81,7 @@ class MaterialCollectionPageControllerTest {
     when(backendApiClient.get(contains("/material-collection"), anyTypeRef()))
         .thenThrow(new BackendServiceException("Backend error", null, 500));
     when(backendApiClient.get(contains("/users/lookup"), anyTypeRef())).thenReturn(List.of());
-    when(backendApiClient.getCached(contains("/locations/lookup"), anyTypeRef()))
+    when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
         .thenReturn(List.of());
 
     // When
@@ -106,7 +107,7 @@ class MaterialCollectionPageControllerTest {
         .thenReturn(List.of());
     when(backendApiClient.get(contains("/users/lookup"), anyTypeRef()))
         .thenThrow(new BackendServiceException("Backend error", null, 500));
-    when(backendApiClient.getCached(contains("/locations/lookup"), anyTypeRef()))
+    when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
         .thenReturn(List.of());
 
     // When
@@ -131,7 +132,7 @@ class MaterialCollectionPageControllerTest {
     when(backendApiClient.get(contains("/material-collection"), anyTypeRef()))
         .thenReturn(List.of());
     when(backendApiClient.get(contains("/users/lookup"), anyTypeRef())).thenReturn(List.of());
-    when(backendApiClient.getCached(contains("/locations/lookup"), anyTypeRef()))
+    when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
         .thenThrow(new BackendServiceException("Backend error", null, 500));
 
     // When

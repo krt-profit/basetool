@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialPriceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialPriceOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -145,7 +146,7 @@ class MaterialsPageControllerMvcTest {
   void getMatrixOverview_rendersGroupByCategoryToggle() throws Exception {
     PageResponse<MaterialMatrixItemDto> emptyPage =
         new PageResponse<>(List.of(), 0, 100000, 0, 0, List.of());
-    when(backendApiClient.getCached(eq("/api/v1/materials/matrix?size=100000"), anyTypeRef()))
+    when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_MATRIX), anyTypeRef()))
         .thenReturn(emptyPage);
 
     mockMvc

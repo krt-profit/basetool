@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialUpdateAjaxReques
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -72,6 +73,9 @@ class AdminMaterialsPageControllerTest {
     // Assert
     assertEquals(200, response.getStatusCode().value());
     assertEquals(updatedMaterial, response.getBody());
+    // A QUANTITY_TYPE edit formerly slipped past the updateType guard and never evicted (F5); the
+    // fix evicts the MATERIAL domain unconditionally on every material edit.
+    verify(backendApiClient).evict(CacheDomain.MATERIAL);
   }
 
   @Test
@@ -234,7 +238,7 @@ class AdminMaterialsPageControllerTest {
     // Assert
     assertEquals(200, response.getStatusCode().value());
     assertEquals(created, response.getBody());
-    verify(backendApiClient).clearStaticDataCache();
+    verify(backendApiClient).evict(CacheDomain.MATERIAL);
   }
 
   @Test
@@ -255,6 +259,6 @@ class AdminMaterialsPageControllerTest {
 
     // Assert — 400 propagates so the JS layer can show a problem-detail toast
     assertEquals(400, response.getStatusCode().value());
-    verify(backendApiClient, org.mockito.Mockito.never()).clearStaticDataCache();
+    verify(backendApiClient, org.mockito.Mockito.never()).evict(CacheDomain.MATERIAL);
   }
 }

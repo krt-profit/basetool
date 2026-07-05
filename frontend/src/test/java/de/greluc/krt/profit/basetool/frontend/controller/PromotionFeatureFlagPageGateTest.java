@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.frontend.config.SquadronContextAdvice;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -83,7 +84,7 @@ class PromotionFeatureFlagPageGateTest {
     // SquadronContextAdvice.availableSquadrons() now reads the catalogue from the STATIC_DATA_CACHE
     // (getCached) rather than a plain get (REQ-DATA-007), so the promotion gate's flag lookup goes
     // through getCached — stub it too or the squadron list is empty and the gate misreads the flag.
-    when(backendApiClient.getCached(contains("/api/v1/squadrons"), anyTypeRef()))
+    when(backendApiClient.getCached(eq(CachedCatalog.SQUADRONS), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(squadron), 0, 1000, 1, 1, List.of()));
     when(backendApiClient.get(
             eq("/api/v1/me/active-org-unit"),

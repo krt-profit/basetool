@@ -33,6 +33,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.frontend.config.SquadronContextAdvice.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import java.util.Locale;
 import java.util.UUID;
@@ -135,8 +136,7 @@ class SquadronContextAdviceTest {
 
     advice().availableSquadrons();
 
-    verify(backendApiClient)
-        .getCached(eq("/api/v1/squadrons?size=1000&sort=name,asc"), anyTypeRef());
+    verify(backendApiClient).getCached(eq(CachedCatalog.SQUADRONS), anyTypeRef());
     verify(backendApiClient, never())
         .get(eq("/api/v1/squadrons?size=1000&sort=name,asc"), anyTypeRef());
   }
@@ -153,12 +153,10 @@ class SquadronContextAdviceTest {
 
     advice().availableOrgUnits();
 
-    verify(backendApiClient)
-        .getCached(eq("/api/v1/squadrons?size=1000&sort=name,asc"), anyTypeRef());
+    verify(backendApiClient).getCached(eq(CachedCatalog.SQUADRONS), anyTypeRef());
     verify(backendApiClient, never())
         .get(eq("/api/v1/squadrons?size=1000&sort=name,asc"), anyTypeRef());
-    verify(backendApiClient)
-        .getCached(eq("/api/v1/special-commands?size=1000&sort=name,asc"), anyTypeRef());
+    verify(backendApiClient).getCached(eq(CachedCatalog.SPECIAL_COMMANDS), anyTypeRef());
     verify(backendApiClient, never())
         .get(eq("/api/v1/special-commands?size=1000&sort=name,asc"), anyTypeRef());
   }

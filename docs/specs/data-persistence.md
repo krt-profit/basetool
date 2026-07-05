@@ -168,24 +168,51 @@ test schema, and the two partial indexes additionally have their `WHERE` predica
 pinned (via `pg_indexes.indexdef`) so a later migration cannot silently narrow the predicate or flip
 a sort while keeping the index name.
 
-### REQ-DATA-007 — Slow-changing global catalogues are served from the frontend `STATIC_DATA_CACHE`
+### REQ-DATA-007 — Slow-changing global catalogues are served from the frontend per-domain caches
 
 A backend list that is **global** (no per-principal variance) and **slow-changing** is fetched through
-`BackendApiClient.getCached(...)` — the 10-minute Caffeine `STATIC_DATA_CACHE`, keyed on the request
-URI — not a plain `get(...)` on every render. The canonical case is the **squadron catalogue** (`GET
-/api/v1/squadrons?size=1000&sort=name,asc`): it is read on **every** authenticated render by
-`SquadronContextAdvice` (`availableSquadrons()` plus the admin switcher's `loadAdminOrgUnitCatalogue()`)
-and by the page controllers that already cache the identical URI (e.g.
-`JobOrderPageController.fetchSquadrons()`). Because the cache key is the URI alone, all those callers
-share **one** entry, so the catalogue is fetched at most once per TTL app-wide and the admin render's
-former double-fetch of the identical URI collapses to a single cached read.
+`BackendApiClient.getCached(...)` — a per-domain Caffeine cache — not a plain `get(...)` on every render.
+The canonical case is the **squadron catalogue** (`GET /api/v1/squadrons?size=1000&sort=name,asc`): it is
+read on **every** authenticated render by `SquadronContextAdvice` (`availableSquadrons()` plus the admin
+switcher's `loadAdminOrgUnitCatalogue()`) and by the page controllers that cache the identical catalogue,
+so it is fetched at most once per TTL app-wide.
+
+**Type-safe allowlist (FE-CACHE-1).** `getCached` takes a `CachedCatalog` enum constant, **not** a raw
+URI string — the `getCached(String, …)` overloads were removed. Each constant pins its exact request URI
+and its invalidation domain; the cache key is the constant's `name()`. This makes the unsafe state
+**unrepresentable**: a per-principal URI (`/api/v1/users/me`, `/api/v1/me/capabilities`,
+`/api/v1/me/active-org-unit`) cannot be cached because no constant names it, and adding one is a
+reviewable, spec-gated act. Every `CachedCatalog` is verified global (no `sub` / role /
+`X-Active-Org-Unit-Id` / redaction variance). `FrontendCacheSplitTest` pins the URIs so a refactor
+cannot silently change a cache target.
+
+**Per-domain split (FE-CACHE-2).** Catalogues no longer share one `staticData` cache that any admin
+mutation dropped wholesale (a squadron toggle cold-starting the 10 000-row terminal list, the material
+lists, …). Each `CacheDomain` (`squadronCatalogue`, `orgUnitCatalogue`, `materialCatalogue`,
+`terminalCatalogue`, …) is its own named Caffeine cache, routed by `CatalogCacheResolver`; a mutation
+calls `backendApiClient.evict(CacheDomain…)` with the domain(s) it changed, so eviction blast-radius is
+one domain, not all. The shared `AdminMissionDataPageController.okOrRelay` AJAX helper and the
+settings writer keep the coarse `clearStaticDataCache()` (→ `evictAllCatalogues()`) fallback: where the
+changed domain set is not cleanly known at the call site, **over-eviction is always safe, whereas a
+wrong narrow evict would strand stale data**. Single-domain admin writers whose changed domain _is_
+cleanly known (material, location, terminal, P4K-import apply, …) instead call the precise
+`evict(CacheDomain…)`. Every domain cache keeps `recordStats()`, so the
+`cache_*` Prometheus meters and monitoring panels light up per domain (REQ-OBS-005/-006). Each domain
+carries its **own** `expireAfterWrite` TTL (`CacheDomain.getTtl()`): **6 h** for pure reference
+catalogues (materials, locations, ship types, terminals, …) and **2 h** for the org-structure catalogues
+(squadrons, org-unit pickers) and settings. The TTL is only a backstop — freshness comes from the
+per-mutation evict, so the longer TTLs trade a negligible staleness risk (bounded by the TTL only if an
+evict is missed, or by a future >1-replica deployment per CACHE-DIST-01) for far fewer refetches of the
+large catalogues.
 
 Invariants that must hold:
 
 - **Cacheability is gated on eviction.** A catalogue may be cached **only** if every admin mutation of
-  it evicts the cache via `clearStaticDataCache()`, so no user sees a list more stale than the last
-  mutation. Squadron lifecycle changes (`AdminMissionDataPageController`) evict, so the squadron
-  catalogue is cacheable.
+  it evicts its domain cache — via `evict(CacheDomain…)` for the precise domain(s), or the coarse
+  `clearStaticDataCache()` fallback where the domain set is not cleanly known — so no user sees a list
+  more stale than the last mutation. Squadron lifecycle changes (`AdminMissionDataPageController` coarse;
+  `SquadronAdminProxyController` precise `evict(SQUADRON, ORG_UNIT)`) evict, so the squadron catalogue is
+  cacheable.
 - **The same rule enrols the job-order age thresholds.** `GET /api/v1/settings/job_order.age_yellow_days`
   and `…age_red_days` are global, slow-changing settings read through `getCached` on the orders list and
   detail renders (`JobOrderPageController`). Their sole writer is `AdminSettingsPageController`, which
@@ -201,6 +228,29 @@ Invariants that must hold:
   once per TTL app-wide instead of on every admin render. Member-roster mutations (add / remove / flags /
   lead) do not change the catalogue's name / shorthand / active / profit-eligible fields, so they
   deliberately do **not** evict.
+- **The active-org-unit owner pickers (`/api/v1/org-units/active`, `/api/v1/org-units/active-all-kinds`)
+  are cached.** Both return a **global** catalogue (all active org units, no per-principal / per-active-
+  org-unit-header / redaction variance — the endpoints do no scope filtering), so the URI-keyed cache is
+  safe. `/active` (Staffel + SK) is read on every mission-detail render (`MissionPageController`) and
+  every Job-Order render (`JobOrderPageController.fetchActiveOrgUnitOptions`); `/active-all-kinds`
+  (+ Bereich + OL) on every bank-management render (`BankManagePageController`) and the authenticated
+  Job-Order requesting picker. Their eviction gate is now complete: Squadron writes
+  (`AdminMissionDataPageController` / `SquadronAdminProxyController`), SK writes
+  (`AdminSpecialCommandsPageController` / `SpecialCommandAdminProxyController`) **and** Bereich/OL writes
+  (`AdminOrgStructurePageController` create-Bereich / create-OL / re-parent) all call
+  `clearStaticDataCache()`, so a picker never shows an org unit more stale than the last mutation.
+- **The reference catalogues cached for the pickers evict their own domain on every admin write.** Each
+  single-purpose admin write path calls the precise `evict(CacheDomain…)` for the one domain it changes,
+  so a stale list never survives the mutation: `AdminMaterialsPageController`'s create and field-edit AJAX
+  writers evict `MATERIAL` **unconditionally on every `updateType`** — a former `updateType` guard skipped
+  `CATEGORY` / `REFINED` / `QUANTITY_TYPE` edits and stranded those lists until the TTL;
+  `AdminLocationsPageController`'s visibility / home-location toggles (classic **and** AJAX) evict
+  `LOCATION`; `AdminUexPageController`'s terminal-visibility toggle (classic **and** AJAX) evicts
+  `TERMINAL`. The async P4K import (`AdminP4kImportPageController.applyJob`) evicts the four domains its
+  apply rewrites — `evict(MATERIAL, MANUFACTURER, SHIP_TYPE, ITEM_CATALOG)` — at **apply-enqueue** time:
+  the apply runs as an async backend job, so the eviction is deliberately eager; the brief window in which
+  a concurrent read could re-cache pre-apply data is bounded by the domain TTL and the action is rare and
+  admin-only.
 - **Per-principal calls are never URI-cached.** `/api/v1/users/me`, `/api/v1/me/capabilities`, and
   `/api/v1/me/active-org-unit` share a URI across users; a URI-keyed cache would cross-contaminate
   them, so they remain plain `get(...)`.
@@ -223,6 +273,12 @@ SpecialCommand catalogue through `getCached`. (`AdminSpecialCommandsPageControll
 activate (classic and AJAX) and the profit-eligible flip — evicts `STATIC_DATA_CACHE`, while a
 member-roster mutation does not. (`AdminSettingsPageControllerMvcTest`): every successful settings save —
 classic and AJAX, including a partial save where a later PUT throws — evicts `STATIC_DATA_CACHE`.
+(`AdminMaterialsPageControllerTest`): a material create and a field-edit AJAX write — including a
+`QUANTITY_TYPE` edit that the former `updateType` guard skipped — evict `MATERIAL`, while a rejected
+create does not. (`AdminLocationsPageControllerTest`): the visibility / home-location toggles evict
+`LOCATION`. (`AdminUexPageControllerTest`): the terminal-visibility toggle (classic and AJAX) evicts
+`TERMINAL`. (`AdminP4kImportPageControllerTest`): an apply evicts
+`MATERIAL, MANUFACTURER, SHIP_TYPE, ITEM_CATALOG`.
 
 ### REQ-DATA-008 — User deletion reassigns or clears every `app_user` FK that lacks an `ON DELETE` clause
 

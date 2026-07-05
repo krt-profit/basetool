@@ -20,8 +20,8 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -34,6 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -101,10 +102,11 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
 
     // Reference catalogs (materials / orderable items / squadrons) go through the cached client;
     // empty keeps them from blocking the render.
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
-    // Authenticated requesting picker sources the all-kinds catalog via the authenticated client.
-    when(backendApiClient.get(eq(ALL_KINDS_URI), anyTypeRef()))
+    // Authenticated requesting picker sources the all-kinds catalog via the authenticated client
+    // (now cached — REQ-DATA-007, eviction gated on Squadron/SK/Bereich/OL admin mutations).
+    when(backendApiClient.getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef()))
         .thenReturn(List.of(profitStaffel, profitSk, bereich, ol));
 
     mockMvc
@@ -119,8 +121,10 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
         .andExpect(content().string(Matchers.containsString("Kartellleitung XYZ")));
 
     // Authenticated callers source the all-kinds catalog — never the Staffel/SK-only /active.
-    verify(backendApiClient).get(eq(ALL_KINDS_URI), anyTypeRef());
-    verify(backendApiClient, never()).get(eq(ACTIVE_URI), anyTypeRef(), anyBoolean());
-    verify(backendApiClient, never()).getCached(eq(SK_CATALOG_URI), anyTypeRef(), anyBoolean());
+    verify(backendApiClient).getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef());
+    verify(backendApiClient, never())
+        .getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE), anyTypeRef(), anyBoolean());
+    verify(backendApiClient, never())
+        .getCached(eq(CachedCatalog.SPECIAL_COMMANDS), anyTypeRef(), anyBoolean());
   }
 }

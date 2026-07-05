@@ -20,39 +20,62 @@
 package de.greluc.krt.profit.basetool.frontend.config;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
-import java.util.concurrent.TimeUnit;
+import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/** Spring configuration for Cache. */
+/**
+ * Caffeine-backed {@link CacheManager} exposing one named cache per {@link CacheDomain}
+ * (FE-CACHE-2).
+ *
+ * <p>Slow-changing backend catalogues used to share a single {@code staticData} cache that any
+ * admin mutation dropped wholesale — so a squadron toggle cold-started the 10&nbsp;000-row terminal
+ * list, the material lists and every location list it never touched. Each catalogue now lives in
+ * its domain's cache ({@code squadronCatalogue}, {@code orgUnitCatalogue}, {@code
+ * materialCatalogue}, …) so a mutation evicts only the affected domain via {@code
+ * BackendApiClient.evict(CacheDomain…)}. Routing is declarative: {@code getCached(CachedCatalog,
+ * …)} is {@code @Cacheable} with a {@link
+ * de.greluc.krt.profit.basetool.frontend.service.CatalogCacheResolver} that picks the domain cache
+ * from the catalogue argument.
+ *
+ * <p>Each domain cache is registered with its <b>own</b> {@code expireAfterWrite} TTL (see {@link
+ * CacheDomain#getTtl()}) — 6&nbsp;h for pure reference catalogues, 2&nbsp;h for the org-structure
+ * catalogues and settings. The TTL is only a backstop: cacheability is eviction-gated
+ * (REQ-DATA-007), so freshness comes from the per-mutation evict, not from the TTL. All caches keep
+ * {@code maximumSize=1000} and {@code recordStats()} — Spring Boot binds Caffeine's
+ * hit/miss/eviction/size counters as {@code cache_*} meters per {@code cache} label
+ * (REQ-OBS-005/-006), so the monitoring hit-ratio / eviction / size panels light up per domain
+ * automatically.
+ */
 @Configuration
 @EnableCaching
 public class CacheConfig {
 
-  public static final String STATIC_DATA_CACHE = "staticData";
+  /** Shared entry cap for every domain cache. */
+  private static final long MAX_CACHE_SIZE = 1000;
 
   /**
-   * Caffeine-backed {@link CacheManager} exposing the {@link #STATIC_DATA_CACHE} cache (10-minute
-   * TTL, max 1000 entries). Used by {@code BackendApiClient.getCached(...)} for slow-changing
-   * lookup data.
+   * Builds the shared cache manager, registering one named Caffeine cache per {@link CacheDomain}
+   * with the domain's own TTL. Pre-registering every domain (rather than {@code setCaffeine} + a
+   * single spec) is what lets each domain carry a different {@code expireAfterWrite}.
    *
-   * <p>{@code recordStats()} keeps Caffeine's hit/miss counters, which Spring Boot's cache metrics
-   * auto-configuration binds as {@code cache_*} meters on {@code /actuator/prometheus}
-   * (REQ-OBS-005, epic #936) — without it the hit-ratio panels of the monitoring dashboards would
-   * read zero forever. The counters are plain {@code LongAdder}s; the overhead is negligible
-   * against the backend HTTP round-trip each miss saves.
+   * @return the configured {@link CaffeineCacheManager}
    */
   @Bean
   public CacheManager cacheManager() {
-    CaffeineCacheManager cacheManager = new CaffeineCacheManager(STATIC_DATA_CACHE);
-    cacheManager.setCaffeine(
-        Caffeine.newBuilder()
-            .expireAfterWrite(10, TimeUnit.MINUTES)
-            .maximumSize(1000)
-            .recordStats());
+    CaffeineCacheManager cacheManager = new CaffeineCacheManager();
+    for (CacheDomain domain : CacheDomain.values()) {
+      cacheManager.registerCustomCache(
+          domain.getCacheName(),
+          Caffeine.newBuilder()
+              .expireAfterWrite(domain.getTtl())
+              .maximumSize(MAX_CACHE_SIZE)
+              .recordStats()
+              .build());
+    }
     return cacheManager;
   }
 }

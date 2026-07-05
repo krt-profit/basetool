@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronShipOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.ShipForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
@@ -153,8 +154,7 @@ public class HangarPageController {
             .<List<ShipTypeDto>>loadAsync(
                 () -> {
                   PageResponse<ShipTypeDto> p =
-                      backendApiClient.getCached(
-                          "/api/v1/ship-types?size=1000", SHIP_TYPE_PAGE_TYPE);
+                      backendApiClient.getCached(CachedCatalog.SHIP_TYPES, SHIP_TYPE_PAGE_TYPE);
                   return p != null && p.content() != null
                       ? new ArrayList<>(p.content())
                       : new ArrayList<>();
@@ -170,7 +170,7 @@ public class HangarPageController {
             .<List<LocationDto>>loadAsync(
                 () -> {
                   PageResponse<LocationDto> p =
-                      backendApiClient.getCached("/api/v1/locations?size=1000", LOCATION_PAGE_TYPE);
+                      backendApiClient.getCached(CachedCatalog.LOCATIONS, LOCATION_PAGE_TYPE);
                   return p != null && p.content() != null
                       ? new ArrayList<>(p.content())
                       : new ArrayList<>();
@@ -187,7 +187,7 @@ public class HangarPageController {
                 () -> {
                   PageResponse<ManufacturerDto> p =
                       backendApiClient.getCached(
-                          "/api/v1/manufacturers?size=1000", MANUFACTURER_PAGE_TYPE);
+                          CachedCatalog.MANUFACTURERS, MANUFACTURER_PAGE_TYPE);
                   return p != null && p.content() != null
                       ? new ArrayList<>(p.content())
                       : new ArrayList<>();
@@ -204,7 +204,7 @@ public class HangarPageController {
                 () -> {
                   List<LocationDto> hl =
                       backendApiClient.getCached(
-                          "/api/v1/locations/home-locations", HOME_LOCATION_LIST_TYPE);
+                          CachedCatalog.LOCATIONS_HOME, HOME_LOCATION_LIST_TYPE);
                   return hl != null ? new ArrayList<>(hl) : new ArrayList<>();
                 })
             .exceptionally(

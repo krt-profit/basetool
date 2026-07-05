@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialUpdateAjaxReques
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
@@ -314,11 +315,13 @@ public class AdminMaterialsPageController {
               request.version());
 
       backendApiClient.put("/api/v1/materials/" + id, body, Void.class);
-      if ("JOB_ORDER".equals(request.updateType())
-          || "MANUAL_RAW".equals(request.updateType())
-          || "VISIBILITY".equals(request.updateType())) {
-        backendApiClient.clearStaticDataCache();
-      }
+      // Every material edit changes the cached material catalogues (list, lookup, job-order,
+      // matrix)
+      // regardless of updateType, so evict the MATERIAL domain unconditionally (REQ-DATA-007). The
+      // former updateType guard missed CATEGORY / REFINED / QUANTITY_TYPE edits, leaving those
+      // lists
+      // stale up to the TTL.
+      backendApiClient.evict(CacheDomain.MATERIAL);
       MaterialDto updatedMaterial =
           backendApiClient.get("/api/v1/materials/" + id, MaterialDto.class);
       return ResponseEntity.ok(updatedMaterial);
@@ -346,7 +349,7 @@ public class AdminMaterialsPageController {
       @Valid @RequestBody MaterialCreateAjaxRequest request) {
     try {
       MaterialDto created = backendApiClient.post("/api/v1/materials", request, MaterialDto.class);
-      backendApiClient.clearStaticDataCache();
+      backendApiClient.evict(CacheDomain.MATERIAL);
       return ResponseEntity.ok(created);
     } catch (BackendServiceException e) {
       log.warn(

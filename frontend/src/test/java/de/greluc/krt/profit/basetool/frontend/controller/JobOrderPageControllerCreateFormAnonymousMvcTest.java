@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -34,6 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SystemSettingDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -91,7 +92,7 @@ class JobOrderPageControllerCreateFormAnonymousMvcTest {
   @WithAnonymousUser
   void viewCreateForm_AsAnonymousGuest_ShouldFetchMaterialsThroughPublicWebClient()
       throws Exception {
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), eq(true)))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -99,8 +100,10 @@ class JobOrderPageControllerCreateFormAnonymousMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("orders-create"));
 
-    verify(backendApiClient).getCached(eq("/api/v1/materials/job-order"), anyTypeRef(), eq(true));
-    verify(backendApiClient, never()).getCached(eq("/api/v1/materials/job-order"), anyTypeRef());
+    verify(backendApiClient)
+        .getCached(eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef(), eq(true));
+    verify(backendApiClient, never())
+        .getCached(eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef());
   }
 
   @Test
@@ -117,11 +120,11 @@ class JobOrderPageControllerCreateFormAnonymousMvcTest {
 
     // Reference catalogs (materials / orderable items / squadrons) go through the cached public
     // client; an empty list keeps them from blocking the render.
-    when(backendApiClient.getCached(anyString(), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), eq(true)))
         .thenReturn(Collections.emptyList());
     // The org-unit catalog and the intake-SK setting are reachable anonymously (permitAll) via the
-    // public client.
-    when(backendApiClient.get(eq(ACTIVE_URI), anyTypeRef(), eq(true)))
+    // public client. The org-unit catalog is now cached (REQ-DATA-007).
+    when(backendApiClient.getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE), anyTypeRef(), eq(true)))
         .thenReturn(List.of(profitStaffel, intakeSk, nonProfitSk));
     when(backendApiClient.get(eq(INTAKE_SETTING_URI), eq(SystemSettingDto.class), eq(true)))
         .thenReturn(new SystemSettingDto(INTAKE_SETTING_URI, intakeId.toString(), 0L));
@@ -146,10 +149,11 @@ class JobOrderPageControllerCreateFormAnonymousMvcTest {
                                 + "\"\\s+selected=\"selected\".*",
                             Pattern.DOTALL))));
 
-    verify(backendApiClient).get(eq(ACTIVE_URI), anyTypeRef(), eq(true));
+    verify(backendApiClient).getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE), anyTypeRef(), eq(true));
     verify(backendApiClient).get(eq(INTAKE_SETTING_URI), eq(SystemSettingDto.class), eq(true));
     // A guest keeps the Staffel/SK-only catalog — the Bereich/OL tiers (authenticated, epic #692)
     // are never offered to an anonymous caller.
-    verify(backendApiClient, never()).get(eq(ALL_KINDS_URI), anyTypeRef());
+    verify(backendApiClient, never())
+        .getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef());
   }
 }

@@ -21,12 +21,14 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -65,5 +67,19 @@ class AdminLocationsPageControllerTest {
     assertEquals(false, body.getValue().hidden(), "hidden flag must be preserved");
     assertEquals(2L, body.getValue().version(), "version must be echoed for optimistic locking");
     assertEquals("redirect:/admin/locations", view);
+    verify(backendApiClient).evict(CacheDomain.LOCATION);
+  }
+
+  @Test
+  void toggleLocationVisibilityAjax_evictsLocationDomainAfterWrite() {
+    UUID id = UUID.randomUUID();
+    LocationDto current = new LocationDto(id, "Area18", "ArcCorp city", false, false, 4L);
+    when(backendApiClient.get("/api/v1/locations/" + id, LocationDto.class)).thenReturn(current);
+
+    controller.toggleLocationVisibilityAjax(id);
+
+    verify(backendApiClient)
+        .put(eq("/api/v1/locations/" + id), any(LocationDto.class), eq(Void.class));
+    verify(backendApiClient).evict(CacheDomain.LOCATION);
   }
 }

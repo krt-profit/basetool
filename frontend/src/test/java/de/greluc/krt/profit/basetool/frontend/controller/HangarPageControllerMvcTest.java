@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.ShipDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ShipTypeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronShipOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -83,9 +84,9 @@ class HangarPageControllerMvcTest {
 
     when(backendApiClient.get(eq("/api/v1/hangar/my-ships?page=0&size=50"), anyTypeRef()))
         .thenReturn(ships);
-    when(backendApiClient.getCached(eq("/api/v1/ship-types?size=1000"), anyTypeRef()))
+    when(backendApiClient.getCached(eq(CachedCatalog.SHIP_TYPES), anyTypeRef()))
         .thenReturn(shipTypes);
-    when(backendApiClient.getCached(eq("/api/v1/locations?size=1000"), anyTypeRef()))
+    when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS), anyTypeRef()))
         .thenReturn(locations);
 
     // When & Then
@@ -136,7 +137,7 @@ class HangarPageControllerMvcTest {
 
     when(backendApiClient.get(eq("/api/v1/hangar/my-ships?page=0&size=50"), anyTypeRef()))
         .thenReturn(ships);
-    when(backendApiClient.getCached(eq("/api/v1/locations/home-locations"), anyTypeRef()))
+    when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_HOME), anyTypeRef()))
         .thenReturn(List.of(homeLoc));
 
     // When & Then

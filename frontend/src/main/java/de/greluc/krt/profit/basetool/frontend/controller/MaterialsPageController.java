@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialPriceOverviewDto
 import de.greluc.krt.profit.basetool.frontend.model.dto.MatrixGridDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -302,8 +303,7 @@ public class MaterialsPageController {
   @NotNull
   private List<MaterialMatrixItemDto> fetchMatrixItems() {
     PageResponse<MaterialMatrixItemDto> page =
-        backendApiClient.getCached(
-            "/api/v1/materials/matrix?size=100000", MATERIAL_MATRIX_PAGE_TYPE);
+        backendApiClient.getCached(CachedCatalog.MATERIALS_MATRIX, MATERIAL_MATRIX_PAGE_TYPE);
     if (page == null || page.content() == null) {
       return new ArrayList<>();
     }

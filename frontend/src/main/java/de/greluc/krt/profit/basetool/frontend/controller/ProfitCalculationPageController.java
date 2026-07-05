@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ShipTypeDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.List;
 import java.util.Map;
@@ -77,8 +78,7 @@ public class ProfitCalculationPageController {
     try {
       // Fetch ship types for the dropdown
       PageResponse<ShipTypeDto> shipTypesPage =
-          backendApiClient.getCached(
-              "/api/v1/ship-types?size=1000&sort=name,asc", SHIP_TYPE_PAGE_TYPE);
+          backendApiClient.getCached(CachedCatalog.SHIP_TYPES_SORTED, SHIP_TYPE_PAGE_TYPE);
 
       List<ShipTypeDto> shipTypes =
           (shipTypesPage != null && shipTypesPage.content() != null)
@@ -97,7 +97,7 @@ public class ProfitCalculationPageController {
 
       // Fetch terminals to get unique star systems
       PageResponse<Map<String, Object>> terminalsPage =
-          backendApiClient.getCached("/api/v1/terminals?size=10000", TERMINAL_PAGE_TYPE);
+          backendApiClient.getCached(CachedCatalog.TERMINALS, TERMINAL_PAGE_TYPE);
 
       Set<String> starSystems = new TreeSet<>();
       if (terminalsPage != null && terminalsPage.content() != null) {

@@ -29,6 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ShipTypeDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -71,9 +72,9 @@ class ProfitCalculationPageControllerMvcTest {
     PageResponse<Map<String, Object>> terminals =
         new PageResponse<>(List.of(Map.of("starSystemName", "Stanton")), 0, 10, 1, 1, List.of());
 
-    when(backendApiClient.getCached(eq("/api/v1/ship-types?size=1000&sort=name,asc"), anyTypeRef()))
+    when(backendApiClient.getCached(eq(CachedCatalog.SHIP_TYPES_SORTED), anyTypeRef()))
         .thenReturn(shipTypes);
-    when(backendApiClient.getCached(eq("/api/v1/terminals?size=10000"), anyTypeRef()))
+    when(backendApiClient.getCached(eq(CachedCatalog.TERMINALS), anyTypeRef()))
         .thenReturn(terminals);
 
     // When & Then
@@ -98,9 +99,9 @@ class ProfitCalculationPageControllerMvcTest {
     PageResponse<Map<String, Object>> terminals =
         new PageResponse<>(List.of(), 0, 10, 0, 1, List.of());
 
-    when(backendApiClient.getCached(eq("/api/v1/ship-types?size=1000&sort=name,asc"), anyTypeRef()))
+    when(backendApiClient.getCached(eq(CachedCatalog.SHIP_TYPES_SORTED), anyTypeRef()))
         .thenReturn(shipTypes);
-    when(backendApiClient.getCached(eq("/api/v1/terminals?size=10000"), anyTypeRef()))
+    when(backendApiClient.getCached(eq(CachedCatalog.TERMINALS), anyTypeRef()))
         .thenReturn(terminals);
 
     // When & Then
@@ -127,9 +128,9 @@ class ProfitCalculationPageControllerMvcTest {
     PageResponse<Map<String, Object>> terminals =
         new PageResponse<>(List.of(), 0, 10, 0, 1, List.of());
 
-    when(backendApiClient.getCached(eq("/api/v1/ship-types?size=1000&sort=name,asc"), anyTypeRef()))
+    when(backendApiClient.getCached(eq(CachedCatalog.SHIP_TYPES_SORTED), anyTypeRef()))
         .thenReturn(shipTypes);
-    when(backendApiClient.getCached(eq("/api/v1/terminals?size=10000"), anyTypeRef()))
+    when(backendApiClient.getCached(eq(CachedCatalog.TERMINALS), anyTypeRef()))
         .thenReturn(terminals);
 
     // When & Then

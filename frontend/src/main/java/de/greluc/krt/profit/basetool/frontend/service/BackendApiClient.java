@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.frontend.service;
 
-import de.greluc.krt.profit.basetool.frontend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.frontend.exception.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import io.github.resilience4j.bulkhead.BulkheadFullException;
@@ -29,6 +28,8 @@ import java.util.concurrent.TimeoutException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
@@ -41,7 +42,8 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * WebClient wrapper for the backend REST API. Centralises RFC-7807 problem-response parsing into
  * {@link BackendServiceException} and exposes typed convenience overloads for every HTTP verb.
- * {@code getCached(...)} layers Spring Cache on top using {@link CacheConfig#STATIC_DATA_CACHE}.
+ * {@code getCached(CachedCatalog, ...)} layers Spring Cache on top, routing each {@link
+ * CachedCatalog} to its per-domain named cache via {@link CatalogCacheResolver} (FE-CACHE-1/2).
  *
  * <p><b>Resilience layering.</b> Every outbound call — regardless of HTTP verb — passes through the
  * {@link de.greluc.krt.profit.basetool.frontend.config.WebClientConfig#resilienceFilter WebClient
@@ -71,6 +73,7 @@ public class BackendApiClient {
   private final WebClient webClient;
   private final WebClient publicWebClient;
   private final MeterRegistry meterRegistry;
+  private final CacheManager cacheManager;
 
   /**
    * Dedicated ObjectMapper used exclusively to decode backend Problem+JSON bodies. Kept as an
@@ -161,42 +164,102 @@ public class BackendApiClient {
   }
 
   /**
-   * Cached GET; subsequent calls within {@link CacheConfig#STATIC_DATA_CACHE}'s TTL hit the cache.
+   * Cached GET of a {@link CachedCatalog}. Subsequent calls within the catalogue's domain-cache TTL
+   * hit the cache; the per-domain named cache is resolved by {@link CatalogCacheResolver}
+   * (FE-CACHE-1/2). Only an allowlisted {@link CachedCatalog} can be cached, so a per-principal URI
+   * is unrepresentable.
+   *
+   * @param catalog the allowlisted catalogue to fetch and cache
+   * @param responseType the decoded response type
+   * @param <T> the response body type
+   * @return the decoded (possibly cached) response body
    */
-  @Cacheable(cacheNames = CacheConfig.STATIC_DATA_CACHE, key = "#uri")
-  public <T> T getCached(String uri, ParameterizedTypeReference<T> responseType) {
-    return getCached(uri, responseType, false);
+  @Cacheable(cacheResolver = "catalogCacheResolver", key = "#catalog.name()")
+  public <T> T getCached(CachedCatalog catalog, ParameterizedTypeReference<T> responseType) {
+    return getCached(catalog, responseType, false);
   }
 
   /**
-   * Cached GET overload that targets the anonymous public WebClient when {@code isPublic} is true.
+   * Cached GET of a {@link CachedCatalog} that targets the anonymous public WebClient when {@code
+   * isPublic} is true (a {@code permitAll} catalogue reachable from an unauthenticated page).
+   *
+   * @param catalog the allowlisted catalogue to fetch and cache
+   * @param responseType the decoded response type
+   * @param isPublic true to use the anonymous {@code publicWebClient}
+   * @param <T> the response body type
+   * @return the decoded (possibly cached) response body
    */
-  @Cacheable(cacheNames = CacheConfig.STATIC_DATA_CACHE, key = "#uri")
-  public <T> T getCached(String uri, ParameterizedTypeReference<T> responseType, boolean isPublic) {
-    return executeGet(isPublic ? publicWebClient : webClient, uri, responseType);
-  }
-
-  /** Class-typed cached GET. */
-  @Cacheable(cacheNames = CacheConfig.STATIC_DATA_CACHE, key = "#uri")
-  public <T> T getCached(String uri, Class<T> responseType) {
-    return getCached(uri, responseType, false);
+  @Cacheable(cacheResolver = "catalogCacheResolver", key = "#catalog.name()")
+  public <T> T getCached(
+      CachedCatalog catalog, ParameterizedTypeReference<T> responseType, boolean isPublic) {
+    return executeGet(isPublic ? publicWebClient : webClient, catalog.getUri(), responseType);
   }
 
   /**
-   * Class-typed cached GET overload that targets the anonymous public WebClient when {@code
-   * isPublic} is true.
+   * Class-typed cached GET of a {@link CachedCatalog}.
+   *
+   * @param catalog the allowlisted catalogue to fetch and cache
+   * @param responseType the decoded response type
+   * @param <T> the response body type
+   * @return the decoded (possibly cached) response body
    */
-  @Cacheable(cacheNames = CacheConfig.STATIC_DATA_CACHE, key = "#uri")
-  public <T> T getCached(String uri, Class<T> responseType, boolean isPublic) {
-    return executeGet(isPublic ? publicWebClient : webClient, uri, responseType);
+  @Cacheable(cacheResolver = "catalogCacheResolver", key = "#catalog.name()")
+  public <T> T getCached(CachedCatalog catalog, Class<T> responseType) {
+    return getCached(catalog, responseType, false);
   }
 
-  /** Drops every entry in {@link CacheConfig#STATIC_DATA_CACHE}; call after admin mutations. */
-  @org.springframework.cache.annotation.CacheEvict(
-      cacheNames = CacheConfig.STATIC_DATA_CACHE,
-      allEntries = true)
+  /**
+   * Class-typed cached GET of a {@link CachedCatalog} that targets the anonymous public WebClient
+   * when {@code isPublic} is true.
+   *
+   * @param catalog the allowlisted catalogue to fetch and cache
+   * @param responseType the decoded response type
+   * @param isPublic true to use the anonymous {@code publicWebClient}
+   * @param <T> the response body type
+   * @return the decoded (possibly cached) response body
+   */
+  @Cacheable(cacheResolver = "catalogCacheResolver", key = "#catalog.name()")
+  public <T> T getCached(CachedCatalog catalog, Class<T> responseType, boolean isPublic) {
+    return executeGet(isPublic ? publicWebClient : webClient, catalog.getUri(), responseType);
+  }
+
+  /**
+   * Evicts the named cache of each given {@link CacheDomain}; call after an admin mutation with the
+   * domain(s) it changed so only the affected catalogues are dropped (FE-CACHE-2). A domain cache
+   * absent from the manager is tolerated.
+   *
+   * @param domains the invalidation domains to clear
+   */
+  public void evict(CacheDomain... domains) {
+    for (CacheDomain domain : domains) {
+      Cache cache = cacheManager.getCache(domain.getCacheName());
+      if (cache != null) {
+        cache.clear();
+      }
+    }
+    if (log.isDebugEnabled()) {
+      log.debug("Evicted catalogue cache(s) {}", java.util.Arrays.toString(domains));
+    }
+  }
+
+  /**
+   * Evicts every catalogue domain — the coarse fallback for a genuinely multi-domain admin action
+   * where the precise domain set is not known at the call site.
+   */
+  public void evictAllCatalogues() {
+    evict(CacheDomain.values());
+  }
+
+  /**
+   * Coarse evict-all fallback (drops every catalogue domain). Retained for admin mutations whose
+   * changed domain set is not cleanly known at the call site (e.g. the shared {@code
+   * AdminMissionDataPageController.okOrRelay} AJAX helper that spans job-types / squadrons /
+   * frequency-types) — over-eviction is always safe, whereas a wrong narrow evict would strand
+   * stale data (REQ-DATA-007). Prefer {@link #evict(CacheDomain...)} with the precise domain(s) at
+   * any single-purpose site.
+   */
   public void clearStaticDataCache() {
-    log.info("Cleared STATIC_DATA_CACHE manually");
+    evictAllCatalogues();
   }
 
   private <T> T executeGet(
