@@ -171,7 +171,7 @@ a sort while keeping the index name.
 ### REQ-DATA-007 — Slow-changing global catalogues are served from the frontend per-domain caches
 
 A backend list that is **global** (no per-principal variance) and **slow-changing** is fetched through
-`BackendApiClient.getCached(...)` — a 10-minute Caffeine cache — not a plain `get(...)` on every render.
+`BackendApiClient.getCached(...)` — a per-domain Caffeine cache — not a plain `get(...)` on every render.
 The canonical case is the **squadron catalogue** (`GET /api/v1/squadrons?size=1000&sort=name,asc`): it is
 read on **every** authenticated render by `SquadronContextAdvice` (`availableSquadrons()` plus the admin
 switcher's `loadAdminOrgUnitCatalogue()`) and by the page controllers that cache the identical catalogue,
@@ -195,7 +195,13 @@ one domain, not all. The shared `AdminMissionDataPageController.okOrRelay` AJAX 
 material/settings writers keep the coarse `clearStaticDataCache()` (→ `evictAllCatalogues()`) fallback:
 where the changed domain set is not cleanly known at the call site, **over-eviction is always safe,
 whereas a wrong narrow evict would strand stale data**. Every domain cache keeps `recordStats()`, so the
-`cache_*` Prometheus meters and monitoring panels light up per domain (REQ-OBS-005/-006).
+`cache_*` Prometheus meters and monitoring panels light up per domain (REQ-OBS-005/-006). Each domain
+carries its **own** `expireAfterWrite` TTL (`CacheDomain.getTtl()`): **6 h** for pure reference
+catalogues (materials, locations, ship types, terminals, …) and **2 h** for the org-structure catalogues
+(squadrons, org-unit pickers) and settings. The TTL is only a backstop — freshness comes from the
+per-mutation evict, so the longer TTLs trade a negligible staleness risk (bounded by the TTL only if an
+evict is missed, or by a future >1-replica deployment per CACHE-DIST-01) for far fewer refetches of the
+large catalogues.
 
 Invariants that must hold:
 
