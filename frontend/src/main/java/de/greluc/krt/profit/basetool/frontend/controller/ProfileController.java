@@ -263,7 +263,7 @@ public class ProfileController {
           Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
-      log.error("Update failed", e);
+      log.debug("Update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
       } else {
@@ -324,7 +324,7 @@ public class ProfileController {
               "version", form.version() == null ? 0L : form.version()),
           Void.class);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
-      log.error("AJAX profile description update failed", e);
+      log.debug("AJAX profile description update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
             .body(Map.of("code", "OPTIMISTIC_LOCK", "detail", msg("error.concurrency.conflict")));
@@ -383,7 +383,7 @@ public class ProfileController {
           Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
-      log.error("Update failed", e);
+      log.debug("Update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
       } else {
@@ -444,7 +444,7 @@ public class ProfileController {
           Map.of("preference", preference, "version", form.version() == null ? 0L : form.version()),
           Void.class);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
-      log.error("AJAX payout-preference update failed", e);
+      log.debug("AJAX payout-preference update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
             .body(Map.of("code", "OPTIMISTIC_LOCK", "detail", msg("error.concurrency.conflict")));
@@ -500,7 +500,7 @@ public class ProfileController {
           Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
-      log.error("Update failed", e);
+      log.debug("Update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
       } else {
@@ -559,7 +559,7 @@ public class ProfileController {
               form.version() == null ? 0L : form.version()),
           Void.class);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
-      log.error("AJAX blueprint-sharing update failed", e);
+      log.debug("AJAX blueprint-sharing update failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
             .body(Map.of("code", "OPTIMISTIC_LOCK", "detail", msg("error.concurrency.conflict")));

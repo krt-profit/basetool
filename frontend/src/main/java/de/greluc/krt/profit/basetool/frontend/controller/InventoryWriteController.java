@@ -185,7 +185,7 @@ public class InventoryWriteController {
       return org.springframework.http.ResponseEntity.ok(
           java.util.Map.of("targetUrl", inventorySourceTarget(form.getSource())));
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
-      log.error("Failed to add inventory item (ajax): {}", e.getMessage());
+      log.debug("Failed to add inventory item (ajax): {}", e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Failed to add inventory item (ajax)", e);
@@ -388,7 +388,7 @@ public class InventoryWriteController {
       }
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
-      log.error(
+      log.debug(
           "Failed to transfer inventory item: status={}, {}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
@@ -418,7 +418,7 @@ public class InventoryWriteController {
               "/api/v1/inventory/" + id + "/personal-rebook", dto, InventoryItemDto.class);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
-      log.error(
+      log.debug(
           "Failed to rebook inventory item: status={}, {}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
@@ -456,7 +456,7 @@ public class InventoryWriteController {
       backendApiClient.post("/api/v1/inventory/bulk-checkout", request, Void.class);
       return org.springframework.http.ResponseEntity.noContent().build();
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
-      log.error("Failed to bulk-checkout inventory items (ajax): {}", e.getMessage());
+      log.debug("Failed to bulk-checkout inventory items (ajax): {}", e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Failed to bulk-checkout inventory items (ajax)", e);
@@ -483,7 +483,7 @@ public class InventoryWriteController {
           backendApiClient.put("/api/v1/inventory/" + id, dto, InventoryItemDto.class);
       return org.springframework.http.ResponseEntity.ok(updated);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
-      log.error(
+      log.debug(
           "Failed to update inventory item associations: status={}, {}",
           e.getStatusCode(),
           e.getMessage());
@@ -517,7 +517,7 @@ public class InventoryWriteController {
       // Propagate backend status (e.g. 409 Conflict from Optimistic Locking, 400 Validation,
       // 403 Forbidden) to the browser instead of masking it as 500, so the JS note modal
       // can react appropriately (toast + reload on 409).
-      log.error(
+      log.debug(
           "Failed to update inventory item note: status={}, {}", e.getStatusCode(), e.getMessage());
       return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
     } catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
@@ -546,7 +546,7 @@ public class InventoryWriteController {
               "/api/v1/inventory/" + id + "/delivered", request, InventoryItemDto.class);
       return org.springframework.http.ResponseEntity.ok(updated);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
-      log.error(
+      log.debug(
           "Failed to update delivered status: status={}, {}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
     } catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {

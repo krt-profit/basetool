@@ -205,7 +205,7 @@ public class AdminSpecialCommandsPageController {
       backendApiClient.post("/api/v1/special-commands", body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
-      log.error("Create SpecialCommand failed", e);
+      log.debug("Create SpecialCommand failed", e);
       if (e.getStatusCode() == 409) {
         redirectAttributes.addFlashAttribute("errorToast", "error.duplicate.specialcommand");
         return "redirect:/admin/special-commands";
@@ -248,7 +248,7 @@ public class AdminSpecialCommandsPageController {
       backendApiClient.put("/api/v1/special-commands/" + id, body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
-      log.error("Update SpecialCommand failed", e);
+      log.debug("Update SpecialCommand failed", e);
       if (e.getStatusCode() == 409) {
         if ("concurrency-conflict".equals(e.getProblemType())) {
           redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
@@ -281,7 +281,7 @@ public class AdminSpecialCommandsPageController {
       backendApiClient.delete("/api/v1/special-commands/" + id, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
-      log.error("Delete SpecialCommand failed", e);
+      log.debug("Delete SpecialCommand failed", e);
       if (e.getStatusCode() == 409) {
         redirectAttributes.addFlashAttribute("errorToast", "error.delete.specialcommand.in_use");
         return "redirect:/admin/special-commands";
@@ -380,7 +380,7 @@ public class AdminSpecialCommandsPageController {
           "/api/v1/special-commands/" + id + "/members/" + userId, null, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
-      log.error("Add SpecialCommand member failed", e);
+      log.debug("Add SpecialCommand member failed", e);
       if (e.getStatusCode() == 409) {
         redirectAttributes.addFlashAttribute("errorToast", "error.specialcommand.member.duplicate");
         return "redirect:/admin/special-commands/" + id;
@@ -450,7 +450,7 @@ public class AdminSpecialCommandsPageController {
           "/api/v1/special-commands/" + id + "/members/" + userId, body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
-      log.error("Patch SpecialCommand member flags failed", e);
+      log.debug("Patch SpecialCommand member flags failed", e);
       if (e.getStatusCode() == 409) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
         return "redirect:/admin/special-commands/" + id;
@@ -490,7 +490,7 @@ public class AdminSpecialCommandsPageController {
           "/api/v1/special-commands/" + id + "/members/" + userId + "/lead", body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
-      log.error("Toggle SpecialCommand member lead failed", e);
+      log.debug("Toggle SpecialCommand member lead failed", e);
       if (e.getStatusCode() == 409) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
         return "redirect:/admin/special-commands/" + id;
@@ -695,7 +695,7 @@ public class AdminSpecialCommandsPageController {
       backendCall.run();
       return ResponseEntity.ok().build();
     } catch (BackendServiceException e) {
-      log.error("SpecialCommand write (ajax) failed", e);
+      log.debug("SpecialCommand write (ajax) failed", e);
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("SpecialCommand write (ajax) failed", e);

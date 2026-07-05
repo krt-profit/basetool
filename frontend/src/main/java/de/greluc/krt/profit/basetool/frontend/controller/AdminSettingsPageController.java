@@ -443,7 +443,7 @@ public class AdminSettingsPageController {
     } catch (NumberFormatException e) {
       return validationProblem("error.settings.invalid.format", locale);
     } catch (BackendServiceException e) {
-      log.error("Failed to update settings (ajax)", e);
+      log.debug("Failed to update settings (ajax)", e);
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Failed to update settings (ajax)", e);

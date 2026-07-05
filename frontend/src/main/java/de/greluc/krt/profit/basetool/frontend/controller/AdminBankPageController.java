@@ -142,7 +142,7 @@ public class AdminBankPageController {
       body.put("holderStashesZeroed", result == null ? 0 : result.holderStashesZeroed());
       return ResponseEntity.ok(body);
     } catch (BackendServiceException e) {
-      log.error("Bank wipe reset (ajax) failed", e);
+      log.debug("Bank wipe reset (ajax) failed", e);
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Bank wipe reset (ajax) failed", e);

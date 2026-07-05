@@ -315,7 +315,7 @@ public class AdminUexPageController {
       backendApiClient.put("/api/v1/terminals/" + id, body, Void.class);
       return ResponseEntity.ok().build();
     } catch (BackendServiceException e) {
-      log.error("Toggle terminal visibility (ajax) failed", e);
+      log.debug("Toggle terminal visibility (ajax) failed", e);
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Toggle terminal visibility (ajax) failed", e);
@@ -350,7 +350,7 @@ public class AdminUexPageController {
       }
       return ResponseEntity.ok().build();
     } catch (BackendServiceException e) {
-      log.error("Override update (ajax) failed", e);
+      log.debug("Override update (ajax) failed", e);
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Override update (ajax) failed", e);
@@ -390,7 +390,7 @@ public class AdminUexPageController {
       }
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
-      log.error("Override update failed", e);
+      log.debug("Override update failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.admin.uex.flag.update");
     } catch (Exception e) {
       log.error("Override update failed", e);

@@ -20,6 +20,15 @@ Both modules emit one access-log line per request and enrich every log line with
 [`org-unit-tenancy.md`](org-unit-tenancy.md) REQ-ORG-007). Logback patterns must include
 `%X{orgUnitId}` to keep audit trails intact.
 
+A relayed backend failure is logged **exactly once, at the level its status warrants.** The
+frontend's `BackendApiClient` boundary logs every backend error once — a 5xx server fault at
+`ERROR`, a 4xx client error (validation `400`, conflict `409`, …) at `WARN` — with method, URI,
+stable `code`, correlationId and detail. Frontend page/write controllers therefore relay the error
+to the caller (`propagateBackendError`) **without re-logging it at `ERROR`**; an expected client 4xx
+must never reach `ERROR`, or it inflates `logback_events_total{level="error"}` and trips the
+`LogbackErrorSpike` alert on normal user-input mistakes. Only a genuinely unexpected failure (a bare
+`catch (Exception …)`, not a mapped `BackendServiceException`) logs at `ERROR`.
+
 ### REQ-OBS-002 — Correlation-id propagation
 
 `correlationId` comes from the inbound `X-Correlation-Id` header (configurable via

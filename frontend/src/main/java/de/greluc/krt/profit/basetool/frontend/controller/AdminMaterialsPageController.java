@@ -203,7 +203,7 @@ public class AdminMaterialsPageController {
               MaterialCategoryDto.class);
       return ResponseEntity.ok(created);
     } catch (BackendServiceException e) {
-      log.error("Create category (ajax) failed", e);
+      log.debug("Create category (ajax) failed", e);
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Create category (ajax) failed", e);
@@ -228,7 +228,7 @@ public class AdminMaterialsPageController {
       backendApiClient.delete("/api/v1/material-categories/" + id, Void.class);
       return ResponseEntity.ok().build();
     } catch (BackendServiceException e) {
-      log.error("Delete category (ajax) failed", e);
+      log.debug("Delete category (ajax) failed", e);
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Delete category (ajax) failed", e);

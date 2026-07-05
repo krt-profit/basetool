@@ -144,7 +144,7 @@ public class AdminDefaultBlueprintsPageController {
           // Already a default — skip silently.
           continue;
         }
-        log.error("Failed to add default blueprint '{}': {}", key, e.getMessage());
+        log.debug("Failed to add default blueprint '{}': {}", key, e.getMessage());
         failed = true;
       } catch (Exception e) {
         log.error("Failed to add default blueprint '{}'", key, e);

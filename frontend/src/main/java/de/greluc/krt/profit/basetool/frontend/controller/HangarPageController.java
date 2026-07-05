@@ -600,7 +600,7 @@ public class HangarPageController {
           ShipDto.class);
       return ResponseEntity.noContent().build();
     } catch (BackendServiceException e) {
-      log.error("Failed to add ship (ajax): {}", e.getMessage());
+      log.debug("Failed to add ship (ajax): {}", e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Failed to add ship (ajax)", e);
@@ -642,7 +642,7 @@ public class HangarPageController {
           ShipDto.class);
       return ResponseEntity.noContent().build();
     } catch (BackendServiceException e) {
-      log.error("Failed to update ship (ajax): {}", e.getMessage());
+      log.debug("Failed to update ship (ajax): {}", e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Failed to update ship (ajax)", e);
@@ -665,7 +665,7 @@ public class HangarPageController {
       backendApiClient.delete("/api/v1/hangar/ships/" + id, Void.class);
       return ResponseEntity.noContent().build();
     } catch (BackendServiceException e) {
-      log.error("Failed to delete ship (ajax): {}", e.getMessage());
+      log.debug("Failed to delete ship (ajax): {}", e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Failed to delete ship (ajax)", e);
@@ -694,7 +694,7 @@ public class HangarPageController {
       backendApiClient.post("/api/v1/hangar/ships/home-location", request, Void.class);
       return ResponseEntity.noContent().build();
     } catch (BackendServiceException e) {
-      log.error("Failed to set home location (ajax): {}", e.getMessage());
+      log.debug("Failed to set home location (ajax): {}", e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Failed to set home location (ajax)", e);
