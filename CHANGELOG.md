@@ -12,6 +12,8 @@
 
 - **Bank – Buchungsanträge-Übersicht mit parallelen Status-Filtern.** Die Anträge stehen jetzt in einer Tabelle mit unabhängig schaltbaren Filtern (Ausstehend/Bestätigt/Abgelehnt/Zurückgezogen); standardmäßig ist nur „Ausstehend" aktiv. Die Auswahl wird pro Nutzer gespeichert, und Begründung sowie Notiz eines Antrags lassen sich je Zeile ausklappen (#995).
 
+- **Bank – Kontoübersicht mit Kachel-/Tabellen- und Bereichsansicht.** Die Kartellbank-Übersicht lässt sich jetzt zwischen Kachel- und Tabellenansicht umschalten und wahlweise nach Bereichen gruppieren – zuerst KRT und KRT-Bank, dann je Bereich (mit Bereichs-, Staffel- und SK-Konten) in der Bereichsfarbe, am Ende Sonderkonten und geschlossene Konten. Ansicht und Gruppierung werden pro Nutzer gespeichert; Kacheln und A-Z bleiben Standard (#996).
+
 
 ## [v1.1.3](https://github.com/krt-profit/basetool/releases/tag/v1.1.3) - 2026-07-05
 

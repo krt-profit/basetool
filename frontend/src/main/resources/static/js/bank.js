@@ -1391,6 +1391,17 @@
                 visible += 1;
             }
         });
+        // By-Bereich view (REQ-BANK-016): hide a group whose accounts are all filtered out so no
+        // empty coloured header lingers. A no-op on the flat views (no groups present).
+        scope.querySelectorAll('[data-bank-acc-group]').forEach(function (groupEl) {
+            const anyVisible = Array.prototype.some.call(
+                groupEl.querySelectorAll('[data-filter-name]'),
+                function (item) {
+                    return !item.hidden;
+                },
+            );
+            groupEl.hidden = !anyVisible;
+        });
         const emptySelector = input.getAttribute('data-filter-empty');
         const empty = emptySelector ? document.querySelector(emptySelector) : null;
         if (empty) {
@@ -1594,5 +1605,142 @@
         applyChipStates(ordered);
         writeSaved(ordered);
         refetch(ordered);
+    });
+})();
+
+// ------------------------------------------------------------------------------------------------
+// Bank dashboard view options (REQ-BANK-016): a card/table layout toggle and an alphabetical/
+// by-Bereich grouping toggle, each persisted per user in localStorage and replayed through the
+// `layout` / `group` query parameters. The toggles live outside the swapped `bankGrid` fragment, so
+// this module owns their pressed state and re-fetches just the grid via krtFetch.swap on every
+// change, re-applying the account-name filter afterwards. Default (no saved preference) is the card
+// grid ordered A→Z, rendered server-side.
+// ------------------------------------------------------------------------------------------------
+(function () {
+    function viewToggles() {
+        return document.querySelector('[data-bank-view-toggles]');
+    }
+
+    function storageKey() {
+        const main = document.querySelector('main[data-user-id]');
+        const uid = main ? main.getAttribute('data-user-id') : 'unknown';
+        return 'bank_dashboard_view_' + uid;
+    }
+
+    function pressedValue(attr, fallback) {
+        const pressed = document.querySelector('[' + attr + '][aria-pressed="true"]');
+        return pressed ? pressed.getAttribute(attr) : fallback;
+    }
+
+    function renderedState() {
+        return {
+            layout: pressedValue('data-bank-view-layout', 'card'),
+            group: pressedValue('data-bank-view-group', 'alpha'),
+        };
+    }
+
+    function readSaved() {
+        try {
+            const raw = localStorage.getItem(storageKey());
+            if (raw === null) {
+                return null;
+            }
+            const parsed = JSON.parse(raw) || {};
+            return {
+                layout: parsed.layout === 'table' ? 'table' : 'card',
+                group: parsed.group === 'bereich' ? 'bereich' : 'alpha',
+            };
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function writeSaved(state) {
+        try {
+            localStorage.setItem(storageKey(), JSON.stringify(state));
+        } catch (e) {
+            /* localStorage unavailable (private mode): the choice simply will not persist. */
+        }
+    }
+
+    function applyButtonStates(state) {
+        document.querySelectorAll('[data-bank-view-layout]').forEach(function (btn) {
+            const on = btn.getAttribute('data-bank-view-layout') === state.layout;
+            btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+            btn.classList.toggle('btn--cta', on);
+            btn.classList.toggle('btn-ghost', !on);
+        });
+        document.querySelectorAll('[data-bank-view-group]').forEach(function (btn) {
+            const on = btn.getAttribute('data-bank-view-group') === state.group;
+            btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+            btn.classList.toggle('btn--cta', on);
+            btn.classList.toggle('btn-ghost', !on);
+        });
+    }
+
+    function reapplyNameFilter() {
+        const input = document.querySelector('[data-bank-acc-filter]');
+        if (input && input.value) {
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    }
+
+    function fetchView(state) {
+        if (!window.krtFetch || typeof window.krtFetch.swap !== 'function') {
+            window.location.reload();
+            return;
+        }
+        window.krtFetch
+            .swap({
+                url: '/bank?layout=' + state.layout + '&group=' + state.group,
+                container: '#bank-grid-results',
+                fragmentValue: 'bankGrid',
+                history: true,
+            })
+            .then(function () {
+                reapplyNameFilter();
+            });
+    }
+
+    // On load, reconcile the saved per-user view with the server-rendered toggles. An explicit
+    // `layout`/`group` in the address bar is authoritative and is persisted; otherwise a saved view
+    // that differs from the server default (card + A→Z) is applied and the grid re-fetched.
+    document.addEventListener('DOMContentLoaded', function () {
+        if (!viewToggles()) {
+            return;
+        }
+        if (/[?&](layout|group)=/.test(window.location.search)) {
+            writeSaved(renderedState());
+            return;
+        }
+        const saved = readSaved();
+        if (saved === null) {
+            writeSaved(renderedState());
+            return;
+        }
+        const current = renderedState();
+        if (saved.layout !== current.layout || saved.group !== current.group) {
+            applyButtonStates(saved);
+            fetchView(saved);
+        }
+    });
+
+    document.addEventListener('click', function (event) {
+        const btn = event.target.closest
+            ? event.target.closest('[data-bank-view-layout],[data-bank-view-group]')
+            : null;
+        if (!btn) {
+            return;
+        }
+        event.preventDefault();
+        const state = renderedState();
+        if (btn.hasAttribute('data-bank-view-layout')) {
+            state.layout = btn.getAttribute('data-bank-view-layout');
+        } else {
+            state.group = btn.getAttribute('data-bank-view-group');
+        }
+        applyButtonStates(state);
+        writeSaved(state);
+        fetchView(state);
     });
 })();
