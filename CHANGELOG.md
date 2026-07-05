@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.1.2](https://github.com/krt-profit/basetool/releases/tag/v1.1.2) - 2026-07-05
+
 ### Added
 
 - **Monitoring: geänderte Prometheus-/Alloy-/Blackbox-Configs werden beim Deploy automatisch nachgeladen.** `deploy.sh` schickt nach dem (nicht-gatenden) Monitoring-`up` ein gezieltes `SIGHUP` an genau die Dienste, deren Config-Teilbaum sich in diesem Deploy geändert hat — Reload ohne Neustart, ohne Scrape-Lücke, ohne State-Verlust. Grafana (Dashboards) und der Loki-Ruler laden ohnehin selbst nach; nur Prometheus (Config + Alert-Rules), Alloy und blackbox_exporter brauchten bisher einen manuellen Anstoß (Epic #936).
