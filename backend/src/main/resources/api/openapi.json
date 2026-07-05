@@ -44194,8 +44194,12 @@
           "in" : "query",
           "required" : false,
           "schema" : {
-            "type" : "string",
-            "enum" : [ "PENDING", "CONFIRMED", "REJECTED", "CANCELLED" ]
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "PENDING", "CONFIRMED", "REJECTED", "CANCELLED" ]
+            },
+            "uniqueItems" : true
           }
         }, {
           "name" : "page",

@@ -733,6 +733,16 @@ raised against a `CLOSED` account.
 > destination holders, via `bookTransfer`), and an **over-limit** request additionally requires the
 > bank employee's mandatory "approval obtained" checkbox (`BANK_OWNER_APPROVAL_REQUIRED`, 409) before
 > it can be confirmed, audited as `BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED`.
+>
+> **Amended (2026-07-05, #995):** the staff queue is a **single table with parallel status filters**
+> — Ausstehend / Bestätigt / Abgelehnt / Zurückgezogen toggled independently rather than the former
+> mutually-exclusive tabs, defaulting to **only Ausstehend**. The `status` query parameter is now
+> multi-valued (comma-separated / repeatable; an absent parameter defaults to `PENDING`, a blank one
+> is the deliberate "all filters off" selection → empty table with a distinct hint), and the backend
+> pages over `findByStatusIn` / `findByStatusInAndAccountIdIn`. The selection is persisted **per user**
+> in `localStorage` (the Lager pattern) and replayed on load, and each request row carries an
+> **expandable Begründung + Notiz sub-row** reusing the account-detail chevron pattern
+> (REQ-BANK-017/-045).
 
 A **bank employee** confirms or rejects a `PENDING` request under
 `/api/v1/bank/requests/**` (`BANK_EMPLOYEE` URL+method gate). **Confirmation** records the
@@ -758,6 +768,10 @@ row is pessimistically locked and `@Version`-guarded so two decisions cannot dou
 - [x] The queue's account column leads with the account's display name (`accountName`) for
   readability, with the account number shown small underneath; the org-unit shorthand is dropped
   from this column (frontend `BankRequestQueuePageControllerMvcTest`).
+- [x] The queue is one table with parallel status-filter toggles (default Ausstehend), the selection
+  saved per user; an empty selection shows a distinct hint, and each request row expands to show its
+  Begründung + Notiz (frontend `BankRequestQueuePageControllerMvcTest`, `BankRequestControllerTest`,
+  `BankBookingRequestServiceTest`).
 
 **Enforced by:** `BankBookingRequestServiceTest`, `BankRequestControllerTest`, frontend `BankRequestQueuePageControllerMvcTest` · **Code:** `service/BankBookingRequestService`, `controller/BankRequestController`, frontend `controller/BankRequestQueuePageController`, `controller/BankProxyController`, `templates/bank-requests.html` · **Issues:** #666, #671, #672
 
