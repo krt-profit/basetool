@@ -155,7 +155,15 @@ case "${1:-}" in
       *) exit 1 ;;
     esac
     ;;
-  create | cp | rm) exit 0 ;;
+  create | rm) exit 0 ;;
+  cp)
+    # docker cp <cid>:/config/. <dest>/ — when a scenario supplies a fixture bundle,
+    # populate the extraction target from it; otherwise a no-op like create/rm.
+    if [[ -n "${FAKE_CONFIG_BUNDLE:-}" && "${2:-}" == *:/config/. ]]; then
+      cp -R "${FAKE_CONFIG_BUNDLE}/." "${3%/}/" 2>/dev/null || true
+    fi
+    exit 0
+    ;;
   *) exit 1 ;;
 esac
 FAKE
@@ -542,6 +550,71 @@ scenario_starting_grace() {
   rm -rf "${tmp}"
 }
 
+# ---------------------------------------------------------------------------
+# Scenario 11: a config-bundle change that touches ONLY the prometheus slice of
+# the monitoring tree, monitoring enabled. After the health-gated app `up` and
+# the non-gating monitoring `up -d`, deploy.sh must SIGHUP-reload ONLY the
+# service whose slice changed (prometheus); Alloy and blackbox, whose slices are
+# byte-identical across the apply, must be left running untouched.
+# ---------------------------------------------------------------------------
+scenario_monitoring_config_reload() {
+  echo "Scenario: config change touches only prometheus/ → reload prometheus, not alloy/blackbox"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  echo "# dummy monitoring compose" > "${T_COMPOSE_DIR}/docker-compose.monitoring.yml"
+  # The live (pre-apply) monitoring tree — snapshotted as the diff baseline.
+  mkdir -p "${T_COMPOSE_DIR}/monitoring/prometheus" \
+    "${T_COMPOSE_DIR}/monitoring/alloy" "${T_COMPOSE_DIR}/monitoring/blackbox"
+  echo "old" > "${T_COMPOSE_DIR}/monitoring/prometheus/prometheus.yml"
+  echo "same" > "${T_COMPOSE_DIR}/monitoring/alloy/config.alloy"
+  echo "same" > "${T_COMPOSE_DIR}/monitoring/blackbox/blackbox.yml"
+  # The promoted config bundle: prometheus.yml differs, alloy/blackbox identical.
+  local bundle="${tmp}/bundle"
+  mkdir -p "${bundle}/monitoring/prometheus" \
+    "${bundle}/monitoring/alloy" "${bundle}/monitoring/blackbox"
+  echo "# dummy compose file" > "${bundle}/docker-compose.yml"
+  echo "# dummy monitoring compose" > "${bundle}/docker-compose.monitoring.yml"
+  echo "new" > "${bundle}/monitoring/prometheus/prometheus.yml"
+  echo "same" > "${bundle}/monitoring/alloy/config.alloy"
+  echo "same" > "${bundle}/monitoring/blackbox/blackbox.yml"
+  write_marker "${MARKER}"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" \
+    "IRI_MONITORING_ENABLED=true" \
+    "FAKE_CONFIG_BUNDLE=${bundle}" \
+    "FAKE_REMOTE_CONFIG=sha256:config-next" || rc=$?
+  assert_exit 0 "$rc" "config-change deploy with a monitoring reload succeeds"
+  assert_docker "monitoring.yml up -d" "the monitoring stack is reconciled"
+  assert_docker "kill -s SIGHUP prometheus" "prometheus is SIGHUP-reloaded (its slice changed)"
+  assert_no_docker "kill -s SIGHUP alloy" "alloy is left alone (its slice is unchanged)"
+  assert_no_docker "kill -s SIGHUP blackbox-exporter" "blackbox is left alone (its slice is unchanged)"
+  rm -rf "${tmp}"
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 12: monitoring enabled, a normal image re-apply but NO config-bundle
+# change. The monitoring stack must still be reconciled, but nothing may be
+# SIGHUP-reloaded — the reload is gated on a config tree actually being swapped
+# in this tick, so a plain 5-minute app tick never bounces the monitoring config.
+# ---------------------------------------------------------------------------
+scenario_monitoring_reload_gated_on_config_change() {
+  echo "Scenario: monitoring enabled, no config change → reconcile but no SIGHUP reload"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  echo "# dummy monitoring compose" > "${T_COMPOSE_DIR}/docker-compose.monitoring.yml"
+  write_marker "${MARKER}"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" \
+    "IRI_MONITORING_ENABLED=true" \
+    "FAKE_REPODIGESTS_backend=ghcr.io/krt-profit/basetool-backend@sha256:backend-stale" || rc=$?
+  assert_exit 0 "$rc" "monitoring-enabled deploy without a config change succeeds"
+  assert_docker "monitoring.yml up -d" "the monitoring stack is still reconciled"
+  assert_no_docker "kill -s SIGHUP" "no service is reloaded when the config tree did not change"
+  rm -rf "${tmp}"
+}
+
 scenario_converged_noop
 scenario_stale_image_drift
 scenario_unhealthy_drift
@@ -552,6 +625,8 @@ scenario_drift_respects_backoff
 scenario_drift_reapply_fails
 scenario_oneoff_ignored
 scenario_starting_grace
+scenario_monitoring_config_reload
+scenario_monitoring_reload_gated_on_config_change
 
 echo
 if [[ "$tests_failed" -eq 0 ]]; then

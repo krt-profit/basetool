@@ -63,9 +63,9 @@
       },
       "targets": [
         {
-          "expr": "sum(rate({app=\"host-auth\"} |~ \"Failed password\" [5m]))",
+          "expr": "sum(rate({app=\"host-auth\"} |~ \"Failed (password|publickey)\" [5m]))",
           "refId": "A",
-          "legendFormat": "failed password",
+          "legendFormat": "failed auth",
           "datasource": {
             "type": "loki",
             "uid": "loki"
@@ -230,7 +230,7 @@
         "y": 8
       },
       "type": "timeseries",
-      "title": "NPM admin-UI login attempts",
+      "title": "NPM errors & warnings",
       "datasource": {
         "type": "loki",
         "uid": "loki"
@@ -256,9 +256,9 @@
       },
       "targets": [
         {
-          "expr": "sum(rate({app=\"npm\"} |~ \"(?i)(login|password|token)\" [10m]))",
+          "expr": "sum(rate({app=\"npm\"} |~ \"(?i)(error|emerg|warn|failed|host not found)\" [10m]))",
           "refId": "A",
-          "legendFormat": "npm auth activity",
+          "legendFormat": "npm errors/warnings",
           "datasource": {
             "type": "loki",
             "uid": "loki"
