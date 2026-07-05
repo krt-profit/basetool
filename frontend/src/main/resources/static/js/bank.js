@@ -1814,7 +1814,7 @@
                       return arr.indexOf(s) !== -1;
                   })
                 : null;
-        } catch (e) {
+        } catch {
             return null;
         }
     }
@@ -1822,7 +1822,7 @@
     function writeSaved(list) {
         try {
             localStorage.setItem(storageKey(), JSON.stringify(list));
-        } catch (e) {
+        } catch {
             /* localStorage unavailable (private mode): the filter simply will not persist. */
         }
     }
@@ -1954,7 +1954,7 @@
                 layout: parsed.layout === 'table' ? 'table' : 'card',
                 group: parsed.group === 'bereich' ? 'bereich' : 'alpha',
             };
-        } catch (e) {
+        } catch {
             return null;
         }
     }
@@ -1962,7 +1962,7 @@
     function writeSaved(state) {
         try {
             localStorage.setItem(storageKey(), JSON.stringify(state));
-        } catch (e) {
+        } catch {
             /* localStorage unavailable (private mode): the choice simply will not persist. */
         }
     }

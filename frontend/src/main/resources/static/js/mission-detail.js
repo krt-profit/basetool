@@ -471,7 +471,7 @@ document.addEventListener('krt:swapped', function (ev) {
             },
         });
     }
-    function addStep(btn) {
+    function addStep(_btn) {
         if (stepsVersion() === null) {
             return;
         }
@@ -715,7 +715,7 @@ document.addEventListener('krt:swapped', function (ev) {
         );
     }
 
-    function addObjective(btn) {
+    function addObjective(_btn) {
         if (objectivesVersion() === null) {
             return;
         }
