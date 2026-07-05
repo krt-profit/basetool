@@ -19,12 +19,17 @@
 
 package de.greluc.krt.profit.basetool.ingest.config;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
+import org.springframework.boot.ssl.SslBundles;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -32,6 +37,7 @@ import org.springframework.security.config.annotation.web.configurers.HeadersCon
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtClaimNames;
 import org.springframework.security.oauth2.jwt.JwtClaimValidator;
@@ -41,9 +47,12 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Security configuration for the ingest gateway: a pure JWT-bearer resource server. There is no
@@ -72,24 +81,81 @@ public class SecurityConfig {
   private List<String> expectedAudiences;
 
   /**
-   * Opt-in audience-validating {@link JwtDecoder}, created ONLY when {@code
-   * app.security.jwt.expected-audiences} is set. Otherwise Spring Boot's auto-configured decoder is
-   * used unchanged. When active it layers an {@code aud} check on top of the default signature /
-   * issuer / timestamp validators.
+   * Custom resource-server {@link JwtDecoder}, created ONLY when at least one hardening knob is
+   * set: {@code app.security.jwt.expected-audiences} (opt-in {@code aud} enforcement) and/or {@code
+   * app.security.jwt.jwk-set-uri} (opt-in: fetch the JWKS from the INTERNAL Keycloak so token
+   * validation no longer hairpins through the public edge — REQ-SEC-024). When neither is set the
+   * bean is absent and Spring Boot's auto-configured, lazily-fetching decoder is used unchanged, so
+   * the default behaviour — including the {@code test} profile's placeholder issuer — is untouched.
    *
-   * @param issuerUri the configured Keycloak issuer location
-   * @return a Nimbus decoder whose validator chain additionally requires a matching {@code aud}
+   * <p>The validator chain is identical to the auto-config default plus the optional audience
+   * check: signature + issuer + timestamp via {@link JwtValidators#createDefaultWithIssuer(String)}
+   * — the {@code iss} claim is still validated against the PUBLIC issuer Keycloak stamps into
+   * tokens, so split-horizon JWKS (public {@code iss}, internal key fetch) is transparent — and the
+   * {@code aud} validator only when non-blank audiences are configured.
+   *
+   * @param issuerUri the configured Keycloak issuer location (used for {@code iss} validation)
+   * @param jwkSetUri the internal JWKS URL, or blank to derive keys from the issuer location
+   * @param sslBundles the registered SSL bundles, consulted for the {@code keycloak-trust} pin when
+   *     an internal {@code jwkSetUri} is used
+   * @return a Nimbus decoder wired for the configured hardening knobs
    */
   @Bean
-  @ConditionalOnProperty(prefix = "app.security.jwt", name = "expected-audiences")
-  JwtDecoder audienceValidatingJwtDecoder(
-      @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String issuerUri) {
-    NimbusJwtDecoder decoder = NimbusJwtDecoder.withIssuerLocation(issuerUri).build();
-    decoder.setJwtValidator(
-        new DelegatingOAuth2TokenValidator<>(
-            JwtValidators.createDefaultWithIssuer(issuerUri),
-            audienceValidator(expectedAudiences)));
+  @ConditionalOnExpression(
+      "!'${app.security.jwt.expected-audiences:}'.isBlank()"
+          + " or !'${app.security.jwt.jwk-set-uri:}'.isBlank()")
+  JwtDecoder resourceServerJwtDecoder(
+      @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String issuerUri,
+      @Value("${app.security.jwt.jwk-set-uri:}") String jwkSetUri,
+      SslBundles sslBundles) {
+    NimbusJwtDecoder decoder = buildDecoder(issuerUri, jwkSetUri, sslBundles);
+    List<OAuth2TokenValidator<Jwt>> validators = new ArrayList<>();
+    validators.add(JwtValidators.createDefaultWithIssuer(issuerUri));
+    List<String> audiences = expectedAudiences.stream().filter(StringUtils::hasText).toList();
+    if (!audiences.isEmpty()) {
+      validators.add(audienceValidator(audiences));
+    }
+    decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(validators));
     return decoder;
+  }
+
+  /**
+   * Builds the underlying {@link NimbusJwtDecoder} for {@link #resourceServerJwtDecoder}. With a
+   * blank {@code jwkSetUri} it reproduces the auto-config exactly ({@link
+   * NimbusJwtDecoder#withIssuerLocation(String)}). With an internal {@code jwkSetUri} it fetches
+   * keys from that URL over a {@link KeycloakTrustSupport}-pinned client so the self-signed
+   * internal Keycloak certificate is trusted; when no {@code keycloak-trust} bundle is registered
+   * (dev/test) it falls back to the default client.
+   *
+   * @param issuerUri the Keycloak issuer location
+   * @param jwkSetUri the internal JWKS URL, or blank for issuer-location discovery
+   * @param sslBundles the registered SSL bundles
+   * @return the Nimbus decoder (validators are attached by the caller)
+   */
+  // Package-private (not private) so SecurityConfigInternalJwksDecoderTest can assert the
+  // internal-JWKS path accepts a non-RS256 (ES256) token — the REQ-SEC-024 algorithm-set fix.
+  static NimbusJwtDecoder buildDecoder(String issuerUri, String jwkSetUri, SslBundles sslBundles) {
+    if (!StringUtils.hasText(jwkSetUri)) {
+      return NimbusJwtDecoder.withIssuerLocation(issuerUri).build();
+    }
+    NimbusJwtDecoder.JwkSetUriJwtDecoderBuilder builder =
+        NimbusJwtDecoder.withJwkSetUri(jwkSetUri)
+            // withJwkSetUri defaults to RS256-ONLY, whereas withIssuerLocation derives the accepted
+            // algorithm set from the live JWKS. Restore the full asymmetric set so enabling
+            // internal
+            // JWKS cannot 401 every token the moment the realm signs with PS*/ES* (REQ-SEC-024).
+            // SignatureAlgorithm carries only asymmetric algorithms (no HMAC), so widening it
+            // cannot
+            // open an algorithm-confusion attack — the signature is still verified against the JWK.
+            .jwsAlgorithms(
+                algorithms -> algorithms.addAll(EnumSet.allOf(SignatureAlgorithm.class)));
+    ClientHttpRequestFactory trusted =
+        KeycloakTrustSupport.trustedRequestFactory(
+            sslBundles, KeycloakTrustSupport.KEYCLOAK_TRUST_BUNDLE);
+    if (trusted != null) {
+      builder.restOperations(new RestTemplate(trusted));
+    }
+    return builder.build();
   }
 
   /**
@@ -108,14 +174,19 @@ public class SecurityConfig {
   /**
    * The single {@link SecurityFilterChain}: CSRF enabled but ignored for the bearer-only {@code
    * /v1/**} endpoints, empty CORS, locked-down response headers, the authorization matrix, JWT
-   * resource-server activation and a stateless session policy.
+   * resource-server activation, the identity-provider-unavailable 503 re-map and a stateless
+   * session policy.
    *
    * @param http the Spring Security builder
+   * @param objectMapper serializes the {@link IdentityProviderUnavailableFilter}'s 503 problem body
+   * @param meterRegistry counts the identity-provider-unavailable 503 on {@code
+   *     basetool_http_error_total} (REQ-OBS-011)
    * @return the configured filter chain
    * @throws Exception propagated from {@link HttpSecurity#build()}
    */
   @Bean
-  public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+  public SecurityFilterChain filterChain(
+      HttpSecurity http, ObjectMapper objectMapper, MeterRegistry meterRegistry) throws Exception {
     // CSRF stays ENABLED (never disabled) so the gateway carries no weaker posture than the
     // backend. Every real endpoint (/v1/**) is JSON + bearer-token only on a stateless chain with
     // no session cookie, so it can never be driven from a CSRF-vulnerable browser flow — those
@@ -155,6 +226,15 @@ public class SecurityConfig {
                     .anyRequest()
                     .authenticated())
         .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}))
+        // REQ-SEC-024: re-map an identity-provider-unreachable failure (JWKS timeout / 5xx /
+        // Docker-DNS strand) escaping the bearer-token filter as a re-thrown
+        // AuthenticationServiceException to a retryable 503 instead of an opaque 500. Installed
+        // before the bearer-token filter so its try/catch wraps that filter; a genuine 401 never
+        // reaches it.
+        .addFilterBefore(
+            new IdentityProviderUnavailableFilter(objectMapper, meterRegistry),
+            org.springframework.security.oauth2.server.resource.web.authentication
+                .BearerTokenAuthenticationFilter.class)
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
     return http.build();
   }

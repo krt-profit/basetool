@@ -256,8 +256,12 @@ transaction per pass) rather than per-scrape.
   bounded enums — never the external asset name/uuid/detail).
 - `basetool_http_error_total{code}` counter at the `GlobalExceptionHandler` 409/401/403 methods
   (`OPTIMISTIC_LOCK` = optimistic-locking regression indicator, `PESSIMISTIC_LOCK`,
-  `UNAUTHENTICATED`, `ACCESS_DENIED`). Filter-level 401/403 re-dispatch through the same advice,
-  so there is exactly one non-double-counted increment site per status.
+  `UNAUTHENTICATED`, `ACCESS_DENIED`) plus `SERVICE_UNAVAILABLE`, incremented directly by
+  `IdentityProviderUnavailableFilter` when an unreachable Keycloak JWKS is re-mapped to a retryable
+  503 (REQ-SEC-024) — a filter-level site that bypasses the advice, so "one non-double-counted
+  increment site" holds per code, not per handler. The ingest gateway emits the same metric name
+  with the `SERVICE_UNAVAILABLE` code from its own filter; the `application` common tag
+  distinguishes the module.
 - `basetool_audit_events_total{domain}` counter at the single `AuditService.record` choke point
   (`domain` = the 8 `AuditDomain` values; the physically separate Bank audit trail is out of
   scope here).
@@ -341,3 +345,25 @@ a full edge outage pages once (liveness), not once per posture assertion.
 `monitoring/prometheus/alerts/infrastructure.yml` (`EdgeActuatorDenyBroken`,
 `EdgeForceSslRedirectBroken`, `EdgeHstsHeaderMissing`, scoped `BlackboxProbeFailed`) ·
 `.github/workflows/edge-deny-probe.yml`
+
+### REQ-OBS-013 — Telemetry-sink failures are not application errors
+
+A failure to reach the observability plane must never look like an application fault. In
+particular, the OpenTelemetry OTLP span exporter logs a failed export batch (Alloy/Tempo unreachable
+or slow) at ERROR by default; that noise flows into `logback_events_total{level="error"}` and can
+trip the `LogbackErrorSpike` alert on a monitoring-plane outage that has nothing to do with the
+application. All three modules therefore pin the `io.opentelemetry.exporter` logger to WARN, so a
+telemetry-sink outage stays visible (a WARN breadcrumb) without inflating the app error-rate signal.
+Detection of a genuine tracing outage is owned by the `up{job=~"alloy|tempo"}` targets and the
+dead-man's switch, not by the app's own error log.
+
+**Acceptance**
+
+- [ ] With Alloy/Tempo unreachable, backend/frontend/ingest keep logging OTLP export failures at
+  WARN (not ERROR), so `logback_events_total{level="error"}` does not rise and `LogbackErrorSpike`
+  does not fire on the export failures alone.
+- [ ] A real application error still logs at ERROR and still counts toward `LogbackErrorSpike`.
+
+**Enforced by:** `{backend,frontend,ingest}/src/main/resources/application.yml`
+(`logging.level."io.opentelemetry.exporter": WARN`) · `monitoring/prometheus/alerts/apps.yml`
+(`LogbackErrorSpike`)

@@ -253,6 +253,9 @@ logging:
     org.springframework.web: INFO
     org.springframework.security: INFO
     io.github.resilience4j: INFO
+    # REQ-OBS-013: demote OTLP span-export failures to WARN so an unreachable Alloy/Tempo does not
+    # inflate logback_events_total{level="error"} and falsely trip the LogbackErrorSpike alert.
+    io.opentelemetry.exporter: WARN
 
 resilience4j:
   spring:

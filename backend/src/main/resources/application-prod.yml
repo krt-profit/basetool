@@ -87,6 +87,16 @@ app:
       - 172.17.0.0/16
       - 172.18.0.0/16
       - 172.19.0.0/16
+  security:
+    jwt:
+      # REQ-SEC-024: opt-in. Fetch the JWKS from the INTERNAL Keycloak (https://keycloak:18443) so
+      # backend JWT validation no longer hairpins through the public edge (NPM), where an edge or
+      # public-Keycloak blip turns every authenticated request into a 5xx. Empty (default) keeps the
+      # current behaviour: keys are derived from issuer-uri (the public host). When set, the key
+      # fetch reuses the keycloak-trust bundle above, so the cert's SAN must carry dns:keycloak.
+      # Recommended value once verified on the host:
+      #   https://keycloak:18443/realms/iri/protocol/openid-connect/certs
+      jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:}
 
 # SC Wiki catalogue sync. The per-sync feature flags default to false in code
 # (ScWikiProperties -- "ships dark"); enabled here so each scheduler step runs on the

@@ -67,6 +67,21 @@ public final class MetricNames {
   /** Failure reason: any other unexpected relay failure. */
   public static final String REASON_INTERNAL = "internal";
 
+  /**
+   * Counter {@code basetool_http_error_total} — tag {@code code} (stable RFC-7807 code). Shares its
+   * name with the backend's error counter; the {@code application} common tag distinguishes the
+   * module. Emitted by {@link
+   * de.greluc.krt.profit.basetool.ingest.config.IdentityProviderUnavailableFilter} for an
+   * identity-provider-unavailable 503 (REQ-SEC-024, REQ-OBS-011).
+   */
+  public static final String HTTP_ERROR = "basetool.http.error";
+
+  /** Tag key: the stable RFC-7807 error code. */
+  public static final String TAG_CODE = "code";
+
+  /** Error code: the identity provider (Keycloak JWKS) was unreachable — retryable 503. */
+  public static final String CODE_SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE";
+
   private MetricNames() {
     // Constants holder — not instantiable.
   }

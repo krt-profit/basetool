@@ -64,7 +64,19 @@ public class NotificationStreamService {
     SseEmitter emitter = newEmitter();
     emittersBySub.computeIfAbsent(recipientSub, key -> ConcurrentHashMap.newKeySet()).add(emitter);
     emitter.onCompletion(() -> remove(recipientSub, emitter));
-    emitter.onTimeout(() -> remove(recipientSub, emitter));
+    emitter.onTimeout(
+        () -> {
+          // Complete the emitter on timeout so Spring MVC records a NORMAL async completion rather
+          // than raising AsyncRequestTimeoutException — which Micrometer books as a phantom 503 on
+          // http.server.requests even though the client received a clean 30-minute stream and
+          // simply
+          // reconnects. Without the explicit complete() the request finalizes as a server error and
+          // inflates the frontend's 5xx rate (REQ-NOTIF-010). Removal also runs via the
+          // onCompletion
+          // callback complete() triggers; the extra remove() here is idempotent.
+          remove(recipientSub, emitter);
+          emitter.complete();
+        });
     emitter.onError(error -> remove(recipientSub, emitter));
     try {
       emitter.send(SseEmitter.event().name("connected").data("ok"));

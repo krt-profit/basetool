@@ -18,6 +18,15 @@ spring:
             location: ${SERVER_SSL_KEY_STORE:classpath:keystore.p12}
             password: ${SERVER_SSL_KEY_STORE_PASSWORD}
             type: PKCS12
+        # REQ-SEC-024: pins the same bind-mounted self-signed keystore.p12 as a TRUSTSTORE for the
+        # OPT-IN internal JWKS fetch (https://keycloak:18443). Consumed via
+        # SslBundles.getBundle("keycloak-trust") only when app.security.jwt.jwk-set-uri is set; the
+        # shared cert's SAN carries dns:keycloak. Same env vars — no new compose secret.
+        keycloak-trust:
+          truststore:
+            location: ${SERVER_SSL_KEY_STORE:classpath:keystore.p12}
+            password: ${SERVER_SSL_KEY_STORE_PASSWORD}
+            type: PKCS12
 
 # OpenAPI document is disabled in prod (parity with the backend) — never reachable from outside.
 springdoc:
@@ -28,3 +37,10 @@ app:
   ingest:
     backend-base-url: ${BACKEND_URL:https://backend:11261}
     frontend-base-url: ${FRONTEND_URL}
+  security:
+    jwt:
+      # REQ-SEC-024: opt-in. Fetch the JWT signing keys from the INTERNAL Keycloak instead of
+      # hairpinning through the public edge. Empty (default) derives the JWKS from issuer-uri. When
+      # set, the key fetch uses the keycloak-trust bundle above (cert SAN dns:keycloak). Recommended:
+      #   https://keycloak:18443/realms/iri/protocol/openid-connect/certs
+      jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:}
