@@ -200,6 +200,17 @@ Invariants that must hold:
 - **Per-principal calls are never URI-cached.** `/api/v1/users/me`, `/api/v1/me/capabilities`, and
   `/api/v1/me/active-org-unit` share a URI across users; a URI-keyed cache would cross-contaminate
   them, so they remain plain `get(...)`.
+- **The eviction guarantee holds only under single-instance deployment (CACHE-DIST-01).** Caffeine is
+  per-JVM: both `STATIC_DATA_CACHE` and the backend master-data caches evict only the local JVM's copy.
+  This "no user sees a list more stale than the last mutation" guarantee is airtight **because prod runs
+  exactly one frontend and one backend container** — the fixed `container_name` in `docker-compose.yml`
+  structurally forbids `docker compose --scale`, and `deploy.sh` recreates in place rather than scaling
+  out. **Scaling either module to more than one replica breaks this**: a peer would serve entries up to
+  the TTL stale after another replica's mutation. Horizontal scale-out is therefore gated on first
+  replacing the eviction-sensitive caches with a shared / broadcast eviction scheme (preferred: a Redis
+  pub/sub evict-broadcast keeping Caffeine as the local read path) — see
+  [ADR-0074](../adr/0074-cache-invalidation-per-instance-caffeine.md), deferred and **not** built while
+  the topology is single-instance.
 
 **Acceptance** (`SquadronContextAdviceTest`): both `availableSquadrons()` and the admin switcher route
 the squadron catalogue through `getCached`, never a plain `get`; the SpecialCommand catalogue stays a
