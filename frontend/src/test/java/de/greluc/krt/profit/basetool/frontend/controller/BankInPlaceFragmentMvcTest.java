@@ -180,17 +180,31 @@ class BankInPlaceFragmentMvcTest {
         // Field hints are inline "?" tooltip markers, not sub-field text.
         .andExpect(content().string(Matchers.containsString("field-hint-marker")))
         // The fee-inclusive toggle (REQ-BANK-033, #999) renders in the modal, hidden by default
-        // (bank.js reveals it only for a fee-bearing withdrawal/transfer).
+        // (bank.js reveals it only for a fee-bearing withdrawal/transfer) and is now CHECKED by
+        // default — the fee-inclusive mode is the flipped default.
         .andExpect(
             content()
                 .string(Matchers.containsString("data-testid=\"bank-movement-fee-inclusive\"")))
         .andExpect(content().string(Matchers.containsString("data-fee-inclusive-row")))
+        .andExpect(
+            content()
+                .string(Matchers.containsString("name=\"feeInclusive\" value=\"true\" checked")))
         // The external-counterparty toggle + free-text name + shared all-org-units source render
-        // (REQ-BANK-044, #994).
+        // (REQ-BANK-044, #994); the "kein Tool-Account" toggle now sits AFTER the
+        // Einzahler/Empfaenger
+        // picker and BEFORE the shared Einheit row.
         .andExpect(
             content().string(Matchers.containsString("data-role=\"bank-cp-external-toggle\"")))
         .andExpect(content().string(Matchers.containsString("name=\"counterpartyExternalName\"")))
         .andExpect(content().string(Matchers.containsString("data-bank-all-orgunits")))
+        .andExpect(
+            content()
+                .string(
+                    Matchers.stringContainsInOrder(
+                        List.of(
+                            "data-counterparty-user",
+                            "data-role=\"bank-cp-external-toggle\"",
+                            "data-counterparty-orgunit"))))
         .andExpect(
             content().string(Matchers.not(Matchers.containsString("id=\"bank-deposit-modal\""))));
   }

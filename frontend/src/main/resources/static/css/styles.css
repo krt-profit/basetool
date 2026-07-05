@@ -4272,7 +4272,10 @@ textarea:focus-visible,
     width: max-content;
     max-width: min(17rem, 78vw);
     padding: var(--space-2) 0.6rem;
-    transform: translateX(-50%);
+    /* --hint-shift is set by common-handlers.js when the centred bubble would overflow its
+       clipping container (e.g. a scrolling .krt-modal-body, whose overflow-y:auto also clips
+       horizontally): it slides the bubble back inside so the text is never cut off. Default 0. */
+    transform: translateX(calc(-50% + var(--hint-shift, 0px)));
     background: rgb(0 0 0 / 95%);
     border: 1px solid var(--color-primary);
     box-shadow: 0 0 10px rgb(231 126 35 / 30%);
@@ -4300,12 +4303,13 @@ textarea:focus-visible,
     visibility: visible;
 }
 
-/* Down-pointing arrow that ties the bubble to its disc. */
+/* Down-pointing arrow that ties the bubble to its disc. It counter-shifts by --hint-shift so it
+   keeps pointing at the "?" disc even when the bubble was slid sideways to avoid clipping. */
 .scu-hint__bubble::after {
     content: '';
     position: absolute;
     top: 100%;
-    left: 50%;
+    left: calc(50% - var(--hint-shift, 0px));
     border: 0.3rem solid transparent;
     border-top-color: var(--color-primary);
     transform: translateX(-50%);

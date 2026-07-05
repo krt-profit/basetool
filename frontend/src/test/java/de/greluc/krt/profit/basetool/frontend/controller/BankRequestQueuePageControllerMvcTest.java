@@ -149,19 +149,19 @@ class BankRequestQueuePageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = {"BANK_EMPLOYEE"})
-  void queue_defaultRendersPendingChipActiveUserIdAndExpandableDetail() throws Exception {
+  void queue_defaultRendersPendingCheckboxActiveUserIdAndExpandableDetail() throws Exception {
     stubData();
 
     mockMvc
         .perform(get("/bank/requests"))
         .andExpect(status().isOk())
-        // Parallel status filter chips replace the exclusive tabs; the bar and the per-user hook
-        // are
-        // present and only PENDING is active by default (REQ-BANK-023).
+        // Parallel status-filter checkboxes replace the filled toggle chips; the bar and the
+        // per-user hook are present and only PENDING is checked by default (REQ-BANK-023).
         .andExpect(content().string(Matchers.containsString("data-bank-status-filter-bar")))
         .andExpect(content().string(Matchers.containsString("data-user-id")))
         .andExpect(content().string(Matchers.containsString("data-bank-status-filter=\"PENDING\"")))
-        .andExpect(content().string(Matchers.containsString("aria-pressed=\"true\"")))
+        .andExpect(content().string(Matchers.containsString("type=\"checkbox\"")))
+        .andExpect(content().string(Matchers.containsString("checked=\"checked\"")))
         // The row carries a note, so it is expandable and its detail sub-row surfaces it.
         .andExpect(content().string(Matchers.containsString("bank-request-detail")))
         .andExpect(content().string(Matchers.containsString("from sale")));
@@ -225,6 +225,12 @@ class BankRequestQueuePageControllerMvcTest {
         // surface) and one of its options.
         .andExpect(content().string(Matchers.containsString("bank-movement-type")))
         .andExpect(content().string(Matchers.containsString("bank-movement-source-account")))
+        // The account label is type-aware (REQ-BANK-023): bank.js swaps it to Zielkonto for a
+        // deposit (which has no source account) and Quellkonto for a withdrawal/transfer, from the
+        // per-type data-label-* it carries.
+        .andExpect(
+            content().string(Matchers.containsString("data-role=\"bank-movement-account-label\"")))
+        .andExpect(content().string(Matchers.containsString("data-label-deposit")))
         // Field hints are inline "?" tooltip markers, not sub-field text.
         .andExpect(content().string(Matchers.containsString("field-hint-marker")))
         // A type-gated row is present for the JS to switch.

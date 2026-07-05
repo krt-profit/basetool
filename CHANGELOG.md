@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Bank – Filter und Ansichts-Umschalter als Checkboxen statt oranger Schalter.** Die Status-Filter der Buchungsanträge-Übersicht und die Ansichts-Optionen der Kontoübersicht (Tabellenansicht, nach Bereich gruppieren) sind jetzt Checkboxen und werden nicht mehr knallorange, wenn sie aktiv sind. Die Kachelansicht (A-Z) ist wieder der Standard, und das Umschalten von Ansicht und Bereichsgruppierung wirkt wieder zuverlässig; Verhalten und pro-Nutzer-Speicherung bleiben unverändert.
+
+- **Bank – „Kontobewegung"-Button in der Kontoübersicht; Verwaltung/Berechtigungen entfernt.** Die Kartellbank-Übersicht hat jetzt den „Kontobewegung"-Button für Direktbuchungen (wie die Buchungsanträge-Übersicht); nach einer Buchung aktualisiert sich die Übersicht ohne Neuladen. Die Buttons „Verwaltung" und „Berechtigungen" wurden aus der Kopfzeile entfernt und sind weiterhin über die Seitenleiste erreichbar.
+
+- **Bank – „Gebühr im Betrag enthalten" ist jetzt standardmäßig aktiv.** Im Kontobewegungs-Fenster ist die Option bei gebührenpflichtigen Buchungen (Auszahlung/Transfer) jetzt vorausgewählt: der eingegebene Betrag gilt als abgebuchter Betrag und der Empfänger erhält ihn abzüglich Gebühr. Wer die Gebühr obendrauf legen möchte, entfernt den Haken (bisher genau umgekehrt).
+
+- **Bank – Kontobewegung: Einzahlung ohne „Quellkonto".** Bei einer Einzahlung heißt das Kontofeld jetzt „Zielkonto" statt „Quellkonto" – eine Einzahlung hat kein Quellkonto, Geld von einem Konto wäre ein Transfer. Der Schalter „Kein Tool-Account" steht in den Kontobewegungs-Fenstern jetzt unter dem Einzahler-/Empfänger-Feld.
+
+### Fixed
+
+- **Bank – Überlappung im Kontonamen-Suchfeld behoben.** Im Suchfeld der Konto- und der Org-Einheits-Bank überlagerten sich Lupensymbol und Platzhaltertext („Nach Kontonamen filtern"); der Text beginnt jetzt rechts neben dem Symbol.
+
+- **UI – abgeschnittene „?"-Hilfetexte in Fenstern behoben.** Die „?"-Tooltips wurden in Fenstern mit Bildlauf abgeschnitten, wenn das „?" weit am Rand saß (z. B. „Quellkonto" im Kontobewegungs-Fenster); sie werden jetzt automatisch so verschoben, dass der Text vollständig im sichtbaren Bereich bleibt.
+
 ## [v1.1.4](https://github.com/krt-profit/basetool/releases/tag/v1.1.4) - 2026-07-05
 
 ### Changed

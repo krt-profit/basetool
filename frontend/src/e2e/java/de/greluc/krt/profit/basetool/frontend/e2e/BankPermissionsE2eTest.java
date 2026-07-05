@@ -214,9 +214,9 @@ class BankPermissionsE2eTest {
     }
   }
 
-  /** UI: bank management lands on the dashboard and sees the management action links. */
+  /** UI: bank management lands on the dashboard and sees the direct-booking + report actions. */
   @Test
-  void managementUiSeesDashboardAndManageLinks() {
+  void managementUiSeesDashboardAndBookingCta() {
     String baseUrl = STACK.baseUrl();
     try (BrowserContext context =
         browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
@@ -225,9 +225,11 @@ class BankPermissionsE2eTest {
         E2eSupport.login(page, baseUrl, MGMT_USER, MGMT_PASSWORD);
         E2eSupport.navigate(page, baseUrl + "/bank");
         page.waitForLoadState();
-        assertThat(page.locator("[data-testid='bank-manage-link']"))
+        // The direct-booking Kontobewegung CTA and the management-only three-month report render on
+        // the dashboard header; Verwaltung / Berechtigungen moved to the sidebar.
+        assertThat(page.locator("[data-testid='bank-movement-open']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
-        assertThat(page.locator("[data-testid='bank-grants-link']")).isVisible();
+        assertThat(page.locator("[data-testid='bank-report-download']")).isVisible();
         // At least the two seeded accounts render as cards.
         assertTrue(
             page.locator("[data-testid='bank-account-card']").count() >= 2,
