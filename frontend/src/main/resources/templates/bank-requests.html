@@ -23,19 +23,30 @@
     </nav>
 </header>
 
-<main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-user-id=${#authentication.name}">
+<main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-user-id=${#authentication.name},data-transfer-fee-rate=${transferFeeRate}">
     <div class="greeting hud-box flex-between">
         <div>
             <h1 th:text="#{bank.requests.title}">Buchungsantr&auml;ge</h1>
             <p class="text-muted" style="margin: 0.25rem 0 0; font-size: 0.8rem;"
                th:text="#{bank.requests.subtitle}">Antr&auml;ge der Org-Einheiten best&auml;tigen oder ablehnen.</p>
         </div>
-        <!-- Parallel status filters (REQ-BANK-023): independent toggle chips, not exclusive tabs.
-             Selection is persisted per user in localStorage by bank.js and replayed via the `status`
-             query param; the chips live outside the swapped `requestQueue` fragment, so bank.js owns
-             their pressed state. Default (no saved pref) is Ausstehend only, rendered server-side. -->
-        <div class="bank-head-actions" role="group" data-bank-status-filter-bar
-             th:aria-label="#{bank.requests.filter.aria}">
+        <div class="bank-requests-head-right">
+            <!-- Direct-booking CTA (REQ-BANK-023, #997): bank staff post a deposit/withdrawal/transfer
+                 straight against a chosen account (not a request). The modal carries a source-account
+                 selector because this page is not account-scoped. Shown when any active account
+                 exists. -->
+            <button type="button" class="btn btn--cta" th:if="${canBook}"
+                    data-trigger="open-modal-display" data-modal-id="bank-movement-modal"
+                    data-testid="bank-movement-open">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-swap"/></svg>
+                <span th:text="#{bank.action.movement}">Kontobewegung</span>
+            </button>
+            <!-- Parallel status filters (REQ-BANK-023): independent toggle chips, not exclusive tabs.
+                 Selection is persisted per user in localStorage by bank.js and replayed via the `status`
+                 query param; the chips live outside the swapped `requestQueue` fragment, so bank.js owns
+                 their pressed state. Default (no saved pref) is Ausstehend only, rendered server-side. -->
+            <div class="bank-head-actions" role="group" data-bank-status-filter-bar
+                 th:aria-label="#{bank.requests.filter.aria}">
             <button type="button" class="btn btn-sm bank-status-chip" data-bank-status-filter="PENDING"
                     th:classappend="${#lists.contains(selectedStatuses, 'PENDING')} ? ' btn--cta' : ' btn-ghost'"
                     th:attr="aria-pressed=${#lists.contains(selectedStatuses, 'PENDING')}"
@@ -52,6 +63,7 @@
                     th:classappend="${#lists.contains(selectedStatuses, 'CANCELLED')} ? ' btn--cta' : ' btn-ghost'"
                     th:attr="aria-pressed=${#lists.contains(selectedStatuses, 'CANCELLED')}"
                     th:text="#{bank.request.status.CANCELLED}">Zur&uuml;ckgezogen</button>
+            </div>
         </div>
     </div>
 
@@ -280,6 +292,12 @@
             </form>
         </div>
     </div>
+
+    <!-- Direct-booking movement modal (REQ-BANK-017/-023, #997): outside the swapped requestQueue
+         fragment, with a source-account selector; a successful booking re-renders the queue in place
+         (unchanged, since a direct booking is not a request) and shows the saved toast. -->
+    <th:block th:if="${canBook}"
+              th:replace="~{fragments/bank-movement-modal :: movementModal('bank-movement-modal', 'requestQueue', null, true, false, true, true, true)}"></th:block>
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />

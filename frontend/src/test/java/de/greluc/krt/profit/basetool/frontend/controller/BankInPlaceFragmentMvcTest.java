@@ -170,10 +170,17 @@ class BankInPlaceFragmentMvcTest {
         // The facts strip + booking history are inside the swapped body.
         .andExpect(content().string(Matchers.containsString("data-testid=\"bank-balance\"")))
         .andExpect(content().string(Matchers.containsString("data-testid=\"bank-bookings-panel\"")))
-        // Unlike manage/grants, the booking MODALS are part of the accountBody fragment so their
-        // distribution-derived holder selects refresh in the same swap.
-        .andExpect(content().string(Matchers.containsString("id=\"bank-deposit-modal\"")))
-        .andExpect(content().string(Matchers.containsString("id=\"bank-withdraw-modal\"")));
+        // Unlike manage/grants, the unified movement modal is part of the accountBody fragment so
+        // its
+        // distribution-derived holder selects refresh in the same swap (REQ-BANK-017, #997). The
+        // single Kontobewegung entry point + its type selector replace the three old modals.
+        .andExpect(content().string(Matchers.containsString("data-testid=\"bank-movement-open\"")))
+        .andExpect(content().string(Matchers.containsString("id=\"bank-movement-modal\"")))
+        .andExpect(content().string(Matchers.containsString("data-testid=\"bank-movement-type\"")))
+        // Field hints are inline "?" tooltip markers, not sub-field text.
+        .andExpect(content().string(Matchers.containsString("field-hint-marker")))
+        .andExpect(
+            content().string(Matchers.not(Matchers.containsString("id=\"bank-deposit-modal\""))));
   }
 
   private static BankAccountDto account(UUID id, String no, String status, String balance) {

@@ -30,6 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
@@ -182,5 +183,51 @@ class BankRequestQueuePageControllerMvcTest {
   @WithMockUser(roles = {"OFFICER"})
   void queue_nonStaffIsForbidden() throws Exception {
     mockMvc.perform(get("/bank/requests")).andExpect(status().isForbidden());
+  }
+
+  /**
+   * With at least one active account, the direct-booking "Kontobewegung" CTA and the unified
+   * movement modal render (REQ-BANK-017/-023, #997): the type selector, the source-account picker
+   * (this page is not account-scoped) and the inline "?" field-hint markers are present, and the
+   * whole page still resolves without a Thymeleaf error.
+   */
+  @Test
+  @WithMockUser(roles = {"BANK_EMPLOYEE"})
+  void queue_withActiveAccounts_rendersMovementCtaAndModal() throws Exception {
+    stubData();
+    BankAccountDto account =
+        new BankAccountDto(
+            UUID.randomUUID(),
+            "KB-0001",
+            "Staffel IRIDIUM",
+            "ORG_UNIT",
+            "ACTIVE",
+            null,
+            null,
+            new BigDecimal("1000"),
+            null,
+            null,
+            null,
+            0L,
+            Instant.parse("2026-01-01T00:00:00Z"));
+    PageResponse<BankAccountDto> accountsPage =
+        new PageResponse<>(List.of(account), 0, 500, 1, 1, List.of());
+    when(backendApiClient.get(startsWith("/api/v1/bank/accounts"), anyTypeRef()))
+        .thenReturn(accountsPage);
+
+    mockMvc
+        .perform(get("/bank/requests"))
+        .andExpect(status().isOk())
+        // The page-level CTA and the unified modal render.
+        .andExpect(content().string(Matchers.containsString("bank-movement-open")))
+        .andExpect(content().string(Matchers.containsString("id=\"bank-movement-modal\"")))
+        // The type selector plus the source-account picker (only present on this non-account-scoped
+        // surface) and one of its options.
+        .andExpect(content().string(Matchers.containsString("bank-movement-type")))
+        .andExpect(content().string(Matchers.containsString("bank-movement-source-account")))
+        // Field hints are inline "?" tooltip markers, not sub-field text.
+        .andExpect(content().string(Matchers.containsString("field-hint-marker")))
+        // A type-gated row is present for the JS to switch.
+        .andExpect(content().string(Matchers.containsString("data-movement-types")));
   }
 }

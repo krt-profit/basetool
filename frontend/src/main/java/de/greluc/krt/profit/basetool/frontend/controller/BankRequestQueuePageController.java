@@ -19,11 +19,15 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankTransferFeeRateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
@@ -70,6 +74,20 @@ public class BankRequestQueuePageController {
   private static final ParameterizedTypeReference<List<BankHolderDto>> BANK_HOLDER_LIST =
       new ParameterizedTypeReference<>() {};
 
+  /**
+   * Response type for the account list ({@code /api/v1/bank/accounts}) feeding the direct-booking
+   * modal's source and transfer-destination selectors (REQ-BANK-023, #997).
+   */
+  private static final ParameterizedTypeReference<PageResponse<BankAccountDto>> BANK_ACCOUNT_PAGE =
+      new ParameterizedTypeReference<>() {};
+
+  /**
+   * Response type for the direct-booking counterparty picker lookup ({@code /api/v1/users/lookup},
+   * REQ-BANK-044).
+   */
+  private static final ParameterizedTypeReference<List<UserReferenceDto>> USER_REFERENCE_LIST =
+      new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -112,7 +130,44 @@ public class BankRequestQueuePageController {
     if ("requestQueue".equals(fragment)) {
       return "bank-requests :: requestQueue";
     }
+    // Full-page render only: assemble the direct-booking "Kontobewegung" modal's data
+    // (REQ-BANK-023,
+    // #997). The CTA + modal live OUTSIDE the swapped requestQueue fragment, so a filter toggle or
+    // a
+    // confirm/reject swap never re-reads these; the modal books straight against the chosen
+    // account.
+    PageResponse<BankAccountDto> accounts =
+        backendApiClient.get("/api/v1/bank/accounts?size=500", BANK_ACCOUNT_PAGE);
+    List<BankAccountDto> activeAccounts =
+        accounts == null
+            ? List.of()
+            : BankAccountOrder.byName(
+                accounts.content().stream().filter(a -> "ACTIVE".equals(a.status())).toList(),
+                BankAccountDto::name);
+    // Every active account is both a bookable source and a transfer destination on this non-account
+    // scoped surface; a same-account transfer is rejected by the backend (REQ-BANK-006).
+    model.addAttribute("movementAccounts", activeAccounts);
+    model.addAttribute("transferTargets", activeAccounts);
+    model.addAttribute("canBook", !activeAccounts.isEmpty());
+    List<UserReferenceDto> users =
+        backendApiClient.get("/api/v1/users/lookup", USER_REFERENCE_LIST);
+    model.addAttribute("users", users == null ? List.<UserReferenceDto>of() : users);
+    model.addAttribute("transferFeeRate", fetchTransferFeeRate());
     return "bank-requests";
+  }
+
+  /**
+   * Fetches the current in-game transfer-fee rate for the direct-booking modal's live fee preview
+   * (ADR-0052, REQ-BANK-033); a backend failure or absent rate degrades to {@link BigDecimal#ZERO}
+   * so the page still renders (the preview then simply shows no fee). The authoritative fee is
+   * always computed server-side at booking time.
+   *
+   * @return the fee rate as a fraction, never {@code null}
+   */
+  private BigDecimal fetchTransferFeeRate() {
+    BankTransferFeeRateDto rate =
+        backendApiClient.get("/api/v1/bank/transfer-fee-rate", BankTransferFeeRateDto.class);
+    return rate == null || rate.rate() == null ? BigDecimal.ZERO : rate.rate();
   }
 
   /**
