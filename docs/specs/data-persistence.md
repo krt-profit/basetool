@@ -347,12 +347,12 @@ because the wire behaviour is unchanged.
 ### REQ-DATA-011 — Background sync sweeps evict the master-data caches they rewrite (CACHE-SYNC-EVICT-001)
 
 The backend serves quasi-static reference data from per-cache Caffeine caches (backend `CacheConfig`,
-master-data TTL 30 min). The admin CRUD services evict their own cache on every user-facing write, but
+master-data TTL 12 h). The admin CRUD services evict their own cache on every user-facing write, but
 the periodic **UEX** (`UexScheduler`) and **SC Wiki** (`ScWikiScheduler`) sync sweeps bulk-write
 directly to the repositories behind those caches — bypassing the `@CacheEvict` hooks — so before this
 rule a freshly-synced material / manufacturer / ship-type / star-system / city / refining-method / the
-blueprint variant-family index stayed invisible for up to the TTL (the window the 2 min→30 min TTL bump
-widened 15×).
+blueprint variant-family index stayed invisible for up to the TTL — a window the deliberately long
+master-data TTL makes large, which is exactly why the sync must **evict** rather than rely on the TTL.
 
 Each sweep therefore evicts the caches it can make stale **on completion**, through
 `MasterDataCacheEvictionService`:
@@ -361,7 +361,7 @@ Each sweep therefore evicts the caches it can make stale **on completion**, thro
   reconciled even when a later step aborts the sweep (UEX is fail-fast; SC Wiki swallows per step).
 - The two per-sweep cache-name sets (`UEX_SYNCED_CACHES`, `SCWIKI_SYNCED_CACHES`) are the **single
   source of truth** for "a sync can make these stale". **A new cache added over a synced table MUST be
-  added to the matching set**, or it silently lags the TTL again after a sync. The 30 min TTL is only
+  added to the matching set**, or it silently lags the TTL again after a sync. The 12 h TTL is only
   the backstop, never the primary freshness mechanism for synced data.
 - This is also the sole evict hook for `BLUEPRINT_FAMILY_INDEX_CACHE`, which has no per-write hook of
   its own (CACHE-DIST-03); it is rebuilt only by the SC Wiki blueprint sync, so evicting it at sweep

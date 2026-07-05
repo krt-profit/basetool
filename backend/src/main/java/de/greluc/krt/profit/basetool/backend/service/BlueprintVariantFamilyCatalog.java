@@ -44,7 +44,7 @@ import org.springframework.transaction.annotation.Transactional;
  * CacheConfig#BLUEPRINT_FAMILY_INDEX_CACHE} (master-data TTL). It carries no per-write evict hook,
  * but the SC Wiki sync sweep evicts it on completion (via {@code MasterDataCacheEvictionService},
  * CACHE-DIST-03), so a blueprint sync is reflected on the next read rather than lagging the TTL;
- * the 30-minute TTL is only the backstop. Even at maximum staleness this is an oversight surface,
+ * the 12-hour TTL is only the backstop. Even at maximum staleness this is an oversight surface,
  * where the live availability count comes from the (always-fresh) owned-row aggregation and only
  * the lazy owner drill-down consults this index.
  */
