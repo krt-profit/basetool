@@ -651,16 +651,9 @@
             inclusiveRow.hidden = !feeApplies;
         }
         if (inclusiveToggle) {
-            // Default ON (fee inclusive): apply the checked default whenever the toggle FRESHLY
-            // becomes applicable (it was disabled and a fee now applies), but preserve the user's own
-            // choice while it stays applicable. Gated off (no fee applies) -> unchecked; it is
-            // disabled there and thus omitted from the submitted body anyway.
-            const wasDisabled = inclusiveToggle.disabled;
             inclusiveToggle.disabled = !feeApplies;
             if (!feeApplies) {
                 inclusiveToggle.checked = false;
-            } else if (wasDisabled) {
-                inclusiveToggle.checked = true;
             }
         }
         const amount = Number(amountEl.value);

@@ -1225,12 +1225,11 @@ superseding the carve-out model of ADR-0041):
   recorded legs, restoring the gross to the source).
 
 > **Amended (2026-07-05, #999) — two fee modes (on-top vs. fee-inclusive):** a fee-bearing booking
-> (`WITHDRAWAL`, holder-changing `TRANSFER`) carries a `feeInclusive` flag whose **request-DTO
-> absent-default is `false`** (on-top; but the Kontobewegung UI now defaults the checkbox to checked —
-> see the fee-inclusive-default amendment below). In **both** modes the fee is `round(entered × rate)`
-> — only the interpretation of the entered amount differs:
+> (`WITHDRAWAL`, holder-changing `TRANSFER`) carries a `feeInclusive` flag, **default `false`**. In
+> **both** modes the fee is `round(entered × rate)` — only the interpretation of the entered amount
+> differs:
 >
-> - **`feeInclusive = false` (on-top):** the entered amount is what **arrives**;
+> - **`feeInclusive = false` (default, unchanged, on-top):** the entered amount is what **arrives**;
 >   the fee is added on top; the source is debited `amount + fee`; the destination receives `amount`.
 > - **`feeInclusive = true` (inclusive):** the entered amount is the gross **debited**; the source is
 >   debited exactly `amount`; the destination/recipient receives `amount − fee`. A 500 000 inclusive
@@ -1242,8 +1241,7 @@ superseding the carve-out model of ADR-0041):
 > account legs still net to `−transfer_fee` (inclusive: source `−amount`, destination `+(amount −
 > fee)`). The flag is a **bank-staff choice at booking time only** — a booking **request** never
 > carries it, so confirmation always books on-top. It is exposed on the direct-booking Kontobewegung
-> modal (REQ-BANK-017) as a checkbox (shown only where a fee applies; **default on** = fee-inclusive,
-> see the amendment below), and the live
+> modal (REQ-BANK-017) as a checkbox (default off, shown only where a fee applies), and the live
 > preview shows the fee, the "wird abgebucht" gross and the "kommt an" net for the selected mode.
 > Audited in the existing `WITHDRAWAL_BOOKED` / `TRANSFER_BOOKED` detail (the fee amount plus an
 > `incl` marker; amounts only, no PII) — no new audit event and no monitoring change.
@@ -1254,8 +1252,6 @@ superseding the carve-out model of ADR-0041):
 > (`CARTEL`) account** (a single `−fee` account leg) — see REQ-BANK-031. Same rate, same
 > whole-aUEC rounding. The inclusive-fee mode above does **not** apply to the Umbuchung (the KRT
 > account, not a recipient, bears it). The `HOLDER_TRANSFER` audit detail now carries the fee.
->
-> **Amended (2026-07-05) — fee-inclusive is the default Kontobewegung mode:** the direct-booking Kontobewegung modal's `feeInclusive` checkbox now defaults to **checked** (fee-inclusive), flipping the tool's default booking mode from on-top; `bank.js` re-applies the checked default whenever the toggle freshly becomes applicable (a fee-bearing withdrawal / holder-changing transfer) and the tool always transmits the checkbox value, so the request DTO's absent-default of `false` (on-top) now governs only direct API calls that omit the flag and the booking-request **confirmation** path (which still never carries the flag, so confirmation still books on-top). No backend, ledger or audit change — only the UI default and its hint text (`bank.field.feeInclusive.hint`, which now marks Aktiv/On as the Standard/default) flip.
 
 **Acceptance**
 
@@ -1272,8 +1268,7 @@ superseding the carve-out model of ADR-0041):
   entered amount and the destination/recipient receives `amount − fee` (500 000 → 497 500 at 0.5%);
   the account legs still net to `−transfer_fee`; `amount − fee ≤ 0` is rejected
   `BANK_FEE_EXCEEDS_AMOUNT`; a booking request never carries the flag (confirmation books on-top);
-  the preview shows "wird abgebucht" and "kommt an" for the selected mode; the Kontobewegung UI
-  defaults the checkbox to on (fee-inclusive), while the request-DTO absent-default stays on-top.
+  the preview shows "wird abgebucht" and "kommt an" for the selected mode; default is off.
 
 **Enforced by:** `BankLedgerServiceTest` (fee added on top / fee-inclusive debit + amount−fee to destination + BANK_FEE_EXCEEDS_AMOUNT, full amount to destination, overdraft against the actual debit, same-holder + holder-Umbuchung fee-free, legs net to −fee), `BankTransferFeeServiceTest` (rate resolution + whole-aUEC rounding + `totalDebit`), `BankLedgerIntegrityServiceTest`, `BankControllerSecurityTest` (rate endpoint), frontend `BankInPlaceFragmentMvcTest` (fee-inclusive toggle renders) / `BankPageControllerTest` / `BankManagePageControllerTest` / `BankAccountDetailFragmentMvcTest` / `BankHolderDetailFragmentMvcTest` · **Code:** `service/BankTransferFeeService` (`feeOn` + `totalDebit`), `service/BankLedgerService` (deposit/withdrawal/transfer/holder-transfer), `model/dto/request/BankWithdrawalRequest` + `BankTransferRequest` (`feeInclusive`), `model/BankTransaction#transferFee`, `controller/BankBookingController#getTransferFeeRate`, `repository/BankTransactionRepository` + `BankHolderPostingRepository` (integrity), `db/migration/V183`, frontend `controller/BankPageController` / `BankManagePageController`, `static/js/bank.js`, `templates/fragments/bank-movement-modal.html`, `templates/bank-account-detail.html` / `bank-manage.html` / `bank-holder-detail.html` · **ADR:** [ADR-0052](../adr/0052-bank-transfer-fee-borne-by-debited-account.md) (supersedes [ADR-0041](../adr/0041-bank-in-game-transfer-fee.md)) · **Issues:** #556, #999
 

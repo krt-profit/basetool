@@ -6,6 +6,8 @@
 
 - **Release: blockierendes CVE-Gate der Promotion nach `:stable` entfernt.** Der `promote`-Workflow führt vor dem Umhängen keinen Trivy-Scan mehr aus, der die Promotion abbricht; der Eingang `skip_vuln_gate` entfällt damit. Das Freigabe-Gate (`production`-Umgebung mit erforderlichem Reviewer) und das Signatur-Gate (cosign) bleiben bestehen. `release-images.yml` scannt weiterhin jeden Build mit Trivy und lädt die Funde in den Security-Tab, ohne den Build oder die Promotion zu blockieren (REQ-OPS-002).
 
+- **Bank – „Gebühr im Betrag enthalten" wieder standardmäßig aus.** Im Kontobewegungs-Fenster gilt bei gebührenpflichtigen Buchungen (Auszahlung/Transfer) wieder der eingegebene Betrag als der Betrag, der beim Empfänger ankommt; die Gebühr wird zusätzlich beim Sender abgezogen (wie im Spiel). Mit gesetztem Haken entspricht der eingegebene Betrag dem abgebuchten Betrag (Überweisung + Gebühr) und der Empfänger erhält ihn abzüglich Gebühr – macht die in v1.1.5 eingeführte Umkehrung des Standards rückgängig.
+
 ## [v1.1.5](https://github.com/krt-profit/basetool/releases/tag/v1.1.5) - 2026-07-05
 
 ### Changed
