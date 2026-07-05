@@ -76,6 +76,10 @@
         // Bank-staff confirmation queue (#666 F2): the request table re-renders after a
         // confirm/reject; `?status=` preserved so the staffer stays on the filtered view.
         requestQueue: { container: '#bank-request-queue-results', preserveQuery: true },
+        // Bank dashboard (REQ-BANK-016/-023): a direct booking from the header Kontobewegung modal
+        // re-renders the switchable account grid so balances + 30-day deltas refresh in place;
+        // `?layout=/group=` preserved so the booking keeps the caller's chosen view.
+        bankGrid: { container: '#bank-grid-results', preserveQuery: true },
     };
 
     /**
@@ -647,9 +651,16 @@
             inclusiveRow.hidden = !feeApplies;
         }
         if (inclusiveToggle) {
+            // Default ON (fee inclusive): apply the checked default whenever the toggle FRESHLY
+            // becomes applicable (it was disabled and a fee now applies), but preserve the user's own
+            // choice while it stays applicable. Gated off (no fee applies) -> unchecked; it is
+            // disabled there and thus omitted from the submitted body anyway.
+            const wasDisabled = inclusiveToggle.disabled;
             inclusiveToggle.disabled = !feeApplies;
             if (!feeApplies) {
                 inclusiveToggle.checked = false;
+            } else if (wasDisabled) {
+                inclusiveToggle.checked = true;
             }
         }
         const amount = Number(amountEl.value);
@@ -1356,6 +1367,17 @@
                 submit.textContent = label;
             }
         }
+        // Source-account label follows the type on the selectable (requests / dashboard) variant
+        // (REQ-BANK-023): a deposit lands ON the account (Zielkonto — a deposit has no source
+        // account, that would be a transfer); a withdrawal/transfer debits it (Quellkonto). Only
+        // present when accountSelectable; a no-op on the fixed-account detail modal.
+        const accountLabel = form.querySelector('[data-role="bank-movement-account-label"]');
+        if (accountLabel) {
+            const accountLabelText = accountLabel.getAttribute('data-label-' + type.toLowerCase());
+            if (accountLabelText) {
+                accountLabel.textContent = accountLabelText;
+            }
+        }
         updateFeePreview(form);
         updateMovementJustification(form);
     }
@@ -1779,11 +1801,11 @@
 })();
 
 // ------------------------------------------------------------------------------------------------
-// Booking-request queue status filter (REQ-BANK-023): parallel toggle chips whose selection is
-// persisted per user in localStorage and replayed through the `status` query parameter. The chips
-// live outside the swapped `requestQueue` fragment, so this module owns their pressed state and
-// re-fetches the table via the shared krtFetch.swap on every change. Default (no saved preference)
-// is Ausstehend only, rendered server-side; deselecting all shows the "no filter" hint.
+// Booking-request queue status filter (REQ-BANK-023): parallel checkboxes whose selection is
+// persisted per user in localStorage and replayed through the `status` query parameter. The
+// checkboxes live outside the swapped `requestQueue` fragment, so this module owns their checked
+// state and re-fetches the table via the shared krtFetch.swap on every change. Default (no saved
+// preference) is Ausstehend only, rendered server-side; deselecting all shows the "no filter" hint.
 // ------------------------------------------------------------------------------------------------
 (function () {
     const STATUSES = ['PENDING', 'CONFIRMED', 'REJECTED', 'CANCELLED'];
@@ -1798,8 +1820,8 @@
         return 'bank_request_status_filter_' + uid;
     }
 
-    function chipFor(status) {
-        return document.querySelector('[data-bank-status-filter="' + status + '"]');
+    function checkboxFor(status) {
+        return document.querySelector('input[data-bank-status-filter="' + status + '"]');
     }
 
     function readSaved() {
@@ -1829,21 +1851,17 @@
 
     function renderedSelection() {
         return STATUSES.filter(function (s) {
-            const c = chipFor(s);
-            return c && c.getAttribute('aria-pressed') === 'true';
+            const c = checkboxFor(s);
+            return c && c.checked;
         });
     }
 
-    function applyChipStates(list) {
+    function applyCheckStates(list) {
         STATUSES.forEach(function (s) {
-            const c = chipFor(s);
-            if (!c) {
-                return;
+            const c = checkboxFor(s);
+            if (c) {
+                c.checked = list.indexOf(s) !== -1;
             }
-            const on = list.indexOf(s) !== -1;
-            c.setAttribute('aria-pressed', on ? 'true' : 'false');
-            c.classList.toggle('btn--cta', on);
-            c.classList.toggle('btn-ghost', !on);
         });
     }
 
@@ -1864,10 +1882,10 @@
         });
     }
 
-    // On load, reconcile the saved per-user selection with the server-rendered chips. An explicit
-    // `status` in the address bar (deep link / back-forward) is authoritative and is persisted;
-    // otherwise a saved selection that differs from the server default (PENDING) is applied and the
-    // queue re-fetched to match.
+    // On load, reconcile the saved per-user selection with the server-rendered checkboxes. An
+    // explicit `status` in the address bar (deep link / back-forward) is authoritative and is
+    // persisted; otherwise a saved selection that differs from the server default (PENDING) is
+    // applied and the queue re-fetched to match.
     document.addEventListener('DOMContentLoaded', function () {
         if (!filterBar()) {
             return;
@@ -1882,43 +1900,33 @@
             return;
         }
         if (saved.join(',') !== renderedSelection().join(',')) {
-            applyChipStates(saved);
+            applyCheckStates(saved);
             refetch(saved);
         }
     });
 
-    document.addEventListener('click', function (event) {
-        const chip = event.target.closest
-            ? event.target.closest('[data-bank-status-filter]')
+    // A checkbox toggle fires `change`; its own `checked` state is already the new one, so the
+    // current selection is read straight off the DOM and persisted + replayed.
+    document.addEventListener('change', function (event) {
+        const checkbox = event.target.closest
+            ? event.target.closest('input[data-bank-status-filter]')
             : null;
-        if (!chip) {
+        if (!checkbox) {
             return;
         }
-        event.preventDefault();
-        const status = chip.getAttribute('data-bank-status-filter');
-        const selection = renderedSelection();
-        const at = selection.indexOf(status);
-        if (at === -1) {
-            selection.push(status);
-        } else {
-            selection.splice(at, 1);
-        }
-        const ordered = STATUSES.filter(function (s) {
-            return selection.indexOf(s) !== -1;
-        });
-        applyChipStates(ordered);
+        const ordered = renderedSelection();
         writeSaved(ordered);
         refetch(ordered);
     });
 })();
 
 // ------------------------------------------------------------------------------------------------
-// Bank dashboard view options (REQ-BANK-016): a card/table layout toggle and an alphabetical/
-// by-Bereich grouping toggle, each persisted per user in localStorage and replayed through the
-// `layout` / `group` query parameters. The toggles live outside the swapped `bankGrid` fragment, so
-// this module owns their pressed state and re-fetches just the grid via krtFetch.swap on every
-// change, re-applying the account-name filter afterwards. Default (no saved preference) is the card
-// grid ordered A→Z, rendered server-side.
+// Bank dashboard view options (REQ-BANK-016): two independent checkboxes — a table-view toggle and
+// a by-Bereich grouping toggle — each persisted per user in localStorage and replayed through the
+// `layout` / `group` query parameters. The checkboxes live outside the swapped `bankGrid` fragment,
+// so this module owns their checked state and re-fetches just the grid via krtFetch.swap on every
+// change, re-applying the account-name filter afterwards. Default (both unchecked, no saved
+// preference) is the card grid ordered A→Z, rendered server-side.
 // ------------------------------------------------------------------------------------------------
 (function () {
     function viewToggles() {
@@ -1931,15 +1939,22 @@
         return 'bank_dashboard_view_' + uid;
     }
 
-    function pressedValue(attr, fallback) {
-        const pressed = document.querySelector('[' + attr + '][aria-pressed="true"]');
-        return pressed ? pressed.getAttribute(attr) : fallback;
+    function layoutCheckbox() {
+        return document.querySelector('input[data-bank-view-layout]');
     }
 
+    function groupCheckbox() {
+        return document.querySelector('input[data-bank-view-group]');
+    }
+
+    // The checked checkbox maps to the non-default value (table / bereich); unchecked = the default
+    // (card / alpha), so the pair encodes the same {layout, group} state the query params carry.
     function renderedState() {
+        const layoutEl = layoutCheckbox();
+        const groupEl = groupCheckbox();
         return {
-            layout: pressedValue('data-bank-view-layout', 'card'),
-            group: pressedValue('data-bank-view-group', 'alpha'),
+            layout: layoutEl && layoutEl.checked ? 'table' : 'card',
+            group: groupEl && groupEl.checked ? 'bereich' : 'alpha',
         };
     }
 
@@ -1967,19 +1982,15 @@
         }
     }
 
-    function applyButtonStates(state) {
-        document.querySelectorAll('[data-bank-view-layout]').forEach(function (btn) {
-            const on = btn.getAttribute('data-bank-view-layout') === state.layout;
-            btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-            btn.classList.toggle('btn--cta', on);
-            btn.classList.toggle('btn-ghost', !on);
-        });
-        document.querySelectorAll('[data-bank-view-group]').forEach(function (btn) {
-            const on = btn.getAttribute('data-bank-view-group') === state.group;
-            btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-            btn.classList.toggle('btn--cta', on);
-            btn.classList.toggle('btn-ghost', !on);
-        });
+    function applyCheckboxStates(state) {
+        const layoutEl = layoutCheckbox();
+        const groupEl = groupCheckbox();
+        if (layoutEl) {
+            layoutEl.checked = state.layout === 'table';
+        }
+        if (groupEl) {
+            groupEl.checked = state.group === 'bereich';
+        }
     }
 
     function reapplyNameFilter() {
@@ -2006,7 +2017,7 @@
             });
     }
 
-    // On load, reconcile the saved per-user view with the server-rendered toggles. An explicit
+    // On load, reconcile the saved per-user view with the server-rendered checkboxes. An explicit
     // `layout`/`group` in the address bar is authoritative and is persisted; otherwise a saved view
     // that differs from the server default (card + A→Z) is applied and the grid re-fetched.
     document.addEventListener('DOMContentLoaded', function () {
@@ -2024,26 +2035,21 @@
         }
         const current = renderedState();
         if (saved.layout !== current.layout || saved.group !== current.group) {
-            applyButtonStates(saved);
+            applyCheckboxStates(saved);
             fetchView(saved);
         }
     });
 
-    document.addEventListener('click', function (event) {
-        const btn = event.target.closest
-            ? event.target.closest('[data-bank-view-layout],[data-bank-view-group]')
+    // A checkbox toggle fires `change`; its own `checked` state is already the new one, so the
+    // current {layout, group} is read straight off the DOM, persisted and replayed onto the grid.
+    document.addEventListener('change', function (event) {
+        const checkbox = event.target.closest
+            ? event.target.closest('input[data-bank-view-layout],input[data-bank-view-group]')
             : null;
-        if (!btn) {
+        if (!checkbox) {
             return;
         }
-        event.preventDefault();
         const state = renderedState();
-        if (btn.hasAttribute('data-bank-view-layout')) {
-            state.layout = btn.getAttribute('data-bank-view-layout');
-        } else {
-            state.group = btn.getAttribute('data-bank-view-group');
-        }
-        applyButtonStates(state);
         writeSaved(state);
         fetchView(state);
     });

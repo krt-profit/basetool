@@ -452,6 +452,15 @@ tr.is-inert td {
     justify-content: flex-end;
 }
 
+/* Request status filter (REQ-BANK-023): the independent status checkboxes, wrapping onto their own
+   line on narrow viewports. */
+.bank-status-filter {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    align-items: center;
+}
+
 /* ---- Account-name live filter (REQ-BANK-046): dashboard cards + org-unit account list ---- */
 /*
  * The filter hides non-matching items via the `hidden` attribute. The card / row author rules set
@@ -480,7 +489,10 @@ tr.is-inert td {
     pointer-events: none;
 }
 
-.bank-acc-search-input {
+/* The descendant selector lifts this above the global `input[type='search']` rule (specificity
+   0,1,1), whose `padding` shorthand would otherwise reset padding-left and slide the placeholder
+   text under the magnifier icon (dashboard D1 + org-unit bank live filters, REQ-BANK-046). */
+.bank-acc-search .bank-acc-search-input {
     width: 220px;
     max-width: 100%;
     padding-left: 30px;
@@ -598,6 +610,26 @@ tr.is-inert td {
     color: var(--color-white);
     text-transform: none;
     letter-spacing: normal;
+}
+
+/* Compact inline checkbox + label used by the dashboard view options (REQ-BANK-016) and the request
+   status filter (REQ-BANK-023): a small checkbox that is orange only when ticked, beside a quiet
+   label — deliberately NOT a filled-orange toggle button, so an active filter does not shout. */
+.bank-check-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.72rem;
+    color: var(--color-gray-1);
+    cursor: pointer;
+    user-select: none;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.bank-check-inline input[type='checkbox'] {
+    width: 1rem;
+    height: 1rem;
 }
 
 .bank-datetime-row {
@@ -1182,26 +1214,15 @@ tr.is-inert td {
     color: var(--color-warning);
 }
 
-/* ===== Dashboard view options (REQ-BANK-016): card/table layout + by-Bereich grouping ===== */
+/* ===== Dashboard view options (REQ-BANK-016): table-view + by-Bereich grouping checkboxes ===== */
 
-/* Two segmented toggle controls (layout, grouping) in the dashboard header. */
+/* The two view-option checkboxes sit inline in the dashboard header (both unchecked = the default
+   card grid ordered A→Z). */
 .bank-view-toggles {
     display: inline-flex;
-    gap: 10px;
+    gap: 14px;
     flex-wrap: wrap;
-}
-
-.bank-seg {
-    display: inline-flex;
-    gap: 0;
-}
-
-.bank-seg .bank-view-btn {
-    border-radius: 0;
-}
-
-.bank-seg .bank-view-btn + .bank-view-btn {
-    margin-left: -1px;
+    align-items: center;
 }
 
 /* Tabular account view — reuses the shared .data-table look; keep the trend cell compact. */

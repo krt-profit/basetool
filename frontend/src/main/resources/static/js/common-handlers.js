@@ -48,6 +48,70 @@
         }
     });
 
+    /*
+     * Keep a "?" field-hint tooltip (fragments/scu-hint) inside its clipping container. The bubble is
+     * a pure-CSS tooltip centred on its disc; inside a scrolling `.krt-modal-body` (overflow-y: auto,
+     * which per the CSS overflow spec also computes overflow-x to auto) it is clipped horizontally, so
+     * a disc near the container's left/right edge had its tooltip text cut off. On hover/focus of a
+     * `.scu-hint` we measure the bubble against its nearest overflow-clipping ancestor (or the
+     * viewport) and, if it would overflow, set `--hint-shift` to slide it back inside; the CSS bubble
+     * transform and its arrow honour that variable (the arrow counter-shifts so it still points at the
+     * disc). Registered before the `krtEvents` guard so it works even without the delegation registry.
+     */
+    function hintClippingAncestor(el) {
+        let node = el.parentElement;
+        while (node && node !== document.body && node !== document.documentElement) {
+            const style = window.getComputedStyle(node);
+            if (style.overflowX !== 'visible' || style.overflowY !== 'visible') {
+                return node;
+            }
+            node = node.parentElement;
+        }
+        return null;
+    }
+
+    function positionHintBubble(hint) {
+        const bubble = hint.querySelector('.scu-hint__bubble');
+        if (!bubble) {
+            return;
+        }
+        // Reset before measuring so the rect reflects the un-shifted (centred) position.
+        bubble.style.setProperty('--hint-shift', '0px');
+        const rect = bubble.getBoundingClientRect();
+        const pad = 6;
+        let minX = pad;
+        let maxX = document.documentElement.clientWidth - pad;
+        const clip = hintClippingAncestor(hint);
+        if (clip) {
+            const cr = clip.getBoundingClientRect();
+            minX = cr.left + pad;
+            maxX = cr.right - pad;
+        }
+        let shift = 0;
+        if (rect.left < minX) {
+            shift = minX - rect.left;
+        } else if (rect.right > maxX) {
+            shift = maxX - rect.right;
+        }
+        if (shift !== 0) {
+            bubble.style.setProperty('--hint-shift', Math.round(shift) + 'px');
+        }
+    }
+
+    function repositionHintFrom(target) {
+        const hint = target && target.closest ? target.closest('.scu-hint') : null;
+        if (hint) {
+            positionHintBubble(hint);
+        }
+    }
+
+    document.addEventListener('mouseover', function (event) {
+        repositionHintFrom(event.target);
+    });
+    document.addEventListener('focusin', function (event) {
+        repositionHintFrom(event.target);
+    });
+
     if (!window.krtEvents || typeof window.krtEvents.on !== 'function') {
         // event-delegation.js has not loaded — abort silently. Production fragments/head.html
         // wires event-delegation.js BEFORE this file, so the guard only fires if a test slice

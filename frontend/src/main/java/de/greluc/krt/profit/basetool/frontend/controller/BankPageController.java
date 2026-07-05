@@ -145,7 +145,9 @@ public class BankPageController {
    * {@code group} mode (alphabetical vs. by Bereich). The cards are always sorted A→Z by name; the
    * by-Bereich view additionally chunks them into coloured vertical groups (KRT rubric → Bereich
    * groups → Sonderkonten → Ohne Bereich → Geschlossen). A {@code bankGrid} fragment request
-   * re-renders just the switchable grid for the in-place toggle swap (REQ-FE-005).
+   * re-renders just the switchable grid for the in-place toggle swap (REQ-FE-005). The full-page
+   * render additionally assembles the header's direct-booking "Kontobewegung" modal ({@link
+   * #addMovementModalData}, REQ-BANK-023); the fragment swap skips it.
    *
    * @param layout {@code table} for the tabular view, otherwise the default card grid
    * @param group {@code bereich} for the grouped view, otherwise the default alphabetical view
@@ -179,7 +181,52 @@ public class BankPageController {
     if ("bankGrid".equals(fragment)) {
       return "bank-dashboard :: bankGrid";
     }
+    // Full-page render only: assemble the direct-booking "Kontobewegung" modal's data
+    // (REQ-BANK-023, #997). The CTA + modal live OUTSIDE the swapped bankGrid fragment, so a
+    // view-toggle swap never re-reads these; a successful booking re-renders the grid in place.
+    addMovementModalData(model);
     return "bank-dashboard";
+  }
+
+  /**
+   * Assembles the shared "Kontobewegung" direct-booking modal's catalog data for the dashboard's
+   * full-page render (REQ-BANK-023, #997). Every active account is both a bookable source and a
+   * transfer destination on this non-account-scoped surface (a same-account transfer is rejected by
+   * the backend, REQ-BANK-006); the holder registry, counterparty user lookup, all-kinds org-unit
+   * picklist and the in-game transfer-fee rate feed the modal's selectors and live fee preview. The
+   * modal books through the unchanged {@code /deposits} / {@code /withdrawals} / {@code /transfers}
+   * endpoints, so this adds no new endpoint, audit event or metric. Mirrors {@code
+   * BankRequestQueuePageController}.
+   *
+   * @param model the MVC model populated with the movement-modal catalogs and {@code canBook}
+   */
+  private void addMovementModalData(@NotNull Model model) {
+    PageResponse<BankAccountDto> accounts =
+        backendApiClient.get("/api/v1/bank/accounts?size=500", BANK_ACCOUNT_PAGE);
+    List<BankAccountDto> activeAccounts =
+        accounts == null
+            ? List.of()
+            : BankAccountOrder.byName(
+                accounts.content().stream().filter(a -> "ACTIVE".equals(a.status())).toList(),
+                BankAccountDto::name);
+    model.addAttribute("movementAccounts", activeAccounts);
+    model.addAttribute("transferTargets", activeAccounts);
+    model.addAttribute("canBook", !activeAccounts.isEmpty());
+    List<BankHolderDto> holders = backendApiClient.get("/api/v1/bank/holders", BANK_HOLDER_LIST);
+    model.addAttribute("holders", holders == null ? List.<BankHolderDto>of() : holders);
+    model.addAttribute(
+        "activeHolders",
+        holders == null
+            ? List.<BankHolderDto>of()
+            : holders.stream().filter(BankHolderDto::active).toList());
+    List<UserReferenceDto> users =
+        backendApiClient.get("/api/v1/users/lookup", USER_REFERENCE_LIST);
+    model.addAttribute("users", users == null ? List.<UserReferenceDto>of() : users);
+    List<OrgUnitMembershipOptionDto> allOrgUnits =
+        backendApiClient.get("/api/v1/org-units/active-all-kinds", ORG_UNIT_OPTION_LIST);
+    model.addAttribute(
+        "allOrgUnits", allOrgUnits == null ? List.<OrgUnitMembershipOptionDto>of() : allOrgUnits);
+    model.addAttribute("transferFeeRate", fetchTransferFeeRate());
   }
 
   /**

@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Bank – Filter und Ansichts-Umschalter als Checkboxen statt oranger Schalter.** Die Status-Filter der Buchungsanträge-Übersicht und die Ansichts-Optionen der Kontoübersicht (Tabellenansicht, nach Bereich gruppieren) sind jetzt Checkboxen und werden nicht mehr knallorange, wenn sie aktiv sind. Die Kachelansicht (A-Z) ist wieder der Standard, und das Umschalten von Ansicht und Bereichsgruppierung wirkt wieder zuverlässig; Verhalten und pro-Nutzer-Speicherung bleiben unverändert.
+
+- **Bank – „Kontobewegung"-Button in der Kontoübersicht; Verwaltung/Berechtigungen entfernt.** Die Kartellbank-Übersicht hat jetzt den „Kontobewegung"-Button für Direktbuchungen (wie die Buchungsanträge-Übersicht); nach einer Buchung aktualisiert sich die Übersicht ohne Neuladen. Die Buttons „Verwaltung" und „Berechtigungen" wurden aus der Kopfzeile entfernt und sind weiterhin über die Seitenleiste erreichbar.
+
+- **Bank – „Gebühr im Betrag enthalten" ist jetzt standardmäßig aktiv.** Im Kontobewegungs-Fenster ist die Option bei gebührenpflichtigen Buchungen (Auszahlung/Transfer) jetzt vorausgewählt: der eingegebene Betrag gilt als abgebuchter Betrag und der Empfänger erhält ihn abzüglich Gebühr. Wer die Gebühr obendrauf legen möchte, entfernt den Haken (bisher genau umgekehrt).
+
+- **Bank – Kontobewegung: Einzahlung ohne „Quellkonto".** Bei einer Einzahlung heißt das Kontofeld jetzt „Zielkonto" statt „Quellkonto" – eine Einzahlung hat kein Quellkonto, Geld von einem Konto wäre ein Transfer. Der Schalter „Kein Tool-Account" steht in den Kontobewegungs-Fenstern jetzt unter dem Einzahler-/Empfänger-Feld.
+
+### Fixed
+
+- **Bank – Überlappung im Kontonamen-Suchfeld behoben.** Im Suchfeld der Konto- und der Org-Einheits-Bank überlagerten sich Lupensymbol und Platzhaltertext („Nach Kontonamen filtern"); der Text beginnt jetzt rechts neben dem Symbol.
+
+- **UI – abgeschnittene „?"-Hilfetexte in Fenstern behoben.** Die „?"-Tooltips wurden in Fenstern mit Bildlauf abgeschnitten, wenn das „?" weit am Rand saß (z. B. „Quellkonto" im Kontobewegungs-Fenster); sie werden jetzt automatisch so verschoben, dass der Text vollständig im sichtbaren Bereich bleibt.
+
 ### Fixed
 
 - **Monitoring: Postgres-Logs nicht mehr durch fehlerhafte Exporter-Abfrage geflutet.** Der `stat_replication`-Collector von postgres_exporter fragt `slot_name` aus `pg_stat_replication` ab — eine Spalte, die es dort nicht gibt (Upstream-Bug bis v0.20.0). Beide DBs loggten pro Scrape `ERROR: column "slot_name" does not exist` (~5.760 Zeilen/Tag). Der Collector ist auf beiden Exportern per `--no-collector.stat_replication` abgeschaltet; auf den Single-Instance-DBs ohne Streaming-Replikation lieferte er ohnehin keine Metrik (ADR-0072).
@@ -9,8 +25,11 @@
 ### Security
 
 - **Deploy: der Host prüft jetzt selbst die Image-Signaturen vor dem Ausrollen.** `deploy.sh` verifiziert jeden aufgelösten Digest (Backend/Frontend/Ingest sowie die `config`- und `keycloak-spi`-Bundles) per `cosign` gegen die Signatur des `release-images`-Workflows, bevor gezogen, entpackt oder angewendet wird — die Host-Hälfte der Lieferketten-Absicherung (die CI-Hälfte ist `promote.yml`). Ein außerhalb von `promote.yml` verschobener `:stable`-Tag (etwa durch ein geleaktes `packages:write`-Token) wird dadurch auf dem Host abgelehnt statt ausgeführt; fail-closed (cosign erforderlich), Notausstieg `IRI_COSIGN_VERIFY=false` nur für einen Sigstore-Ausfall. `deploy.sh --check-only` verifiziert die Signaturen jetzt als wiederholbarer Preflight, ohne auszurollen (REQ-OPS-015, ADR-0075).
+
 - **Deploy: alle Produktionscontainer laufen jetzt mit gehärtetem Laufzeit-Profil.** Backend, Frontend, Ingest, Keycloak, Redis und beide Postgres-Instanzen erhalten dieselbe Härtung wie bisher nur der Edge-Proxy: `no-new-privileges`, `cap_drop: [ALL]` mit minimalem `cap_add` (die JVM-Dienste und Keycloak laufen ohnehin als non-root und brauchen keine Capabilities; Postgres/Redis behalten nur die für den Rechte-Wechsel nötigen) und ein `pids`-Limit. Reduziert den Schadensradius eines kompromittierten Containers deutlich (REQ-OPS-014).
+
 - **Release: Promotion nach `:stable` hat jetzt ein Freigabe- und ein CVE-Gate.** Der `promote`-Workflow ist an die GitHub-Umgebung `production` gebunden (erforderlicher Reviewer muss den Lauf freigeben, statt dass jeder mit Actions-Rechten prod umlegen kann) und führt vor dem Umhängen einen Trivy-Scan des exakten Digests aus — ein behebbarer HIGH/CRITICAL-Fund bricht die Promotion ab. Der Eingang `skip_vuln_gate=true` ist der bewusste Hotfix-Notausstieg (REQ-OPS-002). Einmalige Einrichtung des Reviewers: Settings → Environments → `production`.
+
 - **Deploy-Host: tiefere Absicherung des Deploy-Diensts, des Keystores und der Token-Überwachung.** Die `iri-deploy`-systemd-Unit erhält ein deutlich strengeres Sandbox-Profil (Seccomp-`SystemCallFilter`, leere `CapabilityBoundingSet`, eingeschränkte Adressfamilien, engeres `ReadWritePaths` ohne die DB-Bind-Mounts). Der geteilte `keystore.p12` liegt jetzt `0640` mit einer POSIX-ACL für uid 1000 statt world-readable `0644`. Und der GHCR-Pull-Token wird überwacht: `deploy.sh` schreibt sein Ablaufdatum als Metrik, neue Alerts `GhcrPullTokenExpiring`/`GhcrPullTokenExpired` warnen ~2 Wochen vorher bzw. beim Ablauf (REQ-OPS-016). Bootstrap-/Runbook-Schritte entsprechend angepasst (u. a. `setfacl`, `.expiry`-Datei, `acl`-Paket).
 
 ## [v1.1.4](https://github.com/krt-profit/basetool/releases/tag/v1.1.4) - 2026-07-05

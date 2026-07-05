@@ -41,28 +41,33 @@
                 <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-swap"/></svg>
                 <span th:text="#{bank.action.movement}">Kontobewegung</span>
             </button>
-            <!-- Parallel status filters (REQ-BANK-023): independent toggle chips, not exclusive tabs.
-                 Selection is persisted per user in localStorage by bank.js and replayed via the `status`
-                 query param; the chips live outside the swapped `requestQueue` fragment, so bank.js owns
-                 their pressed state. Default (no saved pref) is Ausstehend only, rendered server-side. -->
-            <div class="bank-head-actions" role="group" data-bank-status-filter-bar
+            <!-- Parallel status filters (REQ-BANK-023): independent checkboxes, not exclusive tabs and
+                 not filled toggle buttons. Selection is persisted per user in localStorage by bank.js
+                 and replayed via the `status` query param; the checkboxes live outside the swapped
+                 `requestQueue` fragment, so bank.js owns their checked state. Default (no saved pref)
+                 is Ausstehend only, rendered server-side. -->
+            <div class="bank-status-filter" role="group" data-bank-status-filter-bar
                  th:aria-label="#{bank.requests.filter.aria}">
-            <button type="button" class="btn btn-sm bank-status-chip" data-bank-status-filter="PENDING"
-                    th:classappend="${#lists.contains(selectedStatuses, 'PENDING')} ? ' btn--cta' : ' btn-ghost'"
-                    th:attr="aria-pressed=${#lists.contains(selectedStatuses, 'PENDING')}"
-                    th:text="#{bank.request.status.PENDING}">Ausstehend</button>
-            <button type="button" class="btn btn-sm bank-status-chip" data-bank-status-filter="CONFIRMED"
-                    th:classappend="${#lists.contains(selectedStatuses, 'CONFIRMED')} ? ' btn--cta' : ' btn-ghost'"
-                    th:attr="aria-pressed=${#lists.contains(selectedStatuses, 'CONFIRMED')}"
-                    th:text="#{bank.request.status.CONFIRMED}">Best&auml;tigt</button>
-            <button type="button" class="btn btn-sm bank-status-chip" data-bank-status-filter="REJECTED"
-                    th:classappend="${#lists.contains(selectedStatuses, 'REJECTED')} ? ' btn--cta' : ' btn-ghost'"
-                    th:attr="aria-pressed=${#lists.contains(selectedStatuses, 'REJECTED')}"
-                    th:text="#{bank.request.status.REJECTED}">Abgelehnt</button>
-            <button type="button" class="btn btn-sm bank-status-chip" data-bank-status-filter="CANCELLED"
-                    th:classappend="${#lists.contains(selectedStatuses, 'CANCELLED')} ? ' btn--cta' : ' btn-ghost'"
-                    th:attr="aria-pressed=${#lists.contains(selectedStatuses, 'CANCELLED')}"
-                    th:text="#{bank.request.status.CANCELLED}">Zur&uuml;ckgezogen</button>
+                <label class="bank-check-inline">
+                    <input type="checkbox" data-bank-status-filter="PENDING"
+                           th:checked="${#lists.contains(selectedStatuses, 'PENDING')}">
+                    <span th:text="#{bank.request.status.PENDING}">Ausstehend</span>
+                </label>
+                <label class="bank-check-inline">
+                    <input type="checkbox" data-bank-status-filter="CONFIRMED"
+                           th:checked="${#lists.contains(selectedStatuses, 'CONFIRMED')}">
+                    <span th:text="#{bank.request.status.CONFIRMED}">Best&auml;tigt</span>
+                </label>
+                <label class="bank-check-inline">
+                    <input type="checkbox" data-bank-status-filter="REJECTED"
+                           th:checked="${#lists.contains(selectedStatuses, 'REJECTED')}">
+                    <span th:text="#{bank.request.status.REJECTED}">Abgelehnt</span>
+                </label>
+                <label class="bank-check-inline">
+                    <input type="checkbox" data-bank-status-filter="CANCELLED"
+                           th:checked="${#lists.contains(selectedStatuses, 'CANCELLED')}">
+                    <span th:text="#{bank.request.status.CANCELLED}">Zur&uuml;ckgezogen</span>
+                </label>
             </div>
         </div>
     </div>

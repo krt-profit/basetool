@@ -505,6 +505,8 @@ design/delivery/audit rules as REQ-BANK-014. Employees cannot trigger this expor
 > bounded query (no per-account N+1); the bank stays org-unit-blind (REQ-BANK-008 —
 > `BankDashboardService` reads `OrgUnitRepository`, never `OwnerScopeService`). The account-name
 > filter (REQ-BANK-046) applies across every view.
+>
+> **Amended (2026-07-05) — view options as checkboxes + dashboard Kontobewegung CTA:** the two per-user view options are now **independent checkboxes** (a "Tabellenansicht" toggle and a "Nach Bereich gruppieren" toggle, `bank.dashboard.view.tableToggle` / `.groupToggle`) rather than filled orange segmented buttons — **both unchecked is the default card grid ordered A→Z**; each still persists per user in `localStorage` and replays through the `layout` / `group` query parameters on the `bankGrid` fragment swap (`bank.js` reads their `checked` state on `change`, not a button's `aria-pressed`). The dashboard header additionally gains the shared direct-booking **"Kontobewegung"** CTA + unified movement modal (REQ-BANK-023/-017, shown when an active account exists); a successful booking re-renders the `bankGrid` in place so balances and 30-day deltas refresh without a reload (`bankGrid` refresh target, REQ-FE-005). The **Verwaltung / Berechtigungen** links are removed from the header — they remain reachable from the sidebar (`nav.bank.manage` / `nav.bank.grants`) — while the three-month report stays bank-management-only. `BankPageController#addMovementModalData` assembles the modal's catalogs (active accounts, holders, counterparty users, org units, fee rate) only on the full-page render, not the `bankGrid` fragment swap, and reuses the unchanged `/deposits` · `/withdrawals` · `/transfers` endpoints, so this adds **no new endpoint, audit event or metric**.
 
 The bank landing page (`/bank`) is a **dashboard** in the design system's **D1 card
 grid** layout (`proposals/bank-dashboard-varianten.html`): one `.kpi-card` per visible
@@ -537,14 +539,20 @@ per-account N+1 (REQ-DATA-003).
   A→Z by name (case-insensitive), via the shared `BankAccountOrder` helper.
 - [x] 30-day delta equals the sum of postings in the window (test-pinned).
 - [x] Dashboard renders correctly on all four device classes (REQ-UI responsive rules).
-- [x] A client-side account-name live filter sits beside the Verwaltung button and hides
+- [x] A client-side account-name live filter sits beside the view-option checkboxes and hides
   non-matching cards as the user types (REQ-BANK-046).
+- [x] The two view options render as independent checkboxes (both unchecked = the default card grid
+  A→Z); the header carries the direct-booking Kontobewegung CTA + modal (when an active account
+  exists) and no longer the Verwaltung / Berechtigungen links (frontend `BankDashboardFilterMvcTest`).
 
 **Enforced by:** `BankPageControllerTest` (sparkline scaling), `BankAccountOrderTest` (A→Z
-case-insensitive, null-safe, original list untouched), single-statement repository reads · **Code:**
-`service/BankDashboardService`, `controller/BankPageController`, `controller/BankAccountOrder`
-(shared account ordering for `BankManagePageController` / `BankGrantsPageController` /
-`OrgUnitBankPageController`) · **Issues:** #556
+case-insensitive, null-safe, original list untouched), frontend `BankDashboardFilterMvcTest` (filter
+wiring, view-option checkboxes, Kontobewegung CTA/modal, Verwaltung/Berechtigungen absent),
+single-statement repository reads · **Code:** `service/BankDashboardService`,
+`controller/BankPageController` (`addMovementModalData`), `controller/BankAccountOrder` (shared
+account ordering for `BankManagePageController` / `BankGrantsPageController` /
+`OrgUnitBankPageController`), `templates/bank-dashboard.html`, `static/js/bank.js`, `static/css/bank.css`
+· **Issues:** #556
 
 ### REQ-BANK-017 — UI: design system, i18n, modals
 
@@ -589,6 +597,8 @@ in `messages.properties` / `_de` / `_en` under new `bank.*`, `admin.bank.*` and
 > via the generalised `fragments/scu-hint :: fieldHint(key)` marker instead of small sub-field text;
 > hint text stays in `bank.*` i18n keys and is mirrored onto `aria-label`. New keys:
 > `bank.action.movement`, `bank.modal.movement.title`, `bank.movement.field.sourceAccount(.placeholder/.hint)`.
+>
+> **Amended (2026-07-05) — Kontobewegung modal polish:** three refinements to the shared movement modal. (1) On the account-selectable variant (requests overview + dashboard) the account label follows the movement type (`bank.js` `syncMovementRows`): a **deposit** lands ON the account so its label is **Zielkonto** (a deposit has no source account — money from a source account would be a transfer), while a withdrawal/transfer keeps **Quellkonto**; the label carries per-type `data-label-*` (reusing `bank.field.targetAccount`). (2) The "kein Tool-Account" counterparty toggle (`bank-counterparty.html`) now sits **below** the Einzahler/Empfänger picker (and its external-name alternative) and above the shared Einheit row, matching reading order. (3) The **"?" field-hint tooltip** (`fragments/scu-hint`) no longer clips inside a scrolling `.krt-modal-body` (whose `overflow-y: auto` also clips horizontally): `common-handlers.js` measures the bubble against its clipping ancestor on hover/focus and sets a `--hint-shift` CSS variable that slides it back inside (the arrow counter-shifts to keep pointing at the disc). All three are UI-only — no endpoint, DTO, audit or monitoring change.
 
 **Acceptance**
 
@@ -793,6 +803,8 @@ raised against a `CLOSED` account.
 > data (active accounts, holders, counterparty users, fee rate) only on the **full-page** render, not
 > on the `requestQueue` fragment swap; a successful booking re-renders the queue in place (unchanged,
 > since a direct booking is not a request).
+>
+> **Amended (2026-07-05) — status filters as checkboxes:** the parallel status filters render as **independent checkboxes** (Ausstehend / Bestätigt / Abgelehnt / Zurückgezogen) instead of filled orange toggle chips, so an active filter no longer shouts. The behaviour is unchanged — each is independent, the selection persists per user in `localStorage` and replays through the multi-valued `status` query parameter (`NONE` sentinel = all off), defaulting to only Ausstehend — only the control and its styling change (`bank.js` reads each checkbox's `checked` state on `change`, not a button's `aria-pressed`).
 
 A **bank employee** confirms or rejects a `PENDING` request under
 `/api/v1/bank/requests/**` (`BANK_EMPLOYEE` URL+method gate). **Confirmation** records the
@@ -818,10 +830,10 @@ row is pessimistically locked and `@Version`-guarded so two decisions cannot dou
 - [x] The queue's account column leads with the account's display name (`accountName`) for
   readability, with the account number shown small underneath; the org-unit shorthand is dropped
   from this column (frontend `BankRequestQueuePageControllerMvcTest`).
-- [x] The queue is one table with parallel status-filter toggles (default Ausstehend), the selection
-  saved per user; an empty selection shows a distinct hint, and each request row expands to show its
-  Begründung + Notiz (frontend `BankRequestQueuePageControllerMvcTest`, `BankRequestControllerTest`,
-  `BankBookingRequestServiceTest`).
+- [x] The queue is one table with parallel status-filter checkboxes (default Ausstehend), the
+  selection saved per user; an empty selection shows a distinct hint, and each request row expands to
+  show its Begründung + Notiz (frontend `BankRequestQueuePageControllerMvcTest`,
+  `BankRequestControllerTest`, `BankBookingRequestServiceTest`).
 - [x] The queue header carries a page-level **Kontobewegung** CTA (when an active account exists) that
   opens the shared unified movement modal with a source-account selector and books directly via the
   existing endpoints — no new endpoint/audit/metric (frontend
@@ -1213,11 +1225,12 @@ superseding the carve-out model of ADR-0041):
   recorded legs, restoring the gross to the source).
 
 > **Amended (2026-07-05, #999) — two fee modes (on-top vs. fee-inclusive):** a fee-bearing booking
-> (`WITHDRAWAL`, holder-changing `TRANSFER`) carries a `feeInclusive` flag, **default `false`**. In
-> **both** modes the fee is `round(entered × rate)` — only the interpretation of the entered amount
-> differs:
+> (`WITHDRAWAL`, holder-changing `TRANSFER`) carries a `feeInclusive` flag whose **request-DTO
+> absent-default is `false`** (on-top; but the Kontobewegung UI now defaults the checkbox to checked —
+> see the fee-inclusive-default amendment below). In **both** modes the fee is `round(entered × rate)`
+> — only the interpretation of the entered amount differs:
 >
-> - **`feeInclusive = false` (default, unchanged, on-top):** the entered amount is what **arrives**;
+> - **`feeInclusive = false` (on-top):** the entered amount is what **arrives**;
 >   the fee is added on top; the source is debited `amount + fee`; the destination receives `amount`.
 > - **`feeInclusive = true` (inclusive):** the entered amount is the gross **debited**; the source is
 >   debited exactly `amount`; the destination/recipient receives `amount − fee`. A 500 000 inclusive
@@ -1229,7 +1242,8 @@ superseding the carve-out model of ADR-0041):
 > account legs still net to `−transfer_fee` (inclusive: source `−amount`, destination `+(amount −
 > fee)`). The flag is a **bank-staff choice at booking time only** — a booking **request** never
 > carries it, so confirmation always books on-top. It is exposed on the direct-booking Kontobewegung
-> modal (REQ-BANK-017) as a checkbox (default off, shown only where a fee applies), and the live
+> modal (REQ-BANK-017) as a checkbox (shown only where a fee applies; **default on** = fee-inclusive,
+> see the amendment below), and the live
 > preview shows the fee, the "wird abgebucht" gross and the "kommt an" net for the selected mode.
 > Audited in the existing `WITHDRAWAL_BOOKED` / `TRANSFER_BOOKED` detail (the fee amount plus an
 > `incl` marker; amounts only, no PII) — no new audit event and no monitoring change.
@@ -1240,6 +1254,8 @@ superseding the carve-out model of ADR-0041):
 > (`CARTEL`) account** (a single `−fee` account leg) — see REQ-BANK-031. Same rate, same
 > whole-aUEC rounding. The inclusive-fee mode above does **not** apply to the Umbuchung (the KRT
 > account, not a recipient, bears it). The `HOLDER_TRANSFER` audit detail now carries the fee.
+>
+> **Amended (2026-07-05) — fee-inclusive is the default Kontobewegung mode:** the direct-booking Kontobewegung modal's `feeInclusive` checkbox now defaults to **checked** (fee-inclusive), flipping the tool's default booking mode from on-top; `bank.js` re-applies the checked default whenever the toggle freshly becomes applicable (a fee-bearing withdrawal / holder-changing transfer) and the tool always transmits the checkbox value, so the request DTO's absent-default of `false` (on-top) now governs only direct API calls that omit the flag and the booking-request **confirmation** path (which still never carries the flag, so confirmation still books on-top). No backend, ledger or audit change — only the UI default and its hint text (`bank.field.feeInclusive.hint`, which now marks Aktiv/On as the Standard/default) flip.
 
 **Acceptance**
 
@@ -1256,7 +1272,8 @@ superseding the carve-out model of ADR-0041):
   entered amount and the destination/recipient receives `amount − fee` (500 000 → 497 500 at 0.5%);
   the account legs still net to `−transfer_fee`; `amount − fee ≤ 0` is rejected
   `BANK_FEE_EXCEEDS_AMOUNT`; a booking request never carries the flag (confirmation books on-top);
-  the preview shows "wird abgebucht" and "kommt an" for the selected mode; default is off.
+  the preview shows "wird abgebucht" and "kommt an" for the selected mode; the Kontobewegung UI
+  defaults the checkbox to on (fee-inclusive), while the request-DTO absent-default stays on-top.
 
 **Enforced by:** `BankLedgerServiceTest` (fee added on top / fee-inclusive debit + amount−fee to destination + BANK_FEE_EXCEEDS_AMOUNT, full amount to destination, overdraft against the actual debit, same-holder + holder-Umbuchung fee-free, legs net to −fee), `BankTransferFeeServiceTest` (rate resolution + whole-aUEC rounding + `totalDebit`), `BankLedgerIntegrityServiceTest`, `BankControllerSecurityTest` (rate endpoint), frontend `BankInPlaceFragmentMvcTest` (fee-inclusive toggle renders) / `BankPageControllerTest` / `BankManagePageControllerTest` / `BankAccountDetailFragmentMvcTest` / `BankHolderDetailFragmentMvcTest` · **Code:** `service/BankTransferFeeService` (`feeOn` + `totalDebit`), `service/BankLedgerService` (deposit/withdrawal/transfer/holder-transfer), `model/dto/request/BankWithdrawalRequest` + `BankTransferRequest` (`feeInclusive`), `model/BankTransaction#transferFee`, `controller/BankBookingController#getTransferFeeRate`, `repository/BankTransactionRepository` + `BankHolderPostingRepository` (integrity), `db/migration/V183`, frontend `controller/BankPageController` / `BankManagePageController`, `static/js/bank.js`, `templates/fragments/bank-movement-modal.html`, `templates/bank-account-detail.html` / `bank-manage.html` / `bank-holder-detail.html` · **ADR:** [ADR-0052](../adr/0052-bank-transfer-fee-borne-by-debited-account.md) (supersedes [ADR-0041](../adr/0041-bank-in-game-transfer-fee.md)) · **Issues:** #556, #999
 
@@ -1882,7 +1899,7 @@ column) · **Code:** `model/BankAccountType#requiresDebitJustification`, `model/
 
 The bank **dashboard** (`/bank`, REQ-BANK-016) and the org-unit **account list** (`/org-unit-bank`
 "Konten" tab, REQ-BANK-021) each carry a **client-side, live account-name filter**. A search box —
-on the dashboard **next to the Verwaltung button** in the header actions, on the org-unit page
+on the dashboard **beside the view-option checkboxes** in the header actions, on the org-unit page
 **directly above the account list** — filters the rendered account tiles/rows **in place as the user
 types**: an account whose **name** does not contain the entered term (case-insensitive substring) is
 hidden, matching ones stay. Matching is on the account **name** only (each item carries a
@@ -1894,8 +1911,9 @@ already-rendered items with **no server round-trip, no `krtFetch`, no page reloa
 therefore satisfies the live-update standard (REQ-FE-001) **by construction** and records **no audit
 event** — it mutates nothing, so the REQ-BANK-012 audited activities are unaffected. On the dashboard
 the box is shown to **every** viewer who sees at least one card (**bank employees included**), so it
-is **not** behind the `BANK_MANAGEMENT` gate that still guards the Verwaltung / Berechtigungen /
-Report buttons. On the org-unit page the box lives **inside** the swapped `orgUnitBank` fragment, so a
+is **not** behind the `BANK_MANAGEMENT` gate that still guards the three-month report button (the
+Verwaltung / Berechtigungen links now live in the sidebar, not the dashboard header, REQ-BANK-016).
+On the org-unit page the box lives **inside** the swapped `orgUnitBank` fragment, so a
 booking-request create/cancel swap re-renders it empty, resetting the filter to "show all". When the
 filter hides **every** account, a localized "no accounts match the filter" note
 (`bank.filter.empty`) is revealed — distinct from the server-rendered "no accounts at all" empty
@@ -1912,7 +1930,8 @@ state, which a genuinely empty list keeps.
 - [x] Filtering every account down to none reveals the localized `bank.filter.empty` note; a
   genuinely empty account list keeps its own empty state instead.
 - [x] The dashboard filter renders for bank employees (not gated behind `BANK_MANAGEMENT`), while the
-  Verwaltung / Berechtigungen / Report buttons stay management-only.
+  three-month report button stays management-only (Verwaltung / Berechtigungen live in the sidebar,
+  REQ-BANK-016).
 
 **Enforced by:** `BankPageControllerTest` (dashboard renders the filter box + `data-filter-name` +
 filter-empty note, employee perspective included), `OrgUnitBankPageControllerMvcTest` (Konten list

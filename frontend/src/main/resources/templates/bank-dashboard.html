@@ -23,7 +23,7 @@
     </nav>
 </header>
 
-<main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-refresh-error=#{bank.refresh.failed},data-user-id=${#authentication.name}">
+<main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-user-id=${#authentication.name},data-transfer-fee-rate=${transferFeeRate}">
     <div class="greeting hud-box flex-between">
         <div>
             <h1 th:text="#{bank.dashboard.title}">Kartellbank</h1>
@@ -35,46 +35,43 @@
                 <span class="utc-time" th:text="${now}">2026-06-12T14:02:00Z</span>
             </p>
         </div>
-        <!-- Header actions. The account-name live filter (REQ-BANK-046) and the view toggles
-             (REQ-BANK-016: card/table layout + alphabetical/by-Bereich grouping, persisted per user)
-             are visible to EVERY viewer who sees at least one card; the
-             Verwaltung/Berechtigungen/Report buttons stay bank-management only. -->
+        <!-- Header actions. The account-name live filter (REQ-BANK-046) and the two view checkboxes
+             (REQ-BANK-016: table-view + by-Bereich grouping, persisted per user; the card grid ordered
+             A→Z is the default when both are unchecked) are visible to EVERY viewer who sees at least
+             one card. The direct-booking Kontobewegung CTA shows for any bank employee once a bookable
+             account exists; the three-month report stays bank-management only. Verwaltung and
+             Berechtigungen are reached from the sidebar (nav.bank.manage / nav.bank.grants), so they
+             are no longer duplicated in the header. -->
         <div class="bank-head-actions">
-            <!-- View toggles: two independent segmented controls (layout + grouping). bank.js owns
-                 their pressed state, persists the choice per user in localStorage and re-fetches the
-                 bankGrid fragment on change. -->
+            <!-- View options: two independent checkboxes (table view + group by Bereich). bank.js owns
+                 their checked state, persists the choice per user in localStorage and re-fetches the
+                 bankGrid fragment on change. Both unchecked = the default card grid ordered A→Z. -->
             <th:block th:if="${!#lists.isEmpty(cards)}">
-                <div class="bank-view-toggles" data-bank-view-toggles>
-                    <div class="bank-seg" role="group" th:aria-label="#{bank.dashboard.view.layout}">
-                        <button type="button" class="btn btn-sm bank-view-btn" data-bank-view-layout="card"
-                                th:classappend="${layout == 'card'} ? ' btn--cta' : ' btn-ghost'"
-                                th:attr="aria-pressed=${layout == 'card'}"
-                                th:text="#{bank.dashboard.view.card}">Kacheln</button>
-                        <button type="button" class="btn btn-sm bank-view-btn" data-bank-view-layout="table"
-                                th:classappend="${layout == 'table'} ? ' btn--cta' : ' btn-ghost'"
-                                th:attr="aria-pressed=${layout == 'table'}"
-                                th:text="#{bank.dashboard.view.table}">Tabelle</button>
-                    </div>
-                    <div class="bank-seg" role="group" th:aria-label="#{bank.dashboard.view.grouping}">
-                        <button type="button" class="btn btn-sm bank-view-btn" data-bank-view-group="alpha"
-                                th:classappend="${group == 'alpha'} ? ' btn--cta' : ' btn-ghost'"
-                                th:attr="aria-pressed=${group == 'alpha'}"
-                                th:text="#{bank.dashboard.view.alpha}">A–Z</button>
-                        <button type="button" class="btn btn-sm bank-view-btn" data-bank-view-group="bereich"
-                                th:classappend="${group == 'bereich'} ? ' btn--cta' : ' btn-ghost'"
-                                th:attr="aria-pressed=${group == 'bereich'}"
-                                th:text="#{bank.dashboard.view.bereich}">Bereiche</button>
-                    </div>
+                <div class="bank-view-toggles" role="group" data-bank-view-toggles
+                     th:aria-label="#{bank.dashboard.view.aria}">
+                    <label class="bank-check-inline">
+                        <input type="checkbox" data-bank-view-layout data-testid="bank-view-layout"
+                               th:checked="${layout == 'table'}">
+                        <span th:text="#{bank.dashboard.view.tableToggle}">Tabellenansicht</span>
+                    </label>
+                    <label class="bank-check-inline">
+                        <input type="checkbox" data-bank-view-group data-testid="bank-view-group"
+                               th:checked="${group == 'bereich'}">
+                        <span th:text="#{bank.dashboard.view.groupToggle}">Nach Bereich gruppieren</span>
+                    </label>
                 </div>
                 <th:block th:replace="~{fragments/components :: bankAccSearch('bank-acc-filter', '#bank-grid-results', '#bank-acc-filter-empty')}"></th:block>
             </th:block>
+            <!-- Direct-booking CTA (REQ-BANK-017/-023): a bank employee books a deposit/withdrawal/
+                 transfer straight against a chosen account via the shared unified movement modal.
+                 Shown whenever an active account exists (canBook). -->
+            <button type="button" class="btn btn--cta" th:if="${canBook}"
+                    data-trigger="open-modal-display" data-modal-id="bank-movement-modal"
+                    data-testid="bank-movement-open">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-swap"/></svg>
+                <span th:text="#{bank.action.movement}">Kontobewegung</span>
+            </button>
             <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)">
-                <a th:href="@{/bank/manage}" class="btn btn-ghost" data-testid="bank-manage-link">
-                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-gear"/></svg>
-                    <span th:text="#{bank.dashboard.manage}">Verwaltung</span>
-                </a>
-                <a th:href="@{/bank/grants}" class="btn btn-ghost" data-testid="bank-grants-link"
-                   th:text="#{bank.dashboard.grants}">Berechtigungen</a>
                 <button type="button" class="btn btn-ghost bank-download-btn"
                         data-download-url="/api/proxy/bank/export/three-month-report"
                         data-filename="bank-3-monats-report.pdf"
@@ -140,6 +137,12 @@
             </p>
         </div>
     </div>
+
+    <!-- Direct-booking movement modal (REQ-BANK-017/-023): outside the swapped bankGrid fragment, with
+         a source-account selector; a successful booking re-renders the account grid in place so the
+         balances and 30-day deltas refresh without a reload, and shows the saved toast. -->
+    <th:block th:if="${canBook}"
+              th:replace="~{fragments/bank-movement-modal :: movementModal('bank-movement-modal', 'bankGrid', null, true, false, true, true, true)}"></th:block>
 </main>
 
 

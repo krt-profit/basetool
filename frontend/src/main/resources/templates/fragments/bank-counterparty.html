@@ -25,16 +25,6 @@
      data-counterparty-section th:attr="data-movement-types=${movementType}"
      th:hidden="${movementType != 'DEPOSIT'}">
 
-    <!-- "not a tool user" toggle (#994): reveals the free-text name + widens the unit picklist. -->
-    <div class="bank-form-row">
-        <label class="bank-check-label">
-            <input type="checkbox" disabled data-role="bank-cp-external-toggle"
-                   th:attr="data-testid=${prefix} + '-external'">
-            <span th:text="#{bank.field.counterparty.external}">Kein Tool-Account</span>
-            <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.field.counterparty.external.hint')}"></th:block>
-        </label>
-    </div>
-
     <!-- Registered counterparty (default): the tool-user lookup + membership-filtered unit. -->
     <div class="bank-form-row" data-cp-registered-row>
         <label th:for="${prefix} + '-user'">
@@ -59,6 +49,18 @@
                data-counterparty-name th:attr="data-testid=${prefix} + '-name'"
                th:placeholder="#{bank.field.counterparty.externalName.placeholder}">
         <span class="bank-field-error" data-error-for="counterpartyExternalName"></span>
+    </div>
+
+    <!-- "not a tool user" toggle (#994): reveals the free-text name + widens the unit picklist. Sits
+         directly under the Einzahler/Empfaenger picker it swaps (it toggles the registered vs.
+         free-text alternative above), before the shared Einheit row below. -->
+    <div class="bank-form-row">
+        <label class="bank-check-label">
+            <input type="checkbox" disabled data-role="bank-cp-external-toggle"
+                   th:attr="data-testid=${prefix} + '-external'">
+            <span th:text="#{bank.field.counterparty.external}">Kein Tool-Account</span>
+            <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.field.counterparty.external.hint')}"></th:block>
+        </label>
     </div>
 
     <!-- Unit: registered -> the user's memberships (bank.js), external -> all org units (bank.js
