@@ -100,6 +100,9 @@ logging:
   level:
     root: INFO
     io.github.resilience4j: INFO
+    # REQ-OBS-013: demote OTLP span-export failures to WARN so an unreachable Alloy/Tempo does not
+    # inflate logback_events_total{level="error"} and falsely trip the LogbackErrorSpike alert.
+    io.opentelemetry.exporter: WARN
 
 # Actuator: expose `health` (Docker HEALTHCHECK / compose service_healthy gating; bare status)
 # plus `prometheus` for the monitoring scrape (REQ-OBS-005). `/actuator/prometheus` is NOT

@@ -338,8 +338,12 @@ public class NotificationPageController {
    * ReauthenticationRequiredException#isReauthSignal}), a named {@code reauth} event carrying the
    * Keycloak login path is pushed so the browser can redirect the whole window instead of entering
    * an {@code EventSource} reconnect loop against a dead session; the stream then completes
-   * cleanly. Any other error completes the emitter with the error (the browser's polling fallback
-   * keeps the badge fresh).
+   * cleanly. Any other error also completes the emitter <b>cleanly</b> (not {@code
+   * completeWithError}): SSE push is best-effort (REQ-NOTIF-010) and the unread-count poll is the
+   * guaranteed fallback, so a dropped/unavailable backend stream is not an application fault.
+   * {@code completeWithError} would re-dispatch the error through the MVC {@code @ExceptionHandler}
+   * and log a spurious ERROR per dropped stream — the dominant source of frontend ERROR-log noise
+   * while the backend/Keycloak has a blip; a clean completion just lets the browser reconnect.
    *
    * @param emitter the browser-facing emitter to terminate
    * @param error the error raised by the backend stream subscription
@@ -356,7 +360,13 @@ public class NotificationPageController {
       }
       return;
     }
-    emitter.completeWithError(error);
+    // Best-effort SSE: complete cleanly (browser reconnects, poll keeps the badge fresh) instead of
+    // completeWithError(), which re-dispatches through the MVC exception handler and logs an ERROR
+    // for every transient backend-stream drop (REQ-NOTIF-010). DEBUG only.
+    log.debug(
+        "Notification stream dropped ({}); completing cleanly, poll fallback keeps the badge fresh",
+        error.getClass().getSimpleName());
+    emitter.complete();
   }
 
   private static void forward(SseEmitter emitter, ServerSentEvent<String> event) {

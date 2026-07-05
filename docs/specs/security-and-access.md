@@ -698,6 +698,55 @@ unchanged and remains the precise, per-subject layer behind this coarse edge net
 `monitoring/loki/rules/fake/basetool-log-alerts.yml` (`EdgeRateLimitSpike`) · **Runbook:**
 `docs/deployment.md` → *Edge rate limiting*
 
+### REQ-SEC-024 — Keycloak resilience: internal JWKS + retryable 503 on IdP outage
+
+Both JWT resource servers — the backend and the ingest gateway (REQ-SEC-001) — fetch Keycloak's
+JWKS to validate every token. Two hardening rules keep a transient Keycloak / edge / Docker-DNS blip
+from masquerading as an application outage (the failure mode that drove the frontend
+`Http5xxRateHigh` incident: a slow / unreachable Keycloak turned JWKS retrieval into an
+`AuthenticationServiceException` → `500` on every authenticated endpoint):
+
+- **Internal JWKS (opt-in).** Setting `app.security.jwt.jwk-set-uri` (env `KEYCLOAK_JWK_SET_URI`)
+  points key retrieval at the **internal** Keycloak connector
+  (`https://keycloak:18443/realms/iri/protocol/openid-connect/certs`), reusing the `keycloak-trust`
+  SSL bundle (REQ-SEC-014 — so the cert's SAN must carry `dns:keycloak`) instead of hairpinning
+  through the public edge (NPM). The `iss` claim is still validated against the **public** issuer
+  Keycloak stamps into tokens, so the split-horizon (public `iss`, internal key fetch) is
+  transparent. Because `NimbusJwtDecoder.withJwkSetUri` defaults to **RS256-only** (unlike
+  issuer-location discovery, which derives the accepted algorithms from the live JWKS), the
+  internal-JWKS path explicitly widens the accepted set to the full asymmetric `SignatureAlgorithm`
+  set, so enabling it never 401s a PS\*/ES\*-signed token (no HMAC is added, so no algorithm
+  confusion). Empty (the default) preserves the auto-configured, issuer-derived decoder
+  byte-for-byte — the knob is off until an operator opts in, and the `test` profile's placeholder
+  issuer is unaffected.
+- **IdP unavailable → retryable 503, not 500.** When the JWKS fetch fails on a transport / upstream
+  problem (timeout, connection error, `UnresolvedAddressException` on a Docker-DNS strand, or a
+  Keycloak 5xx), the re-thrown `AuthenticationServiceException` — which otherwise escapes as an
+  opaque `500` on every authenticated endpoint (Micrometer `uri="UNKNOWN"`) — is re-mapped to a
+  retryable `503 Service Unavailable` (RFC-7807 problem+json, `Retry-After`, code
+  `SERVICE_UNAVAILABLE`), logged at WARN (not ERROR) and counted on
+  `basetool_http_error_total{code="SERVICE_UNAVAILABLE"}`. Genuine token rejections are untouched —
+  bad/expired tokens stay `401`, missing roles stay `403`.
+
+**Acceptance**
+
+- [ ] With `jwk-set-uri` set, tokens validate against keys fetched from the internal Keycloak over
+  the pinned bundle while the public `iss` still validates; with it empty, decoder behaviour is
+  unchanged.
+- [ ] The internal-JWKS decoder accepts an `ES256` (and `PS*`) token, not just `RS256`.
+- [ ] A JWKS timeout / 5xx / DNS failure yields `503` + `Retry-After` (not `500`), logged at WARN
+  and counted on `basetool_http_error_total{code="SERVICE_UNAVAILABLE"}`.
+- [ ] An expired/invalid bearer token still yields `401`; a caller lacking the required role still
+  yields `403` (the 503 re-map never swallows an auth decision).
+
+**Enforced by (both resource servers):** backend `SecurityConfig#resourceServerJwtDecoder` +
+`KeycloakTrustSupport` + `IdentityProviderUnavailableFilter` (tests:
+`IdentityProviderUnavailableFilterTest`, `SecurityConfigInternalJwksDecoderTest`) ·
+`BasetoolErrorController` (503 problem mapping) · the **ingest gateway's** own package-local
+`KeycloakTrustSupport` / `IdentityProviderUnavailableFilter` + matching tests (it cannot depend on
+backend classes across the module boundary, so the pattern is duplicated) · `application-prod.yml`
+in both modules (`app.security.jwt.jwk-set-uri` + the `keycloak-trust` bundle).
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the
