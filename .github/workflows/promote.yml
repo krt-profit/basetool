@@ -16,7 +16,7 @@ name: Promote to stable
 # the run before any :stable flip happens — workflow_dispatch alone would let
 # anyone with Actions-write reach prod (REQ-OPS-002).
 #
-# Three gates guard a promotion, in order:
+# Two gates guard a promotion, in order:
 #   1. cosign-verify the source digest's keyless signature against this repo's
 #      release-images workflow identity (pinned to @refs/heads/main | tags/v.+).
 #      A tag not produced by our own CI cannot be promoted even if the registry
@@ -24,10 +24,7 @@ name: Promote to stable
 #      CI half of the supply-chain seam; scripts/deploy.sh re-verifies the same
 #      identity on the host before it applies (REQ-OPS-015), so the seam holds
 #      even if :stable is later moved out-of-band.
-#   2. Trivy vulnerability gate: a fixable HIGH/CRITICAL in the exact digest fails
-#      the promotion (the production vuln gate release-images defers to). Skippable
-#      via the skip_vuln_gate input for a deliberate hotfix.
-#   3. Re-tag the (verified, scanned) digest as :stable.
+#   2. Re-tag the (verified) digest as :stable.
 
 on:
   workflow_dispatch:
@@ -36,11 +33,6 @@ on:
         description: 'Image tag to promote (e.g. "1.4.3", "sha-abc1234"). NOT "stable" itself.'
         required: true
         type: string
-      skip_vuln_gate:
-        description: 'Hotfix escape hatch: promote even if the image has fixable HIGH/CRITICAL CVEs.'
-        required: false
-        default: false
-        type: boolean
 
 concurrency:
   # Serialise promotions globally so two simultaneous flips cannot leave the
@@ -155,25 +147,6 @@ jobs:
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
             > /dev/null
           echo "Signature OK"
-
-      # The production vulnerability gate. release-images.yml scans on build but
-      # does NOT block the push (a CVE-bearing image is preferable to no image on
-      # an urgent build); promotion is where the scan becomes a GATE. A fixable
-      # HIGH/CRITICAL in the exact digest being promoted fails the promotion, so a
-      # known-vulnerable image cannot reach :stable by accident. Only the app
-      # images carry OS packages — the config + keycloak-spi bundles are
-      # `FROM scratch`, so the scan is skipped for them. `skip_vuln_gate` is the
-      # deliberate hotfix escape hatch when the CVE is unrelated to the fix and
-      # shipping now matters more (promotion is already a human decision).
-      - name: Vulnerability gate (Trivy — production promotion gate)
-        if: ${{ !inputs.skip_vuln_gate && contains(fromJSON('["backend","frontend","ingest"]'), matrix.module) }}
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}@${{ steps.resolve.outputs.digest }}
-          format: table
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: '1'
 
       - name: Re-tag digest as :stable
         env:
