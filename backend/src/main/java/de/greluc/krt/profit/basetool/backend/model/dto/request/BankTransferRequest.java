@@ -47,6 +47,12 @@ import org.jetbrains.annotations.Nullable;
  *     {@linkplain
  *     de.greluc.krt.profit.basetool.backend.model.BankAccountType#requiresDebitJustification()
  *     mandates a reason}, optional otherwise
+ * @param feeInclusive fee-mode toggle (REQ-BANK-033, #999), effective only on a holder-changing
+ *     (fee-bearing) transfer: {@code false} (default, unchanged) means the entered {@code amount}
+ *     arrives at the destination and the fee is added on top — the source is debited {@code amount
+ *     + fee}; {@code true} means the entered {@code amount} is the gross debited and the
+ *     destination receives {@code amount - fee}. A bank-staff choice at booking time only — a
+ *     transfer <em>request</em> never carries it (confirmation always books on-top)
  */
 public record BankTransferRequest(
     @NotNull UUID sourceAccountId,
@@ -55,13 +61,15 @@ public record BankTransferRequest(
     @NotNull UUID destinationHolderId,
     @NotNull @DecimalMin("1") @DecimalMax("1000000000000.0") @WholeNumber BigDecimal amount,
     @Nullable @Size(max = 500) String note,
-    @Nullable @Size(max = 500) String justification) {
+    @Nullable @Size(max = 500) String justification,
+    boolean feeInclusive) {
 
   /**
    * Convenience constructor for a transfer without a recorded justification (the pre-REQ-BANK-045
-   * shape), delegating to the canonical constructor with {@code justification} {@code null}.
-   * Inbound JSON is always deserialized via the canonical (all-component) constructor, so this
-   * overload only serves programmatic callers.
+   * shape) and the default on-top fee mode (REQ-BANK-033), delegating to the canonical constructor
+   * with {@code justification} {@code null} and {@code feeInclusive} {@code false}. Inbound JSON is
+   * always deserialized via the canonical (all-component) constructor, so this overload only serves
+   * programmatic callers.
    *
    * @param sourceAccountId the account the value leaves
    * @param sourceHolderId the player whose stash shrinks
@@ -84,6 +92,7 @@ public record BankTransferRequest(
         destinationHolderId,
         amount,
         note,
-        null);
+        null,
+        false);
   }
 }

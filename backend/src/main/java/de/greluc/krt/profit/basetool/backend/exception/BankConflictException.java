@@ -140,6 +140,13 @@ public final class BankConflictException extends AppException {
    */
   public static final String CODE_BANK_JUSTIFICATION_REQUIRED = "BANK_JUSTIFICATION_REQUIRED";
 
+  /**
+   * Fee-inclusive withdrawal/transfer (REQ-BANK-033, #999) whose entered amount does not exceed the
+   * in-game fee, so nothing would arrive at the recipient/destination ({@code amount - fee <= 0}).
+   * Raise the amount. Never thrown in the default on-top fee mode.
+   */
+  public static final String CODE_BANK_FEE_EXCEEDS_AMOUNT = "BANK_FEE_EXCEEDS_AMOUNT";
+
   /** The stable machine-readable problem code, one of the {@code CODE_BANK_*} constants. */
   private final String code;
 

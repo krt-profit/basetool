@@ -18,6 +18,8 @@
 
 - **Bank – ein „Kontobewegung"-Button statt Einzahlen/Auszahlen/Transfer.** Die drei getrennten Buttons auf der Kontoseite sind zu einem „Kontobewegung"-Button zusammengefasst; die Art wird im Modal ausgewählt. Denselben Button gibt es jetzt auch in der Buchungsanträge-Übersicht, wo Bankmitarbeiter direkt gegen ein gewähltes Konto buchen. Die Feld-Hinweise im Buchungsfenster stehen nicht mehr klein unter den Feldern, sondern erscheinen als „?"-Tooltip beim Überfahren – auch die Optionalitäts-Hinweise. Endpunkte, Auditierung und Monitoring bleiben unverändert (#997).
 
+- **Bank – Option „Gebühr im Betrag enthalten" bei gebührenpflichtigen Buchungen.** Neue Auswahl im Kontobewegungs-Fenster (Auszahlung/Transfer, standardmäßig aus): ist sie aktiv, gilt der eingegebene Betrag als abgebuchter Betrag und der Empfänger erhält den Betrag abzüglich Gebühr (z. B. 500.000 abgebucht → 497.500 kommen an); aus (Standard) bleibt es wie bisher, die Gebühr kommt oben drauf. Die Live-Vorschau zeigt „wird abgebucht" und „kommt an"; ein Betrag, der die Gebühr nicht übersteigt, wird abgelehnt (#999).
+
 
 ## [v1.1.3](https://github.com/krt-profit/basetool/releases/tag/v1.1.3) - 2026-07-05
 

@@ -53080,6 +53080,9 @@
           "counterpartyOrgUnitId" : {
             "type" : "string",
             "format" : "uuid"
+          },
+          "feeInclusive" : {
+            "type" : "boolean"
           }
         },
         "required" : [ "accountId", "amount", "holderId" ]
@@ -53137,6 +53140,9 @@
             "type" : "string",
             "maxLength" : 500,
             "minLength" : 0
+          },
+          "feeInclusive" : {
+            "type" : "boolean"
           }
         },
         "required" : [ "amount", "destinationAccountId", "destinationHolderId", "sourceAccountId", "sourceHolderId" ]

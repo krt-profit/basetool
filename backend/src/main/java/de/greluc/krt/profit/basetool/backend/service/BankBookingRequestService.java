@@ -418,7 +418,11 @@ public class BankBookingRequestService {
                       request.getNote(),
                       request.getJustification(),
                       requesterId,
-                      counterpartyOrgUnitId));
+                      counterpartyOrgUnitId,
+                      // A booking request never carries the fee-inclusive flag (REQ-BANK-033,
+                      // #999);
+                      // confirmation always books the default on-top fee mode.
+                      false));
           case TRANSFER -> {
             BankAccount target = request.getTargetAccount();
             if (target == null || destinationHolderId == null) {
@@ -440,7 +444,10 @@ public class BankBookingRequestService {
                     destinationHolderId,
                     request.getAmount(),
                     request.getNote(),
-                    request.getJustification()),
+                    request.getJustification(),
+                    // A booking request never carries the fee-inclusive flag (REQ-BANK-033, #999);
+                    // confirmation always books the default on-top fee mode.
+                    false),
                 true);
           }
         };

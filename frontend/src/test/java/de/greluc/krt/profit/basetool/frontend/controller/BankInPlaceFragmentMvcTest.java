@@ -179,6 +179,12 @@ class BankInPlaceFragmentMvcTest {
         .andExpect(content().string(Matchers.containsString("data-testid=\"bank-movement-type\"")))
         // Field hints are inline "?" tooltip markers, not sub-field text.
         .andExpect(content().string(Matchers.containsString("field-hint-marker")))
+        // The fee-inclusive toggle (REQ-BANK-033, #999) renders in the modal, hidden by default
+        // (bank.js reveals it only for a fee-bearing withdrawal/transfer).
+        .andExpect(
+            content()
+                .string(Matchers.containsString("data-testid=\"bank-movement-fee-inclusive\"")))
+        .andExpect(content().string(Matchers.containsString("data-fee-inclusive-row")))
         .andExpect(
             content().string(Matchers.not(Matchers.containsString("id=\"bank-deposit-modal\""))));
   }

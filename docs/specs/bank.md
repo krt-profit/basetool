@@ -1188,6 +1188,28 @@ superseding the carve-out model of ADR-0041):
   change is needed. The `REVERSAL` mirror invariant is unchanged (a reversal negates the actual
   recorded legs, restoring the gross to the source).
 
+> **Amended (2026-07-05, #999) — two fee modes (on-top vs. fee-inclusive):** a fee-bearing booking
+> (`WITHDRAWAL`, holder-changing `TRANSFER`) carries a `feeInclusive` flag, **default `false`**. In
+> **both** modes the fee is `round(entered × rate)` — only the interpretation of the entered amount
+> differs:
+>
+> - **`feeInclusive = false` (default, unchanged, on-top):** the entered amount is what **arrives**;
+>   the fee is added on top; the source is debited `amount + fee`; the destination receives `amount`.
+> - **`feeInclusive = true` (inclusive):** the entered amount is the gross **debited**; the source is
+>   debited exactly `amount`; the destination/recipient receives `amount − fee`. A 500 000 inclusive
+>   withdrawal at 0.5% debits 500 000 and the recipient gets 497 500.
+>
+> The overdraft guard runs against whatever is actually debited (`amount + fee` on-top, `amount`
+> inclusive). An inclusive booking whose `amount − fee ≤ 0` is rejected `BANK_FEE_EXCEEDS_AMOUNT`
+> (409). The ledger-integrity invariant is preserved in both modes: a holder-changing transfer's
+> account legs still net to `−transfer_fee` (inclusive: source `−amount`, destination `+(amount −
+> fee)`). The flag is a **bank-staff choice at booking time only** — a booking **request** never
+> carries it, so confirmation always books on-top. It is exposed on the direct-booking Kontobewegung
+> modal (REQ-BANK-017) as a checkbox (default off, shown only where a fee applies), and the live
+> preview shows the fee, the "wird abgebucht" gross and the "kommt an" net for the selected mode.
+> Audited in the existing `WITHDRAWAL_BOOKED` / `TRANSFER_BOOKED` detail (the fee amount plus an
+> `incl` marker; amounts only, no PII) — no new audit event and no monitoring change.
+
 **Acceptance**
 
 - [x] A withdrawal of `A` records `fee = round(A × rate)`, debits the account and the holder the
@@ -1199,8 +1221,13 @@ superseding the carve-out model of ADR-0041):
   amount.
 - [x] The booking modals show a live "Gebühr / wird abgebucht" preview (fee plus the gross debited)
   as the amount is typed; the rate is the shared `operation.transfer_fee_rate`.
+- [x] A **fee-inclusive** (`feeInclusive = true`) withdrawal/transfer (#999) debits the source the
+  entered amount and the destination/recipient receives `amount − fee` (500 000 → 497 500 at 0.5%);
+  the account legs still net to `−transfer_fee`; `amount − fee ≤ 0` is rejected
+  `BANK_FEE_EXCEEDS_AMOUNT`; a booking request never carries the flag (confirmation books on-top);
+  the preview shows "wird abgebucht" and "kommt an" for the selected mode; default is off.
 
-**Enforced by:** `BankLedgerServiceTest` (fee added on top, full amount to destination, overdraft against the gross, same-holder + holder-Umbuchung fee-free, legs net to −fee), `BankTransferFeeServiceTest` (rate resolution + whole-aUEC rounding + `totalDebit`), `BankLedgerIntegrityServiceTest`, `BankControllerSecurityTest` (rate endpoint), frontend `BankPageControllerTest` / `BankManagePageControllerTest` / `BankAccountDetailFragmentMvcTest` / `BankHolderDetailFragmentMvcTest` · **Code:** `service/BankTransferFeeService` (`feeOn` + `totalDebit`), `service/BankLedgerService` (deposit/withdrawal/transfer/holder-transfer), `model/BankTransaction#transferFee`, `controller/BankBookingController#getTransferFeeRate`, `repository/BankTransactionRepository` + `BankHolderPostingRepository` (integrity), `db/migration/V183`, frontend `controller/BankPageController` / `BankManagePageController`, `static/js/bank.js`, `templates/bank-account-detail.html` / `bank-manage.html` / `bank-holder-detail.html` · **ADR:** [ADR-0052](../adr/0052-bank-transfer-fee-borne-by-debited-account.md) (supersedes [ADR-0041](../adr/0041-bank-in-game-transfer-fee.md)) · **Issues:** #556
+**Enforced by:** `BankLedgerServiceTest` (fee added on top / fee-inclusive debit + amount−fee to destination + BANK_FEE_EXCEEDS_AMOUNT, full amount to destination, overdraft against the actual debit, same-holder + holder-Umbuchung fee-free, legs net to −fee), `BankTransferFeeServiceTest` (rate resolution + whole-aUEC rounding + `totalDebit`), `BankLedgerIntegrityServiceTest`, `BankControllerSecurityTest` (rate endpoint), frontend `BankInPlaceFragmentMvcTest` (fee-inclusive toggle renders) / `BankPageControllerTest` / `BankManagePageControllerTest` / `BankAccountDetailFragmentMvcTest` / `BankHolderDetailFragmentMvcTest` · **Code:** `service/BankTransferFeeService` (`feeOn` + `totalDebit`), `service/BankLedgerService` (deposit/withdrawal/transfer/holder-transfer), `model/dto/request/BankWithdrawalRequest` + `BankTransferRequest` (`feeInclusive`), `model/BankTransaction#transferFee`, `controller/BankBookingController#getTransferFeeRate`, `repository/BankTransactionRepository` + `BankHolderPostingRepository` (integrity), `db/migration/V183`, frontend `controller/BankPageController` / `BankManagePageController`, `static/js/bank.js`, `templates/fragments/bank-movement-modal.html`, `templates/bank-account-detail.html` / `bank-manage.html` / `bank-holder-detail.html` · **ADR:** [ADR-0052](../adr/0052-bank-transfer-fee-borne-by-debited-account.md) (supersedes [ADR-0041](../adr/0041-bank-in-game-transfer-fee.md)) · **Issues:** #556, #999
 
 ### REQ-BANK-034 — Per-account responsible holder (derived, "Kontoverantwortliche/r")
 
