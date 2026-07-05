@@ -57,6 +57,7 @@ class UexSchedulerTest {
   @Mock private UexCategoryRefService uexCategoryRefService;
   @Mock private UexItemSyncService uexItemSyncService;
   @Mock private UexItemPriceSyncService uexItemPriceSyncService;
+  @Mock private MasterDataCacheEvictionService masterDataCacheEvictionService;
 
   // A real coordinator (spied so it can be told the gate is busy) — its default behaviour runs the
   // sweep synchronously, so the existing ordering/verify tests below exercise the real steps.
@@ -190,6 +191,29 @@ class UexSchedulerTest {
   }
 
   @Test
+  void scheduleTask_evictsUexSyncedMasterDataAfterSweep() {
+    // When the sweep runs to completion
+    scheduler.scheduleCommodityPriceUpdate();
+
+    // Then the caches the UEX writes can make stale are evicted once (CACHE-SYNC-EVICT-001) so a
+    // freshly-synced catalogue is visible on the next read instead of lagging the 30-min TTL.
+    verify(masterDataCacheEvictionService).evictUexSyncedMasterData();
+  }
+
+  @Test
+  void scheduleTask_evictsMasterDataEvenWhenAStepFails() {
+    // Given a mid-sweep step aborts the remaining steps
+    doThrow(new RuntimeException("UEX 500")).when(uexUniverseSyncService).syncFactions();
+
+    // When
+    scheduler.scheduleCommodityPriceUpdate();
+
+    // Then the finally still evicts, so any step that DID commit is reconciled rather than stranded
+    // until the TTL.
+    verify(masterDataCacheEvictionService).evictUexSyncedMasterData();
+  }
+
+  @Test
   void scheduleTask_skipsEntireSweep_whenAnotherSyncIsAlreadyRunning() {
     // Given the shared gate denies entry (a UEX or SC Wiki sync is already in flight)
     doReturn(false).when(syncCoordinator).runExclusively(eq("UEX"), any());
@@ -197,7 +221,8 @@ class UexSchedulerTest {
     // When
     scheduler.scheduleCommodityPriceUpdate();
 
-    // Then no sync step runs — the tick is dropped, never started concurrently
+    // Then no sync step runs — the tick is dropped, never started concurrently — and, since the
+    // sweep body never executes, the master-data caches are not evicted either.
     verifyNoInteractions(
         uexUniverseSyncService,
         uexStarSystemService,
@@ -207,6 +232,7 @@ class UexSchedulerTest {
         uexCategoryRefService,
         uexItemSyncService,
         uexItemPriceSyncService,
-        uexRefinerySyncService);
+        uexRefinerySyncService,
+        masterDataCacheEvictionService);
   }
 }

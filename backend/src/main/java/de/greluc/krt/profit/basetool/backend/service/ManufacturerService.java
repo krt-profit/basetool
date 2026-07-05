@@ -37,8 +37,9 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>The catalog itself is owned by {@link UexManufacturerService}; this service exposes the cached
  * read surface used by every page that needs a manufacturer dropdown, plus the admin-only {@code
- * hidden} flag flip. Cache is the {@code manufacturers} cache from {@link CacheConfig} — 2-minute
- * write-expire, evicted on any visibility change.
+ * hidden} flag flip. Cache is the {@code manufacturers} cache from {@link CacheConfig} — 30-minute
+ * master-data write-expire, evicted on any visibility change and on completion of the UEX / SC Wiki
+ * sync sweep (via {@code MasterDataCacheEvictionService}, CACHE-SYNC-EVICT-001).
  */
 @Service
 @RequiredArgsConstructor

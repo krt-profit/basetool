@@ -41,10 +41,12 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>The index is built once from the ~1600-row active blueprint master ({@link
  * BlueprintRepository#findActiveProductRows}) and cached as a single entry under {@link
- * CacheConfig#BLUEPRINT_FAMILY_INDEX_CACHE} (master-data TTL). It carries no write-evict hook, so
- * it lags the periodic SC Wiki blueprint sync by at most the TTL — acceptable for this oversight
- * surface, where the live availability count comes from the (always-fresh) owned-row aggregation
- * and only the lazy owner drill-down consults this index.
+ * CacheConfig#BLUEPRINT_FAMILY_INDEX_CACHE} (master-data TTL). It carries no per-write evict hook,
+ * but the SC Wiki sync sweep evicts it on completion (via {@code MasterDataCacheEvictionService},
+ * CACHE-DIST-03), so a blueprint sync is reflected on the next read rather than lagging the TTL;
+ * the 30-minute TTL is only the backstop. Even at maximum staleness this is an oversight surface,
+ * where the live availability count comes from the (always-fresh) owned-row aggregation and only
+ * the lazy owner drill-down consults this index.
  */
 @Component
 @RequiredArgsConstructor

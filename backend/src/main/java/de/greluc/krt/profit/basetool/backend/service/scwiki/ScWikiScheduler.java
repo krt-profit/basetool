@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.config.ScWikiProperties;
 import de.greluc.krt.profit.basetool.backend.integration.scwiki.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
+import de.greluc.krt.profit.basetool.backend.service.MasterDataCacheEvictionService;
 import de.greluc.krt.profit.basetool.backend.service.SyncCoordinator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -68,6 +69,7 @@ public class ScWikiScheduler {
   private final ScWikiManufacturerSyncService manufacturerSyncService;
   private final SyncCoordinator syncCoordinator;
   private final TaskMetrics taskMetrics;
+  private final MasterDataCacheEvictionService masterDataCacheEvictionService;
 
   /**
    * Periodic SC Wiki sync entry point. Runs on the {@link AsyncConfig#SCWIKI_EXECUTOR} pool so a
@@ -98,14 +100,23 @@ public class ScWikiScheduler {
    * through {@link SyncCoordinator#runExclusively(String, Runnable)} — and therefore only when no
    * UEX sync is in progress; if one is, this run waits for it to finish first (bounded by the
    * coordinator's wait cap) so the two never execute at the same time.
+   *
+   * <p>After the steps run, the master-data caches this sweep can make stale are evicted in a
+   * {@code finally} ({@link MasterDataCacheEvictionService#evictScWikiSyncedMasterData()}) so
+   * synced commodity / vehicle / manufacturer / blueprint-family changes are visible on the next
+   * read rather than lagging the 30-minute TTL (CACHE-SYNC-EVICT-001, CACHE-DIST-03).
    */
   private void runAllSyncSteps() {
     log.debug("Running scheduled SC Wiki sync against {}", scWikiClient.getClass().getSimpleName());
-    runStep("commodity", commoditySyncService::syncCommodities);
-    runStep("vehicle", vehicleSyncService::syncVehicles);
-    runStep("item", itemSyncService::syncItems);
-    runStep("blueprint", blueprintSyncService::syncBlueprints);
-    runStep("manufacturer", manufacturerSyncService::syncManufacturers);
+    try {
+      runStep("commodity", commoditySyncService::syncCommodities);
+      runStep("vehicle", vehicleSyncService::syncVehicles);
+      runStep("item", itemSyncService::syncItems);
+      runStep("blueprint", blueprintSyncService::syncBlueprints);
+      runStep("manufacturer", manufacturerSyncService::syncManufacturers);
+    } finally {
+      masterDataCacheEvictionService.evictScWikiSyncedMasterData();
+    }
   }
 
   /**

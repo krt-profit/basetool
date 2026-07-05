@@ -36,9 +36,10 @@ import org.springframework.transaction.annotation.Transactional;
  * Read service plus admin-override mutators for the city catalogue. The records themselves are
  * owned by {@link UexUniverseSyncService}; this service only exposes the read API and the
  * admin-only {@code hasLoadingDock} pin used by the UEX-overrides admin page. Read methods are
- * cached against {@link CacheConfig#CITIES_CACHE}; the override mutators evict the whole cache. The
- * 2-minute Caffeine TTL absorbs background-sync writes from {@link UexUniverseSyncService} without
- * an explicit evict — admin edits via this service still see immediate consistency.
+ * cached against {@link CacheConfig#CITIES_CACHE}; the override mutators evict the whole cache, and
+ * the periodic {@link UexUniverseSyncService} sweep evicts it on completion (via {@code
+ * MasterDataCacheEvictionService}, CACHE-SYNC-EVICT-001), so background-sync writes are visible on
+ * the next read; the 30-minute master-data TTL is only the backstop.
  */
 @Service
 @RequiredArgsConstructor

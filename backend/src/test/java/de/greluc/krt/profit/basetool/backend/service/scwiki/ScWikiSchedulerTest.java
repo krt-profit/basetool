@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.config.ScWikiProperties;
 import de.greluc.krt.profit.basetool.backend.integration.scwiki.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
+import de.greluc.krt.profit.basetool.backend.service.MasterDataCacheEvictionService;
 import de.greluc.krt.profit.basetool.backend.service.SyncCoordinator;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
@@ -49,6 +50,7 @@ class ScWikiSchedulerTest {
   @Mock private ScWikiItemSyncService itemSyncService;
   @Mock private ScWikiVehicleSyncService vehicleSyncService;
   @Mock private ScWikiManufacturerSyncService manufacturerSyncService;
+  @Mock private MasterDataCacheEvictionService masterDataCacheEvictionService;
 
   // A real coordinator (spied so it can be told the gate is busy); its default runs the sweep.
   @Spy private SyncCoordinator syncCoordinator = new SyncCoordinator(3_600_000);
@@ -86,6 +88,18 @@ class ScWikiSchedulerTest {
   }
 
   @Test
+  void schedule_evictsScWikiSyncedMasterDataAfterSweep() {
+    when(properties.getSchedulerEnabled()).thenReturn(true);
+
+    scheduler.scheduleScWikiSync();
+
+    // The commodity/vehicle/manufacturer/blueprint writes bypass the @CacheEvict read services, so
+    // the sweep evicts the caches they can make stale on completion (CACHE-SYNC-EVICT-001,
+    // CACHE-DIST-03 for the blueprint-family index).
+    verify(masterDataCacheEvictionService).evictScWikiSyncedMasterData();
+  }
+
+  @Test
   void schedule_skipsEntireSweep_whenAnotherSyncIsAlreadyRunning() {
     when(properties.getSchedulerEnabled()).thenReturn(true);
     // The shared gate denies entry (a UEX or SC Wiki sync is already in flight) → no step runs.
@@ -98,6 +112,7 @@ class ScWikiSchedulerTest {
         vehicleSyncService,
         itemSyncService,
         blueprintSyncService,
-        manufacturerSyncService);
+        manufacturerSyncService,
+        masterDataCacheEvictionService);
   }
 }
