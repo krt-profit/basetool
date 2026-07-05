@@ -652,6 +652,15 @@ violations as `ERROR` log events with `correlationId`.
 > gross against one holder leg of the gross. It is a `DEPOSIT`, so the zero-/`−fee`-sum invariants
 > (which apply only to `TRANSFER`/`HOLDER_TRANSFER`) do not constrain it; it still carries exactly one
 > audit row (`DEPOSIT_SPLIT_BOOKED`), so the audit-row-per-transaction sweep is unchanged.
+>
+> **Amended (ADR-0052 fee model; #998 Umbuchung fee):** the account- and holder-leg sums for
+> `TRANSFER` and `HOLDER_TRANSFER` net to **`−transfer_fee`**, not zero — a fee-free row (`transfer_fee
+> = 0`) still nets to zero, so the same `SUM(legs) + transfer_fee = 0` check holds. Since #998 a
+> fee-bearing `HOLDER_TRANSFER` books a single `CARTEL` **account leg** of `−fee` (the fee borne by the
+> KRT account, REQ-BANK-031), so the account-leg sweep now covers `HOLDER_TRANSFER` too; a fee-free
+> Umbuchung books no account leg and never appears in that check. The metric/alert
+> (`basetool_bank_ledger_integrity_violations`) is unchanged — the sweep simply accepts the new shape,
+> so it never false-fires (REQ-OBS-011).
 
 **Acceptance**
 
@@ -1087,23 +1096,38 @@ zero (REQ-BANK-006). It is gated `hasRole('BANK_EMPLOYEE')`, needs **no** per-ac
 (it touches no account), and **ignores the holder `active` flag in both directions** so a
 deactivated holder's residual (positive or negative) can be reconciled. Source and destination
 holder must differ. Every Umbuchung is audited (`HOLDER_TRANSFER`, REQ-BANK-012) and recorded
-in the unified activity audit (REQ-AUDIT-001). The Umbuchung is **fee-free** (ADR-0052): although a
-holder physically sends the money in-game, this internal reconciliation runs among bank staff who
-bear that fee **personally** — it is not the bank's concern — so the source is debited exactly the
-entered amount, the destination credited the same, no `transfer_fee` is recorded, and the two holder
-legs net to zero (in contrast to a customer-facing payout/transfer, where the fee is added on top,
-REQ-BANK-033).
+in the unified activity audit (REQ-AUDIT-001).
+
+> **Amended (2026-07-05, #998, owner-approved — supersedes the fee-free clause of ADR-0052/ADR-0039):**
+> the Umbuchung **bears the in-game transfer fee, borne by the KRT (`CARTEL`) account.** `fee =
+> round(amount × rate)` (the shared `operation.transfer_fee_rate`): the **source** holder's custody is
+> reduced by the fee (source holder leg `−(amount + fee)`), the destination is credited the full
+> `amount`, and the fee is **debited from the CARTEL account** (a single `−fee` account leg). So the
+> holder ledger nets to `−fee` and the CARTEL account bears the real aUEC lost to the game — the same
+> `SUM(legs) = −transfer_fee` shape as a fee-bearing `TRANSFER`, except only the CARTEL account is
+> touched (REQ-BANK-033/-020). The CARTEL account is **overdraft-guarded** and never driven negative:
+> a **missing or closed** CARTEL rejects the Umbuchung (`BANK_ACCOUNT_CLOSED`), and a fee it cannot
+> cover is a `BANK_OVERDRAFT` (REQ-BANK-006). The fee-bearing Umbuchung stays **uncapped** — no
+> KRT-account approval-tier check (REQ-BANK-047) — and the inclusive-fee toggle (REQ-BANK-033, #999)
+> does **not** apply (the KRT account, not a recipient, bears the fee). A **tiny** amount whose fee
+> rounds to `0` keeps the legacy fee-free shape (no account leg, holder legs net to zero); historical
+> fee-free rows (`transfer_fee = 0`) stay sound. A **reversal** negates all three legs.
 
 **Acceptance**
 
-- [x] An Umbuchung books two holder legs summing to zero and **no** account leg; account
-  balances are unchanged; both holders' global balances move by ±amount.
+- [x] An Umbuchung of `A` with `fee = round(A × rate)` debits the source holder `A + fee`, credits
+  the destination `A`, and debits the **CARTEL** account `fee` (`transfer_fee = fee`); a tiny amount
+  whose fee rounds to 0 keeps the legacy fee-free shape (no account leg, holder legs net to zero).
+- [x] A missing/closed CARTEL account (`BANK_ACCOUNT_CLOSED`) or a fee it cannot cover
+  (`BANK_OVERDRAFT`) rejects the Umbuchung; the CARTEL account is never driven negative.
+- [x] The ledger-integrity sweep accepts the fee-bearing Umbuchung (account + holder legs net to
+  `−transfer_fee`); a reversal negates all three legs and the sweep stays sound.
 - [x] It works to/from a deactivated holder and may drive the source holder negative (no
   holder overdraft); same source/destination holder is rejected.
 - [x] It is reachable by `BANK_EMPLOYEE` without an account grant; a member/anonymous caller is
-  403; it writes a `HOLDER_TRANSFER` audit event.
+  403; it writes a `HOLDER_TRANSFER` audit event (detail carries the fee, amounts only).
 
-**Enforced by:** `BankLedgerServiceTest` (holder legs sum zero, no account leg, deactivated/negative allowed), `BankHolderControllerTest`/`BankControllerSecurityTest` · **Code:** `service/BankLedgerService#bookHolderTransfer`, `controller/BankHolderController`, `model/dto/request/BankHolderTransferRequest`, `model/BankTransactionType`, `model/BankAuditEventType` · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md), [ADR-0040](../adr/0040-bank-staff-are-holders-and-employee-administration-access.md) · **Issues:** #556
+**Enforced by:** `BankLedgerServiceTest` (tiny fee-free Umbuchung, deactivated/negative allowed), `BankHolderTransferFeeTest` (fee borne by CARTEL, missing/closed/overdraft reject, reversal negates all three legs, integrity sweep sound), `BankHolderControllerTest`/`BankControllerSecurityTest` · **Code:** `service/BankLedgerService#bookHolderTransfer`, `service/BankLedgerIntegrityService` + `repository/BankTransactionRepository#findTransferTransactionsWithNonZeroSum` (integrity now covers HOLDER_TRANSFER), `controller/BankHolderController`, `model/dto/request/BankHolderTransferRequest`, `model/BankTransactionType`, `model/BankAuditEventType` · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) (amended by #998), [ADR-0052](../adr/0052-bank-transfer-fee-borne-by-debited-account.md) (amended by #998), [ADR-0040](../adr/0040-bank-staff-are-holders-and-employee-administration-access.md) · **Issues:** #556, #998
 
 ### REQ-BANK-032 — Holder custody history (own for employees, all for management)
 
@@ -1209,6 +1233,13 @@ superseding the carve-out model of ADR-0041):
 > preview shows the fee, the "wird abgebucht" gross and the "kommt an" net for the selected mode.
 > Audited in the existing `WITHDRAWAL_BOOKED` / `TRANSFER_BOOKED` detail (the fee amount plus an
 > `incl` marker; amounts only, no PII) — no new audit event and no monitoring change.
+>
+> **Amended (2026-07-05, #998) — the fee now also applies to the `HOLDER_TRANSFER` Umbuchung.** The
+> internal holder→holder Umbuchung is **no longer exempt**: a fee-bearing Umbuchung debits the source
+> holder `amount + fee`, credits the destination `amount`, and debits the fee from the **KRT
+> (`CARTEL`) account** (a single `−fee` account leg) — see REQ-BANK-031. Same rate, same
+> whole-aUEC rounding. The inclusive-fee mode above does **not** apply to the Umbuchung (the KRT
+> account, not a recipient, bears it). The `HOLDER_TRANSFER` audit detail now carries the fee.
 
 **Acceptance**
 

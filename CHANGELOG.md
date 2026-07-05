@@ -23,6 +23,8 @@
 
 - **Bank – Einzahler/Empfänger ohne Tool-Account erfassbar.** Beim Ein- und Auszahlen kann die Gegenpartei jetzt per Schalter „Kein Tool-Account" als freier Name eingetragen werden; die Einheit wird dann aus der vollständigen Org-Einheiten-Liste gewählt (statt nur aus den Mitgliedschaften eines Tool-Nutzers). Der bisherige Weg über einen Tool-Nutzer bleibt unverändert. Name und Einheit erscheinen wie gewohnt in der Kontohistorie und den PDFs (#994).
 
+- **Bank – Umbuchungen zwischen Haltern tragen jetzt die Gebühr über das KRT-Konto.** Bei einer Halter-Umbuchung wird die In-Game-Transfergebühr (Standard 0,5 %) vom KRT-Konto (CARTEL) getragen und dort abgebucht; der Bestand des abgebuchten Halters verringert sich entsprechend um die Gebühr. Fehlt das KRT-Konto, ist es geschlossen oder reicht sein Guthaben nicht, wird die Umbuchung abgelehnt (das KRT-Konto wird nie negativ). Sehr kleine Beträge, deren Gebühr auf 0 rundet, bleiben gebührenfrei (#998).
+
 
 ## [v1.1.3](https://github.com/krt-profit/basetool/releases/tag/v1.1.3) - 2026-07-05
 
