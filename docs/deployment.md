@@ -438,6 +438,37 @@ The state files `deploy.sh` adds for this flow live under `/var/lib/iri/`:
 `config-stage/` (extraction scratch), `config-previous/` (rollback snapshot of the
 config tree) and `config-blocked.marker` (the stateful-infra gate, below).
 
+**A compose `networks:` edit forces a clean recreate.** A change to the network
+topology (a re-pinned subnet, a net added/removed) cannot be rolled onto a running
+stack — Docker can't move a live container onto a differently-addressed bridge, so
+an in-place `up` silently strands `keycloak`<->`backend` / `keycloak`<->`db-keycloak`
+name resolution (the 2026-07 incident, #974). When `deploy.sh` sees the promoted
+`networks:` block differ from the live one, it logs `network topology changed ->
+clean recreate` and takes the whole stack **fully down** — the app project *and* the
+monitoring project (which holds the shared data nets as `external`) — prunes the
+stale bridges, then `up`s, on both apply and rollback. That is a brief full-stack
+outage, taken **only** on an actual `networks:` change; ordinary bumps keep the fast
+in-place `up`. The pinning keeps the recreated gateways stable, so the NPM `/admin`
+allow-list stays valid.
+
+**Manual recovery, if a stack is ever stranded** (a hand-run `docker compose up`
+after a networks edit, or an older `deploy.sh` without the recreate). Symptoms:
+`UnresolvedAddressException` / `UnknownHostException` for `keycloak` / `db-keycloak`
+in the backend/keycloak logs, a `Http5xxRateHigh` alert, and 500s on authenticated
+endpoints. Recreate from a clean slate:
+
+```bash
+cd /var/iri/code
+# Release the shared data nets the monitoring project holds as external:
+docker compose -p iri-monitoring -f docker-compose.monitoring.yml down --remove-orphans
+# App project: remove its containers AND the pinned bridges:
+docker compose --profile prod down --remove-orphans
+# Drop any stale-subnet bridge a stray endpoint kept alive:
+docker network prune -f
+# Redeploy from the clean slate (bypasses the bad-digest backoff):
+sudo -u deploy /var/iri/code/scripts/deploy.sh --force
+```
+
 ## Stateful-infra upgrades (operator-gated: postgres, Keycloak)
 
 A **postgres** or **Keycloak** image change is the one carve-out that does **not**
