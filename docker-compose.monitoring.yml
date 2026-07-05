@@ -356,12 +356,22 @@ services:
   # postgres_exporter ×2 — one per DB, dedicated pg_monitor-only user. Each bridges into the app
   # data net to reach its DB AND the scrape net so Prometheus can scrape it (keeps the DBs off the
   # broad scrape net — no new lateral path). sslmode=disable: the DBs serve plain on isolated nets.
+  #
+  # --no-collector.stat_replication: the exporter's default-enabled `stat_replication` collector runs
+  # `SELECT …, slot_name, … FROM pg_stat_replication`, but pg_stat_replication has NO slot_name column
+  # (it lives in pg_stat_replication_slots / pg_stat_wal_receiver) — an upstream bug still present on
+  # v0.20.0 and main. On every scrape both DBs logged `ERROR: column "slot_name" does not exist`,
+  # spamming Loki. These are single-instance DBs with no streaming replicas, so the metric is dead
+  # weight anyway; the flag (kingpin-only, no envar) disables the broken query. The valid `replication`
+  # / `replication_slots` collectors stay on.
   # ------------------------------------------------------------------------------------------
   postgres-exporter-backend:
     <<: *mon-base
     container_name: postgres-exporter-backend
     image: quay.io/prometheuscommunity/postgres-exporter:v0.20.0
     cap_drop: [ALL]
+    command:
+      - --no-collector.stat_replication
     environment:
       DATA_SOURCE_NAME: "postgresql://${PG_EXPORTER_USER:-monitoring}:${PG_EXPORTER_BACKEND_PASSWORD:?PG_EXPORTER_BACKEND_PASSWORD must be set}@db-backend:15432/${POSTGRES_DB:?POSTGRES_DB must be set}?sslmode=disable"
     deploy:
@@ -378,6 +388,9 @@ services:
     container_name: postgres-exporter-keycloak
     image: quay.io/prometheuscommunity/postgres-exporter:v0.20.0
     cap_drop: [ALL]
+    # --no-collector.stat_replication: see the backend exporter above — upstream slot_name bug.
+    command:
+      - --no-collector.stat_replication
     environment:
       DATA_SOURCE_NAME: "postgresql://${PG_EXPORTER_USER:-monitoring}:${PG_EXPORTER_KEYCLOAK_PASSWORD:?PG_EXPORTER_KEYCLOAK_PASSWORD must be set}@db-keycloak:15433/${KC_POSTGRES_DB:?KC_POSTGRES_DB must be set}?sslmode=disable"
     deploy:

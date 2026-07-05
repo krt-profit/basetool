@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Monitoring: Postgres-Logs nicht mehr durch fehlerhafte Exporter-Abfrage geflutet.** Der `stat_replication`-Collector von postgres_exporter fragt `slot_name` aus `pg_stat_replication` ab — eine Spalte, die es dort nicht gibt (Upstream-Bug bis v0.20.0). Beide DBs loggten pro Scrape `ERROR: column "slot_name" does not exist` (~5.760 Zeilen/Tag). Der Collector ist auf beiden Exportern per `--no-collector.stat_replication` abgeschaltet; auf den Single-Instance-DBs ohne Streaming-Replikation lieferte er ohnehin keine Metrik (ADR-0072).
+
 ## [v1.1.4](https://github.com/krt-profit/basetool/releases/tag/v1.1.4) - 2026-07-05
 
 ### Changed
