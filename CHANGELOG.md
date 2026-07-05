@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Bank – Kontoübersicht: Tabelle und Kacheln erschienen gleichzeitig, Bereichsansicht und Umschalten waren defekt.** In der Kartellbank-Übersicht wurden Tabellen- und Kachelansicht übereinander gerendert, die Gruppierung nach Bereich brach mit einem Serverfehler ab und das Umschalten der Ansichts-Checkboxen blieb wirkungslos. Ursache war die Thymeleaf-Attributreihenfolge (`th:replace` läuft vor `th:if`/`th:unless`/`th:each`), sodass die Bedingung bzw. die Schleife übergangen wurde. Jede Ansicht rendert jetzt wieder genau einmal, und die Bereichsgruppierung lädt fehlerfrei – auch beim Umschalten per Checkbox (REQ-BANK-016).
+
+- **Bank – Platzhalter „Nach Kontonamen filtern" wird wieder vollständig angezeigt.** Das Suchfeld der Kontoübersicht war einige Zeichen zu schmal, sodass der Platzhaltertext am Ende abgeschnitten wurde; das Feld ist jetzt breit genug für den vollständigen Text (REQ-BANK-046).
+
 ## [v1.1.6](https://github.com/krt-profit/basetool/releases/tag/v1.1.6) - 2026-07-05
 
 ### Changed

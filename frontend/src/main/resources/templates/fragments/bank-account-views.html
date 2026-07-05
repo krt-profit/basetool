@@ -93,10 +93,15 @@
     <h2 class="bank-acc-group-head"
         th:classappend="${group.deptClass() != null} ? ' ' + ${group.deptClass()} : ''"
         th:text="${group.titleKey() != null} ? #{__${group.titleKey()}__} : ${group.bereichName()}">Bereich</h2>
-    <th:block th:if="${layout == 'table'}"
-              th:replace="~{fragments/bank-account-views :: accTable(${group.cards()})}"></th:block>
-    <th:block th:unless="${layout == 'table'}"
-              th:replace="~{fragments/bank-account-views :: accGrid(${group.cards()})}"></th:block>
+    <!-- th:if/th:unless gate an OUTER wrapper and never share an element with th:replace: the latter
+         (attribute precedence 1) runs before the condition (3), which would render BOTH the table and
+         the grid for every group. -->
+    <th:block th:if="${layout == 'table'}">
+        <th:block th:replace="~{fragments/bank-account-views :: accTable(${group.cards()})}"></th:block>
+    </th:block>
+    <th:block th:unless="${layout == 'table'}">
+        <th:block th:replace="~{fragments/bank-account-views :: accGrid(${group.cards()})}"></th:block>
+    </th:block>
 </section>
 </body>
 </html>
