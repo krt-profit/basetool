@@ -28,6 +28,14 @@
 # provider-JAR change stays operator-gated by the postgres/Keycloak carve-out
 # above — the image change blocks the tick until the operator runs --force.
 #
+# Every resolved digest is cosign-VERIFIED on the host against the release-images
+# workflow's keyless signature before it is pulled, extracted or applied
+# (REQ-OPS-015) — the host half of the supply-chain seam whose CI half is
+# promote.yml. A `:stable` tag moved out-of-band to an untrusted digest is
+# rejected here, so the blind `:stable` pull is safe. Requires cosign on the host
+# (fail-closed); break-glass IRI_COSIGN_VERIFY=false disables it for a Sigstore
+# outage only.
+#
 # Invoked periodically by the `iri-deploy.timer` systemd unit, or manually:
 #   sudo -u deploy /var/iri/code/scripts/deploy.sh                  # apply :stable
 #   sudo -u deploy /var/iri/code/scripts/deploy.sh --tag 1.4.2      # pin a specific version
@@ -100,6 +108,34 @@ REGISTRY="${IRI_REGISTRY:-ghcr.io}"
 NAMESPACE="${IRI_IMAGE_NAMESPACE:-krt-profit}"
 GHCR_USERNAME="${IRI_GHCR_USERNAME:-deploy-bot}"
 
+# --- Supply-chain signature verification (REQ-OPS-015) ----------------------
+# Every resolved image digest is cosign-verified against the release-images
+# workflow's keyless (Fulcio/OIDC) signature BEFORE it is pulled, extracted or
+# applied — the HOST half of the supply-chain seam (the CI half is promote.yml's
+# pre-flight verify). Without this the host trusts whatever `:stable` points at:
+# a leaked `packages:write` credential retagging an arbitrary digest to :stable,
+# or a registry-side tag manipulation, bypasses promote.yml's verify entirely,
+# and the next timer tick would pull and run the unverified image (the deploy
+# user is in the `docker` group, so that is code execution as root-equivalent).
+# cosign reads the registry credential from the DOCKER_CONFIG written by the
+# `docker login` below; keyless verify additionally reaches the Sigstore
+# public-good Fulcio/Rekor roots over outbound HTTPS.
+#
+# Break-glass: IRI_COSIGN_VERIFY=false disables the gate for a tick — use ONLY
+# to ride out a Sigstore public-good outage that is blocking every deploy. Each
+# skipped verification is logged loudly (WARNING); the deploy still proceeds, so
+# keep it a deliberate, temporary override and re-enable it the moment Sigstore
+# recovers.
+COSIGN_VERIFY="${IRI_COSIGN_VERIFY:-true}"
+# The GitHub repository whose release-images.yml workflow identity signed the
+# artifacts. Mirrors promote.yml's `--certificate-identity-regexp`. The `@refs/`
+# suffix is pinned to `heads/main` (main-branch :edge/:sha builds) or `tags/v.+`
+# (release builds) — NOT the broad `refs/.+`, so an image built by a
+# workflow_dispatch run off an arbitrary feature branch is not trusted for prod.
+COSIGN_REPO="${IRI_COSIGN_REPO:-krt-profit/basetool}"
+COSIGN_IDENTITY_REGEXP="${IRI_COSIGN_IDENTITY_REGEXP:-https://github.com/${COSIGN_REPO}/\\.github/workflows/release-images\\.yml@refs/(heads/main|tags/v.+)}"
+COSIGN_OIDC_ISSUER="${IRI_COSIGN_OIDC_ISSUER:-https://token.actions.githubusercontent.com}"
+
 PROFILE=prod
 TARGET_TAG=stable
 CHECK_ONLY=false
@@ -136,7 +172,9 @@ Usage: deploy.sh [--tag <ref>] [--check-only] [--force]
 Options:
   --tag <ref>     Image tag/ref to deploy. Default: stable
                   Examples: stable, latest, 1.4.2, sha-abc1234
-  --check-only    Resolve digests but do not apply (dry-run).
+  --check-only    Resolve digests + cosign-verify them, but do not apply
+                  (dry-run / signature preflight). Exits non-zero if a signature
+                  does not verify; writes no deploy metric.
   --force         Bypass the bad-digest backoff and retry a previously failed
                   target now (e.g. after fixing an environmental cause).
   -h, --help      Show this help.
@@ -152,6 +190,11 @@ Environment overrides (all optional, sensible defaults shown):
   IRI_REGISTRY=ghcr.io
   IRI_IMAGE_NAMESPACE=krt-profit
   IRI_GHCR_USERNAME=deploy-bot
+  IRI_COSIGN_VERIFY=true    (host-side cosign signature gate; false = break-glass,
+                            Sigstore-outage only)
+  IRI_COSIGN_REPO=krt-profit/basetool   (repo whose release-images.yml identity signs)
+  IRI_COSIGN_IDENTITY_REGEXP=...        (override the trusted signer identity regexp)
+  IRI_COSIGN_OIDC_ISSUER=https://token.actions.githubusercontent.com
   DOCKER_CONFIG=/var/lib/iri/.docker   (where `docker login` writes its
                                         credentials.json; defaults to a
                                         per-script location under STATE_DIR
@@ -224,13 +267,26 @@ extract_config_bundle() {
 # built from an explicit COPY allowlist and .dockerignore bars secrets from the
 # build context, but this is the last gate before the tree is copied onto the
 # host — defence in depth against a future Dockerfile edit widening the COPY.
+#
+# The pattern set MIRRORS the CI-side assertion in release-images.yml (*.p12,
+# *.jks, *.pem, *.key, .env, realm-export.json) so the host gate is not narrower
+# than the build gate — an earlier version checked only the three literal names
+# and would have let a stray `*.pem`/`*.key`/`*.jks` through this last barrier.
 assert_no_secrets() {
-  local dir="$1" name
-  for name in .env keystore.p12 realm-export.json; do
-    if find "${dir}" -name "${name}" -print -quit 2>/dev/null | grep -q .; then
-      fail "SECURITY: promoted config bundle contains forbidden file '${name}' — aborting before apply"
-    fi
-  done
+  local dir="$1"
+  # Glob-shaped secrets (any key/cert material), matched by name anywhere in the
+  # staged tree. `-iname` is case-insensitive so a `.PEM` cannot slip past.
+  if find "${dir}" \( \
+        -iname '.env' -o -iname '*.p12' -o -iname '*.jks' \
+        -o -iname '*.pem' -o -iname '*.key' -o -iname 'realm-export.json' \
+      \) -print -quit 2>/dev/null | grep -q .; then
+    local hit
+    hit="$(find "${dir}" \( \
+        -iname '.env' -o -iname '*.p12' -o -iname '*.jks' \
+        -o -iname '*.pem' -o -iname '*.key' -o -iname 'realm-export.json' \
+      \) -print -quit 2>/dev/null)"
+    fail "SECURITY: promoted config bundle contains a forbidden secret-shaped file '${hit}' — aborting before apply"
+  fi
   if [[ -d "${dir}/keycloak/providers" ]]; then
     fail "SECURITY: promoted config bundle contains keycloak/providers — aborting before apply"
   fi
@@ -386,6 +442,52 @@ extract_keycloak_spi_jar() {
   rm -f "${stage}"
 }
 
+# Cosign-verify one resolved `image@digest` against the release-images workflow's
+# keyless signature (REQ-OPS-015). Returns 0 when the signature is trusted (or
+# when the break-glass IRI_COSIGN_VERIFY=false is set — logged loudly), non-zero
+# when verification fails. Never calls `fail` itself so the caller can attach a
+# failure metric before aborting.
+verify_signature() {
+  local ref="$1"
+  if [[ "${COSIGN_VERIFY}" != "true" ]]; then
+    log "WARNING: signature verification DISABLED (IRI_COSIGN_VERIFY=false) — NOT verifying ${ref}"
+    return 0
+  fi
+  cosign verify "${ref}" \
+    --certificate-identity-regexp "${COSIGN_IDENTITY_REGEXP}" \
+    --certificate-oidc-issuer "${COSIGN_OIDC_ISSUER}" \
+    >/dev/null 2>&1
+}
+
+# Verify a resolved digest or abort the whole deploy. A verification failure is a
+# supply-chain alarm (a :stable tag moved to an untrusted digest), so it records
+# a deploy-failure metric — surfacing the existing DeployFailed alert — and then
+# `fail`s the tick before anything is pulled, extracted or applied.
+verify_digest_or_die() {
+  local label="$1" ref="$2"
+  if verify_signature "${ref}"; then
+    log "  ${label}: signature OK"
+    return 0
+  fi
+  write_deploy_metric failure
+  fail "SECURITY: cosign signature verification failed for ${label} (${ref}) — refusing to deploy an unverified/untrusted image (expected identity: ${COSIGN_IDENTITY_REGEXP})"
+}
+
+# The --check-only variant of the verify: report per-artifact OK/FAIL and return
+# non-zero on any failure, but WITHOUT `fail`ing the process or writing a
+# deploy-failure metric (a dry-run must not trip DeployFailed). Lets an operator
+# preflight the signature gate — `deploy.sh --check-only` — against the current
+# :stable in the real deploy-user + sandbox context, without applying anything.
+check_only_verify_one() {
+  local label="$1" ref="$2"
+  if verify_signature "${ref}"; then
+    log "  ${label}: signature OK"
+    return 0
+  fi
+  log "  ${label}: SIGNATURE VERIFICATION FAILED (${ref})"
+  return 1
+}
+
 # --- Pre-flight -------------------------------------------------------------
 require_file "${COMPOSE_DIR}/docker-compose.yml"
 require_file "${COMPOSE_DIR}/.env"
@@ -419,11 +521,29 @@ mkdir -p "${STATE_DIR}"
 export DOCKER_CONFIG="${DOCKER_CONFIG:-${STATE_DIR}/.docker}"
 install -d -m 0700 "${DOCKER_CONFIG}"
 
+# cosign writes its Sigstore/TUF cache under $HOME/.sigstore. The deploy user has
+# no usable $HOME (created with --no-create-home, and the systemd unit's
+# ProtectHome=true makes /home an inaccessible tmpfs), so point $HOME at STATE_DIR
+# — already writable in the unit's ReadWritePaths and 0700-owned by deploy —
+# otherwise `cosign verify` (REQ-OPS-015) cannot initialise its trust root under
+# the sandbox. docker resolves its credential via DOCKER_CONFIG (set above), NOT
+# $HOME, so this does not affect the registry login.
+export HOME="${IRI_HOME:-${STATE_DIR}}"
+
 # Compose v2 ships with Docker Engine ≥ 20.10.13 as `docker compose`; the
 # `--wait` flag landed in 2.1.0. Fail fast on older installs rather than
 # discovering it during `up`.
 if ! docker compose version --short >/dev/null 2>&1; then
   fail "docker compose v2 not available; install Docker Engine ≥ 23.x"
+fi
+
+# cosign is required for the host-side signature gate (REQ-OPS-015). Fail closed:
+# a host that cannot verify signatures must not silently fall back to trusting an
+# unverified :stable. Missing cosign with the gate ON is a bootstrap error, not a
+# reason to skip verification — install cosign (docs/deployment.md) or, only to
+# break glass during a Sigstore outage, run with IRI_COSIGN_VERIFY=false.
+if [[ "${COSIGN_VERIFY}" == "true" ]] && ! command -v cosign >/dev/null 2>&1; then
+  fail "cosign not found on PATH but signature verification is enabled — install cosign (see docs/deployment.md → 'Signature verification (cosign)') or set IRI_COSIGN_VERIFY=false ONLY to break glass during a Sigstore outage"
 fi
 
 PIN_FILE_CURRENT="${STATE_DIR}/current-digest-pin.yml"
@@ -454,6 +574,43 @@ KEYCLOAK_SPI_PREVIOUS_JAR="${STATE_DIR}/keycloak-spi-previous.jar"
 TEXTFILE_DIR="${IRI_MONITORING_TEXTFILE_DIR:-/var/iri/monitoring/textfile}"
 DEPLOY_METRIC_FILE="${TEXTFILE_DIR}/deploy.prom"
 START_EPOCH="$(date +%s)"
+
+# GHCR pull token expiry. The token is a 90-day PAT (docs/deployment.md → Token
+# rotation); a lapsed token silently stops every deploy. There is no way to read
+# a PAT's expiry from the token itself, so the operator records it at rotation
+# time in ${TOKEN_FILE}.expiry (an ISO-8601 date the host `date` can parse, e.g.
+# `2026-10-01`). deploy.sh emits it as a gauge so the GhcrPullTokenExpiring alert
+# can warn ~2 weeks ahead instead of the deploy loop failing on the expiry day.
+TOKEN_EXPIRY_FILE="${IRI_GHCR_TOKEN_EXPIRY_FILE:-${TOKEN_FILE}.expiry}"
+TOKEN_METRIC_FILE="${TEXTFILE_DIR}/ghcr-token.prom"
+
+# Emit basetool_ghcr_token_expiry_timestamp from the operator-recorded expiry
+# date. Best-effort: absent/unparseable → no metric (the alert's absent() guard
+# nudges the operator to create the file); never fails the deploy. Called on
+# EVERY tick, including the idempotence no-op, so the gauge does not go stale.
+write_token_expiry_metric() {
+  local raw epoch tmp
+  [[ -f "${TOKEN_EXPIRY_FILE}" ]] || return 0
+  raw="$(tr -d '[:space:]' < "${TOKEN_EXPIRY_FILE}" 2>/dev/null || true)"
+  [[ -n "${raw}" ]] || return 0
+  epoch="$(date -u -d "${raw}" +%s 2>/dev/null || true)"
+  if ! [[ "${epoch}" =~ ^[0-9]+$ ]]; then
+    log "WARN: could not parse GHCR token expiry '${raw}' from ${TOKEN_EXPIRY_FILE}"
+    return 0
+  fi
+  install -d -m 0755 "${TEXTFILE_DIR}" 2>/dev/null || true
+  tmp="${TOKEN_METRIC_FILE}.$$"
+  if {
+    echo "# HELP basetool_ghcr_token_expiry_timestamp Unix time the GHCR pull token expires (operator-recorded in ${TOKEN_FILE}.expiry)."
+    echo "# TYPE basetool_ghcr_token_expiry_timestamp gauge"
+    echo "basetool_ghcr_token_expiry_timestamp ${epoch}"
+  } > "${tmp}" 2>/dev/null; then
+    mv -f "${tmp}" "${TOKEN_METRIC_FILE}" 2>/dev/null || true
+  else
+    log "WARN: could not write GHCR token expiry metric (${TEXTFILE_DIR})"
+    rm -f "${tmp}" 2>/dev/null || true
+  fi
+}
 
 # write_deploy_metric <success|rollback|failure|blocked>
 write_deploy_metric() {
@@ -520,6 +677,10 @@ if ! docker login "${REGISTRY}" \
        --password-stdin < "${TOKEN_FILE}" >/dev/null 2>&1; then
   fail "docker login to ${REGISTRY} failed — check ${TOKEN_FILE} (scope: read:packages)"
 fi
+
+# Refresh the token-expiry gauge on every tick (incl. the no-op below), so the
+# GhcrPullTokenExpiring alert can warn ahead of a lapse. Best-effort, never gates.
+write_token_expiry_metric
 
 # --- Resolve target digests -------------------------------------------------
 BACKEND_IMAGE="${REGISTRY}/${NAMESPACE}/basetool-backend"
@@ -674,27 +835,56 @@ running_stack_drift() {
 }
 
 DRIFTED=false
+NOOP=false
 if [[ -f "${LAST_DEPLOYED_FILE}" ]] \
    && grep -qFx "${EXPECTED_MARKER}" "${LAST_DEPLOYED_FILE}"; then
   DRIFT_REPORT="$(running_stack_drift)"
   if [[ -z "${DRIFT_REPORT}" ]]; then
-    log "no change — already at target digests (running stack verified)"
-    exit 0
+    # A converged no-op. Normally the fast exit; under --check-only we fall
+    # through so the signature preflight below still runs (that is the point of
+    # a dry-run signature check even when nothing needs applying).
+    if [[ "${CHECK_ONLY}" != "true" ]]; then
+      log "no change — already at target digests (running stack verified)"
+      exit 0
+    fi
+    NOOP=true
+  else
+    DRIFTED=true
+    while IFS= read -r drift_line; do
+      log "drift: ${drift_line}"
+    done <<< "${DRIFT_REPORT}"
+    log "running stack does not match the last-deployed target — re-applying"
   fi
-  DRIFTED=true
-  while IFS= read -r drift_line; do
-    log "drift: ${drift_line}"
-  done <<< "${DRIFT_REPORT}"
-  log "running stack does not match the last-deployed target — re-applying"
 fi
 
 if [[ "${CHECK_ONLY}" == "true" ]]; then
-  if [[ "${DRIFTED}" == "true" ]]; then
+  if [[ "${NOOP}" == "true" ]]; then
+    log "check-only: no change (already at target digests, running stack verified)"
+  elif [[ "${DRIFTED}" == "true" ]]; then
     log "check-only: would re-apply (running stack drifted from target digests)"
   else
     log "check-only: would deploy"
   fi
-  exit 0
+  # Signature preflight (REQ-OPS-015): verify every resolved digest against the
+  # release-images identity and report per artifact. Exits non-zero on any
+  # failure WITHOUT writing a deploy metric — a dry-run must not trip DeployFailed.
+  log "check-only: verifying image signatures (cosign keyless)"
+  co_rc=0
+  check_only_verify_one "backend"  "${BACKEND_IMAGE}@${BACKEND_DIGEST}"  || co_rc=1
+  check_only_verify_one "frontend" "${FRONTEND_IMAGE}@${FRONTEND_DIGEST}" || co_rc=1
+  check_only_verify_one "ingest"   "${INGEST_IMAGE}@${INGEST_DIGEST}"     || co_rc=1
+  if [[ -n "${CONFIG_DIGEST}" ]]; then
+    check_only_verify_one "config" "${CONFIG_IMAGE}@${CONFIG_DIGEST}" || co_rc=1
+  fi
+  if [[ -n "${KEYCLOAK_SPI_DIGEST}" ]]; then
+    check_only_verify_one "keycloak-spi" "${KEYCLOAK_SPI_IMAGE}@${KEYCLOAK_SPI_DIGEST}" || co_rc=1
+  fi
+  if [[ "${co_rc}" -eq 0 ]]; then
+    log "check-only: all signatures verified OK"
+  else
+    log "check-only: SIGNATURE VERIFICATION FAILED for one or more artifacts"
+  fi
+  exit "${co_rc}"
 fi
 
 # --- Bad-digest backoff -----------------------------------------------------
@@ -732,6 +922,22 @@ if [[ -f "${FAILED_FILE}" ]]; then
   fi
 fi
 
+# --- Verify supply-chain signatures (host-side gate, REQ-OPS-015) -----------
+# We are now committed to applying (past the idempotence no-op, the --check-only
+# dry-run and the bad-digest backoff), so cosign-verify every resolved digest
+# against the release-images keyless signature BEFORE the first pull / extract /
+# up. A :stable tag moved out-of-band to an unsigned or differently-signed
+# digest is rejected here — it is never pulled, the config bundle and provider
+# JAR are never extracted onto the host, and the stack is never recreated on it.
+# The config + keycloak-spi digests are verified only when resolved (best-effort
+# absence leaves them empty, nothing to verify or stage that tick).
+log "verifying image signatures (cosign keyless)"
+verify_digest_or_die "backend"  "${BACKEND_IMAGE}@${BACKEND_DIGEST}"
+verify_digest_or_die "frontend" "${FRONTEND_IMAGE}@${FRONTEND_DIGEST}"
+verify_digest_or_die "ingest"   "${INGEST_IMAGE}@${INGEST_DIGEST}"
+[[ -n "${CONFIG_DIGEST}" ]]       && verify_digest_or_die "config"       "${CONFIG_IMAGE}@${CONFIG_DIGEST}"
+[[ -n "${KEYCLOAK_SPI_DIGEST}" ]] && verify_digest_or_die "keycloak-spi" "${KEYCLOAK_SPI_IMAGE}@${KEYCLOAK_SPI_DIGEST}"
+
 # --- Save rollback anchor + write new pin -----------------------------------
 [[ -f "${PIN_FILE_CURRENT}" ]] && cp "${PIN_FILE_CURRENT}" "${PIN_FILE_PREVIOUS}"
 
@@ -767,20 +973,33 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
   # operator runs the documented manual upgrade, then re-runs with --force.
   OLD_INFRA="$(infra_image_pins "${COMPOSE_DIR}/docker-compose.yml")"
   NEW_INFRA="$(infra_image_pins "${CONFIG_STAGE_DIR}/docker-compose.yml")"
-  if [[ "${OLD_INFRA}" != "${NEW_INFRA}" ]] && [[ "${FORCE}" != "true" ]]; then
-    if [[ -f "${CONFIG_BLOCKED_FILE}" ]] && grep -qFx "${EXPECTED_MARKER}" "${CONFIG_BLOCKED_FILE}"; then
-      log "stateful-infra upgrade still operator-gated for this target; skipping tick (run the manual upgrade then --force)"
-      exit 0
+  if [[ "${OLD_INFRA}" != "${NEW_INFRA}" ]]; then
+    if [[ "${FORCE}" != "true" ]]; then
+      if [[ -f "${CONFIG_BLOCKED_FILE}" ]] && grep -qFx "${EXPECTED_MARKER}" "${CONFIG_BLOCKED_FILE}"; then
+        log "stateful-infra upgrade still operator-gated for this target; skipping tick (run the manual upgrade then --force)"
+        exit 0
+      fi
+      echo "${EXPECTED_MARKER}" > "${CONFIG_BLOCKED_FILE}"
+      log "CARVE-OUT: postgres/Keycloak image pin changed — refusing to auto-apply a stateful-infra upgrade"
+      log "  old: $(printf '%s' "${OLD_INFRA}" | tr '\n' ' ')"
+      log "  new: $(printf '%s' "${NEW_INFRA}" | tr '\n' ' ')"
+      log "  perform the documented manual upgrade (docs/deployment.md → Stateful-infra upgrades), then: deploy.sh --force"
+      write_deploy_metric blocked
+      exit 3
     fi
-    echo "${EXPECTED_MARKER}" > "${CONFIG_BLOCKED_FILE}"
-    log "CARVE-OUT: postgres/Keycloak image pin changed — refusing to auto-apply a stateful-infra upgrade"
-    log "  old: $(printf '%s' "${OLD_INFRA}" | tr '\n' ' ')"
-    log "  new: $(printf '%s' "${NEW_INFRA}" | tr '\n' ' ')"
-    log "  perform the documented manual upgrade (docs/deployment.md → Stateful-infra upgrades), then: deploy.sh --force"
-    write_deploy_metric blocked
-    exit 3
+    # --force through a gated stateful-infra change. Deliberately do NOT clear the
+    # block marker here (pre-apply): if this forced apply fails its health gate and
+    # rolls back, the gate must stay in place so the next automatic (non-force) tick
+    # QUIETLY skips (marker still matches EXPECTED_MARKER) instead of re-firing the
+    # CARVE-OUT alert + blocked metric as if it were the first encounter. The marker
+    # is cleared only on a SUCCESSFUL apply (the success block below).
+    log "stateful-infra upgrade forced (--force) — applying the gated change"
+  else
+    # No stateful-infra change for this target: clear any stale block marker (e.g.
+    # left by a previous, now-superseded gated target) so a lingering marker cannot
+    # keep the basetool_deploy_config_blocked metric stuck at 1.
+    rm -f "${CONFIG_BLOCKED_FILE}"
   fi
-  rm -f "${CONFIG_BLOCKED_FILE}"
 
   # A change to the compose `networks:` block cannot be applied by an in-place
   # `up -d` (it strands container name resolution, #974). Detect it now, while the
@@ -999,7 +1218,10 @@ if [[ "${NETWORK_TOPOLOGY_CHANGED}" == "true" \
 fi
 
 # Either way, this run failed → non-zero exit so the systemd unit reports
-# `failed`, journalctl flags it, and any OnFailure= hook fires. A rollback newer than the last
-# success is the "promoted release did not ship" signal (epic #936 alert catalog).
+# `failed` and journalctl flags it. Active alerting is via the textfile metric
+# written just below, not a systemd OnFailure= hook: a rollback newer than the
+# last success trips the DeployRolledBack Prometheus alert (a failure trips
+# DeployFailed) — the "promoted release did not ship" signal (epic #936 alert
+# catalog, monitoring/prometheus/alerts/ops-automation.yml).
 write_deploy_metric rollback
 exit 1
