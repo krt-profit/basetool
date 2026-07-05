@@ -51,6 +51,8 @@
         BANK_SPLIT_TOO_SMALL: 'splitPercent',
         // Missing Begründung on a debit from a justification-mandating account (REQ-BANK-045).
         BANK_JUSTIFICATION_REQUIRED: 'justification',
+        // Fee-inclusive amount that does not exceed the fee, so nothing would arrive (REQ-BANK-033).
+        BANK_FEE_EXCEEDS_AMOUNT: 'amount',
     };
 
     /**
@@ -517,12 +519,15 @@
     }
 
     /**
-     * Live transfer-fee preview (REQ-BANK-033, ADR-0052): the entered amount is what must ARRIVE at
-     * the destination, so this fills the on-top fee (`round(amount * rate)`) and the gross actually
-     * debited from the source (`amount + fee`). Hidden when the amount is non-positive, the rate is
-     * zero, or — for an account transfer — the source and destination holder match (a same-holder
-     * transfer is fee-free). Guidance only; the authoritative fee is computed server-side at booking
-     * time.
+     * Live transfer-fee preview + fee-mode gating (REQ-BANK-033, ADR-0052, #999). The fee is always
+     * `round(entered * rate)`; only what the toggle does with it differs. In the default on-top mode
+     * the entered amount is what ARRIVES and the source is debited `amount + fee`; in the fee-inclusive
+     * mode (`feeInclusive` checkbox on) the entered amount is the gross DEBITED and the recipient gets
+     * `amount - fee`. The preview shows the fee, the "wird abgebucht" gross and the "kommt an" net for
+     * the selected mode. A fee applies only to a withdrawal and a holder-changing transfer — a deposit
+     * and a same-holder transfer are fee-free, where the fee-inclusive toggle is hidden, reset and
+     * disabled (so it is omitted from the body) and the preview is suppressed. Guidance only; the
+     * authoritative fee is computed server-side at booking time.
      *
      * @param {HTMLFormElement} form the booking form carrying a `[data-fee-preview]` block
      */
@@ -532,30 +537,50 @@
         if (!preview || !amountEl) {
             return;
         }
-        // A deposit never carries an in-game fee (#997 unified modal): hide the preview outright so
-        // the shared amount-row block does not show a phantom fee for a Einzahlung.
-        const movementTypeEl = form.querySelector('[data-role="bank-movement-type"]');
-        if (movementTypeEl && movementTypeEl.value === 'DEPOSIT') {
-            preview.hidden = true;
-            return;
-        }
         const rate = transferFeeRate();
-        const amount = Number(amountEl.value);
+        const typeEl = form.querySelector('[data-role="bank-movement-type"]');
+        const type = typeEl ? typeEl.value : null;
         const src = form.querySelector('[name="sourceHolderId"]');
         const dst = form.querySelector('[name="destinationHolderId"]');
         const sameHolder = !!(src && dst && src.value && src.value === dst.value);
-        if (!Number.isFinite(amount) || amount <= 0 || rate <= 0 || sameHolder) {
+        // A fee applies to a withdrawal and to a holder-changing transfer (ADR-0052); a deposit and a
+        // same-holder transfer are fee-free.
+        const feeApplies = rate > 0 && type !== 'DEPOSIT' && !(type === 'TRANSFER' && sameHolder);
+        // The fee-inclusive toggle (#999) is only meaningful where a fee applies: reveal + enable it
+        // there, otherwise hide, reset and disable it so `feeInclusive` is omitted from the body.
+        const inclusiveRow = form.querySelector('[data-fee-inclusive-row]');
+        const inclusiveToggle = inclusiveRow
+            ? inclusiveRow.querySelector('input[name="feeInclusive"]')
+            : null;
+        if (inclusiveRow) {
+            inclusiveRow.hidden = !feeApplies;
+        }
+        if (inclusiveToggle) {
+            inclusiveToggle.disabled = !feeApplies;
+            if (!feeApplies) {
+                inclusiveToggle.checked = false;
+            }
+        }
+        const amount = Number(amountEl.value);
+        if (!feeApplies || !Number.isFinite(amount) || amount <= 0) {
             preview.hidden = true;
             return;
         }
         const fee = Math.round(amount * rate);
+        const inclusive = !!(inclusiveToggle && inclusiveToggle.checked);
+        const debited = inclusive ? amount : amount + fee;
+        const arrives = inclusive ? amount - fee : amount;
         const valueEl = preview.querySelector('[data-fee-value]');
         const debitEl = preview.querySelector('[data-fee-debit]');
+        const arrivesEl = preview.querySelector('[data-fee-arrives]');
         if (valueEl) {
             valueEl.textContent = fee.toLocaleString('de-DE');
         }
         if (debitEl) {
-            debitEl.textContent = (amount + fee).toLocaleString('de-DE');
+            debitEl.textContent = debited.toLocaleString('de-DE');
+        }
+        if (arrivesEl) {
+            arrivesEl.textContent = arrives.toLocaleString('de-DE');
         }
         preview.hidden = false;
     }

@@ -255,7 +255,14 @@ class BankReportServiceTest {
     String note = "note-" + UUID.randomUUID().toString().substring(0, 8);
     bankLedgerService.bookWithdrawal(
         new BankWithdrawalRequest(
-            account.getId(), holder.getId(), new BigDecimal("100"), note, reason, null, null));
+            account.getId(),
+            holder.getId(),
+            new BigDecimal("100"),
+            note,
+            reason,
+            null,
+            null,
+            false));
     Instant after = Instant.now().plus(1, ChronoUnit.HOURS);
 
     String text =

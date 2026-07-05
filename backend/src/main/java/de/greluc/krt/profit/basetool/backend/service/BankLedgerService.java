@@ -331,11 +331,14 @@ public class BankLedgerService {
    * no-overdraft rule at <strong>account</strong> level only (REQ-BANK-006) — the holder may go
    * negative.
    *
-   * <p>The entered amount is what the external recipient must <strong>receive</strong>; the in-game
-   * transfer fee (ADR-0052 superseding ADR-0041, REQ-BANK-033) is added on top and the account and
-   * holder's stash are debited the gross ({@code amount + fee}). The overdraft guard runs against
-   * that gross, so the account may not be driven negative by the fee. The holder is thus not out of
-   * pocket — the fee is borne by the debited account, not by their private money.
+   * <p>By default (on-top, ADR-0052 superseding ADR-0041, REQ-BANK-033) the entered amount is what
+   * the external recipient must <strong>receive</strong>; the in-game transfer fee is added on top
+   * and the account and holder's stash are debited the gross ({@code amount + fee}). With the
+   * <strong>fee-inclusive</strong> mode ({@code request.feeInclusive()}, #999) the entered amount
+   * is instead the gross <strong>debited</strong> and the recipient receives {@code amount - fee}
+   * (rejected with {@code BANK_FEE_EXCEEDS_AMOUNT} when {@code amount - fee <= 0}). The overdraft
+   * guard runs against whatever is actually debited, so the account may not be driven negative; the
+   * holder is not out of pocket — the fee is borne by the debited account, not their private money.
    *
    * <p>Optionally records the <strong>counterparty</strong> — the Empf&auml;nger who received the
    * payout, and the org unit they belong to — on the transaction header (REQ-BANK-044), distinct
@@ -353,12 +356,22 @@ public class BankLedgerService {
     BankAccount account = lockAccount(request.accountId());
     requireActive(account);
     requireDebitJustification(account, request.justification());
-    BankHolder holder = requireHolder(request.holderId());
+    final BankHolder holder = requireHolder(request.holderId());
     CounterpartySnapshot counterparty =
         resolveCounterparty(request.counterpartyUserId(), request.counterpartyOrgUnitId());
 
+    // Fee mode (REQ-BANK-033, #999). The fee is always round(entered amount x rate). On-top
+    // (default):
+    // the source is debited amount + fee and the recipient gets the full amount. Inclusive: the
+    // source
+    // is debited exactly the entered amount and the recipient gets amount - fee (rejected if that
+    // leaves nothing to arrive). The overdraft guard runs against whatever is actually debited.
     BigDecimal fee = transferFeeService.feeOn(request.amount());
-    BigDecimal debit = transferFeeService.totalDebit(request.amount());
+    BigDecimal debit =
+        request.feeInclusive() ? request.amount() : transferFeeService.totalDebit(request.amount());
+    if (request.feeInclusive()) {
+      requireAmountExceedsFee(request.amount(), fee);
+    }
     requireAccountCoverage(account, debit);
 
     Instant now = Instant.now();
@@ -383,7 +396,7 @@ public class BankLedgerService {
             + " aUEC @"
             + holder.getHandle()
             + counterpartyDetail(counterparty, "->")
-            + feeDetail(fee));
+            + feeDetail(fee, request.feeInclusive()));
     return toDto(tx);
   }
 
@@ -437,12 +450,16 @@ public class BankLedgerService {
    * overdraft; the holder dimension is not (ADR-0039).
    *
    * <p>When the custody actually changes hands (source holder ≠ destination holder), a real in-game
-   * transfer happens, so the in-game fee (ADR-0052 superseding ADR-0041, REQ-BANK-033) is added on
-   * top: the source account and holder are debited the gross ({@code amount + fee}), while the
-   * destination account and holder are credited the full entered amount — the money that arrives
-   * equals what was requested, the fee is borne by the source. The source overdraft guard runs
-   * against the gross. A same-holder transfer moves no money in-game (the holder merely re-labels
-   * which account owns it), so it is fee-free and both legs net to zero as before.
+   * transfer happens, so the in-game fee (ADR-0052 superseding ADR-0041, REQ-BANK-033) applies. By
+   * default (on-top) the source account and holder are debited the gross ({@code amount + fee})
+   * while the destination is credited the full entered amount. With the
+   * <strong>fee-inclusive</strong> mode ({@code request.feeInclusive()}, #999) the source is
+   * debited exactly the entered amount and the destination is credited {@code amount - fee}
+   * (rejected with {@code BANK_FEE_EXCEEDS_AMOUNT} when {@code amount - fee <= 0}). Either way the
+   * account legs net to {@code -fee}, preserving the ledger-integrity invariant. The source
+   * overdraft guard runs against the actual debit. A same-holder transfer moves no money in-game
+   * (the holder merely re-labels which account owns it), so it is fee-free — {@code feeInclusive}
+   * has no effect — and both legs net to zero as before.
    *
    * @param request validated transfer payload (source and destination accounts must differ)
    * @param destinationVisible whether the caller may see the destination account (pre-computed by
@@ -491,7 +508,19 @@ public class BankLedgerService {
     // against the gross so the fee can never drive the source account negative.
     final boolean holderChanges = !sourceHolder.getId().equals(destinationHolder.getId());
     BigDecimal fee = holderChanges ? transferFeeService.feeOn(request.amount()) : BigDecimal.ZERO;
-    BigDecimal debit = request.amount().add(fee);
+    // Fee mode (REQ-BANK-033, #999), effective only on a holder-changing transfer (a same-holder
+    // transfer is fee-free, so both modes debit and credit the plain amount). On-top (default):
+    // source
+    // debited amount + fee, destination credited the full amount. Inclusive: source debited exactly
+    // the entered amount, destination credited amount - fee (rejected if that leaves nothing). Both
+    // net to -fee across the account legs, so the ledger-integrity invariant (SUM(legs) =
+    // -transfer_fee, ADR-0052) holds in either mode. The overdraft guard runs against the debit.
+    final boolean inclusive = request.feeInclusive() && holderChanges;
+    BigDecimal debit = inclusive ? request.amount() : request.amount().add(fee);
+    final BigDecimal credit = inclusive ? request.amount().subtract(fee) : request.amount();
+    if (inclusive) {
+      requireAmountExceedsFee(request.amount(), fee);
+    }
     requireAccountCoverage(source, debit);
 
     Instant now = Instant.now();
@@ -505,9 +534,9 @@ public class BankLedgerService {
             now,
             null);
     persistAccountPosting(tx, source, debit.negate(), now);
-    persistAccountPosting(tx, destination, request.amount(), now);
+    persistAccountPosting(tx, destination, credit, now);
     persistHolderPosting(tx, sourceHolder, debit.negate(), now);
-    persistHolderPosting(tx, destinationHolder, request.amount(), now);
+    persistHolderPosting(tx, destinationHolder, credit, now);
     bankAuditService.record(
         BankAuditEventType.TRANSFER_BOOKED,
         source.getId(),
@@ -521,7 +550,7 @@ public class BankLedgerService {
             + " -> "
             + destinationHolder.getHandle()
             + ")"
-            + feeDetail(fee));
+            + feeDetail(fee, inclusive));
     return toDto(tx);
   }
 
@@ -893,14 +922,42 @@ public class BankLedgerService {
   }
 
   /**
-   * Renders the audit-detail suffix for a fee-bearing transaction (ADR-0052): {@code " (fee N
-   * aUEC)"} when the fee is positive, empty otherwise. No PII — only the numeric fee.
+   * Renders the audit-detail suffix for a fee-bearing transaction (ADR-0052, REQ-BANK-033): {@code
+   * " (fee N aUEC)"} — or {@code " (fee N aUEC, incl)"} in the fee-inclusive mode (#999) so the
+   * mode is auditable — when the fee is positive, empty otherwise. No PII — only the numeric fee
+   * and the mode marker.
    *
-   * @param fee the on-top transfer fee borne by the debited source
+   * @param fee the transfer fee (round(entered x rate)) recorded on the transaction
+   * @param feeInclusive whether the entered amount was the gross debited (inclusive) rather than
+   *     the amount that arrives (on-top); only distinguishes when the fee is positive
    * @return the fee suffix, or an empty string when there is no fee
    */
-  private static String feeDetail(@NotNull BigDecimal fee) {
-    return fee.signum() > 0 ? " (fee " + plain(fee) + " aUEC)" : "";
+  private static String feeDetail(@NotNull BigDecimal fee, boolean feeInclusive) {
+    if (fee.signum() <= 0) {
+      return "";
+    }
+    return " (fee " + plain(fee) + " aUEC" + (feeInclusive ? ", incl" : "") + ")";
+  }
+
+  /**
+   * Guards the fee-inclusive fee mode (REQ-BANK-033, #999): the entered gross must exceed the
+   * in-game fee so something actually arrives at the recipient/destination. Rejects with {@code
+   * BANK_FEE_EXCEEDS_AMOUNT} when {@code amount - fee <= 0}. Called only in the inclusive mode; in
+   * the default on-top mode the fee rides on top and the full amount always arrives, so the guard
+   * never applies.
+   *
+   * @param amount the entered gross debited from the source
+   * @param fee the in-game fee skimmed from it
+   * @throws BankConflictException {@code BANK_FEE_EXCEEDS_AMOUNT} when nothing would arrive
+   */
+  private void requireAmountExceedsFee(@NotNull BigDecimal amount, @NotNull BigDecimal fee) {
+    if (amount.subtract(fee).signum() <= 0) {
+      throw new BankConflictException(
+          BankConflictException.CODE_BANK_FEE_EXCEEDS_AMOUNT,
+          "In fee-inclusive mode the entered amount does not exceed the fee, so nothing would"
+              + " arrive; raise the amount",
+          Map.of("fee", plain(fee)));
+    }
   }
 
   /**

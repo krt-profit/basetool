@@ -49,6 +49,12 @@ import org.jetbrains.annotations.Nullable;
  * @param counterpartyOrgUnitId optional org unit the Empf&auml;nger belongs to, chosen from their
  *     own memberships; only meaningful together with {@code counterpartyUserId} and validated to be
  *     one of that user's memberships (REQ-BANK-044)
+ * @param feeInclusive fee-mode toggle (REQ-BANK-033, #999): {@code false} (default, unchanged)
+ *     means the entered {@code amount} is what must arrive and the in-game fee is added on top —
+ *     the source is debited {@code amount + fee}; {@code true} means the entered {@code amount} is
+ *     the gross debited and the recipient receives {@code amount - fee}. A bank-staff choice at
+ *     booking time only — a withdrawal <em>request</em> never carries it (confirmation always books
+ *     on-top)
  */
 public record BankWithdrawalRequest(
     @NotNull UUID accountId,
@@ -57,14 +63,16 @@ public record BankWithdrawalRequest(
     @Nullable @Size(max = 500) String note,
     @Nullable @Size(max = 500) String justification,
     @Nullable UUID counterpartyUserId,
-    @Nullable UUID counterpartyOrgUnitId) {
+    @Nullable UUID counterpartyOrgUnitId,
+    boolean feeInclusive) {
 
   /**
    * Convenience constructor for a withdrawal with <strong>no</strong> recorded justification or
-   * counterparty (REQ-BANK-044/-045) — the common case where neither is captured. Delegates to the
-   * canonical constructor with the justification and both counterparty fields {@code null}. Inbound
-   * JSON is always deserialized via the canonical (all-component) constructor, so this overload
-   * only serves programmatic callers.
+   * counterparty (REQ-BANK-044/-045) and the default on-top fee mode (REQ-BANK-033) — the common
+   * case where neither is captured. Delegates to the canonical constructor with the justification
+   * and both counterparty fields {@code null} and {@code feeInclusive} {@code false}. Inbound JSON
+   * is always deserialized via the canonical (all-component) constructor, so this overload only
+   * serves programmatic callers.
    *
    * @param accountId the paying account
    * @param holderId the player who physically paid the money out
@@ -73,6 +81,6 @@ public record BankWithdrawalRequest(
    */
   public BankWithdrawalRequest(
       UUID accountId, UUID holderId, BigDecimal amount, @Nullable String note) {
-    this(accountId, holderId, amount, note, null, null, null);
+    this(accountId, holderId, amount, note, null, null, null, false);
   }
 }

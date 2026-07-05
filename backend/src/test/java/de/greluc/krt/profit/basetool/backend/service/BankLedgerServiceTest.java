@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
+import de.greluc.krt.profit.basetool.backend.model.SystemSetting;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankTransactionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankDepositRequest;
@@ -54,6 +55,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.repository.SystemSettingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -97,6 +99,7 @@ class BankLedgerServiceTest {
   @Autowired private UserRepository userRepository;
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
+  @Autowired private SystemSettingRepository systemSettingRepository;
 
   private BankAccount account;
   private BankAccount otherAccount;
@@ -182,7 +185,8 @@ class BankLedgerServiceTest {
                         "note",
                         "   ",
                         null,
-                        null)));
+                        null,
+                        false)));
 
     assertEquals(BankConflictException.CODE_BANK_JUSTIFICATION_REQUIRED, ex.getCode());
     assertEquals(0, balance(special).compareTo(new BigDecimal("500")), "balance unchanged");
@@ -205,7 +209,8 @@ class BankLedgerServiceTest {
                 null,
                 "Reparaturkosten",
                 null,
-                null));
+                null,
+                false));
 
     BankTransaction stored = transactionRepository.findById(tx.id()).orElseThrow();
     assertEquals("Reparaturkosten", stored.getJustification());
@@ -336,6 +341,125 @@ class BankLedgerServiceTest {
         "destination gets the full entered amount");
     assertEquals(0, holderTotal(holderA).signum());
     assertEquals(0, holderTotal(holderB).compareTo(new BigDecimal("1000")));
+  }
+
+  @Test
+  void bookWithdrawal_feeInclusive_debitsEnteredAmountAndRecipientGetsAmountMinusFee() {
+    // Given (REQ-BANK-033, #999): in the fee-inclusive mode the entered amount is what is DEBITED
+    // and
+    // the recipient gets amount - fee. A 1000 inclusive payout at 0.5% debits exactly 1000 (not
+    // 1005), records fee 5, and the recipient effectively receives 995 (the 500000 -> 497500
+    // example
+    // scaled down). Only the entered amount needs to be in the account.
+    deposit(account, holderA, "1000");
+
+    // When: pay out 1000 with fee-inclusive on
+    BankTransactionDto tx =
+        bankLedgerService.bookWithdrawal(
+            new BankWithdrawalRequest(
+                account.getId(),
+                holderA.getId(),
+                new BigDecimal("1000"),
+                null,
+                null,
+                null,
+                null,
+                true));
+
+    // Then: the recorded fee is still 5, but the account/holder are debited exactly the entered
+    // 1000
+    // (balance 0), so the recipient got amount - fee = 995.
+    assertEquals(0, storedFee(tx).compareTo(new BigDecimal("5")));
+    assertEquals(0, balance(account).signum(), "account debited exactly the entered 1000");
+    assertEquals(0, holderTotal(holderA).signum(), "holder debited exactly the entered 1000");
+  }
+
+  @Test
+  void bookTransfer_feeInclusive_debitsEnteredAmountAndCreditsAmountMinusFee() {
+    // Given (REQ-BANK-033, #999): a holder-changing transfer in the fee-inclusive mode debits the
+    // source exactly the entered amount and credits the destination amount - fee; the account legs
+    // still net to -fee, so the ledger-integrity invariant holds. Moving 1000 needs only 1000 in
+    // the
+    // source (not 1005).
+    deposit(account, holderA, "1000");
+
+    // When: deliver 1000 (fee-inclusive) to another account AND another holder
+    BankTransactionDto tx =
+        bankLedgerService.bookTransfer(
+            new BankTransferRequest(
+                account.getId(),
+                holderA.getId(),
+                otherAccount.getId(),
+                holderB.getId(),
+                new BigDecimal("1000"),
+                "Bereichsanteil",
+                null,
+                true),
+            true);
+
+    // Then: fee = 5; source debited exactly 1000 (balance 0), destination credited 995, and both
+    // the
+    // account legs and the holder legs still net to -5 (integrity preserved).
+    assertEquals(0, storedFee(tx).compareTo(new BigDecimal("5")));
+    List<BankCounterLeg> accountLegs = postingRepository.findLegsByTransactionIds(List.of(tx.id()));
+    assertEquals(
+        0,
+        sum(accountLegs.stream().map(BankCounterLeg::amount).toList())
+            .compareTo(new BigDecimal("-5")),
+        "account legs net to -fee");
+    List<BankHolderLeg> holderLegs =
+        holderPostingRepository.findHolderLegsByTransactionIds(List.of(tx.id()));
+    assertEquals(
+        0,
+        sum(holderLegs.stream().map(BankHolderLeg::amount).toList())
+            .compareTo(new BigDecimal("-5")),
+        "holder legs net to -fee");
+    assertEquals(0, balance(account).signum(), "source debited exactly the entered 1000");
+    assertEquals(
+        0, balance(otherAccount).compareTo(new BigDecimal("995")), "destination gets amount - fee");
+    assertEquals(0, holderTotal(holderA).signum());
+    assertEquals(0, holderTotal(holderB).compareTo(new BigDecimal("995")));
+  }
+
+  @Test
+  void bookWithdrawal_feeInclusive_rejectsWhenAmountDoesNotExceedFee() {
+    // Given (REQ-BANK-033, #999 decision #4): under a punitive fee rate the whole entered amount is
+    // consumed by the fee, so nothing would arrive in the fee-inclusive mode. fee = round(1 * 0.99)
+    // =
+    // 1, so amount - fee = 0. The rate is a global setting seeded by V79; flip it for this test and
+    // restore it afterwards so no other test sees the punitive rate.
+    SystemSetting rate =
+        systemSettingRepository.findById("operation.transfer_fee_rate").orElseThrow();
+    String original = rate.getValue();
+    rate.setValue("0.99");
+    systemSettingRepository.saveAndFlush(rate);
+    try {
+      deposit(account, holderA, "10");
+
+      // When / Then: a fee-inclusive payout of 1 is refused before the overdraft check, balance
+      // intact
+      BankConflictException ex =
+          assertThrows(
+              BankConflictException.class,
+              () ->
+                  bankLedgerService.bookWithdrawal(
+                      new BankWithdrawalRequest(
+                          account.getId(),
+                          holderA.getId(),
+                          new BigDecimal("1"),
+                          null,
+                          null,
+                          null,
+                          null,
+                          true)));
+      assertEquals(BankConflictException.CODE_BANK_FEE_EXCEEDS_AMOUNT, ex.getCode());
+      assertEquals(0, balance(account).compareTo(new BigDecimal("10")), "balance unchanged");
+    } finally {
+      SystemSetting reset =
+          systemSettingRepository.findById("operation.transfer_fee_rate").orElseThrow();
+      reset.setValue(original);
+      systemSettingRepository.saveAndFlush(reset);
+    }
   }
 
   @Test
@@ -720,7 +844,8 @@ class BankLedgerServiceTest {
                 null,
                 null,
                 recipient.getId(),
-                null));
+                null,
+                false));
 
     // Then: the user + handle are snapshotted, the org unit stays empty
     BankTransaction stored = transactionRepository.findById(tx.id()).orElseThrow();
