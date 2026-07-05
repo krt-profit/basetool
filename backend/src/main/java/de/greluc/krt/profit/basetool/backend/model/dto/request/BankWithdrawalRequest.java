@@ -46,15 +46,20 @@ import org.jetbrains.annotations.Nullable;
  * @param counterpartyUserId optional Empf&auml;nger — the member who received the payout
  *     (REQ-BANK-044), distinct from the paying holder; {@code null} when no counterparty is
  *     recorded
- * @param counterpartyOrgUnitId optional org unit the Empf&auml;nger belongs to, chosen from their
- *     own memberships; only meaningful together with {@code counterpartyUserId} and validated to be
- *     one of that user's memberships (REQ-BANK-044)
+ * @param counterpartyOrgUnitId optional org unit the Empf&auml;nger belongs to; for a registered
+ *     counterparty ({@code counterpartyUserId}) it is validated to be one of that user's
+ *     memberships, for an external counterparty ({@code counterpartyExternalName}) it may be
+ *     <em>any</em> active org unit (REQ-BANK-044, #994)
  * @param feeInclusive fee-mode toggle (REQ-BANK-033, #999): {@code false} (default, unchanged)
  *     means the entered {@code amount} is what must arrive and the in-game fee is added on top —
  *     the source is debited {@code amount + fee}; {@code true} means the entered {@code amount} is
  *     the gross debited and the recipient receives {@code amount - fee}. A bank-staff choice at
  *     booking time only — a withdrawal <em>request</em> never carries it (confirmation always books
  *     on-top)
+ * @param counterpartyExternalName optional Empf&auml;nger recorded as <strong>free text</strong>
+ *     for a person <em>without</em> a basetool account (REQ-BANK-044, #994); mutually exclusive
+ *     with {@code counterpartyUserId}. When set, the handle is snapshotted from this name and no
+ *     {@code counterparty_user_id} FK is stored
  */
 public record BankWithdrawalRequest(
     @NotNull UUID accountId,
@@ -64,15 +69,16 @@ public record BankWithdrawalRequest(
     @Nullable @Size(max = 500) String justification,
     @Nullable UUID counterpartyUserId,
     @Nullable UUID counterpartyOrgUnitId,
-    boolean feeInclusive) {
+    boolean feeInclusive,
+    @Nullable @Size(max = 100) String counterpartyExternalName) {
 
   /**
    * Convenience constructor for a withdrawal with <strong>no</strong> recorded justification or
    * counterparty (REQ-BANK-044/-045) and the default on-top fee mode (REQ-BANK-033) — the common
    * case where neither is captured. Delegates to the canonical constructor with the justification
-   * and both counterparty fields {@code null} and {@code feeInclusive} {@code false}. Inbound JSON
-   * is always deserialized via the canonical (all-component) constructor, so this overload only
-   * serves programmatic callers.
+   * and both counterparty fields {@code null}, {@code feeInclusive} {@code false} and no external
+   * counterparty. Inbound JSON is always deserialized via the canonical (all-component)
+   * constructor, so this overload only serves programmatic callers.
    *
    * @param accountId the paying account
    * @param holderId the player who physically paid the money out
@@ -81,6 +87,43 @@ public record BankWithdrawalRequest(
    */
   public BankWithdrawalRequest(
       UUID accountId, UUID holderId, BigDecimal amount, @Nullable String note) {
-    this(accountId, holderId, amount, note, null, null, null, false);
+    this(accountId, holderId, amount, note, null, null, null, false, null);
+  }
+
+  /**
+   * Convenience constructor for a withdrawal with no external free-text counterparty (REQ-BANK-044,
+   * #994) — the pre-#994 canonical shape (justification + registered counterparty + fee mode).
+   * Delegates to the canonical constructor with {@code counterpartyExternalName} {@code null},
+   * keeping every existing call site (the request-confirmation path and the fee-mode tests)
+   * unchanged; programmatic callers only, Jackson uses the canonical.
+   *
+   * @param accountId the paying account
+   * @param holderId the player who physically paid the money out
+   * @param amount whole-aUEC amount, at least 1
+   * @param note optional free-text note for the booking history and statements
+   * @param justification optional free-text justification (Begr&uuml;ndung)
+   * @param counterpartyUserId the Empf&auml;nger (registered member), or {@code null}
+   * @param counterpartyOrgUnitId the Empf&auml;nger's org unit, or {@code null}
+   * @param feeInclusive the fee mode (REQ-BANK-033); {@code false} is the default on-top mode
+   */
+  public BankWithdrawalRequest(
+      @NotNull UUID accountId,
+      @NotNull UUID holderId,
+      @NotNull BigDecimal amount,
+      @Nullable String note,
+      @Nullable String justification,
+      @Nullable UUID counterpartyUserId,
+      @Nullable UUID counterpartyOrgUnitId,
+      boolean feeInclusive) {
+    this(
+        accountId,
+        holderId,
+        amount,
+        note,
+        justification,
+        counterpartyUserId,
+        counterpartyOrgUnitId,
+        feeInclusive,
+        null);
   }
 }

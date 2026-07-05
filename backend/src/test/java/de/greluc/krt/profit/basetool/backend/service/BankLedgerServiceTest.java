@@ -891,6 +891,89 @@ class BankLedgerServiceTest {
     assertNull(auditForTransaction(account.getId(), tx.id()).getTargetUserId());
   }
 
+  @Test
+  void bookDeposit_recordsExternalCounterpartyNameAndAnyOrgUnitWithoutUserId() {
+    // Given (REQ-BANK-044, #994): an external Einzahler with NO tool account, attributed to an org
+    // unit they are not a member of (any active org unit is allowed for an external counterparty).
+    Squadron anyStaffel = newSquadron("Staffel " + UUID.randomUUID());
+
+    // When: the deposit records a free-text name + that org unit, no counterparty user
+    BankTransactionDto tx =
+        bankLedgerService.bookDeposit(
+            new BankDepositRequest(
+                account.getId(),
+                holderA.getId(),
+                new BigDecimal("500"),
+                null,
+                false,
+                null,
+                null,
+                anyStaffel.getId(),
+                "Max Mustermann"));
+
+    // Then: the handle snapshots the free-text name, the org-unit snapshot is set, but NO
+    // counterparty_user_id FK is stored and the audit target user is null (no PII beyond the label)
+    BankTransaction stored = transactionRepository.findById(tx.id()).orElseThrow();
+    assertNull(stored.getCounterpartyUserId(), "an external counterparty has no user FK");
+    assertEquals("Max Mustermann", stored.getCounterpartyHandle());
+    assertEquals(anyStaffel.getId(), stored.getCounterpartyOrgUnitId());
+    assertEquals(anyStaffel.getName(), stored.getCounterpartyOrgUnitName());
+    BankAuditEvent audit = auditForTransaction(account.getId(), tx.id());
+    assertNull(audit.getTargetUserId(), "no target user for an external counterparty");
+    assertTrue(audit.getDetails().contains("Max Mustermann"));
+    assertTrue(audit.getDetails().contains(anyStaffel.getName()));
+  }
+
+  @Test
+  void bookWithdrawal_externalCounterparty_nameOnly_snapshotsNameWithNullUserAndOrgUnit() {
+    // Given (REQ-BANK-044, #994): an external Empfänger recorded by name only, no org unit
+    deposit(account, holderA, "500");
+
+    // When
+    BankTransactionDto tx =
+        bankLedgerService.bookWithdrawal(
+            new BankWithdrawalRequest(
+                account.getId(),
+                holderA.getId(),
+                new BigDecimal("100"),
+                null,
+                null,
+                null,
+                null,
+                false,
+                "Erika Extern"));
+
+    // Then: the name is snapshotted with no user FK and no org unit
+    BankTransaction stored = transactionRepository.findById(tx.id()).orElseThrow();
+    assertNull(stored.getCounterpartyUserId());
+    assertEquals("Erika Extern", stored.getCounterpartyHandle());
+    assertNull(stored.getCounterpartyOrgUnitId());
+    assertNull(stored.getCounterpartyOrgUnitName());
+    assertNull(auditForTransaction(account.getId(), tx.id()).getTargetUserId());
+  }
+
+  @Test
+  void bookDeposit_rejectsBothRegisteredAndExternalCounterparty() {
+    // Given (REQ-BANK-044, #994): a counterparty is either a registered user or an external name
+    User depositor = newUser("doppelt");
+
+    // When / Then: supplying both is a 400
+    assertThrows(
+        BadRequestException.class,
+        () ->
+            bankLedgerService.bookDeposit(
+                new BankDepositRequest(
+                    account.getId(),
+                    holderA.getId(),
+                    new BigDecimal("10"),
+                    null,
+                    false,
+                    null,
+                    depositor.getId(),
+                    null,
+                    "Max Mustermann")));
+  }
+
   /** Books a deposit through the service (the canonical seeding path). */
   private BankTransactionDto deposit(BankAccount target, BankHolder holder, String amount) {
     return bankLedgerService.bookDeposit(

@@ -142,7 +142,10 @@ public class BankLedgerService {
     BankHolder holder = requireHolder(request.holderId());
     requireActiveHolder(holder);
     CounterpartySnapshot counterparty =
-        resolveCounterparty(request.counterpartyUserId(), request.counterpartyOrgUnitId());
+        resolveCounterparty(
+            request.counterpartyUserId(),
+            request.counterpartyExternalName(),
+            request.counterpartyOrgUnitId());
 
     Instant now = Instant.now();
     // A deposit carries no bank-borne fee: whoever pays money IN bears their own in-game transfer
@@ -257,7 +260,10 @@ public class BankLedgerService {
     BigDecimal namedShare = gross.subtract(distributed);
 
     CounterpartySnapshot counterparty =
-        resolveCounterparty(request.counterpartyUserId(), request.counterpartyOrgUnitId());
+        resolveCounterparty(
+            request.counterpartyUserId(),
+            request.counterpartyExternalName(),
+            request.counterpartyOrgUnitId());
     Instant now = Instant.now();
     BankTransaction tx =
         persistTransaction(
@@ -358,7 +364,10 @@ public class BankLedgerService {
     requireDebitJustification(account, request.justification());
     final BankHolder holder = requireHolder(request.holderId());
     CounterpartySnapshot counterparty =
-        resolveCounterparty(request.counterpartyUserId(), request.counterpartyOrgUnitId());
+        resolveCounterparty(
+            request.counterpartyUserId(),
+            request.counterpartyExternalName(),
+            request.counterpartyOrgUnitId());
 
     // Fee mode (REQ-BANK-033, #999). The fee is always round(entered amount x rate). On-top
     // (default):
@@ -1002,46 +1011,81 @@ public class BankLedgerService {
   }
 
   /**
-   * Resolves the optional deposit/withdrawal counterparty (REQ-BANK-044) into a snapshot stamped on
-   * the transaction header. A {@code null} user means "no counterparty recorded" (a lone org unit
-   * without a user is rejected). The handle is snapshotted from the user's effective name; when an
-   * org unit is named it is validated to be one of the user's own memberships across all four kinds
-   * (via the shared, kind-safe {@link OrgUnitMembershipService#listDirectMembershipOptions}) and
-   * its name snapshotted, so a later user/org-unit deletion leaves the recorded booking intact.
+   * Resolves the optional deposit/withdrawal counterparty (REQ-BANK-044, #994) into a snapshot
+   * stamped on the transaction header. The counterparty is either a <strong>registered</strong>
+   * tool user or an <strong>external</strong> free-text name (mutually exclusive; supplying both is
+   * a 400). With neither, no counterparty is recorded (a lone org unit is a 400).
    *
-   * @param userId the counterparty user id, or {@code null} when none was chosen
+   * <ul>
+   *   <li><strong>Registered</strong> ({@code userId}): the handle is snapshotted from the user's
+   *       effective name; a named org unit is validated to be one of the user's own memberships
+   *       across all four kinds (via the shared, kind-safe {@link
+   *       OrgUnitMembershipService#listDirectMembershipOptions}) and its name snapshotted.
+   *   <li><strong>External</strong> ({@code externalName}, #994): the handle is snapshotted from
+   *       the free-text name and <em>no</em> {@code counterparty_user_id} FK is stored; a named org
+   *       unit may be <em>any</em> active org unit (the membership check is skipped, since there is
+   *       no linked user), resolved to its name snapshot via {@link
+   *       OrgUnitMembershipService#listAllActiveOrgUnitOptionsAllKinds}.
+   * </ul>
+   *
+   * <p>Either way the org-unit name is snapshotted so a later user/org-unit deletion leaves the
+   * recorded booking intact.
+   *
+   * @param userId the registered counterparty user id, or {@code null}
+   * @param externalName the external free-text counterparty name (#994), or {@code null}/blank
    * @param orgUnitId the counterparty's chosen org unit, or {@code null}
-   * @return the resolved snapshot, or {@code null} when no counterparty user was chosen
-   * @throws BadRequestException when an org unit is named without a user, or one that is not a
-   *     membership of the counterparty user
-   * @throws NotFoundException when the named counterparty user does not exist
+   * @return the resolved snapshot, or {@code null} when no counterparty was chosen
+   * @throws BadRequestException when both a user and an external name are given, when an org unit
+   *     is named without a counterparty, when a registered user's org unit is not one of their
+   *     memberships, or when an external counterparty's org unit does not exist / is inactive
+   * @throws NotFoundException when the named registered counterparty user does not exist
    */
   @Nullable
   private CounterpartySnapshot resolveCounterparty(
-      @Nullable UUID userId, @Nullable UUID orgUnitId) {
-    if (userId == null) {
+      @Nullable UUID userId, @Nullable String externalName, @Nullable UUID orgUnitId) {
+    String external = externalName == null || externalName.isBlank() ? null : externalName.trim();
+    if (userId != null && external != null) {
+      throw new BadRequestException(
+          "A counterparty is either a registered user or an external free-text name, not both");
+    }
+    if (userId == null && external == null) {
       if (orgUnitId != null) {
-        throw new BadRequestException("A counterparty org unit requires a counterparty user");
+        throw new BadRequestException("A counterparty org unit requires a counterparty");
       }
       return null;
     }
-    User user =
-        userRepository
-            .findById(userId)
-            .orElseThrow(() -> new NotFoundException("Counterparty user not found"));
-    if (orgUnitId == null) {
-      return new CounterpartySnapshot(user.getId(), user.getEffectiveName(), null, null);
+    if (userId != null) {
+      User user =
+          userRepository
+              .findById(userId)
+              .orElseThrow(() -> new NotFoundException("Counterparty user not found"));
+      if (orgUnitId == null) {
+        return new CounterpartySnapshot(user.getId(), user.getEffectiveName(), null, null);
+      }
+      OrgUnitMembershipOptionDto membership =
+          orgUnitMembershipService.listDirectMembershipOptions(userId).stream()
+              .filter(option -> option.orgUnitId().equals(orgUnitId))
+              .findFirst()
+              .orElseThrow(
+                  () ->
+                      new BadRequestException(
+                          "The selected org unit is not one of the counterparty's memberships"));
+      return new CounterpartySnapshot(
+          user.getId(), user.getEffectiveName(), membership.orgUnitId(), membership.orgUnitName());
     }
-    OrgUnitMembershipOptionDto membership =
-        orgUnitMembershipService.listDirectMembershipOptions(userId).stream()
+    // External counterparty (#994): free-text name + any active org unit, no membership check.
+    if (orgUnitId == null) {
+      return new CounterpartySnapshot(null, external, null, null);
+    }
+    OrgUnitMembershipOptionDto orgUnit =
+        orgUnitMembershipService.listAllActiveOrgUnitOptionsAllKinds().stream()
             .filter(option -> option.orgUnitId().equals(orgUnitId))
             .findFirst()
             .orElseThrow(
                 () ->
                     new BadRequestException(
-                        "The selected org unit is not one of the counterparty's memberships"));
-    return new CounterpartySnapshot(
-        user.getId(), user.getEffectiveName(), membership.orgUnitId(), membership.orgUnitName());
+                        "The selected counterparty org unit does not exist or is inactive"));
+    return new CounterpartySnapshot(null, external, orgUnit.orgUnitId(), orgUnit.orgUnitName());
   }
 
   /**
@@ -1067,17 +1111,19 @@ public class BankLedgerService {
   }
 
   /**
-   * Immutable snapshot of a deposit/withdrawal counterparty (REQ-BANK-044) threaded from {@link
-   * #resolveCounterparty} onto the transaction header — the far-side member and, optionally, the
-   * org unit they belong to, each captured with a deletion-proof name snapshot.
+   * Immutable snapshot of a deposit/withdrawal counterparty (REQ-BANK-044, #994) threaded from
+   * {@link #resolveCounterparty} onto the transaction header — the far-side party and, optionally,
+   * the org unit they belong to, each captured with a deletion-proof name snapshot.
    *
-   * @param userId the counterparty user id (never {@code null} within a non-null snapshot)
-   * @param handle the user's effective-name snapshot
+   * @param userId the registered counterparty user id, or {@code null} for an external free-text
+   *     counterparty (#994) — the handle then carries the entered name and no FK is stored
+   * @param handle the party's name snapshot (a registered user's effective name, or the external
+   *     free-text name)
    * @param orgUnitId the chosen org unit id, or {@code null}
    * @param orgUnitName the org unit's name snapshot, or {@code null} when no org unit was chosen
    */
   public record CounterpartySnapshot(
-      @NotNull UUID userId,
+      @Nullable UUID userId,
       @NotNull String handle,
       @Nullable UUID orgUnitId,
       @Nullable String orgUnitName) {}
