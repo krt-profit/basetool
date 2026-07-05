@@ -59,6 +59,7 @@ import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -67,6 +68,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
@@ -94,6 +98,29 @@ class BankBookingRequestServiceTest {
   @Mock private ApplicationEventPublisher eventPublisher;
 
   @InjectMocks private BankBookingRequestService service;
+
+  @Test
+  void listQueue_emptyStatuses_returnsEmptyWithoutQuerying() {
+    Page<BankBookingRequestDto> result = service.listQueue(Set.of(), PageRequest.of(0, 20));
+
+    assertThat(result.getTotalElements()).isZero();
+    verify(requestRepository, never()).findByStatusIn(any(), any());
+    verify(requestRepository, never()).findByStatusInAndAccountIdIn(any(), any(), any());
+  }
+
+  @Test
+  void listQueue_management_delegatesToFindByStatusInAcrossAllAccounts() {
+    Set<BankBookingRequestStatus> statuses =
+        Set.of(BankBookingRequestStatus.PENDING, BankBookingRequestStatus.CONFIRMED);
+    when(bankSecurityService.isManagement()).thenReturn(true);
+    when(requestRepository.findByStatusIn(eq(statuses), any(Pageable.class)))
+        .thenReturn(Page.<BankBookingRequest>empty());
+
+    service.listQueue(statuses, PageRequest.of(0, 20));
+
+    verify(requestRepository).findByStatusIn(eq(statuses), any(Pageable.class));
+    verify(requestRepository, never()).findByStatusInAndAccountIdIn(any(), any(), any());
+  }
 
   private static BankAccount account(UUID id) {
     BankAccount account = new BankAccount();

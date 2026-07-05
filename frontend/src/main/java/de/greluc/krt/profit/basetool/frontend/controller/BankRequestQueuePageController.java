@@ -24,10 +24,13 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -41,17 +44,20 @@ import org.springframework.web.util.UriComponentsBuilder;
  * caller may act on, with confirm (records the holder, books the ledger) and reject modals. Gated
  * to {@code BANK_EMPLOYEE} like the rest of the bank area; the backend scopes the list to the
  * accounts the caller can see. Confirm/reject are AJAX writes via {@code
- * /api/proxy/bank/requests/**} that swap the {@code requestQueue} fragment in place. The holder
- * registry is fetched here so the confirm modal's holder select works without a follow-up read.
+ * /api/proxy/bank/requests/**} that swap the {@code requestQueue} fragment in place. The queue is a
+ * single table with parallel status filters (Ausstehend / Best&auml;tigt / Abgelehnt /
+ * Zur&uuml;ckgezogen) whose selection {@code bank.js} persists per user in {@code localStorage} and
+ * replays through the {@code status} query parameter; the holder registry is fetched here so the
+ * confirm modal's holder select works without a follow-up read.
  */
 @Controller
 @RequiredArgsConstructor
 @Slf4j
 public class BankRequestQueuePageController {
 
-  /** Lifecycle states the queue filter offers, in display order. */
-  private static final Set<String> ALLOWED_STATUSES =
-      Set.of("PENDING", "CONFIRMED", "REJECTED", "CANCELLED");
+  /** Lifecycle states the queue filter offers, in canonical display order. */
+  private static final List<String> STATUS_ORDER =
+      List.of("PENDING", "CONFIRMED", "REJECTED", "CANCELLED");
 
   /** Response type for one page of booking requests ({@code /api/v1/bank/requests}). */
   private static final ParameterizedTypeReference<PageResponse<BankBookingRequestDto>>
@@ -67,11 +73,14 @@ public class BankRequestQueuePageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the queue (or its {@code requestQueue} fragment for an in-place swap after a decision).
+   * Renders the queue (or its {@code requestQueue} fragment for an in-place swap after a decision
+   * or a filter change).
    *
-   * @param status the lifecycle filter; defaults to {@code PENDING} (the work queue)
+   * @param status the parallel status filter as a comma-separated list of lifecycle states; {@code
+   *     null} (absent) is a first, unfiltered load and defaults to {@code PENDING}; the {@code
+   *     NONE} sentinel is the deliberate "all filters off" selection (empty table)
    * @param fragment when {@code "requestQueue"} only the queue table is re-rendered (AJAX swap
-   *     after confirm/reject); otherwise the full page is returned
+   *     after confirm/reject or a filter toggle); otherwise the full page is returned
    * @param model Spring MVC model
    * @return the template, or its {@code requestQueue} fragment view
    */
@@ -81,18 +90,17 @@ public class BankRequestQueuePageController {
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String fragment,
       Model model) {
-    String effectiveStatus =
-        status != null && ALLOWED_STATUSES.contains(status) ? status : "PENDING";
-    PageResponse<BankBookingRequestDto> requests =
-        backendApiClient.get(
-            UriComponentsBuilder.fromPath("/api/v1/bank/requests")
-                .queryParam("status", effectiveStatus)
-                .queryParam("size", 200)
-                .toUriString(),
-            BOOKING_REQUEST_PAGE);
+    List<String> selectedStatuses = resolveStatuses(status);
+    PageResponse<BankBookingRequestDto> requests = null;
+    if (!selectedStatuses.isEmpty()) {
+      UriComponentsBuilder uri =
+          UriComponentsBuilder.fromPath("/api/v1/bank/requests").queryParam("size", 200);
+      selectedStatuses.forEach(s -> uri.queryParam("status", s));
+      requests = backendApiClient.get(uri.toUriString(), BOOKING_REQUEST_PAGE);
+    }
     List<BankHolderDto> holders = backendApiClient.get("/api/v1/bank/holders", BANK_HOLDER_LIST);
     model.addAttribute("requests", requests);
-    model.addAttribute("status", effectiveStatus);
+    model.addAttribute("selectedStatuses", selectedStatuses);
     model.addAttribute("holders", holders == null ? List.<BankHolderDto>of() : holders);
     // Active holders feed the transfer-confirm destination-holder select (REQ-BANK-040): a
     // destination may only receive money on an active holder.
@@ -105,5 +113,26 @@ public class BankRequestQueuePageController {
       return "bank-requests :: requestQueue";
     }
     return "bank-requests";
+  }
+
+  /**
+   * Resolves the raw {@code status} query parameter into the ordered, validated list of lifecycle
+   * states to show. {@code null} — the parameter is absent (a first, unfiltered load) or a blank
+   * value the global {@code emptyAsNull} string binder collapsed to {@code null} — defaults to the
+   * {@code PENDING} work queue. Otherwise the comma-separated names are kept in canonical display
+   * order, de-duplicated and filtered to the known states; the client sends the {@code NONE}
+   * sentinel (an unknown status that filters out) for the deliberate "all filters off" selection,
+   * so it yields an empty list distinct from the absent-parameter default.
+   *
+   * @param status the raw {@code status} query parameter, or {@code null} when absent/blank
+   * @return the lifecycle states to show, in canonical display order (possibly empty)
+   */
+  private List<String> resolveStatuses(@Nullable String status) {
+    if (status == null) {
+      return List.of("PENDING");
+    }
+    Set<String> requested =
+        Arrays.stream(status.split(",")).map(String::trim).collect(Collectors.toSet());
+    return STATUS_ORDER.stream().filter(requested::contains).toList();
   }
 }

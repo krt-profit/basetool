@@ -7,6 +7,10 @@
 - **Deploy: geänderte Netz-Topologie wird sauber neu erstellt statt in-place.** Ändert eine promotete `docker-compose.yml` die `networks:`-Definition (neu gepinntes Subnetz, Netz hinzugefügt/entfernt), kann ein in-place `up` das nicht auf laufende Container anwenden – die Namensauflösung strandet (`keycloak`<->`backend`/`db`, Vorfall vom 05.07.). `deploy.sh` erkennt das jetzt und fährt Stack + Monitoring für die Anwendung sauber herunter (`down` + prune + `up`), im Vorwärts- und Rollback-Pfad – kurze Vollausfallzeit, aber nur bei echter Netz-Änderung; normale Config-Bumps bleiben in-place (#974).
 - **Frontend: erwartete Backend-4xx fluten nicht mehr das Fehler-Log.** 33 Controller loggten relayte Backend-Fehler zusätzlich auf ERROR – auch bei Client-4xx (Validierung 400, Konflikt 409). Diese 88 redundanten Logs sind auf DEBUG gesenkt (der `BackendApiClient`-Boundary loggt ohnehin einmal korrekt: 5xx→ERROR, 4xx→WARN), sodass normale Nutzereingabe-Fehler nicht mehr fälschlich `LogbackErrorSpike` auslösen (REQ-OBS-001).
 
+### Changed
+
+- **Bank – Buchungsanträge-Übersicht mit parallelen Status-Filtern.** Die Anträge stehen jetzt in einer Tabelle mit unabhängig schaltbaren Filtern (Ausstehend/Bestätigt/Abgelehnt/Zurückgezogen); standardmäßig ist nur „Ausstehend" aktiv. Die Auswahl wird pro Nutzer gespeichert, und Begründung sowie Notiz eines Antrags lassen sich je Zeile ausklappen (#995).
+
 
 ## [v1.1.3](https://github.com/krt-profit/basetool/releases/tag/v1.1.3) - 2026-07-05
 
