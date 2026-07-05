@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Monitoring: geänderte Prometheus-/Alloy-/Blackbox-Configs werden beim Deploy automatisch nachgeladen.** `deploy.sh` schickt nach dem (nicht-gatenden) Monitoring-`up` ein gezieltes `SIGHUP` an genau die Dienste, deren Config-Teilbaum sich in diesem Deploy geändert hat — Reload ohne Neustart, ohne Scrape-Lücke, ohne State-Verlust. Grafana (Dashboards) und der Loki-Ruler laden ohnehin selbst nach; nur Prometheus (Config + Alert-Rules), Alloy und blackbox_exporter brauchten bisher einen manuellen Anstoß (Epic #936).
+
+### Fixed
+
+- **Monitoring: SSH/Host-Auth-Dashboard + NPM-Panel korrigiert (Epic #936).** „Failed SSH auth rate" erfasst jetzt „Failed publickey" statt nur „Failed password" — auf dem Key-only-Host wird nie ein Passwort-Fehlversuch geloggt, weshalb das Panel dauerhaft leer blieb. Das Panel „NPM admin-UI login attempts" samt Loki-Alarm `NpmAdminLoginFailure` wurde entfernt und zu „NPM errors & warnings" umgewidmet: nginx-proxy-manager loggt Admin-Logins nicht auf stdout und die Admin-Oberfläche ist nur per Loopback erreichbar — das Admin-Login-Monitoring ist als akzeptierte Lücke dokumentiert (REQ-OBS-007/-010).
+
 ## [v1.1.1](https://github.com/krt-profit/basetool/releases/tag/v1.1.1) - 2026-07-04
 
 ### Added

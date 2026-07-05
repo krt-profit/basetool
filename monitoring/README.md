@@ -72,10 +72,18 @@ to the realm role `Admin`. There is no other exposed monitoring surface.
   — 12 dashboards, provisioned **read-only** (see the sandbox-export workflow
   below).
 
+**Config changes reach the running stack automatically.** On each deploy `deploy.sh`
+mirrors this tree to the host and — after the non-gating monitoring `up -d` — sends a
+targeted `SIGHUP` to the services whose slice changed (`prometheus` for `prometheus/**`,
+`alloy` for `alloy/**`, `blackbox-exporter` for `blackbox/**`): an in-place reload, no
+restart, no scrape gap. Grafana file-provisions its dashboards and the Loki ruler polls its
+rule dir, so those apply without a signal. `loki-config.yml` and `tempo.yaml` (main configs)
+still need a container restart on the rare change.
+
 ## Privacy / retention at a glance
 
 - **Metrics — 180d.** No PII; bounded labels only (REQ-OBS-006).
-- **Logs — 31d.** The NPM-access, NPM-admin, SSH-host-auth, host-auditd (config /
+- **Logs — 31d.** The NPM-access, SSH-host-auth, host-auditd (config /
   authorized_keys tamper) and host-fail2ban (SSH-jail bans) streams retain client
   IPs / usernames (owner-approved, covered by the privacy policy — REQ-OBS-010).
   The Keycloak file log is masked in the shipper before it reaches Loki.
@@ -110,7 +118,6 @@ Keep triage fast: confirm the signal in the matching Grafana dashboard, then act
 | **SshFailedAuthSpike**                                             | Failed SSH auth surge. Check source IPs; confirm fail2ban/firewall are active and consider blocking.                                                                                                                 |
 | **SshRootLoginAccepted**                                           | A successful **root** SSH login. Expected only for operator admin/tunnel sessions — confirm it was you; if not, treat as compromise (review auth logs, rotate keys).                                                 |
 | **SudoAuthFailure**                                                | A `sudo` failure on the host. The only non-root account (`deploy`) has no sudo, so any failure implies an unexpected actor — investigate the source and session.                                                     |
-| **NpmAdminLoginFailure**                                           | Failed logins against the NPM admin UI. Confirm it is not exposed publicly; review source IPs.                                                                                                                       |
 | **EdgeServerErrorSpike**                                           | 5xx spike at the edge (NPM). Check upstream app health and NPM logs; correlate with recent deploys.                                                                                                                  |
 | **EdgeRateLimitSpike**                                             | The edge per-IP limiter (or the backend limiter) is rejecting a sustained flood with 429s. Check source IPs in the `npm-access` stream; consider blocking at the firewall.                                           |
 | **EdgeActuatorDenyBroken**                                         | **CRITICAL.** A public app host no longer answers 404 on `/actuator/*` — the NPM proxy-host deny drifted (ADR-0072 compensating control). Re-add `location /actuator { return 404; }` in the host's Advanced config. |

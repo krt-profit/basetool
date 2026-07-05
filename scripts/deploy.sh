@@ -298,6 +298,28 @@ apply_config_tree() {
   fi
 }
 
+# In-place reload of a monitoring service whose slice of the config tree changed this run.
+# `up -d` recreates a container only when its DEFINITION changes; a config-file-only edit would
+# otherwise leave the process on the old config until its next natural recreate. Prometheus
+# (config + alert rules), Alloy (pipelines) and blackbox_exporter do NOT auto-reload, so we send
+# them SIGHUP — an in-place reload with no restart, no scrape gap, no state loss (an invalid
+# config is rejected and the running one stays live). Grafana file-provisions its dashboards and
+# the Loki ruler polls its rule dir, so both pick changes up on their own and are deliberately not
+# signalled here. `${CONFIG_PREVIOUS_DIR}/monitoring` is the pre-apply snapshot; `diff -rq` is
+# non-zero when the subtree changed OR the snapshot is absent (first apply) — both mean "reload".
+# Best-effort: a stopped service or a failed signal only logs and never gates the deploy.
+reload_monitoring_on_config_change() {
+  local svc="$1" subpath="$2"
+  if diff -rq "${CONFIG_PREVIOUS_DIR}/monitoring/${subpath}" \
+       "${COMPOSE_DIR}/monitoring/${subpath}" >/dev/null 2>&1; then
+    return 0
+  fi
+  log "  monitoring: ${subpath} config changed → reloading ${svc} (SIGHUP)"
+  docker compose -p iri-monitoring --project-directory "${COMPOSE_DIR}" \
+    -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" kill -s SIGHUP "${svc}" >/dev/null 2>&1 \
+    || log "  monitoring: WARN reload of ${svc} failed (non-gating; service not running?)"
+}
+
 # Extract the promoted Keycloak provider JAR (/providers/keycloak-spi.jar inside
 # the scratch basetool-keycloak-spi image) onto the host as the mounted provider
 # JAR. Like the config bundle the image has no entrypoint/command, so `docker
@@ -365,6 +387,9 @@ LAST_DEPLOYED_FILE="${STATE_DIR}/last-deployed.digests"
 FAILED_FILE="${STATE_DIR}/failed.digests"
 CONFIG_STAGE_DIR="${STATE_DIR}/config-stage"
 CONFIG_PREVIOUS_DIR="${STATE_DIR}/config-previous"
+# Set true once a new config tree is swapped in this run; gates the post-apply monitoring
+# in-place reload so a config-unchanged tick signals nothing.
+CONFIG_APPLIED=false
 CONFIG_BLOCKED_FILE="${STATE_DIR}/config-blocked.marker"
 # The live Keycloak provider JAR (mounted into the keycloak container) and the
 # rollback snapshot of it taken before a provider-JAR swap.
@@ -714,6 +739,7 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
   [[ -f "${COMPOSE_DIR}/.env" ]] \
     || fail "POST-APPLY: ${COMPOSE_DIR}/.env vanished after config swap — aborting before up"
   log "config applied"
+  CONFIG_APPLIED=true
 fi
 
 # --- Apply ------------------------------------------------------------------
@@ -820,6 +846,14 @@ if docker compose \
     if docker compose -p iri-monitoring --project-directory "${COMPOSE_DIR}" \
          -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" up -d 2>&1 | sed 's/^/  monitoring: /'; then
       log "monitoring stack reconciled"
+      # `up -d` already reloaded any service whose DEFINITION changed; for a config-file-only
+      # change, SIGHUP the components that do not auto-reload — only when this tick swapped in a
+      # new config tree, and only the services whose own slice actually changed.
+      if [[ "${CONFIG_APPLIED}" == "true" ]]; then
+        reload_monitoring_on_config_change prometheus prometheus
+        reload_monitoring_on_config_change alloy alloy
+        reload_monitoring_on_config_change blackbox-exporter blackbox
+      fi
     else
       log "WARN: monitoring stack apply failed — app deploy stays successful (non-gating)"
     fi

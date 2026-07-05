@@ -92,10 +92,18 @@ phase checklists. This ADR records the architectural decisions and their trade-o
 
 8. **Log-privacy per stream (`REQ-OBS-007`):** app streams are PII-masked at the source
    (the ingest module gained the `PiiMaskingLogstashEncoder` for exactly this reason);
-   Keycloak's file log is masked in the shipper; **NPM access, NPM admin-UI and
-   SSH/host-auth streams are deliberately ingested with client IPs/usernames at 31-day
-   retention** — an owner-recorded data-protection decision conditioned on the
+   Keycloak's file log is masked in the shipper; **NPM access, SSH/host-auth and the host
+   security (auditd, fail2ban) streams are deliberately ingested with client IPs/usernames at
+   31-day retention** — an owner-recorded data-protection decision conditioned on the
    privacy-policy extension (Phase-2 deliverable).
+
+   **Amendment (2026-07-04, epic [#936](https://github.com/krt-profit/basetool/issues/936)):** an
+   "NPM admin-UI" login stream was originally named here as an IP-bearing stream. It does not
+   exist as designed — nginx-proxy-manager does not log admin-UI logins to its container
+   stdout (only operational lines: nginx reloads, cert renewals, `[emerg]`/`[error]`), and the
+   admin UI is loopback-only. Admin-UI login monitoring is therefore descoped (accepted gap);
+   the NPM container stdout is retained as **PII-free operational logging**, surfaced on the
+   *NPM errors & warnings* dashboard panel, and is **not** part of the 31-day IP-retention set.
 
 9. **Single Prometheus with long local retention instead of Thanos/Mimir:** at this
    series volume (~11 jobs, one host) a remote-storage tier is pure overhead. The 180-day

@@ -103,13 +103,19 @@ rule — no blanket "everything is masked" claim:
   the shipper adds no further masking.
 - **Keycloak file log** — masked **in the shipper** (Alloy stages scrub `username=` /
   `ipAddress=` before ingestion).
-- **NPM access logs, NPM admin-UI stdout, SSH/host-auth logs, and the host security logs
+- **NPM access logs, SSH/host-auth logs, and the host security logs
   (auditd `sshd_config`/`authorized_keys` tamper watches, fail2ban SSH-jail bans)** — ingested **including
   client IPs and usernames** at a **31-day retention**. This is a deliberate,
   owner-approved data-protection decision (2026-07-02) for security monitoring and abuse
   detection; it is conditioned on the privacy-policy extension (`privacy.html` + DE/EN
   bundles) that ships with the Phase-2 PR, and Loki is deliberately excluded from backups so
   the GFS retention cannot silently extend those 31 days (ADR-0072).
+- **NPM container stdout** (`app="npm"`) — operational logs only (nginx reloads, cert
+  renewals, `[emerg]`/`[error]`); **no client IPs or usernames**, so no shipper masking and
+  not part of the 31-day IP-retention set. Surfaced on the SSH/host-auth dashboard's *NPM
+  errors & warnings* panel. Admin-UI login monitoring was originally planned on this stream,
+  but nginx-proxy-manager does not log admin logins to stdout and the admin UI is
+  loopback-only — descoped as an accepted gap (REQ-OBS-010).
 - **PostgreSQL container logs** — ingested with `log_error_verbosity=terse` so `DETAIL`
   lines cannot leak row data.
 - Loki labels stay low-cardinality (`app`, `level`, bounded `host`); log lines are never
@@ -177,15 +183,13 @@ Tracing on the OTel SDK) behind a hard master gate:
 
 ### REQ-OBS-010 — Edge / host-auth log streams: 31-day IP retention + privacy-policy linkage
 
-The monitoring plane ingests five log streams **including client IPs / usernames** at a
+The monitoring plane ingests four log streams **including client IPs / usernames** at a
 **31-day retention** — a deliberate, owner-approved data-protection trade-off (2026-07-02, epic
 [#936](https://github.com/krt-profit/basetool/issues/936), ADR-0072) for security monitoring and
 abuse detection:
 
 - **NPM edge access logs** — all public proxy hosts, client IPs (edge 4xx/5xx rates, scan/probe
   detection, per-host traffic).
-- **NPM admin-UI stdout** — the loopback-only admin UI; any failed login implies a host-local actor
-  or tunnel (high-signal).
 - **SSH / host-auth logs** — `/var/log/auth.log` (or the journal per distro): failed-auth spikes,
   invalid users, sudo failures, successful root logins, and a successful password/keyboard-interactive
   login on a key-only host.
@@ -194,6 +198,11 @@ abuse detection:
   downgrade). Ingested unmasked so the acting user stays attributable.
 - **Host fail2ban log** — `/var/log/fail2ban.log`: SSH-jail ban/unban events carrying the offending
   client IP — the active-blocking complement to the `SshFailedAuthSpike` detection.
+
+An NPM admin-UI login stream was originally planned as a fifth stream but was **descoped**:
+nginx-proxy-manager does not log admin logins to its container stdout, and the admin UI is
+loopback-only. Its stdout is still ingested — as **PII-free operational logging** (REQ-OBS-007),
+not an IP-bearing stream — and surfaced on the *NPM errors & warnings* dashboard panel.
 
 Binding conditions on this retention:
 

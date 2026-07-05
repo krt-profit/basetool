@@ -172,8 +172,9 @@ discovery.docker "containers" {
 discovery.relabel "containers" {
 	targets = discovery.docker.containers.targets
 
-	// Keep only the container streams we ingest via the docker API (NPM stdout = admin-UI logins;
-	// ingest JSON is masked at source; postgres runs with log_error_verbosity=terse).
+	// Keep only the container streams we ingest via the docker API (NPM stdout = operational logs
+	// — nginx reloads, cert renewals, [emerg]/[error]; NOT admin-UI logins, which NPM never writes
+	// to stdout; ingest JSON is masked at source; postgres runs with log_error_verbosity=terse).
 	rule {
 		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
 		regex         = "ingest|npm|redis|db-backend|db-keycloak"

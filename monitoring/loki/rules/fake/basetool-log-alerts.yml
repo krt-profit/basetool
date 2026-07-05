@@ -1,10 +1,10 @@
 # Loki ruler alerting rules (LogQL). Epic #936 — "committed in Phase 2, not optional".
 # These catch failure signals that `logback_events_total` cannot see (it covers only the 3 Spring
-# apps): Keycloak's fail-open Discord SPI error path, Postgres FATAL/PANIC, SSH auth attacks, NPM
-# admin-UI login failures, and edge 5xx. The `app`/`level` stream labels are set by Alloy
+# apps): Keycloak's fail-open Discord SPI error path, Postgres FATAL/PANIC, SSH auth attacks, and
+# edge 5xx/429. The `app`/`level` stream labels are set by Alloy
 # (config.alloy). "fake" is the single-tenant id when auth_enabled is false.
 #
-# NOTE: the exact NPM access-log, NPM admin-UI, and host auth.log line formats are verified ONCE on
+# NOTE: the exact NPM access-log and host auth.log line formats are verified ONCE on
 # the test stack during rollout (docs/MONITORING_ROLLOUT_RUNBOOK.md) and the line filters below
 # adjusted there if needed — they are the documented first-cut patterns.
 groups:
@@ -92,15 +92,6 @@ groups:
         annotations:
           summary: "sudo authentication failure on the host"
           description: "auth.log shows a sudo failure. The only non-root account has no sudo, so a failure implies an unexpected actor — investigate."
-
-      - alert: NpmAdminLoginFailure
-        expr: sum(rate({app="npm"} |~ "(?i)(invalid|failed).*(login|password|token)" [10m])) > 0
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "NPM admin-UI login failure"
-          description: "The NPM admin UI (loopback-only) recorded a failed login — any failure implies a host-local actor or tunnel. Verify the exact line format on the test stack."
 
       - alert: EdgeServerErrorSpike
         expr: sum(rate({app="npm-access"} |~ " 5[0-9][0-9] " [5m])) > 1
