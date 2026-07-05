@@ -563,10 +563,15 @@ scenario_monitoring_config_reload() {
   tmp="$(mktmp)"
   setup_host "${tmp}"
   echo "# dummy monitoring compose" > "${T_COMPOSE_DIR}/docker-compose.monitoring.yml"
-  # The live (pre-apply) monitoring tree — snapshotted as the diff baseline.
+  # The live (pre-apply) monitoring tree — snapshotted as the diff baseline. The changed
+  # prometheus.yml deliberately differs in BYTE LENGTH from the bundle's version below:
+  # mirror_dir uses rsync on Linux (CI), whose size+mtime quick-check would skip a same-size,
+  # same-second edit as "unchanged" and never apply it — so the on-disk config would not
+  # actually change and the reload would (correctly) not fire. Windows uses the cp -R fallback,
+  # which always copies. Different lengths guarantee the edit lands on every host.
   mkdir -p "${T_COMPOSE_DIR}/monitoring/prometheus" \
     "${T_COMPOSE_DIR}/monitoring/alloy" "${T_COMPOSE_DIR}/monitoring/blackbox"
-  echo "old" > "${T_COMPOSE_DIR}/monitoring/prometheus/prometheus.yml"
+  echo "scrape_interval: 30s" > "${T_COMPOSE_DIR}/monitoring/prometheus/prometheus.yml"
   echo "same" > "${T_COMPOSE_DIR}/monitoring/alloy/config.alloy"
   echo "same" > "${T_COMPOSE_DIR}/monitoring/blackbox/blackbox.yml"
   # The promoted config bundle: prometheus.yml differs, alloy/blackbox identical.
@@ -575,7 +580,7 @@ scenario_monitoring_config_reload() {
     "${bundle}/monitoring/alloy" "${bundle}/monitoring/blackbox"
   echo "# dummy compose file" > "${bundle}/docker-compose.yml"
   echo "# dummy monitoring compose" > "${bundle}/docker-compose.monitoring.yml"
-  echo "new" > "${bundle}/monitoring/prometheus/prometheus.yml"
+  echo "scrape_interval: 15s  # bumped" > "${bundle}/monitoring/prometheus/prometheus.yml"
   echo "same" > "${bundle}/monitoring/alloy/config.alloy"
   echo "same" > "${bundle}/monitoring/blackbox/blackbox.yml"
   write_marker "${MARKER}"
