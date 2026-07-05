@@ -411,7 +411,7 @@ gh workflow run promote.yml -f version=1.4.3
 (or use the GitHub Actions UI: *Actions → Promote to stable → Run
 workflow → version `1.4.3`*)
 
-The promotion passes three gates before it flips `:stable` (REQ-OPS-002):
+The promotion passes two gates before it flips `:stable` (REQ-OPS-002):
 
 1. **Approval.** The `promote` job is bound to the `production` GitHub
    Environment. A configured **required reviewer** must approve the run in the
@@ -421,13 +421,9 @@ The promotion passes three gates before it flips `:stable` (REQ-OPS-002):
    environment reference is a harmless no-op.
 2. **Signature.** cosign-verify of the exact digest against the release-images
    identity (the same identity the host re-verifies — REQ-OPS-015).
-3. **Vulnerability.** A Trivy scan of the exact digest fails the promotion on a
-   fixable HIGH/CRITICAL (the production vuln gate `release-images.yml` defers
-   to). For a deliberate hotfix whose CVE is unrelated to the fix, override it:
 
-   ```bash
-   gh workflow run promote.yml -f version=1.4.3 -f skip_vuln_gate=true
-   ```
+`release-images.yml` still scans every build with Trivy and uploads the findings
+to the repository's Security tab, but the scan does not gate the promotion.
 
 This re-tags the existing 1.4.3 image digest as `:stable` in GHCR. No
 rebuild. Same digest, two tags.

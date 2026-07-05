@@ -44,14 +44,13 @@ existing, already-validated digest to `:stable`. The app images, the `basetool-c
 and the `basetool-keycloak-spi` provider-JAR bundle are promoted **in lock-step**, so the compose
 file, the Keycloak provider JAR and the image versions the host applies always match each other.
 
-A promotion passes three gates before it flips `:stable`: (1) a **human-approval** gate — the
+A promotion passes two gates before it flips `:stable`: (1) a **human-approval** gate — the
 `promote` job is bound to the `production` GitHub Environment, so a repo-configured required reviewer
-must approve the run (workflow_dispatch alone lets anyone with Actions-write reach prod); (2) the
-**signature** gate — cosign-verify the source digest against the release-images identity; and (3) the
-**vulnerability** gate — a Trivy scan of the exact digest fails the promotion on a fixable
-HIGH/CRITICAL, so a known-vulnerable image cannot reach `:stable` by accident. `release-images.yml`
-scans on build but does not block the push (an urgent build must not be starved of an image); the
-gate lives at promotion. A `skip_vuln_gate` input is the deliberate hotfix escape hatch.
+must approve the run (workflow_dispatch alone lets anyone with Actions-write reach prod); and (2) the
+**signature** gate — cosign-verify the source digest against the release-images identity, so only an
+image built and signed by our own release pipeline can be promoted. `release-images.yml` scans every
+build with Trivy (SARIF uploaded to the Security tab for visibility) but the scan blocks neither the
+build nor the promotion — a Trivy finding is surfaced, not enforced, at any stage.
 
 **Acceptance**
 
@@ -61,11 +60,10 @@ gate lives at promotion. A `skip_vuln_gate` input is the deliberate hotfix escap
   `config` and `keycloak-spi` together (`fail-fast: true`).
 - [ ] The `promote` job declares `environment: production`, so a required reviewer configured on
   that environment gates the run before any `:stable` flip.
-- [ ] The `promote` job runs a Trivy scan (HIGH/CRITICAL, `ignore-unfixed`, `exit-code: 1`) of the
-  resolved digest for the app images before re-tagging; a fixable HIGH/CRITICAL fails the promotion
-  unless `skip_vuln_gate` is set. The `config` + `keycloak-spi` (`FROM scratch`) bundles are exempt.
+- [ ] The `promote` job cosign-verifies the resolved digest against the release-images identity
+  before re-tagging; an image not signed by our own release pipeline cannot be promoted.
 
-**Enforced by:** `.github/workflows/release-images.yml` · `.github/workflows/promote.yml` (`environment`, Trivy gate) · **Runbook:** `docs/deployment.md` → *Promoting to production*
+**Enforced by:** `.github/workflows/release-images.yml` · `.github/workflows/promote.yml` (`environment`, cosign gate) · **Runbook:** `docs/deployment.md` → *Promoting to production*
 
 ### REQ-OPS-003 — Digest pin + health gate + auto-rollback
 
