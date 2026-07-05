@@ -69,26 +69,27 @@ public class BankRequestController {
    * (REQ-BANK-023). Management sees every account; an employee sees only requests on accounts they
    * are granted on. Defaults to the {@code PENDING} work queue, newest first.
    *
-   * @param status the lifecycle state to list; defaults to {@code PENDING}
+   * @param status the lifecycle states to include (repeatable or comma-separated); defaults to
+   *     {@code PENDING} when omitted
    * @param page zero-based page index
    * @param size page size
    * @param sort whitelisted sort spec
-   * @return one page of requests visible to the caller
+   * @return one page of requests visible to the caller in any of those states
    */
   @Operation(summary = "List booking requests for the bank-staff confirmation queue (paged)")
   @GetMapping
   public PageResponse<BankBookingRequestDto> getQueue(
-      @RequestParam(required = false) BankBookingRequestStatus status,
+      @RequestParam(required = false) Set<BankBookingRequestStatus> status,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort) {
-    BankBookingRequestStatus effectiveStatus =
-        status == null ? BankBookingRequestStatus.PENDING : status;
+    Set<BankBookingRequestStatus> effectiveStatuses =
+        status == null || status.isEmpty() ? Set.of(BankBookingRequestStatus.PENDING) : status;
     String effectiveSort = sort == null || sort.isBlank() ? "createdAt,desc" : sort;
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, effectiveSort, QUEUE_SORT_FIELDS, "createdAt");
     Page<BankBookingRequestDto> result =
-        bankBookingRequestService.listQueue(effectiveStatus, pageable);
+        bankBookingRequestService.listQueue(effectiveStatuses, pageable);
     return new PageResponse<>(
         result.getContent(),
         result.getNumber(),

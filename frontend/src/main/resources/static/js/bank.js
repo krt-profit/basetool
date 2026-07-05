@@ -1462,3 +1462,137 @@
         }
     });
 })();
+
+// ------------------------------------------------------------------------------------------------
+// Booking-request queue status filter (REQ-BANK-023): parallel toggle chips whose selection is
+// persisted per user in localStorage and replayed through the `status` query parameter. The chips
+// live outside the swapped `requestQueue` fragment, so this module owns their pressed state and
+// re-fetches the table via the shared krtFetch.swap on every change. Default (no saved preference)
+// is Ausstehend only, rendered server-side; deselecting all shows the "no filter" hint.
+// ------------------------------------------------------------------------------------------------
+(function () {
+    const STATUSES = ['PENDING', 'CONFIRMED', 'REJECTED', 'CANCELLED'];
+
+    function filterBar() {
+        return document.querySelector('[data-bank-status-filter-bar]');
+    }
+
+    function storageKey() {
+        const main = document.querySelector('main[data-user-id]');
+        const uid = main ? main.getAttribute('data-user-id') : 'unknown';
+        return 'bank_request_status_filter_' + uid;
+    }
+
+    function chipFor(status) {
+        return document.querySelector('[data-bank-status-filter="' + status + '"]');
+    }
+
+    function readSaved() {
+        try {
+            const raw = localStorage.getItem(storageKey());
+            if (raw === null) {
+                return null;
+            }
+            const arr = JSON.parse(raw);
+            return Array.isArray(arr)
+                ? STATUSES.filter(function (s) {
+                      return arr.indexOf(s) !== -1;
+                  })
+                : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function writeSaved(list) {
+        try {
+            localStorage.setItem(storageKey(), JSON.stringify(list));
+        } catch (e) {
+            /* localStorage unavailable (private mode): the filter simply will not persist. */
+        }
+    }
+
+    function renderedSelection() {
+        return STATUSES.filter(function (s) {
+            const c = chipFor(s);
+            return c && c.getAttribute('aria-pressed') === 'true';
+        });
+    }
+
+    function applyChipStates(list) {
+        STATUSES.forEach(function (s) {
+            const c = chipFor(s);
+            if (!c) {
+                return;
+            }
+            const on = list.indexOf(s) !== -1;
+            c.setAttribute('aria-pressed', on ? 'true' : 'false');
+            c.classList.toggle('btn--cta', on);
+            c.classList.toggle('btn-ghost', !on);
+        });
+    }
+
+    // A blank query value collapses to null via the frontend's global emptyAsNull string binder,
+    // which the controller reads as "no selection" and defaults to PENDING. So an empty selection is
+    // sent as the non-empty `NONE` sentinel (an unknown status the controller filters out to an empty
+    // set), keeping deselect-all distinct from a first, unfiltered load.
+    function refetch(list) {
+        if (!window.krtFetch || typeof window.krtFetch.swap !== 'function') {
+            window.location.reload();
+            return;
+        }
+        window.krtFetch.swap({
+            url: '/bank/requests?status=' + (list.length ? list.join(',') : 'NONE'),
+            container: '#bank-request-queue-results',
+            fragmentValue: 'requestQueue',
+            history: true,
+        });
+    }
+
+    // On load, reconcile the saved per-user selection with the server-rendered chips. An explicit
+    // `status` in the address bar (deep link / back-forward) is authoritative and is persisted;
+    // otherwise a saved selection that differs from the server default (PENDING) is applied and the
+    // queue re-fetched to match.
+    document.addEventListener('DOMContentLoaded', function () {
+        if (!filterBar()) {
+            return;
+        }
+        if (/[?&]status=/.test(window.location.search)) {
+            writeSaved(renderedSelection());
+            return;
+        }
+        const saved = readSaved();
+        if (saved === null) {
+            writeSaved(renderedSelection());
+            return;
+        }
+        if (saved.join(',') !== renderedSelection().join(',')) {
+            applyChipStates(saved);
+            refetch(saved);
+        }
+    });
+
+    document.addEventListener('click', function (event) {
+        const chip = event.target.closest
+            ? event.target.closest('[data-bank-status-filter]')
+            : null;
+        if (!chip) {
+            return;
+        }
+        event.preventDefault();
+        const status = chip.getAttribute('data-bank-status-filter');
+        const selection = renderedSelection();
+        const at = selection.indexOf(status);
+        if (at === -1) {
+            selection.push(status);
+        } else {
+            selection.splice(at, 1);
+        }
+        const ordered = STATUSES.filter(function (s) {
+            return selection.indexOf(s) !== -1;
+        });
+        applyChipStates(ordered);
+        writeSaved(ordered);
+        refetch(ordered);
+    });
+})();

@@ -147,6 +147,38 @@ class BankRequestQueuePageControllerMvcTest {
   }
 
   @Test
+  @WithMockUser(roles = {"BANK_EMPLOYEE"})
+  void queue_defaultRendersPendingChipActiveUserIdAndExpandableDetail() throws Exception {
+    stubData();
+
+    mockMvc
+        .perform(get("/bank/requests"))
+        .andExpect(status().isOk())
+        // Parallel status filter chips replace the exclusive tabs; the bar and the per-user hook
+        // are
+        // present and only PENDING is active by default (REQ-BANK-023).
+        .andExpect(content().string(Matchers.containsString("data-bank-status-filter-bar")))
+        .andExpect(content().string(Matchers.containsString("data-user-id")))
+        .andExpect(content().string(Matchers.containsString("data-bank-status-filter=\"PENDING\"")))
+        .andExpect(content().string(Matchers.containsString("aria-pressed=\"true\"")))
+        // The row carries a note, so it is expandable and its detail sub-row surfaces it.
+        .andExpect(content().string(Matchers.containsString("bank-request-detail")))
+        .andExpect(content().string(Matchers.containsString("from sale")));
+  }
+
+  @Test
+  @WithMockUser(roles = {"BANK_EMPLOYEE"})
+  void queue_allFiltersOffShowsNoFilterHintAndNoTable() throws Exception {
+    stubData();
+
+    mockMvc
+        .perform(get("/bank/requests").param("status", "NONE"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString("bank-requests-nofilter")))
+        .andExpect(content().string(Matchers.not(Matchers.containsString("bank-requests-table"))));
+  }
+
+  @Test
   @WithMockUser(roles = {"OFFICER"})
   void queue_nonStaffIsForbidden() throws Exception {
     mockMvc.perform(get("/bank/requests")).andExpect(status().isForbidden());

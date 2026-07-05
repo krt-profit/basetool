@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.service.BankBookingRequestService;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -65,13 +66,27 @@ class BankRequestControllerTest {
     BankBookingRequestDto dto = requestDto();
     Page<BankBookingRequestDto> page = new PageImpl<>(List.of(dto), PageRequest.of(0, 20), 1);
     when(bankBookingRequestService.listQueue(
-            eq(BankBookingRequestStatus.PENDING), any(Pageable.class)))
+            eq(Set.of(BankBookingRequestStatus.PENDING)), any(Pageable.class)))
         .thenReturn(page);
 
     PageResponse<BankBookingRequestDto> result = controller.getQueue(null, null, null, null);
 
     assertEquals(1, result.totalElements());
     assertSame(dto, result.content().getFirst());
+  }
+
+  @Test
+  void getQueue_passesSelectedStatusesThrough() {
+    Page<BankBookingRequestDto> page =
+        new PageImpl<>(List.of(requestDto()), PageRequest.of(0, 20), 1);
+    Set<BankBookingRequestStatus> selected =
+        Set.of(BankBookingRequestStatus.CONFIRMED, BankBookingRequestStatus.REJECTED);
+    when(bankBookingRequestService.listQueue(eq(selected), any(Pageable.class))).thenReturn(page);
+
+    PageResponse<BankBookingRequestDto> result = controller.getQueue(selected, null, null, null);
+
+    assertEquals(1, result.totalElements());
+    verify(bankBookingRequestService).listQueue(eq(selected), any(Pageable.class));
   }
 
   @Test

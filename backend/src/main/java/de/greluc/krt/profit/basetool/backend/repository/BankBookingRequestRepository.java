@@ -138,6 +138,52 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
       BankBookingRequestStatus status, Collection<UUID> accountIds, Pageable pageable);
 
   /**
+   * One page of requests in any of the given lifecycle states across all accounts — the
+   * management/admin confirmation queue with the parallel status filter (REQ-BANK-023). An empty
+   * status collection yields an empty page.
+   *
+   * @param statuses the lifecycle states to include (any-of)
+   * @param pageable page, size and whitelisted sort
+   * @return one page of requests in any of those states
+   */
+  @EntityGraph(
+      attributePaths = {
+        "account",
+        "account.orgUnit",
+        "targetAccount",
+        "holder",
+        "holder.user",
+        "resultingTransaction"
+      })
+  Page<BankBookingRequest> findByStatusIn(
+      Collection<BankBookingRequestStatus> statuses, Pageable pageable);
+
+  /**
+   * One page of requests in any of the given states restricted to the supplied accounts — the
+   * bank-employee confirmation queue with the parallel status filter, scoped to the accounts the
+   * employee is granted on (REQ-BANK-023). An empty status or account collection yields an empty
+   * page.
+   *
+   * @param statuses the lifecycle states to include (any-of)
+   * @param accountIds the accounts the employee may see
+   * @param pageable page, size and whitelisted sort
+   * @return one page of requests in any of those states on those accounts
+   */
+  @EntityGraph(
+      attributePaths = {
+        "account",
+        "account.orgUnit",
+        "targetAccount",
+        "holder",
+        "holder.user",
+        "resultingTransaction"
+      })
+  Page<BankBookingRequest> findByStatusInAndAccountIdIn(
+      Collection<BankBookingRequestStatus> statuses,
+      Collection<UUID> accountIds,
+      Pageable pageable);
+
+  /**
    * Every request on the given accounts, most-recent first — the "Fremde Anträge" tab where a
    * responsible holder sees all requests raised against the accounts they are responsible for
    * (REQ-BANK-041). An empty id collection yields an empty list.

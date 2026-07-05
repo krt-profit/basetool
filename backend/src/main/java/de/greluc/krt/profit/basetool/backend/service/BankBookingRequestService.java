@@ -298,19 +298,24 @@ public class BankBookingRequestService {
   }
 
   /**
-   * One page of booking requests in the given lifecycle state for the bank-staff confirmation queue
-   * (REQ-BANK-023). Management sees every account; an employee sees only requests on accounts they
-   * are granted on. This is a pure bank-staff surface — it consults grants, never org-unit scope.
+   * One page of booking requests in any of the given lifecycle states for the bank-staff
+   * confirmation queue with the parallel status filter (REQ-BANK-023). Management sees every
+   * account; an employee sees only requests on accounts they are granted on. This is a pure
+   * bank-staff surface — it consults grants, never org-unit scope. An empty status set yields an
+   * empty page (the caller deselected every filter).
    *
-   * @param status the lifecycle state to list (e.g. {@code PENDING})
+   * @param statuses the lifecycle states to include (any-of, e.g. {@code PENDING})
    * @param pageable page, size and whitelisted sort
-   * @return one page of requests visible to the caller
+   * @return one page of requests visible to the caller in any of those states
    */
   @NotNull
   public Page<BankBookingRequestDto> listQueue(
-      @NotNull BankBookingRequestStatus status, @NotNull Pageable pageable) {
+      @NotNull Set<BankBookingRequestStatus> statuses, @NotNull Pageable pageable) {
+    if (statuses.isEmpty()) {
+      return Page.empty(pageable);
+    }
     if (bankSecurityService.isManagement()) {
-      return requestRepository.findByStatus(status, pageable).map(this::toDto);
+      return requestRepository.findByStatusIn(statuses, pageable).map(this::toDto);
     }
     Optional<UUID> caller = authHelperService.currentUserId();
     if (caller.isEmpty()) {
@@ -324,7 +329,7 @@ public class BankBookingRequestService {
       return Page.empty(pageable);
     }
     return requestRepository
-        .findByStatusAndAccountIdIn(status, grantedAccountIds, pageable)
+        .findByStatusInAndAccountIdIn(statuses, grantedAccountIds, pageable)
         .map(this::toDto);
   }
 
