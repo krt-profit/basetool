@@ -59,10 +59,11 @@
         </button>
     </div>
 
-    <!-- Type-to-confirm danger modal (wipe-reset-grade). Starts hidden via inline display:none
-         (this page's .krt-modal-overlay defaults to flex); the shared open/close-modal-display
-         handlers toggle it. admin-personal-blueprints-purge.js arms the submit and does the krtFetch
-         POST; the classic form POST is the no-JS fallback. -->
+    <!-- Type-to-confirm danger modal (wipe-reset-grade). Explicit inline display:none keeps it
+         hidden on load (belt-and-suspenders over the global .krt-modal-overlay { display:none }
+         default in styles.css); the shared open/close-modal-display handlers toggle it.
+         admin-personal-blueprints-purge.js arms the submit and does the krtFetch POST; the classic
+         form POST is the no-JS fallback. -->
     <div class="krt-modal-overlay" id="bp-purge-modal" style="display:none;">
         <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true"
              th:aria-label="#{admin.personalInventory.blueprints.purge.modal.title}">
