@@ -23,33 +23,49 @@
     </nav>
 </header>
 
-<main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed}">
+<main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-user-id=${#authentication.name}">
     <div class="greeting hud-box flex-between">
         <div>
             <h1 th:text="#{bank.requests.title}">Buchungsantr&auml;ge</h1>
             <p class="text-muted" style="margin: 0.25rem 0 0; font-size: 0.8rem;"
                th:text="#{bank.requests.subtitle}">Antr&auml;ge der Org-Einheiten best&auml;tigen oder ablehnen.</p>
         </div>
-        <div class="bank-head-actions">
-            <a th:href="@{/bank/requests(status='PENDING')}" class="btn btn-ghost btn-sm"
-               th:classappend="${status == 'PENDING'} ? ' btn--cta' : ''"
-               th:text="#{bank.request.status.PENDING}">Ausstehend</a>
-            <a th:href="@{/bank/requests(status='CONFIRMED')}" class="btn btn-ghost btn-sm"
-               th:classappend="${status == 'CONFIRMED'} ? ' btn--cta' : ''"
-               th:text="#{bank.request.status.CONFIRMED}">Best&auml;tigt</a>
-            <a th:href="@{/bank/requests(status='REJECTED')}" class="btn btn-ghost btn-sm"
-               th:classappend="${status == 'REJECTED'} ? ' btn--cta' : ''"
-               th:text="#{bank.request.status.REJECTED}">Abgelehnt</a>
-            <a th:href="@{/bank/requests(status='CANCELLED')}" class="btn btn-ghost btn-sm"
-               th:classappend="${status == 'CANCELLED'} ? ' btn--cta' : ''"
-               th:text="#{bank.request.status.CANCELLED}">Zur&uuml;ckgezogen</a>
+        <!-- Parallel status filters (REQ-BANK-023): independent toggle chips, not exclusive tabs.
+             Selection is persisted per user in localStorage by bank.js and replayed via the `status`
+             query param; the chips live outside the swapped `requestQueue` fragment, so bank.js owns
+             their pressed state. Default (no saved pref) is Ausstehend only, rendered server-side. -->
+        <div class="bank-head-actions" role="group" data-bank-status-filter-bar
+             th:aria-label="#{bank.requests.filter.aria}">
+            <button type="button" class="btn btn-sm bank-status-chip" data-bank-status-filter="PENDING"
+                    th:classappend="${#lists.contains(selectedStatuses, 'PENDING')} ? ' btn--cta' : ' btn-ghost'"
+                    th:attr="aria-pressed=${#lists.contains(selectedStatuses, 'PENDING')}"
+                    th:text="#{bank.request.status.PENDING}">Ausstehend</button>
+            <button type="button" class="btn btn-sm bank-status-chip" data-bank-status-filter="CONFIRMED"
+                    th:classappend="${#lists.contains(selectedStatuses, 'CONFIRMED')} ? ' btn--cta' : ' btn-ghost'"
+                    th:attr="aria-pressed=${#lists.contains(selectedStatuses, 'CONFIRMED')}"
+                    th:text="#{bank.request.status.CONFIRMED}">Best&auml;tigt</button>
+            <button type="button" class="btn btn-sm bank-status-chip" data-bank-status-filter="REJECTED"
+                    th:classappend="${#lists.contains(selectedStatuses, 'REJECTED')} ? ' btn--cta' : ' btn-ghost'"
+                    th:attr="aria-pressed=${#lists.contains(selectedStatuses, 'REJECTED')}"
+                    th:text="#{bank.request.status.REJECTED}">Abgelehnt</button>
+            <button type="button" class="btn btn-sm bank-status-chip" data-bank-status-filter="CANCELLED"
+                    th:classappend="${#lists.contains(selectedStatuses, 'CANCELLED')} ? ' btn--cta' : ' btn-ghost'"
+                    th:attr="aria-pressed=${#lists.contains(selectedStatuses, 'CANCELLED')}"
+                    th:text="#{bank.request.status.CANCELLED}">Zur&uuml;ckgezogen</button>
         </div>
     </div>
 
-    <!-- requestQueue fragment: the filtered request table; swapped in place after a decision. -->
+    <!-- requestQueue fragment: the filtered request table; swapped in place after a decision or a
+         status-filter toggle (REQ-BANK-023 / REQ-FE-005). -->
     <div id="bank-request-queue-results" th:fragment="requestQueue">
         <div class="hud-box mt-2">
-            <p class="text-center" th:if="${requests == null or #lists.isEmpty(requests.content())}"
+            <!-- All filters off (deselected): a distinct hint, not "no requests match". -->
+            <p class="text-center" th:if="${#lists.isEmpty(selectedStatuses)}"
+               data-testid="bank-requests-nofilter" th:text="#{bank.requests.empty.noFilter}">
+                Kein Status-Filter aktiv.
+            </p>
+            <p class="text-center"
+               th:if="${!#lists.isEmpty(selectedStatuses) and (requests == null or #lists.isEmpty(requests.content()))}"
                data-testid="bank-requests-empty" th:text="#{bank.requests.empty}">
                 Keine Antr&auml;ge in diesem Status.
             </p>
@@ -57,6 +73,7 @@
                    data-testid="bank-requests-table">
                 <thead>
                 <tr>
+                    <th class="bank-expand-cell"></th>
                     <th th:text="#{bank.request.col.account}">Konto</th>
                     <th th:text="#{bank.request.col.type}">Typ</th>
                     <th th:text="#{bank.request.col.amount}">Betrag</th>
@@ -67,7 +84,19 @@
                 </tr>
                 </thead>
                 <tbody>
-                <tr th:each="r : ${requests.content()}" data-testid="bank-request-row">
+                <th:block th:each="r : ${requests.content()}"
+                          th:with="hasDetail=${!#strings.isEmpty(r.justification()) or !#strings.isEmpty(r.note())},detailId='bank-req-' + ${r.id()}">
+                <tr data-testid="bank-request-row" class="bank-booking-row"
+                    th:classappend="${hasDetail} ? ' is-expandable' : ''">
+                    <td class="bank-expand-cell">
+                        <button type="button" class="bank-row-toggle" th:if="${hasDetail}"
+                                data-trigger="bank-row-expand" aria-expanded="false"
+                                th:attr="aria-controls=${detailId}"
+                                th:aria-label="#{bank.detail.toggleDetails}"
+                                data-testid="bank-request-expand">
+                            <svg class="krt-icon bank-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+                        </button>
+                    </td>
                     <td>
                         <span th:text="${r.accountName()}">Staffel IRIDIUM</span>
                         <br>
@@ -111,6 +140,25 @@
                               th:text="${r.deciderHandle() != null} ? ${r.deciderHandle()} : '&ndash;'">&ndash;</span>
                     </td>
                 </tr>
+                <!-- Detail sub-row (REQ-BANK-045): Begr&uuml;ndung first (more important), then Notiz;
+                     revealed by clicking the row / chevron, hidden by default. Mirrors the
+                     account-detail booking history; reuses the delegated bank.js toggle (no new JS). -->
+                <tr class="bank-booking-detail" th:if="${hasDetail}" th:id="${detailId}" hidden
+                    data-testid="bank-request-detail">
+                    <td colspan="8" class="bank-booking-detail-cell">
+                        <div class="bank-booking-detail-body">
+                            <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.justification())}">
+                                <span class="bank-detail-label" th:text="#{bank.booking.justification}">Begr&uuml;ndung</span>
+                                <span class="bank-detail-value" data-testid="bank-request-justification" th:text="${r.justification()}">Missionsfreigabe</span>
+                            </div>
+                            <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.note())}">
+                                <span class="bank-detail-label" th:text="#{bank.booking.note}">Notiz</span>
+                                <span class="bank-detail-value" data-testid="bank-request-note" th:text="${r.note()}">Missionsertrag</span>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                </th:block>
                 </tbody>
             </table>
         </div>

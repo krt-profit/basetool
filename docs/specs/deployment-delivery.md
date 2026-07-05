@@ -80,6 +80,20 @@ a bumped redis or npm image pin) is detected and applied — it is never skipped
 app-image idempotence check. No manual `cp docker-compose.yml` or hand-run
 `docker compose up -d` is required for an auto-appliable change.
 
+One apply mode is special: a change to the compose **`networks:` topology** (a re-pinned subnet, a
+network added/removed) **cannot** be applied by an in-place `up -d` — Docker can neither move a
+running container onto a differently-addressed bridge nor recreate a bridge that still has
+endpoints, so an in-place apply silently **strands** container name resolution (the 2026-07
+`keycloak`↔`backend` / `keycloak`↔`db-keycloak` incident, #974). `deploy.sh` detects it (the promoted
+compose's `networks:` block differs from the live one, comments ignored) and applies it via a **clean
+down+up**: the app project *and* the monitoring project that references the shared data nets as
+`external` are brought fully down, the stale bridges dropped, then recreated on the (pinned) subnets —
+on the forward apply **and** on the rollback. This is a brief full-stack outage, taken *only* on an
+actual `networks:` change; every ordinary config/app change keeps the fast rolling in-place `up`. It
+is **not** operator-gated (unlike the stateful-infra carve-out, REQ-OPS-006) — no data migration is
+involved, and the subnet pinning keeps the recreated gateways stable, so the NPM SSH-tunnel admin
+allow-list stays valid.
+
 **Acceptance**
 
 - [ ] After a promotion whose only change is an infra pin bump, the next timer tick applies
@@ -89,8 +103,13 @@ app-image idempotence check. No manual `cp docker-compose.yml` or hand-run
   makes the marker differ and triggers an apply.
 - [ ] A missing/unresolvable `basetool-config` artifact degrades to the legacy app-only deploy
   rather than failing the loop.
+- [ ] A promotion that changes the compose `networks:` block is applied via a clean down+up (not an
+  in-place `up`) on both apply and rollback, so name resolution is not stranded; a
+  `networks:`-unchanged config bump keeps the in-place `up`.
 
-**Enforced by:** `scripts/deploy.sh` (config-delivery block, `EXPECTED_MARKER`) · `docker/config/Dockerfile` · `.github/workflows/release-images.yml` (`build-config`) · **Runbook:** `docs/deployment.md` → *Infra / host-config bumps*
+**Enforced by:** `scripts/deploy.sh` (config-delivery block, `EXPECTED_MARKER`, `network_block` /
+`clean_slate_recreate`) · `docker/config/Dockerfile` · `.github/workflows/release-images.yml`
+(`build-config`) · **Runbook:** `docs/deployment.md` → *Infra / host-config bumps*
 
 ### REQ-OPS-005 — No secrets in the delivered bundle
 
