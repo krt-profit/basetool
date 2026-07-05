@@ -248,6 +248,51 @@ infra_image_pins() {
     | sed -E 's/image:[[:space:]]*//' | sort -u || true
 }
 
+# Emit the compose top-level `networks:` block, comment- and blank-stripped, so a
+# deploy can tell whether the network TOPOLOGY changed (a network added/removed, a
+# subnet/gateway re-pinned). Such a change cannot be applied by an in-place `up -d`:
+# Docker can neither move a running container onto a differently-addressed bridge
+# nor recreate a bridge that still has endpoints, so an in-place apply silently
+# STRANDS container name resolution (keycloak<->backend, keycloak<->db-keycloak —
+# the 2026-07 incident, #974). It must instead force a clean down+up. A
+# comment-only edit inside the block does not count (comments are stripped here).
+network_block() {
+  awk '
+    /^networks:[[:space:]]*$/ { inblock = 1; print; next }
+    inblock && /^[^[:space:]#]/ { inblock = 0 }
+    inblock {
+      line = $0
+      sub(/[[:space:]]*#.*$/, "", line)
+      if (line ~ /[^[:space:]]/) print line
+    }
+  ' "$1"
+}
+
+# Bring the WHOLE stack fully down — the app project AND the monitoring project that
+# references the shared data nets as `external` — drop the stale bridges, so the
+# following `up` recreates them on the compose's (new) pinned subnets. Only used on
+# the rare deploy that changes the compose `networks:` block: an in-place `up` there
+# strands name resolution (#974). This is a brief FULL-STACK outage, which is why it
+# is gated on an actual topology change, never taken on an ordinary config swap.
+# Because the pinning fixes each subnet, the recreated bridges keep the same
+# addresses/gateways, so the NPM SSH-tunnel admin allow-list stays valid.
+clean_slate_recreate() {
+  log "network topology changed -> clean recreate (brief full-stack downtime)"
+  if [[ "${IRI_MONITORING_ENABLED:-false}" == "true" && -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" ]]; then
+    log "  monitoring down (it holds the shared data nets as external)"
+    docker compose -p iri-monitoring --project-directory "${COMPOSE_DIR}" \
+      -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" down --remove-orphans >/dev/null 2>&1 \
+      || log "  WARN: monitoring 'down' reported an error (continuing)"
+  fi
+  log "  app down"
+  docker compose -f "${COMPOSE_DIR}/docker-compose.yml" --profile "${PROFILE}" \
+    down --remove-orphans >/dev/null 2>&1 \
+    || log "  WARN: app 'down' reported an error (continuing to prune + up)"
+  # Belt-and-braces: a stray endpoint can block `down` from removing a bridge; drop
+  # any now-unused network so `up` cannot reuse a stale-subnet one (single-purpose host).
+  docker network prune -f >/dev/null 2>&1 || true
+}
+
 # Snapshot the live config tree (the allowlisted paths) into a directory so the
 # rollback path can restore the exact compose the previous digest pin expects.
 snapshot_config_tree() {
@@ -390,6 +435,10 @@ CONFIG_PREVIOUS_DIR="${STATE_DIR}/config-previous"
 # Set true once a new config tree is swapped in this run; gates the post-apply monitoring
 # in-place reload so a config-unchanged tick signals nothing.
 CONFIG_APPLIED=false
+# Set true when the promoted compose changes the `networks:` topology (a re-pinned
+# subnet, a net added/removed); forces a clean down+up instead of an in-place `up`
+# on apply AND on rollback, so the change never strands name resolution (#974).
+NETWORK_TOPOLOGY_CHANGED=false
 CONFIG_BLOCKED_FILE="${STATE_DIR}/config-blocked.marker"
 # The live Keycloak provider JAR (mounted into the keycloak container) and the
 # rollback snapshot of it taken before a provider-JAR swap.
@@ -733,6 +782,15 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
   fi
   rm -f "${CONFIG_BLOCKED_FILE}"
 
+  # A change to the compose `networks:` block cannot be applied by an in-place
+  # `up -d` (it strands container name resolution, #974). Detect it now, while the
+  # LIVE compose is still on disk, so the apply below forces a clean down+up.
+  if [[ "$(network_block "${COMPOSE_DIR}/docker-compose.yml")" \
+        != "$(network_block "${CONFIG_STAGE_DIR}/docker-compose.yml")" ]]; then
+    NETWORK_TOPOLOGY_CHANGED=true
+    log "network topology changed in the promoted compose -> clean recreate on apply (#974)"
+  fi
+
   # Snapshot the live config tree as the rollback anchor, then swap in the new.
   snapshot_config_tree "${CONFIG_PREVIOUS_DIR}"
   apply_config_tree "${CONFIG_STAGE_DIR}" "${COMPOSE_DIR}"
@@ -760,6 +818,14 @@ docker compose \
   -f "${PIN_FILE_CURRENT}" \
   --profile "${PROFILE}" \
   pull --quiet backend frontend ingest
+
+# A network-topology change (detected above) cannot be applied in place — take the
+# whole stack down first so the `up` below recreates the bridges on the compose's
+# pinned subnets (#974). Ordinary config/app changes keep the fast rolling in-place
+# `up`; only a `networks:` edit pays the brief full-stack outage.
+if [[ "${NETWORK_TOPOLOGY_CHANGED}" == "true" ]]; then
+  clean_slate_recreate
+fi
 
 log "applying (timeout ${HEALTH_TIMEOUT}s)"
 if docker compose \
@@ -898,6 +964,14 @@ fi
 
 cp "${PIN_FILE_PREVIOUS}" "${PIN_FILE_CURRENT}"
 
+# If this deploy crossed a network-topology change, the previous compose's subnets
+# differ from the just-recreated ones, so the rollback `up` is itself a topology
+# change — recreate cleanly again rather than stranding on the way back (#974).
+if [[ "${NETWORK_TOPOLOGY_CHANGED}" == "true" ]]; then
+  log "rolling back across the network topology change -> clean recreate again"
+  clean_slate_recreate
+fi
+
 if docker compose \
      -f docker-compose.yml \
      -f "${PIN_FILE_CURRENT}" \
@@ -910,6 +984,18 @@ if docker compose \
   log "rolled back to previous digest pin successfully"
 else
   log "rollback ALSO failed — one or more target digests broken or environment problem"
+fi
+
+# clean_slate_recreate() took the monitoring project down to release the shared nets;
+# the success path's monitoring reconcile never runs on a rollback, so bring it back
+# best-effort here rather than leaving it down until the next successful deploy.
+if [[ "${NETWORK_TOPOLOGY_CHANGED}" == "true" \
+      && "${IRI_MONITORING_ENABLED:-false}" == "true" \
+      && -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" ]]; then
+  log "restoring the monitoring project after the rollback recreate (best-effort)"
+  docker compose -p iri-monitoring --project-directory "${COMPOSE_DIR}" \
+    -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" up -d >/dev/null 2>&1 \
+    || log "WARN: monitoring restore failed — it returns on the next successful deploy"
 fi
 
 # Either way, this run failed → non-zero exit so the systemd unit reports
