@@ -266,29 +266,31 @@ class BankBookingE2eTest {
   }
 
   /**
-   * Opens the deposit modal, books the given amount to the UI holder and waits for the account-body
-   * swap to repaint the balance in place — without any page navigation. Captures the pre-deposit
-   * balance text and waits on the XHR POST plus the post-swap DOM change, so the assertion is
-   * independent of locale number formatting.
+   * Opens the unified "Kontobewegung" modal (REQ-BANK-017, #997) — Einzahlung is the default type —
+   * books the given amount to the UI holder and waits for the account-body swap to repaint the
+   * balance in place, without any page navigation. Captures the pre-deposit balance text and waits
+   * on the XHR POST plus the post-swap DOM change, so the assertion is independent of locale number
+   * formatting.
    *
    * @param page the active page
    * @param amount the whole-aUEC amount to deposit
    */
   private static void depositInPlace(Page page, String amount) {
     String balanceBefore = page.locator("[data-testid='bank-balance']").textContent().trim();
-    page.locator("[data-testid='bank-deposit-open']")
+    page.locator("[data-testid='bank-movement-open']")
         .click(new com.microsoft.playwright.Locator.ClickOptions().setTimeout(20_000));
-    page.locator("[data-testid='bank-deposit-amount']").fill(amount);
+    // The movement type defaults to DEPOSIT (first offered type); the deposit fields are shown.
+    page.locator("[data-testid='bank-movement-amount']").fill(amount);
     // The holder picker is a searchable combobox; pick the employee's holder by its value.
     E2eSupport.selectComboboxByValue(
-        page.locator("[data-testid='bank-deposit-holder']"), uiHolderId);
+        page.locator("[data-testid='bank-movement-deposit-holder']"), uiHolderId);
     page.waitForResponse(
         r -> r.url().contains("/api/proxy/bank/deposits") && "POST".equals(r.request().method()),
         // 60 s (above the 30 s default): the deposit's proxied XHR round-trip can outrun 30 s on a
         // contended CI runner (the Firefox-only flake window), timing out an otherwise-correct
         // POST.
         new Page.WaitForResponseOptions().setTimeout(60_000),
-        () -> page.locator("[data-testid='bank-deposit-submit']").click());
+        () -> page.locator("[data-testid='bank-movement-submit']").click());
     // The accountBody swap repaints the facts strip; wait for the balance text to actually change
     // so
     // the proof is that the money region updated IN PLACE, not via a reload.

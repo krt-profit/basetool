@@ -30,5 +30,25 @@
     <span class="scu-hint__bubble" aria-hidden="true"
           th:text="#{material.scu.hint}">Eingabe in SCU. cSCU ist 0,01 SCU. &#181;SCU ist 0,001 SCU.</span>
 </span>
+
+<!--
+  Generic field-help marker (#997): the same focusable "?" disc + pure-CSS HUD tooltip as scuHint,
+  but with a caller-supplied i18n message key so any form field can carry an inline hover/keyboard
+  hint instead of small, hard-to-read sub-field text. Reuses the `.scu-hint` / `.scu-hint__bubble`
+  styles (styles.css). The key is resolved once, mirrored onto aria-label so screen-reader users
+  hear it on focus, and shown in the bubble. Drop it right after a field's <label> text.
+
+  Parameter:
+    - messageKey : the i18n key of the hint text (e.g. 'bank.field.amount.hint').
+-->
+<span th:fragment="fieldHint(messageKey)"
+      class="scu-hint field-hint-marker"
+      tabindex="0"
+      role="img"
+      th:aria-label="#{__${messageKey}__}">
+    <span aria-hidden="true">?</span>
+    <span class="scu-hint__bubble" aria-hidden="true"
+          th:text="#{__${messageKey}__}">Hinweis</span>
+</span>
 </body>
 </html>

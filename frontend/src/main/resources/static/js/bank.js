@@ -76,6 +76,18 @@
         requestQueue: { container: '#bank-request-queue-results', preserveQuery: true },
     };
 
+    /**
+     * Maps a movement type on the unified "Kontobewegung" modal (#997) onto its backend endpoint and
+     * the JSON field the (fixed or chosen) source-account id is submitted under: a deposit/withdrawal
+     * books against `accountId`, a transfer against `sourceAccountId`. syncMovementRows switches the
+     * form's `data-endpoint` + `data-account-id-field` from this on every type change and on open.
+     */
+    const MOVEMENT_ENDPOINTS = {
+        DEPOSIT: { endpoint: '/api/proxy/bank/deposits', accountField: 'accountId' },
+        WITHDRAWAL: { endpoint: '/api/proxy/bank/withdrawals', accountField: 'accountId' },
+        TRANSFER: { endpoint: '/api/proxy/bank/transfers', accountField: 'sourceAccountId' },
+    };
+
     /** Maps a grant flag name onto the row attribute the next toggle click reads. */
     const FLAG_ATTR = {
         canDeposit: 'data-can-deposit',
@@ -208,6 +220,15 @@
                 toggleSplitRow(splitToggle);
             }
         }
+        // Unified movement modal (#997): sync the whole modal (rows, endpoint, submit label, live
+        // helpers) to its type selector's current value so a (re)opened modal never shows a stale
+        // type's fields. Runs last so it owns the final consistent state.
+        if (form) {
+            const movementType = form.querySelector('[data-role="bank-movement-type"]');
+            if (movementType) {
+                syncMovementRows(movementType);
+            }
+        }
     }
 
     document.addEventListener('click', function (event) {
@@ -322,6 +343,14 @@
      */
     async function submitBankForm(form) {
         clearErrors(form);
+        // Unified movement modal (#997): the source-account picker carries no name, so mirror its
+        // current value onto data-account-id (submitBankForm injects it under the type-specific
+        // data-account-id-field). Its native `required` gates an empty pick before submit even fires;
+        // a stray empty value is a backstop the backend rejects with an inline accountId error.
+        const movementSource = form.querySelector('[data-role="bank-movement-source"]');
+        if (movementSource) {
+            form.setAttribute('data-account-id', movementSource.value || '');
+        }
         const method = (form.getAttribute('data-method') || 'POST').toUpperCase();
         const body = {};
         const placeholders = {};
@@ -501,6 +530,13 @@
         const preview = form.querySelector('[data-fee-preview]');
         const amountEl = form.querySelector('input[name="amount"]');
         if (!preview || !amountEl) {
+            return;
+        }
+        // A deposit never carries an in-game fee (#997 unified modal): hide the preview outright so
+        // the shared amount-row block does not show a phantom fee for a Einzahlung.
+        const movementTypeEl = form.querySelector('[data-role="bank-movement-type"]');
+        if (movementTypeEl && movementTypeEl.value === 'DEPOSIT') {
+            preview.hidden = true;
             return;
         }
         const rate = transferFeeRate();
@@ -1077,6 +1113,151 @@
         if (select) {
             syncRequestTypeRows(select);
         }
+    });
+
+    /**
+     * Enables or disables one control inside a unified movement-modal row (#997), keeping a gated-off
+     * control out of the submitted JSON (submitBankForm skips disabled controls). Clears the value
+     * when disabling so a hidden type's field never leaks into another type's booking: a checkbox is
+     * unticked, a searchable-select combobox is reset via its controller, any other control blanked;
+     * the combobox's visible textbox mirrors the disabled state.
+     *
+     * @param {HTMLElement} control the form control to toggle
+     * @param {boolean} on whether the owning row is active for the current movement type
+     */
+    function setMovementControlActive(control, on) {
+        control.disabled = !on;
+        if (control.type === 'checkbox') {
+            if (!on) {
+                control.checked = false;
+            }
+        } else if (!on) {
+            if (control.krtCombobox) {
+                control.krtCombobox.setValue('');
+            } else {
+                control.value = '';
+            }
+        }
+        const box = control.closest ? control.closest('.krt-combobox') : null;
+        const textbox = box ? box.querySelector('.krt-combobox__input') : null;
+        if (textbox) {
+            textbox.disabled = !on;
+        }
+    }
+
+    /**
+     * Shows/hides a movement-modal row and enables/disables every submittable control inside it, so
+     * only the active movement type's fields are visible AND submitted. A combobox replaces its
+     * <select> with a hidden value input, so the two selector groups never double-count one control;
+     * the visible combobox textbox is excluded (its disabled state rides on its hidden input via
+     * {@link setMovementControlActive}).
+     *
+     * @param {HTMLElement} row the [data-movement-types] wrapper
+     * @param {boolean} on whether the row is active for the current movement type
+     */
+    function setMovementRowActive(row, on) {
+        row.hidden = !on;
+        row.querySelectorAll(
+            'input:not(.krt-combobox__input), select, textarea, .krt-combobox input[type="hidden"]',
+        ).forEach(function (control) {
+            setMovementControlActive(control, on);
+        });
+    }
+
+    /**
+     * Recomputes the Begründung field's `required` flag on the unified movement modal (REQ-BANK-045):
+     * required only for a WITHDRAWAL/TRANSFER whose source account mandates a reason. On the
+     * account-detail page the source is fixed, so the mandate rides on the form as
+     * data-justification-required; on the requests overview it comes from the chosen source account's
+     * <option> data-requires-justification.
+     *
+     * @param {HTMLFormElement} form the movement form
+     */
+    function updateMovementJustification(form) {
+        const input = form.querySelector('input[name="justification"]');
+        const typeEl = form.querySelector('[data-role="bank-movement-type"]');
+        if (!input || !typeEl) {
+            return;
+        }
+        const type = typeEl.value;
+        if (type !== 'WITHDRAWAL' && type !== 'TRANSFER') {
+            input.required = false;
+            return;
+        }
+        const source = form.querySelector('[data-role="bank-movement-source"]');
+        if (source) {
+            const option = source.options[source.selectedIndex];
+            input.required =
+                !!option && option.getAttribute('data-requires-justification') === 'true';
+        } else {
+            input.required = form.getAttribute('data-justification-required') === 'true';
+        }
+    }
+
+    /**
+     * Adapts the unified "Kontobewegung" modal (#997, REQ-BANK-017/-023) to the chosen movement type:
+     * routes the form to the type's endpoint + source-account field name (MOVEMENT_ENDPOINTS), shows
+     * only that type's [data-movement-types] rows (disabling the rest so they stay out of the body),
+     * swaps the submit-button label, and refreshes the live split / fee / justification helpers. A
+     * deposit exposes the split + Einzahler rows; a withdrawal the payer holder + Empfänger + fee
+     * preview + Begründung; a transfer the destination account/holder pair + fee preview + Begründung.
+     *
+     * @param {HTMLSelectElement} typeSelect the movement-type select
+     */
+    function syncMovementRows(typeSelect) {
+        const form = typeSelect.closest('form');
+        if (!form) {
+            return;
+        }
+        const type = typeSelect.value;
+        const spec = MOVEMENT_ENDPOINTS[type];
+        if (spec) {
+            form.setAttribute('data-endpoint', spec.endpoint);
+            form.setAttribute('data-account-id-field', spec.accountField);
+        }
+        form.querySelectorAll('[data-movement-types]').forEach(function (row) {
+            const types = row.getAttribute('data-movement-types').split(/\s+/);
+            setMovementRowActive(row, types.indexOf(type) !== -1);
+        });
+        // The split toggle sits in a DEPOSIT-only block: re-sync its percentage row + preview after
+        // the block's active state changed (it is unchecked + disabled when the block is gated off).
+        const splitToggle = form.querySelector('[data-role="bank-split-toggle"]');
+        if (splitToggle) {
+            toggleSplitRow(splitToggle);
+        }
+        // Submit label follows the type (localized keys carried on the button as data-label-*).
+        const submit = form.querySelector('button[type="submit"][data-label-deposit]');
+        if (submit) {
+            const label = submit.getAttribute('data-label-' + type.toLowerCase());
+            if (label) {
+                submit.textContent = label;
+            }
+        }
+        updateFeePreview(form);
+        updateMovementJustification(form);
+    }
+
+    document.addEventListener('change', function (event) {
+        const select = event.target.closest('select[data-role="bank-movement-type"]');
+        if (select) {
+            syncMovementRows(select);
+        }
+    });
+
+    // The source-account picker (requests overview) drives the fixed-account id mirrored onto the
+    // form, the per-account Begründung mandate and the fee preview: re-sync them when it changes.
+    document.addEventListener('change', function (event) {
+        const source = event.target.closest('select[data-role="bank-movement-source"]');
+        if (!source) {
+            return;
+        }
+        const form = source.closest('form');
+        if (!form) {
+            return;
+        }
+        form.setAttribute('data-account-id', source.value || '');
+        updateMovementJustification(form);
+        updateFeePreview(form);
     });
 
     /**

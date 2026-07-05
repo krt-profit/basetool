@@ -574,6 +574,21 @@ in `messages.properties` / `_de` / `_en` under new `bank.*`, `admin.bank.*` and
 > Both toggles are CSP-safe, document-delegated in `bank.js` (survive the `krtFetch` fragment swap),
 > and every new string is a `bank.*` key (`bank.detail.toggleDetails`, the renamed
 > `bank.booking.counterparty` = "Quell-/Zielkonto").
+>
+> **Amended (2026-07-05, #997) — single "Kontobewegung" entry point + "?" field hints:** the
+> account-detail (K1) booking actions collapse from three separate buttons/modals (Einzahlen /
+> Auszahlen / Transfer) into **one "Kontobewegung"** button, shown when the caller may do any of
+> deposit/withdraw/transfer on the active account. It opens a **single modal whose movement-type
+> selector** (Einzahlung / Auszahlung / Transfer, only the permitted types offered) switches the
+> type-specific fields and routes the submit to the correct existing endpoint
+> (`/deposits` · `/withdrawals` · `/transfers`); the three backend endpoints are unchanged, so audit
+> and monitoring are unchanged (exactly one audit event per booking, per REQ-BANK-012). The reusable
+> modal lives in `templates/fragments/bank-movement-modal.html` and is shared with the requests
+> overview (REQ-BANK-023). All field hints in the modal — including the **optionality notes** (the
+> counterparty being optional, the payer-holder note) — become inline **"?" hover/focus tooltips**
+> via the generalised `fragments/scu-hint :: fieldHint(key)` marker instead of small sub-field text;
+> hint text stays in `bank.*` i18n keys and is mirrored onto `aria-label`. New keys:
+> `bank.action.movement`, `bank.modal.movement.title`, `bank.movement.field.sourceAccount(.placeholder/.hint)`.
 
 **Acceptance**
 
@@ -583,7 +598,7 @@ in `messages.properties` / `_de` / `_en` under new `bank.*`, `admin.bank.*` and
   management W1 + G1/G2, admin A1 + A2) and reuses the design-system bank component
   classes instead of bespoke CSS.
 
-**Enforced by:** `:frontend:check` (htmlhint/eslint/stylelint/prettier) over the bank templates · **Code:** `static/css/bank.css`, `templates/bank-*.html`, `templates/admin/bank*.html` · **Issues:** #556
+**Enforced by:** `:frontend:check` (htmlhint/eslint/stylelint/prettier) over the bank templates · `BankInPlaceFragmentMvcTest` (single Kontobewegung entry point in `accountBody`) · **Code:** `static/css/bank.css`, `templates/bank-*.html`, `templates/fragments/bank-movement-modal.html`, `templates/fragments/scu-hint.html`, `templates/admin/bank*.html`, `static/js/bank.js` · **Issues:** #556, #997
 
 ### REQ-BANK-018 — API & persistence conventions
 
@@ -758,6 +773,17 @@ raised against a `CLOSED` account.
 > in `localStorage` (the Lager pattern) and replayed on load, and each request row carries an
 > **expandable Begründung + Notiz sub-row** reusing the account-detail chevron pattern
 > (REQ-BANK-017/-045).
+>
+> **Amended (2026-07-05, #997) — direct-booking "Kontobewegung" CTA:** the queue header gains a
+> page-level **"Kontobewegung"** button (shown when at least one active account exists) that opens the
+> **shared unified movement modal** (REQ-BANK-017). Because this surface is not account-scoped, the
+> modal adds a **source-account selector**; bank staff **book directly** against the chosen account
+> (a deposit/withdrawal/transfer, not a request) through the unchanged `/api/proxy/bank/{deposits,
+> withdrawals,transfers}` endpoints — so this adds **no new endpoint, audit event or metric** (the
+> booking is audited exactly once by the existing ledger flow). The controller assembles the modal's
+> data (active accounts, holders, counterparty users, fee rate) only on the **full-page** render, not
+> on the `requestQueue` fragment swap; a successful booking re-renders the queue in place (unchanged,
+> since a direct booking is not a request).
 
 A **bank employee** confirms or rejects a `PENDING` request under
 `/api/v1/bank/requests/**` (`BANK_EMPLOYEE` URL+method gate). **Confirmation** records the
@@ -787,8 +813,12 @@ row is pessimistically locked and `@Version`-guarded so two decisions cannot dou
   saved per user; an empty selection shows a distinct hint, and each request row expands to show its
   Begründung + Notiz (frontend `BankRequestQueuePageControllerMvcTest`, `BankRequestControllerTest`,
   `BankBookingRequestServiceTest`).
+- [x] The queue header carries a page-level **Kontobewegung** CTA (when an active account exists) that
+  opens the shared unified movement modal with a source-account selector and books directly via the
+  existing endpoints — no new endpoint/audit/metric (frontend
+  `BankRequestQueuePageControllerMvcTest`).
 
-**Enforced by:** `BankBookingRequestServiceTest`, `BankRequestControllerTest`, frontend `BankRequestQueuePageControllerMvcTest` · **Code:** `service/BankBookingRequestService`, `controller/BankRequestController`, frontend `controller/BankRequestQueuePageController`, `controller/BankProxyController`, `templates/bank-requests.html` · **Issues:** #666, #671, #672
+**Enforced by:** `BankBookingRequestServiceTest`, `BankRequestControllerTest`, frontend `BankRequestQueuePageControllerMvcTest` · **Code:** `service/BankBookingRequestService`, `controller/BankRequestController`, frontend `controller/BankRequestQueuePageController`, `controller/BankProxyController`, `templates/bank-requests.html`, `templates/fragments/bank-movement-modal.html` · **Issues:** #666, #671, #672, #997
 
 ### REQ-BANK-024 — Off-ledger requests: audit & ledger-integrity isolation
 
