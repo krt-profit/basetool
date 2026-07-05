@@ -56,12 +56,15 @@ class P4kImportJobRunnerTest {
 
   @Mock private P4kImportJobService jobService;
   @Mock private P4kImportService importService;
+  @Mock private MasterDataCacheEvictionService cacheEvictionService;
 
   private P4kImportJobRunner runner;
 
   @BeforeEach
   void setUp() {
-    runner = new P4kImportJobRunner(jobService, importService, JsonMapper.builder().build());
+    runner =
+        new P4kImportJobRunner(
+            jobService, importService, cacheEvictionService, JsonMapper.builder().build());
   }
 
   private static P4kImportResultDto someResult() {
@@ -87,6 +90,8 @@ class P4kImportJobRunnerTest {
         .deletePayload(any()); // a preview keeps its payload for a later apply
     verify(jobService, never()).markFailed(any(), anyString());
     verify(jobService).pruneOldJobs();
+    // A preview changes no master data, so it must never evict the caches.
+    verify(cacheEvictionService, never()).evictP4kSyncedMasterData();
   }
 
   @Test
@@ -103,6 +108,24 @@ class P4kImportJobRunnerTest {
     verify(jobService).markSucceeded(eq(id), anyString());
     verify(jobService).deletePayload(id); // an apply is terminal -> reclaim the bytes
     verify(jobService).pruneOldJobs();
+    // A committed apply rewrote master data -> evict the P4K-synced caches.
+    verify(cacheEvictionService).evictP4kSyncedMasterData();
+  }
+
+  @Test
+  void run_applyFailure_recordsFailed_andDoesNotEvictCaches() {
+    UUID id = UUID.randomUUID();
+    byte[] bytes = "{}".getBytes(StandardCharsets.UTF_8);
+    when(jobService.loadPayload(id)).thenReturn(bytes);
+    when(importService.applyImport(bytes, false))
+        .thenThrow(new BadRequestException("empty catalog"));
+
+    runner.run(id, P4kImportJobKind.APPLY, false);
+
+    verify(jobService).markFailed(id, "empty catalog");
+    verify(jobService).deletePayload(id); // the payload is still reclaimed on a failed apply
+    // The apply rolled back, so nothing changed -> the caches must NOT be evicted.
+    verify(cacheEvictionService, never()).evictP4kSyncedMasterData();
   }
 
   @Test

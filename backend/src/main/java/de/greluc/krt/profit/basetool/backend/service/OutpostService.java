@@ -19,11 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.Outpost;
 import de.greluc.krt.profit.basetool.backend.repository.OutpostRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -32,7 +35,11 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Read service plus admin-override mutators for the outpost catalogue. The records themselves are
  * owned by {@link UexUniverseSyncService}; this service only exposes the read API and the
- * admin-only {@code hasLoadingDock} pin used by the UEX-overrides admin page.
+ * admin-only {@code hasLoadingDock} pin used by the UEX-overrides admin page. Read methods are
+ * cached against {@link CacheConfig#OUTPOSTS_CACHE}; the override mutators evict the whole cache,
+ * and the periodic {@link UexUniverseSyncService} sweep evicts it on completion (via {@code
+ * MasterDataCacheEvictionService}, CACHE-SYNC-EVICT-001), so background-sync writes are visible on
+ * the next read; the 12-hour master-data TTL is only the backstop.
  */
 @Service
 @RequiredArgsConstructor
@@ -47,6 +54,7 @@ public class OutpostService {
    * @param pageable page request
    * @return one page of outposts, sorted by the pageable's sort
    */
+  @Cacheable(cacheNames = CacheConfig.OUTPOSTS_CACHE)
   public Page<Outpost> getAllOutposts(Pageable pageable) {
     return outpostRepository.findAll(pageable);
   }
@@ -58,6 +66,7 @@ public class OutpostService {
    * @return the managed outpost entity
    * @throws NotFoundException when no outpost matches the id
    */
+  @Cacheable(cacheNames = CacheConfig.OUTPOSTS_CACHE)
   public Outpost getOutpost(UUID id) {
     return outpostRepository
         .findById(id)
@@ -73,6 +82,7 @@ public class OutpostService {
    * @return the persisted outpost
    */
   @Transactional
+  @CacheEvict(cacheNames = CacheConfig.OUTPOSTS_CACHE, allEntries = true)
   public Outpost setLoadingDockOverride(UUID id, boolean value) {
     Outpost outpost = getOutpost(id);
     outpost.setHasLoadingDock(value);
@@ -88,6 +98,7 @@ public class OutpostService {
    * @return the persisted outpost
    */
   @Transactional
+  @CacheEvict(cacheNames = CacheConfig.OUTPOSTS_CACHE, allEntries = true)
   public Outpost clearLoadingDockOverride(UUID id) {
     Outpost outpost = getOutpost(id);
     outpost.setHasLoadingDockOverridden(false);

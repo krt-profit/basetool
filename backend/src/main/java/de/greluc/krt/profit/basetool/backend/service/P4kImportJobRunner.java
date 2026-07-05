@@ -54,6 +54,7 @@ public class P4kImportJobRunner {
 
   private final P4kImportJobService jobService;
   private final P4kImportService importService;
+  private final MasterDataCacheEvictionService cacheEvictionService;
   private final ObjectMapper objectMapper;
 
   /**
@@ -68,13 +69,20 @@ public class P4kImportJobRunner {
   @Async(AsyncConfig.IMPORT_EXECUTOR)
   public void run(@NotNull UUID jobId, @NotNull P4kImportJobKind kind, boolean seedNew) {
     log.info("P4K import job {} ({}) starting.", jobId, kind);
+    // Whether the APPLY reconcile transaction actually committed (its own @Transactional; a normal
+    // return means committed). Gates the cache eviction below so it fires iff master data changed —
+    // never for a PREVIEW and never for an apply that rolled back.
+    boolean appliedMasterData = false;
     try {
       jobService.markRunning(jobId);
       byte[] bytes = jobService.loadPayload(jobId);
-      P4kImportResultDto result =
-          kind == P4kImportJobKind.APPLY
-              ? importService.applyImport(bytes, seedNew)
-              : importService.previewImport(bytes);
+      P4kImportResultDto result;
+      if (kind == P4kImportJobKind.APPLY) {
+        result = importService.applyImport(bytes, seedNew);
+        appliedMasterData = true;
+      } else {
+        result = importService.previewImport(bytes);
+      }
       jobService.markSucceeded(jobId, objectMapper.writeValueAsString(result));
       log.info("P4K import job {} ({}) succeeded.", jobId, kind);
     } catch (Exception e) {
@@ -82,6 +90,16 @@ public class P4kImportJobRunner {
       jobService.markFailed(jobId, describe(e));
     } finally {
       if (kind == P4kImportJobKind.APPLY) {
+        if (appliedMasterData) {
+          // The apply runs on the import executor, outside the UEX / SC Wiki scheduler sweeps, so
+          // it
+          // has no @CacheEvict of its own — evict the master-data caches it rewrote (materials,
+          // manufacturers, ship types, blueprint family index) so the changes are visible on the
+          // next read instead of after the 12 h TTL (REQ-DATA-011, CACHE-SYNC-EVICT-001).
+          safely(
+              cacheEvictionService::evictP4kSyncedMasterData,
+              "evict P4K-synced master-data caches");
+        }
         // The apply ran against its own payload copy and is terminal — reclaim the bytes now.
         safely(() -> jobService.deletePayload(jobId), "delete payload");
       }
