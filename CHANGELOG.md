@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.1.5](https://github.com/krt-profit/basetool/releases/tag/v1.1.5) - 2026-07-05
+
 ### Changed
 
 - **Bank – Filter und Ansichts-Umschalter als Checkboxen statt oranger Schalter.** Die Status-Filter der Buchungsanträge-Übersicht und die Ansichts-Optionen der Kontoübersicht (Tabellenansicht, nach Bereich gruppieren) sind jetzt Checkboxen und werden nicht mehr knallorange, wenn sie aktiv sind. Die Kachelansicht (A-Z) ist wieder der Standard, und das Umschalten von Ansicht und Bereichsgruppierung wirkt wieder zuverlässig; Verhalten und pro-Nutzer-Speicherung bleiben unverändert.
@@ -17,8 +19,6 @@
 - **Bank – Überlappung im Kontonamen-Suchfeld behoben.** Im Suchfeld der Konto- und der Org-Einheits-Bank überlagerten sich Lupensymbol und Platzhaltertext („Nach Kontonamen filtern"); der Text beginnt jetzt rechts neben dem Symbol.
 
 - **UI – abgeschnittene „?"-Hilfetexte in Fenstern behoben.** Die „?"-Tooltips wurden in Fenstern mit Bildlauf abgeschnitten, wenn das „?" weit am Rand saß (z. B. „Quellkonto" im Kontobewegungs-Fenster); sie werden jetzt automatisch so verschoben, dass der Text vollständig im sichtbaren Bereich bleibt.
-
-### Fixed
 
 - **Monitoring: Postgres-Logs nicht mehr durch fehlerhafte Exporter-Abfrage geflutet.** Der `stat_replication`-Collector von postgres_exporter fragt `slot_name` aus `pg_stat_replication` ab — eine Spalte, die es dort nicht gibt (Upstream-Bug bis v0.20.0). Beide DBs loggten pro Scrape `ERROR: column "slot_name" does not exist` (~5.760 Zeilen/Tag). Der Collector ist auf beiden Exportern per `--no-collector.stat_replication` abgeschaltet; auf den Single-Instance-DBs ohne Streaming-Replikation lieferte er ohnehin keine Metrik (ADR-0072).
 
