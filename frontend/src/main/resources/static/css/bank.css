@@ -493,7 +493,9 @@ tr.is-inert td {
    0,1,1), whose `padding` shorthand would otherwise reset padding-left and slide the placeholder
    text under the magnifier icon (dashboard D1 + org-unit bank live filters, REQ-BANK-046). */
 .bank-acc-search .bank-acc-search-input {
-    width: 220px;
+    /* Wide enough for the full German placeholder "Nach Kontonamen filtern" once the 30px icon gutter
+       is subtracted; max-width keeps it from overflowing the narrow device classes. */
+    width: 260px;
     max-width: 100%;
     padding-left: 30px;
 }

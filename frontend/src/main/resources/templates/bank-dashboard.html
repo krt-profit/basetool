@@ -114,14 +114,27 @@
          scopes this whole container so it works across every view. -->
     <div id="bank-grid-results" th:fragment="bankGrid">
         <th:block th:if="${!#lists.isEmpty(cards)}">
-            <!-- Alphabetical (flat) view. -->
+            <!-- Alphabetical (flat) view. th:if/th:unless must NOT share an element with th:replace:
+                 th:replace (attribute precedence 1) is processed BEFORE th:if/th:unless (3), so a
+                 same-element combination renders the fragment UNCONDITIONALLY and BOTH the table and
+                 the card grid appear at once. The condition therefore gates an outer wrapper while
+                 th:replace sits alone on the inner block. -->
             <th:block th:if="${group != 'bereich'}">
-                <th:block th:if="${layout == 'table'}" th:replace="~{fragments/bank-account-views :: accTable(${cards})}"></th:block>
-                <th:block th:unless="${layout == 'table'}" th:replace="~{fragments/bank-account-views :: accGrid(${cards})}"></th:block>
+                <th:block th:if="${layout == 'table'}">
+                    <th:block th:replace="~{fragments/bank-account-views :: accTable(${cards})}"></th:block>
+                </th:block>
+                <th:block th:unless="${layout == 'table'}">
+                    <th:block th:replace="~{fragments/bank-account-views :: accGrid(${cards})}"></th:block>
+                </th:block>
             </th:block>
-            <!-- By-Bereich (grouped) view: coloured vertical groups the user scrolls through. -->
+            <!-- By-Bereich (grouped) view: coloured vertical groups the user scrolls through. th:each
+                 (precedence 2) is likewise processed AFTER th:replace (1); sharing an element leaves
+                 the loop variable unbound (grp == null -> group.key() NPE -> HTTP 500). th:each gates
+                 an outer wrapper while th:replace sits alone on the inner block. -->
             <th:block th:if="${group == 'bereich'}">
-                <th:block th:each="grp : ${groups}" th:replace="~{fragments/bank-account-views :: accGroup(${grp}, ${layout})}"></th:block>
+                <th:block th:each="grp : ${groups}">
+                    <th:block th:replace="~{fragments/bank-account-views :: accGroup(${grp}, ${layout})}"></th:block>
+                </th:block>
             </th:block>
             <!-- No-results note for the client-side account-name filter (REQ-BANK-046): revealed by
                  bank.js when the live filter hides every account. Distinct from the "no accounts at
