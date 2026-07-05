@@ -942,7 +942,7 @@ public class JobOrderPageController {
   private List<OrgUnitMembershipOptionDto> fetchActiveOrgUnitOptions() {
     try {
       List<OrgUnitMembershipOptionDto> options =
-          backendApiClient.get(
+          backendApiClient.getCached(
               "/api/v1/org-units/active", LIST_OF_ORG_UNIT_MEMBERSHIP_OPTION, true);
       return options != null ? options : List.of();
     } catch (Exception e) {
@@ -970,7 +970,7 @@ public class JobOrderPageController {
     }
     try {
       List<OrgUnitMembershipOptionDto> options =
-          backendApiClient.get(
+          backendApiClient.getCached(
               "/api/v1/org-units/active-all-kinds", LIST_OF_ORG_UNIT_MEMBERSHIP_OPTION);
       return options != null ? options : fetchActiveOrgUnitOptions();
     } catch (Exception e) {

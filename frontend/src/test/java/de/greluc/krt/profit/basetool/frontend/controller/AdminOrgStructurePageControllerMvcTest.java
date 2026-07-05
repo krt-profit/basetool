@@ -24,6 +24,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -157,5 +158,62 @@ class AdminOrgStructurePageControllerMvcTest {
                 .content(
                     "{\"parentOrgUnitId\":\"00000000-0000-0000-0000-000000000003\",\"version\":0}"))
         .andExpect(status().isOk());
+  }
+
+  // REQ-DATA-007 — a Bereich / OL create and an org-unit re-parent all change the cached
+  // /api/v1/org-units/active-all-kinds picker, so each must evict STATIC_DATA_CACHE.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void createBereich_ajax_evictsStaticDataCache() throws Exception {
+    when(backendApiClient.post(any(String.class), any(), eq(Object.class)))
+        .thenReturn(Map.of("id", "00000000-0000-0000-0000-000000000001", "version", 0));
+
+    mockMvc
+        .perform(
+            post("/admin/org-structure/bereiche")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Profit\",\"shorthand\":\"PRF\"}"))
+        .andExpect(status().isOk());
+
+    verify(backendApiClient).clearStaticDataCache();
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void createOrganisationsleitung_ajax_evictsStaticDataCache() throws Exception {
+    when(backendApiClient.post(any(String.class), any(), eq(Object.class)))
+        .thenReturn(Map.of("id", "00000000-0000-0000-0000-000000000004", "version", 0));
+
+    mockMvc
+        .perform(
+            post("/admin/org-structure/organisationsleitung")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Kartellleitung\",\"shorthand\":\"OL\"}"))
+        .andExpect(status().isOk());
+
+    verify(backendApiClient).clearStaticDataCache();
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void setParent_ajax_evictsStaticDataCache() throws Exception {
+    when(backendApiClient.patch(contains("/parent"), any(), eq(Object.class)))
+        .thenReturn(Map.of("version", 1));
+
+    mockMvc
+        .perform(
+            patch("/admin/org-structure/org-units/00000000-0000-0000-0000-000000000002/parent")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"parentOrgUnitId\":\"00000000-0000-0000-0000-000000000003\",\"version\":0}"))
+        .andExpect(status().isOk());
+
+    verify(backendApiClient).clearStaticDataCache();
   }
 }

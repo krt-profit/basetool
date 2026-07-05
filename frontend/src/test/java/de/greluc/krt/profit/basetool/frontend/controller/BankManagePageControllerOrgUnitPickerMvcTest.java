@@ -85,7 +85,7 @@ class BankManagePageControllerOrgUnitPickerMvcTest {
     // The accounts / holders / users fetches may return null; the controller defaults them to empty
     // lists. Only the org-unit catalog needs a concrete option to assert the picker label.
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
-    when(backendApiClient.get(eq(ACTIVE_URI), anyTypeRef())).thenReturn(List.of(staffel));
+    when(backendApiClient.getCached(eq(ACTIVE_URI), anyTypeRef())).thenReturn(List.of(staffel));
 
     mockMvc
         .perform(get("/bank/manage"))

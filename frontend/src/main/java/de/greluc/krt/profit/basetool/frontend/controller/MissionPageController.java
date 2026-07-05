@@ -618,7 +618,8 @@ public class MissionPageController {
       if (!authHelperService.isAnonymous()) {
         try {
           List<OrgUnitMembershipOptionDto> orgUnits =
-              backendApiClient.get("/api/v1/org-units/active", ORG_UNIT_MEMBERSHIP_OPTION_LIST);
+              backendApiClient.getCached(
+                  "/api/v1/org-units/active", ORG_UNIT_MEMBERSHIP_OPTION_LIST);
           model.addAttribute("orgUnits", orgUnits != null ? orgUnits : List.of());
         } catch (Exception e) {
           model.addAttribute("orgUnits", List.of());

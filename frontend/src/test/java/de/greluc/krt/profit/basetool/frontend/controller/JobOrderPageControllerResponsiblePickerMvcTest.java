@@ -103,8 +103,9 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
     // empty keeps them from blocking the render.
     when(backendApiClient.getCached(anyString(), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
-    // Authenticated requesting picker sources the all-kinds catalog via the authenticated client.
-    when(backendApiClient.get(eq(ALL_KINDS_URI), anyTypeRef()))
+    // Authenticated requesting picker sources the all-kinds catalog via the authenticated client
+    // (now cached — REQ-DATA-007, eviction gated on Squadron/SK/Bereich/OL admin mutations).
+    when(backendApiClient.getCached(eq(ALL_KINDS_URI), anyTypeRef()))
         .thenReturn(List.of(profitStaffel, profitSk, bereich, ol));
 
     mockMvc
@@ -119,8 +120,8 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
         .andExpect(content().string(Matchers.containsString("Kartellleitung XYZ")));
 
     // Authenticated callers source the all-kinds catalog — never the Staffel/SK-only /active.
-    verify(backendApiClient).get(eq(ALL_KINDS_URI), anyTypeRef());
-    verify(backendApiClient, never()).get(eq(ACTIVE_URI), anyTypeRef(), anyBoolean());
+    verify(backendApiClient).getCached(eq(ALL_KINDS_URI), anyTypeRef());
+    verify(backendApiClient, never()).getCached(eq(ACTIVE_URI), anyTypeRef(), anyBoolean());
     verify(backendApiClient, never()).getCached(eq(SK_CATALOG_URI), anyTypeRef(), anyBoolean());
   }
 }

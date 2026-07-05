@@ -147,7 +147,8 @@ public class BankManagePageController {
     // management-gated — are skipped for a plain employee (REQ-BANK-030).
     if (management) {
       List<OrgUnitMembershipOptionDto> orgUnits =
-          backendApiClient.get("/api/v1/org-units/active-all-kinds", ORG_UNIT_OPTION_LIST_TYPE);
+          backendApiClient.getCached(
+              "/api/v1/org-units/active-all-kinds", ORG_UNIT_OPTION_LIST_TYPE);
       List<UserReferenceDto> users =
           backendApiClient.get("/api/v1/users/lookup", USER_REFERENCE_LIST_TYPE);
       model.addAttribute(

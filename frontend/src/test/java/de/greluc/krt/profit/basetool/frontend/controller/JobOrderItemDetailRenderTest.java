@@ -780,7 +780,7 @@ class JobOrderItemDetailRenderTest {
     // The authenticated requesting picker sources the all-kinds catalog; return one option so the
     // fetch path runs end to end (the apply step derives the responsible subset from it) and the
     // picker never falls back to the /active catalog.
-    when(backendApiClient.get(eq("/api/v1/org-units/active-all-kinds"), anyTypeRef()))
+    when(backendApiClient.getCached(eq("/api/v1/org-units/active-all-kinds"), anyTypeRef()))
         .thenReturn(
             List.of(
                 new OrgUnitMembershipOptionDto(
@@ -792,7 +792,8 @@ class JobOrderItemDetailRenderTest {
 
     // Each of the four independent logistician lookups fires exactly once — the parallel fan-out
     // does not duplicate any round-trip.
-    verify(backendApiClient, times(1)).get(eq("/api/v1/org-units/active-all-kinds"), anyTypeRef());
+    verify(backendApiClient, times(1))
+        .getCached(eq("/api/v1/org-units/active-all-kinds"), anyTypeRef());
     verify(backendApiClient, times(1)).get(eq("/api/v1/users?size=1000"), anyTypeRef());
     verify(backendApiClient, times(1))
         .getCached(eq("/api/v1/materials/job-order"), anyTypeRef(), eq(true));

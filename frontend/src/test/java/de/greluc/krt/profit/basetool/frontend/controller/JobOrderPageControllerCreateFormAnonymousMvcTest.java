@@ -120,8 +120,8 @@ class JobOrderPageControllerCreateFormAnonymousMvcTest {
     when(backendApiClient.getCached(anyString(), anyTypeRef(), eq(true)))
         .thenReturn(Collections.emptyList());
     // The org-unit catalog and the intake-SK setting are reachable anonymously (permitAll) via the
-    // public client.
-    when(backendApiClient.get(eq(ACTIVE_URI), anyTypeRef(), eq(true)))
+    // public client. The org-unit catalog is now cached (REQ-DATA-007).
+    when(backendApiClient.getCached(eq(ACTIVE_URI), anyTypeRef(), eq(true)))
         .thenReturn(List.of(profitStaffel, intakeSk, nonProfitSk));
     when(backendApiClient.get(eq(INTAKE_SETTING_URI), eq(SystemSettingDto.class), eq(true)))
         .thenReturn(new SystemSettingDto(INTAKE_SETTING_URI, intakeId.toString(), 0L));
@@ -146,10 +146,10 @@ class JobOrderPageControllerCreateFormAnonymousMvcTest {
                                 + "\"\\s+selected=\"selected\".*",
                             Pattern.DOTALL))));
 
-    verify(backendApiClient).get(eq(ACTIVE_URI), anyTypeRef(), eq(true));
+    verify(backendApiClient).getCached(eq(ACTIVE_URI), anyTypeRef(), eq(true));
     verify(backendApiClient).get(eq(INTAKE_SETTING_URI), eq(SystemSettingDto.class), eq(true));
     // A guest keeps the Staffel/SK-only catalog — the Bereich/OL tiers (authenticated, epic #692)
     // are never offered to an anonymous caller.
-    verify(backendApiClient, never()).get(eq(ALL_KINDS_URI), anyTypeRef());
+    verify(backendApiClient, never()).getCached(eq(ALL_KINDS_URI), anyTypeRef());
   }
 }

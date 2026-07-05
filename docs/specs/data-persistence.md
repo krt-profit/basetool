@@ -201,6 +201,17 @@ Invariants that must hold:
   once per TTL app-wide instead of on every admin render. Member-roster mutations (add / remove / flags /
   lead) do not change the catalogue's name / shorthand / active / profit-eligible fields, so they
   deliberately do **not** evict.
+- **The active-org-unit owner pickers (`/api/v1/org-units/active`, `/api/v1/org-units/active-all-kinds`)
+  are cached.** Both return a **global** catalogue (all active org units, no per-principal / per-active-
+  org-unit-header / redaction variance — the endpoints do no scope filtering), so the URI-keyed cache is
+  safe. `/active` (Staffel + SK) is read on every mission-detail render (`MissionPageController`) and
+  every Job-Order render (`JobOrderPageController.fetchActiveOrgUnitOptions`); `/active-all-kinds`
+  (+ Bereich + OL) on every bank-management render (`BankManagePageController`) and the authenticated
+  Job-Order requesting picker. Their eviction gate is now complete: Squadron writes
+  (`AdminMissionDataPageController` / `SquadronAdminProxyController`), SK writes
+  (`AdminSpecialCommandsPageController` / `SpecialCommandAdminProxyController`) **and** Bereich/OL writes
+  (`AdminOrgStructurePageController` create-Bereich / create-OL / re-parent) all call
+  `clearStaticDataCache()`, so a picker never shows an org unit more stale than the last mutation.
 - **Per-principal calls are never URI-cached.** `/api/v1/users/me`, `/api/v1/me/capabilities`, and
   `/api/v1/me/active-org-unit` share a URI across users; a URI-keyed cache would cross-contaminate
   them, so they remain plain `get(...)`.

@@ -166,7 +166,11 @@ public class AdminOrgStructurePageController {
   @PostMapping(value = "/bereiche", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> createBereich(@RequestBody BereichCreateRequest request) {
     try {
-      return ResponseEntity.ok(backendApiClient.post(BACKEND_BEREICHE, request, Object.class));
+      Object created = backendApiClient.post(BACKEND_BEREICHE, request, Object.class);
+      // A new Bereich appears in the cached /org-units/active-all-kinds picker, so evict the shared
+      // catalogue cache or that picker stays stale up to the TTL (REQ-DATA-007 eviction gate).
+      backendApiClient.clearStaticDataCache();
+      return ResponseEntity.ok(created);
     } catch (BackendServiceException e) {
       return propagateBackendError(e);
     } catch (Exception e) {
@@ -186,7 +190,10 @@ public class AdminOrgStructurePageController {
   public ResponseEntity<Object> createOrganisationsleitung(
       @RequestBody OrganisationsleitungCreateRequest request) {
     try {
-      return ResponseEntity.ok(backendApiClient.post(BACKEND_OL, request, Object.class));
+      Object created = backendApiClient.post(BACKEND_OL, request, Object.class);
+      // The Organisationsleitung appears in the cached /org-units/active-all-kinds picker → evict.
+      backendApiClient.clearStaticDataCache();
+      return ResponseEntity.ok(created);
     } catch (BackendServiceException e) {
       return propagateBackendError(e);
     } catch (Exception e) {
@@ -208,9 +215,14 @@ public class AdminOrgStructurePageController {
   public ResponseEntity<Object> setParent(
       @PathVariable @NotNull UUID id, @RequestBody OrgUnitParentUpdateRequest request) {
     try {
-      return ResponseEntity.ok(
+      Object updated =
           backendApiClient.patch(
-              "/api/v1/org-hierarchy/org-units/" + id + "/parent", request, Object.class));
+              "/api/v1/org-hierarchy/org-units/" + id + "/parent", request, Object.class);
+      // Re-parenting changes the org-unit tree the cached /org-units/active-all-kinds picker
+      // renders
+      // (a unit can move under a different Bereich), so evict the shared catalogue cache.
+      backendApiClient.clearStaticDataCache();
+      return ResponseEntity.ok(updated);
     } catch (BackendServiceException e) {
       return propagateBackendError(e);
     } catch (Exception e) {
