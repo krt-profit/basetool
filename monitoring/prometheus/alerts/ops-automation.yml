@@ -71,14 +71,20 @@ groups:
 
   - name: ops-automation-warning
     rules:
+      # Opt-in: fires ONLY when an expiry has been recorded (the .expiry sidecar
+      # exists) and is <14d away. A token with no expiry (a classic PAT kept
+      # non-expiring by choice) simply has no .expiry file, emits no metric, and
+      # is intentionally NOT alerted on — deploy.sh's write_token_expiry_metric is
+      # a no-op then. (Do not re-add an `absent()` guard: it would false-warn
+      # forever on every host that runs a non-expiring token.)
       - alert: GhcrPullTokenExpiring
-        expr: (basetool_ghcr_token_expiry_timestamp - time()) < 14 * 24 * 3600 or absent(basetool_ghcr_token_expiry_timestamp)
+        expr: (basetool_ghcr_token_expiry_timestamp - time()) < 14 * 24 * 3600
         for: 1h
         labels:
           severity: warning
         annotations:
-          summary: "GHCR pull token expiring <14d or expiry unknown"
-          description: "The production GHCR pull token expires in under 14 days, or its expiry gauge is absent (record the rotation date in the token's .expiry file — docs/deployment.md → Token rotation). A lapsed token silently stops all deploys."
+          summary: "GHCR pull token expiring <14d"
+          description: "The production GHCR pull token's recorded expiry is under 14 days away — rotate it and update its .expiry file (docs/deployment.md → Token rotation). A lapsed token silently stops all deploys."
 
       - alert: DockerCleanupStaleOrMissing
         expr: (time() - basetool_docker_cleanup_last_success_timestamp) > 8 * 24 * 3600 or absent(basetool_docker_cleanup_last_success_timestamp)

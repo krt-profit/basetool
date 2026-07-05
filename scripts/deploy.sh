@@ -575,19 +575,22 @@ TEXTFILE_DIR="${IRI_MONITORING_TEXTFILE_DIR:-/var/iri/monitoring/textfile}"
 DEPLOY_METRIC_FILE="${TEXTFILE_DIR}/deploy.prom"
 START_EPOCH="$(date +%s)"
 
-# GHCR pull token expiry. The token is a 90-day PAT (docs/deployment.md → Token
-# rotation); a lapsed token silently stops every deploy. There is no way to read
-# a PAT's expiry from the token itself, so the operator records it at rotation
-# time in ${TOKEN_FILE}.expiry (an ISO-8601 date the host `date` can parse, e.g.
-# `2026-10-01`). deploy.sh emits it as a gauge so the GhcrPullTokenExpiring alert
-# can warn ~2 weeks ahead instead of the deploy loop failing on the expiry day.
+# GHCR pull token expiry (OPT-IN). A token that expires (a fine-grained PAT, which
+# GitHub forces to expire) silently stops every deploy on the expiry day. There is
+# no way to read a PAT's expiry from the token itself, so IF the token expires the
+# operator records the date at rotation time in ${TOKEN_FILE}.expiry (an ISO-8601
+# date the host `date` can parse, e.g. `2026-10-01`) and deploy.sh emits it as a
+# gauge so the GhcrPullTokenExpiring alert warns ~2 weeks ahead. A token kept
+# NON-expiring (a classic PAT, by deliberate choice) simply omits the file — no
+# metric, no alert (docs/deployment.md → Token rotation).
 TOKEN_EXPIRY_FILE="${IRI_GHCR_TOKEN_EXPIRY_FILE:-${TOKEN_FILE}.expiry}"
 TOKEN_METRIC_FILE="${TEXTFILE_DIR}/ghcr-token.prom"
 
 # Emit basetool_ghcr_token_expiry_timestamp from the operator-recorded expiry
-# date. Best-effort: absent/unparseable → no metric (the alert's absent() guard
-# nudges the operator to create the file); never fails the deploy. Called on
-# EVERY tick, including the idempotence no-op, so the gauge does not go stale.
+# date. Best-effort and opt-in: absent file → no metric, and the alert does NOT
+# fire on absence (a non-expiring token is a valid, un-alerted state);
+# unparseable → a WARN; never fails the deploy. Called on EVERY tick, including
+# the idempotence no-op, so the gauge does not go stale.
 write_token_expiry_metric() {
   local raw epoch tmp
   [[ -f "${TOKEN_EXPIRY_FILE}" ]] || return 0

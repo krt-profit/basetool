@@ -252,21 +252,24 @@ sudo install -m 0640 -o deploy -g docker /path/to/realm-export.json /var/iri/cod
 Generate a fine-grained PAT in GitHub:
 - Repository access: `krt-profit/basetool` only
 - Permissions: `Packages: Read` (no other scopes)
-- Expiry: 90 days
+- Expiry: 90 days (recommended — bounds leak exposure; fine-grained PATs must
+expire. A classic PAT can be non-expiring, but a token that never expires is
+valid forever if leaked, so prefer an expiry + rotation.)
 
 ```bash
 # Fine-grained PATs are prefixed `github_pat_` (NOT the classic `ghp_`).
 sudo install -m 0600 -o deploy -g deploy /dev/stdin /etc/iri/ghcr-pull-token <<< 'github_pat_xxxxxxxx'
 
-# Record the PAT's expiry date so the deploy loop can warn ~2 weeks ahead instead
-# of failing on expiry day (deploy.sh emits basetool_ghcr_token_expiry_timestamp;
-# the GhcrPullTokenExpiring alert reads it). Use the same date you set in GitHub:
+# OPTIONAL, only if the token EXPIRES: record its expiry date so the deploy loop
+# warns ~2 weeks ahead instead of failing on expiry day (deploy.sh emits
+# basetool_ghcr_token_expiry_timestamp; the GhcrPullTokenExpiring alert reads it).
+# A NON-expiring token skips this file entirely — no metric, no alert.
 sudo install -m 0640 -o deploy -g deploy /dev/stdin /etc/iri/ghcr-pull-token.expiry <<< '2026-10-01'
 ```
 
 The token file is owner-only readable. The deploy user uses `cat` against
-it (via the systemd unit), nothing else touches it. The `.expiry` sidecar holds
-only the (non-secret) rotation date.
+it (via the systemd unit), nothing else touches it. The optional `.expiry`
+sidecar holds only the (non-secret) rotation date.
 
 ### 6. Install the systemd timer
 
@@ -1174,17 +1177,21 @@ host validation, so they are tracked separately rather than bundled here.
 ## Token rotation
 
 GHCR pull tokens are scoped to the basetool repo with `Packages: Read`
-only. Rotate every 90 days, or immediately on any suspicion of leak. You do not
-have to watch the calendar: `deploy.sh` publishes the recorded expiry as
-`basetool_ghcr_token_expiry_timestamp`, and the **GhcrPullTokenExpiring** alert
-warns ~2 weeks out (**GhcrPullTokenExpired** is critical). Rotate on that alert:
+only. Rotate every 90 days, or immediately on any suspicion of leak. If the token
+**expires**, you do not have to watch the calendar: `deploy.sh` publishes the
+recorded expiry as `basetool_ghcr_token_expiry_timestamp`, and the
+**GhcrPullTokenExpiring** alert warns ~2 weeks out (**GhcrPullTokenExpired** is
+critical). The expiry alerts are **opt-in** — they only fire when a `.expiry`
+sidecar records a date; a deliberately **non-expiring** token has no `.expiry`
+file and is not alerted on (rotate it on your own schedule instead). Rotate:
 
 ```bash
 # 1. Generate a new fine-grained PAT in GitHub (same scopes as before).
 
-# 2. Replace the token file atomically, and update the expiry sidecar.
+# 2. Replace the token file atomically.
 sudo install -m 0600 -o deploy -g deploy /dev/stdin /etc/iri/ghcr-pull-token.new <<< 'github_pat_new_token'
 sudo mv /etc/iri/ghcr-pull-token.new /etc/iri/ghcr-pull-token
+# ...and update the expiry sidecar IF the token expires (skip for a non-expiring token):
 echo '2027-01-01' | sudo install -m 0640 -o deploy -g deploy /dev/stdin /etc/iri/ghcr-pull-token.expiry
 
 # 3. Force a deploy run to verify the new token works (and refresh the metric).

@@ -352,10 +352,12 @@ The deploy path is hardened at the host layer, beyond running as an unprivileged
   POSIX ACL granting read to uid 1000 (`setfacl -m u:1000:r`) — so both container uids read it (10001
   via group, 1000 via ACL) without the private-key material being readable by `other`. The previous
   `0644` made it readable by every account on the host.
-- **Token expiry is monitored.** `deploy.sh` emits `basetool_ghcr_token_expiry_timestamp` from an
-  operator-recorded `${TOKEN_FILE}.expiry` on every tick (incl. the no-op); `GhcrPullTokenExpiring`
-  (warning, <14 d or absent) and `GhcrPullTokenExpired` (critical) alert before/at the lapse of the
-  90-day PAT, whose expiry silently stops all deploys.
+- **Token expiry is monitored (opt-in).** When the pull token **expires**, `deploy.sh` emits
+  `basetool_ghcr_token_expiry_timestamp` from an operator-recorded `${TOKEN_FILE}.expiry` on every
+  tick (incl. the no-op); `GhcrPullTokenExpiring` (warning, <14 d) and `GhcrPullTokenExpired`
+  (critical) alert before/at the lapse, whose expiry would otherwise silently stop all deploys.
+  A deliberately **non-expiring** token omits the `.expiry` file — no metric, and the alerts do
+  **not** fire on absence (no `absent()` guard), so a non-expiring token is not falsely warned on.
 
 **Acceptance**
 
@@ -363,8 +365,9 @@ The deploy path is hardened at the host layer, beyond running as an unprivileged
   seccomp `SystemCallFilter`, and a `ReadWritePaths` that excludes the DB/redis/npm bind mounts.
 - [ ] The keystore is `0640` with a `user:1000:r` ACL, not world-readable `0644`; the runbook +
   restore procedure re-apply the ACL.
-- [ ] `deploy.sh` writes `basetool_ghcr_token_expiry_timestamp` when `${TOKEN_FILE}.expiry` exists,
-  and `ops-automation.yml` alerts on <14 d / absent / expired.
+- [ ] `deploy.sh` writes `basetool_ghcr_token_expiry_timestamp` when `${TOKEN_FILE}.expiry` exists
+  (and nothing when it does not); `ops-automation.yml` alerts on <14 d / expired only — **not** on
+  absence, so a non-expiring token is not false-warned.
 
 **Enforced by:** `scripts/iri-deploy.service` (sandbox) · `scripts/deploy.sh` (`write_token_expiry_metric`,
 `HOME` for the cosign cache) · `monitoring/prometheus/alerts/ops-automation.yml` (token alerts) ·
