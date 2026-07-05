@@ -1730,6 +1730,29 @@ user free text) and sets the structured `target_user_id` on `DEPOSIT_BOOKED` / `
 > transfer's counter-account with a direction arrow (→ to / ← from) or the deposit/withdrawal
 > counterparty, unified exactly as the PDFs already do. The **Begründung + Notiz** move out of their own
 > columns into an **expandable per-booking sub-row** (REQ-BANK-017/-045), reason first.
+>
+> **Amended (2026-07-05, #994, owner-approved — supersedes the "tool user, no free-text" clause of the
+> [ADR-0054](../adr/0054-bank-transaction-counterparty.md) amendment; closes spec Open question #5):**
+> a deposit/withdrawal counterparty may now also be an **external party without a basetool account**,
+> recorded as a **free-text name**. The Kontobewegung modal's counterparty block gains a "kein
+>
+>> Tool-Account" toggle: off (default) is the unchanged registered-user path; on swaps the
+>> `/users/lookup` picker for a free-text **`counterpartyExternalName`** input and **widens the unit
+>> picklist to every active org unit** (`GET /api/v1/org-units/active-all-kinds`, all four kinds) with
+>> the **membership check skipped** — there is no linked user. Server-side, `counterpartyUserId` and
+>> `counterpartyExternalName` are **mutually exclusive** (both → 400); an external counterparty stores
+>> the free-text name in the **`counterparty_handle` snapshot with `counterparty_user_id` NULL**, and
+>> its org unit — any active one — in the existing `counterparty_org_unit_id` + name snapshot (resolved
+>> via `OrgUnitMembershipService.listAllActiveOrgUnitOptionsAllKinds`, still org-unit-blind for
+>> authorization). The snapshot columns are reused (no new column); **V205 relaxes the V197 check
+>> constraint** so the *handle* is the presence marker (registered handle **or** external name) and the
+>> user FK is optional (previously the constraint tied the handle 1:1 to the user id).
+>> The audit detail records the external name + unit as **snapshot labels only** and leaves
+>> `target_user_id` **null** (REQ-BANK-012 — a counterparty label is a system snapshot, not the
+>> free-text note/justification the details-payload rule forbids). Only a **Bank Employee** records it
+>> (the staff who already book deposits/withdrawals); external **Halter** stay out of scope. New
+>> `bank.field.counterparty.external*` i18n keys (DE/EN); `openapi.json` regenerated
+>> (`counterpartyExternalName` on the deposit/withdrawal request DTOs).
 
 **Acceptance**
 
@@ -1744,8 +1767,13 @@ user free text) and sets the structured `target_user_id` on `DEPOSIT_BOOKED` / `
   (amended: previously the counterparty was redacted like the holder).
 - [x] A confirmed deposit/withdrawal **request** records the requester as the counterparty user plus
   their deterministic primary org unit (null when the requester has no membership).
+- [x](#994) An **external** counterparty is booked as a free-text `counterpartyExternalName` +
+  **any** active org unit (membership check skipped), snapshotting the name with
+  `counterparty_user_id` NULL and a null audit `target_user_id`; supplying both a registered user and
+  an external name is a 400; the registered-user path (incl. the membership 400) is unchanged.
 
-**Enforced by:** `BankLedgerServiceTest` (header snapshot, org-unit-membership validation, audit
+**Enforced by:** `BankLedgerServiceTest` (header snapshot, org-unit-membership validation, external
+free-text name + any-org-unit + null user/target + both-set 400, audit
 target + detail, transfers leave it null), `BankReportServiceTest` (Gegenseite column present in the
 full statement, redacted out), `OrgUnitBankAccessServiceTest` (counterparty redacted for org-unit
 viewers), `OrgUnitMembershipServiceTest` (`listDirectMembershipOptions` spans all four kinds; primary
@@ -1757,9 +1785,14 @@ reaches `/memberships`) · **Code:**
 `service/OrgUnitMembershipService#listDirectMembershipOptions`, `model/projection/BankBookingRow`,
 `repository/BankPostingRepository`, `model/dto/BankBookingDto`, `service/Bank{Statement,Management}ReportService`,
 `service/OrgUnitBankAccessService#redact`, `controller/UserController`, `config/SecurityConfig`,
-`db/migration/V197`, frontend `controller/BankPageController`, `controller/UserProxyController`,
-`templates/bank-account-detail.html`, `static/js/bank.js` · **ADR:**
-[ADR-0054](../adr/0054-bank-transaction-counterparty.md) · **Issues:** —
+`db/migration/V197`, `db/migration/V205` (#994 constraint relax),
+`service/OrgUnitMembershipService#listAllActiveOrgUnitOptionsAllKinds` (#994),
+frontend `controller/BankPageController`, `controller/BankRequestQueuePageController`,
+`controller/UserProxyController`, `templates/fragments/bank-counterparty.html` (#994),
+`templates/fragments/bank-movement-modal.html`, `templates/bank-account-detail.html`,
+`static/js/bank.js` · **ADR:** [ADR-0054](../adr/0054-bank-transaction-counterparty.md) (amended by
+
+# 994) · **Issues:** #994
 
 ### REQ-BANK-045 — Conditional Begründung (justification) on withdrawals & transfers
 
@@ -2008,4 +2041,7 @@ members), `OrgUnitBankControllerTest`, frontend `OrgUnitBankPageControllerMvcTes
 5. **Holders without a basetool account** — v1 requires every holder to be a registered
    tool user (picked via the user lookup, handle snapshotted). Allowing free-text
    external holders would be a small spec change; decide at Phase 1 review.
+   **Partly resolved (2026-07-05, #994):** external free-text parties are now allowed for the
+   deposit/withdrawal **counterparty** (Einzahler/Empfänger, REQ-BANK-044). External **Halter**
+   remain out of scope — this question stays open only for the custody dimension.
 

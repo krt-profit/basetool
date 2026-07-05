@@ -311,6 +311,97 @@
     });
 
     /**
+     * Enables/disables one control in a counterparty block, clearing its value when disabling so a
+     * gated-off field (the hidden registered-user vs external-name alternative) is omitted from the
+     * submitted JSON (submitBankForm skips disabled controls).
+     *
+     * @param {HTMLElement} control the counterparty control
+     * @param {boolean} on whether it is the active alternative
+     */
+    function setCounterpartyControl(control, on) {
+        control.disabled = !on;
+        if (!on) {
+            control.value = '';
+        }
+    }
+
+    /**
+     * Resets a counterparty org-unit select to just its placeholder option and clears the selection,
+     * mirroring {@link fillCounterpartyOrgUnits}'s reset before it repopulates.
+     *
+     * @param {HTMLSelectElement} select the org-unit select
+     */
+    function resetCounterpartyOrgUnitOptions(select) {
+        const placeholder = select.querySelector('option[value=""]');
+        select.innerHTML = '';
+        if (placeholder) {
+            select.appendChild(placeholder);
+        }
+        select.value = '';
+    }
+
+    /**
+     * Switches a counterparty block between the registered-tool-user path and the external
+     * free-text path (REQ-BANK-044, #994). External: hide + disable the user lookup, show + enable the
+     * free-text name, and widen the unit picklist to ALL active org units (cloned from the shared
+     * [data-bank-all-orgunits] source) with no membership filter. Registered (default): the reverse —
+     * the unit select resets to its placeholder and is disabled until a user is chosen (then
+     * {@link fillCounterpartyOrgUnits} fills it from that user's memberships). A no-op for a
+     * gated-off (movement-type-inactive) block, since its toggle is disabled.
+     *
+     * @param {HTMLInputElement} toggle the "kein Tool-Account" checkbox
+     */
+    function toggleCounterpartyExternal(toggle) {
+        const section = toggle.closest('[data-counterparty-section]');
+        if (!section) {
+            return;
+        }
+        const external = toggle.checked && !toggle.disabled;
+        const registeredRow = section.querySelector('[data-cp-registered-row]');
+        const externalRow = section.querySelector('[data-cp-external-row]');
+        const userSelect = section.querySelector('[data-counterparty-user]');
+        const nameInput = section.querySelector('[data-counterparty-name]');
+        const orgSelect = section.querySelector('[data-counterparty-orgunit]');
+        if (registeredRow) {
+            registeredRow.hidden = external;
+        }
+        if (userSelect) {
+            setCounterpartyControl(userSelect, !external);
+        }
+        if (externalRow) {
+            externalRow.hidden = !external;
+        }
+        if (nameInput) {
+            setCounterpartyControl(nameInput, external);
+        }
+        if (orgSelect) {
+            resetCounterpartyOrgUnitOptions(orgSelect);
+            if (external) {
+                const form = toggle.closest('form');
+                const source = form ? form.querySelector('[data-bank-all-orgunits]') : null;
+                if (source) {
+                    Array.prototype.forEach.call(source.options, function (option) {
+                        if (option.value) {
+                            orgSelect.appendChild(option.cloneNode(true));
+                        }
+                    });
+                }
+                orgSelect.disabled = false;
+            } else {
+                orgSelect.disabled = true;
+            }
+        }
+    }
+
+    // Delegated so it survives the accountBody swap: toggling "kein Tool-Account" swaps the block.
+    document.addEventListener('change', function (event) {
+        const toggle = event.target.closest('[data-role="bank-cp-external-toggle"]');
+        if (toggle) {
+            toggleCounterpartyExternal(toggle);
+        }
+    });
+
+    /**
      * Converts one form control into its JSON value: checkboxes to booleans,
      * whitelisted names to numbers/booleans, everything else stays a string.
      *
@@ -1250,6 +1341,13 @@
         if (splitToggle) {
             toggleSplitRow(splitToggle);
         }
+        // Restore each ACTIVE counterparty block's registered-vs-external state after the type gating
+        // (#994): a gated-off block's toggle is disabled, so skip it — its controls stay disabled.
+        form.querySelectorAll('[data-role="bank-cp-external-toggle"]').forEach(function (t) {
+            if (!t.disabled) {
+                toggleCounterpartyExternal(t);
+            }
+        });
         // Submit label follows the type (localized keys carried on the button as data-label-*).
         const submit = form.querySelector('button[type="submit"][data-label-deposit]');
         if (submit) {

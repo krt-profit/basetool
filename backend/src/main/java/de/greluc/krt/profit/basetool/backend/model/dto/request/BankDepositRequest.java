@@ -52,9 +52,14 @@ import org.jetbrains.annotations.Nullable;
  *     #splitEnabled}, ignored otherwise
  * @param counterpartyUserId optional Einzahler — the member who handed the money in (REQ-BANK-044),
  *     distinct from the receiving holder; {@code null} when no counterparty is recorded
- * @param counterpartyOrgUnitId optional org unit the Einzahler belongs to, chosen from their own
- *     memberships; only meaningful together with {@code counterpartyUserId} and validated to be one
- *     of that user's memberships (REQ-BANK-044)
+ * @param counterpartyOrgUnitId optional org unit the Einzahler belongs to; for a registered
+ *     counterparty ({@code counterpartyUserId}) it is validated to be one of that user's
+ *     memberships, for an external counterparty ({@code counterpartyExternalName}) it may be
+ *     <em>any</em> active org unit (REQ-BANK-044, #994)
+ * @param counterpartyExternalName optional Einzahler recorded as <strong>free text</strong> for a
+ *     person <em>without</em> a basetool account (REQ-BANK-044, #994); mutually exclusive with
+ *     {@code counterpartyUserId}. When set, the handle is snapshotted from this name and no {@code
+ *     counterparty_user_id} FK is stored
  */
 public record BankDepositRequest(
     @NotNull UUID accountId,
@@ -64,7 +69,8 @@ public record BankDepositRequest(
     boolean splitEnabled,
     @Nullable @DecimalMin("1") @DecimalMax("100") @WholeNumber BigDecimal splitPercent,
     @Nullable UUID counterpartyUserId,
-    @Nullable UUID counterpartyOrgUnitId) {
+    @Nullable UUID counterpartyOrgUnitId,
+    @Nullable @Size(max = 100) String counterpartyExternalName) {
 
   /**
    * Cross-field rule (REQ-BANK-043): a split deposit must carry a percentage; a non-split deposit
@@ -95,7 +101,7 @@ public record BankDepositRequest(
       @NotNull UUID holderId,
       @NotNull BigDecimal amount,
       @Nullable String note) {
-    this(accountId, holderId, amount, note, false, null, null, null);
+    this(accountId, holderId, amount, note, false, null, null, null, null);
   }
 
   /**
@@ -118,7 +124,7 @@ public record BankDepositRequest(
       @Nullable String note,
       boolean splitEnabled,
       @Nullable BigDecimal splitPercent) {
-    this(accountId, holderId, amount, note, splitEnabled, splitPercent, null, null);
+    this(accountId, holderId, amount, note, splitEnabled, splitPercent, null, null, null);
   }
 
   /**
@@ -141,6 +147,51 @@ public record BankDepositRequest(
       @Nullable String note,
       @Nullable UUID counterpartyUserId,
       @Nullable UUID counterpartyOrgUnitId) {
-    this(accountId, holderId, amount, note, false, null, counterpartyUserId, counterpartyOrgUnitId);
+    this(
+        accountId,
+        holderId,
+        amount,
+        note,
+        false,
+        null,
+        counterpartyUserId,
+        counterpartyOrgUnitId,
+        null);
+  }
+
+  /**
+   * Convenience constructor for a deposit with no external free-text counterparty (REQ-BANK-044,
+   * #994) — the pre-#994 canonical shape. Delegates to the canonical constructor with {@code
+   * counterpartyExternalName} {@code null}, keeping every call site that used the split +
+   * registered-counterparty form unchanged; programmatic callers only, Jackson uses the canonical.
+   *
+   * @param accountId the receiving account
+   * @param holderId the player who physically received the money
+   * @param amount whole-aUEC amount, at least 1
+   * @param note optional free-text note for the booking history and statements
+   * @param splitEnabled whether to distribute {@code splitPercent} across the squadron accounts
+   * @param splitPercent the whole-percent (1–100) to distribute when {@code splitEnabled}
+   * @param counterpartyUserId the Einzahler (registered member), or {@code null}
+   * @param counterpartyOrgUnitId the Einzahler's org unit, or {@code null}
+   */
+  public BankDepositRequest(
+      @NotNull UUID accountId,
+      @NotNull UUID holderId,
+      @NotNull BigDecimal amount,
+      @Nullable String note,
+      boolean splitEnabled,
+      @Nullable BigDecimal splitPercent,
+      @Nullable UUID counterpartyUserId,
+      @Nullable UUID counterpartyOrgUnitId) {
+    this(
+        accountId,
+        holderId,
+        amount,
+        note,
+        splitEnabled,
+        splitPercent,
+        counterpartyUserId,
+        counterpartyOrgUnitId,
+        null);
   }
 }

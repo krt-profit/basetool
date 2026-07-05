@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankTransferFeeRateDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -88,6 +89,14 @@ public class BankRequestQueuePageController {
   private static final ParameterizedTypeReference<List<UserReferenceDto>> USER_REFERENCE_LIST =
       new ParameterizedTypeReference<>() {};
 
+  /**
+   * Response type for the all-kinds active org-unit option list ({@code
+   * /api/v1/org-units/active-all-kinds}) feeding the external-counterparty unit picklist
+   * (REQ-BANK-044, #994).
+   */
+  private static final ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>
+      ORG_UNIT_OPTION_LIST = new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -152,6 +161,12 @@ public class BankRequestQueuePageController {
     List<UserReferenceDto> users =
         backendApiClient.get("/api/v1/users/lookup", USER_REFERENCE_LIST);
     model.addAttribute("users", users == null ? List.<UserReferenceDto>of() : users);
+    // All active org units (all kinds) feed the external-counterparty unit picklist (REQ-BANK-044,
+    // #994) in the direct-booking modal.
+    List<OrgUnitMembershipOptionDto> allOrgUnits =
+        backendApiClient.get("/api/v1/org-units/active-all-kinds", ORG_UNIT_OPTION_LIST);
+    model.addAttribute(
+        "allOrgUnits", allOrgUnits == null ? List.<OrgUnitMembershipOptionDto>of() : allOrgUnits);
     model.addAttribute("transferFeeRate", fetchTransferFeeRate());
     return "bank-requests";
   }

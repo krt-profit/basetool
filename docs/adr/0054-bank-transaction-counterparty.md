@@ -17,6 +17,24 @@
 > Separately, that unified column is **renamed** "Gegenseite"/"Gegenpartei" → **"Quell-/Zielkonto"**
 > in both account-detail tables and both PDFs, and the Begründung + Notiz move into an expandable
 > per-booking sub-row (REQ-BANK-045).
+>
+> **Amended (2026-07-05, #994, owner-approved) — the counterparty may be external free text.** This
+> **supersedes the "tool user (no free-text)" clause of decision point 2 below** for the
+> *counterparty* dimension. A deposit/withdrawal counterparty (Einzahler/Empfänger) may now be a
+> person **without a basetool account**, recorded as a free-text **`counterpartyExternalName`** with
+> `counterparty_user_id` **NULL** (the name still lives in the deletion-proof `counterparty_handle`
+> snapshot); it is **mutually exclusive** with the registered `counterpartyUserId`. For an external
+> counterparty the org unit may be **any** active org unit (all four kinds) — the membership
+> validation of decision point 3 is **skipped**, since there is no linked user — resolved to its name
+> snapshot via `OrgUnitMembershipService.listAllActiveOrgUnitOptionsAllKinds`, still org-unit-blind
+> for authorization. No new column; **V205 relaxes the V197 check constraint** so the *handle* (not
+> the user id) is the counterparty presence marker and the user FK is optional. The audit stays a
+> snapshot label with a **null `target_user_id`** for an
+> external party (REQ-BANK-012). The registered-user path — including the membership 400 — is
+> unchanged. The **custody Halter** stays registered-user-only (out of scope; spec Open question #5).
+> Rationale: bank staff routinely take deposits from / pay out to people who have no tool account, so
+> forcing a tool user made the counterparty unrecordable for them; a free-text snapshot carries the
+> same audit weight as a user's snapshotted handle and introduces no authorization surface.
 
 ## Context
 
