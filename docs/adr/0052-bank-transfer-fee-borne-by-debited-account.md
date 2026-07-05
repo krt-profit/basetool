@@ -9,6 +9,22 @@
   [ADR-0010](0010-bank-double-entry-append-only-ledger.md) ·
   epic [#556](https://github.com/krt-profit/basetool/issues/556)
 
+> **Amended (2026-07-05, #998, owner-approved) — the `HOLDER_TRANSFER` Umbuchung is no longer
+> fee-free; its fee is borne by the KRT (`CARTEL`) account.** This ADR (and ADR-0039) exempted the
+> internal holder→holder Umbuchung from the fee ("the staff bear it personally"). The owner reversed
+> that for the Umbuchung: a fee-bearing Umbuchung reduces the **source holder's** custody by the fee
+> (source holder leg `−(amount + fee)`), credits the destination the full `amount`, and debits the fee
+> from the **CARTEL account** (a single `−fee` account leg — the one exception to "no account leg on a
+>
+>> `HOLDER_TRANSFER`" of ADR-0039). So the holder ledger nets to `−fee` and the CARTEL account bears
+>> the real aUEC lost to the game, the same `SUM(legs) = −transfer_fee` shape as a fee-bearing
+>> `TRANSFER`, except only the CARTEL account is touched. The CARTEL account is overdraft-guarded and
+>> never driven negative (missing/closed → `BANK_ACCOUNT_CLOSED`, uncovered fee → `BANK_OVERDRAFT`);
+>> the Umbuchung stays uncapped (no REQ-BANK-047 tier check) and the inclusive-fee mode (#999) does not
+>> apply. A tiny amount whose fee rounds to `0` keeps the legacy fee-free shape. See REQ-BANK-031.
+>> Rationale: the KRT (the org's central account) already absorbs org-level costs, so charging it the
+>> reconciliation fee — rather than the individual staffer — matches how the org actually settles.
+
 ## Context
 
 ADR-0041 made the bank absorb the Star Citizen in-game transfer fee so bank staff are never out

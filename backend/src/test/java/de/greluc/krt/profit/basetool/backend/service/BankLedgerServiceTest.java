@@ -485,32 +485,35 @@ class BankLedgerServiceTest {
   }
 
   @Test
-  void bookHolderTransfer_movesGlobalCustodyWithNoAccountLegAndIsFeeFree() {
+  void bookHolderTransfer_tinyAmount_isFeeFreeAndBooksNoAccountLeg() {
     // Given: holder A holds 800 (via a deposit onto the account)
     deposit(account, holderA, "800");
     BigDecimal accountBefore = balance(account);
     long auditBefore = auditEventRepository.count();
 
-    // When: A hands 400 of physical custody to B — no account is touched. The internal Umbuchung is
-    // fee-free (REQ-BANK-031, ADR-0052): the staff bear any in-game fee personally, so A is debited
-    // exactly 400 and B credited exactly 400.
+    // When: A hands 50 of physical custody to B. The fee round(50 * 0.005) = 0 rounds away, so this
+    // stays the legacy fee-free Umbuchung shape (REQ-BANK-031, #998): no account leg is booked, A
+    // is
+    // debited exactly 50 and B credited exactly 50. (Fee-bearing Umbuchungen are covered by the
+    // dedicated, isolated BankHolderTransferFeeTest, since the CARTEL account is a singleton.)
     BankTransactionDto tx =
         bankLedgerService.bookHolderTransfer(
             new BankHolderTransferRequest(
-                holderA.getId(), holderB.getId(), new BigDecimal("400"), "Schichtwechsel"));
+                holderA.getId(), holderB.getId(), new BigDecimal("50"), "Schichtwechsel"));
 
     // Then: only holder balances move; the account is untouched and the tx books no account leg;
     // no fee is recorded and the two holder legs net to zero.
     assertEquals(BankTransactionType.HOLDER_TRANSFER, tx.type());
-    assertEquals(0, storedFee(tx).signum(), "holder Umbuchung is fee-free");
+    assertEquals(0, storedFee(tx).signum(), "a tiny Umbuchung whose fee rounds to 0 is fee-free");
     assertEquals(0, balance(account).compareTo(accountBefore), "account balance unchanged");
     assertTrue(postingRepository.findLegsByTransactionIds(List.of(tx.id())).isEmpty());
     List<BankHolderLeg> holderLegs =
         holderPostingRepository.findHolderLegsByTransactionIds(List.of(tx.id()));
     assertEquals(2, holderLegs.size());
     assertEquals(0, sum(holderLegs.stream().map(BankHolderLeg::amount).toList()).signum());
-    assertEquals(0, holderTotal(holderA).compareTo(new BigDecimal("400")), "source debited 400");
-    assertEquals(0, holderTotal(holderB).compareTo(new BigDecimal("400")), "destination gets 400");
+    assertEquals(
+        0, holderTotal(holderA).compareTo(new BigDecimal("750")), "source debited 50 (800 - 50)");
+    assertEquals(0, holderTotal(holderB).compareTo(new BigDecimal("50")), "destination gets 50");
     assertEquals(auditBefore + 1, auditEventRepository.count());
     assertTrue(auditEventRepository.existsByTransactionId(tx.id()));
   }
@@ -534,15 +537,17 @@ class BankLedgerServiceTest {
     holderRepository.save(holderB);
 
     // When: reconcile B's stash even though it is deactivated; A goes negative (no holder
-    // overdraft). The internal Umbuchung is fee-free (REQ-BANK-031, ADR-0052), so A is debited
-    // exactly 200 and B credited exactly 200.
+    // overdraft).
+    // A tiny fee-free amount (round(50 * 0.005) = 0) keeps this focused on the holder dimension, so
+    // A
+    // is debited exactly 50 and B credited exactly 50 with no CARTEL account leg (#998).
     bankLedgerService.bookHolderTransfer(
         new BankHolderTransferRequest(
-            holderA.getId(), holderB.getId(), new BigDecimal("200"), null));
+            holderA.getId(), holderB.getId(), new BigDecimal("50"), null));
 
-    // Then: source debited 200 (goes negative), destination credited the full 200
-    assertEquals(0, holderTotal(holderA).compareTo(new BigDecimal("-200")));
-    assertEquals(0, holderTotal(holderB).compareTo(new BigDecimal("200")));
+    // Then: source debited 50 (goes negative), destination credited the full 50
+    assertEquals(0, holderTotal(holderA).compareTo(new BigDecimal("-50")));
+    assertEquals(0, holderTotal(holderB).compareTo(new BigDecimal("50")));
   }
 
   @Test

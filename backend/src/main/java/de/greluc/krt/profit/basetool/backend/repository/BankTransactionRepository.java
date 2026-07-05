@@ -44,19 +44,23 @@ public interface BankTransactionRepository extends JpaRepository<BankTransaction
   boolean existsByReversedTransactionId(UUID reversedTransactionId);
 
   /**
-   * Integrity check (REQ-BANK-020, ADR-0052): ids of {@code TRANSFER} transactions whose account
-   * legs do not net to {@code -transfer_fee}. A fee-free (same-holder) transfer nets to zero; a
-   * fee-bearing holder-changing transfer debits the source the gross (amount + fee) and credits the
-   * destination the full entered amount, so its two account legs net to {@code -transfer_fee} (real
-   * money lost to the in-game fee). The holder side is checked by {@code
+   * Integrity check (REQ-BANK-020, ADR-0052, #998): ids of {@code TRANSFER} / {@code
+   * HOLDER_TRANSFER} transactions whose account legs do not net to {@code -transfer_fee}. A
+   * fee-free (same-holder) transfer nets to zero; a fee-bearing holder-changing transfer debits the
+   * source the gross (amount + fee) and credits the destination the full entered amount, so its two
+   * account legs net to {@code -transfer_fee}. Since #998 a fee-bearing {@code HOLDER_TRANSFER}
+   * Umbuchung books a single {@code CARTEL} account leg of {@code -fee}, which nets to {@code
+   * -transfer_fee} too; a fee-free Umbuchung books no account leg at all (so it never appears here)
+   * and legacy fee-free rows stay sound. The holder side is checked by {@code
    * BankHolderPostingRepository.findHolderMovementTransactionsWithNonZeroSum}.
    *
-   * @return the violating transfer transaction ids (empty when sound)
+   * @return the violating transaction ids (empty when sound)
    */
   @Query(
       """
-      SELECT t.id FROM BankPosting p JOIN p.transaction t WHERE t.type =
-      de.greluc.krt.profit.basetool.backend.model.BankTransactionType.TRANSFER
+      SELECT t.id FROM BankPosting p JOIN p.transaction t WHERE t.type IN (
+      de.greluc.krt.profit.basetool.backend.model.BankTransactionType.TRANSFER,
+      de.greluc.krt.profit.basetool.backend.model.BankTransactionType.HOLDER_TRANSFER)
       GROUP BY t.id, t.transferFee HAVING SUM(p.amount) + t.transferFee <> 0
       """)
   List<UUID> findTransferTransactionsWithNonZeroSum();

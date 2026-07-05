@@ -569,18 +569,23 @@ public class BankLedgerService {
    * staff stay payout-capable. The source holder may go negative; the active flag is ignored in
    * both directions so a deactivated holder's residual can be reconciled to zero.
    *
-   * <p>This Umbuchung is <strong>fee-free</strong> (ADR-0052): the holders are bank staff
-   * reconciling their physically-held stashes among themselves, and they bear any in-game transfer
-   * fee on such an internal move <em>personally</em> — it is not the bank's concern. So the source
-   * holder is debited exactly the entered amount, the destination credited the same, the header
-   * carries no {@code transfer_fee}, and the two holder legs net to zero. The in-game fee on a
-   * customer-facing payout or holder-changing account transfer is modelled there (REQ-BANK-033),
-   * not here.
+   * <p><strong>The Umbuchung fee is borne by the KRT ({@code CARTEL}) account</strong>
+   * (REQ-BANK-031, #998 — supersedes the fee-free ADR-0052/ADR-0039 clause). {@code fee =
+   * round(amount × rate)}: the <strong>source</strong> holder's custody is reduced by the fee
+   * ({@code -(amount + fee)}), the destination is credited the full {@code amount}, and the fee is
+   * <strong>debited from the CARTEL account</strong> ({@code -fee}) — so the holder ledger nets to
+   * {@code -fee} and the CARTEL account bears the real aUEC lost to the game. The CARTEL account is
+   * locked + overdraft-guarded and is never driven negative; a <em>missing or closed</em> CARTEL
+   * account rejects the Umbuchung ({@code BANK_ACCOUNT_CLOSED}), and a fee it cannot cover is a
+   * {@code BANK_OVERDRAFT}. A tiny amount whose fee rounds to {@code 0} keeps the legacy fee-free
+   * shape (no account leg, holder legs net to zero).
    *
    * @param request validated holder-transfer payload (source and destination holders must differ)
    * @return acknowledgement of the created transaction
    * @throws NotFoundException when a holder does not exist
-   * @throws BankConflictException with {@code BANK_SELF_TRANSFER} when source equals destination
+   * @throws BankConflictException {@code BANK_SELF_TRANSFER} when source equals destination, {@code
+   *     BANK_ACCOUNT_CLOSED} when the CARTEL account is missing/closed, or {@code BANK_OVERDRAFT}
+   *     when the fee would overdraw it
    */
   @Transactional
   public BankTransactionDto bookHolderTransfer(@NotNull BankHolderTransferRequest request) {
@@ -592,28 +597,47 @@ public class BankLedgerService {
     BankHolder sourceHolder = requireHolder(request.sourceHolderId());
     BankHolder destinationHolder = requireHolder(request.destinationHolderId());
 
+    // The fee is borne by, and debited from, the KRT/CARTEL account (#998). Locked + overdraft-
+    // guarded so it is never driven negative; missing/closed -> BANK_ACCOUNT_CLOSED. A fee that
+    // rounds
+    // to 0 (tiny amount) books no account leg and keeps the legacy fee-free shape.
+    BigDecimal fee = transferFeeService.feeOn(request.amount());
+    BankAccount cartel = null;
+    if (fee.signum() > 0) {
+      UUID cartelId =
+          accountRepository
+              .findFirstByType(BankAccountType.CARTEL)
+              .map(BankAccount::getId)
+              .orElseThrow(
+                  () ->
+                      new BankConflictException(
+                          BankConflictException.CODE_BANK_ACCOUNT_CLOSED,
+                          "The KRT (CARTEL) account that bears the Umbuchung fee does not exist"));
+      cartel = lockAccount(cartelId);
+      requireActive(cartel);
+      requireAccountCoverage(cartel, fee);
+    }
+
     Instant now = Instant.now();
     BankTransaction tx =
         persistTransaction(
-            BankTransactionType.HOLDER_TRANSFER,
-            request.note(),
-            null,
-            null,
-            BigDecimal.ZERO,
-            now,
-            null);
-    persistHolderPosting(tx, sourceHolder, request.amount().negate(), now);
+            BankTransactionType.HOLDER_TRANSFER, request.note(), null, null, fee, now, null);
+    persistHolderPosting(tx, sourceHolder, request.amount().add(fee).negate(), now);
     persistHolderPosting(tx, destinationHolder, request.amount(), now);
+    if (cartel != null) {
+      persistAccountPosting(tx, cartel, fee.negate(), now);
+    }
     bankAuditService.record(
         BankAuditEventType.HOLDER_TRANSFER,
-        null,
+        cartel == null ? null : cartel.getId(),
         tx.getId(),
         null,
         plain(request.amount())
             + " aUEC "
             + sourceHolder.getHandle()
             + " -> "
-            + destinationHolder.getHandle());
+            + destinationHolder.getHandle()
+            + feeDetail(fee, false));
     return toDto(tx);
   }
 
