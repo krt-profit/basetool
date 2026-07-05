@@ -25,6 +25,8 @@ import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -205,5 +207,121 @@ class AdminSpecialCommandsPageControllerMvcTest {
                 .param("description", "d")
                 .param("version", "0"))
         .andExpect(status().is3xxRedirection());
+  }
+
+  // REQ-DATA-007 — every SK lifecycle mutation evicts STATIC_DATA_CACHE so the cached org-units
+  // pickers + SquadronContextAdvice's SK catalogue cannot serve a stale name/active/profit-eligible
+  // up to the TTL. Classic create path.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void createSpecialCommand_classic_evictsStaticDataCache() throws Exception {
+    when(backendApiClient.post(contains("/special-commands"), any(), eq(Void.class)))
+        .thenReturn(null);
+
+    mockMvc
+        .perform(
+            post("/admin/special-commands")
+                .with(csrf())
+                .param("name", "New SK")
+                .param("shorthand", "NSK")
+                .param("description", "d")
+                .param("version", "0"))
+        .andExpect(status().is3xxRedirection());
+
+    verify(backendApiClient).clearStaticDataCache();
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void createSpecialCommandAjax_evictsStaticDataCache() throws Exception {
+    when(backendApiClient.post(contains("/special-commands"), any(), eq(Void.class)))
+        .thenReturn(null);
+
+    mockMvc
+        .perform(
+            post("/admin/special-commands")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("name", "New SK")
+                .param("shorthand", "NSK")
+                .param("description", "d")
+                .param("version", "0"))
+        .andExpect(status().isOk());
+
+    verify(backendApiClient).clearStaticDataCache();
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void updateSpecialCommandAjax_evictsStaticDataCache() throws Exception {
+    UUID id = UUID.randomUUID();
+    when(backendApiClient.put(contains("/special-commands/"), any(), eq(Void.class)))
+        .thenReturn(null);
+
+    mockMvc
+        .perform(
+            post("/admin/special-commands/" + id + "/update")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("name", "SK")
+                .param("shorthand", "SK")
+                .param("description", "d")
+                .param("version", "0"))
+        .andExpect(status().isOk());
+
+    verify(backendApiClient).clearStaticDataCache();
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void deleteSpecialCommandAjax_evictsStaticDataCache() throws Exception {
+    UUID id = UUID.randomUUID();
+    when(backendApiClient.delete(contains("/special-commands/"), eq(Void.class))).thenReturn(null);
+
+    mockMvc
+        .perform(
+            post("/admin/special-commands/" + id + "/delete")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf()))
+        .andExpect(status().isOk());
+
+    verify(backendApiClient).clearStaticDataCache();
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void activateSpecialCommandAjax_evictsStaticDataCache() throws Exception {
+    UUID id = UUID.randomUUID();
+    when(backendApiClient.post(contains("/activate"), any(), eq(Void.class))).thenReturn(null);
+
+    mockMvc
+        .perform(
+            post("/admin/special-commands/" + id + "/activate")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf()))
+        .andExpect(status().isOk());
+
+    verify(backendApiClient).clearStaticDataCache();
+  }
+
+  // REQ-DATA-007 — a member-roster mutation does NOT change the SK catalogue's
+  // name/shorthand/active/profit-eligible fields, so it must NOT evict the shared cache.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void memberMutation_doesNotEvictStaticDataCache() throws Exception {
+    UUID skId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    when(backendApiClient.patch(contains("/lead"), any(), eq(Void.class))).thenReturn(null);
+
+    mockMvc
+        .perform(
+            post("/admin/special-commands/" + skId + "/members/" + userId + "/lead")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("isLead", "true")
+                .param("version", "0"))
+        .andExpect(status().isOk());
+
+    verify(backendApiClient, never()).clearStaticDataCache();
   }
 }
