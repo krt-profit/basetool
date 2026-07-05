@@ -66,7 +66,10 @@ class BankPageControllerTest {
         "ACTIVE",
         new BigDecimal("1850000"),
         new BigDecimal("420000"),
-        sparkline);
+        sparkline,
+        null,
+        null,
+        null);
   }
 
   private static BankDashboardAccountDto dashboardAccount(String accountNo, String name) {
@@ -78,7 +81,43 @@ class BankPageControllerTest {
         "ACTIVE",
         new BigDecimal("1000"),
         BigDecimal.ZERO,
-        List.of());
+        List.of(),
+        null,
+        null,
+        null);
+  }
+
+  /**
+   * Builds a dashboard account with the full type/status/Bereich shape for the by-Bereich grouping
+   * tests.
+   *
+   * @param name the account name
+   * @param type the account type enum name
+   * @param status the lifecycle enum name
+   * @param bereichId the owning Bereich id, or {@code null}
+   * @param bereichName the owning Bereich name, or {@code null}
+   * @param department the Bereich department enum name, or {@code null}
+   * @return the account payload
+   */
+  private static BankDashboardAccountDto groupedAccount(
+      String name,
+      String type,
+      String status,
+      UUID bereichId,
+      String bereichName,
+      String department) {
+    return new BankDashboardAccountDto(
+        UUID.randomUUID(),
+        "KB-" + name,
+        name,
+        type,
+        status,
+        new BigDecimal("1000"),
+        BigDecimal.ZERO,
+        List.of(),
+        bereichId,
+        bereichName,
+        department);
   }
 
   @Test
@@ -97,7 +136,7 @@ class BankPageControllerTest {
         .thenReturn(dashboard);
 
     // When
-    String view = controller.dashboard(model);
+    String view = controller.dashboard(null, null, null, model);
 
     // Then
     assertEquals("bank-dashboard", view);
@@ -123,7 +162,7 @@ class BankPageControllerTest {
         .thenReturn(dashboard);
 
     // When
-    controller.dashboard(model);
+    controller.dashboard(null, null, null, model);
 
     // Then
     List<BankPageController.BankDashboardCardView> cards =
@@ -143,7 +182,7 @@ class BankPageControllerTest {
         .thenReturn(new BankDashboardDto(false, List.of(dashboardAccount(List.of())), null));
 
     // When
-    controller.dashboard(model);
+    controller.dashboard(null, null, null, model);
 
     // Then
     List<BankPageController.BankDashboardCardView> cards =
@@ -171,7 +210,7 @@ class BankPageControllerTest {
         .thenReturn(dashboard);
 
     // When
-    controller.dashboard(model);
+    controller.dashboard(null, null, null, model);
 
     // Then — cards are ordered case-insensitively by account name, not by account number.
     List<BankPageController.BankDashboardCardView> cards =
@@ -180,6 +219,71 @@ class BankPageControllerTest {
     assertEquals(
         List.of("alpha Reserve", "Mittelkasse", "Zeta Vorrat"),
         cards.stream().map(card -> card.account().name()).toList());
+  }
+
+  @Test
+  void dashboard_byBereich_groupsAccountsWithColouredHeadersInOrder() {
+    // Given — one account of each grouping-relevant shape, out of display order.
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    BankPageController controller = new BankPageController(backendApiClient);
+    Model model = new ConcurrentModel();
+    UUID profit = UUID.randomUUID();
+    BankDashboardDto dashboard =
+        new BankDashboardDto(
+            true,
+            List.of(
+                groupedAccount("KRT", "CARTEL", "ACTIVE", null, null, null),
+                groupedAccount("KRT Bank", "CARTEL_BANK", "ACTIVE", null, null, null),
+                groupedAccount("IRIDIUM", "ORG_UNIT", "ACTIVE", profit, "Profit", "PROFIT"),
+                groupedAccount("Profit", "AREA", "ACTIVE", profit, "Profit", "PROFIT"),
+                groupedAccount("Sonderkonto", "SPECIAL", "ACTIVE", null, null, null),
+                groupedAccount("Waise", "ORG_UNIT", "ACTIVE", null, null, null),
+                groupedAccount("Altkonto", "ORG_UNIT", "CLOSED", profit, "Profit", "PROFIT")),
+            null);
+    when(backendApiClient.get(eq("/api/v1/bank/dashboard"), eq(BankDashboardDto.class)))
+        .thenReturn(dashboard);
+
+    // When
+    String view = controller.dashboard("card", "bereich", null, model);
+
+    // Then — groups render in the fixed order: KRT rubric, Bereich groups, Sonderkonten, Ohne
+    // Bereich, Geschlossen; each Bereich group leads with its AREA account and is colour-classed.
+    assertEquals("bank-dashboard", view);
+    assertEquals("bereich", model.getAttribute("group"));
+    List<BankPageController.BankDashboardGroupView> groups =
+        (List<BankPageController.BankDashboardGroupView>) model.getAttribute("groups");
+    assertNotNull(groups);
+    assertEquals(
+        List.of("krt", "bereich:" + profit, "special", "ungrouped", "closed"),
+        groups.stream().map(BankPageController.BankDashboardGroupView::key).toList());
+    BankPageController.BankDashboardGroupView bereich = groups.get(1);
+    assertEquals("Profit", bereich.bereichName());
+    assertEquals("bank-dept--profit", bereich.deptClass());
+    assertEquals(
+        List.of("Profit", "IRIDIUM"),
+        bereich.cards().stream().map(card -> card.account().name()).toList());
+    assertEquals(
+        List.of("Altkonto"),
+        groups.get(4).cards().stream().map(card -> card.account().name()).toList());
+  }
+
+  @Test
+  void dashboard_tableFragment_resolvesGridFragmentAndCarriesNoGroupsInAlphaMode() {
+    // Given
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    BankPageController controller = new BankPageController(backendApiClient);
+    Model model = new ConcurrentModel();
+    when(backendApiClient.get(eq("/api/v1/bank/dashboard"), eq(BankDashboardDto.class)))
+        .thenReturn(new BankDashboardDto(true, List.of(), null));
+
+    // When
+    String view = controller.dashboard("table", "alpha", "bankGrid", model);
+
+    // Then — the toggle swap re-renders only the switchable grid; alphabetical mode has no groups.
+    assertEquals("bank-dashboard :: bankGrid", view);
+    assertEquals("table", model.getAttribute("layout"));
+    assertEquals("alpha", model.getAttribute("group"));
+    assertEquals(List.of(), model.getAttribute("groups"));
   }
 
   @Test

@@ -23,7 +23,7 @@
     </nav>
 </header>
 
-<main th:attr="data-bank-generic-error=#{bank.error.network}">
+<main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-refresh-error=#{bank.refresh.failed},data-user-id=${#authentication.name}">
     <div class="greeting hud-box flex-between">
         <div>
             <h1 th:text="#{bank.dashboard.title}">Kartellbank</h1>
@@ -35,15 +35,38 @@
                 <span class="utc-time" th:text="${now}">2026-06-12T14:02:00Z</span>
             </p>
         </div>
-        <!-- Header actions. The account-name live filter (REQ-BANK-046) is visible to EVERY viewer who
-             sees at least one card (bank employees included), so it is NOT under the management gate;
-             the Verwaltung/Berechtigungen/Report buttons stay bank-management only. -->
+        <!-- Header actions. The account-name live filter (REQ-BANK-046) and the view toggles
+             (REQ-BANK-016: card/table layout + alphabetical/by-Bereich grouping, persisted per user)
+             are visible to EVERY viewer who sees at least one card; the
+             Verwaltung/Berechtigungen/Report buttons stay bank-management only. -->
         <div class="bank-head-actions">
-            <!-- The account-name filter renders only when there are accounts; the th:if must sit on
-                 an outer th:block because th:replace (precedence 100) would otherwise run before the
-                 host's own th:if (300) and always emit the fragment (#906 Q14). -->
+            <!-- View toggles: two independent segmented controls (layout + grouping). bank.js owns
+                 their pressed state, persists the choice per user in localStorage and re-fetches the
+                 bankGrid fragment on change. -->
             <th:block th:if="${!#lists.isEmpty(cards)}">
-                <th:block th:replace="~{fragments/components :: bankAccSearch('bank-acc-filter', '.bank-acc-grid', '#bank-acc-filter-empty')}"></th:block>
+                <div class="bank-view-toggles" data-bank-view-toggles>
+                    <div class="bank-seg" role="group" th:aria-label="#{bank.dashboard.view.layout}">
+                        <button type="button" class="btn btn-sm bank-view-btn" data-bank-view-layout="card"
+                                th:classappend="${layout == 'card'} ? ' btn--cta' : ' btn-ghost'"
+                                th:attr="aria-pressed=${layout == 'card'}"
+                                th:text="#{bank.dashboard.view.card}">Kacheln</button>
+                        <button type="button" class="btn btn-sm bank-view-btn" data-bank-view-layout="table"
+                                th:classappend="${layout == 'table'} ? ' btn--cta' : ' btn-ghost'"
+                                th:attr="aria-pressed=${layout == 'table'}"
+                                th:text="#{bank.dashboard.view.table}">Tabelle</button>
+                    </div>
+                    <div class="bank-seg" role="group" th:aria-label="#{bank.dashboard.view.grouping}">
+                        <button type="button" class="btn btn-sm bank-view-btn" data-bank-view-group="alpha"
+                                th:classappend="${group == 'alpha'} ? ' btn--cta' : ' btn-ghost'"
+                                th:attr="aria-pressed=${group == 'alpha'}"
+                                th:text="#{bank.dashboard.view.alpha}">A–Z</button>
+                        <button type="button" class="btn btn-sm bank-view-btn" data-bank-view-group="bereich"
+                                th:classappend="${group == 'bereich'} ? ' btn--cta' : ' btn-ghost'"
+                                th:attr="aria-pressed=${group == 'bereich'}"
+                                th:text="#{bank.dashboard.view.bereich}">Bereiche</button>
+                    </div>
+                </div>
+                <th:block th:replace="~{fragments/components :: bankAccSearch('bank-acc-filter', '#bank-grid-results', '#bank-acc-filter-empty')}"></th:block>
             </th:block>
             <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)">
                 <a th:href="@{/bank/manage}" class="btn btn-ghost" data-testid="bank-manage-link">
@@ -63,7 +86,8 @@
         </div>
     </div>
 
-    <!-- Management-only aggregate strip (.kpi-total, D1 / REQ-BANK-016). -->
+    <!-- Management-only aggregate strip (.kpi-total, D1 / REQ-BANK-016). View-independent, so it sits
+         outside the swappable bankGrid fragment. -->
     <div class="bank-totals mt-2" th:if="${dashboard != null and dashboard.totals() != null}"
          data-testid="bank-totals">
         <div class="kpi-total">
@@ -88,50 +112,36 @@
         </div>
     </div>
 
-    <!-- D1 card grid: one .kpi-card per visible account; the whole card links to the detail. -->
-    <div class="bank-acc-grid mt-2" th:if="${!#lists.isEmpty(cards)}">
-        <a th:each="card : ${cards}" class="kpi-card"
-           th:classappend="${card.account().status() == 'CLOSED'} ? ' kpi-card--closed' : ''"
-           th:href="@{'/bank/accounts/' + ${card.account().id()}}"
-           data-testid="bank-account-card"
-           th:attr="data-account-no=${card.account().accountNo()},data-filter-name=${card.account().name()}">
-            <div class="kpi-card-top">
-                <div>
-                    <div class="kpi-title" th:text="${card.account().name()}">Staffel IRIDIUM</div>
-                    <div class="kpi-sub" th:text="${card.account().accountNo()}">KB-0001</div>
-                </div>
-                <span class="chip" style="font-size: 0.55rem;"
-                      th:classappend="${card.account().status() == 'CLOSED'} ? ' chip--muted' : ''"
-                      th:text="${card.account().status() == 'CLOSED'} ? #{bank.account.status.CLOSED} : #{'bank.account.type.' + ${card.account().type()}}">Staffel</span>
+    <!-- bankGrid fragment: the switchable account view (card/table layout × alphabetical/by-Bereich
+         grouping); swapped in place when a view toggle changes (REQ-FE-005). The account-name filter
+         scopes this whole container so it works across every view. -->
+    <div id="bank-grid-results" th:fragment="bankGrid">
+        <th:block th:if="${!#lists.isEmpty(cards)}">
+            <!-- Alphabetical (flat) view. -->
+            <th:block th:if="${group != 'bereich'}">
+                <th:block th:if="${layout == 'table'}" th:replace="~{fragments/bank-account-views :: accTable(${cards})}"></th:block>
+                <th:block th:unless="${layout == 'table'}" th:replace="~{fragments/bank-account-views :: accGrid(${cards})}"></th:block>
+            </th:block>
+            <!-- By-Bereich (grouped) view: coloured vertical groups the user scrolls through. -->
+            <th:block th:if="${group == 'bereich'}">
+                <th:block th:each="grp : ${groups}" th:replace="~{fragments/bank-account-views :: accGroup(${grp}, ${layout})}"></th:block>
+            </th:block>
+            <!-- No-results note for the client-side account-name filter (REQ-BANK-046): revealed by
+                 bank.js when the live filter hides every account. Distinct from the "no accounts at
+                 all" empty state below. -->
+            <div id="bank-acc-filter-empty" class="empty-state mt-2" hidden>
+                <div class="empty-text" th:text="#{bank.filter.empty}">Keine Konten passen zum Filter.</div>
             </div>
-            <div class="kpi-value"
-                 th:text="${#numbers.formatInteger(@moneyFormat.round(card.account().balance()), 1, 'POINT')} + ' aUEC'">1.850.000 aUEC</div>
-            <div class="kpi-card-foot">
-                <span class="kpi-delta"
-                      th:classappend="${card.account().delta30d().signum() > 0} ? ' kpi-delta--pos' : (${card.account().delta30d().signum() < 0} ? ' kpi-delta--neg' : ' kpi-delta--flat')"
-                      th:text="${card.account().delta30d().signum() > 0 ? '&#9650; +' : (card.account().delta30d().signum() < 0 ? '&#9660; ' : '&#177; ')} + ${#numbers.formatInteger(@moneyFormat.round(card.account().delta30d()), 1, 'POINT')} + ' ' + #{bank.dashboard.delta30}">&#9650; +420.000 / 30 T</span>
-                <svg th:if="${card.sparklinePoints() != null}" width="96" height="26" viewBox="0 0 96 26" aria-hidden="true">
-                    <polyline th:attr="points=${card.sparklinePoints()}"
-                              th:classappend="${card.flat()} ? ' kpi-sparkline--flat' : ''"
-                              class="kpi-sparkline" fill="none" stroke-width="1.5"/>
-                </svg>
-            </div>
-        </a>
-    </div>
+        </th:block>
 
-    <!-- No-results note for the client-side account-name filter (REQ-BANK-046): revealed by bank.js
-         when the live filter hides every card. Distinct from the "no accounts at all" empty state
-         below (which is server-rendered when the caller sees no card). -->
-    <div id="bank-acc-filter-empty" class="empty-state mt-2" th:if="${!#lists.isEmpty(cards)}" hidden>
-        <div class="empty-text" th:text="#{bank.filter.empty}">Keine Konten passen zum Filter.</div>
-    </div>
-
-    <div class="hud-box mt-2" th:if="${#lists.isEmpty(cards)}">
-        <p class="text-center" data-testid="bank-dashboard-empty" th:text="#{bank.dashboard.empty}">
-            Noch keine Konten sichtbar. Berechtigungen vergibt die Bankleitung.
-        </p>
+        <div class="hud-box mt-2" th:if="${#lists.isEmpty(cards)}">
+            <p class="text-center" data-testid="bank-dashboard-empty" th:text="#{bank.dashboard.empty}">
+                Noch keine Konten sichtbar. Berechtigungen vergibt die Bankleitung.
+            </p>
+        </div>
     </div>
 </main>
+
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:src="@{/js/bank.js}" defer th:attr="nonce=${cspNonce}"></script>

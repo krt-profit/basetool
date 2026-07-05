@@ -491,6 +491,21 @@ design/delivery/audit rules as REQ-BANK-014. Employees cannot trigger this expor
 
 ### REQ-BANK-016 — Dashboards
 
+> **Amended (2026-07-05, #996):** the dashboard gains **two per-user view options**, persisted
+> client-side in `localStorage` (the Lager pattern) and replayed through the `layout` / `group` query
+> parameters on a `bankGrid` fragment swap: a **card ⇆ table layout** switch (the card grid stays the
+> default) and an **alphabetical ⇆ by-Bereich grouping**. The A→Z-by-name order below stays the
+> default and the within-group order; the by-Bereich view chunks the same cards into **coloured
+> vertical groups** (not tabs) in a fixed order — the **KRT rubric** (CARTEL + KRT-bank), one group
+> **per Bereich** (A→Z by Bereich name, each leading with its `AREA` account then its Staffel/SK
+> accounts), the **Sonderkonten**, an **"Ohne Bereich"** bucket for org-unit accounts with no Bereich,
+> and finally every **closed** account. Each Bereich header is tinted with its department's
+> Bereichsfarbe (`--color-dept-*`, REQ-ORG-018), mirroring the org chart. The account→Bereich mapping
+> is a display-only owner-label read resolved from the account's owning org unit + its parent via one
+> bounded query (no per-account N+1); the bank stays org-unit-blind (REQ-BANK-008 —
+> `BankDashboardService` reads `OrgUnitRepository`, never `OwnerScopeService`). The account-name
+> filter (REQ-BANK-046) applies across every view.
+
 The bank landing page (`/bank`) is a **dashboard** in the design system's **D1 card
 grid** layout (`proposals/bank-dashboard-varianten.html`): one `.kpi-card` per visible
 account showing the current balance and the **net change over the last 30 days**

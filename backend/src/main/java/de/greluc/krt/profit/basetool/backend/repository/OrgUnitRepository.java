@@ -153,4 +153,20 @@ public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {
    */
   @Query("SELECT o FROM OrgUnit o LEFT JOIN FETCH o.parent WHERE o.active = true")
   List<OrgUnit> findAllActiveWithParent();
+
+  /**
+   * Loads the given org units by id with their parent eagerly fetched — the bank dashboard's
+   * owner-label read for the by-Bereich grouping (REQ-BANK-016): an {@code AREA} account's owning
+   * org unit is the Bereich itself, a Staffel/SK account's Bereich is that owner's parent, so the
+   * caller needs both the owner and its parent. The {@code LEFT JOIN FETCH o.parent} keeps the
+   * resolution a single query instead of one lazy load per account, so the dashboard stays N+1-free
+   * (REQ-DATA-003). Includes inactive org units so a deactivated Staffel's account still groups
+   * under its Bereich. This is a plain owner-label read, not an org-unit scope decision
+   * (REQ-BANK-008). An empty collection returns an empty list.
+   *
+   * @param ids the owning org-unit ids to load (parent pre-loaded)
+   * @return the matching org units with their parent initialised, in arbitrary order
+   */
+  @Query("SELECT o FROM OrgUnit o LEFT JOIN FETCH o.parent WHERE o.id IN :ids")
+  List<OrgUnit> findAllByIdInWithParent(@Param("ids") Collection<UUID> ids);
 }
