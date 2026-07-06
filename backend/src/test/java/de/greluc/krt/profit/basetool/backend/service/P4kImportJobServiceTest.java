@@ -33,12 +33,15 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.P4kImportJob;
 import de.greluc.krt.profit.basetool.backend.model.P4kImportJobKind;
 import de.greluc.krt.profit.basetool.backend.model.P4kImportJobPayload;
 import de.greluc.krt.profit.basetool.backend.model.P4kImportJobStatus;
 import de.greluc.krt.profit.basetool.backend.repository.P4kImportJobPayloadRepository;
 import de.greluc.krt.profit.basetool.backend.repository.P4kImportJobRepository;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
@@ -48,23 +51,43 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Pure-Mockito unit tests for {@link P4kImportJobService}: the two repositories are mocked, no
- * Spring context and no database. {@code jobRepository.save} is stubbed to assign an id, standing
- * in for the Hibernate {@code GenerationType.UUID} generator, so the create paths can wire the
- * payload to the persisted job id. Covers job creation (preview + apply-from-preview with its
- * guards), the lifecycle transitions, payload reclaim, prune delegation and the startup orphan
- * reconciliation.
+ * Pure-Mockito unit tests for {@link P4kImportJobService}: the two repositories are mocked and a
+ * real {@link SimpleMeterRegistry} captures the terminal-outcome counter, no Spring context and no
+ * database. {@code jobRepository.save} is stubbed to assign an id, standing in for the Hibernate
+ * {@code GenerationType.UUID} generator, so the create paths can wire the payload to the persisted
+ * job id. Covers job creation (preview + apply-from-preview with its guards), the lifecycle
+ * transitions (with their {@code basetool_p4k_import_jobs_total} increments), payload reclaim,
+ * prune delegation and the startup orphan reconciliation.
  */
 @ExtendWith(MockitoExtension.class)
 class P4kImportJobServiceTest {
 
   @Mock private P4kImportJobRepository jobRepository;
   @Mock private P4kImportJobPayloadRepository payloadRepository;
+  @Spy private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
   @InjectMocks private P4kImportJobService service;
+
+  /**
+   * Reads the current value of the terminal-outcome counter for a bounded {@code outcome} / {@code
+   * kind} pair, or {@code 0} when that series has not been registered yet.
+   *
+   * @param outcome the terminal outcome tag ({@code succeeded} / {@code failed})
+   * @param kind the import job kind tag ({@code PREVIEW} / {@code APPLY})
+   * @return the counter value, or {@code 0.0} when no matching series exists
+   */
+  private double terminalCount(String outcome, String kind) {
+    var counter =
+        meterRegistry
+            .find(MetricNames.P4K_IMPORT_JOBS)
+            .tags(MetricNames.TAG_OUTCOME, outcome, MetricNames.TAG_KIND, kind)
+            .counter();
+    return counter == null ? 0.0 : counter.count();
+  }
 
   /**
    * Stubs {@code save} to assign a random id (mimicking the JPA UUID generator) and echo the job.
@@ -212,6 +235,9 @@ class P4kImportJobServiceTest {
     assertEquals("{\"dryRun\":true}", job.getResultJson());
     assertNotNull(job.getFinishedAt());
     assertNull(job.getErrorMessage());
+    assertEquals(
+        1.0, terminalCount(MetricNames.OUTCOME_SUCCEEDED, P4kImportJobKind.PREVIEW.name()));
+    assertEquals(0.0, terminalCount(MetricNames.OUTCOME_FAILED, P4kImportJobKind.PREVIEW.name()));
   }
 
   @Test
@@ -226,6 +252,9 @@ class P4kImportJobServiceTest {
     assertEquals("boom", job.getErrorMessage());
     assertNotNull(job.getFinishedAt());
     assertNull(job.getResultJson());
+    assertEquals(1.0, terminalCount(MetricNames.OUTCOME_FAILED, P4kImportJobKind.PREVIEW.name()));
+    assertEquals(
+        0.0, terminalCount(MetricNames.OUTCOME_SUCCEEDED, P4kImportJobKind.PREVIEW.name()));
   }
 
   // ──────────────────────────────────────────────────── payload + prune ──
@@ -258,6 +287,7 @@ class P4kImportJobServiceTest {
   void failOrphanedJobs_flipsPendingAndRunningToFailed() {
     P4kImportJob pending = jobWithId(UUID.randomUUID(), P4kImportJobStatus.PENDING);
     P4kImportJob running = jobWithId(UUID.randomUUID(), P4kImportJobStatus.RUNNING);
+    running.setKind(P4kImportJobKind.APPLY);
     when(jobRepository.findByStatusIn(any())).thenReturn(List.of(pending, running));
 
     service.failOrphanedJobs();
@@ -266,6 +296,8 @@ class P4kImportJobServiceTest {
     assertEquals(P4kImportJobStatus.FAILED, running.getStatus());
     assertNotNull(pending.getFinishedAt());
     assertNotNull(running.getErrorMessage());
+    assertEquals(1.0, terminalCount(MetricNames.OUTCOME_FAILED, P4kImportJobKind.PREVIEW.name()));
+    assertEquals(1.0, terminalCount(MetricNames.OUTCOME_FAILED, P4kImportJobKind.APPLY.name()));
   }
 
   @Test

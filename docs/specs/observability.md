@@ -329,8 +329,16 @@ transaction per pass) rather than per-scrape.
   `_oldest_age_seconds`, `basetool_bank_booking_request_pending_count` + `_oldest_age_seconds`,
   and `{status}`-labelled `basetool_job_order_open_count` / `basetool_operation_open_count` /
   `basetool_refinery_order_open_count` / `basetool_p4k_import_job_pending_count` each with an
-  `_oldest_age_seconds` companion. The oldest-age gauges drive the "oldest pending > 48 h" style
-  alerts; an empty queue reports `0`.
+  `_oldest_age_seconds` companion. Every oldest-age gauge now drives a stuck-queue alert: the
+  registration + bank pairs the "oldest pending > 48 h" `*ApprovalOverdue` alerts, and (since #1041
+  item 15) the four work queues `P4kImportStuck` (> 6 h — imports finish in minutes), `JobOrderStale`
+  / `RefineryOrderStale` / `OperationStale` (> 30 d, baseline-tune). An empty queue reports `0`, so
+  there is no `absent()` ambiguity.
+- `basetool_p4k_import_jobs_total{outcome,kind}` counter (`P4kImportJobService`, #1041 item 15),
+  bumped at each terminal transition — `outcome` = `succeeded` / `failed` (the lowercased terminal
+  status, including a restart orphan-fail), `kind` = `PREVIEW` / `APPLY`. It makes a reliably-failing
+  import observable (`P4kImportFailed`): the pending-queue gauge drains back to `0` after a failed
+  run, so an empty queue alone cannot distinguish "nothing to do" from "every run fails".
 
 **Frontend.** `basetool_mission_presence_missions` gauge (missions with a live editor; single-JVM
 edit-awareness, unlabelled), `basetool_active_sessions` gauge (active Spring Session sessions;

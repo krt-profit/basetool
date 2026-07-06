@@ -21,12 +21,14 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.P4kImportJob;
 import de.greluc.krt.profit.basetool.backend.model.P4kImportJobKind;
 import de.greluc.krt.profit.basetool.backend.model.P4kImportJobPayload;
 import de.greluc.krt.profit.basetool.backend.model.P4kImportJobStatus;
 import de.greluc.krt.profit.basetool.backend.repository.P4kImportJobPayloadRepository;
 import de.greluc.krt.profit.basetool.backend.repository.P4kImportJobRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -66,6 +68,7 @@ public class P4kImportJobService {
 
   private final P4kImportJobRepository jobRepository;
   private final P4kImportJobPayloadRepository payloadRepository;
+  private final MeterRegistry meterRegistry;
 
   /**
    * Enqueues a new {@link P4kImportJobKind#PREVIEW PREVIEW} job in state {@link
@@ -216,6 +219,7 @@ public class P4kImportJobService {
     job.setStatus(P4kImportJobStatus.SUCCEEDED);
     job.setResultJson(resultJson);
     job.setFinishedAt(Instant.now());
+    recordTerminalOutcome(job, MetricNames.OUTCOME_SUCCEEDED);
   }
 
   /**
@@ -231,6 +235,7 @@ public class P4kImportJobService {
     job.setStatus(P4kImportJobStatus.FAILED);
     job.setErrorMessage(message);
     job.setFinishedAt(Instant.now());
+    recordTerminalOutcome(job, MetricNames.OUTCOME_FAILED);
   }
 
   /**
@@ -278,6 +283,7 @@ public class P4kImportJobService {
       job.setStatus(P4kImportJobStatus.FAILED);
       job.setErrorMessage("Interrupted by a backend restart; re-run the import.");
       job.setFinishedAt(now);
+      recordTerminalOutcome(job, MetricNames.OUTCOME_FAILED);
     }
     log.warn("Reconciled {} orphaned P4K import job(s) to FAILED on startup.", orphans.size());
   }
@@ -296,6 +302,26 @@ public class P4kImportJobService {
         .findById(jobId)
         .orElseThrow(
             () -> new IllegalStateException("P4K import job " + jobId + " vanished mid-run."));
+  }
+
+  /**
+   * Increments {@code basetool_p4k_import_jobs_total} for a job that just reached a terminal state,
+   * tagged by the bounded terminal {@code outcome} and the job {@code kind}. This makes a
+   * consistently-failing import observable — the pending-queue gauge alone drains back to zero and
+   * looks healthy even while every run fails.
+   *
+   * @param job the job that reached its terminal state (source of the bounded {@code kind} tag)
+   * @param outcome {@link MetricNames#OUTCOME_SUCCEEDED} or {@link MetricNames#OUTCOME_FAILED}
+   */
+  private void recordTerminalOutcome(@NotNull P4kImportJob job, @NotNull String outcome) {
+    meterRegistry
+        .counter(
+            MetricNames.P4K_IMPORT_JOBS,
+            MetricNames.TAG_OUTCOME,
+            outcome,
+            MetricNames.TAG_KIND,
+            job.getKind().name())
+        .increment();
   }
 
   /**

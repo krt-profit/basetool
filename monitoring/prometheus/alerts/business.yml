@@ -204,6 +204,65 @@ groups:
           summary: "Oldest pending bank booking request >48h"
           description: "A bank booking request has been awaiting approval for more than 48 hours."
 
+      # (#1041 item 15) Stuck work-queue detection. The oldest-age gauges for the JobOrder / Operation
+      # / RefineryOrder / P4K-import queues existed but drove no alert — only registration + bank did.
+      # Empty queues report 0 seconds (BusinessMetricsCollector.ageSeconds), so there is no absent()
+      # ambiguity: a value over threshold means a real item has been waiting that long.
+      #
+      # P4K imports run async and should finish in minutes; a pending import older than 6h means the
+      # worker is wedged (or died without the startup reconcile flipping it).
+      - alert: P4kImportStuck
+        expr: basetool_p4k_import_job_pending_oldest_age_seconds > 21600
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Oldest pending P4K import >6h"
+          description: "A P4K catalog import has been PENDING for more than 6 hours — imports normally finish in minutes, so the async worker is likely wedged. Check the backend logs and re-run the import."
+
+      # Human work queues (JobOrder OPEN, Operation PLANNED, RefineryOrder OPEN) move on human time,
+      # so 30d is a "someone forgot this exists" floor, not an SLA. baseline-tune: raise/lower once the
+      # real queue-age distribution is known for the active org.
+      - alert: JobOrderStale
+        expr: basetool_job_order_open_oldest_age_seconds > 2592000
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Oldest open job order >30d"
+          description: "A job order has been OPEN for more than 30 days — likely abandoned. Close or reassign it (threshold is a baseline; tune to the org's cadence)."
+
+      - alert: RefineryOrderStale
+        expr: basetool_refinery_order_open_oldest_age_seconds > 2592000
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Oldest open refinery order >30d"
+          description: "A refinery order has been OPEN for more than 30 days — likely abandoned. Close or reassign it (threshold is a baseline; tune to the org's cadence)."
+
+      - alert: OperationStale
+        expr: basetool_operation_open_oldest_age_seconds > 2592000
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Oldest planned operation >30d"
+          description: "An operation has been PLANNED for more than 30 days — likely abandoned. Execute, reschedule or cancel it (threshold is a baseline; tune to the org's cadence)."
+
+      # (#1041 item 15) P4K import terminal failures. The pending-queue gauge drains back to 0 after a
+      # failed run, so a reliably-failing import looks like a healthy empty queue. This counter is
+      # bumped at every terminal transition, so any FAILED outcome (worker error or restart orphan)
+      # over 24h surfaces here regardless of the current queue depth.
+      - alert: P4kImportFailed
+        expr: sum(increase(basetool_p4k_import_jobs_total{outcome="failed"}[24h])) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P4K import failure in the last 24h"
+          description: "At least one P4K catalog import reached FAILED in the last 24 hours. A repeatedly-failing import leaves an empty-looking pending queue; check the job list and backend logs for the error."
+
       # Audit silence: backend up but zero audited mutations recorded across a 5-DAY window — a
       # REQ-AUDIT-001 signal that audit logging may be broken. 5d (not hours) so ordinary quiet periods
       # (weekends, maintenance windows) never trip it; only a genuine multi-day silence does. Resolves
