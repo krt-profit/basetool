@@ -61,9 +61,10 @@ import org.springframework.web.context.WebApplicationContext;
  * read at runtime, while keeping {@code th:inline="javascript"} alive on the script tag so the
  * remaining single-primitive translation lookups (toast keys) still resolve.
  *
- * <p>This test pins both halves: (a) the {@code 'admin-materials-update'} delegated binding string
- * (which lives at the very tail of the script) is in the rendered HTML, and (b) the response ends
- * with the closing {@code </html>} tag — the pre-fix bug truncated the body before that.
+ * <p>This test pins both halves: (a) the page loads the extracted {@code
+ * static/js/admin-materials.js} page module (ADR-0069) whose tail carries the {@code
+ * 'admin-materials-update'} delegated binding, and (b) the response ends with the closing {@code
+ * </html>} tag — the pre-fix bug truncated the body before that.
  */
 @SpringBootTest
 class AdminMaterialsPageControllerMvcTest {
@@ -84,8 +85,9 @@ class AdminMaterialsPageControllerMvcTest {
   }
 
   /**
-   * Asserts the {@code 'admin-materials-update'} delegated-event registration (defined AFTER the
-   * datalist in the script) appears in the rendered HTML — proof that the Thymeleaf truncation does
+   * Asserts the rendered page loads the extracted {@code static/js/admin-materials.js} module
+   * (ADR-0069), whose tail carries the {@code 'admin-materials-update'} delegated-event
+   * registration — proof that the bootstrap still renders fully and the Thymeleaf truncation does
    * not strike again.
    */
   @Test
@@ -123,7 +125,7 @@ class AdminMaterialsPageControllerMvcTest {
         .andExpect(view().name("admin/materials"))
         .andExpect(content().string(containsString("id=\"materialNames-data\"")))
         .andExpect(content().string(containsString("value=\"Aluminum\"")))
-        .andExpect(content().string(containsString("'admin-materials-update'")))
+        .andExpect(content().string(containsString("src=\"/js/admin-materials.js\"")))
         .andExpect(content().string(containsString("</html>")));
   }
 
