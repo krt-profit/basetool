@@ -109,22 +109,16 @@ class MaterialsPageControllerMvcTest {
     mockMvc
         .perform(get("/materials"))
         .andExpect(status().isOk())
-        // The category-expand click handler must be registered. If the surrounding <script> block
-        // gets truncated mid-render (the bug this test exists to prevent), this line is the first
-        // thing that disappears from the output.
-        .andExpect(
-            content()
-                .string(containsString("window.krtEvents.on('click', 'materials-toggle-kind'")))
+        // The click/grouping handlers moved into static/js/materials.js (ADR-0069); pin that the
+        // page loads the module. If the render truncated mid-stream (the bug this test exists to
+        // prevent), the th:src tag near the end of the body would disappear from the output.
+        .andExpect(content().string(containsString("src=\"/js/materials.js\"")))
         // The category-grouping view toggle and both views (grouped accordion + flat grid) must
         // render. The flat grid materialises the shared material-card fragment, so a broken
         // fragment reference would 500 the render before any of these strings appear.
         .andExpect(content().string(containsString("data-trigger=\"materials-toggle-grouping\"")))
         .andExpect(content().string(containsString("id=\"materialsGrouped\"")))
         .andExpect(content().string(containsString("id=\"materialsFlat\"")))
-        .andExpect(
-            content()
-                .string(
-                    containsString("window.krtEvents.on('change', 'materials-toggle-grouping'")))
         // Rendering must not abort mid-stream. A truncated response stops at the substituted
         // expression value (e.g. ["Aluminum"]) and never emits the closing </body></html> pair.
         .andExpect(content().string(containsString("</body>")))
@@ -210,9 +204,10 @@ class MaterialsPageControllerMvcTest {
     mockMvc
         .perform(get("/materials/" + id))
         .andExpect(status().isOk())
-        // Post-datalist binding key: the tail of the script registers the live filter on the
-        // terminal table. If the inline-list bug re-appears, this string disappears from output.
-        .andExpect(content().string(containsString("'material-detail-filter-terminals'")))
+        // Post-datalist binding: the filter/sort handlers moved into static/js/material-detail.js
+        // (ADR-0069); pin that the page loads the module. If the render truncated, the th:src tag
+        // near the end of the body would disappear from the output.
+        .andExpect(content().string(containsString("src=\"/js/material-detail.js\"")))
         // Rendering completion marker: the truncation aborts before </body></html>.
         .andExpect(content().string(containsString("</body>")))
         .andExpect(content().string(containsString("</html>")))

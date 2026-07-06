@@ -4,6 +4,10 @@
 
 ### Changed
 
+- **Technisch: Inline-JavaScript weiterer Material- und Lager-Seiten in statische Module ausgelagert.** Das JavaScript der Materialübersicht, der Material-Detailseite, der Material-Sammlung und der Lager-Einbuchung wurde ohne Verhaltensänderung aus den Thymeleaf-Vorlagen in browser-zwischenspeicherbare, lint- und formatierbare Dateien unter `static/js/` verlagert (ADR-0069).
+
+- **Technisch: Inline-JavaScript der Material-Adminseiten in statische Module ausgelagert.** Das JavaScript der Admin-Seiten für den Materialkatalog und die Material-Aliase wurde ohne Verhaltensänderung aus den Thymeleaf-Vorlagen in browser-zwischenspeicherbare, lint- und formatierbare Dateien unter `static/js/` verlagert (ADR-0069).
+
 - **Technisch: Inline-JavaScript der Auftragsseiten in statische Module ausgelagert.** Das JavaScript der Auftrags-Anlege-/Bearbeitungsseite und der Auftragsübersicht (samt der Logistiker-Drag-&-Drop-Priorisierung) wurde ohne Verhaltensänderung aus den Thymeleaf-Vorlagen in browser-zwischenspeicherbare, lint- und formatierbare Dateien unter `static/js/` verlagert (ADR-0069).
 
 - **Monitoring: Fehlgeschlagene UEX-/SC-Wiki-Abrufe sind jetzt sichtbar.** Verschluckte Abruf- und Parse-Fehler der externen Kataloge werden nun gezählt (`basetool_external_fetch_errors_total`) und als `ExternalFetchErrors` alarmiert – bisher meldete der Sync trotz wochenlangem Ausfall weiter „Erfolg". Zusätzlich sind die ausgehenden Backend-Aufrufe jetzt an die Observation-Registry angebunden (Metriken + Spans, REQ-OBS-009/-011).
@@ -35,6 +39,8 @@
 - **Betrieb: täglicher VPN-Neustart (`vpn-restart`) entfernt.** Der Cron-Job, der die WireGuard-Schnittstelle `wg0` täglich um 04:00 neu startete, wird nicht mehr benötigt und wurde samt Skript sowie Cron- und logrotate-Konfiguration entfernt.
 
 ### Fixed
+
+- **Monitoring: „Spring Boot apps"-Dashboard zeigte bei Auswahl „All" keine Daten.** Die Panels filterten das `application`-Label mit exaktem Vergleich, den der von „All" erzeugte Regex-Wert nie erfüllte. Die Abfragen nutzen jetzt den Regex-Vergleich und gruppieren zusätzlich nach `application`, sodass „All" eine Kurve pro Modul zeigt statt beide JVMs zu vermischen.
 
 - **Release: `production`-Umgebung auf der GitHub-Startseite zeigte dauerhaft „Inactive".** Der `promote`-Workflow band das `production`-Environment an die 5er-Modul-Matrix, wodurch jeder Lauf fünf Deployment-Datensätze erzeugte; GitHubs `auto_inactive` setzte vier davon auf „inactive", und das Umgebungs-Widget auf der Repo-Startseite griff einen inaktiven heraus. Das Freigabe-Gate sitzt jetzt auf einem eigenen `approve`-Job, sodass pro Lauf genau ein Deployment entsteht und die Umgebung als „Active" angezeigt wird. Das Reviewer-Gate (REQ-OPS-002) bleibt unverändert.
 
