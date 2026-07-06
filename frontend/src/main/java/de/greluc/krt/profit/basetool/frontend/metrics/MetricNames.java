@@ -40,11 +40,53 @@ public final class MetricNames {
   /** Counter {@code basetool_backend_client_errors_total} — tags {@code reason}, {@code method}. */
   public static final String BACKEND_CLIENT_ERRORS = "basetool.backend.client.errors";
 
-  /** Tag key: the bounded backend-call failure reason. */
+  /**
+   * Gauge {@code basetool_notification_relay_connections} — open browser→backend SSE relays held by
+   * {@code NotificationPageController.stream()} on this instance (#1041 item 17).
+   */
+  public static final String NOTIFICATION_RELAY_CONNECTIONS =
+      "basetool.notification.relay.connections";
+
+  /**
+   * Gauge {@code basetool_presence_ws_sessions} — live mission-presence WebSocket sessions summed
+   * across all missions in {@code MissionPresenceWebSocketHandler} (#1041 item 17).
+   */
+  public static final String PRESENCE_WS_SESSIONS = "basetool.presence.ws.sessions";
+
+  /**
+   * Counter {@code basetool_presence_relay_frames_total} — tag {@code type} ({@link #FRAME_CHANGED}
+   * / {@link #FRAME_SNAPSHOT}). A {@code changed}-frame flatline while {@code snapshot} frames keep
+   * flowing is the early indicator for the REQ-FE-010 live-multi-user-sync defect class.
+   */
+  public static final String PRESENCE_RELAY_FRAMES = "basetool.presence.relay.frames";
+
+  /**
+   * Counter {@code basetool_presence_relay_dropped_total} — tag {@code reason} ({@link
+   * #DROPPED_THROTTLED} / {@link #DROPPED_SEND_FAILED}) at the currently-silent throttle and
+   * send-failure branches of the presence relay (#1041 item 17).
+   */
+  public static final String PRESENCE_RELAY_DROPPED = "basetool.presence.relay.dropped";
+
+  /** Tag key: the bounded backend-call failure reason (also the presence-drop reason). */
   public static final String TAG_REASON = "reason";
 
   /** Tag key: the HTTP verb of the failed backend call ({@code GET}/{@code POST}/…). */
   public static final String TAG_METHOD = "method";
+
+  /** Tag key: the presence-relay frame type on {@link #PRESENCE_RELAY_FRAMES}. */
+  public static final String TAG_TYPE = "type";
+
+  /** Presence relay frame type: a peer-forwarded {@code changed} live-sync signal. */
+  public static final String FRAME_CHANGED = "changed";
+
+  /** Presence relay frame type: a full presence {@code snapshot} broadcast. */
+  public static final String FRAME_SNAPSHOT = "snapshot";
+
+  /** Presence drop reason: a {@code changed} frame rejected by the per-session token bucket. */
+  public static final String DROPPED_THROTTLED = "throttled";
+
+  /** Presence drop reason: a frame that failed to write to a closed/broken session. */
+  public static final String DROPPED_SEND_FAILED = "send_failed";
 
   /** Reason: the backend returned a 4xx problem response. */
   public static final String REASON_BACKEND_4XX = "backend_4xx";

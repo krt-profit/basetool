@@ -19,12 +19,18 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -46,6 +52,16 @@ class NotificationStreamServiceTest {
    */
   private static final class CapturingStreamService extends NotificationStreamService {
     private final SseEmitter emitter = mock(SseEmitter.class);
+    private final SimpleMeterRegistry registry;
+
+    CapturingStreamService() {
+      this(new SimpleMeterRegistry());
+    }
+
+    private CapturingStreamService(SimpleMeterRegistry registry) {
+      super(registry);
+      this.registry = registry;
+    }
 
     @Override
     protected SseEmitter newEmitter() {
@@ -136,5 +152,53 @@ class NotificationStreamServiceTest {
     // phantom 503 on http.server.requests even though the client had a clean stream
     // (REQ-NOTIF-010).
     verify(service.emitter).complete();
+  }
+
+  @Test
+  void subscribe_reflectsLiveConnectionsInSseConnectionsGauge() {
+    // Given a fresh registry the gauge reads zero
+    CapturingStreamService service = new CapturingStreamService();
+    assertEquals(0.0, sseConnections(service));
+
+    // When a subscriber connects (the mock emitter's `connected` send succeeds by default)
+    service.subscribe(UUID.randomUUID());
+
+    // Then the summed-emitter gauge reports one live connection
+    assertEquals(1.0, sseConnections(service));
+  }
+
+  @Test
+  void publish_sendFailure_recordsSseSendFailureCounterAndDropsEmitter() throws Exception {
+    CapturingStreamService service = new CapturingStreamService();
+    UUID recipientSub = UUID.randomUUID();
+    service.subscribe(recipientSub); // `connected` send succeeds, emitter registered
+    clearInvocations(service.emitter);
+    doThrow(new IOException("broken pipe"))
+        .when(service.emitter)
+        .send(any(SseEmitter.SseEventBuilder.class));
+
+    // When the notification push fails on a dead emitter
+    service.publish(List.of(recipientSub));
+
+    // Then the failure is counted under the `notification` event and the emitter is dropped
+    assertEquals(
+        1.0,
+        service
+            .registry
+            .get(MetricNames.SSE_SEND_FAILURES)
+            .tag(MetricNames.TAG_EVENT, MetricNames.SSE_EVENT_NOTIFICATION)
+            .counter()
+            .count());
+    assertEquals(0.0, sseConnections(service));
+  }
+
+  /**
+   * Reads the {@code basetool_sse_connections} gauge value from the service's registry.
+   *
+   * @param service the capturing service under test
+   * @return the current summed-connection gauge value
+   */
+  private static double sseConnections(CapturingStreamService service) {
+    return service.registry.get(MetricNames.SSE_CONNECTIONS).gauge().value();
   }
 }
