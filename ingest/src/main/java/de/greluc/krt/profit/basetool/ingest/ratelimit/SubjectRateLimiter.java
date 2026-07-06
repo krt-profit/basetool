@@ -72,6 +72,11 @@ public class SubjectRateLimiter {
     }
     Bucket bucket = buckets.computeIfAbsent(sub, key -> newBucket());
     ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
+    // Per-bucket evaluation counter (#1041 item 19) — every attempt, so rejections/requests gives
+    // the per-subject rejection ratio. Bounded `subject` literal, never the JWT sub itself.
+    meterRegistry
+        .counter(MetricNames.RATELIMIT_REQUESTS, MetricNames.TAG_BUCKET, MetricNames.BUCKET_SUBJECT)
+        .increment();
     if (!probe.isConsumed()) {
       // Per-subject 429 (REQ-OBS-011). Labelled by the bounded `subject` bucket literal, never the
       // JWT sub itself (PII/unbounded).

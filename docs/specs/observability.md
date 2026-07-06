@@ -299,6 +299,22 @@ transaction per pass) rather than per-scrape.
   job still records a success, this is the only signal of a sustained catalogue outage; it backs the
   `ExternalFetchErrors` alert. The backend `WebClient.Builder` is wired to the `ObservationRegistry`
   (REQ-OBS-009) so these same calls also emit `http_client_requests_seconds` + client spans.
+- Frontend→backend seam (#1041 item 11): the frontend enables the `http.client.requests`
+  percentile-histogram (same bounded 5ms..10s window as `http.server.requests`, so both stay on the
+  same ~14 buckets) to drive a client-p95-vs-server-p95 overlay that separates "backend slow" from
+  "frontend slow". The already-exported resilience4j meters gain two leading-indicator alerts —
+  `BulkheadNearSaturation` (< 5 free bulkhead slots for 10m) and `RetryRateElevated`
+  (`successful_with_retry` > 0.2/s for 10m) — that fire before `circuit_open` / `bulkhead_full`, i.e.
+  before users fail; plus a backend-call resilience row on `03-spring-apps.json` and a
+  frontend-usage row (`basetool_active_sessions`, `basetool_mission_presence_missions`) on `07`.
+- JVM/Hikari depth (#1041 item 12, all Actuator-exported): `HikariConnectionTimeouts` (every
+  `hikaricp_connections_timeout_total` increment is a request that waited ~30s for a pool slot and
+  threw — can hide below `HikariPoolPending`'s window), `JvmFileDescriptorsHigh`
+  (`process_files_open_files` > 85% of max — FD leaks kill a JVM with confusing symptoms) and
+  `JvmGcOverheadHigh` (`rate(jvm_gc_pause_seconds_sum)` > 20% — GC thrash degrades latency before
+  `JvmHeapHigh`'s 90% trips). No metaspace rule (nonheap max is often -1 → NaN). Deepened
+  `03-spring-apps.json`: per-pool heap, GC pause max by action/cause, thread states, open FDs vs max,
+  per-app CPU.
 - `basetool_http_error_total{code}` counter at the `GlobalExceptionHandler` 409/401/403 methods
   (`OPTIMISTIC_LOCK` = optimistic-locking regression indicator, `PESSIMISTIC_LOCK`,
   `UNAUTHENTICATED`, `ACCESS_DENIED`) plus `SERVICE_UNAVAILABLE`, incremented directly by
@@ -322,7 +338,15 @@ transaction per pass) rather than per-scrape.
   `BankAuditSilenceAnomaly` (the bank analogue of `AuditSilenceAnomaly`) and a bank-volume panel on
   the operations dashboard.
 - `basetool_ratelimit_rejections_total{bucket}` counter at the `RateLimitingFilter` reject branch
-  (`bucket` = the rule name, or `global` for the umbrella `/api/**` budget).
+  (`bucket` = the rule name, or `global` for the umbrella `/api/**` budget), paired since #1041
+  item 19 with `basetool_ratelimit_requests_total{bucket}` bumped on **every** bucket evaluation, so
+  rejections/requests is a rejection ratio (`RateLimitRejectionRatioHigh`) rather than 429-only
+  detection.
+- `basetool_discord_precheck_total{outcome}` counter (`DiscordAccountExistenceController`, #1041
+  item 19; `outcome` = `ok` / `unauthorized` / `disabled`). The endpoint sits outside `/api/**`, the
+  rate limiter and the `basetool_http_error` funnel, so this is the only signal for secret-guessing
+  (`DiscordPrecheckUnauthorizedSpike`) or a blank-secret config drift after a rotation
+  (`DiscordPrecheckDisabledOnProd`); no PII, only the coarse outcome.
 - `basetool_bank_ledger_integrity_violations{category}` gauge fed by the hourly integrity sweep
   (six `category` values; **any value > 0 is CRITICAL** — the ledger broke an invariant).
 - Queue-depth gauges (`BusinessMetricsCollector`): `basetool_registration_pending_count` +
@@ -345,6 +369,12 @@ transaction per pass) rather than per-scrape.
   (PII). `MailDeliveryFailing` fires on `failed` > 2/h; `MailDroppedConfigDrift` fires on any
   `dropped_*` (on the configured prod deployment a drop is a config-drift regression that silently
   swallows registration / approval mail, previously visible only via `LogbackErrorSpike`).
+- `basetool_sse_connections` gauge + `basetool_sse_send_failures_total{event}` counter
+  (`NotificationStreamService`, #1041 item 17). The gauge sums the live SSE subscriber count across
+  all recipients (unlabelled — `sub` is PII); the counter is bumped at each drop-on-send-failure
+  branch with a fixed `event` (`connected` / `notification` / `heartbeat`). Zero connections while
+  the frontend still reports active sessions drives `SsePushChannelDead` (a dead push channel, e.g.
+  reverse-proxy buffering drift).
 
 **Frontend.** `basetool_mission_presence_missions` gauge (missions with a live editor; single-JVM
 edit-awareness, unlabelled), `basetool_active_sessions` gauge (active Spring Session sessions;
@@ -352,13 +382,37 @@ edit-awareness, unlabelled), `basetool_active_sessions` gauge (active Spring Ses
 `BackendApiClient` failure funnels. `reason` is a fixed **local** enumeration
 (`backend_4xx`/`backend_5xx`/`circuit_open`/`bulkhead_full`/`timeout`/`unknown`) derived from the
 failure branch — never the backend's response-body code, which could be arbitrary — and `method`
-is the HTTP verb.
+is the HTTP verb. The push-channel surfaces (#1041 item 17) add `basetool_notification_relay_connections`
+(open browser→backend notification SSE relays, `NotificationPageController`) and
+`basetool_presence_ws_sessions` (live mission-presence WebSocket sessions summed across missions,
+`MissionPresenceWebSocketHandler`) gauges, plus the `basetool_presence_relay_frames_total{type}`
+(`changed` / `snapshot`) and `basetool_presence_relay_dropped_total{reason}` (`throttled` /
+`send_failed`) counters at the previously-silent throttle and send-failure branches of the presence
+relay — the component that shipped the REQ-FE-010 staleness defect. A `changed`-frame flatline while
+`snapshot` frames keep flowing is the early indicator for that defect class (panels only, baselined
+before alerting). All labels are fixed literals, pure counts.
+
+The auth surfaces (#1041 item 18) add `basetool_login_total{outcome,reason}` (`SecurityConfig`'s
+OAuth2 success/failure handlers: `outcome` = `success` / `failure`; on failure `reason` =
+`invalid_state` / `provider_error` / `other`, **mapped from the exception type and bounded OAuth2
+error code — never the raw error description**; on success `reason` = `none`) and the unlabelled
+`basetool_csrf_rejections_total` (a custom `AccessDeniedHandler` counts CSRF-token rejections before
+the 403). They drive `FrontendLoginBroken` (failures with zero concurrent successes — the
+code-to-token / JWKS / state break `KeycloakLoginErrorSpike`'s event regex misses) and
+`CsrfRejectionSpike` (a systematic CSRF-wiring regression that `krtFetch`'s silent single-retry
+otherwise masks as intermittent failed writes). The pre-auth `BotProtectionFilter` adds
+`basetool_bot_blocked_total{rule}` (#1041 item 19; `rule` = `method` / `path_prefix` /
+`file_extension`) at its three reject branches, which were otherwise `log.debug`-only and
+prod-invisible — the counter also surfaces a self-inflicted false positive when a new legit route
+matches a blocked prefix. Panels only, all labels fixed literals.
 
 **Ingest.** `basetool_ingest_handoff_total{kind}` (accepted+staged handoffs per `HandoffKind`),
 `basetool_ingest_handoff_errors_total{reason}` (relay failures: `backend_reject` /
 `backend_unavailable` / `internal`; pre-relay rejections are not counted here), and
 `basetool_ratelimit_rejections_total{bucket}` (`bucket` = `ip` / `subject`; shares the metric name
-with the backend counter, the `application` common tag separating the modules).
+with the backend counter, the `application` common tag separating the modules) — paired since #1041
+item 19 with `basetool_ratelimit_requests_total{bucket}` on the per-IP filter and the per-subject
+limiter, feeding the same `RateLimitRejectionRatioHigh` ratio alert.
 
 **Deliberately excluded** (documented so the gap is intentional, not an oversight): notifications
 (no org-wide queue — only per-recipient unread, which is PII-adjacent), org units (no lifecycle

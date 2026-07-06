@@ -19,7 +19,11 @@
 
 package de.greluc.krt.profit.basetool.frontend.websocket;
 
+import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.frontend.service.MissionPresenceService;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PreDestroy;
 import java.io.IOException;
 import java.net.URI;
@@ -123,20 +127,52 @@ public class MissionPresenceWebSocketHandler extends TextWebSocketHandler {
   private final MissionPresenceService presenceService;
   private final ObjectMapper objectMapper;
   private final ScheduledExecutorService reaper;
+  private final Counter framesChanged;
+  private final Counter framesSnapshot;
+  private final Counter droppedThrottled;
+  private final Counter droppedSendFailed;
 
   private final Map<UUID, Set<WebSocketSession>> sessionsByMission = new ConcurrentHashMap<>();
 
   /**
    * Builds the handler. Spring registers it as a bean (see {@code MissionPresenceWebSocketConfig})
-   * and the reaper starts ticking immediately.
+   * and the reaper starts ticking immediately. Binds the {@code basetool_presence_ws_sessions}
+   * gauge (summed live sessions across all missions) and pre-resolves the relay frame / drop
+   * counters (#1041 item 17) — the presence relay is the component that shipped the silent
+   * REQ-FE-010 staleness defect, so its throttle and send-failure branches are made observable.
    *
    * @param presenceService in-memory presence store
    * @param objectMapper Jackson mapper, shared with the rest of the app
+   * @param meterRegistry the Micrometer registry the session gauge and relay counters bind to
    */
   public MissionPresenceWebSocketHandler(
-      @NotNull MissionPresenceService presenceService, @NotNull ObjectMapper objectMapper) {
+      @NotNull MissionPresenceService presenceService,
+      @NotNull ObjectMapper objectMapper,
+      @NotNull MeterRegistry meterRegistry) {
     this.presenceService = presenceService;
     this.objectMapper = objectMapper;
+    Gauge.builder(
+            MetricNames.PRESENCE_WS_SESSIONS,
+            sessionsByMission,
+            map -> map.values().stream().mapToInt(Set::size).sum())
+        .description("Live mission-presence WebSocket sessions summed across all missions.")
+        .register(meterRegistry);
+    this.framesChanged =
+        meterRegistry.counter(
+            MetricNames.PRESENCE_RELAY_FRAMES, MetricNames.TAG_TYPE, MetricNames.FRAME_CHANGED);
+    this.framesSnapshot =
+        meterRegistry.counter(
+            MetricNames.PRESENCE_RELAY_FRAMES, MetricNames.TAG_TYPE, MetricNames.FRAME_SNAPSHOT);
+    this.droppedThrottled =
+        meterRegistry.counter(
+            MetricNames.PRESENCE_RELAY_DROPPED,
+            MetricNames.TAG_REASON,
+            MetricNames.DROPPED_THROTTLED);
+    this.droppedSendFailed =
+        meterRegistry.counter(
+            MetricNames.PRESENCE_RELAY_DROPPED,
+            MetricNames.TAG_REASON,
+            MetricNames.DROPPED_SEND_FAILED);
     this.reaper =
         Executors.newSingleThreadScheduledExecutor(
             r -> {
@@ -221,6 +257,8 @@ public class MissionPresenceWebSocketHandler extends TextWebSocketHandler {
     if ("changed".equals(type)) {
       if (allowChangedFrame(session)) {
         broadcastChanged(missionId, node.get("sections"), session);
+      } else {
+        droppedThrottled.increment();
       }
       return;
     }
@@ -321,7 +359,9 @@ public class MissionPresenceWebSocketHandler extends TextWebSocketHandler {
     }
     TextMessage message = new TextMessage(payload);
     for (WebSocketSession session : List.copyOf(mates)) {
-      sendSafe(session, message);
+      if (sendSafe(session, message)) {
+        framesSnapshot.increment();
+      }
     }
   }
 
@@ -412,14 +452,18 @@ public class MissionPresenceWebSocketHandler extends TextWebSocketHandler {
       if (session == origin) {
         continue;
       }
-      sendSafe(session, message);
+      if (sendSafe(session, message)) {
+        framesChanged.increment();
+      }
     }
   }
 
   private void sendSnapshot(@NotNull WebSocketSession session, @NotNull UUID missionId) {
     try {
       String payload = objectMapper.writeValueAsString(buildSnapshot(missionId));
-      sendSafe(session, new TextMessage(payload));
+      if (sendSafe(session, new TextMessage(payload))) {
+        framesSnapshot.increment();
+      }
     } catch (JacksonException e) {
       log.warn("Failed to serialise initial presence snapshot for mission {}", missionId, e);
     }
@@ -442,16 +486,29 @@ public class MissionPresenceWebSocketHandler extends TextWebSocketHandler {
     return root;
   }
 
-  private void sendSafe(@NotNull WebSocketSession session, @NotNull TextMessage message) {
+  /**
+   * Writes one frame to a session, tolerating a closed or broken peer. A send that throws is
+   * counted as a {@code send_failed} relay drop ({@code basetool_presence_relay_dropped_total}) and
+   * reported as not sent so the caller does not also count it as a delivered frame.
+   *
+   * @param session the target session
+   * @param message the frame to write
+   * @return {@code true} if the frame was written, {@code false} if the session was closed or the
+   *     write failed
+   */
+  private boolean sendSafe(@NotNull WebSocketSession session, @NotNull TextMessage message) {
     if (!session.isOpen()) {
-      return;
+      return false;
     }
     // Spring WebSocket forbids concurrent sends on a single session; serialise here.
     synchronized (session) {
       try {
         session.sendMessage(message);
+        return true;
       } catch (IOException | IllegalStateException e) {
         log.debug("Drop presence frame to closed/broken session {}", session.getId(), e);
+        droppedSendFailed.increment();
+        return false;
       }
     }
   }

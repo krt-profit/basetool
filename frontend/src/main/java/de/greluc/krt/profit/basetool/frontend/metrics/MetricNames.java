@@ -40,11 +40,111 @@ public final class MetricNames {
   /** Counter {@code basetool_backend_client_errors_total} — tags {@code reason}, {@code method}. */
   public static final String BACKEND_CLIENT_ERRORS = "basetool.backend.client.errors";
 
-  /** Tag key: the bounded backend-call failure reason. */
+  /**
+   * Gauge {@code basetool_notification_relay_connections} — open browser→backend SSE relays held by
+   * {@code NotificationPageController.stream()} on this instance (#1041 item 17).
+   */
+  public static final String NOTIFICATION_RELAY_CONNECTIONS =
+      "basetool.notification.relay.connections";
+
+  /**
+   * Gauge {@code basetool_presence_ws_sessions} — live mission-presence WebSocket sessions summed
+   * across all missions in {@code MissionPresenceWebSocketHandler} (#1041 item 17).
+   */
+  public static final String PRESENCE_WS_SESSIONS = "basetool.presence.ws.sessions";
+
+  /**
+   * Counter {@code basetool_presence_relay_frames_total} — tag {@code type} ({@link #FRAME_CHANGED}
+   * / {@link #FRAME_SNAPSHOT}). A {@code changed}-frame flatline while {@code snapshot} frames keep
+   * flowing is the early indicator for the REQ-FE-010 live-multi-user-sync defect class.
+   */
+  public static final String PRESENCE_RELAY_FRAMES = "basetool.presence.relay.frames";
+
+  /**
+   * Counter {@code basetool_presence_relay_dropped_total} — tag {@code reason} ({@link
+   * #DROPPED_THROTTLED} / {@link #DROPPED_SEND_FAILED}) at the currently-silent throttle and
+   * send-failure branches of the presence relay (#1041 item 17).
+   */
+  public static final String PRESENCE_RELAY_DROPPED = "basetool.presence.relay.dropped";
+
+  /**
+   * Counter {@code basetool_login_total} — tags {@code outcome} ({@link #OUTCOME_SUCCESS} / {@link
+   * #OUTCOME_FAILURE}) and {@code reason} (on failure {@link #LOGIN_REASON_INVALID_STATE} / {@link
+   * #LOGIN_REASON_PROVIDER_ERROR} / {@link #LOGIN_REASON_OTHER}, else {@link #LOGIN_REASON_NONE}).
+   * The reason is mapped from the exception type, never the raw error string (#1041 item 18).
+   */
+  public static final String LOGIN = "basetool.login";
+
+  /**
+   * Counter {@code basetool_csrf_rejections_total} (unlabelled) — bumped by the access-denied
+   * handler on a CSRF-token rejection before it delegates the 403. {@code krtFetch}'s silent
+   * single-retry self-heal otherwise masks a systematic CSRF-wiring regression as intermittent
+   * failed writes (#1041 item 18).
+   */
+  public static final String CSRF_REJECTIONS = "basetool.csrf.rejections";
+
+  /**
+   * Counter {@code basetool_bot_blocked_total} — tag {@code rule} ({@link #BOT_RULE_METHOD} /
+   * {@link #BOT_RULE_PATH_PREFIX} / {@link #BOT_RULE_FILE_EXTENSION}). {@code
+   * BotProtectionFilter}'s three reject branches are otherwise {@code log.debug}-only
+   * (prod-invisible); the counter also surfaces a self-inflicted false positive when a new legit
+   * route matches a blocked prefix (#1041 item 19).
+   */
+  public static final String BOT_BLOCKED = "basetool.bot.blocked";
+
+  /** Tag key: the bounded backend-call failure reason (also the presence-drop / login reason). */
   public static final String TAG_REASON = "reason";
 
   /** Tag key: the HTTP verb of the failed backend call ({@code GET}/{@code POST}/…). */
   public static final String TAG_METHOD = "method";
+
+  /** Tag key: the presence-relay frame type on {@link #PRESENCE_RELAY_FRAMES}. */
+  public static final String TAG_TYPE = "type";
+
+  /** Tag key: the login outcome on {@link #LOGIN}. */
+  public static final String TAG_OUTCOME = "outcome";
+
+  /** Tag key: the bot-protection reject rule on {@link #BOT_BLOCKED}. */
+  public static final String TAG_RULE = "rule";
+
+  /** Bot-block rule: a disallowed HTTP method (answered 405). */
+  public static final String BOT_RULE_METHOD = "method";
+
+  /** Bot-block rule: a known bot/scanner path prefix (answered 404). */
+  public static final String BOT_RULE_PATH_PREFIX = "path_prefix";
+
+  /** Bot-block rule: a never-served file extension (answered 404). */
+  public static final String BOT_RULE_FILE_EXTENSION = "file_extension";
+
+  /** Login outcome: authentication succeeded. */
+  public static final String OUTCOME_SUCCESS = "success";
+
+  /** Login outcome: authentication failed. */
+  public static final String OUTCOME_FAILURE = "failure";
+
+  /** Login failure reason: OAuth2 state / authorization-request mismatch (CSRF-of-the-flow). */
+  public static final String LOGIN_REASON_INVALID_STATE = "invalid_state";
+
+  /** Login failure reason: the IdP or the code-to-token exchange returned an error. */
+  public static final String LOGIN_REASON_PROVIDER_ERROR = "provider_error";
+
+  /** Login failure reason: any other authentication exception. */
+  public static final String LOGIN_REASON_OTHER = "other";
+
+  /** Login reason placeholder on a success (keeps the counter's label schema consistent). */
+  public static final String LOGIN_REASON_NONE = "none";
+
+  /** Presence relay frame type: a peer-forwarded {@code changed} live-sync signal. */
+  public static final String FRAME_CHANGED = "changed";
+
+  /** Presence relay frame type: a full presence {@code snapshot} broadcast. */
+  public static final String FRAME_SNAPSHOT = "snapshot";
+
+  /** Presence drop reason: a {@code changed} frame rejected by the per-session token bucket. */
+  public static final String DROPPED_THROTTLED = "throttled";
+
+  /** Presence drop reason: a frame that failed to write to a closed/broken session. */
+  public static final String DROPPED_SEND_FAILED = "send_failed";
 
   /** Reason: the backend returned a 4xx problem response. */
   public static final String REASON_BACKEND_4XX = "backend_4xx";

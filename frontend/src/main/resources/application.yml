@@ -210,12 +210,19 @@ management:
       # Publish latency histogram buckets for http.server.requests so the "HTTP p95 Latency"
       # dashboard panel can compute histogram_quantile (Spring Boot emits no buckets by
       # default). Bounded to 5ms..10s to keep the per-URI bucket cardinality in check (epic #936).
+      # http.client.requests (the WebClient calls to the backend, observation-wired in
+      # WebClientConfig) gets the SAME 5ms..10s bounds so a client-p95-vs-server-p95 overlay can
+      # separate "backend slow" from "frontend slow"; matching the bounds keeps both histograms on
+      # the same ~14 buckets instead of Micrometer's unbounded ~66-bucket default (#1041 item 11).
       percentiles-histogram:
         "[http.server.requests]": true
+        "[http.client.requests]": true
       minimum-expected-value:
         "[http.server.requests]": 5ms
+        "[http.client.requests]": 5ms
       maximum-expected-value:
         "[http.server.requests]": 10s
+        "[http.client.requests]": 10s
   tracing:
     export:
       otlp:

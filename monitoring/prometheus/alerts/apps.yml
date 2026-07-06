@@ -52,6 +52,44 @@ groups:
           summary: "HikariCP has pending connection requests ({{ $labels.application }})"
           description: "Threads are waiting for a DB connection in {{ $labels.application }} — the pool may be undersized or a query is slow."
 
+      # (#1041 item 12) Depth on the JVM/Hikari internals — all metrics already exported by Actuator.
+      # Connection-acquire timeout: every increment is a user request that waited the full
+      # connectionTimeout (~30s) for a pool slot and then threw. That can hide entirely below
+      # HikariPoolPending's `for: 5m` window (a burst clears the pending gauge between scrapes), so
+      # alert on the timeout counter directly.
+      - alert: HikariConnectionTimeouts
+        expr: sum by (application) (increase(hikaricp_connections_timeout_total[10m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HikariCP connection-acquire timeouts ({{ $labels.application }})"
+          description: "{{ $labels.application }} had connection-acquire timeouts in the last 10 minutes — each is a request that waited ~30s for a pool slot and then failed. Check for slow queries holding connections or an undersized pool."
+
+      # File-descriptor exhaustion: an FD leak (unclosed sockets/files) kills a JVM with confusing
+      # symptoms ("Too many open files" surfacing far from the leak). > 85% of the ulimit is the
+      # early warning. process_files_max_files is the positive Linux ulimit here.
+      - alert: JvmFileDescriptorsHigh
+        expr: process_files_open_files / process_files_max_files > 0.85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "JVM file descriptors >85% ({{ $labels.application }})"
+          description: "{{ $labels.application }} is using more than 85% of its file-descriptor limit for 10 minutes — likely an FD leak (unclosed sockets/files). Investigate before it hits the limit and the JVM starts failing to open files/sockets."
+
+      # GC overhead: fraction of wall time spent in stop-the-world GC pauses. > 20% degrades latency
+      # well before JvmHeapHigh's 90% trips (a JVM can thrash the collector while staying under the
+      # heap ceiling). No metaspace rule — nonheap max is often -1, so a used/max ratio is NaN.
+      - alert: JvmGcOverheadHigh
+        expr: sum by (application) (rate(jvm_gc_pause_seconds_sum[5m])) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "JVM GC overhead >20% ({{ $labels.application }})"
+          description: "{{ $labels.application }} has spent more than 20% of wall time in GC pauses for 10 minutes — the collector is thrashing (latency degrades before the heap-90% alert trips). Check allocation pressure and heap sizing."
+
       - alert: LogbackErrorSpike
         expr: sum by (application) (rate(logback_events_total{level="error"}[5m])) > 0.2
         for: 10m
@@ -69,6 +107,32 @@ groups:
         annotations:
           summary: "Circuit breaker OPEN ({{ $labels.application }}/{{ $labels.name }})"
           description: "Resilience4j circuit breaker {{ $labels.name }} in {{ $labels.application }} is open — a downstream dependency is failing."
+
+      # (#1041 item 11) Leading indicators on the frontend→backend seam, before circuit_open /
+      # bulkhead_full (i.e. before users fail). Meters already exported by resilience4j-micrometer.
+      # Bulkhead near saturation: the frontend backendApi bulkhead has 50 slots; < 5 free means a
+      # page render's parallel fan-out is about to queue behind maxWaitDuration and surface as a slow
+      # page. Frontend-only (the backend declares no bulkhead), so no application filter needed.
+      - alert: BulkheadNearSaturation
+        expr: resilience4j_bulkhead_available_concurrent_calls < 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Bulkhead near saturation ({{ $labels.application }}/{{ $labels.name }})"
+          description: "The {{ $labels.name }} bulkhead in {{ $labels.application }} has had fewer than 5 free concurrent-call slots for 10 minutes — the parallel backend fan-out is about to queue and slow page renders. Check backend latency and concurrent load."
+
+      # Retry rate elevated: a sustained stream of calls that only succeeded ON a retry means the
+      # backend hop is flaky (transient resets / packet loss) even though the circuit is still closed
+      # — the early warning the circuit-open alert misses. successful_with_retry is the bounded kind.
+      - alert: RetryRateElevated
+        expr: sum by (application) (rate(resilience4j_retry_calls_total{kind="successful_with_retry"}[5m])) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Backend-call retry rate elevated ({{ $labels.application }})"
+          description: "{{ $labels.application }} has been succeeding only after a retry at more than 0.2/s for 10 minutes — the frontend→backend hop is flaky (transient resets) even though the circuit breaker is still closed. Check backend health and the network path."
 
       - alert: HttpLatencyP95High
         expr: |

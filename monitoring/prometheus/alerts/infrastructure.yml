@@ -129,6 +129,91 @@ groups:
           summary: "Disk >80% on {{ $labels.mountpoint }}"
           description: "Filesystem {{ $labels.mountpoint }} is over 80% full."
 
+      # (#1041 item 14) Host saturation. One CPX42 hosts both DBs, Redis, Keycloak, three JVMs and
+      # the monitoring plane, so memory pressure is the DESIGNED failure mode (the oom_score_adj
+      # sacrifice ordering already OOM-cycled Grafana/Tempo in prod). PSI series are collected by
+      # node_exporter's default `pressure` collector; on a kernel without /proc/pressure they are
+      # simply absent (the alert stays silent, safe). Memory "full" pressure = fraction of wall time
+      # ALL tasks were stalled reclaiming memory — the earliest saturation signal, before the OOM
+      # kill. baseline-tune: thresholds set in the baseline week.
+      - alert: HostMemoryPressureStalled
+        expr: rate(node_pressure_memory_stalled_seconds_total[5m]) > 0.10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host memory full-pressure >10% ({{ $labels.instance }})"
+          description: "The host spent more than 10% of wall time with all tasks stalled reclaiming memory for 10 minutes — memory saturation is building toward the OOM-kill sacrifice ordering. Check per-container working sets and free memory."
+
+      - alert: HostCpuPressure
+        expr: rate(node_pressure_cpu_waiting_seconds_total[5m]) > 0.50
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host CPU pressure >50% ({{ $labels.instance }})"
+          description: "Tasks waited on CPU more than 50% of wall time for 15 minutes — the host is CPU-saturated. Identify the busy container (per-app CPU on 03) and the workload."
+
+      - alert: HostIoPressure
+        expr: rate(node_pressure_io_stalled_seconds_total[5m]) > 0.30
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host I/O full-pressure >30% ({{ $labels.instance }})"
+          description: "The host spent more than 30% of wall time with all tasks stalled on I/O for 15 minutes — disk is the bottleneck (heavy Postgres/Loki writes or swapping). Check disk throughput and temp-file / WAL activity."
+
+      - alert: HostMemoryLow
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host MemAvailable <10% ({{ $labels.instance }})"
+          description: "Less than 10% of host memory is available for 10 minutes — the next allocation spike risks the OOM killer (which sacrifices Grafana/Tempo first by design). Free memory or scale up."
+
+      - alert: HostCpuHigh
+        expr: 1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) > 0.90
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host CPU >90% ({{ $labels.instance }})"
+          description: "Host CPU has averaged more than 90% busy for 15 minutes — sustained saturation degrades every co-located service. Identify the workload."
+
+      - alert: HostLoadHigh
+        expr: node_load15 > 2 * count by (instance) (node_cpu_seconds_total{mode="idle"})
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host load15 >2x vCPU ({{ $labels.instance }})"
+          description: "15-minute load average is more than twice the vCPU count for 15 minutes — the run queue is deep (CPU or I/O contention across the co-located services). Investigate the saturating workload."
+
+      # Clock drift breaks JWT iat/exp validation (login failures) and TLS handshakes; the node_timex
+      # collector reports the NTP-adjusted offset. > 0.25s is well beyond a healthy chrony/systemd-timesyncd.
+      - alert: HostClockDrift
+        expr: abs(node_timex_offset_seconds) > 0.25
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host clock drift >0.25s ({{ $labels.instance }})"
+          description: "The host clock is more than 0.25s off NTP for 5 minutes — this breaks JWT iat/exp validation (spurious login failures) and TLS handshakes. Check the time-sync service (chrony / systemd-timesyncd)."
+
+      # Physical NIC errors (excludes loopback and the virtual docker/veth/bridge interfaces, which
+      # generate noise) — a failing NIC or a saturated link corrupts packets before the app sees a
+      # timeout.
+      - alert: HostNetworkErrors
+        expr: |
+          sum by (instance, device) (rate(node_network_receive_errs_total{device!~"lo|veth.*|docker.*|br-.*"}[5m]) + rate(node_network_transmit_errs_total{device!~"lo|veth.*|docker.*|br-.*"}[5m])) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host NIC errors on {{ $labels.device }} ({{ $labels.instance }})"
+          description: "The {{ $labels.device }} interface has had receive/transmit errors for 10 minutes — a failing NIC or saturated link corrupting packets. Check dmesg and the link/driver state."
+
       - alert: ContainerWorkingSetHigh
         expr: (container_memory_working_set_bytes{name=~".+"} / container_spec_memory_limit_bytes{name=~".+"}) > 0.90
         for: 10m
@@ -190,6 +275,29 @@ groups:
           summary: "Redis is evicting keys"
           description: "Redis evicted keys in the last 15 minutes — the 256 MB limit may be too small for the session set."
 
+      # (#1041 item 13) Redis memory approaching maxmemory — the leading indicator RedisEvictions
+      # misses: evictions fire only AFTER keys (sessions) are already dropped. Guard on
+      # redis_memory_max_bytes > 0 so an unlimited (maxmemory=0) instance never divides by zero.
+      - alert: RedisMemoryHigh
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.85 and redis_memory_max_bytes > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis memory >85% of maxmemory"
+          description: "Redis has used more than 85% of its configured maxmemory for 10 minutes — the session set is approaching the eviction boundary (users would be logged out). Check session growth against the 256 MB limit."
+
+      # Redis rejected new connections — the maxclients limit was reached (a connection leak or a
+      # client storm). New Spring Session reads/writes then fail, so this is a pre-outage signal.
+      - alert: RedisConnectionsRejected
+        expr: increase(redis_rejected_connections_total[15m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis rejected connections"
+          description: "Redis rejected new connections in the last 15 minutes — the maxclients limit was reached (a connection leak or storm). New sessions and Spring Session writes will start failing."
+
       - alert: PostgresDeadlocks
         expr: increase(pg_stat_database_deadlocks{datname!~"template.*"}[15m]) > 0
         for: 5m
@@ -198,6 +306,57 @@ groups:
         annotations:
           summary: "PostgreSQL deadlocks detected ({{ $labels.datname }})"
           description: "PostgreSQL recorded deadlocks in the last 15 minutes."
+
+      # (#1041 item 13) Long-running transaction — an idle-in-transaction session blocks autovacuum,
+      # which lets bloat and XID age grow toward wraparound (plausible given the codebase's multi-step
+      # transaction history). The metric IS genuinely in seconds and is 0 when none are open.
+      - alert: PostgresLongTransaction
+        expr: pg_long_running_transactions_oldest_timestamp_seconds > 3600
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL transaction open >1h"
+          description: "A transaction has been open for more than 1 hour — an idle-in-transaction session blocks autovacuum (bloat + XID-age growth toward wraparound). Find and terminate it via pg_stat_activity."
+
+      # Buffer-cache hit ratio below 90% means queries are hitting disk. Division is NaN when the DB is
+      # idle (both rates 0), so the alert only fires under real block-access load.
+      - alert: PostgresCacheHitLow
+        expr: |
+          sum by (datname) (rate(pg_stat_database_blks_hit{datname!~"template.*"}[30m]))
+            / (sum by (datname) (rate(pg_stat_database_blks_hit{datname!~"template.*"}[30m])) + sum by (datname) (rate(pg_stat_database_blks_read{datname!~"template.*"}[30m]))) < 0.9
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL cache hit ratio <90% ({{ $labels.datname }})"
+          description: "The buffer-cache hit ratio for {{ $labels.datname }} has been below 90% for 30 minutes — queries are reading from disk. Check shared_buffers sizing and recent query/plan changes."
+
+      # Temp-file spill: queries whose sort/hash exceeds work_mem spill to disk. > 1 GB/h points at an
+      # undersized work_mem or a bad plan.
+      - alert: PostgresTempFiles
+        expr: increase(pg_stat_database_temp_bytes{datname!~"template.*"}[1h]) > 1073741824
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL temp files >1GB/h ({{ $labels.datname }})"
+          description: "{{ $labels.datname }} wrote more than 1 GB of temp files in the last hour — queries are spilling to disk (work_mem too small, or a bad plan). Check the heavy queries."
+
+      # CRITICAL: transaction-ID wraparound. IMPORTANT — the metric value is an XID AGE COUNT
+      # (age(datfrozenxid)), NOT seconds: postgres_exporter names it *_seconds but the underlying SQL
+      # is age(datfrozenxid), which returns a transaction count. The hard wraparound limit is ~2.1e9;
+      # autovacuum_freeze_max_age defaults to 2e8, so a healthy DB stays well below that. > 1.5e9 means
+      # autovacuum has been failing to freeze for a very long time and the DB nears a forced read-only
+      # shutdown. Do NOT "fix" this threshold to a seconds value.
+      - alert: PostgresWraparoundCritical
+        expr: pg_database_wraparound_age_datfrozenxid_seconds > 1500000000
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL XID wraparound age critical ({{ $labels.datname }})"
+          description: "The oldest un-frozen transaction-ID age for {{ $labels.datname }} exceeds 1.5 billion of the ~2.1 billion wraparound limit — autovacuum is not keeping up and PostgreSQL will refuse writes as it nears the limit. Investigate autovacuum and long-idle transactions urgently."
 
       # Posture assertions (REQ-OBS-012). Same `and on()` outage guard as EdgeActuatorDenyBroken.
       - alert: EdgeForceSslRedirectBroken

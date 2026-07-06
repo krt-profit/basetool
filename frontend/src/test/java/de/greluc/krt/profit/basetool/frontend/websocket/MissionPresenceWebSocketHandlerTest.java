@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.websocket;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.frontend.service.MissionPresenceService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
@@ -63,12 +64,14 @@ class MissionPresenceWebSocketHandlerTest {
   private MissionPresenceService service;
   private ObjectMapper objectMapper;
   private MissionPresenceWebSocketHandler handler;
+  private SimpleMeterRegistry registry;
 
   @BeforeEach
   void setUp() {
-    service = new MissionPresenceService(new SimpleMeterRegistry());
+    registry = new SimpleMeterRegistry();
+    service = new MissionPresenceService(registry);
     objectMapper = JsonMapper.builder().build();
-    handler = new MissionPresenceWebSocketHandler(service, objectMapper);
+    handler = new MissionPresenceWebSocketHandler(service, objectMapper, registry);
   }
 
   @Test
@@ -310,7 +313,87 @@ class MissionPresenceWebSocketHandlerTest {
         .isLessThan(emitted);
   }
 
+  @Test
+  void openSessions_areCountedInPresenceWsSessionsGauge() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    assertThat(presenceGauge()).isZero();
+
+    FakeSession alice = openSession(missionId, oidcUser("user-1", "Alice"));
+    FakeSession bob = openSession(missionId, oidcUser("user-2", "Bob"));
+    assertThat(presenceGauge()).isEqualTo(2.0);
+
+    alice.open = false;
+    handler.afterConnectionClosed(alice, CloseStatus.NORMAL);
+    assertThat(presenceGauge()).isEqualTo(1.0);
+    assertThat(bob.isOpen()).isTrue();
+  }
+
+  @Test
+  void broadcasts_countSnapshotAndChangedRelayFrames() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    FakeSession alice = openSession(missionId, oidcUser("user-1", "Alice"));
+    openSession(missionId, oidcUser("user-2", "Bob"));
+
+    handler.handleTextMessage(
+        alice, new TextMessage("{\"type\":\"changed\",\"sections\":[\"crew\"]}"));
+
+    // The relayed change is one changed frame; the per-connect snapshots are snapshot frames.
+    assertThat(frameCounter(MetricNames.FRAME_CHANGED)).isEqualTo(1.0);
+    assertThat(frameCounter(MetricNames.FRAME_SNAPSHOT)).isGreaterThan(0.0);
+  }
+
+  @Test
+  void throttledChangedFrames_areCountedAsDroppedThrottled() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    FakeSession alice = openSession(missionId, oidcUser("user-1", "Alice"));
+    openSession(missionId, oidcUser("user-2", "Bob"));
+
+    int emitted = MissionPresenceWebSocketHandler.CHANGED_BURST + 40;
+    for (int i = 0; i < emitted; i++) {
+      handler.handleTextMessage(
+          alice, new TextMessage("{\"type\":\"changed\",\"sections\":[\"crew\"]}"));
+    }
+
+    // Every frame past the per-session token bucket is now counted (previously a silent drop).
+    assertThat(dropCounter(MetricNames.DROPPED_THROTTLED)).isGreaterThan(0.0);
+  }
+
+  @Test
+  void sendFailureToBrokenPeer_isCountedAsDroppedSendFailed() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    FakeSession alice = openSession(missionId, oidcUser("user-1", "Alice"));
+    FakeSession bob = openSession(missionId, oidcUser("user-2", "Bob"));
+    // Bob's socket reports open but every write throws (a half-broken connection).
+    bob.failSend = true;
+
+    handler.handleTextMessage(
+        alice, new TextMessage("{\"type\":\"changed\",\"sections\":[\"crew\"]}"));
+
+    // The failed write is a send_failed drop and must NOT also count as a delivered changed frame.
+    assertThat(dropCounter(MetricNames.DROPPED_SEND_FAILED)).isGreaterThanOrEqualTo(1.0);
+    assertThat(frameCounter(MetricNames.FRAME_CHANGED)).isZero();
+  }
+
   // ── helpers ────────────────────────────────────────────────────────────────────────────────
+
+  private double presenceGauge() {
+    return registry.get(MetricNames.PRESENCE_WS_SESSIONS).gauge().value();
+  }
+
+  private double frameCounter(String type) {
+    var counter =
+        registry.find(MetricNames.PRESENCE_RELAY_FRAMES).tag(MetricNames.TAG_TYPE, type).counter();
+    return counter == null ? 0.0 : counter.count();
+  }
+
+  private double dropCounter(String reason) {
+    var counter =
+        registry
+            .find(MetricNames.PRESENCE_RELAY_DROPPED)
+            .tag(MetricNames.TAG_REASON, reason)
+            .counter();
+    return counter == null ? 0.0 : counter.count();
+  }
 
   private FakeSession openSession(UUID missionId, OidcUser user) throws Exception {
     FakeSession session = new FakeSession();
@@ -352,6 +435,7 @@ class MissionPresenceWebSocketHandlerTest {
     final Map<String, Object> attributes = new HashMap<>();
     final List<WebSocketMessage<?>> sent = new ArrayList<>();
     boolean open;
+    boolean failSend;
     URI uri;
     Principal principal;
     CloseStatus closeStatus;
@@ -423,6 +507,9 @@ class MissionPresenceWebSocketHandlerTest {
 
     @Override
     public void sendMessage(WebSocketMessage<?> message) throws IOException {
+      if (failSend) {
+        throw new IOException("simulated broken socket");
+      }
       sent.add(message);
     }
 

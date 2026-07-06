@@ -43,6 +43,14 @@ public final class MetricNames {
    */
   public static final String RATELIMIT_REJECTIONS = "basetool.ratelimit.rejections";
 
+  /**
+   * Counter {@code basetool_ratelimit_requests_total} — tag {@code bucket} ({@link #BUCKET_IP} /
+   * {@link #BUCKET_SUBJECT}). Bumped for every bucket evaluation (consumed or rejected), so
+   * rejections/requests gives a per-bucket rejection ratio rather than 429-only detection (#1041
+   * item 19).
+   */
+  public static final String RATELIMIT_REQUESTS = "basetool.ratelimit.requests";
+
   /** Tag key: the handoff draft kind ({@code HandoffKind#name()}). */
   public static final String TAG_KIND = "kind";
 

@@ -296,25 +296,6 @@
 </main>
 <th:block th:replace="~{fragments/toast :: toast}" />
 
-<script th:inline="javascript" th:attr="nonce=${cspNonce}" th:unless="${isAllSquadronsMode}">
-    /*<![CDATA[*/
-    /*
-     * Expand-all / collapse-all helpers for the rank-group <details> blocks.
-     * Native <details> already handles the per-group toggle; we only need to
-     * automate the bulk action. No persistence — the "you are here" group is
-     * always re-opened on load, which is the only state we want to remember.
-     */
-    function poToggleAll(openState) {
-        var nodes = document.querySelectorAll('details.rank-group');
-        nodes.forEach(function (d) { d.open = openState; });
-    }
-    document.addEventListener('DOMContentLoaded', function () {
-        if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-            window.krtEvents.on('click', 'po-expand-all', function () { poToggleAll(true); });
-            window.krtEvents.on('click', 'po-collapse-all', function () { poToggleAll(false); });
-        }
-    });
-    /*]]>*/
-</script>
+<script th:src="@{/js/promotion-overview.js}" th:attr="nonce=${cspNonce}" th:unless="${isAllSquadronsMode}"></script>
 </body>
 </html>

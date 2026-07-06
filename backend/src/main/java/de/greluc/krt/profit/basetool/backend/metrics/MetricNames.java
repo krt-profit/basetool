@@ -87,6 +87,24 @@ public final class MetricNames {
   /** Counter {@code basetool_ratelimit_rejections_total} — tag {@code bucket}. */
   public static final String RATELIMIT_REJECTIONS = "basetool.ratelimit.rejections";
 
+  /**
+   * Counter {@code basetool_ratelimit_requests_total} — tag {@code bucket}. Bumped for <b>every</b>
+   * bucket evaluation (consumed or rejected), so rejections/requests gives a rejection ratio and a
+   * spike surfaces before the 429s alone would (#1041 item 19).
+   */
+  public static final String RATELIMIT_REQUESTS = "basetool.ratelimit.requests";
+
+  // --- Discord SPI precheck (DiscordAccountExistenceController) ---------------------------
+
+  /**
+   * Counter {@code basetool_discord_precheck_total} — tag {@code outcome} ({@link
+   * #DISCORD_PRECHECK_OK} / {@link #DISCORD_PRECHECK_UNAUTHORIZED} / {@link
+   * #DISCORD_PRECHECK_DISABLED}). The endpoint sits outside {@code /api/**}, the rate limiter and
+   * the {@code basetool_http_error} funnel, so without this counter secret-guessing or a broken
+   * secret after rotation is log-only (#1041 item 19).
+   */
+  public static final String DISCORD_PRECHECK = "basetool.discord.precheck";
+
   // --- Bank ledger integrity (BankLedgerIntegrityTask) -----------------------------------
 
   /** Gauge {@code basetool_bank_ledger_integrity_violations} — tag {@code category}. */
@@ -154,6 +172,21 @@ public final class MetricNames {
    */
   public static final String MAIL = "basetool.mail";
 
+  /**
+   * Gauge {@code basetool_sse_connections} — the live Server-Sent-Event subscriber count summed
+   * across all recipients in {@code NotificationStreamService}. Drives {@code SsePushChannelDead}
+   * (zero here while the frontend still reports active sessions = a dead push channel).
+   */
+  public static final String SSE_CONNECTIONS = "basetool.sse.connections";
+
+  /**
+   * Counter {@code basetool_sse_send_failures_total} — tag {@code event} ({@link
+   * #SSE_EVENT_CONNECTED} / {@link #SSE_EVENT_NOTIFICATION} / {@link #SSE_EVENT_HEARTBEAT}), bumped
+   * at each drop-on-send-failure branch so a broken push (e.g. proxy buffering drift) is counted
+   * rather than only silently dropping the emitter.
+   */
+  public static final String SSE_SEND_FAILURES = "basetool.sse.send.failures";
+
   // --- Tag keys --------------------------------------------------------------------------
 
   /** Tag key: the scheduled job ({@link ScheduledJob#label()}). */
@@ -194,6 +227,9 @@ public final class MetricNames {
    */
   public static final String TAG_KIND = "kind";
 
+  /** Tag key: the SSE event name that failed to send, on {@link #SSE_SEND_FAILURES}. */
+  public static final String TAG_EVENT = "event";
+
   // --- Bounded tag values (not an application enum) --------------------------------------
 
   /** Outcome tag value for a job run that completed without throwing. */
@@ -226,11 +262,29 @@ public final class MetricNames {
   /** Mail outcome: host set but no {@code JavaMailSender} bean was available. */
   public static final String MAIL_DROPPED_NO_SENDER = "dropped_no_sender";
 
+  /** SSE event value: the initial {@code connected} handshake event. */
+  public static final String SSE_EVENT_CONNECTED = "connected";
+
+  /** SSE event value: an unread-state-changed {@code notification} push. */
+  public static final String SSE_EVENT_NOTIFICATION = "notification";
+
+  /** SSE event value: the periodic keep-alive {@code heartbeat}. */
+  public static final String SSE_EVENT_HEARTBEAT = "heartbeat";
+
   /** Base unit rendered as the {@code _seconds} Prometheus suffix on epoch/age gauges. */
   public static final String UNIT_SECONDS = "seconds";
 
   /** Rate-limit bucket value for the global {@code /api/**} path budget. */
   public static final String BUCKET_GLOBAL = "global";
+
+  /** Discord precheck outcome: an existence check ran and answered {@code 200}. */
+  public static final String DISCORD_PRECHECK_OK = "ok";
+
+  /** Discord precheck outcome: a missing/invalid shared secret was rejected with {@code 401}. */
+  public static final String DISCORD_PRECHECK_UNAUTHORIZED = "unauthorized";
+
+  /** Discord precheck outcome: the feature is unconfigured (blank secret), answered {@code 503}. */
+  public static final String DISCORD_PRECHECK_DISABLED = "disabled";
 
   /** {@code source} value for the UEX API client ({@link #EXTERNAL_FETCH_ERRORS}). */
   public static final String SOURCE_UEX = "uex";
