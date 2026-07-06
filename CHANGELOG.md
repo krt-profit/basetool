@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Off-site-Backup schlug fehl, seit der Keystore gehärtet wurde.** Nachdem der `keystore.p12` in v1.1.7 nicht mehr weltweit lesbar ist (Modus `0640` + ACL nur für die Container-UIDs), konnte der als `deploy`-Nutzer laufende Backup-Lauf ihn nicht mehr direkt kopieren; der Kopierfehler brach den gesamten nächtlichen Lauf ab, sodass auch die Datenbank-Dumps nie in die verschlüsselte Off-site-Ablage gelangten. Das Backup liest den Keystore jetzt – wie schon den root-eigenen NPM-Stand – über einen kurzlebigen Root-Hilfscontainer; ein Lesefehler wird protokolliert und übersprungen und kann den Lauf nicht mehr abbrechen (REQ-OPS-010).
+
 ## [v1.1.7](https://github.com/krt-profit/basetool/releases/tag/v1.1.7) - 2026-07-05
 
 ### Fixed
