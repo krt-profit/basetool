@@ -339,6 +339,12 @@ transaction per pass) rather than per-scrape.
   status, including a restart orphan-fail), `kind` = `PREVIEW` / `APPLY`. It makes a reliably-failing
   import observable (`P4kImportFailed`): the pending-queue gauge drains back to `0` after a failed
   run, so an empty queue alone cannot distinguish "nothing to do" from "every run fails".
+- `basetool_mail_total{outcome}` counter (`SmtpMailService`, #1041 item 16), one bounded `outcome`
+  per delivery path — `sent`, `failed` (swallowed `MailException`), and the three config-gate drops
+  `dropped_disabled` / `dropped_no_host` / `dropped_no_sender`; never the recipient or subject
+  (PII). `MailDeliveryFailing` fires on `failed` > 2/h; `MailDroppedConfigDrift` fires on any
+  `dropped_*` (on the configured prod deployment a drop is a config-drift regression that silently
+  swallows registration / approval mail, previously visible only via `LogbackErrorSpike`).
 
 **Frontend.** `basetool_mission_presence_missions` gauge (missions with a live editor; single-JVM
 edit-awareness, unlabelled), `basetool_active_sessions` gauge (active Spring Session sessions;

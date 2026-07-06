@@ -27,6 +27,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.config.MailProperties;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -39,7 +41,8 @@ import org.springframework.mail.javamail.JavaMailSender;
 
 /**
  * Mockito unit tests for {@link SmtpMailService}: the three off-gates (disabled flag / blank host /
- * absent sender) and the best-effort send path (envelope composition + swallowed delivery failure).
+ * absent sender) and the best-effort send path (envelope composition + swallowed delivery failure),
+ * each asserting the matching {@code basetool_mail_total{outcome}} increment on a real registry.
  */
 @ExtendWith(MockitoExtension.class)
 class SmtpMailServiceTest {
@@ -49,7 +52,21 @@ class SmtpMailServiceTest {
   @Mock private ObjectProvider<JavaMailSender> senderProvider;
   @Mock private JavaMailSender javaMailSender;
 
+  private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
+
   private static final MailMessage MSG = new MailMessage("dest@example.test", "Subject", "Body");
+
+  /**
+   * Reads the {@code basetool_mail_total} value for one bounded {@code outcome}, or {@code 0} when
+   * that outcome's series has not been registered yet.
+   *
+   * @param outcome the bounded mail outcome tag value
+   * @return the counter value, or {@code 0.0} when no matching series exists
+   */
+  private double mailCount(String outcome) {
+    var counter = registry.find(MetricNames.MAIL).tag(MetricNames.TAG_OUTCOME, outcome).counter();
+    return counter == null ? 0.0 : counter.count();
+  }
 
   private static MailProperties props(boolean enabled) {
     MailProperties p = new MailProperties();
@@ -61,38 +78,41 @@ class SmtpMailServiceTest {
 
   @Test
   void disabled_dropsMessageWithoutTouchingTheSender() {
-    SmtpMailService service = new SmtpMailService(props(false), senderProvider, HOST);
+    SmtpMailService service = new SmtpMailService(props(false), senderProvider, registry, HOST);
 
     service.send(MSG);
 
     verify(senderProvider, never()).getIfAvailable();
     verify(javaMailSender, never()).send(any(SimpleMailMessage.class));
+    assertThat(mailCount(MetricNames.MAIL_DROPPED_DISABLED)).isEqualTo(1.0);
   }
 
   @Test
   void enabledButBlankHost_dropsMessageWithoutTouchingTheSender() {
-    SmtpMailService service = new SmtpMailService(props(true), senderProvider, "");
+    SmtpMailService service = new SmtpMailService(props(true), senderProvider, registry, "");
 
     service.send(MSG);
 
     verify(senderProvider, never()).getIfAvailable();
     verify(javaMailSender, never()).send(any(SimpleMailMessage.class));
+    assertThat(mailCount(MetricNames.MAIL_DROPPED_NO_HOST)).isEqualTo(1.0);
   }
 
   @Test
   void enabledWithHostButNoSenderBean_dropsMessage() {
     when(senderProvider.getIfAvailable()).thenReturn(null);
-    SmtpMailService service = new SmtpMailService(props(true), senderProvider, HOST);
+    SmtpMailService service = new SmtpMailService(props(true), senderProvider, registry, HOST);
 
     service.send(MSG);
 
     verify(javaMailSender, never()).send(any(SimpleMailMessage.class));
+    assertThat(mailCount(MetricNames.MAIL_DROPPED_NO_SENDER)).isEqualTo(1.0);
   }
 
   @Test
   void enabledWithHostAndSender_sendsWithComposedEnvelope() {
     when(senderProvider.getIfAvailable()).thenReturn(javaMailSender);
-    SmtpMailService service = new SmtpMailService(props(true), senderProvider, HOST);
+    SmtpMailService service = new SmtpMailService(props(true), senderProvider, registry, HOST);
 
     service.send(MSG);
 
@@ -103,6 +123,7 @@ class SmtpMailServiceTest {
     assertThat(mail.getTo()).containsExactly("dest@example.test");
     assertThat(mail.getSubject()).isEqualTo("Subject");
     assertThat(mail.getText()).isEqualTo("Body");
+    assertThat(mailCount(MetricNames.MAIL_SENT)).isEqualTo(1.0);
   }
 
   @Test
@@ -111,11 +132,12 @@ class SmtpMailServiceTest {
     doThrow(new MailSendException("smtp down"))
         .when(javaMailSender)
         .send(any(SimpleMailMessage.class));
-    SmtpMailService service = new SmtpMailService(props(true), senderProvider, HOST);
+    SmtpMailService service = new SmtpMailService(props(true), senderProvider, registry, HOST);
 
     // Best-effort: a failed send must not propagate to the caller.
     service.send(MSG);
 
     verify(javaMailSender).send(any(SimpleMailMessage.class));
+    assertThat(mailCount(MetricNames.MAIL_FAILED)).isEqualTo(1.0);
   }
 }
