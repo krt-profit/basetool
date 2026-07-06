@@ -184,7 +184,10 @@ class RefineryOrderCreateImportRenderTest {
         .andExpect(content().string(containsString("data-testid=\"refinery-import-button\"")))
         .andExpect(
             content().string(containsString("<form id=\"refineryImportForm\" class=\"no-track\"")))
-        .andExpect(content().string(containsString("importForm.requestSubmit()")))
+        // ADR-0069: the file-picker auto-submit moved from inline JS into the extracted
+        // refinery-orders-create.js page module (requestSubmit, so the unsaved-changes guard
+        // clears); pin that the page loads it. Auto-submit itself is exercised by the e2e suite.
+        .andExpect(content().string(containsString("/js/refinery-orders-create.js")))
         .andExpect(content().string(containsString("</html>")));
   }
 
