@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **Technisch: Inline-JavaScript der Hangar-Seite in ein statisches Modul ausgelagert.** Das umfangreiche JavaScript der Hangar-Seite (Schiff anlegen/bearbeiten/löschen, Alle-löschen, Fleetview-Import, Home-Location setzen, Schiffstyp-nach-Hersteller-Filter sowie serverseitige Suche und Seitennummerierung) wurde ohne Verhaltensänderung aus der Thymeleaf-Vorlage in eine browser-zwischenspeicherbare, lint- und formatierbare Datei unter `static/js/` verlagert; die lokalisierten Meldungstexte bleiben als schlanker Inline-Bootstrap erhalten (ADR-0069).
+
 - **Technisch: Inline-JavaScript der Beförderungs-Adminseiten in statische Module ausgelagert.** Das JavaScript der Beförderungs-Admin-Seiten (Themen/Kategorien und Rang-Anforderungen) wurde ohne Verhaltensänderung aus den Thymeleaf-Vorlagen in browser-zwischenspeicherbare, lint- und formatierbare Dateien unter `static/js/` verlagert (ADR-0069).
 
 - **Technisch: Inline-JavaScript des Organigramm-Editors in ein statisches Modul ausgelagert.** Das JavaScript der Organigramm-Seite (Positionen anlegen/umbesetzen/umbenennen/entfernen, Dialog-Fokusfalle und ARIA-Baum-Tastaturnavigation) wurde ohne Verhaltensänderung aus der Thymeleaf-Vorlage in eine browser-zwischenspeicherbare, lint- und formatierbare Datei unter `static/js/` verlagert (ADR-0069).
