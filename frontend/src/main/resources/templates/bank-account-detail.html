@@ -23,8 +23,8 @@
     </nav>
 </header>
 
-<main th:if="${detail != null}" th:with="acct=${detail.account()}, caps=${detail.capabilities()}"
-      th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-transfer-fee-rate=${transferFeeRate}">
+<main class="bank-detail" th:if="${detail != null}" th:with="acct=${detail.account()}, caps=${detail.capabilities()}"
+      th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-user-id=${#authentication.name},data-transfer-fee-rate=${transferFeeRate}">
     <!-- In-place money writes (REQ-FE-005, #579): deposit/withdraw/transfer/reverse re-render this
          whole body via krtFetch (fragment=accountBody) so the balance and booking history refresh
          without a page reload. The money forms carry no @Version (append-only ledger), so there is no
@@ -132,12 +132,63 @@
         </div>
     </div>
 
-    <!-- Booking history (K1 table), full width below the Konto-Info tile. -->
-    <div class="bank-panel mt-2" data-testid="bank-bookings-panel">
-        <div class="bank-panel-head">
-            <h2 th:text="#{bank.detail.history}">Buchungshistorie</h2>
+    <!-- Balance chart (REQ-BANK-049) + booking history (REQ-BANK-051): a single-column grid that
+         becomes two columns (chart left, history right) on ultra-wide screens (REQ-BANK-052, the
+         .bank-detail-panels grid widens main.bank-detail past its normal cap). Both panels are
+         collapsible (default expanded, per-user state in localStorage). The chart lives inside
+         accountBody so a money write refreshes it (reset to the default 90d range) with the balance;
+         its range selector re-renders only #bank-chart-results via fragment=balanceChart. -->
+    <div class="bank-detail-panels mt-2">
+    <div class="bank-panel" data-testid="bank-chart-panel">
+        <button type="button" class="bank-panel-head bank-collapse-head"
+                data-trigger="bank-panel-collapse" data-collapse-key="chart" aria-expanded="true"
+                aria-controls="bank-chart-body" th:aria-label="#{bank.chart.toggle}"
+                data-testid="bank-chart-toggle">
+            <span class="bank-collapse-title">
+                <svg class="krt-icon bank-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+                <span th:text="#{bank.chart.title}">Saldoverlauf</span>
+            </span>
+        </button>
+        <div class="bank-panel-body" id="bank-chart-body">
+            <div id="bank-chart-results">
+            <th:block th:fragment="balanceChart">
+                <th:block th:replace="~{fragments/bank-balance-chart :: chartBody}"></th:block>
+            </th:block>
+            </div>
         </div>
-        <div class="bank-panel-body">
+    </div>
+
+    <!-- Booking history (K1 table): below the chart when stacked, to its right when side by side. -->
+    <div class="bank-panel" data-testid="bank-bookings-panel">
+        <button type="button" class="bank-panel-head bank-collapse-head"
+                data-trigger="bank-panel-collapse" data-collapse-key="history" aria-expanded="true"
+                aria-controls="bank-history-body" th:aria-label="#{bank.history.toggle}"
+                data-testid="bank-history-toggle">
+            <span class="bank-collapse-title">
+                <svg class="krt-icon bank-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+                <span th:text="#{bank.detail.history}">Buchungshistorie</span>
+            </span>
+        </button>
+        <div class="bank-panel-body" id="bank-history-body">
+            <!-- Period filter (REQ-BANK-051): lives OUTSIDE the swap container so it persists across
+                 pager swaps; changing a date (or submitting for no-JS) re-renders #bank-bookings-results
+                 via fragment=bookings. The size carried by the current page state is preserved. -->
+            <form class="bank-history-filter" method="get" th:action="@{${historyBaseUrl}}"
+                  data-bank-history-filter>
+                <div class="bank-history-filter-field">
+                    <label for="bank-history-from" th:text="#{bank.filter.period.from}">Von</label>
+                    <input type="date" id="bank-history-from" name="from" th:value="${historyFrom}"
+                           data-testid="bank-history-from">
+                </div>
+                <div class="bank-history-filter-field">
+                    <label for="bank-history-to" th:text="#{bank.filter.period.to}">Bis</label>
+                    <input type="date" id="bank-history-to" name="to" th:value="${historyTo}"
+                           data-testid="bank-history-to">
+                </div>
+                <input type="hidden" name="size" th:value="${bookings != null ? bookings.size() : 50}">
+                <button type="submit" class="btn btn-outline btn-sm" data-testid="bank-history-apply"
+                        th:text="#{bank.filter.period.apply}">Anwenden</button>
+            </form>
             <!-- AJAX swap target (REQ-FE-002): the booking-history pager re-renders only this block
                  via krtFetch (fragment=bookings). The reverse button and the row-expand toggle are
                  document-delegated and the .utc-time cells are re-localised on krt:swapped, so
@@ -243,10 +294,14 @@
             </div>
             <p class="text-center text-muted" th:if="${bookings == null or #lists.isEmpty(bookings.content())}"
                data-testid="bank-bookings-empty" th:text="#{bank.detail.history.empty}">Noch keine Buchungen.</p>
-            <nav th:replace="~{fragments/pagination :: pagination(${bookings}, ${paginationBaseUrl})}"></nav>
+            <div class="pagination-controls" th:if="${bookings != null and bookings.totalElements() > 0}">
+                <nav th:replace="~{fragments/pagination :: pageSizePicker(${bookings}, ${paginationBaseUrl}, ${pageSizes})}"></nav>
+                <nav th:replace="~{fragments/pagination :: pagination(${bookings}, ${paginationBaseUrl})}"></nav>
+            </div>
             </th:block>
             </div>
         </div>
+    </div>
     </div>
 
     <!-- ============ Modals (open via data-trigger="open-modal-display") ============ -->
@@ -357,17 +412,68 @@
     // element, so its pagination interception must be re-attached on krt:swapped. bindSwap guards on
     // _krtSwapBound, so re-running it (incl. after a pager-only swap, where the element persists) is
     // an idempotent no-op. No-JS fallback reloads the page.
-    function bindBankBookingsPager() {
+    // The balance-chart range links (fragment=balanceChart, history:false) and the booking-history
+    // pager/size links (fragment=bookings, history:true) are both delegated-intercepted here; a money
+    // write re-renders the whole accountBody (fresh #bank-chart-results / #bank-bookings-results
+    // elements), so both bindings are re-attached on krt:swapped. bindSwap guards on _krtSwapBound, so
+    // re-running it is an idempotent no-op. No-JS fallback reloads the page.
+    function bindBankDetailSwaps() {
         if (window.krtFetch) {
             window.krtFetch.bindSwap({
                 container: '#bank-bookings-results',
                 fragmentValue: 'bookings',
                 history: true
             });
+            window.krtFetch.bindSwap({
+                container: '#bank-chart-results',
+                fragmentValue: 'balanceChart',
+                history: false
+            });
         }
     }
-    bindBankBookingsPager();
-    document.addEventListener('krt:swapped', bindBankBookingsPager);
+    bindBankDetailSwaps();
+    document.addEventListener('krt:swapped', bindBankDetailSwaps);
+
+    // Booking-history period filter (REQ-BANK-051): the from/to date inputs re-render only the
+    // bookings fragment via krtFetch.swap. Document-delegated so it survives the accountBody swap; the
+    // current page size is read from the address bar (kept in sync by the history:true pager) so
+    // changing the period keeps the chosen page size. No-JS falls back to the form's native GET.
+    function bankHistorySwapUrl(form) {
+        var base = form.getAttribute('action');
+        var params = new URLSearchParams();
+        var fromEl = form.querySelector('input[name="from"]');
+        var toEl = form.querySelector('input[name="to"]');
+        if (fromEl && fromEl.value) { params.set('from', fromEl.value); }
+        if (toEl && toEl.value) { params.set('to', toEl.value); }
+        var size = new URLSearchParams(window.location.search).get('size');
+        if (!size) { var hidden = form.querySelector('input[name="size"]'); size = hidden ? hidden.value : ''; }
+        if (size) { params.set('size', size); }
+        params.set('page', '0');
+        return base + '?' + params.toString();
+    }
+    function bankHistoryFilter(form) {
+        if (!window.krtFetch) { return; }
+        window.krtFetch.swap({
+            url: bankHistorySwapUrl(form),
+            container: '#bank-bookings-results',
+            fragmentValue: 'bookings',
+            history: true
+        });
+    }
+    document.addEventListener('submit', function (event) {
+        var form = event.target.closest ? event.target.closest('form[data-bank-history-filter]') : null;
+        if (!form || !window.krtFetch) { return; }
+        event.preventDefault();
+        bankHistoryFilter(form);
+    });
+    document.addEventListener('change', function (event) {
+        var input = event.target.closest
+            ? event.target.closest('form[data-bank-history-filter] input[type="date"]')
+            : null;
+        if (!input) { return; }
+        var form = input.closest('form[data-bank-history-filter]');
+        if (form) { bankHistoryFilter(form); }
+    });
 </script>
 </body>
 </html>

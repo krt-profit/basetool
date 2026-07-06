@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.BankAccountRefDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.BankBalanceSeriesDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitBankAccountDetailDto;
@@ -135,23 +136,50 @@ public class OrgUnitBankController {
    * @param page zero-based page index
    * @param size page size
    * @param sort whitelisted sort spec
+   * @param from optional inclusive period start (ISO-8601 instant)
+   * @param to optional inclusive period end (ISO-8601 instant)
    * @return one page of redacted booking rows
    */
   @GetMapping("/accounts/{id}/transactions")
   @PreAuthorize("isAuthenticated()")
-  @Operation(summary = "Booking history of an org-unit account (Halter redacted)")
+  @Operation(summary = "Booking history of an org-unit account (Halter redacted, optional period)")
   @ApiResponses(
       value = {@ApiResponse(responseCode = "200", description = "Redacted booking history")})
   public PageResponse<BankBookingDto> getAccountBookings(
       @PathVariable @NotNull UUID id,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
-      @RequestParam(required = false) String sort) {
+      @RequestParam(required = false) String sort,
+      @RequestParam(required = false) Instant from,
+      @RequestParam(required = false) Instant to) {
     String effectiveSort = sort == null || sort.isBlank() ? "createdAt,desc" : sort;
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page, size, effectiveSort, BOOKING_SORT_FIELDS, "createdAt");
-    return PageResponse.of(orgUnitBankAccessService.getViewableAccountBookings(id, pageable));
+    return PageResponse.of(
+        orgUnitBankAccessService.getViewableAccountBookings(id, pageable, from, to));
+  }
+
+  /**
+   * Returns the balance-over-time series of an org-unit account the caller may view (REQ-BANK-049)
+   * — the data behind the detail page's balance chart. The org-unit view authorization is enforced
+   * in the service; the series is pure balance math, so nothing is redacted and every viewer of the
+   * account may read it. Read-only, non-audited.
+   *
+   * @param id the account
+   * @param from inclusive period start (ISO-8601 instant)
+   * @param to inclusive period end (ISO-8601 instant)
+   * @return the balance series and the account's balance target
+   */
+  @GetMapping("/accounts/{id}/balance-series")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Balance-over-time series of an org-unit account for a period")
+  @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "Balance series")})
+  public BankBalanceSeriesDto getBalanceSeries(
+      @PathVariable @NotNull UUID id,
+      @RequestParam @NotNull Instant from,
+      @RequestParam @NotNull Instant to) {
+    return orgUnitBankAccessService.getViewableBalanceSeries(id, from, to);
   }
 
   /**

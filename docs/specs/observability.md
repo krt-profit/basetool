@@ -201,6 +201,17 @@ Tracing on the OTel SDK) behind a hard master gate:
   hold one span open for its whole lifetime).
 - Trace retention is short (14 days, Tempo, Phase 2) and access is admin-only via Grafana
   (REQ-OBS-008).
+- **Traces are consumed** (#1041 item 22): the `14-tracing.json` dashboard runs TraceQL-metrics
+  RED/latency panels (`{ kind = server } | rate() by (span:name)`, `quantile_over_time`) and
+  TraceQL search tables (`{ duration > 1s }`, `{ status = error }`) **directly against the Tempo
+  datasource** — zero new Prometheus series (TraceQL metrics are GA in Tempo 3.0; they read only
+  3.0-written RF1 blocks and exclude ~the last 30s). Tempo pipeline health is alerted in `meta.yml`:
+  `TempoSpansRefused` (`tempo_receiver_refused_spans`), `TempoReceiverSilent`
+  (`tempo_receiver_accepted_spans` rate 0 for 1h while the counter is non-zero, so it stays quiet
+  when tracing is disabled) and `TempoWritePathFailing` (live-store completion/flush failures) —
+  metric names verified against a live Tempo 3.0.2 scrape, since REQ-OBS-013 keeps sink failures out
+  of the app logs. The service-graph (node graph) needs the metrics-generator's `service-graphs`
+  processor + Prometheus remote-write, a separate follow-up (owner decision on the remote-write auth).
 
 ### REQ-OBS-010 — Edge / host-auth log streams: 31-day IP retention + privacy-policy linkage
 

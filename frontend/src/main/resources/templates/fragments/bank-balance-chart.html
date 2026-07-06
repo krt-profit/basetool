@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--
+  Shared balance-over-time chart body (REQ-BANK-049), reused by the bank-staff account detail
+  (bank-account-detail.html :: balanceChart) and the org-unit viewer detail
+  (org-unit-bank-account-detail.html :: orgUnitBalanceChart). The enclosing page fragment owns the
+  swap container (#bank-chart-results / #org-unit-bank-chart-results) and the AJAX wiring; this
+  fragment only renders the range selector + the inline SVG line chart from the pre-scaled geometry
+  BankBalanceChart.of(...) put on the model.
+
+  Model contract: `chart` (BankBalanceChart.Chart, may be null/empty), `chartRange` (active range
+  key), `chartRanges` (the ordered range keys), `chartBaseUrl` (the page URL the range links target).
+  Colours come from design-system tokens via the .bank-chart-* CSS classes (bank.css); the x-axis
+  period is conveyed by the range labels, so no SVG text needs the user's time zone.
+-->
+<th:block th:fragment="chartBody">
+    <!-- Range selector (REQ-BANK-049): the active range is an inert span, the others are data-swap
+         links re-rendering only the enclosing chart container in place (bindSwap, history:false). The
+         no-JS fallback follows the link and reloads the page with ?chartRange=. -->
+    <div class="bank-chart-toolbar">
+        <div class="bank-chart-ranges" role="group" th:aria-label="#{bank.chart.range.label}">
+            <th:block th:each="r : ${chartRanges}">
+                <span th:if="${r == chartRange}" class="bank-chart-range-btn is-active"
+                      aria-current="true" th:text="#{'bank.chart.range.' + ${r}}"
+                      th:attr="data-testid='bank-chart-range-' + ${r}">90 Tage</span>
+                <a th:unless="${r == chartRange}" class="bank-chart-range-btn" data-swap
+                   th:href="@{${chartBaseUrl}(chartRange=${r})}"
+                   th:text="#{'bank.chart.range.' + ${r}}"
+                   th:attr="data-testid='bank-chart-range-' + ${r}">90 Tage</a>
+            </th:block>
+        </div>
+    </div>
+    <p th:if="${chart == null or chart.empty()}" class="text-center text-muted bank-chart-empty"
+       data-testid="bank-chart-empty" th:text="#{bank.chart.empty}">Keine Daten f&uuml;r diesen Zeitraum.</p>
+    <div th:unless="${chart == null or chart.empty()}" class="bank-chart" data-testid="bank-chart">
+        <svg class="bank-chart-svg" viewBox="0 0 720 260" role="img" th:aria-label="#{bank.chart.title}">
+            <polygon class="bank-chart-area" th:attr="points=${chart.areaPoints()}" />
+            <line class="bank-chart-grid"
+                  th:attr="x1=${chart.plotLeft()},x2=${chart.plotRight()},y1=${chart.maxLineY()},y2=${chart.maxLineY()}" />
+            <line class="bank-chart-grid"
+                  th:attr="x1=${chart.plotLeft()},x2=${chart.plotRight()},y1=${chart.minLineY()},y2=${chart.minLineY()}" />
+            <line th:if="${chart.targetY() != null}" class="bank-chart-target"
+                  th:attr="x1=${chart.plotLeft()},x2=${chart.plotRight()},y1=${chart.targetY()},y2=${chart.targetY()}" />
+            <polyline class="bank-chart-line" th:attr="points=${chart.linePoints()}" />
+            <text class="bank-chart-axis-label" text-anchor="end"
+                  th:attr="x=${chart.axisLabelX()},y=${chart.maxLineY()}"
+                  th:text="${#numbers.formatInteger(@moneyFormat.round(chart.maxValue()), 1, 'POINT')}">10.000.000</text>
+            <text class="bank-chart-axis-label" text-anchor="end"
+                  th:attr="x=${chart.axisLabelX()},y=${chart.minLineY()}"
+                  th:text="${#numbers.formatInteger(@moneyFormat.round(chart.minValue()), 1, 'POINT')}">0</text>
+        </svg>
+        <div class="bank-chart-legend">
+            <span class="bank-chart-legend-item">
+                <span class="bank-chart-swatch bank-chart-swatch--line" aria-hidden="true"></span>
+                <span th:text="#{bank.chart.legend.actual}">Kontostand</span>
+            </span>
+            <span class="bank-chart-legend-item" th:if="${chart.target() != null}"
+                  data-testid="bank-chart-target-legend">
+                <span class="bank-chart-swatch bank-chart-swatch--target" aria-hidden="true"></span>
+                <span th:text="#{bank.chart.legend.target} + ': ' + ${#numbers.formatInteger(@moneyFormat.round(chart.target()), 1, 'POINT')} + ' aUEC'">Ziel: 10.000.000 aUEC</span>
+            </span>
+        </div>
+    </div>
+</th:block>
+</body>
+</html>

@@ -69,7 +69,7 @@ to the realm role `Admin`. There is no other exposed monitoring surface.
   via `envsubst` at deploy time. The rendered `alertmanager.yml` is **not**
   committed (it carries secrets).
 - **`grafana/provisioning/{datasources,dashboards}`** + **`grafana/dashboards/*.json`**
-  — 12 dashboards, provisioned **read-only** (see the sandbox-export workflow
+  — 13 dashboards, provisioned **read-only** (see the sandbox-export workflow
   below).
 
 **Config changes reach the running stack automatically.** On each deploy `deploy.sh`
