@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.config;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Collection;
 import java.util.HashSet;
@@ -71,6 +72,7 @@ public class SecurityConfig {
 
   private final SsoReAuthenticationEntryPoint ssoReAuthenticationEntryPoint;
   private final CspNonceFilter cspNonceFilter;
+  private final MeterRegistry meterRegistry;
 
   // CSP migration milestone: the ~200 inline event-handler attributes (onclick="…",
   // onchange="…", onsubmit="…", oninput="…", onkeyup="…") that historically pinned us to a
@@ -356,7 +358,11 @@ public class SecurityConfig {
             oauth2 ->
                 oauth2
                     .loginPage("/oauth2/authorization/keycloak")
-                    .failureUrl("/?error")
+                    // #1041 item 18: count each failed login (with a bounded, exception-type-mapped
+                    // reason) into basetool_login_total before the redirect to /?error. A
+                    // code-to-token / JWKS / state failure breaks all logins with no other frontend
+                    // signal — KeycloakLoginErrorSpike's event regex misses code-to-token errors.
+                    .failureHandler(new LoginFailureMetricsHandler(meterRegistry, "/?error"))
                     .successHandler(oauth2LoginSuccessHandler())
                     .authorizationEndpoint(
                         auth ->
@@ -378,7 +384,13 @@ public class SecurityConfig {
                                     .getRequestURI()
                                     .equals(request.getContextPath() + "/logout"))
                     .logoutSuccessHandler(oidcLogoutSuccessHandler))
-        .exceptionHandling(ex -> ex.authenticationEntryPoint(ssoReAuthenticationEntryPoint))
+        .exceptionHandling(
+            ex ->
+                ex.authenticationEntryPoint(ssoReAuthenticationEntryPoint)
+                    // #1041 item 18: count CSRF-token rejections (basetool_csrf_rejections_total)
+                    // before the default 403. krtFetch's silent single-retry self-heal otherwise
+                    // masks a systematic CSRF-wiring regression as intermittent failed writes.
+                    .accessDeniedHandler(new CsrfMetricsAccessDeniedHandler(meterRegistry)))
         // M-14 (+ security audit gap-fill): explicit session-management policy.
         //   * sessionFixation(changeSessionId) is Spring Security's default since 4.x; pinning it
         //     here makes the contract explicit so a future regression that switches to {@code
@@ -443,7 +455,10 @@ public class SecurityConfig {
    */
   @Bean
   public AuthenticationSuccessHandler oauth2LoginSuccessHandler() {
-    return new AssetAwareAuthenticationSuccessHandler();
+    // #1041 item 18: wrap the asset-aware handler so a successful login is counted into
+    // basetool_login_total{outcome="success"} — the denominator FrontendLoginBroken checks against.
+    return new LoginSuccessMetricsHandler(
+        meterRegistry, new AssetAwareAuthenticationSuccessHandler());
   }
 
   private OAuth2AuthorizationRequestResolver authorizationRequestResolver(

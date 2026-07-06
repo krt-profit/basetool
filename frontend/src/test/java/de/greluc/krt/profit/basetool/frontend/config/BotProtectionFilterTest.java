@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.config;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,11 +36,25 @@ class BotProtectionFilterTest {
 
   private BotProtectionFilter filter;
   private FilterChain filterChain;
+  private SimpleMeterRegistry registry;
 
   @BeforeEach
   void setUp() {
-    filter = new BotProtectionFilter();
+    registry = new SimpleMeterRegistry();
+    filter = new BotProtectionFilter(registry);
     filterChain = mock(FilterChain.class);
+  }
+
+  /**
+   * Reads the {@code basetool_bot_blocked_total} value for one bounded {@code rule}, or {@code 0}
+   * when that rule's series has not been registered yet.
+   *
+   * @param rule the bounded reject rule tag value
+   * @return the counter value, or {@code 0.0} when no matching series exists
+   */
+  private double botCount(String rule) {
+    var counter = registry.find(MetricNames.BOT_BLOCKED).tag(MetricNames.TAG_RULE, rule).counter();
+    return counter == null ? 0.0 : counter.count();
   }
 
   // -------------------------------------------------------------------------
@@ -112,6 +128,7 @@ class BotProtectionFilterTest {
     // Then
     assertEquals(404, response.getStatus(), "Bot path should return 404. URI=" + botUri);
     verify(filterChain, never()).doFilter(request, response);
+    assertEquals(1.0, botCount(MetricNames.BOT_RULE_PATH_PREFIX));
   }
 
   @ParameterizedTest
@@ -188,6 +205,14 @@ class BotProtectionFilterTest {
     // Then
     assertEquals(404, response.getStatus(), "Bot file extension should return 404. URI=" + botUri);
     verify(filterChain, never()).doFilter(request, response);
+    // Blocked exactly once. Some URIs (e.g. /config.php, /backup.zip) also match a bot PATH prefix
+    // (/config, /backup), which is checked before the file-extension rule — so the block is counted
+    // under path_prefix for those and under file_extension for the rest. Either way, exactly one.
+    assertEquals(
+        1.0,
+        botCount(MetricNames.BOT_RULE_FILE_EXTENSION) + botCount(MetricNames.BOT_RULE_PATH_PREFIX),
+        "the request must be blocked exactly once, by the file-extension or path-prefix rule: "
+            + botUri);
   }
 
   @ParameterizedTest
@@ -241,6 +266,7 @@ class BotProtectionFilterTest {
     assertEquals(
         405, response.getStatus(), "Disallowed HTTP method should return 405. Method=" + method);
     verify(filterChain, never()).doFilter(request, response);
+    assertEquals(1.0, botCount(MetricNames.BOT_RULE_METHOD));
   }
 
   // -------------------------------------------------------------------------
@@ -282,6 +308,9 @@ class BotProtectionFilterTest {
     assertEquals(
         200, response.getStatus(), "Legitimate path should pass through filter. URI=" + appUri);
     verify(filterChain, times(1)).doFilter(request, response);
+    assertEquals(0.0, botCount(MetricNames.BOT_RULE_PATH_PREFIX));
+    assertEquals(0.0, botCount(MetricNames.BOT_RULE_FILE_EXTENSION));
+    assertEquals(0.0, botCount(MetricNames.BOT_RULE_METHOD));
   }
 
   @ParameterizedTest

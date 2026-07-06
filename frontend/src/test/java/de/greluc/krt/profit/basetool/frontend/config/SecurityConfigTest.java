@@ -53,7 +53,8 @@ class SecurityConfigTest {
             botProtectionFilter,
             sessionDebugFilter,
             ssoEntryPoint,
-            cspNonceFilter);
+            cspNonceFilter,
+            new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
     GrantedAuthoritiesMapper mapper = config.userAuthoritiesMapper();
 
     Map<String, Object> realmAccess = new HashMap<>();

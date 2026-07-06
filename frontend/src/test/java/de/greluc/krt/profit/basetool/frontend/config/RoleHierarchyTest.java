@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.config;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.Collection;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -48,6 +49,8 @@ class RoleHierarchyTest {
   @MockitoBean private SsoReAuthenticationEntryPoint ssoReAuthenticationEntryPoint;
 
   @MockitoBean private CspNonceFilter cspNonceFilter;
+
+  @MockitoBean private MeterRegistry meterRegistry;
 
   @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
 

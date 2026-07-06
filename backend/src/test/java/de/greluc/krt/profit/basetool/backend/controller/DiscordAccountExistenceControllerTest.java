@@ -25,13 +25,17 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.config.DiscordSpiPrecheckProperties;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.dto.DiscordAccountExistenceRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.DiscordAccountExistenceResponse;
 import de.greluc.krt.profit.basetool.backend.service.DiscordAccountExistenceService;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -47,10 +51,26 @@ class DiscordAccountExistenceControllerTest {
 
   @Mock private DiscordAccountExistenceService accountExistenceService;
   @Mock private DiscordSpiPrecheckProperties properties;
+  @Spy private MeterRegistry meterRegistry = new SimpleMeterRegistry();
   @InjectMocks private DiscordAccountExistenceController controller;
 
   private static final DiscordAccountExistenceRequest REQUEST =
       new DiscordAccountExistenceRequest("Maverick", "mav@example.com", "Mav");
+
+  /**
+   * Reads the {@code basetool_discord_precheck_total} value for one bounded {@code outcome}.
+   *
+   * @param outcome the bounded precheck outcome tag value
+   * @return the counter value, or {@code 0.0} when the series is absent
+   */
+  private double precheckCount(String outcome) {
+    var counter =
+        meterRegistry
+            .find(MetricNames.DISCORD_PRECHECK)
+            .tag(MetricNames.TAG_OUTCOME, outcome)
+            .counter();
+    return counter == null ? 0.0 : counter.count();
+  }
 
   @Test
   void disabled_whenSecretNotConfigured_returns503_andDoesNotQuery() {
@@ -61,6 +81,7 @@ class DiscordAccountExistenceControllerTest {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
     verifyNoInteractions(accountExistenceService);
+    assertThat(precheckCount(MetricNames.DISCORD_PRECHECK_DISABLED)).isEqualTo(1.0);
   }
 
   @Test
@@ -72,6 +93,7 @@ class DiscordAccountExistenceControllerTest {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     verifyNoInteractions(accountExistenceService);
+    assertThat(precheckCount(MetricNames.DISCORD_PRECHECK_UNAUTHORIZED)).isEqualTo(1.0);
   }
 
   @Test
@@ -97,6 +119,7 @@ class DiscordAccountExistenceControllerTest {
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(response.getBody()).isNotNull();
     assertThat(response.getBody().exists()).isTrue();
+    assertThat(precheckCount(MetricNames.DISCORD_PRECHECK_OK)).isEqualTo(1.0);
   }
 
   @Test

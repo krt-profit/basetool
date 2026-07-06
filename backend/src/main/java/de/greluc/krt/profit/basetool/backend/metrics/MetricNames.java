@@ -87,6 +87,24 @@ public final class MetricNames {
   /** Counter {@code basetool_ratelimit_rejections_total} — tag {@code bucket}. */
   public static final String RATELIMIT_REJECTIONS = "basetool.ratelimit.rejections";
 
+  /**
+   * Counter {@code basetool_ratelimit_requests_total} — tag {@code bucket}. Bumped for <b>every</b>
+   * bucket evaluation (consumed or rejected), so rejections/requests gives a rejection ratio and a
+   * spike surfaces before the 429s alone would (#1041 item 19).
+   */
+  public static final String RATELIMIT_REQUESTS = "basetool.ratelimit.requests";
+
+  // --- Discord SPI precheck (DiscordAccountExistenceController) ---------------------------
+
+  /**
+   * Counter {@code basetool_discord_precheck_total} — tag {@code outcome} ({@link
+   * #DISCORD_PRECHECK_OK} / {@link #DISCORD_PRECHECK_UNAUTHORIZED} / {@link
+   * #DISCORD_PRECHECK_DISABLED}). The endpoint sits outside {@code /api/**}, the rate limiter and
+   * the {@code basetool_http_error} funnel, so without this counter secret-guessing or a broken
+   * secret after rotation is log-only (#1041 item 19).
+   */
+  public static final String DISCORD_PRECHECK = "basetool.discord.precheck";
+
   // --- Bank ledger integrity (BankLedgerIntegrityTask) -----------------------------------
 
   /** Gauge {@code basetool_bank_ledger_integrity_violations} — tag {@code category}. */
@@ -258,6 +276,15 @@ public final class MetricNames {
 
   /** Rate-limit bucket value for the global {@code /api/**} path budget. */
   public static final String BUCKET_GLOBAL = "global";
+
+  /** Discord precheck outcome: an existence check ran and answered {@code 200}. */
+  public static final String DISCORD_PRECHECK_OK = "ok";
+
+  /** Discord precheck outcome: a missing/invalid shared secret was rejected with {@code 401}. */
+  public static final String DISCORD_PRECHECK_UNAUTHORIZED = "unauthorized";
+
+  /** Discord precheck outcome: the feature is unconfigured (blank secret), answered {@code 503}. */
+  public static final String DISCORD_PRECHECK_DISABLED = "disabled";
 
   /** {@code source} value for the UEX API client ({@link #EXTERNAL_FETCH_ERRORS}). */
   public static final String SOURCE_UEX = "uex";

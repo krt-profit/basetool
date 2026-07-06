@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.config;
 
+import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -54,6 +56,17 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Component
 @Slf4j
 public class BotProtectionFilter extends OncePerRequestFilter {
+
+  private final MeterRegistry meterRegistry;
+
+  /**
+   * Wires the {@code basetool_bot_blocked_total} counter registry (#1041 item 19).
+   *
+   * @param meterRegistry the Micrometer registry the per-rule bot-block counter is bumped against
+   */
+  public BotProtectionFilter(@NotNull MeterRegistry meterRegistry) {
+    this.meterRegistry = meterRegistry;
+  }
 
   /**
    * URI path prefixes that are known to originate from automated scanners, bots, or exploit
@@ -156,6 +169,7 @@ public class BotProtectionFilter extends OncePerRequestFilter {
     // 1. HTTP method check
     if (!ALLOWED_HTTP_METHODS.contains(method.toUpperCase())) {
       log.debug("Blocked disallowed HTTP method: {} {}", method, uri);
+      recordBlocked(MetricNames.BOT_RULE_METHOD);
       response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
       return;
     }
@@ -163,6 +177,7 @@ public class BotProtectionFilter extends OncePerRequestFilter {
     // 2. Path-prefix check
     if (isBotPath(uri)) {
       log.debug("Blocked bot/scanner path: {} {}", method, uri);
+      recordBlocked(MetricNames.BOT_RULE_PATH_PREFIX);
       response.sendError(HttpServletResponse.SC_NOT_FOUND);
       return;
     }
@@ -170,11 +185,23 @@ public class BotProtectionFilter extends OncePerRequestFilter {
     // 3. File-extension check
     if (isBotFileExtension(uri)) {
       log.debug("Blocked bot/scanner file extension: {} {}", method, uri);
+      recordBlocked(MetricNames.BOT_RULE_FILE_EXTENSION);
       response.sendError(HttpServletResponse.SC_NOT_FOUND);
       return;
     }
 
     filterChain.doFilter(request, response);
+  }
+
+  /**
+   * Bumps {@code basetool_bot_blocked_total} for one bounded reject {@code rule}. Only the rule
+   * category is recorded — never the URI or method, both attacker-controlled / unbounded.
+   *
+   * @param rule the bounded reject rule ({@code method} / {@code path_prefix} / {@code
+   *     file_extension})
+   */
+  private void recordBlocked(@NotNull String rule) {
+    meterRegistry.counter(MetricNames.BOT_BLOCKED, MetricNames.TAG_RULE, rule).increment();
   }
 
   /**
