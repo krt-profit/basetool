@@ -661,7 +661,14 @@
                         </div>
                         <div class="drop-zone" data-zone="unit" th:attr="data-unit-id=${unit.id}, tabindex=${mission.canEdit ? '0' : null}, role=${mission.canEdit ? 'button' : null}, aria-label=${mission.canEdit ? unit.name + ' — ' + #messages.msg('mission.crew.unit.drophint') : null}">
                             <th:block th:each="c : ${unit.crew}" th:with="cp=${participantsById[c.participantId]}">
-                                <div th:if="${cp != null}" th:replace="~{:: personRow(${cp}, ${c}, ${unit})}"></div>
+                                <!-- th:if must NOT share an element with th:replace: th:replace (attribute precedence 1)
+                                     runs BEFORE th:if (3), so a same-element guard is dead and a crew entry whose
+                                     participant is missing from participantsById would render a ghost person-row. The
+                                     backend keeps crew and participants in sync (removing a participant scrubs its crew),
+                                     so cp is non-null today; gating an outer th:block keeps that defence effective. -->
+                                <th:block th:if="${cp != null}">
+                                    <div th:replace="~{:: personRow(${cp}, ${c}, ${unit})}"></div>
+                                </th:block>
                             </th:block>
                             <div class="drop-hint" th:if="${mission.canEdit}" th:text="#{mission.crew.unit.drophint}">Teilnehmer hierher ziehen</div>
                             <p th:if="${!mission.canEdit and (unit.crew == null or unit.crew.isEmpty())}" class="desc" th:text="#{mission.unit.no_crew}">Keine Crew.</p>

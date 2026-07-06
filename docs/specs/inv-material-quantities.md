@@ -30,18 +30,27 @@ the field is committed (on blur) and again before submit. The amount must be **>
 exception is the book-out **target stock**, which may be `0` (= "remove all") and opts out via
 `data-scu-allow-zero`.
 
+An SCU field may carry an inline decimal-scale **hint** — the focusable `scu-hint` marker whose
+tooltip explains the cSCU / microSCU scale. The hint is shown **only** on SCU-typed rows, never on
+PIECE rows. Because Thymeleaf resolves `th:replace` / `th:insert` (attribute precedence 1) **before**
+`th:if` (3), the condition that gates the hint must sit on an **outer** element (a wrapping
+`<th:block>`) and never share the element with `th:replace`; a shared-element combination renders the
+hint unconditionally — the refinery store dialog previously showed it on PIECE rows.
+
 **Acceptance**
 
 - [ ] Both `0,01` and `0.01` are accepted and the form submits `0.01`.
 - [ ] An amount with > 3 decimals is rounded half up to 3 (`0.0015` → `0.002`, `1.2345` → `1.235`, `12.9995` → `13`).
 - [ ] An amount that is `0`, negative, or rounds to `0` (e.g. `0.0004`) is rejected before submit; the book-out target stock may be `0`.
 - [ ] The field carries `step="0.001"` and is `type="text" inputmode="decimal" data-scu-decimal`.
+- [ ] The SCU decimal-scale hint (`scu-hint`) renders only on SCU-typed rows — the refinery store dialog shows it for an SCU output material and omits it for a PIECE one.
 
 **Enforced by:** _Client_ — `scu-decimal-input.js` (mode read from the live `step` attribute) +
-`InventoryPageControllerMvcTest` (render-wiring) + web-asset linting (ESLint / HTMLHint / Prettier).
-_Server_ — see [REQ-INV-003](#req-inv-003--server-side-enforcement--scu-scale-storage). **Code:**
-`frontend/.../static/js/scu-decimal-input.js`, `fragments/head.html` (`window.krtScuI18n`).
-**Issues:** PR #465.
+`InventoryPageControllerMvcTest` (render-wiring) + `RefineryStoreScuHintRenderTest` (the SCU hint is
+gated to SCU rows only) + web-asset linting (ESLint / HTMLHint / Prettier). _Server_ — see
+[REQ-INV-003](#req-inv-003--server-side-enforcement--scu-scale-storage). **Code:**
+`frontend/.../static/js/scu-decimal-input.js`, `fragments/head.html` (`window.krtScuI18n`),
+`fragments/scu-hint.html`, `refinery-orders-details.html`. **Issues:** PR #465.
 
 ### REQ-INV-002 — PIECE amounts: positive whole numbers only
 

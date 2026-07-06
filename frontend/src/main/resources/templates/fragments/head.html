@@ -153,6 +153,15 @@
     <script th:src="@{/js/scu-decimal-input.js}" defer th:attr="nonce=${cspNonce}"></script>
 
     <title th:replace="${titleContent}"></title>
-    <th:block th:if="${additionalLinks != null}" th:replace="${additionalLinks}"></th:block>
+    <!--
+      Per-page extra <head> links. th:if must NOT share an element with th:replace: th:replace
+      (attribute precedence 1) is processed BEFORE th:if (3), so a same-element guard is dead.
+      Every caller binds additionalLinks to ~{::extraLinks} or the empty fragment ~{} (both
+      non-null), so the guard never fires today, but gating an outer th:block keeps it effective
+      should a future caller ever omit the parameter (null -> nothing rendered, no error).
+    -->
+    <th:block th:if="${additionalLinks != null}">
+        <th:block th:replace="${additionalLinks}"></th:block>
+    </th:block>
 </head>
 </html>
