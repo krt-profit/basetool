@@ -6,11 +6,15 @@
 
 - **Technisch: Inline-JavaScript weiterer Material- und Lager-Seiten in statische Module ausgelagert.** Das JavaScript der Materialübersicht, der Material-Detailseite, der Material-Sammlung und der Lager-Einbuchung wurde ohne Verhaltensänderung aus den Thymeleaf-Vorlagen in browser-zwischenspeicherbare, lint- und formatierbare Dateien unter `static/js/` verlagert (ADR-0069).
 
+- **Technisch: Inline-JavaScript der Material-Adminseiten in statische Module ausgelagert.** Das JavaScript der Admin-Seiten für den Materialkatalog und die Material-Aliase wurde ohne Verhaltensänderung aus den Thymeleaf-Vorlagen in browser-zwischenspeicherbare, lint- und formatierbare Dateien unter `static/js/` verlagert (ADR-0069).
+
 - **Technisch: Inline-JavaScript der Auftragsseiten in statische Module ausgelagert.** Das JavaScript der Auftrags-Anlege-/Bearbeitungsseite und der Auftragsübersicht (samt der Logistiker-Drag-&-Drop-Priorisierung) wurde ohne Verhaltensänderung aus den Thymeleaf-Vorlagen in browser-zwischenspeicherbare, lint- und formatierbare Dateien unter `static/js/` verlagert (ADR-0069).
 
 - **Monitoring: Fehlgeschlagene UEX-/SC-Wiki-Abrufe sind jetzt sichtbar.** Verschluckte Abruf- und Parse-Fehler der externen Kataloge werden nun gezählt (`basetool_external_fetch_errors_total`) und als `ExternalFetchErrors` alarmiert – bisher meldete der Sync trotz wochenlangem Ausfall weiter „Erfolg". Zusätzlich sind die ausgehenden Backend-Aufrufe jetzt an die Observation-Registry angebunden (Metriken + Spans, REQ-OBS-009/-011).
 
 - **Monitoring: Stille Null-Import-Ausfälle der Kataloge werden jetzt erkannt.** Die UEX- und SC-Wiki-Syncs melden nun die Zahl der pro Lauf geschriebenen Datensätze (`basetool_scheduled_job_items_total`); der neue Alarm `SyncZeroItems` schlägt an, wenn ein Sync 48 h lang „erfolgreich" läuft, dabei aber null Zeilen importiert – der Leere-200-Ausfall, den weder `ExternalSyncStale` noch `ExternalFetchErrors` erkennt (REQ-OBS-011).
+
+- **Monitoring: Stillstände geplanter Jobs und des Kennzahlen-Samplers werden jetzt erkannt.** Neue Staleness-Alarme decken die tägliche Benachrichtigungs-Bereinigung und die stündliche Standard-Bauplan-Befüllung (>26 h) sowie – kritisch – die stündliche Bank-Integritätsprüfung (>6 h) ab, deren Stillstand den Datenkorruptions-Detektor blind macht. Zusätzlich ist der 60-Sekunden-Sampler der Warteschlangen-Kennzahlen instrumentiert (`BusinessMetricsStale`), `UserSyncZeroItems` meldet erfolgreiche, aber leere Nutzer-Syncs, und das Operations-Dashboard zeigt p95-Laufzeit und Datensätze/Stunde je Job (REQ-OBS-011).
 
 - **Monitoring: Die Überwachungsebene erkennt jetzt eigene stille Ausfälle.** Neue Alarme decken fehlgeschlagene Config-Reloads (Prometheus/Alertmanager/Alloy/Blackbox), Regel- und Benachrichtigungsfehler (Prometheus + Loki-Ruler), stille Log-Ströme (Alloy tailt eine kritische Datei wie auth.log/audit.log nicht mehr) sowie cAdvisor-Aussetzer, Container-OOM-Kills und CPU-Drosselung ab. Dazu kommen eine Log-Pipeline-Zeile im Meta-Dashboard und korrigierte Scheduled-Job-Alarmtexte, die wieder den echten Job-Namen statt „basetool-backend" zeigen (REQ-OBS-014).
 
