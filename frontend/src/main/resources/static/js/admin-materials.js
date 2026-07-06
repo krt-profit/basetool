@@ -227,6 +227,12 @@ function filterTable(tableId, query) {
     }
 }
 
+// Publish as a window global for the shared filter-table common-handler: common-handlers.js calls
+// window.filterTable(tableId, value) on the search box's input/keyup. A classic-script top-level
+// function declaration is already a global, so this assignment is a behaviour-neutral no-op — it
+// documents the cross-file contract explicitly (mirroring escape-html.js's `root.escapeHtml = …`).
+window.filterTable = filterTable;
+
 function updateMaterial(selectElement) {
     const tr = selectElement.closest('tr');
     const matId = tr.getAttribute('data-mat-id');
