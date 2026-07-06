@@ -242,7 +242,7 @@ services:
   alertmanager:
     <<: *mon-base
     container_name: alertmanager
-    image: quay.io/prometheus/alertmanager:v0.33.0
+    image: quay.io/prometheus/alertmanager:v0.33.1
     cap_drop: [ALL]
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
