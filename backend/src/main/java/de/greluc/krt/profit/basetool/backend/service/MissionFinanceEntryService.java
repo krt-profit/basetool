@@ -24,7 +24,6 @@ import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.MissionMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
-import de.greluc.krt.profit.basetool.backend.model.FinanceType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
@@ -32,6 +31,8 @@ import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryUpdateDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceTotalsDto;
+import de.greluc.krt.profit.basetool.backend.repository.FinanceEntryAggregate;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
@@ -86,26 +87,33 @@ public class MissionFinanceEntryService {
   }
 
   /**
-   * Aggregated bottom line for a mission: finance entries (income minus expense) plus refinery
-   * order profit. Legacy refinery rows with null sales/expenses are treated as 0 — early data
-   * pre-dates the column.
+   * Aggregated finance totals for a mission's summary strip: per-type sum + count of the finance
+   * entries computed by ONE SQL aggregate (never a row load-all) plus the refinery-order
+   * contribution. Under the multi-user mission-page live-update fan-out (ADR-0078) this must not
+   * scale with the ledger size — the previous {@code size=1000} load-all pinned a database
+   * connection per render. Refinery orders are a small, bounded per-mission list: each contributes
+   * its profit ({@code oreSales − expenses − otherExpenses}) to {@link
+   * MissionFinanceTotalsDto#total()} and its raw expenses (where &gt; 0) to the expense bucket,
+   * matching the previous in-frontend summation. Legacy refinery rows with null sales/expenses are
+   * treated as 0.
    *
    * @param missionId mission id
-   * @return signed total in mission credits
+   * @return the finance totals (sums coalesced to zero; expense bucket folds in refinery expenses)
    */
-  public BigDecimal calculateTotalSum(UUID missionId) {
-    List<MissionFinanceEntry> entries = financeEntryRepository.findAllByMissionId(missionId);
-    BigDecimal total = BigDecimal.ZERO;
-    for (MissionFinanceEntry entry : entries) {
-      if (entry.getType() == FinanceType.INCOME) {
-        total = total.add(entry.getAmount());
-      } else if (entry.getType() == FinanceType.EXPENSE) {
-        total = total.subtract(entry.getAmount());
-      }
-    }
+  public MissionFinanceTotalsDto calculateTotals(UUID missionId) {
+    FinanceEntryAggregate agg = financeEntryRepository.aggregateFinanceByMission(missionId);
+    BigDecimal incomeSum = agg.incomeSum() != null ? agg.incomeSum() : BigDecimal.ZERO;
+    long incomeCount = agg.incomeCount() != null ? agg.incomeCount() : 0L;
+    BigDecimal financeExpenseSum = agg.expenseSum() != null ? agg.expenseSum() : BigDecimal.ZERO;
+    long financeExpenseCount = agg.expenseCount() != null ? agg.expenseCount() : 0L;
 
-    // Refinery orders now contribute their profit/loss (oreSales - expenses - otherExpenses)
-    // rather than only their costs. Null values are treated as 0 (legacy-data safety).
+    // Refinery orders are bounded per mission (not the unbounded size=1000 ledger), so
+    // materializing
+    // them stays cheap. Each folds its profit into the signed total and its raw expenses (> 0) into
+    // the expense bucket, exactly as the previous frontend loop did.
+    BigDecimal refineryProfit = BigDecimal.ZERO;
+    BigDecimal refineryExpenseSum = BigDecimal.ZERO;
+    long refineryExpenseCount = 0L;
     List<RefineryOrder> refineryOrders = refineryOrderRepository.findByMissionId(missionId);
     for (RefineryOrder order : refineryOrders) {
       double sales = order.getOreSales() != null ? order.getOreSales() : 0d;
@@ -113,11 +121,34 @@ public class MissionFinanceEntryService {
       double otherCosts = order.getOtherExpenses() != null ? order.getOtherExpenses() : 0d;
       double profit = sales - costs - otherCosts;
       if (profit != 0d) {
-        total = total.add(BigDecimal.valueOf(profit));
+        refineryProfit = refineryProfit.add(BigDecimal.valueOf(profit));
+      }
+      if (costs > 0d) {
+        refineryExpenseSum = refineryExpenseSum.add(BigDecimal.valueOf(costs));
+        refineryExpenseCount++;
       }
     }
 
-    return total;
+    BigDecimal total = incomeSum.subtract(financeExpenseSum).add(refineryProfit);
+    return new MissionFinanceTotalsDto(
+        total,
+        incomeSum,
+        incomeCount,
+        financeExpenseSum.add(refineryExpenseSum),
+        financeExpenseCount + refineryExpenseCount);
+  }
+
+  /**
+   * Signed bottom line for a mission (finance income − expense + refinery profit). Delegates to
+   * {@link #calculateTotals} so the value comes from the SQL aggregate rather than a finance-entry
+   * row load-all. Kept as its own method because {@code /finance-entries/sum} is a separately
+   * published endpoint reused by the operation finance rollup.
+   *
+   * @param missionId mission id
+   * @return signed total in mission credits
+   */
+  public BigDecimal calculateTotalSum(UUID missionId) {
+    return calculateTotals(missionId).total();
   }
 
   /**

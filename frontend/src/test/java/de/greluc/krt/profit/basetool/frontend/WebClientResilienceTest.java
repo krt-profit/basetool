@@ -94,6 +94,9 @@ class WebClientResilienceTest {
                   .setBodyDelay(1, java.util.concurrent.TimeUnit.SECONDS)
                   .setResponseCode(200);
             }
+            if ("/api/v1/throttled".equals(path)) {
+              return new MockResponse().setResponseCode(429).setBody("slow down");
+            }
             return new MockResponse().setResponseCode(404);
           }
         };
@@ -148,6 +151,59 @@ class WebClientResilienceTest {
     }
     int after = server.getRequestCount();
     assertEquals(before, after, "Request should have been short-circuited (no new backend hit)");
+  }
+
+  /**
+   * A 4xx client error (here a 429 rate-limit) must be treated as a per-call client signal, not a
+   * backend-health fault: it is neither retried nor recorded as a circuit-breaker failure. Pins the
+   * fix for the 2026-07-06 429 storm, where the shared {@code backendApi} breaker tripped OPEN on
+   * rate-limit responses and cascaded a partial throttle into a full "Fehler beim Laden" outage
+   * (ADR-0077). The breaker is reset first so an earlier test that tripped it on 5xx cannot mask
+   * the assertion.
+   */
+  @Test
+  void clientError4xx_IsNeitherRetriedNorTripsBreaker() {
+    circuitBreakerRegistry.circuitBreaker("backendApi").reset();
+
+    // (a) A 4xx GET is not retried: exactly one backend hit, not the 1 + 1-retry a 5xx would incur.
+    int beforeSingle = server.getRequestCount();
+    try {
+      publicWebClient.get().uri("/api/v1/throttled").retrieve().toBodilessEntity().block();
+      fail("Expected 429 TooManyRequests");
+    } catch (Exception ignored) {
+      // expected — the 429 surfaces as a WebClientResponseException, not a retry loop
+    }
+    assertEquals(
+        beforeSingle + 1,
+        server.getRequestCount(),
+        "A 4xx must not be retried (one backend hit, not two)");
+
+    // (b) A burst of 4xx must NOT open the breaker: with the fix each 429 is a success, so the
+    // window never fills with failures and a subsequent call still reaches the backend instead of
+    // being short-circuited. (Without the fix, 8 recorded failures would open the 2-call test
+    // window
+    // and the final call would be short-circuited — beforeFinal + 0.)
+    for (int i = 0; i < 8; i++) {
+      try {
+        publicWebClient.get().uri("/api/v1/throttled").retrieve().toBodilessEntity().block();
+      } catch (Exception ignored) {
+        // each 429 is expected
+      }
+    }
+    int beforeFinal = server.getRequestCount();
+    try {
+      publicWebClient.get().uri("/api/v1/throttled").retrieve().toBodilessEntity().block();
+      fail("Expected 429 TooManyRequests, not a circuit-breaker short-circuit");
+    } catch (Exception e) {
+      assertFalse(
+          e.getCause() instanceof CallNotPermittedException
+              || e instanceof CallNotPermittedException,
+          "A 4xx storm must not open the breaker");
+    }
+    assertEquals(
+        beforeFinal + 1,
+        server.getRequestCount(),
+        "After a 4xx storm the call must still reach the backend (breaker stayed CLOSED)");
   }
 
   @Test

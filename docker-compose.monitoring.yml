@@ -200,10 +200,14 @@ services:
     deploy:
       resources:
         limits:
-          # Under active trace ingestion (Keycloak OTLP spans) the monolithic Tempo grew past its
-          # former 256M cap and OOM-cycled every ~minute on the production host (RSS ~326 MB). 512M
-          # holds with headroom on the 16 GB host (data-driven fine-tune tracked in #937).
-          memory: 512M
+          # Under active trace ingestion (Keycloak OTLP spans) the monolithic Tempo OOM-cycles,
+          # flapping the TargetDown liveness alert (Prometheus can't scrape tempo:3200 -> critical
+          # page). History: former 256M cap -> RSS ~326M -> raised to 512M. Then the service-graph
+          # metrics-generator (#1041 item 22a) was enabled, which processes EVERY span to build the
+          # graph and is a significant new memory driver, pushing the working set past 512M and
+          # resuming the OOM flap. Raised 512M -> 1G: the 16 GB host has ample headroom and 1G clears
+          # the metrics-generator working set with margin (data-driven fine-tune tracked in #937).
+          memory: 1G
           pids: 512
     networks:
       - net-monitoring-core

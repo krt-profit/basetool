@@ -319,14 +319,15 @@ resilience4j:
         baseConfig: default
   bulkhead:
     configs:
-      # Bulkhead concurrency raised from 20 to 50: a single mission-detail or hangar render now
-      # fans out to four parallel backend calls (see `ParallelPageLoader`), and under ~10 concurrent
-      # users that puts ~40 in-flight calls competing for the 20-slot gate. Spillover queues behind
-      # `maxWaitDuration: 1s` and surfaces as a slow page render. 50 leaves comfortable headroom for
-      # 12+ concurrent users without queueing while still capping a runaway from saturating the
-      # Reactor-Netty pool (sized at 100 in `WebClientConfig`).
+      # Bulkhead concurrency raised 50 -> 100 to match the Reactor-Netty connection pool (sized at
+      # 100 in `WebClientConfig`). A single mission-detail or hangar render fans out to four parallel
+      # backend calls (see `ParallelPageLoader`), and under heavy mission-planning bursts (plus the
+      # live-update SSE/presence traffic) the 50-slot gate left half the pool unusable and queued
+      # legitimate calls behind `maxWaitDuration: 1s`, surfacing as slow renders. 100 lets callers use
+      # every pooled connection while still capping a runaway: the 101st concurrent call queues at the
+      # gate rather than over-subscribing Netty.
       default:
-        maxConcurrentCalls: 50
+        maxConcurrentCalls: 100
         maxWaitDuration: 1s
     instances:
       backendApi:

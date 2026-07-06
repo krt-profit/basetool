@@ -165,7 +165,13 @@
     };
 
     MissionPresence.prototype._scheduleReconnect = function () {
-        const delay = this.backoff;
+        // Full jitter (mission-scale hardening, ADR-0078 / finding S2 reconnect-storm): a frontend
+        // redeploy or a brief network blip drops the presence socket for ALL viewers of a mission at
+        // once. An un-jittered backoff makes every client reconnect in the same instant and fire its
+        // resync refetch as one synchronized burst against the backend, which could starve the DB
+        // pool and trip the shared circuit breaker into the very outage the resync is meant to
+        // recover from. Spreading the reconnect uniformly across [0, backoff] decorrelates the herd.
+        const delay = Math.random() * this.backoff;
         this.backoff = Math.min(this.backoff * 2, MAX_BACKOFF_MS);
         const self = this;
         setTimeout(function () {

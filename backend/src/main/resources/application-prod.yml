@@ -15,15 +15,21 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD}
     hikari:
       # Production pool sizing — raised from the previous 10/30000 ms defaults after the
-      # performance audit (H-5). Resilience4j's bulkhead caps fan-out at 50 concurrent
+      # performance audit (H-5). Resilience4j's bulkhead caps fan-out at 100 concurrent
       # backend calls (see frontend application.yml) and Tomcat now runs virtual threads,
-      # so 10 JDBC connections starved the pool under ~10 concurrent users. 15 leaves
-      # headroom for the page-render fan-out (ParallelPageLoader issues 4 parallel calls
-      # per mission-detail / hangar render) without inflating idle-connection cost.
-      # connection-timeout 10 s replaces the previous 30 s: long enough to absorb
-      # legitimate transient pool pressure, short enough that a runaway query no longer
-      # makes a fresh request hang for half a minute before failing.
-      maximum-pool-size: 15
+      # so 10 JDBC connections starved the pool under ~10 concurrent users. Raised 15 -> 100
+      # to fully match the 100-slot frontend bulkhead, so even a worst-case multi-user
+      # mission-page live-update refetch burst never queues on the DB funnel -> 500 ->
+      # shared-breaker outage (mission-scale hardening, ADR-0078). This requires the
+      # matching infra change: db-backend Postgres now runs max_connections=150 with a
+      # 1536M RAM limit (docker-compose.yml), so 100 app connections + postgres_exporter +
+      # Flyway + admin sessions all fit with headroom and cannot exhaust the server or OOM
+      # the container. The complementary defences are cutting the per-fragment read fan-out
+      # (the primary fix) and the finance-summary SQL aggregate that stops a 1000-row load-
+      # all from pinning a connection per render. connection-timeout 10 s: long enough to
+      # absorb legitimate transient pool pressure, short enough that a runaway query no
+      # longer makes a fresh request hang for half a minute before failing.
+      maximum-pool-size: 100
       minimum-idle: 2
       connection-timeout: 10000
       idle-timeout: 600000
@@ -76,17 +82,16 @@ app:
     # Enables the JSON/LogstashEncoder appender defined in logback-spring.xml for the prod profile.
     structured-enabled: true
   rate-limit:
-    # Audit finding H-8: the production deployment runs behind nginx-proxy-manager which
-    # presents the immediate peer as a docker-network IP. Without trusting that range, every
-    # request looks like it originates from NPM and the per-IP bucket collapses into a single
-    # global budget. The default Docker bridge network (172.17.0.0/16) plus the user-defined
-    # bridge ranges (172.18.0.0/16 and 172.19.0.0/16 are the typical compose-allocated
-    # ranges) cover the typical compose topology — override via APP_RATE_LIMIT_TRUSTED_PROXIES
-    # if the NPM container sits on a different subnet.
+    # Audit finding H-8: behind nginx-proxy-manager the backend's immediate peer is the frontend
+    # container, both on the compose bridge networks. Every internal bridge is PINNED under
+    # 172.28.0.0/16 (docker-compose.yml, since #974) — NOT the default Docker bridge (172.17.0.0/16).
+    # Trusting the wrong range silently collapses every per-IP bucket onto the single relaying
+    # container IP, degrading the per-user limiter into one shared org-wide budget — exactly the
+    # 2026-07-06 multi-user mission-page outage, where all traffic was attributed to 172.28.3.2 and
+    # a handful of concurrent users exhausted the shared bucket for everyone. This MUST match the
+    # real compose subnet; override via APP_RATE_LIMIT_TRUSTED_PROXIES only if you re-pin the networks.
     trusted-proxies:
-      - 172.17.0.0/16
-      - 172.18.0.0/16
-      - 172.19.0.0/16
+      - 172.28.0.0/16
   security:
     jwt:
       # REQ-SEC-024: opt-in. Fetch the JWKS from the INTERNAL Keycloak (https://keycloak:18443) so

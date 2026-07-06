@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.controller;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryUpdateDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceTotalsDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
@@ -76,6 +77,15 @@ public class MissionFinanceEntryController {
   private static final Set<String> ALLOWED_SORT =
       Set.of("createdAt", "amount", "type", "note", "id");
 
+  /**
+   * Per-endpoint upper bound on the finance-entry list {@code size}, well below the global {@link
+   * PaginationUtil#MAX_PAGE_SIZE}. The mission finance ledger is not a "load-all" surface — the
+   * summary strip reads the SQL aggregate at {@code /finance-entries/summary} instead — so a modest
+   * cap keeps a single render from materializing thousands of rows and pinning a database
+   * connection under the multi-user live-update fan-out (ADR-0078).
+   */
+  private static final int MAX_FINANCE_PAGE_SIZE = 500;
+
   private final MissionFinanceEntryService financeEntryService;
 
   /**
@@ -98,7 +108,8 @@ public class MissionFinanceEntryController {
       @RequestParam(required = false, defaultValue = "20") int size,
       @RequestParam(required = false, defaultValue = "createdAt,desc") String sort) {
     Pageable pageable =
-        PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "createdAt");
+        PaginationUtil.createPageRequest(
+            page, Math.min(size, MAX_FINANCE_PAGE_SIZE), sort, ALLOWED_SORT, "createdAt");
     Page<MissionFinanceEntryDto> entries =
         financeEntryService.getEntriesByMission(missionId, pageable);
     // Audit H-1: canSeeMission (above) blocks cross-squadron reads of internal missions; on top of
@@ -122,6 +133,23 @@ public class MissionFinanceEntryController {
           + " and @ownerScopeService.canSeeMission(#missionId)")
   public BigDecimal getFinanceEntriesSum(@PathVariable UUID missionId) {
     return financeEntryService.calculateTotalSum(missionId);
+  }
+
+  /**
+   * Aggregated finance totals for the mission's summary strip (Gesamtsumme / Einnahmen / Ausgaben /
+   * je Anteil), computed by a single SQL aggregate rather than a ledger load-all (ADR-0078
+   * mission-scale hardening). Carries only sums and counts — no participant PII — so, unlike the
+   * entry list, it needs no redaction.
+   *
+   * @param missionId mission id
+   * @return the mission's finance totals (income/expense sums + counts and the signed total)
+   */
+  @GetMapping("/missions/{missionId}/finance-entries/summary")
+  @PreAuthorize(
+      "isAuthenticated() and @authHelperService.isMemberOrAbove()"
+          + " and @ownerScopeService.canSeeMission(#missionId)")
+  public MissionFinanceTotalsDto getFinanceSummary(@PathVariable UUID missionId) {
+    return financeEntryService.calculateTotals(missionId);
   }
 
   /**

@@ -206,8 +206,20 @@ app:
     enabled: true
     paths:
       - /api/**
-    capacity: 300
-    refillTokens: 300
+    # Global per-IP umbrella over every /api/** call (reads + writes). Sized for a mission manager
+    # actively assembling a large operation: the crew-assignment endpoints
+    # (/api/v1/missions/*/units/*/crew...) are auth-gated (canManageMission) and carry NO dedicated
+    # rule, so this global budget is the ONLY ceiling on rapid crew edits — a per-endpoint rule
+    # could only make them tighter (rule AND global must both pass), never looser. Raised 300 -> 5000
+    # so heavy multi-user mission-page load (many concurrent viewers, live-update reads, crew/
+    # participant edits, rapid check-ins) never trips 429s. Strictly per-IP — the frontend relays the
+    # real client IP via X-Forwarded-For and the backend/frontend trusted-proxies now match the pinned
+    # 172.28.0.0/16 compose subnet (REQ-SEC-011), so this ceiling only ever applies to one legitimate
+    # user and never widens the abuse surface for an IP-rotating attacker (the edge limiter's 20 r/s
+    # per real client IP is the tighter outer cap). Before the trusted-proxies fix this bucket was
+    # collapsed onto a single container IP and shared org-wide — the 2026-07-06 outage.
+    capacity: 5000
+    refillTokens: 5000
     refillPeriod: 1m
     # Audit finding L-5 (2026-05-20): tighter per-endpoint budgets layered on top of the global
     # 300/min/IP bucket. A spam attacker with one fixed IP trips the per-endpoint budget below
@@ -218,45 +230,51 @@ app:
     rules:
       - name: mission-create
         # Anonymous can create missions via POST /api/v1/missions. The endpoint runs a Mission
-        # row insert + index update — heavy enough that 10/min/IP is the right ceiling for a
-        # legitimate public submission flow.
+        # row insert + index update. Raised 10 -> 100/min/IP so legitimate high-volume submission
+        # (e.g. an operator seeding many missions back-to-back) is not throttled; the edge limiter
+        # (20 r/s per IP, REQ-SEC-023) and the global budget still bound outright flooding.
         methods: [POST]
         paths:
           - /api/v1/missions
-        capacity: 10
-        refillTokens: 10
+        capacity: 100
+        refillTokens: 100
         refillPeriod: 1m
       - name: order-create
         # Anonymous can create job orders via POST /api/v1/orders (CLAUDE.md: gewollt). Same
-        # write-heavy profile as the mission create, same cap.
+        # write-heavy profile as the mission create, same cap. Raised 10 -> 100/min/IP.
         methods: [POST]
         paths:
           - /api/v1/orders
-        capacity: 10
-        refillTokens: 10
+        capacity: 100
+        refillTokens: 100
         refillPeriod: 1m
       - name: finance-entry-create
         # Anonymous guest participants can record their own payouts via POST /api/v1/finance-entries.
-        # Slightly higher cap than mission/order because one mission may legitimately accrue 5–10
-        # finance entries during its lifecycle, all created by the same guest IP.
+        # A mission may legitimately accrue many finance entries across its lifecycle, all created by
+        # the same guest IP. Raised 20 -> 200/min/IP; the edge limiter (20 r/s per IP, REQ-SEC-023)
+        # and the global budget still bound outright flooding.
         methods: [POST]
         paths:
           - /api/v1/finance-entries
-        capacity: 20
-        refillTokens: 20
+        capacity: 200
+        refillTokens: 200
         refillPeriod: 1m
       - name: participant-mutations
-        # Covers the anonymous-reachable participant flows: add, slim add, update, check-in,
-        # check-out, payout-preference change, delete (both legacy and /slim variants). A single
-        # legitimate guest goes through join → check-in → maybe a payout flip → check-out — that's
-        # 4–6 calls per mission they participate in. 30/min/IP comfortably covers the human path
-        # while killing a script that tries to spam the participant table.
+        # Covers the participant flows reachable by both anonymous guests and mission managers:
+        # add, slim add, update, check-in, check-out, payout-preference change, delete (legacy and
+        # /slim variants). The tightest realistic load is NOT the lone guest (join -> check-in ->
+        # maybe a payout flip -> check-out ~= 4-6 calls) but a mission manager building out a large
+        # operation's roster in one sitting — bulk-adding dozens of participants and checking them in
+        # back-to-back while assigning crews. 500/min/IP gives that power-user flow ample headroom
+        # while still killing a script that spams the participant table (a human cannot click ~8
+        # participant mutations per second). Raised from 30 (via 120), which was tuned for the
+        # lone-guest path and kept blocking managers mid-roster.
         methods: [POST, PUT, DELETE]
         paths:
           - /api/v1/missions/*/participants
           - /api/v1/missions/*/participants/**
-        capacity: 30
-        refillTokens: 30
+        capacity: 500
+        refillTokens: 500
         refillPeriod: 1m
 
 # Actuator: expose `health` for the Docker HEALTHCHECK / docker-compose

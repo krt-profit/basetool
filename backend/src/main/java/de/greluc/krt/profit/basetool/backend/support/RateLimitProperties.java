@@ -42,8 +42,10 @@ import org.springframework.validation.annotation.Validated;
  * a token left or the request is rejected with 429.
  *
  * <p>{@code trustedProxies} controls whether the filter honors {@code X-Forwarded-For} from a
- * reverse proxy. The defaults (300 tokens, refilled 300/min) are tuned for the project's typical
- * mission-planning workload — adjust per environment, not via global wildcards.
+ * reverse proxy. The defaults (5000 tokens, refilled 5000/min) are tuned for the project's typical
+ * mission-planning workload, including a mission manager rapidly assembling a large operation's
+ * crew and participant roster (the auth-gated crew endpoints rely on this global budget) — adjust
+ * per environment, not via global wildcards.
  *
  * <p>Lives in the dependency-leaf {@code support} package (not {@code config}) so the {@code
  * filter} layer can read it without a {@code filter} &rarr; {@code config} package cycle; it
@@ -62,11 +64,11 @@ public class RateLimitProperties {
 
   /** Bucket capacity (max tokens). */
   @Min(1)
-  private int capacity = 300;
+  private int capacity = 5000;
 
   /** Tokens refilled per period. */
   @Min(1)
-  private int refillTokens = 300;
+  private int refillTokens = 5000;
 
   /** Refill period. */
   @NotNull private Duration refillPeriod = Duration.ofMinutes(1);

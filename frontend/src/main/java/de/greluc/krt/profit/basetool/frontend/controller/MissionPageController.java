@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.JobTypeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionCrewDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceEntryDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceTotalsDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFrequencyDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionListDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto;
@@ -126,6 +127,15 @@ public class MissionPageController {
   private static final ParameterizedTypeReference<PageResponse<MissionFinanceEntryDto>>
       MISSION_FINANCE_ENTRY_PAGE =
           new ParameterizedTypeReference<PageResponse<MissionFinanceEntryDto>>() {};
+
+  /**
+   * Page size for the mission-detail finance ENTRIES table (ADR-0078). The summary strip reads its
+   * totals from the SQL aggregate at {@code /finance-entries/summary}, so the table itself only
+   * needs a bounded page instead of the previous {@code size=1000} load-all — keeping a finance
+   * render from materializing thousands of rows under the multi-user live-update fan-out. The
+   * backend independently caps the endpoint at 500.
+   */
+  private static final int FINANCE_TABLE_PAGE_SIZE = 200;
 
   /** Response type for the {@code /api/v1/refinery-orders/mission/{id}} order-list read. */
   private static final ParameterizedTypeReference<List<RefineryOrderListDto>> REFINERY_ORDER_LIST =
@@ -351,6 +361,22 @@ public class MissionPageController {
       MissionDto mission =
           backendApiClient.get("/api/v1/missions/" + id, MISSION, authHelperService.isAnonymous());
 
+      // Fragment-gated reads (mission-scale hardening, ADR-0078): an in-place section refetch
+      // (GET /missions/{id}?fragment=X) must issue ONLY the backend reads its own fragment renders,
+      // not the full page's ~8-read fan-out. Without this, one peer's live-update refetch of e.g.
+      // the crew board still pulled the finance ledger (size=1000) + manager pickers, so a
+      // 200-viewer save burst multiplied into thousands of backend GETs, starved the DB pool and
+      // tripped the shared circuit breaker into a fleet-wide outage. `fullRender` (the top-level
+      // page load) keeps fetching everything; a fragment fetches only its slice. The attribute->
+      // fragment mapping is verified against mission-detail.html (finance attrs -> financeSection,
+      // allUsers/ownerOptions -> mgmtPanels, unitShipOptions -> unit modals) so a skipped read is
+      // never dereferenced by the fragment actually rendered.
+      final boolean fullRender = fragment == null;
+      final String frag = fullRender ? null : fragment.toLowerCase(java.util.Locale.ROOT);
+      final boolean needMgmt = fullRender || "mgmt".equals(frag);
+      final boolean needCrewBoard = fullRender || "crew-board".equals(frag);
+      final boolean needFinance = fullRender || "finance".equals(frag);
+
       // Sort participants and build groupings
       List<MissionParticipantDto> participants = new java.util.ArrayList<>(mission.participants());
       participants.sort(
@@ -535,8 +561,11 @@ public class MissionPageController {
       model.addAttribute("frequencyByTypeId", frequencyByTypeId);
       model.addAttribute("customFrequencies", customFrequencies);
 
-      // Fetch all users for manager selection
-      if (!authHelperService.isAnonymous()) {
+      // Fetch users + owner picker for the Verwaltung (mgmt) panel ONLY — the manager/owner selects
+      // live in the mgmtPanels fragment, so a crew/finance/overview/steps/... refetch does not need
+      // them (fragment-gating, see fullRender note above). Default to empty lists when skipped so a
+      // stray reference never NPEs.
+      if (!authHelperService.isAnonymous() && needMgmt) {
         try {
           List<UserReferenceDto> allUsers =
               backendApiClient.get("/api/v1/users/lookup", USER_REFERENCE_LIST, false);
@@ -547,6 +576,9 @@ public class MissionPageController {
         // Owning-org-unit reassignment picker (REQ-ORG-018): the caller's assignable org units feed
         // the Verwaltung "Verantwortliche Einheit" control, mirroring the create-form owner-picker.
         model.addAttribute("ownerOptions", fetchCallerMembershipOptions(principal));
+      } else {
+        model.addAttribute("allUsers", List.of());
+        model.addAttribute("ownerOptions", List.of());
       }
 
       if (!model.containsAttribute("missionForm")) {
@@ -581,7 +613,10 @@ public class MissionPageController {
       addFormsToModel(model, principal);
       addOperationsToModel(model, authHelperService.isAnonymous());
 
-      model.addAttribute("roundingMode", fetchRoundingMode(authHelperService.isAnonymous()));
+      // roundingMode only feeds the finance/refinery display; skip its backend read for non-finance
+      // fragment refetches. The "UP" default matches fetchRoundingMode's own fallback.
+      model.addAttribute(
+          "roundingMode", needFinance ? fetchRoundingMode(authHelperService.isAnonymous()) : "UP");
 
       // Fetch Mission JobTypes
       try {
@@ -645,8 +680,10 @@ public class MissionPageController {
         // OrgUnit-scoped hangar: it returns ships of registered participants (any OrgUnit) plus
         // ships already assigned to a unit. Only fetched when the caller may edit the mission —
         // otherwise the modals don't render and the endpoint would 403.
+        // unit-ship-options only populates the unit add/edit modals (crew board area); skip its
+        // backend read for finance/mgmt/overview/steps/... fragment refetches.
         Boolean canEdit = mission.canEdit();
-        if (canEdit != null && canEdit) {
+        if (canEdit != null && canEdit && needCrewBoard) {
           try {
             List<ShipDto> unitShipOptions =
                 backendApiClient.get(
@@ -670,86 +707,66 @@ public class MissionPageController {
       // mission's payout view). A guest is treated like an anonymous visitor here: the backend
       // would reject these reads with 403 anyway, and skipping them keeps the "Finanzen" panel
       // empty/collapsed instead of leaking refinery expenses through the shared finance table.
-      if (authHelperService.isMemberOrAbove()) {
+      if (authHelperService.isMemberOrAbove() && needFinance) {
         try {
-          // The three reads are independent per-mission lookups; run them concurrently instead of
-          // back to back. join() below surfaces any supplier failure as a CompletionException,
-          // caught and unwrapped by the block's catch. Two deliberate differences from the old
-          // serial code: (1) all three GETs are always dispatched, whereas serially a failure on
-          // the first short-circuited the rest — harmless, as these are idempotent reads; (2) on a
-          // failure of any one read the whole Finanzen panel now collapses to its empty state,
-          // whereas the serial code added financeEntries to the model before the later reads and so
-          // could still render the entries table when only the sum/refinery read failed. The
-          // all-or-nothing panel is the intended outcome here.
-          CompletableFuture<PageResponse<MissionFinanceEntryDto>> financesFuture =
+          // ADR-0078 mission-scale hardening: the summary strip reads its totals from a single
+          // backend SQL aggregate (/finance-entries/summary) instead of loading the whole ledger
+          // and
+          // summing in Java, and the entries table is bounded to a page instead of size=1000. Under
+          // the multi-user live-update fan-out this stops a finance render from pinning a DB
+          // connection on a thousand-row query. The three reads are independent per-mission lookups
+          // run concurrently; on any failure the whole Finanzen panel collapses to its empty state.
+          CompletableFuture<MissionFinanceTotalsDto> totalsFuture =
               parallelPageLoader.loadAsync(
                   () ->
                       backendApiClient.get(
-                          "/api/v1/missions/" + id + "/finance-entries?size=1000",
-                          MISSION_FINANCE_ENTRY_PAGE,
+                          "/api/v1/missions/" + id + "/finance-entries/summary",
+                          MissionFinanceTotalsDto.class,
                           false));
-          CompletableFuture<java.math.BigDecimal> financeSumFuture =
+          CompletableFuture<PageResponse<MissionFinanceEntryDto>> entriesFuture =
               parallelPageLoader.loadAsync(
                   () ->
                       backendApiClient.get(
-                          "/api/v1/missions/" + id + "/finance-entries/sum",
-                          java.math.BigDecimal.class,
+                          "/api/v1/missions/"
+                              + id
+                              + "/finance-entries?size="
+                              + FINANCE_TABLE_PAGE_SIZE,
+                          MISSION_FINANCE_ENTRY_PAGE,
                           false));
           CompletableFuture<List<RefineryOrderListDto>> refineryFuture =
               parallelPageLoader.loadAsync(
                   () ->
                       backendApiClient.get(
                           "/api/v1/refinery-orders/mission/" + id, REFINERY_ORDER_LIST, false));
-          CompletableFuture.allOf(financesFuture, financeSumFuture, refineryFuture).join();
+          CompletableFuture.allOf(totalsFuture, entriesFuture, refineryFuture).join();
 
-          PageResponse<MissionFinanceEntryDto> financesPage = financesFuture.join();
-          model.addAttribute("financeEntries", financesPage.content());
-
-          java.math.BigDecimal financeSum = financeSumFuture.join();
-          model.addAttribute("financeSum", financeSum);
-
-          List<RefineryOrderListDto> refineryOrders = refineryFuture.join();
-          model.addAttribute("refineryOrders", refineryOrders);
-
-          // Finance tab summary strip (Gesamtsumme / Einnahmen / Ausgaben / je Anteil): income
-          // and expense buckets aggregate the manual ledger entries; refinery-order expenses are
-          // the automatic "auto" rows and therefore count into the expense bucket as well.
-          java.math.BigDecimal incomeSum = java.math.BigDecimal.ZERO;
-          java.math.BigDecimal expenseSum = java.math.BigDecimal.ZERO;
-          int incomeCount = 0;
-          int expenseCount = 0;
-          for (MissionFinanceEntryDto entry : financesPage.content()) {
-            if (entry.type() != null && "INCOME".equals(entry.type().name())) {
-              incomeSum = incomeSum.add(entry.amount());
-              incomeCount++;
-            } else if (entry.type() != null) {
-              expenseSum = expenseSum.add(entry.amount());
-              expenseCount++;
-            }
-          }
-          if (refineryOrders != null) {
-            for (RefineryOrderListDto order : refineryOrders) {
-              if (order.expenses() != null && order.expenses() > 0) {
-                expenseSum = expenseSum.add(java.math.BigDecimal.valueOf(order.expenses()));
-                expenseCount++;
-              }
-            }
-          }
-          model.addAttribute("financeIncomeSum", incomeSum);
-          model.addAttribute("financeExpenseSum", expenseSum);
-          model.addAttribute("financeIncomeCount", incomeCount);
-          model.addAttribute("financeExpenseCount", expenseCount);
+          // Summary strip (Gesamtsumme / Einnahmen / Ausgaben / je Anteil) straight from the
+          // aggregate — the expense figures already fold in refinery-order expenses backend-side.
+          MissionFinanceTotalsDto totals = totalsFuture.join();
+          model.addAttribute("financeSum", totals.total());
+          model.addAttribute("financeIncomeSum", totals.incomeSum());
+          model.addAttribute("financeExpenseSum", totals.expenseSum());
+          model.addAttribute("financeIncomeCount", totals.incomeCount());
+          model.addAttribute("financeExpenseCount", totals.expenseCount());
           Integer registered = mission.registeredParticipants();
           model.addAttribute(
               "financePerShare",
-              (financeSum != null && registered != null && registered > 0)
-                  ? financeSum.divide(
-                      java.math.BigDecimal.valueOf(registered), 0, java.math.RoundingMode.HALF_UP)
+              (totals.total() != null && registered != null && registered > 0)
+                  ? totals
+                      .total()
+                      .divide(
+                          java.math.BigDecimal.valueOf(registered),
+                          0,
+                          java.math.RoundingMode.HALF_UP)
                   : null);
+
+          // Bounded entries table + the (small, bounded) refinery-order list for the ledger table.
+          model.addAttribute("financeEntries", entriesFuture.join().content());
+          model.addAttribute("refineryOrders", refineryFuture.join());
         } catch (Exception e) {
           // join() reports a supplier failure wrapped in a CompletionException; log its concrete
-          // cause so the line still names the real backend exception, as the serial code did. Other
-          // failures in this block (e.g. the aggregation loop) are logged as-is.
+          // cause so the line still names the real backend exception. Any failure collapses the
+          // whole Finanzen panel to its empty state.
           Throwable cause =
               (e instanceof java.util.concurrent.CompletionException && e.getCause() != null)
                   ? e.getCause()
@@ -779,8 +796,10 @@ public class MissionPageController {
     // NOT the Keycloak UUID. We must use principal.getSubject() to get the sub (UUID) that matches
     // p.user.id in the participant list.
     model.addAttribute("authUserId", principal != null ? principal.getSubject() : null);
-    // In-place AJAX swap (epic #571): re-render only the section the caller mutated. The full model
-    // is already built above, so each fragment renders with every attribute it needs.
+    // In-place AJAX swap (epic #571): re-render only the section the caller mutated. The model is
+    // built fragment-gated above (see fullRender), so each fragment renders with exactly the
+    // attributes its own section needs — a section refetch no longer pays the full page's read
+    // fan-out (ADR-0078).
     if (fragment != null) {
       return switch (fragment.toLowerCase(java.util.Locale.ROOT)) {
         case "crew-board" -> "mission-detail :: crewBoard";

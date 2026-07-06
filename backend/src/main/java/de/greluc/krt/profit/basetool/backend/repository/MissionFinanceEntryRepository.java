@@ -43,6 +43,30 @@ public interface MissionFinanceEntryRepository extends JpaRepository<MissionFina
   /** Returns every entity matching the derived {@code findAllByMissionIdIn} criteria. */
   List<MissionFinanceEntry> findAllByMissionIdIn(List<UUID> missionIds);
 
+  /**
+   * Aggregates a mission's finance entries into per-type sum + count in ONE grouped query, so the
+   * finance summary strip and the total-sum endpoint no longer materialize every row. Under the
+   * multi-user mission-page live-update fan-out (ADR-0078) the previous {@code size=1000} load-all
+   * pinned a database connection per render and, at 200 viewers, starved the pool. A SQL {@code
+   * SUM} over an empty set is {@code NULL}, so the aggregate's sums may be {@code null} (no entry
+   * of that type); the caller coalesces them to zero. Counts are never {@code null} (0 when none).
+   *
+   * @param missionId mission id
+   * @return per-type sum/count aggregate; sums may be {@code null}, counts are 0 when none
+   */
+  @Query(
+      "select new de.greluc.krt.profit.basetool.backend.repository.FinanceEntryAggregate("
+          + "sum(case when e.type ="
+          + " de.greluc.krt.profit.basetool.backend.model.FinanceType.INCOME then e.amount end),"
+          + " count(case when e.type ="
+          + " de.greluc.krt.profit.basetool.backend.model.FinanceType.INCOME then 1 end),"
+          + " sum(case when e.type ="
+          + " de.greluc.krt.profit.basetool.backend.model.FinanceType.EXPENSE then e.amount end),"
+          + " count(case when e.type ="
+          + " de.greluc.krt.profit.basetool.backend.model.FinanceType.EXPENSE then 1 end))"
+          + " from MissionFinanceEntry e where e.mission.id = :missionId")
+  FinanceEntryAggregate aggregateFinanceByMission(@Param("missionId") UUID missionId);
+
   /** Derived Spring-Data delete - removes every row matching {@code MissionIdIn}. */
   @Modifying
   @Query("DELETE FROM MissionFinanceEntry m WHERE m.mission.id IN :missionIds")

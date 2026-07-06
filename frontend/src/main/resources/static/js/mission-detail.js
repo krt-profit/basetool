@@ -1958,6 +1958,20 @@ document.addEventListener('DOMContentLoaded', function () {
                 sectionKey: 'participant',
             });
             if (res.ok) {
+                // Propagate the fresh @Version from the slim response to EVERY container/button for
+                // this participant synchronously, BEFORE the async fragment refetch lands. Without
+                // this, a rapid follow-up edit of the same participant (its modal opened from a
+                // button still showing the pre-check-in data-version) would echo a stale version and
+                // self-409 on the user's own sequential edits (mission-scale hardening: S1
+                // participant self-409). The check-in/out /ajax proxy returns the participant DTO.
+                const dto = res.body;
+                if (dto && dto.version !== undefined && dto.version !== null && window.krtFetch) {
+                    document
+                        .querySelectorAll('[data-participant-id="' + pId + '"]')
+                        .forEach(function (c) {
+                            window.krtFetch.syncVersion(c, dto.version);
+                        });
+                }
                 window.krtRefreshMissionSection(['crew', 'finance']);
             }
         });
@@ -2492,10 +2506,19 @@ async function changeMissionOwningOrgUnit() {
         return;
     }
     const rawValue = select.value;
-    // Empty value = the "Keine" option → ownerless target (null).
+    // Empty value = the "Keine" option → ownerless target (null). The target is captured at click
+    // time (the user's intent), but the owningOrgUnitVersion is read LAZILY inside the payload thunk
+    // below — mirroring the steps/objectives stepsVersion() pattern — so a rapid second reassignment
+    // picks up the version the first write bumped instead of the stale one that would otherwise be
+    // baked in here before the async mgmt refetch has repainted the row.
     const owningOrgUnitId = rawValue && rawValue.trim() !== '' ? rawValue.trim() : null;
-    const versionAttr = row.getAttribute('data-owning-org-unit-version');
-    const version = versionAttr != null && versionAttr !== '' ? parseInt(versionAttr, 10) : 0;
+    // Re-reads the dedicated owningOrgUnit section counter from the LIVE #owning-org-unit-row at the
+    // moment the seam sends the write (inside the serialized section:owningOrgUnit task).
+    const currentOwningOrgUnitVersion = function () {
+        const liveRow = document.getElementById('owning-org-unit-row');
+        const attr = liveRow ? liveRow.getAttribute('data-owning-org-unit-version') : null;
+        return attr != null && attr !== '' ? parseInt(attr, 10) : 0;
+    };
 
     const confirmed = await window.showKrtConfirm(
         MSG_CONFIRM_OWNING_ORG_UNIT_CHANGE,
@@ -2521,26 +2544,41 @@ async function changeMissionOwningOrgUnit() {
         }
         const cleanMissionId = String(currentMissionId).trim();
 
-        const result = await window.krtMissionWrite({
+        await window.krtMissionWrite({
             method: 'PUT',
             url: `/missions/${cleanMissionId}/owning-org-unit/ajax`,
-            payload: { owningOrgUnitId: owningOrgUnitId, version: version },
+            payload: function () {
+                return { owningOrgUnitId: owningOrgUnitId, version: currentOwningOrgUnitVersion() };
+            },
             sectionKey: 'owningOrgUnit',
+            onSuccess: function (dto) {
+                // Write the bumped owningOrgUnitVersion straight back from the response DTO before
+                // the serialized section:owningOrgUnit chain releases the next queued write, so a
+                // rapid back-to-back reassignment reads the fresh version instead of self-409ing on
+                // the stale one the async mgmt refetch below has not repainted yet.
+                if (dto && dto.owningOrgUnitVersion != null) {
+                    const liveRow = document.getElementById('owning-org-unit-row');
+                    if (liveRow) {
+                        liveRow.setAttribute(
+                            'data-owning-org-unit-version',
+                            String(dto.owningOrgUnitVersion),
+                        );
+                    }
+                }
+                // Repaint the sticky-header owning-squadron badge for the acting user straight from
+                // the DTO — it lives outside every swap container.
+                if (dto) {
+                    updateMissionHeadOrgBadge(dto.owningSquadron);
+                }
+                // Re-render the management panel in place (read-only value, dropdown selection,
+                // bumped owningOrgUnitVersion) and broadcast it to peers (REQ-FE-010): the overview
+                // fragment's krt:swapped listener repaints peers' badges from #overview-head-meta.
+                window.krtRefreshMissionSection('mgmt');
+                if (window.krtNotifyMissionChanged) {
+                    window.krtNotifyMissionChanged('overview');
+                }
+            },
         });
-        if (result.ok) {
-            if (result.body) {
-                updateMissionHeadOrgBadge(result.body.owningSquadron);
-            }
-            // Re-render the management panel in place (read-only value, dropdown selection, bumped
-            // owningOrgUnitVersion) and broadcast it to peers (REQ-FE-010). The owning-squadron badge
-            // lives in the sticky header outside every swap container: the actor patched it locally
-            // above, so signal peers to re-render the overview fragment, whose krt:swapped listener
-            // repaints their badge from #overview-head-meta.
-            window.krtRefreshMissionSection('mgmt');
-            if (window.krtNotifyMissionChanged) {
-                window.krtNotifyMissionChanged('overview');
-            }
-        }
     } catch (err) {
         showFrontendErrorToast(
             `${typeof MSG_ERROR_OWNING_ORG_UNIT_CHANGE !== 'undefined' ? MSG_ERROR_OWNING_ORG_UNIT_CHANGE : 'Fehler beim Ändern der verantwortlichen Einheit'} (Error: ${err.message})`,

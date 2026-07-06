@@ -191,19 +191,41 @@ public class WebClientConfig {
       SslContext sslContext = builder.build();
       boolean disableHostnameVerification = pinnedTrust;
 
-      // Pool sized at 100 connections: a single mission-detail render now fans out to four
-      // parallel backend calls via `ParallelPageLoader`, so ~25 concurrent users can exhaust a
-      // 50-slot pool. 100 gives comfortable headroom; the `pendingAcquireTimeout` is raised in
-      // step from 5 s to 10 s so a transient backend slowdown queues rather than failing fast,
-      // which the page render cannot recover from gracefully. Idle/life timeouts unchanged.
-      reactor.netty.resources.ConnectionProvider provider =
-          reactor.netty.resources.ConnectionProvider.builder("frontend-pool")
-              .maxConnections(100)
-              .maxIdleTime(java.time.Duration.ofSeconds(20))
-              .maxLifeTime(java.time.Duration.ofSeconds(60))
-              .pendingAcquireTimeout(java.time.Duration.ofSeconds(10))
-              .evictInBackground(java.time.Duration.ofSeconds(10))
-              .build();
+      // The connection pool differs by traffic shape: request/response traffic reuses a bounded
+      // pool, while the SSE relay needs a far larger one because each live stream holds its
+      // connection for the whole time the viewer's page is open (ADR-0078 scale-hardening).
+      final reactor.netty.resources.ConnectionProvider provider;
+      if (streaming) {
+        // SSE relay pool. Each viewing browser holds one long-lived (~30-min) frontend->backend
+        // stream for as long as its page is open, and a streaming connection is never returned to
+        // the pool until the stream ends -- so maxConnections here is a hard ceiling on *concurrent
+        // live viewers*, not a connection-reuse cap. At the request pool's 100 the 101st concurrent
+        // viewer's relay would block on pendingAcquireTimeout and then fail, silently dropping that
+        // user's live notification push. Sized at 1000 so a full mission audience (200+ viewers)
+        // has ample headroom on the 16 GB host; mostly-idle long-lived TCP sockets are cheap. No
+        // maxLifeTime: a 30-minute stream must never be treated as "too old" to keep alive.
+        provider =
+            reactor.netty.resources.ConnectionProvider.builder("frontend-sse-pool")
+                .maxConnections(1000)
+                .maxIdleTime(java.time.Duration.ofSeconds(30))
+                .pendingAcquireTimeout(java.time.Duration.ofSeconds(10))
+                .evictInBackground(java.time.Duration.ofSeconds(30))
+                .build();
+      } else {
+        // Request/response pool sized at 100 connections: a single mission-detail render now fans
+        // out to four parallel backend calls via `ParallelPageLoader`, so ~25 concurrent users can
+        // exhaust a 50-slot pool. 100 gives comfortable headroom; the `pendingAcquireTimeout` is
+        // raised from 5 s to 10 s so a transient backend slowdown queues rather than failing fast,
+        // which the page render cannot recover from gracefully. Idle/life timeouts unchanged.
+        provider =
+            reactor.netty.resources.ConnectionProvider.builder("frontend-pool")
+                .maxConnections(100)
+                .maxIdleTime(java.time.Duration.ofSeconds(20))
+                .maxLifeTime(java.time.Duration.ofSeconds(60))
+                .pendingAcquireTimeout(java.time.Duration.ofSeconds(10))
+                .evictInBackground(java.time.Duration.ofSeconds(10))
+                .build();
+      }
 
       HttpClient httpClient =
           HttpClient.create(provider)
@@ -276,15 +298,26 @@ public class WebClientConfig {
 
     return (request, next) ->
         next.exchange(request)
-            // Map HTTP 4xx/5xx to exceptions BEFORE applying resilience operators,
-            // so Retry/CircuitBreaker can react properly
+            // Surface ONLY 5xx server errors to the resilience operators below. A 4xx is a
+            // client-side signal — a 429 rate-limit, a 404, a 409 conflict — NOT a backend-health
+            // fault: retrying it wastes the budget (and for 429 ignores Retry-After, piling load
+            // onto an already-throttled backend), and recording it as a circuit-breaker failure
+            // would trip the shared 'backendApi' breaker OPEN and cascade a per-request client
+            // error
+            // into a total frontend outage (the 429 storm of 2026-07-06, ADR-0077). 4xx responses
+            // therefore pass through untouched; retrieve() turns them into a
+            // WebClientResponseException
+            // downstream, where handleWebClientException maps each to its proper per-call
+            // user-facing
+            // result. Transport failures (timeout, connection reset) already arrive as errors and
+            // still reach the operators. Mirrors the ingest gateway's breaker, which likewise never
+            // opens on an HTTP status error.
             .flatMap(
                 resp -> {
-                  if (resp.statusCode().is4xxClientError()
-                      || resp.statusCode().is5xxServerError()) {
+                  if (resp.statusCode().is5xxServerError()) {
                     return resp.createException().flatMap(Mono::error);
                   }
-                  return reactor.core.publisher.Mono.just(resp);
+                  return Mono.just(resp);
                 })
             // Apply operators (order: bulkhead -> timeLimiter -> retry -> circuitBreaker)
             // Retry before CB so all retry attempts are executed against backend;

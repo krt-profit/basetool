@@ -68,7 +68,11 @@ or check-in change never leaves the bar stale (REQ-FE-010). The four tabs:
 2. **Teilnehmer & Einheiten** — the crew board (REQ-MISSION-005).
 3. **Finanzen & Auszahlung** — summary strip + finance ledger (member+ gate unchanged), payout
    table (public; participation % authenticated-only), and the Wirtschaft `<details>` sections
-   (authenticated + data-present gates unchanged).
+   (authenticated + data-present gates unchanged). The summary strip's totals come from a single
+   aggregate endpoint (`GET /api/v1/missions/{id}/finance-entries/summary`, same member+ /
+   `canSeeMission` gate as the ledger), and the ledger table is fetched as a bounded page rather than
+   loading every entry — so a live-update finance render costs one small query, not a full-ledger
+   load-all (ADR-0078).
 4. **Verwaltung** — role-gated (`canEdit` or `canManageManagers`); hidden otherwise. The left column is
    the mission **details** form (the "Link zum Kalendereintrag" sits **last**, after the actual
    start/end); the right column stacks four cards in the order **Ziele → Ablauf → Organisation →
