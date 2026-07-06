@@ -8,6 +8,8 @@
 
 ### Changed
 
+- **Monitoring: Loki-Ingest-Trend im Meta-Dashboard auf ein 7-Tage-Fenster geglättet.** Das Panel „Loki ingest bytes trend" im Meta-Monitoring-Dashboard mittelt die Ingest-Rate jetzt über 7 statt über 1 Tag, damit der mehrwöchige Wachstumstrend hinter dem 31-Tage-Log-Retention-Footprint sichtbar wird statt der Tagesschwankung (#1041 Item 25).
+
 - **Monitoring: Alloy-Speicherlimit von 192M auf 256M angehoben und `GOMEMLIMIT` gesetzt.** Der Working Set des Alloy-Containers kroch langsam gegen das zu knappe 192M-Limit (dauerhaft ~94 %), was einen OOM-Kill und damit eine Lücke im Log-/Trace-Versand riskierte. Das Limit bekommt jetzt echten Puffer, und `GOMEMLIMIT=230MiB` lässt die Go-Garbage-Collection Speicher zurückgeben, bevor das cgroup-Limit erreicht wird. Greift beim nächsten Deploy (Alloy wird neu erstellt).
 
 - **Technisch: Inline-JavaScript der restlichen Admin-Seiten in statische Module ausgelagert.** Das JavaScript der Admin-Seiten für Discord-Registrierungen, Orte, die Systemnachricht, die Synchronisationsberichte und die Spezialkommando-Detailseite (In-Place-Freigabe/Ablehnung, Sichtbarkeits- und Home-Location-Schalter, Namensfilter, Speichern/Löschen, Berichte-Bereinigung und Mitgliederverwaltung) wurde ohne Verhaltensänderung aus den Thymeleaf-Vorlagen in browser-zwischenspeicherbare, lint- und formatierbare Dateien unter `static/js/` verlagert; die lokalisierten Meldungstexte bleiben als schlanke Inline-Bootstraps erhalten (ADR-0069).
