@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **Technisch: Inline-JavaScript der Admin-Einstellungsseite in ein statisches Modul ausgelagert.** Das JavaScript der Admin-Einstellungen (die Staffel-Schalter für Beförderungssystem und Profit-Berechtigung, der Spezialkommando-Profit-Schalter sowie das In-Place-Speichern der allgemeinen Einstellungen) wurde ohne Verhaltensänderung aus der Thymeleaf-Vorlage in eine browser-zwischenspeicherbare, lint- und formatierbare Datei unter `static/js/` verlagert; die lokalisierten Meldungstexte bleiben als schlanker Inline-Bootstrap erhalten (ADR-0069).
+
 - **Technisch: Inline-JavaScript der Operations-Detailseite in ein statisches Modul ausgelagert.** Das JavaScript der Operations-Detailseite (Tab-Umschaltung, Markdown-Editor mit Vorschau, In-Place-Speichern und -Löschen der Operation sowie der Auszahlungs-Bezahlt-Schalter) wurde ohne Verhaltensänderung aus der Thymeleaf-Vorlage in eine browser-zwischenspeicherbare, lint- und formatierbare Datei unter `static/js/` verlagert; die interpolierten Werte (Operations-ID und lokalisierte Meldungstexte) bleiben als schlanker Inline-Bootstrap erhalten (ADR-0069).
 
 - **Technisch: Restliches Inline-JavaScript der Operationen-Übersicht in ein statisches Modul ausgelagert.** Das noch inline verbliebene JavaScript der Operationen-Übersicht (Lösch-Bestätigungsdialog sowie das In-Place-Anlegen und -Löschen von Operationen) wurde ohne Verhaltensänderung aus der Thymeleaf-Vorlage in eine browser-zwischenspeicherbare, lint- und formatierbare Datei unter `static/js/` verlagert; die lokalisierten Meldungstexte bleiben als schlanker Inline-Bootstrap erhalten (ADR-0069).
