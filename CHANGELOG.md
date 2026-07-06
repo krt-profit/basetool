@@ -36,6 +36,8 @@
 
 ### Fixed
 
+- **Monitoring: „Spring Boot apps"-Dashboard zeigte bei Auswahl „All" keine Daten.** Die Panels filterten das `application`-Label mit exaktem Vergleich, den der von „All" erzeugte Regex-Wert nie erfüllte. Die Abfragen nutzen jetzt den Regex-Vergleich und gruppieren zusätzlich nach `application`, sodass „All" eine Kurve pro Modul zeigt statt beide JVMs zu vermischen.
+
 - **Release: `production`-Umgebung auf der GitHub-Startseite zeigte dauerhaft „Inactive".** Der `promote`-Workflow band das `production`-Environment an die 5er-Modul-Matrix, wodurch jeder Lauf fünf Deployment-Datensätze erzeugte; GitHubs `auto_inactive` setzte vier davon auf „inactive", und das Umgebungs-Widget auf der Repo-Startseite griff einen inaktiven heraus. Das Freigabe-Gate sitzt jetzt auf einem eigenen `approve`-Job, sodass pro Lauf genau ein Deployment entsteht und die Umgebung als „Active" angezeigt wird. Das Reviewer-Gate (REQ-OPS-002) bleibt unverändert.
 
 - **Raffinerie – Einlagern-Fenster zeigte den SCU-Hinweis auch bei stückweise gezählten Materialien.** Im Einlagern-Fenster eines Raffinerieauftrags erschien der SCU-Nachkommastellen-Hinweis („?") an jeder Materialzeile, auch bei stückweise (PIECE) gezählten Ausgabematerialien. Ursache war die Thymeleaf-Attributreihenfolge (`th:replace` läuft vor `th:if`), die die SCU-Bedingung überging. Der Hinweis erscheint jetzt nur noch bei SCU-Zeilen (REQ-INV-001). Dieselbe Attributreihenfolge-Falle wurde vorsorglich in zwei weiteren Vorlagen entschärft (Einsatz-Crew-Board, `<head>`-Zusatzlinks) – ohne sichtbare Verhaltensänderung.
