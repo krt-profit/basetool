@@ -55,6 +55,28 @@ groups:
           summary: "External fetch errors ({{ $labels.source }})"
           description: "The {{ $labels.source }} client swallowed more than 3 fetch/parse errors in 6 hours — the catalogue sync may be silently importing nothing while still recording a success. Check the upstream API and the sync logs."
 
+      # (#1041 item 2) Zero-item catalogue outage. An upstream that returns empty 200s processes NO
+      # rows, yet the sweep still "succeeds" and last_success stays fresh — so ExternalSyncStale never
+      # fires and ExternalFetchErrors stays quiet (an empty 200 is not a fetch error). basetool_
+      # scheduled_job_items_total is populated from the same per-run tallies as the sync-report
+      # summary (UexItemSyncService upserts / the five SC-Wiki step counts). A 48h flatline at zero
+      # while the job keeps succeeding means the catalogue is silently importing nothing. The `and on
+      # (exported_job)` guard matches the two series solely on the job name (their __name__/instance
+      # labels differ). The items series only exists once a counting run has recorded it, so this
+      # cannot fire before the job's first successful run.
+      # baseline-tune: 48h zero-items window is the issue's initial threshold (daily sync cadence).
+      - alert: SyncZeroItems
+        expr: |
+          increase(basetool_scheduled_job_items_total{exported_job=~"uex_sync|scwiki_sync"}[48h]) == 0
+          and on (exported_job)
+          (time() - basetool_scheduled_job_last_success_timestamp_seconds{exported_job=~"uex_sync|scwiki_sync"}) < 172800
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Catalogue sync importing zero items ({{ $labels.exported_job }})"
+          description: "The {{ $labels.exported_job }} sync has processed zero items in 48h while still recording successful runs — the upstream catalogue is likely returning empty responses. Check the upstream API and the sync-report admin page."
+
       - alert: ScheduledJobFailureStreak
         expr: increase(basetool_scheduled_job_executions_total{outcome="failure"}[1h]) >= 3
         for: 5m

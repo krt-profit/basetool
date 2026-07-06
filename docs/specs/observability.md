@@ -270,8 +270,14 @@ transaction per pass) rather than per-scrape.
   `bank_ledger_integrity`, `uex_sync`, `scwiki_sync`) via `TaskMetrics` (`record` /
   `recordCounting`). The last-success gauge is the source of the "user sync stale > 15 min" alert
   (`job="user_sync"`); it is registered lazily so a config-gated-off job never reports a
-  falsely-stale `0`. The items counter is present only for jobs that report a count (user sync,
-  notification retention, default-blueprint provisioning).
+  falsely-stale `0`. The items counter is present only for jobs that report a count: user sync,
+  notification retention, default-blueprint provisioning, and — since #1041 item 2 — `uex_sync` (the
+  `UexItemSyncService` `game_item` upsert tally) and `scwiki_sync` (the sum of the five SC-Wiki step
+  counts, a failing step contributing `0`). For the two catalogue syncs it is populated from the same
+  per-run tallies the sync-report summary uses and backs the `SyncZeroItems` alert, which fires when
+  a sync keeps succeeding but has processed zero rows for 48 h — the empty-200 catalogue outage that
+  neither `ExternalSyncStale` (last-success stays fresh) nor `ExternalFetchErrors` (an empty 200 is
+  not a fetch error) catches.
 - `basetool_sync_events_total{source,event_type}` counter at the three `SyncReportService`
   `log*Event` write sites (`source` = `SyncSourceSystem`, `event_type` = `SyncEventType`; both
   bounded enums — never the external asset name/uuid/detail).

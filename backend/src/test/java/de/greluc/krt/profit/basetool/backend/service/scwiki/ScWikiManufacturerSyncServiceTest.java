@@ -87,11 +87,13 @@ class ScWikiManufacturerSyncServiceTest {
   void syncManufacturers_abortsWithoutSweep_whenWikiReturnsEmpty() {
     when(scWikiClient.fetchAllPages(eq(ENDPOINT), any(), any())).thenReturn(List.of());
 
-    service.syncManufacturers();
+    int written = service.syncManufacturers();
 
     verify(syncReportService, never()).beginRun();
     verify(manufacturerRepository, never()).markScwikiDeletedExcept(any(), any());
     verify(manufacturerRepository, never()).save(any());
+    // An empty Wiki response reconciles no rows → 0 items (#1041 item 2, SyncZeroItems).
+    assertEquals(0, written, "an empty Wiki response must report zero reconciled rows");
   }
 
   @Test
