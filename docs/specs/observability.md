@@ -299,6 +299,14 @@ transaction per pass) rather than per-scrape.
   job still records a success, this is the only signal of a sustained catalogue outage; it backs the
   `ExternalFetchErrors` alert. The backend `WebClient.Builder` is wired to the `ObservationRegistry`
   (REQ-OBS-009) so these same calls also emit `http_client_requests_seconds` + client spans.
+- Frontend→backend seam (#1041 item 11): the frontend enables the `http.client.requests`
+  percentile-histogram (same bounded 5ms..10s window as `http.server.requests`, so both stay on the
+  same ~14 buckets) to drive a client-p95-vs-server-p95 overlay that separates "backend slow" from
+  "frontend slow". The already-exported resilience4j meters gain two leading-indicator alerts —
+  `BulkheadNearSaturation` (< 5 free bulkhead slots for 10m) and `RetryRateElevated`
+  (`successful_with_retry` > 0.2/s for 10m) — that fire before `circuit_open` / `bulkhead_full`, i.e.
+  before users fail; plus a backend-call resilience row on `03-spring-apps.json` and a
+  frontend-usage row (`basetool_active_sessions`, `basetool_mission_presence_missions`) on `07`.
 - `basetool_http_error_total{code}` counter at the `GlobalExceptionHandler` 409/401/403 methods
   (`OPTIMISTIC_LOCK` = optimistic-locking regression indicator, `PESSIMISTIC_LOCK`,
   `UNAUTHENTICATED`, `ACCESS_DENIED`) plus `SERVICE_UNAVAILABLE`, incremented directly by

@@ -70,6 +70,32 @@ groups:
           summary: "Circuit breaker OPEN ({{ $labels.application }}/{{ $labels.name }})"
           description: "Resilience4j circuit breaker {{ $labels.name }} in {{ $labels.application }} is open — a downstream dependency is failing."
 
+      # (#1041 item 11) Leading indicators on the frontend→backend seam, before circuit_open /
+      # bulkhead_full (i.e. before users fail). Meters already exported by resilience4j-micrometer.
+      # Bulkhead near saturation: the frontend backendApi bulkhead has 50 slots; < 5 free means a
+      # page render's parallel fan-out is about to queue behind maxWaitDuration and surface as a slow
+      # page. Frontend-only (the backend declares no bulkhead), so no application filter needed.
+      - alert: BulkheadNearSaturation
+        expr: resilience4j_bulkhead_available_concurrent_calls < 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Bulkhead near saturation ({{ $labels.application }}/{{ $labels.name }})"
+          description: "The {{ $labels.name }} bulkhead in {{ $labels.application }} has had fewer than 5 free concurrent-call slots for 10 minutes — the parallel backend fan-out is about to queue and slow page renders. Check backend latency and concurrent load."
+
+      # Retry rate elevated: a sustained stream of calls that only succeeded ON a retry means the
+      # backend hop is flaky (transient resets / packet loss) even though the circuit is still closed
+      # — the early warning the circuit-open alert misses. successful_with_retry is the bounded kind.
+      - alert: RetryRateElevated
+        expr: sum by (application) (rate(resilience4j_retry_calls_total{kind="successful_with_retry"}[5m])) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Backend-call retry rate elevated ({{ $labels.application }})"
+          description: "{{ $labels.application }} has been succeeding only after a retry at more than 0.2/s for 10 minutes — the frontend→backend hop is flaky (transient resets) even though the circuit breaker is still closed. Check backend health and the network path."
+
       - alert: HttpLatencyP95High
         expr: |
           histogram_quantile(0.95, sum by (application, le) (rate(http_server_requests_seconds_bucket[5m]))) > 2
