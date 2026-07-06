@@ -191,9 +191,10 @@ class OrgUnitBankPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(content().string(Matchers.containsString("id=\"ou-acc-filter\"")))
         .andExpect(content().string(Matchers.containsString("data-bank-acc-filter")))
+        // The filter scopes the switchable account-list container (card grid OR table), not the
+        // former single .ou-list, so it works across both view layouts (REQ-BANK-021/-046).
         .andExpect(
-            content()
-                .string(Matchers.containsString("data-filter-scope=\"#ou-panel-konten .ou-list\"")))
+            content().string(Matchers.containsString("data-filter-scope=\"#ou-acc-results\"")))
         .andExpect(
             content().string(Matchers.containsString("data-filter-empty=\"#ou-acc-filter-empty\"")))
         // The account row carries the name the filter matches against.
@@ -212,6 +213,56 @@ class OrgUnitBankPageControllerMvcTest {
         .perform(get("/org-unit-bank").param("fragment", "orgUnitBank"))
         .andExpect(status().isOk())
         .andExpect(view().name("org-unit-bank :: orgUnitBank"));
+  }
+
+  @Test
+  @WithMockUser(roles = {"OFFICER"})
+  void orgUnitBank_defaultLayoutRendersCardGridAndViewToggle() throws Exception {
+    // REQ-BANK-021: the Konten list defaults to the card grid, with a single per-user
+    // "Tabellenansicht" view toggle (no by-Bereich grouping). The toggle uses distinct
+    // data-ou-view-* attributes and is unchecked by default (card view).
+    stubData(UUID.randomUUID());
+
+    mockMvc
+        .perform(get("/org-unit-bank"))
+        .andExpect(status().isOk())
+        // The switchable account-list container + its server-rendered layout marker.
+        .andExpect(content().string(Matchers.containsString("id=\"ou-acc-results\"")))
+        .andExpect(content().string(Matchers.containsString("data-ou-layout=\"card\"")))
+        // The card grid renders (not the dense table's header strip).
+        .andExpect(content().string(Matchers.containsString("ou-acc-grid")))
+        .andExpect(content().string(Matchers.not(Matchers.containsString("ou-rowhead"))))
+        // The single view toggle, unchecked by default (its own module, not the dashboard's).
+        .andExpect(content().string(Matchers.containsString("data-ou-view-toggles")))
+        .andExpect(content().string(Matchers.containsString("data-ou-view-layout")));
+  }
+
+  @Test
+  @WithMockUser(roles = {"OFFICER"})
+  void orgUnitBank_tableLayoutRendersDenseTable() throws Exception {
+    // REQ-BANK-021: layout=table renders the dense table (the former .ou-list) instead of the card
+    // grid, and the toggle checkbox is checked.
+    stubData(UUID.randomUUID());
+
+    mockMvc
+        .perform(get("/org-unit-bank").param("layout", "table"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString("data-ou-layout=\"table\"")))
+        .andExpect(content().string(Matchers.containsString("ou-rowhead")))
+        .andExpect(content().string(Matchers.not(Matchers.containsString("ou-acc-grid"))));
+  }
+
+  @Test
+  @WithMockUser(roles = {"OFFICER"})
+  void orgUnitBank_accountsFragmentViewResolves() throws Exception {
+    // The view-toggle swap re-renders only the switchable account list (REQ-FE-005).
+    stubData(UUID.randomUUID());
+
+    mockMvc
+        .perform(get("/org-unit-bank").param("fragment", "orgUnitBankAccounts"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("org-unit-bank :: orgUnitBankAccounts"))
+        .andExpect(content().string(Matchers.containsString("Staffel IRIDIUM")));
   }
 
   @Test

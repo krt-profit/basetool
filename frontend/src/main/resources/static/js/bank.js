@@ -68,8 +68,9 @@
         manageBody: { container: '#bank-manage-results', preserveQuery: true },
         grantsMatrix: { container: '#bank-grants-results', preserveQuery: true },
         // Org-unit officer/lead page (#666 F2): balance cards + own-request list re-render after a
-        // create/cancel; query dropped (the page carries no list filter).
-        orgUnitBank: { container: '#org-unit-bank-results', preserveQuery: false },
+        // create/cancel; `?layout=` preserved so the account list keeps the caller's chosen card/
+        // table view (REQ-BANK-021), the server re-rendering it in that layout.
+        orgUnitBank: { container: '#org-unit-bank-results', preserveQuery: true },
         // Org-unit account detail (REQ-BANK-035/-036): the facts + responsibility settings region
         // re-renders in place after a target/visibility write; query dropped.
         orgUnitBankSettings: { container: '#org-unit-bank-settings-results', preserveQuery: false },
@@ -2045,6 +2046,128 @@
         const state = renderedState();
         writeSaved(state);
         fetchView(state);
+    });
+})();
+
+// ------------------------------------------------------------------------------------------------
+// Org-unit bank account-list view toggle (REQ-BANK-021/-046): a SINGLE per-user "Tabellenansicht"
+// checkbox that switches the "Konten" list between the card grid (default) and the dense table —
+// there is NO by-Bereich grouping here (unlike the dashboard, REQ-BANK-016). Mirrors the dashboard
+// view-options module above: the choice is persisted per user in localStorage and replayed through
+// the `layout` query parameter on an `orgUnitBankAccounts` fragment swap (`#ou-acc-results`, no
+// reload, REQ-FE-005), and the layout rides in the address bar (history:true) so it survives the
+// `orgUnitBank` fragment swap after a request create/cancel (that refresh preserves the query, so
+// the server re-renders the chosen layout). The checkbox lives OUTSIDE the swapped `#ou-acc-results`
+// container, so it keeps its state across a layout swap. Distinct `data-ou-view-*` attributes keep
+// it clear of the dashboard's `data-bank-view-*` module.
+// ------------------------------------------------------------------------------------------------
+(function () {
+    function toggleGroup() {
+        return document.querySelector('[data-ou-view-toggles]');
+    }
+
+    function layoutCheckbox() {
+        return document.querySelector('input[data-ou-view-layout]');
+    }
+
+    function storageKey() {
+        const main = document.querySelector('main[data-user-id]');
+        const uid = main ? main.getAttribute('data-user-id') : 'unknown';
+        return 'org_unit_bank_view_' + uid;
+    }
+
+    // The checkbox maps to the non-default layout (table); unchecked = the default card grid, so the
+    // checkbox encodes the same layout the server rendered / the query param carries.
+    function renderedLayout() {
+        const checkbox = layoutCheckbox();
+        return checkbox && checkbox.checked ? 'table' : 'card';
+    }
+
+    function readSaved() {
+        try {
+            const raw = localStorage.getItem(storageKey());
+            if (raw === null) {
+                return null;
+            }
+            const parsed = JSON.parse(raw) || {};
+            return parsed.layout === 'table' ? 'table' : 'card';
+        } catch {
+            return null;
+        }
+    }
+
+    function writeSaved(layout) {
+        try {
+            localStorage.setItem(storageKey(), JSON.stringify({ layout: layout }));
+        } catch {
+            /* localStorage unavailable (private mode): the choice simply will not persist. */
+        }
+    }
+
+    // The name filter box lives outside the swapped #ou-acc-results, so a layout swap leaves its term
+    // applied only to the OLD items; re-dispatch its input event to re-filter the freshly swapped set.
+    function reapplyNameFilter() {
+        const input = document.querySelector('#ou-panel-konten [data-bank-acc-filter]');
+        if (input && input.value) {
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    }
+
+    function fetchView(layout) {
+        if (!window.krtFetch || typeof window.krtFetch.swap !== 'function') {
+            window.location.reload();
+            return;
+        }
+        window.krtFetch
+            .swap({
+                url: '/org-unit-bank?layout=' + layout,
+                container: '#ou-acc-results',
+                fragmentValue: 'orgUnitBankAccounts',
+                history: true,
+            })
+            .then(function () {
+                reapplyNameFilter();
+            });
+    }
+
+    // On load, reconcile the saved per-user layout with the server-rendered checkbox. An explicit
+    // `layout=` in the address bar is authoritative and is persisted; otherwise a saved layout that
+    // differs from the server default (card) is applied and the list re-fetched. No krt:swapped
+    // listener is needed: the layout rides in the query, so every swap re-renders it server-side.
+    document.addEventListener('DOMContentLoaded', function () {
+        if (!toggleGroup()) {
+            return;
+        }
+        if (/[?&]layout=/.test(window.location.search)) {
+            writeSaved(renderedLayout());
+            return;
+        }
+        const saved = readSaved();
+        if (saved === null) {
+            writeSaved(renderedLayout());
+            return;
+        }
+        if (saved !== renderedLayout()) {
+            const checkbox = layoutCheckbox();
+            if (checkbox) {
+                checkbox.checked = saved === 'table';
+            }
+            fetchView(saved);
+        }
+    });
+
+    // A checkbox toggle fires `change`; its own `checked` state is already the new one, so read the
+    // layout straight off the DOM, persist it and replay it onto the account list.
+    document.addEventListener('change', function (event) {
+        const checkbox = event.target.closest
+            ? event.target.closest('input[data-ou-view-layout]')
+            : null;
+        if (!checkbox) {
+            return;
+        }
+        const layout = checkbox.checked ? 'table' : 'card';
+        writeSaved(layout);
+        fetchView(layout);
     });
 })();
 

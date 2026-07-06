@@ -23,7 +23,7 @@
     </nav>
 </header>
 
-<main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed}">
+<main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-user-id=${#authentication.name}">
     <!-- Page head: title + the single, page-level request CTA (REQ-BANK-022/-042). The CTA opens the
          request modal whose source selector lists every active account for a deposit and the
          caller's request-capable accounts for a withdrawal/transfer; it is shown whenever a request
@@ -88,91 +88,45 @@
                 </button>
             </div>
 
-            <!-- KONTEN: dense list, one row per visible account. Newest-first stays server-ordered. -->
+            <!-- KONTEN: the visible accounts as a card grid (default) or a dense table, switchable per
+                 user (REQ-BANK-021/-046). No by-Bereich grouping here (unlike the dashboard). -->
             <div class="mt-2" id="ou-panel-konten" data-tabpanel="konten" role="tabpanel"
                  aria-labelledby="ou-tab-konten" th:if="${showKonten}">
-                <!-- Client-side account-name live filter (REQ-BANK-046): hides non-matching rows as the
-                     user types; read-only + purely visual, no server round-trip. Lives inside the
-                     swapped fragment, so it resets to "show all" after a request create/cancel swap. -->
-                <div class="mb-2">
-                    <th:block th:replace="~{fragments/components :: bankAccSearch('ou-acc-filter', '#ou-panel-konten .ou-list', '#ou-acc-filter-empty')}"></th:block>
+                <!-- Toolbar: the client-side account-name live filter (REQ-BANK-046) + the single
+                     "Tabellenansicht" view toggle. Both live OUTSIDE the swapped #ou-acc-results
+                     sub-fragment but INSIDE the orgUnitBank fragment, so a request create/cancel swap
+                     re-renders them (resetting the filter to "show all") — the layout rides in the
+                     query, so the checkbox keeps its state and the list re-renders in that layout
+                     server-side (bank.js owns the persistence). -->
+                <div class="ou-konten-toolbar mb-2">
+                    <th:block th:replace="~{fragments/components :: bankAccSearch('ou-acc-filter', '#ou-acc-results', '#ou-acc-filter-empty')}"></th:block>
+                    <!-- One per-user view checkbox (card grid ⇆ table); unchecked = the default card
+                     grid. bank.js owns its checked state, persists it in localStorage and re-fetches
+                     the orgUnitBankAccounts sub-fragment on change (REQ-FE-005). Distinct
+                     data-ou-view-* attributes keep it clear of the dashboard's data-bank-view-* module. -->
+                    <div class="bank-view-toggles" role="group" data-ou-view-toggles
+                         th:aria-label="#{bank.dashboard.view.aria}">
+                        <label class="bank-check-inline">
+                            <input type="checkbox" data-ou-view-layout data-testid="org-unit-bank-view-layout"
+                                   th:checked="${layout == 'table'}">
+                            <span th:text="#{bank.dashboard.view.tableToggle}">Tabellenansicht</span>
+                        </label>
+                    </div>
                 </div>
-                <div class="ou-list">
-                    <div class="ou-rowhead" aria-hidden="true">
-                        <span th:text="#{bank.request.col.account}">Konto</span>
-                        <span th:text="#{bank.orgUnit.col.trend}">Trend &middot; 30 T</span>
-                        <span class="e" th:text="#{bank.orgUnit.balance}">Kontostand</span>
-                        <span th:text="#{bank.orgUnit.balanceTarget}">Ziel</span>
-                        <span class="e" th:text="#{bank.request.col.actions}">Aktion</span>
-                    </div>
-                    <div th:each="b : ${balances}" class="ou-row" th:with="spark=${sparks.get(b.accountId())}"
-                         data-testid="org-unit-bank-card"
-                         th:attr="data-account-no=${b.accountNo()},data-filter-name=${b.accountName()}">
-                        <!-- Konto: name (linked to the drill-in) + account no and its org-unit shorthand
-                             (or name). A special account (Sonderkonto, REQ-BANK-028) belongs to no org
-                             unit, so it is labelled by its account-type label instead. -->
-                        <div>
-                            <div class="r-name">
-                                <a th:href="@{/org-unit-bank/accounts/{id}(id=${b.accountId()})}"
-                                   th:text="${b.accountName()}">Staffel IRIDIUM</a>
-                            </div>
-                            <div class="r-sub">
-                                <span th:text="${b.accountNo()}">KB-0001</span>
-                                <span> &middot; </span>
-                                <span th:if="${b.orgUnitId() != null}"
-                                      th:text="${b.orgUnitShorthand() != null ? b.orgUnitShorthand() : b.orgUnitName()}">IRI</span>
-                                <span th:if="${b.orgUnitId() == null}"
-                                      th:text="#{'bank.account.type.' + ${b.type()}}">Sonderkonto</span>
-                            </div>
-                        </div>
-                        <!-- 30-day trend: sign-colored delta + inline SVG sparkline, identical to the
-                             bank dashboard cards (REQ-BANK-016). The SVG is decorative (aria-hidden);
-                             the delta carries the accessible figure. The column header conveys the
-                             window, so the per-row delta omits the "/ 30 T" suffix. -->
-                        <div class="r-trend">
-                            <span class="kpi-delta"
-                                  th:classappend="${b.delta30d().signum() > 0} ? ' kpi-delta--pos' : (${b.delta30d().signum() < 0} ? ' kpi-delta--neg' : ' kpi-delta--flat')"
-                                  th:text="${b.delta30d().signum() > 0 ? '&#9650; +' : (b.delta30d().signum() < 0 ? '&#9660; ' : '&#177; ')} + ${#numbers.formatInteger(@moneyFormat.round(b.delta30d()), 1, 'POINT')}">&#9650; +420.000</span>
-                            <svg th:if="${spark != null and spark.points() != null}" width="92" height="20" viewBox="0 0 96 26" aria-hidden="true">
-                                <polyline th:attr="points=${spark.points()}"
-                                          th:classappend="${spark.flat()} ? ' kpi-sparkline--flat' : ''"
-                                          class="kpi-sparkline" fill="none" stroke-width="1.5"/>
-                            </svg>
-                        </div>
-                        <!-- Kontostand: neutral-light, right-aligned, tabular figures (orange is never
-                             used on a data value). -->
-                        <div class="r-bal">
-                            <span th:text="${#numbers.formatInteger(@moneyFormat.round(b.balance()), 1, 'POINT')}">1.850.000</span>
-                            <span class="unit">aUEC</span>
-                        </div>
-                        <!-- Ziel: mini progress bar + percentage when a balance target is set
-                             (REQ-BANK-036); a muted "no target" note otherwise. -->
-                        <div class="ou-target" data-testid="org-unit-bank-card-target"
-                             th:if="${b.balanceTarget() != null and b.balanceTarget().signum() > 0}"
-                             th:with="pct=${b.balance().doubleValue() / b.balanceTarget().doubleValue() * 100.0}">
-                            <div class="bank-target-bar" aria-hidden="true">
-                                <div class="bank-target-bar-fill"
-                                     th:attr="style='width:' + ${pct > 100 ? 100 : (pct < 0 ? 0 : pct)} + '%'"></div>
-                            </div>
-                            <div class="ou-target-meta">
-                                <b th:text="${#numbers.formatDecimal(pct, 1, 'NONE', 1, 'COMMA')} + ' %'">18,5 %</b>
-                                <span th:text="${#numbers.formatInteger(@moneyFormat.round(b.balanceTarget()), 1, 'POINT')} + ' aUEC'">10.000.000 aUEC</span>
-                            </div>
-                        </div>
-                        <div class="r-noziel" th:unless="${b.balanceTarget() != null and b.balanceTarget().signum() > 0}"
-                             th:text="#{bank.orgUnit.noTarget}">&mdash; kein Ziel</div>
-                        <!-- Aktion: the read-only drill-in (history + Halter-redacted statement,
-                             REQ-BANK-038); the holder/OL get the "manage" label. Booking requests are
-                             raised from the single page-level CTA, never per row. -->
-                        <div class="r-act">
-                            <a class="btn btn-ghost btn-xs" data-testid="org-unit-bank-card-detail"
-                               th:href="@{/org-unit-bank/accounts/{id}(id=${b.accountId()})}"
-                               th:text="${b.canManageSettings()} ? #{bank.orgUnit.detail.manage} : #{bank.orgUnit.detail.open}">Details</a>
-                        </div>
-                    </div>
+                <!-- orgUnitBankAccounts sub-fragment: the switchable account list (card grid or table);
+                     swapped in place when the view toggle changes (REQ-FE-005). data-ou-layout marks
+                     the server-rendered layout for readability/tests. -->
+                <div id="ou-acc-results" th:fragment="orgUnitBankAccounts" th:attr="data-ou-layout=${layout}">
+                    <th:block th:if="${layout == 'table'}">
+                        <th:block th:replace="~{fragments/org-unit-bank-views :: ouAccTable(${balances}, ${sparks})}"></th:block>
+                    </th:block>
+                    <th:block th:unless="${layout == 'table'}">
+                        <th:block th:replace="~{fragments/org-unit-bank-views :: ouAccGrid(${balances}, ${sparks})}"></th:block>
+                    </th:block>
                 </div>
                 <!-- No-results note for the client-side account-name filter (REQ-BANK-046): bank.js
-                     reveals it when the live filter hides every account row. -->
+                     reveals it when the live filter hides every account item. Sits outside the swapped
+                     sub-fragment (the filter re-queries it by selector). -->
                 <div id="ou-acc-filter-empty" class="empty-state mt-2" hidden>
                     <div class="empty-text" th:text="#{bank.filter.empty}">Keine Konten passen zum Filter.</div>
                 </div>

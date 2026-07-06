@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Kartellbank: Kachel- oder Tabellenansicht für die Kontenliste unter „Bank meiner Org-Einheit".** Die Kontenliste auf `/org-unit-bank` lässt sich jetzt — wie auf dem Bank-Dashboard — zwischen einer Kachelansicht (Standard) und einer Tabellenansicht umschalten; eine Gruppierung gibt es hier bewusst nicht. Die Wahl wird pro Nutzer lokal gespeichert und ohne Neuladen der Seite angewendet. (REQ-BANK-021)
+
 ### Changed
 
 - **Missionsseite: Live-Benachrichtigungen bleiben auch bei sehr vielen gleichzeitigen Zuschauern erhalten.** Der Benachrichtigungs-Stream (SSE) nutzte bisher dieselbe 100-Verbindungs-Poolgröße wie der normale Request-Pfad; da jede geöffnete Seite ihren Stream dauerhaft offen hält, war das eine harte Obergrenze für gleichzeitige Zuschauer — ab dem 101. verlor ein Nutzer den Live-Push. Der Stream nutzt jetzt einen eigenen, großzügig dimensionierten Verbindungspool, sodass auch 200+ gleichzeitige Zuschauer ihre Benachrichtigungen live erhalten (ADR-0078). Greift nach dem nächsten Deploy.
