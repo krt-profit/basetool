@@ -154,6 +154,21 @@ public final class MetricNames {
    */
   public static final String MAIL = "basetool.mail";
 
+  /**
+   * Gauge {@code basetool_sse_connections} — the live Server-Sent-Event subscriber count summed
+   * across all recipients in {@code NotificationStreamService}. Drives {@code SsePushChannelDead}
+   * (zero here while the frontend still reports active sessions = a dead push channel).
+   */
+  public static final String SSE_CONNECTIONS = "basetool.sse.connections";
+
+  /**
+   * Counter {@code basetool_sse_send_failures_total} — tag {@code event} ({@link
+   * #SSE_EVENT_CONNECTED} / {@link #SSE_EVENT_NOTIFICATION} / {@link #SSE_EVENT_HEARTBEAT}), bumped
+   * at each drop-on-send-failure branch so a broken push (e.g. proxy buffering drift) is counted
+   * rather than only silently dropping the emitter.
+   */
+  public static final String SSE_SEND_FAILURES = "basetool.sse.send.failures";
+
   // --- Tag keys --------------------------------------------------------------------------
 
   /** Tag key: the scheduled job ({@link ScheduledJob#label()}). */
@@ -194,6 +209,9 @@ public final class MetricNames {
    */
   public static final String TAG_KIND = "kind";
 
+  /** Tag key: the SSE event name that failed to send, on {@link #SSE_SEND_FAILURES}. */
+  public static final String TAG_EVENT = "event";
+
   // --- Bounded tag values (not an application enum) --------------------------------------
 
   /** Outcome tag value for a job run that completed without throwing. */
@@ -225,6 +243,15 @@ public final class MetricNames {
 
   /** Mail outcome: host set but no {@code JavaMailSender} bean was available. */
   public static final String MAIL_DROPPED_NO_SENDER = "dropped_no_sender";
+
+  /** SSE event value: the initial {@code connected} handshake event. */
+  public static final String SSE_EVENT_CONNECTED = "connected";
+
+  /** SSE event value: an unread-state-changed {@code notification} push. */
+  public static final String SSE_EVENT_NOTIFICATION = "notification";
+
+  /** SSE event value: the periodic keep-alive {@code heartbeat}. */
+  public static final String SSE_EVENT_HEARTBEAT = "heartbeat";
 
   /** Base unit rendered as the {@code _seconds} Prometheus suffix on epoch/age gauges. */
   public static final String UNIT_SECONDS = "seconds";

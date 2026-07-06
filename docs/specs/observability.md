@@ -345,6 +345,12 @@ transaction per pass) rather than per-scrape.
   (PII). `MailDeliveryFailing` fires on `failed` > 2/h; `MailDroppedConfigDrift` fires on any
   `dropped_*` (on the configured prod deployment a drop is a config-drift regression that silently
   swallows registration / approval mail, previously visible only via `LogbackErrorSpike`).
+- `basetool_sse_connections` gauge + `basetool_sse_send_failures_total{event}` counter
+  (`NotificationStreamService`, #1041 item 17). The gauge sums the live SSE subscriber count across
+  all recipients (unlabelled — `sub` is PII); the counter is bumped at each drop-on-send-failure
+  branch with a fixed `event` (`connected` / `notification` / `heartbeat`). Zero connections while
+  the frontend still reports active sessions drives `SsePushChannelDead` (a dead push channel, e.g.
+  reverse-proxy buffering drift).
 
 **Frontend.** `basetool_mission_presence_missions` gauge (missions with a live editor; single-JVM
 edit-awareness, unlabelled), `basetool_active_sessions` gauge (active Spring Session sessions;
@@ -352,7 +358,15 @@ edit-awareness, unlabelled), `basetool_active_sessions` gauge (active Spring Ses
 `BackendApiClient` failure funnels. `reason` is a fixed **local** enumeration
 (`backend_4xx`/`backend_5xx`/`circuit_open`/`bulkhead_full`/`timeout`/`unknown`) derived from the
 failure branch — never the backend's response-body code, which could be arbitrary — and `method`
-is the HTTP verb.
+is the HTTP verb. The push-channel surfaces (#1041 item 17) add `basetool_notification_relay_connections`
+(open browser→backend notification SSE relays, `NotificationPageController`) and
+`basetool_presence_ws_sessions` (live mission-presence WebSocket sessions summed across missions,
+`MissionPresenceWebSocketHandler`) gauges, plus the `basetool_presence_relay_frames_total{type}`
+(`changed` / `snapshot`) and `basetool_presence_relay_dropped_total{reason}` (`throttled` /
+`send_failed`) counters at the previously-silent throttle and send-failure branches of the presence
+relay — the component that shipped the REQ-FE-010 staleness defect. A `changed`-frame flatline while
+`snapshot` frames keep flowing is the early indicator for that defect class (panels only, baselined
+before alerting). All labels are fixed literals, pure counts.
 
 **Ingest.** `basetool_ingest_handoff_total{kind}` (accepted+staged handoffs per `HandoffKind`),
 `basetool_ingest_handoff_errors_total{reason}` (relay failures: `backend_reject` /

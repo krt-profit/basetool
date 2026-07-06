@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.MissionPresenceService;
 import de.greluc.krt.profit.basetool.frontend.websocket.MissionPresenceHandshakeAuthInterceptor;
 import de.greluc.krt.profit.basetool.frontend.websocket.MissionPresenceWebSocketHandler;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -61,25 +62,30 @@ public class MissionPresenceWebSocketConfig implements WebSocketConfigurer {
 
   private final MissionPresenceService presenceService;
   private final BackendApiClient backendApiClient;
+  private final MeterRegistry meterRegistry;
   private final List<String> allowedOriginPatterns;
 
   /**
    * Constructor injection of the shared presence store, the backend client used by the handshake
-   * authorization gate, and the WebSocket origin allowlist.
+   * authorization gate, the Micrometer registry for the handler's push-channel metrics, and the
+   * WebSocket origin allowlist.
    *
    * @param presenceService in-memory presence store
    * @param backendApiClient client used by the handshake interceptor to authorize mission access
+   * @param meterRegistry registry the handler binds its session gauge and relay counters to
    * @param allowedOriginPatterns origin patterns accepted on the WebSocket handshake; sourced from
    *     {@code app.websocket.allowed-origin-patterns} with a production default
    */
   public MissionPresenceWebSocketConfig(
       MissionPresenceService presenceService,
       BackendApiClient backendApiClient,
+      MeterRegistry meterRegistry,
       @Value(
               "${app.websocket.allowed-origin-patterns:https://profit-base.online,https://localhost:18081,http://localhost:18081}")
           List<String> allowedOriginPatterns) {
     this.presenceService = presenceService;
     this.backendApiClient = backendApiClient;
+    this.meterRegistry = meterRegistry;
     this.allowedOriginPatterns = allowedOriginPatterns;
   }
 
@@ -91,7 +97,8 @@ public class MissionPresenceWebSocketConfig implements WebSocketConfigurer {
    */
   @Bean
   public MissionPresenceWebSocketHandler missionPresenceWebSocketHandler() {
-    return new MissionPresenceWebSocketHandler(presenceService, JsonMapper.builder().build());
+    return new MissionPresenceWebSocketHandler(
+        presenceService, JsonMapper.builder().build(), meterRegistry);
   }
 
   /** {@inheritDoc} */
