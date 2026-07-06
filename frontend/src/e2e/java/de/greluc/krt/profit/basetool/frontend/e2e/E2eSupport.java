@@ -172,18 +172,27 @@ final class E2eSupport {
    * Launches headless Firefox pinned to a fresh HTTP/1.1 connection per request and, for the
    * ephemeral stack, with {@code host.docker.internal} resolved to the loopback.
    *
-   * <p>Two transport preferences together are the root-cause fix for the suite's dominant
+   * <p><b>The uniform fix now lives at the server: the E2E stack disables HTTP/2 on the
+   * frontend</b> ({@code SERVER_HTTP2_ENABLED=false} in {@code docker-compose.e2e.yml}), so every
+   * engine speaks HTTP/1.1 and the stream-reset class below cannot arise for any of them. The two
+   * Firefox prefs here are retained on top of that as a Firefox-specific guard (the HTTP/1.1
+   * connection-reuse race called out below) plus defence-in-depth, and because they are what
+   * originally root-caused the flake; the narrative is kept for that history.
+   *
+   * <p>Two transport preferences together were the original root-cause fix for the suite's dominant
    * Firefox-only flake — the bank wipe/deposit {@code waitForResponse} hangs that survived raising
-   * the timeout to 60 s. The frontend serves <b>HTTP/2</b> (WebKit reports its aborts as {@code
-   * HTTP/2 Error: INTERNAL_ERROR}), and under CI load Gecko's h2 stack <b>resets the POST stream
-   * mid-flight</b>: the captured deposit reset truncated the request body (the frontend logged
-   * {@code POST /api/proxy/bank/deposits -> 400 "I/O error while reading input message"}) and the
-   * wipe reset dropped the response after the server had already committed {@code 200}. Either way
-   * the browser's {@code fetch()} rejects with a <em>network error</em> rather than delivering an
-   * HTTP response — the in-place handler shows its generic failure toast, and Playwright's {@code
-   * waitForResponse} never matches and hangs to its timeout. Chromium and WebKit absorb the same
-   * reset; Firefox does not, and (unlike an idempotent GET) never auto-retries a non-idempotent
-   * POST.
+   * the timeout to 60 s. The frontend then served <b>HTTP/2</b> (WebKit reports its aborts as
+   * {@code HTTP/2 Error: INTERNAL_ERROR}), and under CI load Gecko's h2 stack <b>reset the POST
+   * stream mid-flight</b>: the captured deposit reset truncated the request body (the frontend
+   * logged {@code POST /api/proxy/bank/deposits -> 400 "I/O error while reading input message"})
+   * and the wipe reset dropped the response after the server had already committed {@code 200}.
+   * Either way the browser's {@code fetch()} rejects with a <em>network error</em> rather than
+   * delivering an HTTP response — the in-place handler shows its generic failure toast, and
+   * Playwright's {@code waitForResponse} never matches and hangs to its timeout. Chromium tolerated
+   * the reset and Firefox did not (and, unlike an idempotent GET, never auto-retries a
+   * non-idempotent POST), so this was first fixed per-browser; WebKit was later observed to hit the
+   * <em>same</em> reset (Tomcat "Client reset the stream before the request was fully read") but
+   * has no Playwright-level h2 toggle, which is why the fix moved to the server above.
    *
    * <ul>
    *   <li><b>{@code network.http.http2.enabled = false}</b> drops Firefox to HTTP/1.1, eliminating
@@ -226,6 +235,11 @@ final class E2eSupport {
    * preference, so for the ephemeral stack it relies on the OS hosts file mapping {@code
    * host.docker.internal} to 127.0.0.1; this fails fast with an actionable message when that
    * mapping is absent rather than surfacing an opaque "Could not connect to server" mid-flow.
+   *
+   * <p>WebKit likewise has no Playwright-level HTTP/2 toggle, so it does not carry the h2 opt-out
+   * the {@link #launchFirefox} prefs give Gecko; it instead depends on the E2E stack serving
+   * HTTP/1.1 ({@code SERVER_HTTP2_ENABLED=false}, see {@code docker-compose.e2e.yml}) to avoid the
+   * POST stream-reset flake documented on {@link #launchFirefox}.
    *
    * @param playwright the Playwright entry point
    * @param managesStack whether the ephemeral stack is in play (requires the hosts-file mapping)

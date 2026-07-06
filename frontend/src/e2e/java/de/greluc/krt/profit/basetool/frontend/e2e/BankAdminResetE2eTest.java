@@ -112,8 +112,11 @@ class BankAdminResetE2eTest {
         page.waitForResponse(
             r -> r.url().contains("/admin/bank/wipe-reset") && "POST".equals(r.request().method()),
             // 60 s (above the 30 s default): the wipe's proxied XHR round-trip can outrun 30 s on a
-            // contended CI runner (the Firefox-only flake window), timing out an otherwise-correct
-            // POST. Headroom hardens the wait without masking a genuinely stuck request.
+            // contended CI runner, timing out an otherwise-correct POST. The HTTP/2 stream-reset
+            // flake that used to hang this wait (Firefox, then WebKit) is now fixed at the source —
+            // the E2E stack serves HTTP/1.1 (SERVER_HTTP2_ENABLED=false, see docker-compose.e2e.yml
+            // and E2eSupport#launchFirefox). The headroom stays as belt-and-suspenders without
+            // masking a genuinely stuck request.
             new Page.WaitForResponseOptions().setTimeout(60_000),
             () -> page.locator("[data-testid='bank-wipe-submit']").click());
         assertThat(page.locator(".notification-toast").first())
