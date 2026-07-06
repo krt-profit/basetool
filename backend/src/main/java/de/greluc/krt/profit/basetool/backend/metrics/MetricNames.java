@@ -36,17 +36,17 @@ public final class MetricNames {
 
   // --- Scheduled-job health (TaskMetrics) ------------------------------------------------
 
-  /** Counter {@code basetool_scheduled_job_executions_total}; tags: job, outcome. */
+  /** Counter {@code basetool_scheduled_job_executions_total}; tags: task, outcome. */
   public static final String SCHEDULED_JOB_EXECUTIONS = "basetool.scheduled.job.executions";
 
-  /** Timer {@code basetool_scheduled_job_duration_seconds} — tag {@code job}. */
+  /** Timer {@code basetool_scheduled_job_duration_seconds} — tag {@code task}. */
   public static final String SCHEDULED_JOB_DURATION = "basetool.scheduled.job.duration";
 
-  /** Gauge {@code basetool_scheduled_job_last_success_timestamp_seconds} — tag {@code job}. */
+  /** Gauge {@code basetool_scheduled_job_last_success_timestamp_seconds} — tag {@code task}. */
   public static final String SCHEDULED_JOB_LAST_SUCCESS =
       "basetool.scheduled.job.last.success.timestamp";
 
-  /** Counter {@code basetool_scheduled_job_items_total} — items processed, tag {@code job}. */
+  /** Counter {@code basetool_scheduled_job_items_total} — items processed, tag {@code task}. */
   public static final String SCHEDULED_JOB_ITEMS = "basetool.scheduled.job.items";
 
   // --- External-sync events (SyncReportService) ------------------------------------------
@@ -189,8 +189,16 @@ public final class MetricNames {
 
   // --- Tag keys --------------------------------------------------------------------------
 
-  /** Tag key: the scheduled job ({@link ScheduledJob#label()}). */
-  public static final String TAG_JOB = "job";
+  /**
+   * Tag key: the scheduled job ({@link ScheduledJob#label()}). Named {@code task}, NOT {@code job}
+   * (#1041 item 23): the Prometheus scrape adds its own {@code job="basetool-backend"} label, and a
+   * metric tag also named {@code job} collides — Prometheus keeps the scrape value and renames the
+   * metric tag to {@code exported_job}, so alerts once had to match the awkward {@code
+   * exported_job} (and one silently never fired when they matched plain {@code job}). {@code task}
+   * sidesteps the collision so the job identity keeps its intended label. Do not rename back to
+   * {@code job}.
+   */
+  public static final String TAG_JOB = "task";
 
   /** Tag key: the run outcome ({@link #OUTCOME_SUCCESS} / {@link #OUTCOME_FAILURE}). */
   public static final String TAG_OUTCOME = "outcome";
