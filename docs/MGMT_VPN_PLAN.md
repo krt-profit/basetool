@@ -117,6 +117,22 @@ On UniFi (owner) / Hetzner:
 
 **Exit criteria:** old-`wg0` leftovers identified (removal happens in Phase 2), textfile dir confirmed, UniFi/Hetzner prerequisites confirmed.
 
+### Phase 0 findings — host side (executed 2026-07-06, read-only over SSH)
+
+- **WireGuard state:** tools installed (`wireguard-tools 1.0.20210914-1ubuntu4`); `wg show all` empty, `wg-quick@wg0` **disabled** — owner statement confirmed, no tunnel runs.
+- **Stale `/etc/wireguard/wg0.conf` exists** (309 B, 2026-03-20, **mode `644 root:root` — the old private key is world-readable**, including inside node-exporter's read-only `/` host mount). Content (secrets omitted): old client `Address 192.168.1.2/32`, `DNS = 192.168.1.1`, peer endpoint **`vpn.greluc.me:51822`**, `AllowedIPs = 10.1.0.0/24, 192.168.1.0/24`, **no `PersistentKeepalive`** — the missing keepalive plus the `DNS=` line explain the old tunnel's flakiness (and the former daily-restart band-aid). → **Phase 2 deletes this file**; the old key counts as exposed and must not be reused; the new conf ships `600` with keepalive and without `DNS=`.
+- **DDNS:** `vpn.greluc.me` still resolves (91.21.156.212) — natural candidate for `<UNIFI_DDNS>` in Phase 1; the old server listened on **51822** (Phase-1 detail: reuse the name; pick the port — UniFi default `51820` or keep `51822`).
+- **Listeners:** `sshd` on `0.0.0.0:22` **and** `[::]:22` (socket-activated, `ssh.socket` active, `00-hardening.conf` drop-in present) — Phase 5's CFW must cover v4 **and** v6, as planned. NPM admin on `127.0.0.1:10081` (docker-proxy) confirmed.
+- **Host firewall posture:** `ufw` inactive, iptables `INPUT` policy `ACCEPT` — nothing on the host filters inbound today; the loopback binding is the only guard for 10081, and 22 is open to the world. Whether a Hetzner Cloud Firewall exists is **not visible from inside** — owner checks the console (open item below).
+- **Routing/collisions:** no `192.168.0.0/16` or `10.0.0.0/8` routes on the host (Docker uses `172.17–.19` + the pinned `172.28.0–11/24`) → `192.168.3.0/24` and `10.1.0.0/24` are collision-free host-side. `rp_filter = 2` (loose) on all/default — no asymmetric-routing trap for the tunnel's routed mgmt-VLAN return path.
+- **Textfile collector confirmed:** `/var/iri/monitoring/textfile/` (holds `backup/deploy/docker_cleanup/restore_drill.prom`) — `wg-ensure.sh` writes `wireguard.prom` there (§8.2), matching `--collector.textfile.directory=/host/var/iri/monitoring/textfile` in `docker-compose.monitoring.yml`.
+- **Repo rot to clean in Phase 4:** `scripts/iri-backup.timer` still references the removed `vpn-restart` cron in comments (lines 3/10). No other cron/systemd/logrotate leftovers; root crontab clean.
+
+### Phase 0 — still open (owner)
+
+- [ ] UniFi: Network-application version (zone-based firewall UI?), `192.168.3.0/24` free in the home site, WAN type (PPPoE? → MTU 1412), confirm `vpn.greluc.me` (and port 51820 vs. 51822) as the WG server endpoint.
+- [ ] Hetzner Cloud Console: does a Cloud Firewall already exist on the server, and with which rules?
+
 ## 5. Phase 1 — UniFi side (WireGuard server) — #1053 · Owner
 
 1. **VPN server:** Settings → VPN → VPN Server → WireGuard: UDP `51820`, subnet `192.168.3.0/24`. One client peer "basetool-prod-host", fixed IP `192.168.3.10`. Hand the exported config to the host **over the existing SSH session only** — never repo/chat/cloud (`REQ-OPS-010` applies to the new key).
@@ -128,7 +144,7 @@ On UniFi (owner) / Hetzner:
 
 ## 6. Phase 2 — Host side (client + self-healing) — #1054 · Claude via SSH, owner applies the key
 
-1. Remove Phase-0 leftovers of the old tunnel (stale conf/cron/logrotate), then `/etc/wireguard/wg0.conf` (mode `600`; owner stores the key out-of-band per `REQ-OPS-010`):
+1. Delete the stale `/etc/wireguard/wg0.conf` (Phase 0 found it world-readable at mode 644 — the old private key counts as **exposed**; generate a **fresh keypair**, never reuse it), then write the new `/etc/wireguard/wg0.conf` (mode `600`; owner stores the key out-of-band per `REQ-OPS-010`):
 
    ```ini
    [Interface]
