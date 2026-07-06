@@ -4,7 +4,7 @@
 #
 # Captures the full-restore backup surface and pushes it CLIENT-SIDE ENCRYPTED
 # to a Nextcloud WebDAV target via restic (over an rclone remote). Runs nightly
-# at 04:15 from iri-backup.timer (after the 04:00 vpn-restart), or manually:
+# at 04:15 from iri-backup.timer, or manually:
 #   sudo -u deploy /var/iri/code/scripts/backup.sh                # full run
 #   sudo -u deploy /var/iri/code/scripts/backup.sh --no-quiesce   # online dump, zero downtime
 #   sudo -u deploy /var/iri/code/scripts/backup.sh --skip-upload  # dump only, no restic push

@@ -1,13 +1,12 @@
 ; systemd timer that fires the nightly backup at 04:15 (host-local time).
 ;
-; 04:15 is deliberate: it lands AFTER the 04:00 vpn-restart (scripts/vpn-restart.cron)
-; so the two never overlap, and inside the 04:00–05:00 maintenance window the
-; backup's brief writer-quiesce is allowed to use. The user-facing downtime is
-; only the database dump (seconds) — the slow Nextcloud upload happens after the
-; stack is back up (see scripts/backup.sh, REQ-OPS-009).
+; 04:15 sits inside the 04:00–05:00 maintenance window, which the backup's brief
+; writer-quiesce is allowed to use. The user-facing downtime is only the database
+; dump (seconds) — the slow Nextcloud upload happens after the stack is back up
+; (see scripts/backup.sh, REQ-OPS-009).
 ;
 ; IMPORTANT: OnCalendar uses the host's local timezone. Make sure the host TZ is
-; what you expect (`timedatectl`); the vpn-restart cron uses the same wall clock.
+; what you expect (`timedatectl`).
 
 [Unit]
 Description=Profit Basetool — nightly backup (04:15)

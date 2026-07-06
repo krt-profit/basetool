@@ -65,7 +65,7 @@ serves the existing maintenance page. An operator may opt into a zero-downtime o
 - [ ] A `trap` restarts the writers on any failure path — a failed dump never leaves production down.
 - [ ] `backup.sh` acquires the same `flock` (`/var/lock/iri-deploy.lock`) as `deploy.sh` and
   releases it as soon as the writers are back up.
-- [ ] The scheduled start is at 04:15, after the 04:00 `vpn-restart`, inside the 04:00–05:00 window.
+- [ ] The scheduled start is at 04:15, inside the 04:00–05:00 window.
 
 **Enforced by:** `scripts/backup.sh` (quiesce + trap + flock) · **Runbook:** [`docs/backup.md`](../backup.md)
 

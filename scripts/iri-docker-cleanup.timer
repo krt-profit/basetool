@@ -1,0 +1,32 @@
+; systemd timer that fires the Docker housekeeping weekly (Saturday 02:00 UTC).
+;
+; The `UTC` suffix on OnCalendar pins the schedule to UTC regardless of the
+; host's local timezone — preserving the behaviour of the retired
+; docker-cleanup.cron drop-in, which forced UTC via `CRON_TZ=UTC`. (Named
+; timezones in OnCalendar require systemd v252+; the production host runs a
+; newer systemd.)
+;
+; 02:00 UTC Saturday sits well clear of the nightly backup window (04:15) and the
+; weekly restore drill (Sun 05:30), so the prune never contends with either. The
+; job only prunes UNUSED resources (running containers and the /var/iri bind
+; mounts are untouched), so the exact time is not load-bearing.
+
+[Unit]
+Description=Profit Basetool — weekly Docker housekeeping (Sat 02:00 UTC)
+Documentation=https://github.com/krt-profit/basetool/blob/main/docs/deployment.md
+Requires=iri-docker-cleanup.service
+
+[Timer]
+OnCalendar=Sat *-*-* 02:00:00 UTC
+
+; Catch up a missed run (host was down at 02:00) on the next boot rather than
+; skipping a whole week.
+Persistent=true
+
+; Small jitter — the prune is not time-critical and sits in no window.
+RandomizedDelaySec=5min
+
+Unit=iri-docker-cleanup.service
+
+[Install]
+WantedBy=timers.target

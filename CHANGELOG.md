@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Betrieb: Docker-Aufräumen läuft jetzt über einen systemd-Timer statt Cron.** Das wöchentliche `docker-cleanup.sh` (Samstag 02:00 UTC) wird nun vom systemd-Timer `iri-docker-cleanup.timer` ausgelöst – konsistent mit Backup, Deploy und Restore-Drill; damit laufen alle Wartungsjobs über systemd. Ausführung und Logs jetzt über `systemctl`/`journalctl`; die Monitoring-Textfile-Metriken und die zugehörige Warnung bleiben unverändert.
+
+### Removed
+
+- **Betrieb: täglicher VPN-Neustart (`vpn-restart`) entfernt.** Der Cron-Job, der die WireGuard-Schnittstelle `wg0` täglich um 04:00 neu startete, wird nicht mehr benötigt und wurde samt Skript sowie Cron- und logrotate-Konfiguration entfernt.
+
 ### Fixed
 
 - **Raffinerie – Einlagern-Fenster zeigte den SCU-Hinweis auch bei stückweise gezählten Materialien.** Im Einlagern-Fenster eines Raffinerieauftrags erschien der SCU-Nachkommastellen-Hinweis („?") an jeder Materialzeile, auch bei stückweise (PIECE) gezählten Ausgabematerialien. Ursache war die Thymeleaf-Attributreihenfolge (`th:replace` läuft vor `th:if`), die die SCU-Bedingung überging. Der Hinweis erscheint jetzt nur noch bei SCU-Zeilen (REQ-INV-001). Dieselbe Attributreihenfolge-Falle wurde vorsorglich in zwei weiteren Vorlagen entschärft (Einsatz-Crew-Board, `<head>`-Zusatzlinks) – ohne sichtbare Verhaltensänderung.

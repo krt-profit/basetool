@@ -1,7 +1,8 @@
 # Ops-automation alerts driven by node_exporter textfile metrics written by deploy.sh, backup.sh,
-# restore-drill.sh and docker-cleanup.sh (ADR-0072). These are the ONLY monitoring signal for
-# cron-driven cleanup (invisible to the systemd collector) and let alerts distinguish
-# "failed" / "stale" / "never ran" via absent()-guards. Textfile names are defined by the scripts.
+# restore-drill.sh and docker-cleanup.sh (ADR-0072). The textfiles carry richer per-outcome detail
+# (per-outcome timestamps, durations, reclaimed bytes, per-artifact restore results) than the
+# systemd collector's unit-level success, and let alerts distinguish "failed" / "stale" / "never
+# ran" via absent()-guards. Textfile names are defined by the scripts.
 groups:
   - name: ops-automation-critical
     rules:
@@ -93,4 +94,4 @@ groups:
           severity: warning
         annotations:
           summary: "docker-cleanup stale >8d or metric absent"
-          description: "The cron docker-cleanup last succeeded more than 8 days ago, or its metric is absent — an early disk-fill indicator."
+          description: "The weekly docker-cleanup last succeeded more than 8 days ago, or its metric is absent — an early disk-fill indicator."

@@ -4,8 +4,8 @@
 #
 # Räumt auf dem Produktions-VM regelmäßig ungenutzte Docker-Ressourcen weg,
 # damit die Festplatte nicht durch alte Image-Layer, Build-Cache und
-# verwaiste Container/Netzwerke vollläuft. Gedacht für einen wöchentlichen
-# Cron-Lauf (siehe scripts/docker-cleanup.cron, Samstag 02:00 UTC).
+# verwaiste Container/Netzwerke vollläuft. Läuft wöchentlich über den
+# systemd-Timer scripts/iri-docker-cleanup.timer (Samstag 02:00 UTC).
 #
 # Was entfernt wird (jeweils nur, wenn von KEINEM Container belegt):
 #   * gestoppte Container       älter als IRI_CLEANUP_CONTAINER_UNTIL
@@ -27,13 +27,13 @@
 #     das Rollback-Image des letzten deploy.sh-Laufs erhalten bleibt. Wird es
 #     doch einmal entfernt, zieht deploy.sh es beim Rollback erneut aus GHCR.
 #
-# Aufruf:
-#   sudo /var/iri/code/scripts/docker-cleanup.sh                 # aufraeumen
-#   sudo /var/iri/code/scripts/docker-cleanup.sh --dry-run       # nur anzeigen
-#   sudo /var/iri/code/scripts/docker-cleanup.sh --help
+# Aufruf (manuell, als deploy-Nutzer wie unter dem systemd-Timer):
+#   sudo -u deploy /var/iri/code/scripts/docker-cleanup.sh             # aufraeumen
+#   sudo -u deploy /var/iri/code/scripts/docker-cleanup.sh --dry-run   # nur anzeigen
+#   sudo -u deploy /var/iri/code/scripts/docker-cleanup.sh --help
 #
-# Cron-Beispiel (woechentlich, Samstag 02:00 UTC):
-#   0 2 * * 6 /var/iri/code/scripts/docker-cleanup.sh >> /var/log/iri-docker-cleanup.log 2>&1
+# Geplanter Lauf: systemd-Timer iri-docker-cleanup.timer (Samstag 02:00 UTC).
+# Sofort ausloesen:  sudo systemctl start iri-docker-cleanup.service
 # =============================================================================
 
 set -euo pipefail
@@ -47,9 +47,10 @@ NETWORK_UNTIL="${IRI_CLEANUP_NETWORK_UNTIL:-24h}"
 PRUNE_VOLUMES="${IRI_CLEANUP_PRUNE_VOLUMES:-true}"
 LOCKFILE="${IRI_CLEANUP_LOCKFILE:-/var/lock/iri-docker-cleanup.lock}"
 
-# Monitoring textfile metrics (epic #936). This job runs from CRON, invisible to node_exporter's
-# systemd collector, so this textfile is its ONLY monitoring signal — the "docker-cleanup stale >8d
-# or absent" warning reads basetool_docker_cleanup_last_success_timestamp.
+# Monitoring textfile metrics (epic #936). The textfile carries richer per-outcome detail (last
+# success, duration, reclaimed bytes) than the systemd collector's unit-level success, and is the
+# signal the "docker-cleanup stale >8d or absent" warning reads via
+# basetool_docker_cleanup_last_success_timestamp.
 TEXTFILE_DIR="${IRI_MONITORING_TEXTFILE_DIR:-/var/iri/monitoring/textfile}"
 START_EPOCH="$(date +%s)"
 

@@ -1,0 +1,24 @@
+# logrotate(8) configuration for /var/log/iri-docker-cleanup.log.
+#
+# Installation (on the production host, one-time):
+#   sudo cp /var/iri/code/scripts/iri-docker-cleanup.logrotate /etc/logrotate.d/iri-docker-cleanup
+#   sudo chown root:root /etc/logrotate.d/iri-docker-cleanup
+#   sudo chmod 0644       /etc/logrotate.d/iri-docker-cleanup
+#
+# Manual test:
+#   sudo logrotate --debug /etc/logrotate.d/iri-docker-cleanup
+#
+# `copytruncate` is required because iri-docker-cleanup.service appends via
+# `StandardOutput=append:...`, holding the fd open across its run — a naive
+# `create` (rename + recreate) would leave systemd writing into the rotated file.
+
+/var/log/iri-docker-cleanup.log {
+    weekly
+    rotate 8
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+    create 0640 deploy adm
+}
