@@ -176,7 +176,7 @@ services:
   tempo:
     <<: *mon-base
     container_name: tempo
-    image: grafana/tempo:2.10.7
+    image: grafana/tempo:3.0.2
     cap_drop: [ALL]
     command: ["-target=all", "-config.file=/etc/tempo/tempo.yaml"]
     volumes:
