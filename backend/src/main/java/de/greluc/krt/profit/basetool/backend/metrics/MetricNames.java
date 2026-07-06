@@ -144,6 +144,16 @@ public final class MetricNames {
    */
   public static final String P4K_IMPORT_JOBS = "basetool.p4k.import.jobs";
 
+  /**
+   * Counter {@code basetool_mail_total} — tag {@code outcome} ({@link #MAIL_SENT} / {@link
+   * #MAIL_FAILED} / {@link #MAIL_DROPPED_DISABLED} / {@link #MAIL_DROPPED_NO_HOST} / {@link
+   * #MAIL_DROPPED_NO_SENDER}). {@code SmtpMailService} swallows delivery failures and silently
+   * drops mail behind three config gates, so without this counter a broken relay or env-var
+   * regression is invisible until someone notices missing registration mail. Never the recipient or
+   * subject.
+   */
+  public static final String MAIL = "basetool.mail";
+
   // --- Tag keys --------------------------------------------------------------------------
 
   /** Tag key: the scheduled job ({@link ScheduledJob#label()}). */
@@ -200,6 +210,21 @@ public final class MetricNames {
 
   /** Outcome tag value for a P4K import that reached {@code FAILED} (error or restart orphan). */
   public static final String OUTCOME_FAILED = "failed";
+
+  /** Mail outcome: the SMTP relay accepted the message. */
+  public static final String MAIL_SENT = "sent";
+
+  /** Mail outcome: the relay threw a {@code MailException} (swallowed, best-effort). */
+  public static final String MAIL_FAILED = "failed";
+
+  /** Mail outcome: dropped because the {@code app.mail.enabled} kill-switch is off. */
+  public static final String MAIL_DROPPED_DISABLED = "dropped_disabled";
+
+  /** Mail outcome: dropped because {@code spring.mail.host} is blank (SMTP not configured). */
+  public static final String MAIL_DROPPED_NO_HOST = "dropped_no_host";
+
+  /** Mail outcome: host set but no {@code JavaMailSender} bean was available. */
+  public static final String MAIL_DROPPED_NO_SENDER = "dropped_no_sender";
 
   /** Base unit rendered as the {@code _seconds} Prometheus suffix on epoch/age gauges. */
   public static final String UNIT_SECONDS = "seconds";

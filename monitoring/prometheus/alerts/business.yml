@@ -263,6 +263,31 @@ groups:
           summary: "P4K import failure in the last 24h"
           description: "At least one P4K catalog import reached FAILED in the last 24 hours. A repeatedly-failing import leaves an empty-looking pending queue; check the job list and backend logs for the error."
 
+      # (#1041 item 16) SMTP mail delivery health. SmtpMailService swallows MailException (log only)
+      # and drops mail behind three config gates, so a broken relay or an env-var regression stops
+      # admins hearing about pending registrations — today visible only via the LogbackErrorSpike
+      # heuristic. basetool_mail_total{outcome} makes each terminal outcome explicit.
+      - alert: MailDeliveryFailing
+        expr: sum(increase(basetool_mail_total{outcome="failed"}[1h])) > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "SMTP mail delivery failing (>2/h)"
+          description: "More than 2 outgoing mails failed to send in the last hour. Check the SMTP relay and the backend logs; registration / approval notifications may be silently lost."
+
+      # On the monitored (prod) deployment mail is configured, so ANY dropped_* outcome means a
+      # config-drift regression (kill-switch flipped, blank host env var, or a missing sender bean)
+      # that silently swallows mail. by(outcome) so the firing alert names the specific gate.
+      - alert: MailDroppedConfigDrift
+        expr: sum by (outcome) (increase(basetool_mail_total{outcome=~"dropped_.*"}[1h])) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mail dropped by a config gate ({{ $labels.outcome }})"
+          description: "Outgoing mail was dropped before delivery ({{ $labels.outcome }}) — mail is configured on this deployment, so this is a config-drift regression (app.mail.enabled, spring.mail.host, or the JavaMailSender bean). Registration / approval notifications are being lost."
+
       # Audit silence: backend up but zero audited mutations recorded across a 5-DAY window — a
       # REQ-AUDIT-001 signal that audit logging may be broken. 5d (not hours) so ordinary quiet periods
       # (weekends, maintenance windows) never trip it; only a genuine multi-day silence does. Resolves
