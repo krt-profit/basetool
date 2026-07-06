@@ -136,6 +136,14 @@ public final class MetricNames {
   public static final String P4K_IMPORT_JOB_PENDING_OLDEST_AGE =
       "basetool.p4k.import.job.pending.oldest.age";
 
+  /**
+   * Counter {@code basetool_p4k_import_jobs_total} — tags {@code outcome} ({@link
+   * #OUTCOME_SUCCEEDED} / {@link #OUTCOME_FAILED}) and {@code kind} ({@link #TAG_KIND}). Bumped at
+   * each terminal transition so a reliably-failing import surfaces as failures rather than an
+   * innocuous-looking empty pending queue.
+   */
+  public static final String P4K_IMPORT_JOBS = "basetool.p4k.import.jobs";
+
   // --- Tag keys --------------------------------------------------------------------------
 
   /** Tag key: the scheduled job ({@link ScheduledJob#label()}). */
@@ -171,6 +179,11 @@ public final class MetricNames {
    */
   public static final String TAG_EVENT_TYPE = "event_type";
 
+  /**
+   * Tag key: the P4K import job kind ({@code P4kImportJobKind#name()}) on {@link #P4K_IMPORT_JOBS}.
+   */
+  public static final String TAG_KIND = "kind";
+
   // --- Bounded tag values (not an application enum) --------------------------------------
 
   /** Outcome tag value for a job run that completed without throwing. */
@@ -178,6 +191,15 @@ public final class MetricNames {
 
   /** Outcome tag value for a job run that threw. */
   public static final String OUTCOME_FAILURE = "failure";
+
+  /**
+   * Outcome tag value for a P4K import that reached {@code SUCCEEDED} — distinct from {@link
+   * #OUTCOME_SUCCESS} because it names the terminal job status, not a scheduled-run result.
+   */
+  public static final String OUTCOME_SUCCEEDED = "succeeded";
+
+  /** Outcome tag value for a P4K import that reached {@code FAILED} (error or restart orphan). */
+  public static final String OUTCOME_FAILED = "failed";
 
   /** Base unit rendered as the {@code _seconds} Prometheus suffix on epoch/age gauges. */
   public static final String UNIT_SECONDS = "seconds";
