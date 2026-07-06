@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:2bcbf7ec-e63d-44c0-9db1-01843043237c" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:9b51a031-2077-4376-888f-3067a4aaa3f8" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-07-05T20:51:09Z</timestamp>
+    <timestamp>2026-07-06T15:51:47Z</timestamp>
     <tools>
       <components>
         <component type="application">
@@ -19,7 +19,7 @@
       <modified>false</modified>
       <externalReferences>
         <reference type="build-system">
-          <url>https://github.com/krt-profit/basetool/actions/runs/28754470873</url>
+          <url>https://github.com/krt-profit/basetool/actions/runs/28804433975</url>
         </reference>
         <reference type="vcs">
           <url>https://github.com/krt-profit/basetool</url>
@@ -4883,51 +4883,51 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.</description>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.flywaydb/flyway-core@12.9.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/org.flywaydb/flyway-core@12.10.0?type=jar">
       <group>org.flywaydb</group>
       <name>flyway-core</name>
-      <version>12.9.0</version>
+      <version>12.10.0</version>
       <hashes>
-        <hash alg="MD5">0854514442cd99f83840bba3765133bb</hash>
-        <hash alg="SHA-1">c09f38ced4d2d14b493c1512fe5dffb79e030b06</hash>
-        <hash alg="SHA-256">e597cec7f68dc2950fb7e88dfae2b2aa156193209791e6b60bf619df74a123d8</hash>
-        <hash alg="SHA-512">7e84e7f28301f15bef08d1e4c98865f9afa8903eb70fa40489c26b8a97a0b26c3174a4e5c5a766d4cbfbbdc529e44ba4740e6a904c905a16cf95cc97efb345ef</hash>
-        <hash alg="SHA-384">34fd0598dbe69cbf0f694ddf620d8b6402cc43313906768349314ad8fb00c29c3e9abb8891b3214e918d4b5b5d602185</hash>
-        <hash alg="SHA3-384">edbe7318fa2733d7f790b94839759ecc03b18241e3f842d1e1e7e5c6014cce6ac713e07bb693bf51b7d1a7c2363b351c</hash>
-        <hash alg="SHA3-256">d966a15d10d8892c98b4f4086d30a2fd5861b65c52e2b5c4c3483f619b1d088a</hash>
-        <hash alg="SHA3-512">637e8301ba42c84a6ff139551725cb20f16510c38d599f6b65d35165099795d8b8d8b7d18e0a5d41f87468602d42c3dc3a86adf57b61954219f05fa884be9012</hash>
+        <hash alg="MD5">ffda6281e5d4b88ce7b3e4ceb318cb92</hash>
+        <hash alg="SHA-1">1b6f40472b6c06bd831d81c017abeb8c4693ca73</hash>
+        <hash alg="SHA-256">78819df13e3196f44506b00a4657b3faaf1d4256914dcfe608396a8585eb51b2</hash>
+        <hash alg="SHA-512">642c60fa3ef32b7b131c0878eb7f7a65ab85ef05bd220f9c548f3d40baf1398c6c534c1f6947936c497f69e19bceaf4b3377b18f97c76f1a59ac5fdb588e3c8d</hash>
+        <hash alg="SHA-384">8a007b09fb1ab5ffe16d64c8083f4ab8ea2d327dce48278b6f1e2ddad71388ce26b65898fa31de56de7727e180d9dee0</hash>
+        <hash alg="SHA3-384">6fc0fd85f0d050b68ebf065a28949df9bc6210755392ae44569f7cef9d6790167ac3fcef9fd5799f65513da815f1e9c3</hash>
+        <hash alg="SHA3-256">df4f6f77ea21a14b05bcf459cf93bb170c65f4e3101a729180fc73ed7ad7d85c</hash>
+        <hash alg="SHA3-512">73b892b6fee60a0ae819ee4e3d307424891d06799c3bdc8f0865154ff1a2e910436c6d9e9058c582169287e884180a5958ddae4f9d13ac925d953479316786e5</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/org.flywaydb/flyway-core@12.9.0?type=jar</purl>
+      <purl>pkg:maven/org.flywaydb/flyway-core@12.10.0?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.flywaydb/flyway-database-postgresql@12.9.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/org.flywaydb/flyway-database-postgresql@12.10.0?type=jar">
       <group>org.flywaydb</group>
       <name>flyway-database-postgresql</name>
-      <version>12.9.0</version>
+      <version>12.10.0</version>
       <hashes>
-        <hash alg="MD5">87c14a84012ef73fea1f03182bfd56c8</hash>
-        <hash alg="SHA-1">c4ff65cac0a05746f9ea198402aff5291256e1d1</hash>
-        <hash alg="SHA-256">f9406e8fba678d717d91878d56ce4accba7bafb8d24bb3160e0ecfd26508424a</hash>
-        <hash alg="SHA-512">60b70dc7786ca85a4172a0f7fb795e54922c81686abd07f227012f0bfa134cd3625c47b35505ab6bec0420ef07fa379c935fa8ceb4c06dc9d9d17689b4a0b533</hash>
-        <hash alg="SHA-384">52bee2b9ed80842524d0da954a0e0c1f3f39a9b28152612af12025d5db6e7e9a0d52ae54b22dc5b2613296f919deb37b</hash>
-        <hash alg="SHA3-384">033e61906f3fb385c4790e8235f834d1b37f5c850acfbc39ea43585b994b3366fc0eb46357e6012dae834eeb2a150cfb</hash>
-        <hash alg="SHA3-256">3c966d2fca1d4a36f3dc538b3274ce448133f85a5c97417eae33cf7dda98a9c7</hash>
-        <hash alg="SHA3-512">e16fa051a2489e2cc968483bd57e2e827aeee1d0c1c58462de1c8898204ab98d72b754a546ff152dbe5141a82dcfdb2e814399946dcec1bd6464d3d3274ceb66</hash>
+        <hash alg="MD5">ddaf999d6340fcb92339b10b191b3163</hash>
+        <hash alg="SHA-1">2749e2f1c268e7b48cc525e76c27191e5b7fbdb8</hash>
+        <hash alg="SHA-256">3a40db4c597d130f0bec3c333f62adb534adeddf54a01cb405e75f473b19b209</hash>
+        <hash alg="SHA-512">65da20cb10f407a326319d2dfaf78039c1deaf8c0d1322b65c13a3ea6e6e1b4fe309ac60f0771c48c0950f6f8ebffbba13a1329aa0c20507b9df9895f1ee3495</hash>
+        <hash alg="SHA-384">9d46011924a3183320d3c4b464318d352acc5daeb82bd9c7a2de98aa75dfab74d5e8e15a351de4afb2bdeb62fb7ebf28</hash>
+        <hash alg="SHA3-384">76ecee888ec24e5e5bd24c6aa79be18734aba7d95172357c42d416d0e08ee0815e65776492f30a35989c4e3f63d4f189</hash>
+        <hash alg="SHA3-256">70d60293e56439007161085381afd90b5a228cb2fd82bf84aacdd45269918328</hash>
+        <hash alg="SHA3-512">dfe518776d0893d0dd9112f5bc4a9a4d243867e7985f208694b9c527fa8a878e4266bdc3aaeb1e36b003fb9295cfdb0c90079055679fb92a06ab0a25c632b39f</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/org.flywaydb/flyway-database-postgresql@12.9.0?type=jar</purl>
+      <purl>pkg:maven/org.flywaydb/flyway-database-postgresql@12.10.0?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
@@ -10896,8 +10896,8 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/io.micrometer/micrometer-registry-prometheus@1.17.0?type=jar"/>
       <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-testing@1.62.0?type=jar"/>
       <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar"/>
-      <dependency ref="pkg:maven/org.flywaydb/flyway-core@12.9.0?type=jar"/>
-      <dependency ref="pkg:maven/org.flywaydb/flyway-database-postgresql@12.9.0?type=jar"/>
+      <dependency ref="pkg:maven/org.flywaydb/flyway-core@12.10.0?type=jar"/>
+      <dependency ref="pkg:maven/org.flywaydb/flyway-database-postgresql@12.10.0?type=jar"/>
       <dependency ref="pkg:maven/org.jacoco/org.jacoco.agent@0.8.14?type=jar"/>
       <dependency ref="pkg:maven/org.jacoco/org.jacoco.ant@0.8.14?type=jar"/>
       <dependency ref="pkg:maven/org.jetbrains/annotations@26.1.0?type=jar"/>
@@ -11352,11 +11352,11 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/jakarta.mail/jakarta.mail-api@2.1.5?type=jar"/>
       <dependency ref="pkg:maven/org.eclipse.angus/angus-activation@2.0.3?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/org.flywaydb/flyway-core@12.9.0?type=jar">
+    <dependency ref="pkg:maven/org.flywaydb/flyway-core@12.10.0?type=jar">
       <dependency ref="pkg:maven/tools.jackson.core/jackson-databind@3.1.4?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/org.flywaydb/flyway-database-postgresql@12.9.0?type=jar">
-      <dependency ref="pkg:maven/org.flywaydb/flyway-core@12.9.0?type=jar"/>
+    <dependency ref="pkg:maven/org.flywaydb/flyway-database-postgresql@12.10.0?type=jar">
+      <dependency ref="pkg:maven/org.flywaydb/flyway-core@12.10.0?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.glassfish.jaxb/jaxb-core@4.0.9?type=jar">
       <dependency ref="pkg:maven/com.sun.istack/istack-commons-runtime@4.1.2?type=jar"/>

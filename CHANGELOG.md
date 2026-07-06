@@ -2,9 +2,7 @@
 
 ## [Unreleased]
 
-### Fixed
-
-- **Kartellbank: Buchungshistorie auf den Konto-Detailseiten lädt wieder.** Der mit dem Zeitraumfilter eingeführte Historienabruf schlug serverseitig fehl (HTTP 500), sodass beide Konto-Detailseiten (`/bank/accounts/{id}` und `/org-unit-bank/accounts/{id}`) statt der Buchungen dauerhaft „Noch keine Buchungen" anzeigten. Ursache war eine untypisierte `IS NULL`-Prüfung der optionalen Zeitraumgrenzen, die PostgreSQL nicht planen konnte; die Grenzen werden nun wie im übrigen Code per `CAST(... AS timestamp)` typisiert. (REQ-BANK-051)
+## [v1.1.8](https://github.com/krt-profit/basetool/releases/tag/v1.1.8) - 2026-07-06
 
 ### Changed
 
@@ -101,6 +99,8 @@
 - **Betrieb: täglicher VPN-Neustart (`vpn-restart`) entfernt.** Der Cron-Job, der die WireGuard-Schnittstelle `wg0` täglich um 04:00 neu startete, wird nicht mehr benötigt und wurde samt Skript sowie Cron- und logrotate-Konfiguration entfernt.
 
 ### Fixed
+
+- **Kartellbank: Buchungshistorie auf den Konto-Detailseiten lädt wieder.** Der mit dem Zeitraumfilter eingeführte Historienabruf schlug serverseitig fehl (HTTP 500), sodass beide Konto-Detailseiten (`/bank/accounts/{id}` und `/org-unit-bank/accounts/{id}`) statt der Buchungen dauerhaft „Noch keine Buchungen" anzeigten. Ursache war eine untypisierte `IS NULL`-Prüfung der optionalen Zeitraumgrenzen, die PostgreSQL nicht planen konnte; die Grenzen werden nun wie im übrigen Code per `CAST(... AS timestamp)` typisiert. (REQ-BANK-051)
 
 - **Monitoring: „Spring Boot apps"-Dashboard zeigte bei Auswahl „All" keine Daten.** Die Panels filterten das `application`-Label mit exaktem Vergleich, den der von „All" erzeugte Regex-Wert nie erfüllte. Die Abfragen nutzen jetzt den Regex-Vergleich und gruppieren zusätzlich nach `application`, sodass „All" eine Kurve pro Modul zeigt statt beide JVMs zu vermischen.
 
