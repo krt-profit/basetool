@@ -288,6 +288,20 @@ groups:
           summary: "Mail dropped by a config gate ({{ $labels.outcome }})"
           description: "Outgoing mail was dropped before delivery ({{ $labels.outcome }}) — mail is configured on this deployment, so this is a config-drift regression (app.mail.enabled, spring.mail.host, or the JavaMailSender bean). Registration / approval notifications are being lost."
 
+      # (#1041 item 17) Dead notification push channel. The backend SSE gauge reads zero while the
+      # frontend still reports active sessions — users are online but no SSE stream reaches the
+      # backend (e.g. reverse-proxy buffering drift), so everyone silently fell back to the poll.
+      # `and on()` broadcasts the cross-target correlation (backend gauge vs frontend gauge, which
+      # live on different scrape jobs); >3 sessions avoids firing on a near-empty site.
+      - alert: SsePushChannelDead
+        expr: (basetool_sse_connections == 0) and on() (basetool_active_sessions > 3)
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Notification SSE push channel dead while users are online"
+          description: "The backend has zero live SSE connections for 30 minutes while the frontend reports more than 3 active sessions — the notification push channel is down and clients fell back to polling. Check reverse-proxy SSE buffering and the /notifications/stream relay."
+
       # Audit silence: backend up but zero audited mutations recorded across a 5-DAY window — a
       # REQ-AUDIT-001 signal that audit logging may be broken. 5d (not hours) so ordinary quiet periods
       # (weekends, maintenance windows) never trip it; only a genuine multi-day silence does. Resolves
