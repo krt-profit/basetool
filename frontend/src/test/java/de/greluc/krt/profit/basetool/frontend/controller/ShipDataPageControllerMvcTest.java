@@ -56,9 +56,12 @@ import org.springframework.web.context.WebApplicationContext;
  * and {@code closeModal} was never registered (the "reset all fitted" confirmation modal could not
  * be cancelled). The fix moves both name lists into sibling {@code <datalist>} elements.
  *
- * <p>This test pins that the {@code 'ship-close-modal'} delegated binding string — registered at
- * the very tail of the script — appears in the rendered HTML, and that the response ends with the
- * closing {@code </html>} tag.
+ * <p>Post-ADR-0069 the page logic lives in the extracted {@code ship-data.js} module (loaded via
+ * {@code th:src}) and the remaining interpolation (the AJAX toast/conflict strings + the reset URL)
+ * sits in a small inline bootstrap right before it. This test pins that the module's {@code th:src}
+ * tag — emitted AFTER that interpolated bootstrap — appears in the rendered HTML (so a
+ * re-introduced inline-truncation bug that ate the bootstrap and dropped the following module tag
+ * is still caught), and that the response ends with the closing {@code </html>} tag.
  */
 @SpringBootTest
 class ShipDataPageControllerMvcTest {
@@ -79,13 +82,13 @@ class ShipDataPageControllerMvcTest {
   }
 
   /**
-   * Asserts the {@code 'ship-close-modal'} delegated-event registration (defined AFTER both
-   * datalists in the script) appears in the rendered HTML — proof that the Thymeleaf truncation
-   * does not strike again.
+   * Asserts the extracted {@code ship-data.js} module tag (emitted AFTER both datalists and the
+   * interpolated bootstrap) appears in the rendered HTML — proof that the Thymeleaf inline
+   * truncation does not strike again.
    */
   @Test
   @WithMockUser(roles = "ADMIN")
-  void listData_ShouldRenderCloseModalBinding_AfterBothDatalists() throws Exception {
+  void listData_ShouldRenderModuleTag_AfterBothDatalists() throws Exception {
     ManufacturerDto manufacturer =
         new ManufacturerDto(
             UUID.randomUUID(),
@@ -117,7 +120,7 @@ class ShipDataPageControllerMvcTest {
         .andExpect(content().string(containsString("id=\"mfgNames-data\"")))
         .andExpect(content().string(containsString("value=\"Avenger Titan\"")))
         .andExpect(content().string(containsString("value=\"Aegis Dynamics\"")))
-        .andExpect(content().string(containsString("'ship-close-modal'")))
+        .andExpect(content().string(containsString("src=\"/js/ship-data.js\"")))
         .andExpect(content().string(containsString("</html>")));
   }
 }
