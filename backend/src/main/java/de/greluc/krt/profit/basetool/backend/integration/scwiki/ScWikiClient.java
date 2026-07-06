@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.integration.scwiki;
 
 import de.greluc.krt.profit.basetool.backend.config.ScWikiProperties;
 import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiResponseDto;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -87,6 +89,13 @@ public class ScWikiClient {
   private final WebClient.Builder webClientBuilder;
   private final ScWikiProperties properties;
 
+  /**
+   * Micrometer registry for the swallowed-fetch-error counter ({@link
+   * MetricNames#EXTERNAL_FETCH_ERRORS}). Injected so a network or parse failure — which the fetch
+   * helpers below map to {@code null} / empty — still leaves a metric trail (REQ-OBS-011).
+   */
+  private final MeterRegistry meterRegistry;
+
   /** Reusable WebClient bound to the Wiki base URL. Built once after dependency injection. */
   private WebClient client;
 
@@ -123,6 +132,19 @@ public class ScWikiClient {
             .baseUrl(properties.getApiUrl())
             .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
             .build();
+  }
+
+  /**
+   * Increments {@link MetricNames#EXTERNAL_FETCH_ERRORS} for the {@code scwiki} source. Called from
+   * each branch that swallows an upstream network or parse failure into a {@code null} / empty
+   * result, so a sustained Wiki outage is visible even though the sync services treat the empty
+   * payload as a skip and the scheduled job still records a success (REQ-OBS-011).
+   */
+  private void recordFetchError() {
+    meterRegistry
+        .counter(
+            MetricNames.EXTERNAL_FETCH_ERRORS, MetricNames.TAG_SOURCE, MetricNames.SOURCE_SCWIKI)
+        .increment();
   }
 
   /**
@@ -293,6 +315,7 @@ public class ScWikiClient {
             .onErrorResume(
                 e -> {
                   log.error("Failed to fetch {} from SC Wiki API ({})", resourceLabel, uri, e);
+                  recordFetchError();
                   return Mono.empty();
                 })
             .blockOptional()
@@ -306,6 +329,7 @@ public class ScWikiClient {
       return objectMapper.treeToValue(payload, type);
     } catch (Exception e) {
       log.error("Failed to parse {} response from SC Wiki API ({})", resourceLabel, uri, e);
+      recordFetchError();
       return null;
     }
   }
@@ -362,6 +386,7 @@ public class ScWikiClient {
         .onErrorResume(
             e -> {
               log.error("Failed to fetch {} from SC Wiki API ({})", resourceLabel, requestUri, e);
+              recordFetchError();
               return Mono.<ScWikiResponseDto<T>>empty();
             })
         .blockOptional()
