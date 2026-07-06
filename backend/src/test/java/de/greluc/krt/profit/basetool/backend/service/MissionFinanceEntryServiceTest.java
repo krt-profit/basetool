@@ -41,6 +41,8 @@ import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryUpdateDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceTotalsDto;
+import de.greluc.krt.profit.basetool.backend.repository.FinanceEntryAggregate;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
@@ -229,13 +231,77 @@ class MissionFinanceEntryServiceTest {
       assertEquals(new BigDecimal("800.0"), service.calculateTotalSum(MISSION_ID));
     }
 
+    @Test
+    void calculateTotals_exposesPerTypeSumsAndCounts() {
+      stubEntries(
+          entry(FinanceType.INCOME, new BigDecimal("500.00")),
+          entry(FinanceType.INCOME, new BigDecimal("75.00")),
+          entry(FinanceType.EXPENSE, new BigDecimal("150.00")));
+      stubRefineryOrders();
+
+      MissionFinanceTotalsDto totals = service.calculateTotals(MISSION_ID);
+
+      assertEquals(new BigDecimal("425.00"), totals.total());
+      assertEquals(new BigDecimal("575.00"), totals.incomeSum());
+      assertEquals(2L, totals.incomeCount());
+      assertEquals(new BigDecimal("150.00"), totals.expenseSum());
+      assertEquals(1L, totals.expenseCount());
+    }
+
+    @Test
+    void calculateTotals_foldsRefineryExpensesIntoBucket_butProfitIntoTotal() {
+      stubEntries(entry(FinanceType.INCOME, new BigDecimal("1000")));
+      // profit = 500 - 300 - 50 = 150 (into total); raw expenses 300 (> 0 -> into expense bucket)
+      stubRefineryOrders(refineryOrder(500.0, 300.0, 50.0));
+
+      MissionFinanceTotalsDto totals = service.calculateTotals(MISSION_ID);
+
+      assertEquals(new BigDecimal("1150.0"), totals.total());
+      assertEquals(new BigDecimal("1000"), totals.incomeSum());
+      assertEquals(1L, totals.incomeCount());
+      assertEquals(new BigDecimal("300.0"), totals.expenseSum());
+      assertEquals(1L, totals.expenseCount());
+    }
+
+    @Test
+    void calculateTotals_emptyMission_returnsZeros() {
+      stubEmpty();
+
+      MissionFinanceTotalsDto totals = service.calculateTotals(MISSION_ID);
+
+      assertEquals(BigDecimal.ZERO, totals.total());
+      assertEquals(BigDecimal.ZERO, totals.incomeSum());
+      assertEquals(0L, totals.incomeCount());
+      assertEquals(BigDecimal.ZERO, totals.expenseSum());
+      assertEquals(0L, totals.expenseCount());
+    }
+
     private void stubEmpty() {
       stubEntries();
       stubRefineryOrders();
     }
 
     private void stubEntries(MissionFinanceEntry... entries) {
-      when(financeEntryRepository.findAllByMissionId(MISSION_ID)).thenReturn(List.of(entries));
+      // calculateTotals now reads a SQL aggregate instead of the row list, so translate the given
+      // entries into the equivalent per-type aggregate (keeping the cases expressed as concrete
+      // entries). A SQL SUM over no rows is NULL, so leave the sum null when a type is absent —
+      // that
+      // exercises the service's coalesce-to-zero path; entry amounts' scales are preserved.
+      BigDecimal incomeSum = null;
+      long incomeCount = 0L;
+      BigDecimal expenseSum = null;
+      long expenseCount = 0L;
+      for (MissionFinanceEntry e : entries) {
+        if (e.getType() == FinanceType.INCOME) {
+          incomeSum = incomeSum == null ? e.getAmount() : incomeSum.add(e.getAmount());
+          incomeCount++;
+        } else if (e.getType() == FinanceType.EXPENSE) {
+          expenseSum = expenseSum == null ? e.getAmount() : expenseSum.add(e.getAmount());
+          expenseCount++;
+        }
+      }
+      when(financeEntryRepository.aggregateFinanceByMission(MISSION_ID))
+          .thenReturn(new FinanceEntryAggregate(incomeSum, incomeCount, expenseSum, expenseCount));
     }
 
     private void stubRefineryOrders(RefineryOrder... orders) {

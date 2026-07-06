@@ -44,10 +44,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceTotalsDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -168,8 +170,8 @@ class MissionPageControllerMvcTest {
     // ROLE_*), so this fetch was silently skipped and the "Finanzen" panel rendered empty.
     verify(backendApiClient)
         .get(
-            eq("/api/v1/missions/" + missionId + "/finance-entries?size=1000"),
-            anyTypeRef(),
+            eq("/api/v1/missions/" + missionId + "/finance-entries/summary"),
+            eq(MissionFinanceTotalsDto.class),
             eq(false));
   }
 
@@ -397,12 +399,20 @@ class MissionPageControllerMvcTest {
    * @param missionId the mission whose finance-entries fetch is stubbed
    */
   private void stubEmptyFinance(UUID missionId) {
+    // ADR-0078: the finance strip reads a single aggregate (/finance-entries/summary) and the table
+    // a bounded page (size=200) instead of the previous size=1000 load-all.
     when(backendApiClient.get(
-            eq("/api/v1/missions/" + missionId + "/finance-entries?size=1000"),
+            eq("/api/v1/missions/" + missionId + "/finance-entries/summary"),
+            eq(MissionFinanceTotalsDto.class),
+            eq(false)))
+        .thenReturn(
+            new MissionFinanceTotalsDto(BigDecimal.ZERO, BigDecimal.ZERO, 0L, BigDecimal.ZERO, 0L));
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + missionId + "/finance-entries?size=200"),
             anyTypeRef(),
             eq(false)))
         .thenReturn(
-            new PageResponse<>(Collections.emptyList(), 0, 1000, 0, 0, Collections.emptyList()));
+            new PageResponse<>(Collections.emptyList(), 0, 200, 0, 0, Collections.emptyList()));
   }
 
   /**
@@ -2730,7 +2740,13 @@ class MissionPageControllerMvcTest {
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), eq(false)))
         .thenReturn(mission);
     when(backendApiClient.get(
-            eq("/api/v1/missions/" + missionId + "/finance-entries?size=1000"),
+            eq("/api/v1/missions/" + missionId + "/finance-entries/summary"),
+            eq(MissionFinanceTotalsDto.class),
+            eq(false)))
+        .thenReturn(
+            new MissionFinanceTotalsDto(BigDecimal.ZERO, BigDecimal.ZERO, 0L, BigDecimal.ZERO, 0L));
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + missionId + "/finance-entries?size=200"),
             anyTypeRef(),
             eq(false)))
         .thenReturn(financesPage);
@@ -3060,6 +3076,163 @@ class MissionPageControllerMvcTest {
         // Section-sized: no page chrome, no full board markup.
         .andExpect(content().string(not(containsString("mission-head-sticky"))))
         .andExpect(content().string(not(containsString("id=\"board-pool\""))));
+  }
+
+  // --- ADR-0078: fragment-gated backend reads (fan-out regression fence) ---
+  // Before ADR-0078 missionDetail() rebuilt the FULL model (~6-9 uncached backend GETs) for every
+  // fragment value, so one peer's crew-board live-update refetch still pulled the size=1000 finance
+  // ledger + the manager/owner pickers. Across 200 concurrent viewers that O(peers x sections x
+  // reads) fan-out starved the backend DB pool and tripped the shared circuit breaker into a
+  // fleet-wide outage. These tests fence the gate: a fragment refetch must issue ONLY the reads its
+  // own section renders. Assertions are Mockito verify() against the mocked BackendApiClient (this
+  // suite has no WireMock server).
+
+  /**
+   * Asserts the member-only finance reads (summary aggregate + entries page + refinery) were NOT
+   * issued.
+   */
+  private void verifyNoFinanceReads(UUID missionId) {
+    verify(backendApiClient, never())
+        .get(
+            eq("/api/v1/missions/" + missionId + "/finance-entries/summary"),
+            anyClass(),
+            anyBoolean());
+    verify(backendApiClient, never())
+        .get(
+            eq("/api/v1/missions/" + missionId + "/finance-entries?size=200"),
+            anyTypeRef(),
+            anyBoolean());
+    verify(backendApiClient, never())
+        .get(eq("/api/v1/refinery-orders/mission/" + missionId), anyTypeRef(), anyBoolean());
+  }
+
+  /**
+   * Asserts the mgmt-only manager-list read was NOT issued. The owner-picker read ({@code
+   * /users/me/pickable-org-units}) lives in the same {@code !anonymous && needMgmt} gated block,
+   * but {@code fetchCallerMembershipOptions} short-circuits to an empty list when the {@code
+   * OidcUser} principal is null — and {@code @WithMockUser} injects a plain user, not an OidcUser —
+   * so that read is never reached here and cannot be asserted separately. {@code /users/lookup}
+   * (not principal-guarded) is therefore the testable proxy for the whole mgmt-block gate.
+   */
+  private void verifyNoManagerReads() {
+    verify(backendApiClient, never()).get(eq("/api/v1/users/lookup"), anyTypeRef(), anyBoolean());
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void missionDetail_CrewBoardFragment_SkipsFinanceAndMgmtReads() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
+        .thenReturn(editableMission(missionId));
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/missions/" + missionId).param("fragment", "crew-board"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("mission-detail :: crewBoard"));
+
+    // A crew-board refetch renders neither finance data nor the manager/owner pickers.
+    verifyNoFinanceReads(missionId);
+    verifyNoManagerReads();
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void missionDetail_OverviewFragment_SkipsFinanceMgmtAndShipReads() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
+        .thenReturn(editableMission(missionId));
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/missions/" + missionId).param("fragment", "overview"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("mission-detail :: overviewSection"));
+
+    // The overview fragment needs none of finance / manager pickers / unit-ship options.
+    verifyNoFinanceReads(missionId);
+    verifyNoManagerReads();
+    verify(backendApiClient, never())
+        .get(
+            eq("/api/v1/missions/" + missionId + "/unit-ship-options"), anyTypeRef(), anyBoolean());
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void missionDetail_FinanceFragment_IssuesFinanceReads() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
+        .thenReturn(editableMission(missionId));
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
+        .thenReturn(Collections.emptyList());
+    stubEmptyFinance(missionId);
+
+    mockMvc
+        .perform(get("/missions/" + missionId).param("fragment", "finance"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("mission-detail :: financeSection"));
+
+    // The finance fragment IS the one that renders the ledger: it fetches the summary aggregate, a
+    // bounded entries page, and the refinery list (ADR-0078 — no more size=1000 load-all).
+    verify(backendApiClient)
+        .get(
+            eq("/api/v1/missions/" + missionId + "/finance-entries/summary"),
+            eq(MissionFinanceTotalsDto.class),
+            eq(false));
+    verify(backendApiClient)
+        .get(
+            eq("/api/v1/missions/" + missionId + "/finance-entries?size=200"),
+            anyTypeRef(),
+            eq(false));
+    verify(backendApiClient)
+        .get(eq("/api/v1/refinery-orders/mission/" + missionId), anyTypeRef(), eq(false));
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void missionDetail_MgmtFragment_IssuesManagerReadsButNotFinance() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
+        .thenReturn(editableMission(missionId));
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/missions/" + missionId).param("fragment", "mgmt"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("mission-detail :: mgmtPanels"));
+
+    // The Verwaltung panel IS the one that renders the manager list (and, with a real OidcUser
+    // principal, the owner picker — see verifyNoManagerReads for why that read is not asserted
+    // here).
+    verify(backendApiClient).get(eq("/api/v1/users/lookup"), anyTypeRef(), anyBoolean());
+    // ... but not the finance trio.
+    verifyNoFinanceReads(missionId);
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void missionDetail_FullPage_StillIssuesEveryGatedRead() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
+        .thenReturn(editableMission(missionId));
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
+        .thenReturn(Collections.emptyList());
+    stubEmptyFinance(missionId);
+
+    // No fragment param -> full page render must keep issuing every read (unchanged behaviour).
+    mockMvc.perform(get("/missions/" + missionId)).andExpect(status().isOk());
+
+    verify(backendApiClient)
+        .get(
+            eq("/api/v1/missions/" + missionId + "/finance-entries/summary"),
+            eq(MissionFinanceTotalsDto.class),
+            eq(false));
+    verify(backendApiClient).get(eq("/api/v1/users/lookup"), anyTypeRef(), anyBoolean());
+    verify(backendApiClient)
+        .get(eq("/api/v1/missions/" + missionId + "/unit-ship-options"), anyTypeRef(), eq(false));
   }
 
   // --- #574: party-lead AJAX endpoint ------------------------------------

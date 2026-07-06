@@ -724,7 +724,10 @@ serialized second toggle would silently revert the first).
   saves both in order with **no** 409 conflict prompt, and the just-typed entry is never lost.
 - [ ] The same holds for the other version-carrying inline editors swept in — the bank-grant flag
   matrix, the inventory job/mission association selects and the note edit, the order status +
-  variant-counting toggles, and the org-structure parent select.
+  variant-counting toggles, the org-structure parent select, and the mission owning-org-unit
+  reassignment (its `krtMissionWrite` payload reads `owningOrgUnitVersion` lazily and its `onSuccess`
+  writes the bumped version back to `#owning-org-unit-row` before the serialized chain releases the
+  next write, ADR-0078).
 - [ ] Two **different** users editing the same entity still get the genuine OPTIMISTIC_LOCK
   reload-confirm (REQ-FE-003) — serialization only orders one client's own writes.
 - [ ] Editing two **disjoint** sections/scopes concurrently does not serialize them against each

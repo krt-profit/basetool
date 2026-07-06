@@ -204,7 +204,12 @@ Beyond the in-app polling baseline (REQ-NOTIF-006), real-time server push uses S
 Events: a backend in-memory emitter registry keyed by `sub` (`NotificationStreamService`) with a
 heartbeat, exposed at `GET /api/v1/notifications/stream`; the frontend relays it to the browser
 via a resilience-free streaming WebClient (`WebClientConfig#sseWebClient`) and an `EventSource`.
-On a `notification` event the client refreshes its unread state immediately. Push is
+Because each viewing browser holds one long-lived frontend→backend relay connection for its whole
+page lifetime, that streaming WebClient uses a **dedicated, generously-sized Netty connection pool**
+(`frontend-sse-pool`, `maxConnections=1000`, no `maxLifeTime`) separate from the request path's
+100-slot `frontend-pool` — sharing the request pool's ceiling would cap concurrent live viewers and
+the surplus would silently lose push (ADR-0078). On a `notification` event the client refreshes its
+unread state immediately. Push is
 **best-effort** — the polling of REQ-NOTIF-006 is the guaranteed fallback, and a failed push or
 broken stream never affects correctness. The unread-count poll adapts to stream health: while the
 `EventSource` is connected it backs off to a slow keepalive (≈5 min) and speeds back up (≈1 min)
@@ -238,6 +243,9 @@ backend/Keycloak blip); the browser reconnects and the poll keeps the badge fres
   liveness watchdog, without waiting for an `error`.
 - [x] The 30-minute emitter timeout completes the emitter cleanly, so the stream is recorded as a
   normal completion and never as a phantom `503` on `http.server.requests`.
+- [x] The frontend SSE relay uses a dedicated connection pool (`frontend-sse-pool`) sized well above
+  the expected concurrent-viewer count, so many simultaneous viewers (200+) each keep their live push
+  instead of the surplus blocking on the request pool's connection ceiling (ADR-0078).
 
 **Enforced by:** `NotificationStreamServiceTest` (named `connected`/`heartbeat`/`notification`
 events + clean timeout completion), full build (bean wiring), frontend lint gate · **Code:**

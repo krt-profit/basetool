@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.model.FinanceType;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryUpdateDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceTotalsDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
@@ -40,6 +41,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -184,6 +186,34 @@ class MissionFinanceEntryControllerTest {
 
     assertThat(result).isEqualByComparingTo(total);
     verify(service).calculateTotalSum(missionId);
+  }
+
+  @Test
+  void getFinanceSummary_delegatesToService() {
+    UUID missionId = UUID.randomUUID();
+    MissionFinanceTotalsDto totals =
+        new MissionFinanceTotalsDto(
+            new BigDecimal("100"), new BigDecimal("300"), 3L, new BigDecimal("200"), 2L);
+    when(service.calculateTotals(missionId)).thenReturn(totals);
+
+    MissionFinanceTotalsDto result = controller.getFinanceSummary(missionId);
+
+    assertThat(result).isSameAs(totals);
+    verify(service).calculateTotals(missionId);
+  }
+
+  @Test
+  void getFinanceEntries_capsPageSizeToPerEndpointMax() {
+    UUID missionId = UUID.randomUUID();
+    when(service.getEntriesByMission(eq(missionId), any(Pageable.class))).thenReturn(Page.empty());
+
+    // A crafted large size must be clamped to the per-endpoint cap (500), not the global 100_000
+    // (ADR-0078): the mission finance ledger is not a load-all surface.
+    controller.getFinanceEntries(missionId, 0, 100_000, "createdAt,desc");
+
+    ArgumentCaptor<Pageable> pageable = ArgumentCaptor.captor();
+    verify(service).getEntriesByMission(eq(missionId), pageable.capture());
+    assertThat(pageable.getValue().getPageSize()).isEqualTo(500);
   }
 
   @Test

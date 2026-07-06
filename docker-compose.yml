@@ -35,18 +35,22 @@ x-db-backend: &db-backend-template
     - SETGID
     - SETUID
   # Container-aware memory tuning. The default Postgres settings (128 kB work_mem,
-  # 128 MB shared_buffers) target a 4 GB host — at our 768 MB container limit the
+  # 128 MB shared_buffers) target a 4 GB host — at our 1536 MB container limit the
   # buffer pool stays warm and join/sort operations spill to disk far less often.
   # `effective_cache_size` is an estimate to the planner, not an allocation, so
   # setting it to ~2/3 of the limit is safe and helps index plans win over seq
-  # scans.
+  # scans. shared_buffers/effective_cache_size and max_connections were scaled up
+  # together with the container RAM (768M -> 1536M) so the backend's 100-slot Hikari
+  # pool (ADR-0078 mission-scale hardening) fits under max_connections with headroom
+  # for postgres_exporter + Flyway + admin sessions, without starving them or OOMing
+  # the container.
   command: >
     postgres
-    -c shared_buffers=192MB
-    -c effective_cache_size=512MB
+    -c shared_buffers=384MB
+    -c effective_cache_size=1024MB
     -c work_mem=8MB
     -c maintenance_work_mem=64MB
-    -c max_connections=100
+    -c max_connections=150
     -c log_error_verbosity=terse
   environment:
     POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set in .env}
@@ -60,20 +64,23 @@ x-db-backend: &db-backend-template
     timeout: 5s
     retries: 5
   stop_grace_period: 60s
-  # Resource budget: targets a 4 vCPU / 8 GB host. Total of all `prod` services
-  # is ~5.6 GB RAM (leaves ~2 GB headroom for the kernel, the Docker daemon and
-  # short-lived bursts). CPU limits are intentionally overcommitted relative to
-  # the four physical vCPUs because they are per-container burst ceilings, not
-  # reserved shares — the CFS scheduler arbitrates contention at run time.
-  # Without these limits an in-container memory leak would let one service
-  # monopolise the host and OOM-kill its neighbours (Postgres in particular
-  # has historically been the casualty when the JVM heap runs away).
+  # Resource budget: the host has 16 GB RAM. The `prod` app services total ~6.4 GB
+  # after the db-backend bump 768M -> 1536M; the separate monitoring compose stack
+  # adds ~2-3 GB, so even together they leave well over 6 GB of headroom for the
+  # kernel, the Docker daemon and short-lived bursts. The db-backend's extra 768 MB
+  # backs the backend's 100-slot Hikari pool (ADR-0078): ~384 MB shared_buffers +
+  # ~100 connections x ~8 MB working memory + overhead. CPU limits are intentionally
+  # overcommitted relative to the four physical vCPUs because they are per-container
+  # burst ceilings, not reserved shares — the CFS scheduler arbitrates contention at
+  # run time. Without these limits an in-container memory leak would let one service
+  # monopolise the host and OOM-kill its neighbours (Postgres in particular has
+  # historically been the casualty when the JVM heap runs away).
   deploy:
     resources:
       limits:
-        memory: 768M
+        memory: 1536M
         cpus: '1.5'
-        # Fork-bomb / runaway-backend ceiling. max_connections=100 caps live backends at ~100 +
+        # Fork-bomb / runaway-backend ceiling. max_connections=150 caps live backends at ~150 +
         # background workers, so 512 is generous headroom, not a tight limit.
         pids: 512
   volumes:
