@@ -1,0 +1,76 @@
+; systemd service for the weekly Profit Basetool Docker housekeeping.
+;
+; Installation (on the production host, one-time — see docs/deployment.md):
+;   sudo cp /var/iri/code/scripts/iri-docker-cleanup.service /etc/systemd/system/
+;   sudo cp /var/iri/code/scripts/iri-docker-cleanup.timer   /etc/systemd/system/
+;   sudo systemctl daemon-reload
+;   sudo systemctl enable --now iri-docker-cleanup.timer
+;
+; Run an immediate cleanup (bypassing the next scheduled tick):
+;   sudo systemctl start iri-docker-cleanup.service
+;
+; Inspect:
+;   systemctl status iri-docker-cleanup.timer
+;   journalctl -u iri-docker-cleanup.service -f
+;
+; Runs as the same unprivileged `deploy` user as iri-backup / iri-deploy (member
+; of the `docker` group, no shell, no sudo): it needs the Docker socket to prune
+; unused resources, nothing more. DOCKER_CONFIG is pinned to a real path because
+; `deploy` is created with `--no-create-home` (no usable $HOME) and, under
+; ProtectHome=true, the Docker CLI would otherwise fail reading its config from
+; the unreachable $HOME/.docker — the same reason deploy.sh pins it.
+
+[Unit]
+Description=Profit Basetool — weekly Docker housekeeping (prune unused images/cache/volumes)
+Documentation=https://github.com/krt-profit/basetool/blob/main/docs/deployment.md
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+
+User=deploy
+Group=docker
+
+; `deploy` has no usable $HOME, so point the Docker CLI at a real, writable path
+; (already in ReadWritePaths below). Mirrors the DOCKER_CONFIG the retired
+; docker-cleanup.cron drop-in used to export.
+Environment=DOCKER_CONFIG=/var/lib/iri/.docker
+
+ExecStart=/var/iri/code/scripts/docker-cleanup.sh
+
+; stdout/stderr to journald AND to /var/log/iri-docker-cleanup.log for
+; logrotate-kept history.
+StandardOutput=append:/var/log/iri-docker-cleanup.log
+StandardError=append:/var/log/iri-docker-cleanup.log
+
+; --- Hardening (mirrors iri-backup.service) --------------------------------
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictRealtime=true
+LockPersonality=true
+; Writable paths the script needs:
+;   /var/lib/iri        — DOCKER_CONFIG (deploy has no usable $HOME)
+;   /var/iri/monitoring — the node_exporter textfile dir the script writes the
+;                         basetool_docker_cleanup_* metrics into
+;   /var/log            — append to iri-docker-cleanup.log
+;   /var/lock           — the docker-cleanup flock
+ReadWritePaths=/var/lib/iri /var/iri/monitoring /var/log /var/lock
+
+; docker prune is light on this host; cap generously. The heavy lifting is
+; delegated to the docker daemon out-of-band from this sandbox.
+MemoryMax=1G
+CPUQuota=200%
+
+TimeoutStartSec=1800
+
+[Install]
+WantedBy=multi-user.target

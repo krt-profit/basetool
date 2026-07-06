@@ -320,18 +320,15 @@ cannot touch.
 
 The job runs as the **`deploy`** user (not root), consistent with `deploy.sh`
 and the `iri-deploy.timer` pipeline — `deploy` is in the `docker` group, so it
-can reach the Docker socket. The drop-in sets `DOCKER_CONFIG=/var/lib/iri/.docker`
+can reach the Docker socket. The unit sets `DOCKER_CONFIG=/var/lib/iri/.docker`
 because `deploy` has no usable `$HOME` (`--no-create-home`), the same reason
 `deploy.sh` pins it.
 
-Preview what it would reclaim, then install the weekly cron (Saturday 02:00 UTC):
+Preview what it would reclaim, then install the weekly systemd timer (Saturday
+02:00 UTC):
 
 ```bash
 sudo -u deploy /var/iri/code/scripts/docker-cleanup.sh --dry-run   # show plan + disk usage
-
-sudo cp /var/iri/code/scripts/docker-cleanup.cron      /etc/cron.d/iri-docker-cleanup
-sudo cp /var/iri/code/scripts/docker-cleanup.logrotate /etc/logrotate.d/iri-docker-cleanup
-sudo chmod 0644 /etc/cron.d/iri-docker-cleanup
 
 sudo chown deploy:deploy /var/iri/code/scripts/docker-cleanup.sh   # owner = deploy
 sudo chmod 0750          /var/iri/code/scripts/docker-cleanup.sh   # rwx for deploy, none for others
@@ -339,12 +336,24 @@ sudo chmod 0750          /var/iri/code/scripts/docker-cleanup.sh   # rwx for dep
 sudo touch /var/log/iri-docker-cleanup.log
 sudo chown deploy:adm /var/log/iri-docker-cleanup.log
 sudo chmod 0640       /var/log/iri-docker-cleanup.log
+sudo cp /var/iri/code/scripts/iri-docker-cleanup.logrotate /etc/logrotate.d/iri-docker-cleanup
+
+sudo cp /var/iri/code/scripts/iri-docker-cleanup.service /etc/systemd/system/
+sudo cp /var/iri/code/scripts/iri-docker-cleanup.timer   /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now iri-docker-cleanup.timer     # arm the weekly tick
 ```
 
-The `CRON_TZ=UTC` line in the drop-in pins the schedule to UTC regardless of the
-host's local timezone. Retention windows and the volume-prune toggle are
-overridable via `IRI_CLEANUP_*` environment variables — see the script header
-or `docker-cleanup.sh --help`.
+Force an immediate run with `sudo systemctl start iri-docker-cleanup.service`;
+follow it with `journalctl -u iri-docker-cleanup.service -f`. The `UTC` suffix on
+the timer's `OnCalendar` pins the schedule to UTC regardless of the host's local
+timezone. Retention windows and the volume-prune toggle are overridable via
+`IRI_CLEANUP_*` environment variables — see the script header or
+`docker-cleanup.sh --help`.
+
+> **Migrating from the old cron drop-in?** This job used to run from
+> `/etc/cron.d/iri-docker-cleanup`. Remove it once the timer is armed so the
+> cleanup does not run twice: `sudo rm -f /etc/cron.d/iri-docker-cleanup`.
 
 ---
 
