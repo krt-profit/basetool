@@ -1,7 +1,7 @@
 # Management-Plane Access via WireGuard VPN — Implementation Plan
 
 > **Doc type:** Implementation plan — **living** until shipped, then freeze and point at the living truth (planned: ADR-0077, `REQ-OPS-017` in [`docs/specs/deployment-delivery.md`](specs/deployment-delivery.md), the reworked "Management access" section of [`docs/deployment.md`](deployment.md), and the `REQ-OBS-012` extension in [`docs/specs/observability.md`](specs/observability.md)).
-> **Status:** Decisions resolved with the owner on 2026-07-06 (§3). No change has been applied to the host, the UniFi gateway, NPM, or Hetzner yet.
+> **Status:** Phase 0 (inventory) **complete** 2026-07-06 — findings in §4. No change has been applied to the host, the UniFi gateway, NPM, or Hetzner yet; next up: Phase 1 (#1053, owner, UniFi UI).
 > **GitHub epic:** [krt-profit/basetool#1051](https://github.com/krt-profit/basetool/issues/1051) · **Sub-issues:** #1052 (Phase 0), #1053 (Phase 1), #1054 (Phase 2), #1055 (Phase 3), #1056 (Phase 4), #1057 (Phase 5).
 > **Execution model (owner decision):** mixed — the owner performs the UniFi UI work (Phase 1) and applies key material on the host; Claude performs the host inventory/setup over SSH (Phases 0/2), the NPM changes (Phase 3), and the repo PR (Phase 4), announcing every host-mutating step beforehand. Phase 5 is a joint, owner-approved cut-over.
 > **Last updated:** 2026-07-06.
@@ -33,7 +33,7 @@
 | WireGuard                                | **The old host `wg0` no longer runs** (owner statement 2026-07-06; the "host already runs WireGuard" note in ADR-0056 is outdated). The daily `vpn-restart` cron was already removed in #1039. The interface name `wg0` is free; leftovers are swept in Phase 0. The `REQ-OPS-010` out-of-band key-backup duty applies to the **new** tunnel | Owner; ADR-0056; `CHANGELOG.md` #1039                          |
 | External deny assertions                 | `.github/workflows/edge-deny-probe.yml` (daily, GitHub runner) asserts Keycloak `/admin` and the `/actuator` edge-deny from a genuinely external vantage point — internal blackbox probes hairpin and get SNAT'd to the allow-listed bridge gateways, so only an external probe can verify a deny                                            | workflow header comment                                        |
 | Blackbox posture (since #1046/#1049)     | v4 liveness (`blackbox-http`), IPv6 liveness (`blackbox-http-ipv6`), force-SSL, HSTS, internal-TLS and DNS jobs exist; hairpinned v4 probes egress as the allow-listed bridge gateways, **v6 probes egress with the host's public IPv6** (relevant for the new vhost, §8.3)                                                                  | `monitoring/prometheus/prometheus.yml`                         |
-| Host                                     | Hetzner Cloud **CPX42** (cloud VM → **Hetzner Cloud Firewall** available; sits outside the VM, immune to Docker's iptables DNAT). Public IPv4 + IPv6                                                                                                                                                                                         | `docs/MONITORING_ROLLOUT_RUNBOOK.md`                           |
+| Host                                     | Hetzner Cloud **CPX42** (cloud VM). **Cloud Firewall `firewall-3` is active** (inbound TCP 22/ICMP/80/443 from Any v4+v6, outbound open); it sits outside the VM, immune to Docker's iptables DNAT. Public IPv4 + IPv6                                                                                                                       | `docs/MONITORING_ROLLOUT_RUNBOOK.md`; Phase 0                  |
 | UniFi site                               | UCG Fibre with **public IPv4 + IPv6 behind DynDNS** (owner-confirmed) → the UCG-as-server direction works; no CGNAT role-flip needed                                                                                                                                                                                                         | Owner (D4)                                                     |
 | Host systemd convention                  | Ops units live in-repo as `scripts/iri-<name>.service` + `.timer` + `.logrotate` pairs (see `iri-docker-cleanup.*`, #1039)                                                                                                                                                                                                                   | `scripts/`                                                     |
 
@@ -50,9 +50,9 @@ Two conclusions that shape the plan:
  Home / UniFi site                                   Hetzner prod host
 ┌───────────────────────────────┐                   ┌──────────────────────────────────────┐
 │ UCG Fibre = WG **server**     │                   │ wg0 = WG **client** (initiates,      │
-│  WG subnet: 192.168.3.0/24    │◄── UDP 51820 ────►│  PersistentKeepalive 25s)            │
+│  WG subnet: 192.168.3.0/24    │◄── UDP 51822 ────►│  PersistentKeepalive 25s)            │
 │  host peer IP: 192.168.3.10   │  (host → DynDNS   │  AllowedIPs = 192.168.3.0/24,        │
-│  endpoint: <UNIFI_DDNS>       │   endpoint only)  │               10.1.0.0/24    (split) │
+│  endpoint: vpn.greluc.me      │   endpoint only)  │               10.1.0.0/24    (split) │
 │                               │                   │                                      │
 │ Mgmt clients in 10.1.0.0/24   │                   │  Via tunnel only:                    │
 │  → allowed to 192.168.3.10:   │                   │   • SSH  root@192.168.3.10:22        │
@@ -84,16 +84,16 @@ Two conclusions that shape the plan:
 
 ## 3. Resolved owner decisions (2026-07-06)
 
-| #  |        Decision        |                                                                          Answer                                                                           |
-|----|------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| D1 | WG transfer subnet     | `192.168.3.0/24` (UniFi default); host peer fixed at `192.168.3.10`. Phase 0 double-checks the net is unused                                              |
-| D2 | Management source net  | Existing VLAN **`10.1.0.0/24`** (no new VLAN)                                                                                                             |
-| D3 | Existing `wg0`         | **No longer runs** (ADR-0056-era info outdated) — fresh setup; Phase 0 sweeps leftovers                                                                   |
-| D4 | UCG inbound endpoint   | Public IPv4 **and** IPv6, reachable via DynDNS → UCG = server as planned, endpoint = DynDNS hostname                                                      |
-| D5 | Grafana                | **Stays public** (other org members need dashboards). Exempted from the lock-down; Grafana login remains the boundary                                     |
-| D6 | Keycloak Admin Console | **Stays SSH-tunnel-only** (unchanged `/admin` allow-list); the `ssh -L` targets the WG address once public 22 closes                                      |
-| D7 | NPM admin path         | **Dedicated vhost** `npm.profit-base.online` (public A record for HTTP-01, LE cert, allow-list, split-DNS via UCG); loopback publish stays as break-glass |
-| D8 | SSH during soak        | **Stays open (key-only) until Phase 5** — no interim Hetzner-CFW restriction                                                                              |
+| #  |        Decision        |                                                                              Answer                                                                              |
+|----|------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| D1 | WG transfer subnet     | `192.168.3.0/24` (UniFi default); host peer fixed at `192.168.3.10`. Phase 0 double-checks the net is unused                                                     |
+| D2 | Management source net  | Existing VLAN **`10.1.0.0/24`** (no new VLAN)                                                                                                                    |
+| D3 | Existing `wg0`         | **No longer runs** (ADR-0056-era info outdated) — fresh setup; Phase 0 sweeps leftovers                                                                          |
+| D4 | UCG inbound endpoint   | Public IPv4 **and** IPv6, reachable via DynDNS → UCG = server as planned; endpoint = **`vpn.greluc.me:51822`** (51820 is taken by another VPN server on the UCG) |
+| D5 | Grafana                | **Stays public** (other org members need dashboards). Exempted from the lock-down; Grafana login remains the boundary                                            |
+| D6 | Keycloak Admin Console | **Stays SSH-tunnel-only** (unchanged `/admin` allow-list); the `ssh -L` targets the WG address once public 22 closes                                             |
+| D7 | NPM admin path         | **Dedicated vhost** `npm.profit-base.online` (public A record for HTTP-01, LE cert, allow-list, split-DNS via UCG); loopback publish stays as break-glass        |
+| D8 | SSH during soak        | **Stays open (key-only) until Phase 5** — no interim Hetzner-CFW restriction                                                                                     |
 
 ---
 
@@ -117,10 +117,31 @@ On UniFi (owner) / Hetzner:
 
 **Exit criteria:** old-`wg0` leftovers identified (removal happens in Phase 2), textfile dir confirmed, UniFi/Hetzner prerequisites confirmed.
 
+### Phase 0 findings — host side (executed 2026-07-06, read-only over SSH)
+
+- **WireGuard state:** tools installed (`wireguard-tools 1.0.20210914-1ubuntu4`); `wg show all` empty, `wg-quick@wg0` **disabled** — owner statement confirmed, no tunnel runs.
+- **Stale `/etc/wireguard/wg0.conf` exists** (309 B, 2026-03-20, **mode `644 root:root` — the old private key is world-readable**, including inside node-exporter's read-only `/` host mount). Content (secrets omitted): old client `Address 192.168.1.2/32`, `DNS = 192.168.1.1`, peer endpoint **`vpn.greluc.me:51822`**, `AllowedIPs = 10.1.0.0/24, 192.168.1.0/24`, **no `PersistentKeepalive`** — the missing keepalive plus the `DNS=` line explain the old tunnel's flakiness (and the former daily-restart band-aid). → **Phase 2 deletes this file**; the old key counts as exposed and must not be reused; the new conf ships `600` with keepalive and without `DNS=`.
+- **DDNS:** `vpn.greluc.me` still resolves (91.21.156.212); the old server listened on **51822**. Owner confirmed `vpn.greluc.me` as the endpoint; the new server reuses port **51822** — the UniFi default 51820 is already taken by another VPN server on the UCG.
+- **Listeners:** `sshd` on `0.0.0.0:22` **and** `[::]:22` (socket-activated, `ssh.socket` active, `00-hardening.conf` drop-in present) — Phase 5's CFW must cover v4 **and** v6, as planned. NPM admin on `127.0.0.1:10081` (docker-proxy) confirmed.
+- **Host firewall posture:** `ufw` inactive, iptables `INPUT` policy `ACCEPT` — nothing **on the host** filters inbound; inbound filtering happens exclusively at the Hetzner Cloud Firewall layer (see the owner-side findings below).
+- **Routing/collisions:** no `192.168.0.0/16` or `10.0.0.0/8` routes on the host (Docker uses `172.17–.19` + the pinned `172.28.0–11/24`) → `192.168.3.0/24` and `10.1.0.0/24` are collision-free host-side. `rp_filter = 2` (loose) on all/default — no asymmetric-routing trap for the tunnel's routed mgmt-VLAN return path.
+- **Textfile collector confirmed:** `/var/iri/monitoring/textfile/` (holds `backup/deploy/docker_cleanup/restore_drill.prom`) — `wg-ensure.sh` writes `wireguard.prom` there (§8.2), matching `--collector.textfile.directory=/host/var/iri/monitoring/textfile` in `docker-compose.monitoring.yml`.
+- **Repo rot to clean in Phase 4:** `scripts/iri-backup.timer` still references the removed `vpn-restart` cron in comments (lines 3/10). No other cron/systemd/logrotate leftovers; root crontab clean.
+
+### Phase 0 findings — UniFi & Hetzner side (owner, 2026-07-06)
+
+- **UniFi Network 10.5.56** on the UCG Fibre → zone-based firewall UI available.
+- **`192.168.3.0/24` is free** in the home site → D1 stands.
+- **WAN is PPPoE**; the exact MTU was not readable at inventory time → Phase 2 sets `MTU = 1412` (safe under any PPPoE MTU ≥ 1492).
+- **DDNS endpoint confirmed: `vpn.greluc.me`**; WG server port = **51822** (the UniFi default 51820 is already occupied by another VPN server on the UCG).
+- **Hetzner Cloud Firewall `firewall-3` already exists and is fully applied to the server** — inbound: TCP 22, ICMP, TCP 80, TCP 443, each from Any IPv4 + Any IPv6; outbound unrestricted. Everything else inbound is already default-denied at the cloud layer (which mitigates the host-side `INPUT ACCEPT` finding), and **Phase 5 reduces to deleting the TCP-22 inbound rule**.
+
+**Phase 0 exit criteria met — phase complete (2026-07-06).**
+
 ## 5. Phase 1 — UniFi side (WireGuard server) — #1053 · Owner
 
-1. **VPN server:** Settings → VPN → VPN Server → WireGuard: UDP `51820`, subnet `192.168.3.0/24`. One client peer "basetool-prod-host", fixed IP `192.168.3.10`. Hand the exported config to the host **over the existing SSH session only** — never repo/chat/cloud (`REQ-OPS-010` applies to the new key).
-2. **DynDNS:** confirm the record updates from the UCG.
+1. **VPN server:** Settings → VPN → VPN Server → WireGuard: UDP `51822` (51820 is taken by the other VPN server), subnet `192.168.3.0/24`. One client peer "basetool-prod-host", fixed IP `192.168.3.10`. Hand the exported config to the host **over the existing SSH session only** — never repo/chat/cloud (`REQ-OPS-010` applies to the new key).
+2. **DynDNS:** `vpn.greluc.me` (Phase-0-confirmed) — verify the record updates from the UCG.
 3. **Firewall (zone-based):** allow `10.1.0.0/24` → `192.168.3.10` tcp `22,80,443` (+ ICMP for diagnostics); **block** new connections from the VPN peer into any internal zone (a compromised prod host must not pivot; stateful replies still flow; if the ADR-0056 SMB-to-UNAS backup fallback is ever activated, add a single host→UNAS:445 allow then); default-deny the rest.
 4. **No "route all traffic" / full-tunnel option anywhere.**
 
@@ -128,23 +149,24 @@ On UniFi (owner) / Hetzner:
 
 ## 6. Phase 2 — Host side (client + self-healing) — #1054 · Claude via SSH, owner applies the key
 
-1. Remove Phase-0 leftovers of the old tunnel (stale conf/cron/logrotate), then `/etc/wireguard/wg0.conf` (mode `600`; owner stores the key out-of-band per `REQ-OPS-010`):
+1. Delete the stale `/etc/wireguard/wg0.conf` (Phase 0 found it world-readable at mode 644 — the old private key counts as **exposed**; generate a **fresh keypair**, never reuse it), then write the new `/etc/wireguard/wg0.conf` (mode `600`; owner stores the key out-of-band per `REQ-OPS-010`):
 
    ```ini
    [Interface]
    Address = 192.168.3.10/32
    PrivateKey = <host-only>
    # No DNS= line — split tunnel, the host keeps its own resolver.
-   # MTU: default 1420; if the UCG WAN is PPPoE (Phase 0), set MTU = 1412.
+   MTU = 1412
+   # 1412, not the wg default 1420: the UCG WAN is PPPoE (Phase 0), 1492 - 80 bytes WG overhead.
 
    [Peer]
    PublicKey = <UCG server pubkey>
-   Endpoint = <UNIFI_DDNS>:51820
+   Endpoint = vpn.greluc.me:51822
    AllowedIPs = 192.168.3.0/24, 10.1.0.0/24
    PersistentKeepalive = 25
    ```
 2. **Boot persistence:** `systemctl enable --now wg-quick@wg0`.
-3. **Self-healing (`scripts/` additions, `iri-docker-cleanup` convention):** `scripts/wg-ensure.sh` — idempotent: (a) interface absent → `systemctl start wg-quick@wg0`; (b) `wg show wg0 latest-handshakes` older than 150 s → re-resolve `<UNIFI_DDNS>` and `wg set wg0 peer <pub> endpoint <ddns>:51820` (stock `reresolve-dns.sh` logic; covers boot-with-DNS-not-ready — wg-quick is `Type=oneshot`, `Restart=` is not permitted, the timer is the retry — plus WAN-IP changes and wedged states); (c) write the §8.2 textfile metric. Plus `scripts/iri-wg-ensure.service` + `.timer` (every 1 min, `Persistent=true`) and logrotate if it logs.
+3. **Self-healing (`scripts/` additions, `iri-docker-cleanup` convention):** `scripts/wg-ensure.sh` — idempotent: (a) interface absent → `systemctl start wg-quick@wg0`; (b) `wg show wg0 latest-handshakes` older than 150 s → re-resolve `vpn.greluc.me` and `wg set wg0 peer <pub> endpoint vpn.greluc.me:51822` (stock `reresolve-dns.sh` logic; covers boot-with-DNS-not-ready — wg-quick is `Type=oneshot`, `Restart=` is not permitted, the timer is the retry — plus WAN-IP changes and wedged states); (c) write the §8.2 textfile metric. Plus `scripts/iri-wg-ensure.service` + `.timer` (every 1 min, `Persistent=true`) and logrotate if it logs.
 4. **Verification (before touching any exposure):**
    - From a `10.1.0.0/24` client: `ssh root@192.168.3.10` works; `curl -k https://192.168.3.10` answers (NPM default site).
    - From the host: `nc -zw2 <LAN-IP> 445` **fails** (UniFi no-pivot rule works).
@@ -188,7 +210,7 @@ Binding per `CLAUDE.md`: ships **together** in one PR (with the Phase-2 scripts/
 
 Precondition: Phases 2–4 verified, tunnel soaked ≥ several days incl. one host reboot, `WireGuardTunnelDown` live.
 
-1. **Hetzner Cloud Firewall** (applies outside the VM — Docker's iptables can never bypass it): inbound `80/tcp` + `443/tcp` from `0.0.0.0/0` **and** `::/0`, nothing else — no 22, no 51820 (the host is the initiating client; the CFW is stateful, replies to the outbound UDP flow pass). No outbound rules (leave egress unrestricted: GHCR, Nextcloud, SMTP, DynDNS, WG handshakes).
+1. **Hetzner Cloud Firewall** (applies outside the VM — Docker's iptables can never bypass it): the existing **`firewall-3`** (Phase 0: inbound TCP 22 / ICMP / TCP 80 / TCP 443 from Any IPv4+IPv6, fully applied, outbound unrestricted) already default-denies everything else, so the cut-over is **deleting the TCP-22 inbound rule**. Keep 80/443 (public edge) and ICMP (diagnostics); no inbound 51822 needed (the host is the initiating client; the CFW is stateful, replies to the outbound UDP flow pass). Keep outbound unrestricted (GHCR, Nextcloud, SMTP, DynDNS, WG handshakes).
 2. **Verify:** external `ssh root@178.104.94.14` times out (v4 and v6); `ssh root@192.168.3.10` via tunnel works; edge-deny workflow green; public app/ingest/keycloak/grafana unchanged; backup + deploy timers each ran once cleanly after the change.
 3. **Break-glass (documented in `docs/deployment.md` by Phase 4):** ① Hetzner Cloud Console web terminal (independent of any network path); ② temporary CFW rule `22/tcp from <current-ip>/32` to recover SSH; ③ SSH-tunnel + hosts-entry path for the UIs once SSH is back. Update every doc/memory reference of routine `root@178.104.94.14` access to `root@192.168.3.10`.
 4. **Rollback:** re-add the 22 rule (or detach the CFW) in the Hetzner console — no host access needed. That is the point of enforcing outside the VM.
