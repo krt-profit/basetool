@@ -85,6 +85,70 @@ modules:
       tls_config:
         insecure_skip_verify: false
 
+  # IPv6 reachability. The public vhosts now carry AAAA records (owner-confirmed 2026-07-06), so a
+  # broken IPv6 path is a real user-facing regression the IPv4 http_2xx job cannot see. These modules
+  # pin the probe to IPv6 with NO v4 fallback, so probe_success flips to 0 when the endpoint is
+  # unreachable over IPv6 while IPv4 still answers. Otherwise identical to their IPv4 counterparts.
+  http_2xx_ipv6:
+    prober: http
+    timeout: 10s
+    http:
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      valid_status_codes: []  # defaults to 2xx
+      method: GET
+      follow_redirects: true
+      fail_if_ssl: false
+      fail_if_not_ssl: false
+      preferred_ip_protocol: "ip6"
+      ip_protocol_fallback: false
+      tls_config:
+        insecure_skip_verify: false
+
+  http_2xx_or_401_ipv6:
+    prober: http
+    timeout: 10s
+    http:
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      valid_status_codes: [200, 401]
+      method: GET
+      follow_redirects: true
+      fail_if_ssl: false
+      fail_if_not_ssl: false
+      preferred_ip_protocol: "ip6"
+      ip_protocol_fallback: false
+      tls_config:
+        insecure_skip_verify: false
+
+  # Public DNS resolution. The probe TARGET is the resolver (see prometheus.yml: 1.1.1.1); the query
+  # name/type live here. Requires NOERROR AND an answer RR of the exact type, so a NODATA response
+  # (zone still NOERROR but the A/AAAA record silently removed) fails the probe, not only NXDOMAIN.
+  # preferred_ip_protocol ip4 connects to the v4 resolver; the query type (A vs AAAA) is what is asserted.
+  dns_apex_a:
+    prober: dns
+    timeout: 5s
+    dns:
+      preferred_ip_protocol: "ip4"
+      ip_protocol_fallback: false
+      query_name: "profit-base.online"
+      query_type: "A"
+      valid_rcodes: ["NOERROR"]
+      validate_answer_rrs:
+        fail_if_not_matches_regexp:
+          - "profit-base\\.online\\.\\s+\\d+\\s+IN\\s+A\\s+.+"
+
+  dns_apex_aaaa:
+    prober: dns
+    timeout: 5s
+    dns:
+      preferred_ip_protocol: "ip4"
+      ip_protocol_fallback: false
+      query_name: "profit-base.online"
+      query_type: "AAAA"
+      valid_rcodes: ["NOERROR"]
+      validate_answer_rrs:
+        fail_if_not_matches_regexp:
+          - "profit-base\\.online\\.\\s+\\d+\\s+IN\\s+AAAA\\s+.+"
+
   # Succeeds ONLY on exactly 404 — the /actuator edge deny (ADR-0072 compensating control). The
   # live block is `location /actuator { return 404; }`; if it drifts, the Spring apps answer the
   # probed /actuator/prometheus path with 401 (fail-closed basic auth) and the probe fails.

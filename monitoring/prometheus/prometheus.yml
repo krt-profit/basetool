@@ -282,3 +282,72 @@ scrape_configs:
         target_label: instance
       - target_label: __address__
         replacement: blackbox-exporter:9115
+
+  # --- IPv6 reachability probes (owner-confirmed AAAA records, 2026-07-06) -------------------------
+  # Mirror the IPv4 liveness jobs over IPv6 so an IPv6-only regression (broken AAAA path, lost edge v6
+  # binding) is caught while IPv4 still answers. Same target URLs/instances as blackbox-http /
+  # blackbox-http-auth so EdgeIpv6Unreachable can guard on(instance) against the matching v4 probe.
+  - job_name: blackbox-http-ipv6
+    metrics_path: /probe
+    params:
+      module: [http_2xx_ipv6]
+    static_configs:
+      - targets:
+          - https://profit-base.online
+          - https://grafana.profit-base.online
+          - https://keycloak.profit-base.online/realms/iri/.well-known/openid-configuration
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  - job_name: blackbox-http-auth-ipv6
+    metrics_path: /probe
+    params:
+      module: [http_2xx_or_401_ipv6]
+    static_configs:
+      - targets:
+          - https://ingest.profit-base.online
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # --- Public DNS resolution probes (owner request 2026-07-06) ------------------------------------
+  # The probe target is the resolver (1.1.1.1); the query name/type live in the blackbox module.
+  # Validates that basetool's apex still resolves an A and an AAAA record end-to-end via a public
+  # resolver (NODATA — record silently removed — fails the probe, not only NXDOMAIN). blackbox has
+  # internet egress on net-monitoring-core.
+  - job_name: blackbox-dns-a
+    metrics_path: /probe
+    params:
+      module: [dns_apex_a]
+    static_configs:
+      - targets: ["1.1.1.1"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  - job_name: blackbox-dns-aaaa
+    metrics_path: /probe
+    params:
+      module: [dns_apex_aaaa]
+    static_configs:
+      - targets: ["1.1.1.1"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
