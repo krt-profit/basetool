@@ -2047,3 +2047,82 @@
         fetchView(state);
     });
 })();
+
+// ------------------------------------------------------------------------------------------------
+// Account-detail collapsible panels (REQ-BANK-050): the balance chart and the booking history are
+// each collapsible, DEFAULT EXPANDED (the server renders aria-expanded="true"), with the
+// collapsed/expanded state persisted per user in localStorage and replayed on load AND on every
+// krt:swapped — an accountBody / settings re-render restores the server default (expanded), so a
+// user who collapsed a panel keeps it collapsed after a money/settings write. The toggle button
+// carries data-collapse-key ("chart" / "history"); the store is a { key: collapsed } object under
+// bank_panel_collapse_<uid>. Distinct from the always-default-collapsed, unpersisted Konto-Info tile
+// (data-trigger="bank-info-collapse"). Document-delegated so it survives every fragment swap.
+// ------------------------------------------------------------------------------------------------
+(function () {
+    function storageKey() {
+        const main = document.querySelector('main[data-user-id]');
+        const uid = main ? main.getAttribute('data-user-id') : 'unknown';
+        return 'bank_panel_collapse_' + uid;
+    }
+
+    function readSaved() {
+        try {
+            const raw = localStorage.getItem(storageKey());
+            return raw === null ? {} : JSON.parse(raw) || {};
+        } catch {
+            return {};
+        }
+    }
+
+    function writeSaved(state) {
+        try {
+            localStorage.setItem(storageKey(), JSON.stringify(state));
+        } catch {
+            /* localStorage unavailable (private mode): the choice simply will not persist. */
+        }
+    }
+
+    // Reflects the collapsed flag onto a toggle head + its aria-controls body (the CSS rotates the
+    // chevron off aria-expanded).
+    function setCollapsed(head, collapsed) {
+        head.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        const id = head.getAttribute('aria-controls');
+        const target = id ? document.getElementById(id) : null;
+        if (target) {
+            target.hidden = collapsed;
+        }
+    }
+
+    // Replays the saved collapsed state onto every panel that has one; panels the user never toggled
+    // keep the server default (expanded).
+    function apply() {
+        const saved = readSaved();
+        document
+            .querySelectorAll('[data-trigger="bank-panel-collapse"][data-collapse-key]')
+            .forEach(function (head) {
+                const key = head.getAttribute('data-collapse-key');
+                if (Object.prototype.hasOwnProperty.call(saved, key)) {
+                    setCollapsed(head, saved[key] === true);
+                }
+            });
+    }
+
+    document.addEventListener('click', function (event) {
+        const head = event.target.closest
+            ? event.target.closest('[data-trigger="bank-panel-collapse"][data-collapse-key]')
+            : null;
+        if (!head) {
+            return;
+        }
+        // Currently expanded => this click collapses it (and vice versa).
+        const collapsed = head.getAttribute('aria-expanded') === 'true';
+        setCollapsed(head, collapsed);
+        const saved = readSaved();
+        saved[head.getAttribute('data-collapse-key')] = collapsed;
+        writeSaved(saved);
+    });
+
+    document.addEventListener('DOMContentLoaded', apply);
+    document.addEventListener('krt:swapped', apply);
+    apply();
+})();

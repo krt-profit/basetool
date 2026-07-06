@@ -1276,3 +1276,172 @@ tr.is-inert td {
 .bank-dept--search-rescue {
     --bank-dept: var(--color-dept-search-rescue);
 }
+
+/* ============================================================================
+   Account-detail balance chart (REQ-BANK-049) + booking-history period filter
+   (REQ-BANK-051). Server-rendered inline SVG line chart (BankBalanceChart), a
+   segmented preset-range selector and the from/to period filter. Colours are
+   design-system tokens; no external chart library (CSP).
+   ============================================================================ */
+
+.bank-chart-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+/* Segmented preset-range group (30 Tage / 90 Tage / 1 Jahr / Gesamt). */
+.bank-chart-ranges {
+    display: inline-flex;
+    flex-wrap: wrap;
+    border: 1px solid var(--color-gray-3);
+}
+
+.bank-chart-range-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 32px;
+    padding: 0 0.75rem;
+    font-size: 0.75rem;
+    color: var(--color-gray-1);
+    background-color: var(--color-surface-input);
+    border-right: 1px solid var(--color-gray-3);
+    text-decoration: none;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.bank-chart-ranges > *:last-child {
+    border-right: 0;
+}
+
+.bank-chart-range-btn:hover {
+    background-color: var(--color-gray-3);
+    color: var(--color-white);
+}
+
+.bank-chart-range-btn.is-active {
+    background-color: var(--color-primary);
+    color: var(--color-bg-black);
+    font-weight: var(--fw-bold);
+    cursor: default;
+}
+
+.bank-chart {
+    width: 100%;
+}
+
+.bank-chart-svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+
+.bank-chart-area {
+    fill: rgb(231 126 35 / 12%);
+    stroke: none;
+}
+
+.bank-chart-line {
+    fill: none;
+    stroke: var(--color-primary);
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+.bank-chart-grid {
+    stroke: var(--color-gray-3);
+    stroke-width: 1;
+}
+
+.bank-chart-target {
+    stroke: var(--color-info-text);
+    stroke-width: 1.5;
+    stroke-dasharray: 5 4;
+}
+
+.bank-chart-axis-label {
+    fill: var(--color-gray-2);
+    font-family: var(--font-body);
+    font-size: 12px;
+    dominant-baseline: middle;
+}
+
+.bank-chart-empty {
+    padding: 2rem 0;
+}
+
+.bank-chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--color-gray-1);
+}
+
+.bank-chart-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.bank-chart-swatch {
+    display: inline-block;
+    width: 18px;
+    height: 0;
+    border-top: 3px solid var(--color-primary);
+}
+
+.bank-chart-swatch--target {
+    border-top-style: dashed;
+    border-top-color: var(--color-info-text);
+}
+
+.bank-history-filter {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.bank-history-filter-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.bank-history-filter-field label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-gray-2);
+}
+
+/* Chart + booking-history layout (REQ-BANK-052): stacked by default (chart above the history),
+   side by side on ultra-wide screens. There, main.bank-detail is allowed past its normal 1200px
+   content cap so the two panels get real room to sit next to each other (REQ-UI-009 "exploit
+   space"); minmax(0, 1fr) lets the history table shrink and scroll instead of blowing out the grid. */
+.bank-detail-panels {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+    align-items: start;
+}
+
+@media (width >= 1800px) {
+    main.bank-detail {
+        max-width: min(2200px, 94vw);
+    }
+
+    main.bank-detail .bank-detail-panels {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 1.25rem;
+    }
+}

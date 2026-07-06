@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **Kartellbank: Konto-Detailseiten mit Saldo-Verlaufsgrafik, Zeitraumfilter und einklappbaren Panels.** Die Konto-Detailseiten (`/bank/accounts/{id}` und `/org-unit-bank/accounts/{id}`) zeigen jetzt oberhalb der Buchungshistorie eine Saldo-Verlaufsgrafik über einen wählbaren Zeitraum (30 Tage / 90 Tage / 1 Jahr / Gesamt, Standard 90 Tage) samt Ziel-Linie, falls ein Kontostandsziel gesetzt ist. Grafik und Buchungshistorie sind einklappbar (standardmäßig ausgeklappt, Zustand pro Nutzer lokal gespeichert), und die Historie lässt sich nach Zeitraum filtern (Standard: letzte 90 Tage) und mit 10/50/100 Einträgen pro Seite paginieren (Standard 50). Auf sehr breiten Bildschirmen (z. B. Vollbild auf 4K) stehen Grafik und Buchungshistorie nebeneinander statt untereinander. (REQ-BANK-049/-050/-051/-052)
+
 - **Technisch: Inline-JavaScript der Beförderungs-Adminseiten in statische Module ausgelagert.** Das JavaScript der Beförderungs-Admin-Seiten (Themen/Kategorien und Rang-Anforderungen) wurde ohne Verhaltensänderung aus den Thymeleaf-Vorlagen in browser-zwischenspeicherbare, lint- und formatierbare Dateien unter `static/js/` verlagert (ADR-0069).
 
 - **Technisch: Inline-JavaScript des Organigramm-Editors in ein statisches Modul ausgelagert.** Das JavaScript der Organigramm-Seite (Positionen anlegen/umbesetzen/umbenennen/entfernen, Dialog-Fokusfalle und ARIA-Baum-Tastaturnavigation) wurde ohne Verhaltensänderung aus der Thymeleaf-Vorlage in eine browser-zwischenspeicherbare, lint- und formatierbare Datei unter `static/js/` verlagert (ADR-0069).

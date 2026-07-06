@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.BankAccountDetailDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankAccountDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.BankBalanceSeriesDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankCapabilitiesDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
@@ -240,15 +241,19 @@ public class BankAccountController {
   }
 
   /**
-   * Pages over the account's booking history, newest first by default.
+   * Pages over the account's booking history, newest first by default. An optional inclusive {@code
+   * [from, to]} period narrows the history to that window (REQ-BANK-051); either bound may be
+   * omitted.
    *
    * @param id the account
    * @param page zero-based page index
    * @param size page size
    * @param sort whitelisted sort spec
+   * @param from optional inclusive period start (ISO-8601 instant)
+   * @param to optional inclusive period end (ISO-8601 instant)
    * @return one page of booking rows incl. transfer counter-legs
    */
-  @Operation(summary = "List the booking history of a bank account (paged)")
+  @Operation(summary = "List the booking history of a bank account (paged, optional period)")
   @GetMapping("/{id}/transactions")
   @PreAuthorize("@bankSecurityService.canSee(#id, authentication)")
   @Transactional(readOnly = true)
@@ -256,12 +261,35 @@ public class BankAccountController {
       @PathVariable @NotNull UUID id,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
-      @RequestParam(required = false) String sort) {
+      @RequestParam(required = false) String sort,
+      @RequestParam(required = false) Instant from,
+      @RequestParam(required = false) Instant to) {
     String effectiveSort = sort == null || sort.isBlank() ? "createdAt,desc" : sort;
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page, size, effectiveSort, BOOKING_SORT_FIELDS, "createdAt");
-    return PageResponse.of(bankAccountService.getBookings(id, pageable));
+    return PageResponse.of(bankAccountService.getBookings(id, pageable, from, to));
+  }
+
+  /**
+   * Returns the account's balance-over-time series for a caller-chosen period plus the balance
+   * target (REQ-BANK-049) — the data behind the detail page's SVG line chart. Read-only projection
+   * of the ledger, gated exactly like the booking history ({@code canSee}); no audit event.
+   *
+   * @param id the account
+   * @param from inclusive period start (ISO-8601 instant)
+   * @param to inclusive period end (ISO-8601 instant)
+   * @return the balance series and the account's balance target
+   */
+  @Operation(summary = "Balance-over-time series of a bank account for a period")
+  @GetMapping("/{id}/balance-series")
+  @PreAuthorize("@bankSecurityService.canSee(#id, authentication)")
+  @Transactional(readOnly = true)
+  public BankBalanceSeriesDto getBalanceSeries(
+      @PathVariable @NotNull UUID id,
+      @RequestParam @NotNull Instant from,
+      @RequestParam @NotNull Instant to) {
+    return bankAccountService.getBalanceSeries(id, from, to);
   }
 
   /**

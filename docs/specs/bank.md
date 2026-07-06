@@ -2051,6 +2051,120 @@ members), `OrgUnitBankControllerTest`, frontend `OrgUnitBankPageControllerMvcTes
 `templates/fragments/bank-approval-limits.html` + `org-unit-bank-account-detail.html` ·
 **ADR:** [ADR-0066](../adr/0066-krt-account-amount-tiered-approval-ladder.md) · **Issues:** —
 
+### REQ-BANK-049 — Account balance-over-time chart
+
+Both account-detail surfaces — the bank-staff `/bank/accounts/{id}` and the org-unit viewer
+`/org-unit-bank/accounts/{id}` — render, **above** the booking history, an inline SVG line chart of
+the account balance over a caller-chosen preset range (**30 Tage / 90 Tage / 1 Jahr / Gesamt**,
+default 90 Tage). When a **balance target** is set (REQ-BANK-036) it is drawn as a dashed reference
+line. The series is computed on demand from the append-only ledger — the opening balance before the
+window (`accountBalanceBefore`) walked over the window's postings into an end-of-day series
+(`BankBalanceSeriesCalculator`, mirroring the statement math REQ-BANK-014), evenly downsampled for
+long ranges — and served by a new read-only endpoint on each surface
+(`GET /api/v1/bank/accounts/{id}/balance-series?from&to`, gated by `canSee`, and its
+`isAuthenticated` + view-scoped org-unit twin). Pure balance math with no holder/counterparty data,
+so nothing is redacted: every viewer who may see the account (and thus its current balance) may see
+how it moved. No external chart library (CSP): the SVG geometry is scaled server-side
+(`BankBalanceChart`, the larger sibling of the dashboard sparkline). A range change re-renders only
+the chart fragment in place (`fragment=balanceChart` / `orgUnitBalanceChart`, no reload,
+REQ-FE-002); a money write resets it to the default range alongside the balance. Read-only, so **not
+audited** and carries **no new `basetool_*` metric** (covered by the generic HTTP server metrics,
+REQ-OBS-011).
+
+**Acceptance**
+
+- [x] The chart renders for every viewer of the account on both surfaces, with the preset range
+  selector (default 90 days) and — when a target is set — the dashed target line + legend.
+- [x] The balance series is the end-of-day running balance over the range (opening + window
+  postings); an empty/no-data window renders the chart's empty state.
+- [x] The `balance-series` endpoints are gated exactly like the booking history (`canSee` /
+  org-unit view scope); a caller without access is forbidden.
+- [x] A range change swaps only the chart fragment in place (no full reload); the series is never
+  audited and adds no business metric.
+
+**Enforced by:** `BankBalanceSeriesCalculatorTest`, `BankAccountServiceTest#getBalanceSeries*`,
+`BankControllerSecurityTest#balanceSeries*`, `OrgUnitBankAccessServiceTest`, frontend
+`BankAccountDetailFragmentMvcTest` (balanceChart fragment) + `OrgUnitBankPageControllerMvcTest` ·
+**Code:** `service/BankBalanceSeriesCalculator`, `service/BankAccountService#getBalanceSeries`,
+`service/OrgUnitBankAccessService#getViewableBalanceSeries`, `controller/BankAccountController`,
+`controller/OrgUnitBankController`, `repository/BankPostingRepository#postingSlicesInRange`,
+`model/dto/BankBalanceSeriesDto` + `BankBalancePointDto`, frontend `controller/BankBalanceChart`,
+`controller/BankAccountDetailSupport`, `templates/fragments/bank-balance-chart.html` · **Issues:** —
+
+### REQ-BANK-050 — Collapsible chart and booking-history panels (per-user state)
+
+On both account-detail surfaces the balance chart (REQ-BANK-049) and the booking history are each
+collapsible, **expanded by default**, with the collapsed/expanded state persisted **per user in
+localStorage** (`bank_panel_collapse_<uid>`, keyed by the panel — `chart` / `history`) and replayed
+on load and on every in-place fragment swap, so a money/settings write that re-renders a panel does
+not lose the user's choice. Distinct from the always-default-collapsed, unpersisted Konto-Info tile
+(REQ-BANK-017). Client-side view preference only — no server state, no new endpoint — in the same
+family as the dashboard's per-user layout/group toggle (REQ-BANK-016).
+
+**Acceptance**
+
+- [x] Both panels render expanded by default; toggling a panel persists its state per user and
+  survives a reload and an in-place fragment swap.
+- [x] The persistence is per user (keyed by the authenticated user) and local (localStorage), never
+  server-side.
+
+**Enforced by:** frontend `BankAccountDetailFragmentMvcTest` / `OrgUnitBankPageControllerMvcTest`
+(the collapse toggles render `aria-expanded="true"` by default) · **Code:** frontend
+`static/js/bank.js` (persisted-collapse module), `templates/bank-account-detail.html`,
+`templates/org-unit-bank-account-detail.html`, `static/css/bank.css` (`.bank-collapse-head`) ·
+**Issues:** —
+
+### REQ-BANK-051 — Booking-history period filter and page-size pagination
+
+The account-detail booking history (both surfaces) gains a **from/to period filter** (default the
+last **90 days**) and **page-size pagination** with the standard controls and **10 / 50 / 100**
+entries per page (default **50**). The period narrows the history via optional inclusive
+`from`/`to` bounds on the transactions endpoints (`(:from IS NULL OR …)`), reusing the shared
+`PaginationUtil` size clamp. Changing the period or the page/size re-renders only the
+booking-history fragment in place (`fragment=bookings` / `orgUnitBankBookings`,
+REQ-FE-002/REQ-FE-005); the period rides the pagination base URL so paging keeps the filter, and the
+no-JS form submit reloads the page with the same params. The org-unit surface stays Halter-redacted
+(REQ-BANK-038).
+
+**Acceptance**
+
+- [x] The history defaults to the last 90 days at 50 entries/page; the user can set from/to and
+  choose 10/50/100 per page.
+- [x] Changing the period or the page size swaps only the history fragment in place and preserves
+  the other setting across paging.
+- [x] The optional `from`/`to` bounds narrow the transactions query on both the bank-staff and the
+  org-unit endpoints; omitting them pages the whole history as before.
+
+**Enforced by:** `BankControllerSecurityTest`, `BankAccountServiceTest`, `OrgUnitBankAccessServiceTest`,
+frontend `BankAccountDetailFragmentMvcTest` (period filter + page-size picker) + `BankPageControllerTest`
+(pagination base URL carries the period) · **Code:**
+`repository/BankPostingRepository#findBookings(from,to)`, `service/BankAccountService#getBookings`,
+`service/OrgUnitBankAccessService#getViewableAccountBookings`, `controller/BankAccountController`,
+`controller/OrgUnitBankController`, frontend `controller/BankAccountDetailSupport`,
+`templates/bank-account-detail.html`, `templates/org-unit-bank-account-detail.html` · **Issues:** —
+
+### REQ-BANK-052 — Chart and booking history side by side on ultra-wide screens
+
+On both account-detail surfaces the balance chart (REQ-BANK-049) and the booking history stack
+vertically (chart above history) by default, but sit **side by side** (chart left, history right) on
+ultra-wide screens (≥ 1800px viewport): the `.bank-detail-panels` grid switches to two columns and
+`main.bank-detail` is allowed past its normal 1200px content cap to exploit the space (REQ-UI-009).
+The two panels stay independently collapsible (REQ-BANK-050) in either layout, and the single-column
+stack keeps the chart-first order on narrower screens.
+
+**Acceptance**
+
+- [x] Below the ultra-wide breakpoint the two panels stack (chart above history); at/above it they
+  render side by side (chart left, history right) and the content region widens past 1200px.
+- [x] Both layouts keep the panels independently collapsible and the chart-first order; the history
+  table shrinks/scrolls inside its column rather than blowing out the grid.
+
+**Enforced by:** the two panels render inside the `.bank-detail-panels` grid on both surfaces
+(frontend `BankAccountDetailMovementModalMvcTest`, `OrgUnitBankPageControllerMvcTest`); the
+two-column switch is the CSS media query (visual, REQ-UI-009) · **Code:** frontend
+`static/css/bank.css` (`.bank-detail-panels` + the `main.bank-detail` ultra-wide media query),
+`templates/bank-account-detail.html`, `templates/org-unit-bank-account-detail.html` · **Issues:** —
+
 ## Out of scope
 
 - **Accounts for individual players** — an explicit owner decision: players appear only

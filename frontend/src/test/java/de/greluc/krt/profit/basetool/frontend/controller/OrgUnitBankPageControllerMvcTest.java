@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -448,7 +449,7 @@ class OrgUnitBankPageControllerMvcTest {
         .thenReturn(detail);
     when(backendApiClient.get(eq(detailUri + "/settings"), eq(OrgUnitBankAccountSettingsDto.class)))
         .thenReturn(settings);
-    when(backendApiClient.get(eq(detailUri + "/transactions?page=0"), anyTypeRef()))
+    when(backendApiClient.get(contains(detailUri + "/transactions"), anyTypeRef()))
         .thenReturn(bookings);
     when(backendApiClient.get(eq("/api/v1/users/lookup"), anyTypeRef())).thenReturn(List.of(user));
   }
@@ -529,7 +530,7 @@ class OrgUnitBankPageControllerMvcTest {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class)))
         .thenReturn(detail);
-    when(backendApiClient.get(eq(detailUri + "/transactions?page=0"), anyTypeRef()))
+    when(backendApiClient.get(contains(detailUri + "/transactions"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 20, 0L, 0, List.of()));
 
     mockMvc
@@ -593,7 +594,7 @@ class OrgUnitBankPageControllerMvcTest {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class)))
         .thenReturn(detail);
-    when(backendApiClient.get(eq(detailUri + "/transactions?page=0"), anyTypeRef()))
+    when(backendApiClient.get(contains(detailUri + "/transactions"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 20, 0L, 0, List.of()));
 
     mockMvc

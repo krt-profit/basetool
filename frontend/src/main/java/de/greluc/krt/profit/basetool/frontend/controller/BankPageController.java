@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDetailDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankBalanceSeriesDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBookingDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankDashboardAccountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankDashboardDto;
@@ -33,6 +34,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -343,35 +345,47 @@ public class BankPageController {
    *
    * @param id the account id
    * @param page zero-based booking page
+   * @param size booking-history page size (10 / 50 / 100, default 50; REQ-BANK-051)
+   * @param from optional booking-history period start ({@code yyyy-MM-dd}); default last 90 days
+   * @param to optional booking-history period end ({@code yyyy-MM-dd}); default today
+   * @param chartRange balance-chart range key ({@code 30d} / {@code 90d} / {@code 365d} / {@code
+   *     all}); default {@code 90d} (REQ-BANK-049)
    * @param fragment when {@code "bookings"} only the paged booking-history fragment is rendered
-   *     (AJAX pager swap, REQ-FE-002); when {@code "accountBody"} the whole account body (facts,
-   *     bookings and the booking modals) is re-rendered in place after a money write (REQ-FE-005)
-   *     so the balance and booking history refresh without a reload; otherwise the full page is
-   *     returned
+   *     (period filter + pager swap, REQ-FE-002); when {@code "balanceChart"} only the
+   *     balance-chart fragment (range swap); when {@code "accountBody"} the whole account body
+   *     (facts, chart, bookings and the booking modals) is re-rendered in place after a money write
+   *     (REQ-FE-005) so the balance, chart and booking history refresh without a reload; otherwise
+   *     the full page is returned
    * @param model Spring MVC model
-   * @return the detail template, or its {@code bookings} / {@code accountBody} fragment for an AJAX
-   *     swap
+   * @return the detail template, or its {@code bookings} / {@code balanceChart} / {@code
+   *     accountBody} fragment for an AJAX swap
    */
   @GetMapping("/bank/accounts/{id}")
   @PreAuthorize("hasRole('" + Roles.BANK_EMPLOYEE + "')")
   public String accountDetail(
       @PathVariable @NotNull UUID id,
       @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String from,
+      @RequestParam(required = false) String to,
+      @RequestParam(required = false) String chartRange,
       @RequestParam(required = false) String fragment,
       Model model) {
     if ("bookings".equals(fragment)) {
-      return bookingsFragment(id, page, model);
+      return bookingsFragment(id, page, size, from, to, model);
     }
-    int effectivePage = page == null || page < 0 ? 0 : page;
+    if ("balanceChart".equals(fragment)) {
+      return balanceChartFragment(id, chartRange, model);
+    }
     BankAccountDetailDto detail =
         backendApiClient.get("/api/v1/bank/accounts/" + id, BankAccountDetailDto.class);
-    PageResponse<BankBookingDto> bookings = fetchBookings(id, effectivePage);
+    addBookingsModel(id, page, size, from, to, model);
+    addChartModel(id, chartRange, detail, model);
     List<BankHolderDto> holders = backendApiClient.get("/api/v1/bank/holders", BANK_HOLDER_LIST);
     PageResponse<BankAccountDto> accounts =
         backendApiClient.get("/api/v1/bank/accounts?size=500", BANK_ACCOUNT_PAGE);
 
     model.addAttribute("detail", detail);
-    model.addAttribute("bookings", bookings);
     model.addAttribute("holders", holders == null ? List.<BankHolderDto>of() : holders);
     model.addAttribute(
         "activeHolders",
@@ -388,7 +402,6 @@ public class BankPageController {
                     .filter(a -> "ACTIVE".equals(a.status()))
                     .toList(),
                 BankAccountDto::name));
-    model.addAttribute("paginationBaseUrl", "/bank/accounts/" + id);
     // User lookup feeds the deposit/withdrawal counterparty picker (Einzahler / Empfänger,
     // REQ-BANK-044) on the always-present booking modals, so it is fetched on every detail render
     // (the /lookup gate now admits BANK_EMPLOYEE). Approval limits are read-only on this surface
@@ -415,48 +428,160 @@ public class BankPageController {
   }
 
   /**
-   * Renders just the paged booking-history block for an AJAX pager swap (REQ-FE-002). Fetches only
-   * the requested bookings page — the account detail, holder registry and transfer-target accounts
-   * the full page loads (only the modals need them) are skipped. A backend failure degrades to an
-   * empty page so the swapped-in fragment shows its empty state rather than injecting an error page
-   * into the sub-table; the reverse-button (delegated) and {@code .utc-time} localiser (re-run on
-   * {@code krt:swapped}) keep working on the swapped-in rows.
+   * Renders just the paged booking-history block for an AJAX period-filter / pager swap
+   * (REQ-FE-002). Fetches only the requested bookings page — the account detail, chart, holder
+   * registry and transfer-target accounts the full page loads are skipped. A backend failure
+   * degrades to an empty page (see {@link #addBookingsModel}) so the swapped-in fragment shows its
+   * empty state rather than injecting an error page into the sub-table; the reverse-button
+   * (delegated) and {@code .utc-time} localiser (re-run on {@code krt:swapped}) keep working on the
+   * swapped-in rows.
    *
    * @param id the account id
    * @param page zero-based booking page (clamped to 0)
-   * @param model Spring MVC model populated with {@code bookings} and {@code paginationBaseUrl}
+   * @param size requested page size, or {@code null} for the default
+   * @param from optional period start ({@code yyyy-MM-dd})
+   * @param to optional period end ({@code yyyy-MM-dd})
+   * @param model Spring MVC model populated with the bookings + period + pagination attributes
    * @return the {@code bank-account-detail :: bookings} fragment view
    */
-  private String bookingsFragment(UUID id, Integer page, Model model) {
-    int effectivePage = page == null || page < 0 ? 0 : page;
-    PageResponse<BankBookingDto> bookings;
-    try {
-      bookings = fetchBookings(id, effectivePage);
-    } catch (Exception e) {
-      log.error("Error loading bookings fragment for account {}", id, e);
-      bookings = null;
-    }
-    model.addAttribute("bookings", bookings);
-    model.addAttribute("paginationBaseUrl", "/bank/accounts/" + id);
+  private String bookingsFragment(
+      UUID id, Integer page, Integer size, String from, String to, Model model) {
+    addBookingsModel(id, page, size, from, to, model);
     return "bank-account-detail :: bookings";
   }
 
   /**
-   * Fetches one page of an account's booking history (page size 20) from the backend transactions
+   * Renders just the balance-chart block for an AJAX range swap (REQ-BANK-049). Re-fetches the
+   * account detail only to resolve the creation instant the {@code "all"} range needs (the balance
+   * target rides on the series payload itself); a failure degrades to an empty chart.
+   *
+   * @param id the account id
+   * @param chartRange the requested range key
+   * @param model Spring MVC model populated with the chart attributes
+   * @return the {@code bank-account-detail :: balanceChart} fragment view
+   */
+  private String balanceChartFragment(UUID id, String chartRange, Model model) {
+    BankAccountDetailDto detail = null;
+    try {
+      detail = backendApiClient.get("/api/v1/bank/accounts/" + id, BankAccountDetailDto.class);
+    } catch (RuntimeException e) {
+      log.warn("Error loading account {} for balance-chart fragment", id, e);
+    }
+    addChartModel(id, chartRange, detail, model);
+    return "bank-account-detail :: balanceChart";
+  }
+
+  /**
+   * Resolves the booking-history period (default last 90 days), fetches the requested page for it
+   * and fills the bookings + period-filter + pagination model attributes shared by the full page
+   * and the {@code bookings} fragment (REQ-BANK-051). A backend failure degrades to an empty page
+   * so the table shows its empty state instead of an error.
+   *
+   * @param id the account id
+   * @param page zero-based page (clamped to 0)
+   * @param size requested page size, or {@code null} for the default
+   * @param from optional period start ({@code yyyy-MM-dd})
+   * @param to optional period end ({@code yyyy-MM-dd})
+   * @param model the model to populate
+   */
+  private void addBookingsModel(
+      UUID id, Integer page, Integer size, String from, String to, Model model) {
+    int effectivePage = page == null || page < 0 ? 0 : page;
+    BankAccountDetailSupport.HistoryPeriod period =
+        BankAccountDetailSupport.resolveHistoryPeriod(from, to);
+    PageResponse<BankBookingDto> bookings;
+    try {
+      bookings = fetchBookings(id, effectivePage, size, period.fromInstant(), period.toInstant());
+    } catch (RuntimeException e) {
+      log.error("Error loading bookings for account {}", id, e);
+      bookings = null;
+    }
+    model.addAttribute("bookings", bookings);
+    model.addAttribute("historyFrom", period.fromDate());
+    model.addAttribute("historyTo", period.toDate());
+    model.addAttribute("pageSizes", BankAccountDetailSupport.PAGE_SIZES);
+    model.addAttribute("historyBaseUrl", "/bank/accounts/" + id);
+    model.addAttribute(
+        "paginationBaseUrl",
+        UriComponentsBuilder.fromPath("/bank/accounts/" + id)
+            .queryParam("from", period.fromDate())
+            .queryParam("to", period.toDate())
+            .toUriString());
+  }
+
+  /**
+   * Resolves the balance-chart range (default 90 days), fetches its balance series and fills the
+   * chart model attributes shared by the full page and the {@code balanceChart} fragment
+   * (REQ-BANK-049). A backend failure degrades to an empty chart.
+   *
+   * @param id the account id
+   * @param chartRange the requested range key
+   * @param detail the account detail (for the {@code "all"} range's start), or {@code null}
+   * @param model the model to populate
+   */
+  private void addChartModel(UUID id, String chartRange, BankAccountDetailDto detail, Model model) {
+    String range = BankAccountDetailSupport.normalizeChartRange(chartRange);
+    Instant now = Instant.now();
+    Instant createdAt =
+        detail != null && detail.account() != null ? detail.account().createdAt() : null;
+    Instant chartFrom = BankAccountDetailSupport.chartFromInstant(range, createdAt, now);
+    BankBalanceSeriesDto series = null;
+    try {
+      series = fetchBalanceSeries(id, chartFrom, now);
+    } catch (RuntimeException e) {
+      log.warn("Error loading balance series for account {}", id, e);
+    }
+    model.addAttribute(
+        "chart",
+        BankBalanceChart.of(
+            series == null ? null : series.points(),
+            series == null ? null : series.balanceTarget()));
+    model.addAttribute("chartRange", range);
+    model.addAttribute("chartRanges", BankAccountDetailSupport.CHART_RANGES);
+    model.addAttribute("chartBaseUrl", "/bank/accounts/" + id);
+  }
+
+  /**
+   * Fetches one page of an account's booking history for a period from the backend transactions
    * endpoint — the single source of the booking query shared by the full-page render and the {@link
    * #bookingsFragment} AJAX swap.
    *
    * @param id the account id whose transactions to page through
    * @param page zero-based, already-clamped page index
+   * @param size requested page size, or {@code null} for the backend default
+   * @param from inclusive period start instant
+   * @param to inclusive period end instant
    * @return the requested bookings page envelope
    */
-  private PageResponse<BankBookingDto> fetchBookings(UUID id, int page) {
+  private PageResponse<BankBookingDto> fetchBookings(
+      UUID id, int page, Integer size, Instant from, Instant to) {
     return backendApiClient.get(
         UriComponentsBuilder.fromPath("/api/v1/bank/accounts/" + id + "/transactions")
             .queryParam("page", page)
-            .queryParam("size", 20)
+            .queryParam("size", size == null ? BankAccountDetailSupport.DEFAULT_PAGE_SIZE : size)
+            .queryParam("from", from)
+            .queryParam("to", to)
             .toUriString(),
         BANK_BOOKING_PAGE);
+  }
+
+  /**
+   * Fetches an account's balance-over-time series for a period from the backend balance-series
+   * endpoint (REQ-BANK-049), the single source shared by the full page and the {@code balanceChart}
+   * fragment swap.
+   *
+   * @param id the account id
+   * @param from inclusive period start instant
+   * @param to inclusive period end instant
+   * @return the balance series envelope
+   */
+  private BankBalanceSeriesDto fetchBalanceSeries(UUID id, Instant from, Instant to) {
+    return backendApiClient.get(
+        UriComponentsBuilder.fromPath("/api/v1/bank/accounts/" + id + "/balance-series")
+            .queryParam("from", from)
+            .queryParam("to", to)
+            .toUriString(),
+        BankBalanceSeriesDto.class);
   }
 
   /**

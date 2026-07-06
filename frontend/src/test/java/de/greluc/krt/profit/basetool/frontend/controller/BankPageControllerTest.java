@@ -338,7 +338,7 @@ class BankPageControllerTest {
         .thenReturn(new BankTransferFeeRateDto(new BigDecimal("0.005")));
 
     // When
-    String view = controller.accountDetail(accountId, null, null, model);
+    String view = controller.accountDetail(accountId, null, null, null, null, null, null, model);
 
     // Then: transfer targets exclude self and the closed account; active holders exclude the
     // deactivated one (ADR-0039: no per-account distribution any more)
@@ -354,7 +354,13 @@ class BankPageControllerTest {
     List<BankHolderDto> holders = (List<BankHolderDto>) model.getAttribute("holders");
     assertNotNull(holders);
     assertEquals(2, holders.size(), "the full registry is offered for the payer/source selects");
-    assertEquals("/bank/accounts/" + accountId, model.getAttribute("paginationBaseUrl"));
+    // paginationBaseUrl now carries the booking-history period so paging keeps the filter
+    // (REQ-BANK-051).
+    assertTrue(
+        model
+            .getAttribute("paginationBaseUrl")
+            .toString()
+            .startsWith("/bank/accounts/" + accountId + "?from="));
     // The transfer-fee rate feeds the withdraw/transfer modals' live fee preview (REQ-BANK-033).
     assertEquals(new BigDecimal("0.005"), model.getAttribute("transferFeeRate"));
   }
@@ -388,7 +394,7 @@ class BankPageControllerTest {
     when(backendApiClient.get(any(String.class), anyTypeRef())).thenReturn(null);
 
     // When
-    controller.accountDetail(accountId, -3, null, model);
+    controller.accountDetail(accountId, -3, null, null, null, null, null, model);
 
     // Then
     assertEquals(List.of(), model.getAttribute("transferTargets"));
@@ -411,12 +417,16 @@ class BankPageControllerTest {
     when(backendApiClient.get(contains("/transactions"), anyTypeRef())).thenReturn(bookings);
 
     // When
-    String view = controller.accountDetail(accountId, 2, "bookings", model);
+    String view = controller.accountDetail(accountId, 2, null, null, null, null, "bookings", model);
 
     // Then
     assertEquals("bank-account-detail :: bookings", view);
     assertEquals(bookings, model.getAttribute("bookings"));
-    assertEquals("/bank/accounts/" + accountId, model.getAttribute("paginationBaseUrl"));
+    assertTrue(
+        model
+            .getAttribute("paginationBaseUrl")
+            .toString()
+            .startsWith("/bank/accounts/" + accountId + "?from="));
     // The fragment path must not load the account detail, holder registry or accounts list.
     verify(backendApiClient, never())
         .get(eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class));
@@ -467,7 +477,8 @@ class BankPageControllerTest {
         .thenReturn(new PageResponse<>(List.of(self), 0, 500, 1, 1, Collections.emptyList()));
 
     // When
-    String view = controller.accountDetail(accountId, null, "accountBody", model);
+    String view =
+        controller.accountDetail(accountId, null, null, null, null, null, "accountBody", model);
 
     // Then
     assertEquals("bank-account-detail :: accountBody", view);
