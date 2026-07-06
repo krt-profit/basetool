@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Kartellbank: Buchungshistorie auf den Konto-Detailseiten lädt wieder.** Der mit dem Zeitraumfilter eingeführte Historienabruf schlug serverseitig fehl (HTTP 500), sodass beide Konto-Detailseiten (`/bank/accounts/{id}` und `/org-unit-bank/accounts/{id}`) statt der Buchungen dauerhaft „Noch keine Buchungen" anzeigten. Ursache war eine untypisierte `IS NULL`-Prüfung der optionalen Zeitraumgrenzen, die PostgreSQL nicht planen konnte; die Grenzen werden nun wie im übrigen Code per `CAST(... AS timestamp)` typisiert. (REQ-BANK-051)
+
 ### Changed
 
 - **Monitoring: Alloy-Speicherlimit von 192M auf 256M angehoben und `GOMEMLIMIT` gesetzt.** Der Working Set des Alloy-Containers kroch langsam gegen das zu knappe 192M-Limit (dauerhaft ~94 %), was einen OOM-Kill und damit eine Lücke im Log-/Trace-Versand riskierte. Das Limit bekommt jetzt echten Puffer, und `GOMEMLIMIT=230MiB` lässt die Go-Garbage-Collection Speicher zurückgeben, bevor das cgroup-Limit erreicht wird. Greift beim nächsten Deploy (Alloy wird neu erstellt).

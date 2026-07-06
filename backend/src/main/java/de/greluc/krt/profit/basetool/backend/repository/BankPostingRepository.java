@@ -119,7 +119,11 @@ public interface BankPostingRepository extends JpaRepository<BankPosting, UUID> 
    *
    * <p>Both period bounds are optional (REQ-BANK-051): a {@code null} {@code from} or {@code to}
    * drops that side of the filter, so passing {@code (null, null)} pages the whole history exactly
-   * as before the period filter existed. The bounds are inclusive.
+   * as before the period filter existed. The bounds are inclusive. Each bound is compared for
+   * nullness through {@code CAST(:bound AS timestamp)} rather than a bare {@code :bound IS NULL}:
+   * PostgreSQL cannot infer the type of an untyped bind parameter in an {@code IS NULL} position
+   * and fails the whole statement at plan time with "could not determine data type of parameter" —
+   * so the cast is load-bearing, not cosmetic (mirrors {@code AuditEventRepository#findFiltered}).
    *
    * @param accountId the account
    * @param from inclusive lower bound on the booking instant, or {@code null} for no lower bound
@@ -134,8 +138,8 @@ public interface BankPostingRepository extends JpaRepository<BankPosting, UUID> 
       FROM BankPosting p JOIN p.transaction t
       LEFT JOIN t.reversedTransaction rt
       WHERE p.account.id = :accountId
-      AND (:from IS NULL OR p.createdAt >= :from)
-      AND (:to IS NULL OR p.createdAt <= :to)
+      AND (CAST(:from AS timestamp) IS NULL OR p.createdAt >= :from)
+      AND (CAST(:to AS timestamp) IS NULL OR p.createdAt <= :to)
       """)
   Page<BankBookingRow> findBookings(
       @Param("accountId") UUID accountId,
