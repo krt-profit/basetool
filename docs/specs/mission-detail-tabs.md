@@ -115,6 +115,14 @@ against the crew update endpoint, with an "Edit functions…" entry opening the 
 modal (multiple functions per person stay supported). Unit heads show name, ship type, responsible
 (ship owner), HVU chip (`.chip--warning`), an "x an Bord" counter, and edit/delete (canEdit).
 
+A unit's crew list carries only participant ids; the board resolves the full participant payload via
+a `participantsById` lookup and renders **no row** for a crew entry whose participant is unresolvable.
+The backend keeps crew and participants in sync (removing a participant scrubs its crew), so this is
+not reachable in practice, but the guard is defensive — and because Thymeleaf resolves `th:replace`
+(attribute precedence 1) **before** `th:if` (3), the `cp != null` condition must gate an **outer**
+`<th:block>` and never share the element with `th:replace`, or the null-safe person-row fragment
+renders a ghost row (empty name, empty `data-participant-id`) past the dead guard.
+
 ### REQ-MISSION-006 — KRT modals with danger confirms naming the consequence
 
 All page modals (participant add/edit, unit add/edit, frequency, finance add/edit, crew functions,

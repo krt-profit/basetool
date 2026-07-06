@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Raffinerie – Einlagern-Fenster zeigte den SCU-Hinweis auch bei stückweise gezählten Materialien.** Im Einlagern-Fenster eines Raffinerieauftrags erschien der SCU-Nachkommastellen-Hinweis („?") an jeder Materialzeile, auch bei stückweise (PIECE) gezählten Ausgabematerialien. Ursache war die Thymeleaf-Attributreihenfolge (`th:replace` läuft vor `th:if`), die die SCU-Bedingung überging. Der Hinweis erscheint jetzt nur noch bei SCU-Zeilen (REQ-INV-001). Dieselbe Attributreihenfolge-Falle wurde vorsorglich in zwei weiteren Vorlagen entschärft (Einsatz-Crew-Board, `<head>`-Zusatzlinks) – ohne sichtbare Verhaltensänderung.
+
+- **Bank – doppelte Freigabe-Limits-Anzeige im Org-Einheits-Konto behoben; Kontobewegungs-Fenster nicht mehr unnötig im DOM.** Im Org-Einheits-Konto-Detail sahen Verantwortliche die schreibgeschützte Freigabe-Limits-Anzeige zusätzlich zum Editor (doppelt); zudem wurde das verborgene Kontobewegungs-Fenster in Kontoübersicht, Buchungsanträgen und Konto-Detail auch ohne Buchungsrecht in die Seite gerendert. Ursache war jeweils die Thymeleaf-Attributreihenfolge (`th:replace` vor `th:if`); die Sichtbarkeitsbedingung sitzt jetzt auf einem äußeren `th:block` (REQ-BANK-017/-041).
+
 ## [v1.1.7](https://github.com/krt-profit/basetool/releases/tag/v1.1.7) - 2026-07-05
 
 ### Fixed

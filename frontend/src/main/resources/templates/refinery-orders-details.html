@@ -395,7 +395,13 @@
                                     <span th:text="#{inventory.form.amount}">Menge</span>
                                     <span th:if="*{items[__${stat.index}__].quantityType == 'PIECE'}" th:text="'(' + #{material.quantity.piece} + ')'"></span>
                                     <span th:if="*{items[__${stat.index}__].quantityType == 'SCU'}" th:text="'(' + #{material.quantity.scu} + ')'"></span>
-                                    <th:block th:if="*{items[__${stat.index}__].quantityType == 'SCU'}" th:replace="~{fragments/scu-hint :: scuHint(null, false)}"></th:block>
+                                    <!-- SCU-only input hint. th:if must NOT share an element with th:replace: th:replace
+                                         (attribute precedence 1) runs BEFORE th:if (3), so a same-element guard is dead
+                                         and the hint would render on every row - including PIECE rows. The condition
+                                         gates an outer th:block while th:replace sits alone on the inner one. -->
+                                    <th:block th:if="*{items[__${stat.index}__].quantityType == 'SCU'}">
+                                        <th:block th:replace="~{fragments/scu-hint :: scuHint(null, false)}"></th:block>
+                                    </th:block>
                                 </label>
                                 <input type="text" data-scu-decimal th:id="'storeAmount_' + ${stat.index}" th:field="*{items[__${stat.index}__].amount}" th:step="*{items[__${stat.index}__].quantityType == 'PIECE' ? '1' : '0.001'}" min="0" inputmode="decimal" required>
                             </div>

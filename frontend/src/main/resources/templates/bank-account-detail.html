@@ -254,8 +254,14 @@
     <!-- Unified Kontobewegung modal (REQ-BANK-017, #997): the source account is fixed to this
          account; the type selector offers only the permitted movements. Lives inside accountBody so a
          write re-renders it (fresh holder/target lists) on the in-place swap. -->
-    <th:block th:if="${caps != null and (caps.canDeposit() or caps.canWithdraw() or caps.canTransfer())}"
-              th:replace="~{fragments/bank-movement-modal :: movementModal('bank-movement-modal', 'accountBody', ${acct.id()}, false, ${acct.type() == 'CARTEL' or acct.type() == 'CARTEL_BANK' or acct.type() == 'SPECIAL'}, ${caps.canDeposit()}, ${caps.canWithdraw()}, ${caps.canTransfer()})}"></th:block>
+    <!-- th:if must NOT share an element with th:replace: th:replace (attribute precedence 1) runs
+         BEFORE th:if (3), so a same-element guard is dead and the modal renders (with an empty type
+         selector) for a view-only employee whose caps are all false. The condition gates an outer
+         th:block, mirroring the correctly-gated CTA button above; the outer th:if also short-circuits
+         the ${caps...} dereferences. -->
+    <th:block th:if="${caps != null and (caps.canDeposit() or caps.canWithdraw() or caps.canTransfer())}">
+        <th:block th:replace="~{fragments/bank-movement-modal :: movementModal('bank-movement-modal', 'accountBody', ${acct.id()}, false, ${acct.type() == 'CARTEL' or acct.type() == 'CARTEL_BANK' or acct.type() == 'SPECIAL'}, ${caps.canDeposit()}, ${caps.canWithdraw()}, ${caps.canTransfer()})}"></th:block>
+    </th:block>
 
     <!-- The intra-account holder rebooking modal was removed (ADR-0039): custody is no longer
          per-account, so redistribution between holders is the global holder→holder Umbuchung in the

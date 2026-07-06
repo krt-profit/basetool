@@ -405,6 +405,146 @@ class MissionPageControllerMvcTest {
             new PageResponse<>(Collections.emptyList(), 0, 1000, 0, 0, Collections.emptyList()));
   }
 
+  /**
+   * Builds a renderable {@link MissionDto} carrying the given participants and assigned units, so
+   * the crew board (unit drop zones + per-crew person rows) actually renders. Editable (canEdit) so
+   * the board shows for the OFFICER fixture. All other collections are empty.
+   *
+   * @param missionId the id to stamp on the mission
+   * @param participants the mission participants (source of {@code participantsById})
+   * @param units the assigned units whose crew rows the board renders
+   * @return a mission fixture with the given participants + units
+   */
+  private MissionDto missionWithUnitsAndParticipants(
+      UUID missionId,
+      java.util.Set<de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto>
+          participants,
+      java.util.List<de.greluc.krt.profit.basetool.frontend.model.dto.MissionUnitDto> units) {
+    de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto manager =
+        new de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto(
+            UUID.randomUUID(), "manager", null, "Test Manager", 0);
+    return new MissionDto(
+        missionId,
+        "Test Mission",
+        null,
+        null,
+        "PLANNED",
+        null,
+        null,
+        null,
+        null,
+        null,
+        false,
+        participants,
+        units,
+        Collections.emptyList(),
+        Collections.emptySet(),
+        Collections.emptyList(),
+        Collections.emptyList(),
+        null,
+        null,
+        java.util.Set.of(manager),
+        true,
+        true,
+        1L,
+        1L,
+        1L,
+        1L,
+        0,
+        0,
+        null,
+        null,
+        null,
+        null,
+        0L,
+        java.util.List.of(),
+        0L,
+        java.util.List.of(),
+        0L,
+        null);
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void missionDetail_crewWithUnresolvableParticipant_SuppressesGhostRow() throws Exception {
+    // A unit's crew entry carries a participantId; the crew board resolves the full participant via
+    // participantsById (built only from mission.participants). The backend keeps crew and
+    // participants in sync, so cp is non-null in practice — but the mission-detail template guards
+    // the per-crew personRow with th:if=${cp != null} as defence-in-depth. This test pins that
+    // guard: a crew entry whose participant is absent from participantsById must render NO row.
+    //
+    // Regression guard for the Thymeleaf precedence trap — th:replace (precedence 1) runs before
+    // th:if (3), so a same-element guard is dead and the null-safe personRow fragment rendered a
+    // ghost row (empty name, empty data-participant-id). The fix gates an outer th:block; this test
+    // fails on the pre-fix markup (ghost row present) and passes after it.
+    UUID missionId = UUID.randomUUID();
+    UUID realParticipantId = UUID.randomUUID();
+    UUID missingParticipantId = UUID.randomUUID();
+    UUID realCrewId = UUID.randomUUID();
+    UUID ghostCrewId = UUID.randomUUID();
+
+    de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto realParticipant =
+        new de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto(
+            realParticipantId,
+            null,
+            "Real Crew",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            de.greluc.krt.profit.basetool.frontend.model.PayoutPreference.PAYOUT,
+            1L,
+            null);
+    de.greluc.krt.profit.basetool.frontend.model.dto.MissionCrewDto realCrew =
+        new de.greluc.krt.profit.basetool.frontend.model.dto.MissionCrewDto(
+            realCrewId, realParticipantId, "Real Crew", null);
+    // Crew entry whose participant is NOT in the participants set -> participantsById lookup is
+    // null.
+    de.greluc.krt.profit.basetool.frontend.model.dto.MissionCrewDto ghostCrew =
+        new de.greluc.krt.profit.basetool.frontend.model.dto.MissionCrewDto(
+            ghostCrewId, missingParticipantId, "Ghost", null);
+    de.greluc.krt.profit.basetool.frontend.model.dto.MissionUnitDto unit =
+        new de.greluc.krt.profit.basetool.frontend.model.dto.MissionUnitDto(
+            UUID.randomUUID(),
+            "Alpha Unit",
+            null,
+            null,
+            null,
+            false,
+            null,
+            null,
+            java.util.List.of(realCrew, ghostCrew));
+
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
+        .thenReturn(
+            missionWithUnitsAndParticipants(
+                missionId, java.util.Set.of(realParticipant), java.util.List.of(unit)));
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
+        .thenReturn(Collections.emptyList());
+    stubEmptyFinance(missionId);
+
+    String html =
+        mockMvc
+            .perform(get("/missions/" + missionId))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    // The unit board rendered...
+    assertThat(html).as("crew board unit rendered").contains("Alpha Unit");
+    // ...the resolvable crew member renders its person-row (personRow stamps the crew id)...
+    assertThat(html)
+        .as("resolvable crew member renders a person-row")
+        .contains("data-crew-id=\"" + realCrewId + "\"");
+    // ...but the crew entry with an unresolvable participant renders NO ghost person-row.
+    assertThat(html)
+        .as("crew entry with an unresolvable participant renders no ghost person-row")
+        .doesNotContain("data-crew-id=\"" + ghostCrewId + "\"");
+  }
+
   @Test
   @WithMockUser(roles = "OFFICER")
   void missionDetail_AsAuthenticated_ShouldShowParticipationColumn() throws Exception {

@@ -115,8 +115,14 @@
              responsible holder (settings == null) so they still see the limits that apply to their
              requests. It is deliberately OUTSIDE the responsibility tab — that tab is the responsible
              holder's alone — and renders as a plain inline section below the info tiles. -->
-        <th:block th:if="${settings == null}"
-                  th:replace="~{fragments/bank-approval-limits :: limitsDisplay(${detail.detail().approvalLimits()})}"></th:block>
+        <!-- th:if must NOT share an element with th:replace: th:replace (attribute precedence 1) runs
+             BEFORE th:if (3), so a same-element guard is dead and the read-only limits box renders
+             even for a manager (settings != null), duplicating the editor shown in the settings tab.
+             The condition gates an outer th:block so the display stays hidden from the responsible
+             holder. -->
+        <th:block th:if="${settings == null}">
+            <th:block th:replace="~{fragments/bank-approval-limits :: limitsDisplay(${detail.detail().approvalLimits()})}"></th:block>
+        </th:block>
 
         <!-- KRT-account (CARTEL) amount-tiered approval ladder, read-only to every viewer
              (REQ-BANK-047): the amount bands and who approves each. Managed only by the Bankleitung in
