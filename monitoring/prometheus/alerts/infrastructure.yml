@@ -129,6 +129,91 @@ groups:
           summary: "Disk >80% on {{ $labels.mountpoint }}"
           description: "Filesystem {{ $labels.mountpoint }} is over 80% full."
 
+      # (#1041 item 14) Host saturation. One CPX42 hosts both DBs, Redis, Keycloak, three JVMs and
+      # the monitoring plane, so memory pressure is the DESIGNED failure mode (the oom_score_adj
+      # sacrifice ordering already OOM-cycled Grafana/Tempo in prod). PSI series are collected by
+      # node_exporter's default `pressure` collector; on a kernel without /proc/pressure they are
+      # simply absent (the alert stays silent, safe). Memory "full" pressure = fraction of wall time
+      # ALL tasks were stalled reclaiming memory — the earliest saturation signal, before the OOM
+      # kill. baseline-tune: thresholds set in the baseline week.
+      - alert: HostMemoryPressureStalled
+        expr: rate(node_pressure_memory_stalled_seconds_total[5m]) > 0.10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host memory full-pressure >10% ({{ $labels.instance }})"
+          description: "The host spent more than 10% of wall time with all tasks stalled reclaiming memory for 10 minutes — memory saturation is building toward the OOM-kill sacrifice ordering. Check per-container working sets and free memory."
+
+      - alert: HostCpuPressure
+        expr: rate(node_pressure_cpu_waiting_seconds_total[5m]) > 0.50
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host CPU pressure >50% ({{ $labels.instance }})"
+          description: "Tasks waited on CPU more than 50% of wall time for 15 minutes — the host is CPU-saturated. Identify the busy container (per-app CPU on 03) and the workload."
+
+      - alert: HostIoPressure
+        expr: rate(node_pressure_io_stalled_seconds_total[5m]) > 0.30
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host I/O full-pressure >30% ({{ $labels.instance }})"
+          description: "The host spent more than 30% of wall time with all tasks stalled on I/O for 15 minutes — disk is the bottleneck (heavy Postgres/Loki writes or swapping). Check disk throughput and temp-file / WAL activity."
+
+      - alert: HostMemoryLow
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host MemAvailable <10% ({{ $labels.instance }})"
+          description: "Less than 10% of host memory is available for 10 minutes — the next allocation spike risks the OOM killer (which sacrifices Grafana/Tempo first by design). Free memory or scale up."
+
+      - alert: HostCpuHigh
+        expr: 1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) > 0.90
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host CPU >90% ({{ $labels.instance }})"
+          description: "Host CPU has averaged more than 90% busy for 15 minutes — sustained saturation degrades every co-located service. Identify the workload."
+
+      - alert: HostLoadHigh
+        expr: node_load15 > 2 * count by (instance) (node_cpu_seconds_total{mode="idle"})
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host load15 >2x vCPU ({{ $labels.instance }})"
+          description: "15-minute load average is more than twice the vCPU count for 15 minutes — the run queue is deep (CPU or I/O contention across the co-located services). Investigate the saturating workload."
+
+      # Clock drift breaks JWT iat/exp validation (login failures) and TLS handshakes; the node_timex
+      # collector reports the NTP-adjusted offset. > 0.25s is well beyond a healthy chrony/systemd-timesyncd.
+      - alert: HostClockDrift
+        expr: abs(node_timex_offset_seconds) > 0.25
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host clock drift >0.25s ({{ $labels.instance }})"
+          description: "The host clock is more than 0.25s off NTP for 5 minutes — this breaks JWT iat/exp validation (spurious login failures) and TLS handshakes. Check the time-sync service (chrony / systemd-timesyncd)."
+
+      # Physical NIC errors (excludes loopback and the virtual docker/veth/bridge interfaces, which
+      # generate noise) — a failing NIC or a saturated link corrupts packets before the app sees a
+      # timeout.
+      - alert: HostNetworkErrors
+        expr: |
+          sum by (instance, device) (rate(node_network_receive_errs_total{device!~"lo|veth.*|docker.*|br-.*"}[5m]) + rate(node_network_transmit_errs_total{device!~"lo|veth.*|docker.*|br-.*"}[5m])) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host NIC errors on {{ $labels.device }} ({{ $labels.instance }})"
+          description: "The {{ $labels.device }} interface has had receive/transmit errors for 10 minutes — a failing NIC or saturated link corrupting packets. Check dmesg and the link/driver state."
+
       - alert: ContainerWorkingSetHigh
         expr: (container_memory_working_set_bytes{name=~".+"} / container_spec_memory_limit_bytes{name=~".+"}) > 0.90
         for: 10m
