@@ -41,6 +41,8 @@ import de.greluc.krt.profit.basetool.backend.dto.uex.UexSpaceStationDto;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexStarSystemDto;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexTerminalDto;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexVehicleDto;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import java.time.Duration;
 import java.util.Collections;
@@ -90,6 +92,13 @@ public class UexClient {
 
   private final WebClient.Builder webClientBuilder;
   private final UexProperties uexProperties;
+
+  /**
+   * Micrometer registry for the swallowed-fetch-error counter ({@link
+   * MetricNames#EXTERNAL_FETCH_ERRORS}). Injected so a transient-or-sustained upstream failure —
+   * which {@link #fetchList} maps to an empty list — still leaves a metric trail (REQ-OBS-011).
+   */
+  private final MeterRegistry meterRegistry;
 
   /**
    * Reusable WebClient bound to the UEX base URL. Built once after dependency injection completes
@@ -413,6 +422,12 @@ public class UexClient {
         .onErrorResume(
             e -> {
               log.error("Failed to fetch {} from UEX API", resourceLabel, e);
+              meterRegistry
+                  .counter(
+                      MetricNames.EXTERNAL_FETCH_ERRORS,
+                      MetricNames.TAG_SOURCE,
+                      MetricNames.SOURCE_UEX)
+                  .increment();
               return Mono.just(Collections.<T>emptyList());
             })
         .blockOptional()

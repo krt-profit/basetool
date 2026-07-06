@@ -275,6 +275,12 @@ transaction per pass) rather than per-scrape.
 - `basetool_sync_events_total{source,event_type}` counter at the three `SyncReportService`
   `log*Event` write sites (`source` = `SyncSourceSystem`, `event_type` = `SyncEventType`; both
   bounded enums — never the external asset name/uuid/detail).
+- `basetool_external_fetch_errors_total{source}` counter incremented where the `UexClient` /
+  `ScWikiClient` swallow an upstream fetch or parse error into an empty result (`source` = the fixed
+  literal `uex` / `scwiki`). Because every upstream failure is mapped to an empty list and the sync
+  job still records a success, this is the only signal of a sustained catalogue outage; it backs the
+  `ExternalFetchErrors` alert. The backend `WebClient.Builder` is wired to the `ObservationRegistry`
+  (REQ-OBS-009) so these same calls also emit `http_client_requests_seconds` + client spans.
 - `basetool_http_error_total{code}` counter at the `GlobalExceptionHandler` 409/401/403 methods
   (`OPTIMISTIC_LOCK` = optimistic-locking regression indicator, `PESSIMISTIC_LOCK`,
   `UNAUTHENTICATED`, `ACCESS_DENIED`) plus `SERVICE_UNAVAILABLE`, incremented directly by

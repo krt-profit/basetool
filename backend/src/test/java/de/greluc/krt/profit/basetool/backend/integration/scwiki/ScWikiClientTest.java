@@ -25,6 +25,8 @@ import de.greluc.krt.profit.basetool.backend.config.ScWikiProperties;
 import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiBlueprintDto;
 import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiCommodityDto;
 import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiResponseDto;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -66,6 +68,7 @@ class ScWikiClientTest {
   private MockWebServer server;
   private ScWikiProperties properties;
   private ScWikiClient client;
+  private SimpleMeterRegistry meterRegistry;
 
   @BeforeEach
   void setUp() throws Exception {
@@ -75,7 +78,8 @@ class ScWikiClientTest {
     properties.setApiUrl(server.url("/").toString());
     properties.setPageSize(200);
     properties.setRequestsPerSecond(1000);
-    client = new ScWikiClient(WebClient.builder(), properties);
+    meterRegistry = new SimpleMeterRegistry();
+    client = new ScWikiClient(WebClient.builder(), properties, meterRegistry);
     client.initClient();
   }
 
@@ -197,7 +201,7 @@ class ScWikiClientTest {
 
     AtomicInteger paceCalls = new AtomicInteger(0);
     ScWikiClient counter =
-        new ScWikiClient(WebClient.builder(), properties) {
+        new ScWikiClient(WebClient.builder(), properties, meterRegistry) {
           @Override
           public void paceForRateLimit() {
             paceCalls.incrementAndGet();
@@ -235,6 +239,16 @@ class ScWikiClientTest {
 
     assertNotNull(rows, "fallback must return empty list, not null");
     assertTrue(rows.isEmpty());
+    // The swallowed upstream failure must still leave a metric trail (REQ-OBS-011, #1041 item 2).
+    assertEquals(
+        1.0,
+        meterRegistry
+            .get(MetricNames.EXTERNAL_FETCH_ERRORS)
+            .tag(MetricNames.TAG_SOURCE, MetricNames.SOURCE_SCWIKI)
+            .counter()
+            .count(),
+        "a swallowed SC Wiki fetch error must increment"
+            + " basetool_external_fetch_errors_total{source=scwiki}");
   }
 
   @Test
