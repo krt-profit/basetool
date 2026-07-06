@@ -265,7 +265,23 @@ docker run --rm -v "${NPM_DIR}:/src:ro" "${HELPER_IMAGE}" tar -C /src -cz . \
 log "capturing host config (.env, keystore, realm-export, providers)"
 cp -p "${COMPOSE_DIR}/.env" "${STAGING}/config/dotenv"
 if [[ -f "${KEYSTORE_PATH}" ]]; then
-  cp -p "${KEYSTORE_PATH}" "${STAGING}/config/keystore.p12"
+  # The keystore is a root-owned 0640 secret (REQ-OPS-016, #1018): readable only by
+  # root, group 10001 (the JVM containers) and uid 1000 via a POSIX ACL (Keycloak).
+  # The deploy user that runs this backup is none of those and CANNOT read it
+  # directly — a plain `cp` here is what broke the 2026-07-06 run. Capture it the
+  # same way as the other root-owned artifacts (NPM mount, grafana.db): stream the
+  # bytes out through a throwaway root helper container. This uses docker access the
+  # deploy user already has, so it needs no extra host ACL and leaves the keystore's
+  # 0640 hardening untouched. Best-effort + loud: a read failure must never abort the
+  # whole backup and lose the irreplaceable DB dumps (the original set -e landmine).
+  if docker run --rm -v "$(dirname "${KEYSTORE_PATH}"):/src:ro" "${HELPER_IMAGE}" \
+       cat "/src/$(basename "${KEYSTORE_PATH}")" > "${STAGING}/config/keystore.p12" 2>/dev/null \
+     && [[ -s "${STAGING}/config/keystore.p12" ]]; then
+    :
+  else
+    rm -f "${STAGING}/config/keystore.p12"
+    log "WARN: could not read keystore at ${KEYSTORE_PATH} via ${HELPER_IMAGE} — skipped"
+  fi
 else
   log "WARN: keystore not found at ${KEYSTORE_PATH} — skipped"
 fi
