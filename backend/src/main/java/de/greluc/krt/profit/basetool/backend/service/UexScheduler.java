@@ -95,7 +95,7 @@ public class UexScheduler {
       initialDelayString = "${krt.uex.scheduler-initial-delay:0}")
   public void scheduleCommodityPriceUpdate() {
     syncCoordinator.runExclusively(
-        "UEX", () -> taskMetrics.record(ScheduledJob.UEX_SYNC, this::runAllSyncSteps));
+        "UEX", () -> taskMetrics.recordCounting(ScheduledJob.UEX_SYNC, this::runAllSyncSteps));
   }
 
   /**
@@ -110,9 +110,21 @@ public class UexScheduler {
    * MasterDataCacheEvictionService#evictUexSyncedMasterData()}), so a freshly-synced catalogue is
    * visible on the next read instead of lagging the 12-hour TTL (CACHE-SYNC-EVICT-001) — and
    * committed steps are still reconciled when a later step aborts the sweep.
+   *
+   * <p>Returns the item-catalogue upsert count from {@link UexItemSyncService#syncItems()} — the
+   * representative "rows processed" tally for the whole sweep — which {@link
+   * #scheduleCommodityPriceUpdate()} records into {@code
+   * basetool_scheduled_job_items_total{job="uex_sync"}} via {@code TaskMetrics.recordCounting}.
+   * When a step throws the count is discarded (the run is recorded as a {@code failure}, no items
+   * counted); a clean run that upserted zero rows records {@code 0}, which is what the {@code
+   * SyncZeroItems} alert watches for (#1041 item 2).
+   *
+   * @return the number of {@code game_item} rows the item sync upserted this run ({@code 0} if the
+   *     sweep aborted before the item step ran)
    */
-  private void runAllSyncSteps() {
+  private int runAllSyncSteps() {
     log.info("Running scheduled task to update UEX data...");
+    int itemsProcessed = 0;
     try {
       uexUniverseSyncService.syncFactions();
       uexUniverseSyncService.syncJurisdictions();
@@ -134,7 +146,7 @@ public class UexScheduler {
       // UexItemSyncService iterates; the latter resolves manufacturers (already synced above)
       // and linked ship types (also above), so the topological order is preserved.
       uexCategoryRefService.syncCategories();
-      uexItemSyncService.syncItems();
+      itemsProcessed = uexItemSyncService.syncItems();
 
       // R7 — item prices. Runs after the item catalogue (resolves game_item) and terminals
       // (synced in the universe phase above). Self-guards on krt.uex.item-price-sync-enabled, so
@@ -146,5 +158,6 @@ public class UexScheduler {
     } finally {
       masterDataCacheEvictionService.evictUexSyncedMasterData();
     }
+    return itemsProcessed;
   }
 }

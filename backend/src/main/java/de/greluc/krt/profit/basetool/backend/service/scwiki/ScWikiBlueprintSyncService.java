@@ -135,13 +135,20 @@ public class ScWikiBlueprintSyncService {
    * recipe graph. Each blueprint's detail (carrying {@code requirement_groups}) is fetched per UUID
    * outside any transaction, then persisted in its own {@code REQUIRES_NEW} transaction via {@link
    * #upsertBlueprintWithinTransaction(UUID, ScWikiBlueprintDto, UUID, Instant)}.
+   *
+   * <p>Returns the number of blueprints upserted this run, which {@link ScWikiScheduler}
+   * accumulates into {@code basetool_scheduled_job_items_total{job="scwiki_sync"}}. The disabled
+   * and empty-response short-circuits return {@code 0} so a Wiki outage surfaces as a zero-item run
+   * ({@code SyncZeroItems}, #1041 item 2).
+   *
+   * @return the number of blueprint rows upserted this run
    */
-  public void syncBlueprints() {
+  public int syncBlueprints() {
     if (!Boolean.TRUE.equals(properties.getBlueprintSyncEnabled())) {
       log.info(
           "SC Wiki blueprint sync invoked but disabled "
               + "(krt.scwiki.blueprint-sync-enabled=false) — skipping.");
-      return;
+      return 0;
     }
 
     log.info("Starting SC Wiki blueprint sync...");
@@ -152,7 +159,7 @@ public class ScWikiBlueprintSyncService {
             "blueprints");
     if (fetched.isEmpty()) {
       log.warn("No blueprints received from SC Wiki API. Aborting sync (no orphan sweep).");
-      return;
+      return 0;
     }
 
     UUID runId = syncReportService.beginRun();
@@ -223,6 +230,7 @@ public class ScWikiBlueprintSyncService {
         detailMisses,
         overrideKeysFired.size(),
         obsoleteOverrides);
+    return processed;
   }
 
   /**

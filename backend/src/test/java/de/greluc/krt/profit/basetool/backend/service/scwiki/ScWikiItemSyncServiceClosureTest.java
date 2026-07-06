@@ -90,9 +90,12 @@ class ScWikiItemSyncServiceClosureTest {
   void syncItems_isNoOp_whenFeatureFlagOff() {
     properties.setItemSyncEnabled(false);
 
-    service.syncItems();
+    int written = service.syncItems();
 
     verifyNoInteractions(scWikiClient, gameItemRepository, blueprintRepository);
+    // A dark sync writes no rows → 0 items, so scwiki_sync's tally reflects only enabled steps
+    // (#1041 item 2, SyncZeroItems).
+    assertEquals(0, written, "a disabled item sync must report zero written rows");
   }
 
   @Test
@@ -151,8 +154,11 @@ class ScWikiItemSyncServiceClosureTest {
     when(gameItemRepository.findByExternalUuid(uuid)).thenReturn(Optional.of(existing));
     when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    service.syncItems();
+    int written = service.syncItems();
 
+    // One existing row filled → one written row, the count fed to scwiki_sync's item tally (#1041
+    // item 2).
+    assertEquals(1, written, "filling one existing row must report one written row");
     ArgumentCaptor<GameItem> saved = ArgumentCaptor.forClass(GameItem.class);
     verify(gameItemRepository).save(saved.capture());
     GameItem result = saved.getValue();

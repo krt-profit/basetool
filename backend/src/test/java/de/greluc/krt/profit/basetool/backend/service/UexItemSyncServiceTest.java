@@ -289,9 +289,12 @@ class UexItemSyncServiceTest {
     when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
     when(uexClient.getItemsForCategory(3)).thenReturn(List.of());
 
-    service.syncItems();
+    int upserted = service.syncItems();
 
     verify(gameItemRepository, never()).markUexDeletedExcept(any(), any());
+    // Zero upserts is the tally fed to basetool_scheduled_job_items_total{job=uex_sync} — a UEX
+    // catalogue outage returning empty responses shows here as 0 (#1041 item 2, SyncZeroItems).
+    assertEquals(0, upserted, "an empty UEX catalogue must report zero upserts");
   }
 
   @Test
@@ -305,9 +308,12 @@ class UexItemSyncServiceTest {
     when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
     when(gameItemRepository.markUexDeletedExcept(any(), any())).thenReturn(0);
 
-    service.syncItems();
+    int upserted = service.syncItems();
 
     verify(gameItemRepository).markUexDeletedExcept(any(), any());
+    // One item upserted → the count reported to basetool_scheduled_job_items_total{job=uex_sync}
+    // (#1041 item 2).
+    assertEquals(1, upserted, "one processed item must report one upsert");
   }
 
   @Test

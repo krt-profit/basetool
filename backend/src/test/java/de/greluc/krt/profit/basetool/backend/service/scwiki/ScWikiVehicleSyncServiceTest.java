@@ -163,9 +163,11 @@ class ScWikiVehicleSyncServiceTest {
   void syncVehicles_emptyResponse_skipsOrphanSweep() {
     when(scWikiClient.fetchAllPages(any(), any(), eq("vehicles"))).thenReturn(List.of());
 
-    service.syncVehicles();
+    int written = service.syncVehicles();
 
     verify(shipTypeRepository, never()).markScwikiDeletedExcept(any(), any());
     verify(shipTypeRepository, never()).save(any());
+    // An empty Wiki response writes no rows → 0 items (#1041 item 2, SyncZeroItems).
+    assertEquals(0, written, "an empty Wiki response must report zero written rows");
   }
 }

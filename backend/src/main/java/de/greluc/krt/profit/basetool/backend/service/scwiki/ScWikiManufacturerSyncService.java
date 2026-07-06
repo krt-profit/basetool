@@ -79,14 +79,23 @@ public class ScWikiManufacturerSyncService {
   /**
    * Runs the manufacturer reconciliation. No-op (with an INFO line) when the feature flag is off;
    * an empty Wiki response short-circuits before the orphan sweep.
+   *
+   * <p>Returns the number of {@code manufacturer} rows this run wrote — first-time links plus
+   * refreshed links (conflicts and unmatched rows excluded, since they leave the row untouched) —
+   * which {@link ScWikiScheduler} accumulates into {@code
+   * basetool_scheduled_job_items_total{job="scwiki_sync"}}. The disabled and empty-response
+   * short-circuits return {@code 0} so a Wiki outage surfaces as a zero-item run ({@code
+   * SyncZeroItems}, #1041 item 2).
+   *
+   * @return the number of {@code manufacturer} rows written this run ({@code linked + refreshed})
    */
   @Transactional
-  public void syncManufacturers() {
+  public int syncManufacturers() {
     if (!Boolean.TRUE.equals(properties.getManufacturerSyncEnabled())) {
       log.info(
           "SC Wiki manufacturer sync invoked but disabled "
               + "(krt.scwiki.manufacturer-sync-enabled=false) — skipping.");
-      return;
+      return 0;
     }
 
     log.info("Starting SC Wiki manufacturer reconciliation...");
@@ -97,7 +106,7 @@ public class ScWikiManufacturerSyncService {
             "manufacturers");
     if (fetched.isEmpty()) {
       log.warn("No manufacturers received from SC Wiki API. Aborting reconciliation (no sweep).");
-      return;
+      return 0;
     }
 
     UUID runId = syncReportService.beginRun();
@@ -180,6 +189,7 @@ public class ScWikiManufacturerSyncService {
         refreshed,
         conflicts,
         unmatched);
+    return linked + refreshed;
   }
 
   /**

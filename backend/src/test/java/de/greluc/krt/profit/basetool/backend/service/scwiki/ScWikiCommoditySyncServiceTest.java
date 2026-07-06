@@ -89,10 +89,13 @@ class ScWikiCommoditySyncServiceTest {
   void syncCommodities_emptyResponse_skipsOrphanSweep() {
     when(scWikiClient.fetchAllPages(any(), any(), eq("commodities"))).thenReturn(List.of());
 
-    service.syncCommodities();
+    int written = service.syncCommodities();
 
     verify(materialRepository, never()).markScwikiDeleted(any(), any());
     verify(materialRepository, never()).save(any());
+    // An empty Wiki response writes no rows → 0 items, the signal SyncZeroItems watches (#1041
+    // item 2).
+    assertEquals(0, written, "an empty Wiki response must report zero written rows");
   }
 
   // ─── junk filter ────────────────────────────────────────────────────────
