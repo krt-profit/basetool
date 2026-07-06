@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **Monitoring: Alloy-Speicherlimit von 192M auf 256M angehoben und `GOMEMLIMIT` gesetzt.** Der Working Set des Alloy-Containers kroch langsam gegen das zu knappe 192M-Limit (dauerhaft ~94 %), was einen OOM-Kill und damit eine Lücke im Log-/Trace-Versand riskierte. Das Limit bekommt jetzt echten Puffer, und `GOMEMLIMIT=230MiB` lässt die Go-Garbage-Collection Speicher zurückgeben, bevor das cgroup-Limit erreicht wird. Greift beim nächsten Deploy (Alloy wird neu erstellt).
+
 - **Technisch: Inline-JavaScript der Admin-Einstellungsseite in ein statisches Modul ausgelagert.** Das JavaScript der Admin-Einstellungen (die Staffel-Schalter für Beförderungssystem und Profit-Berechtigung, der Spezialkommando-Profit-Schalter sowie das In-Place-Speichern der allgemeinen Einstellungen) wurde ohne Verhaltensänderung aus der Thymeleaf-Vorlage in eine browser-zwischenspeicherbare, lint- und formatierbare Datei unter `static/js/` verlagert; die lokalisierten Meldungstexte bleiben als schlanker Inline-Bootstrap erhalten (ADR-0069).
 
 - **Technisch: Inline-JavaScript der UEX-Adminseite in ein statisches Modul ausgelagert.** Das JavaScript der UEX-Admin-Seite (die In-Place-Override- und Sichtbarkeits-Schalter für Terminals, die Lokalisierung der Letzte-Synchronisation-Zeitstempel sowie der globale Filter über Systeme/Orte/Terminals) wurde ohne Verhaltensänderung aus der Thymeleaf-Vorlage in eine browser-zwischenspeicherbare, lint- und formatierbare Datei unter `static/js/` verlagert; die lokalisierten Meldungstexte bleiben als schlanker Inline-Bootstrap erhalten (ADR-0069).

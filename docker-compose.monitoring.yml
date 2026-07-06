@@ -213,6 +213,13 @@ services:
     # syslog:adm-owned /var/log/auth.log. Re-verify both GIDs if the alloy base image ever changes.
     cap_drop: [ALL]
     group_add: ["473", "4"]
+    # GOMEMLIMIT is a SOFT cap set ~90% of the 256M hard limit below so the Go GC reclaims heap and
+    # returns it to the OS BEFORE the cgroup OOM-kills Alloy. Without it Alloy's working set creeps
+    # monotonically toward the cgroup limit (Go frees memory lazily when there is no pressure), which
+    # eventually trips ContainerOomKilled and cuts the log/trace shipping stream. Keep it a notch under
+    # deploy.resources.limits.memory whenever that limit changes.
+    environment:
+      GOMEMLIMIT: "230MiB"
     command:
       - run
       - --server.http.listen-addr=0.0.0.0:12345
@@ -230,7 +237,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 192M
+          # 256M (was 192M): Alloy's OTLP receiver+exporter, ~8 file tailers and the docker log source
+          # settle around 180-200M, so 192M ran within ~5% of the limit and crept upward. 256M gives
+          # real headroom; GOMEMLIMIT above keeps the Go heap from drifting back into the OOM zone.
+          memory: 256M
           pids: 512
     networks:
       - net-monitoring-core
