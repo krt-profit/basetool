@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.1.9](https://github.com/krt-profit/basetool/releases/tag/v1.1.9) - 2026-07-06
+
 ### Added
 
 - **Kartellbank: Kachel- oder Tabellenansicht für die Kontenliste unter „Bank meiner Org-Einheit".** Die Kontenliste auf `/org-unit-bank` lässt sich jetzt — wie auf dem Bank-Dashboard — zwischen einer Kachelansicht (Standard) und einer Tabellenansicht umschalten; eine Gruppierung gibt es hier bewusst nicht. Die Wahl wird pro Nutzer lokal gespeichert und ohne Neuladen der Seite angewendet. (REQ-BANK-021)
