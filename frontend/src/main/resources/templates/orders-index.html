@@ -205,186 +205,28 @@
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    // Thymeleaf-interpolated server values only; the age-colouring + in-place filter logic lives in
+    // the orders-index.js page module loaded immediately after this bootstrap (ADR-0069).
     const KRT_ORDERS_AGE_YELLOW = /*[[${ageYellowDays}]]*/ 30;
     const KRT_ORDERS_AGE_RED = /*[[${ageRedDays}]]*/ 90;
-
-    // Age-colour the order ids. Extracted so it can re-run on `krt:swapped` — the row colours are
-    // otherwise only applied on the initial load and would be lost on a fragment swap (#573).
-    function colorOrderAges(root) {
-        const now = new Date();
-        (root || document).querySelectorAll('.order-id-display').forEach(el => {
-            const utcDateStr = el.getAttribute('data-utc');
-            if (utcDateStr) {
-                const date = new Date(utcDateStr);
-                if (!isNaN(date)) {
-                    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-                    if (diffDays >= KRT_ORDERS_AGE_RED) {
-                        el.classList.add('text-danger');
-                        el.style.fontWeight = 'bold';
-                    } else if (diffDays >= KRT_ORDERS_AGE_YELLOW) {
-                        el.classList.add('text-warning');
-                        el.style.fontWeight = 'bold';
-                    }
-                }
-            }
-        });
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        colorOrderAges(document);
-
-        // In-place status/scope filter (epic #571 / #573). The form id was renamed off the generic
-        // "filter-form" so the sidebar's generic change->submit auto-reload no longer fires here.
-        const filterForm = document.getElementById('orders-filter-form');
-        const resultsContainer = document.getElementById('orders-results');
-        if (filterForm && resultsContainer && window.krtFetch) {
-            const applyFilter = () => {
-                const data = new FormData(filterForm);
-                const params = new URLSearchParams();
-                for (const [key, value] of data.entries()) {
-                    if (value !== '') params.append(key, value);
-                }
-                const query = params.toString();
-                window.krtFetch.swap({
-                    url: '/orders' + (query ? '?' + query : ''),
-                    container: resultsContainer,
-                    history: true,
-                });
-            };
-            filterForm.addEventListener('submit', (event) => {
-                event.preventDefault();
-                applyFilter();
-            });
-            filterForm.querySelectorAll('input').forEach((el) => {
-                el.addEventListener('change', applyFilter);
-            });
-        }
-    });
-
-    document.addEventListener('krt:swapped', (e) => {
-        colorOrderAges(e && e.detail ? e.detail.container : document);
-    });
 </script>
+<script th:src="@{/js/orders-index.js}" th:attr="nonce=${cspNonce}"></script>
 <script sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)" th:inline="javascript" th:attr="nonce=${cspNonce}">
-// Bind the drag-reorder to the STABLE #orders-results container (not the <tbody>) so the
-// delegation survives a filter fragment swap that replaces the table (#573). The handlers
-// already use e.target.closest('tr.draggable-row'), so container-level delegation is equivalent.
-
-// Localized strings for the in-place reorder (#575). krtFetch.write takes already-localized text.
-const KRT_ORDERS_REORDER_I18N = {
-    success: /*[[#{success.joborder.priority}]]*/ 'Priority updated.',
-    error: /*[[#{error.joborder.priority.failed}]]*/ 'Could not update priority.',
-    conflict: {
-        title: /*[[#{orders.conflict.toast.title}]]*/ 'Conflict',
-        detail: /*[[#{orders.conflict.toast.detail}]]*/ 'The data changed in the meantime.',
-        reloadLabel: /*[[#{orders.conflict.action.reload}]]*/ 'Load current values',
-        reloadQuestion: /*[[#{orders.conflict.action.reload.question}]]*/ 'Load current values?',
-        dismissLabel: /*[[#{orders.conflict.action.dismiss}]]*/ 'Cancel'
-    }
-};
-
-// Persist a drag-reorder in place (#571 / #575): krtFetch.write the new slot, then re-render the
-// WHOLE queue via a ?fragment=results swap. The backend reshuffles every active order's priority,
-// so the swap is mandatory to refresh all siblings' data-priority (a partial DOM patch would make
-// the next drag compute a stale target). The swap also reverts the optimistic dragover move when
-// the write failed, keeping the visible order consistent with the persisted one.
-async function persistOrderReorder(orderId, targetPriority) {
-    const container = document.getElementById('orders-results');
-    let res = { ok: false };
-    if (window.krtFetch) {
-        res = await window.krtFetch.write({
-            method: 'PUT',
-            url: '/orders/' + orderId + '/priority/ajax?priority=' + targetPriority,
-            toast: false,
-            errorMessage: KRT_ORDERS_REORDER_I18N.error,
-            conflict: {
-                title: KRT_ORDERS_REORDER_I18N.conflict.title,
-                reloadLabel: KRT_ORDERS_REORDER_I18N.conflict.reloadLabel,
-                reloadQuestion: KRT_ORDERS_REORDER_I18N.conflict.reloadQuestion,
-                dismissLabel: KRT_ORDERS_REORDER_I18N.conflict.dismissLabel,
-                reloadDetailFallback: KRT_ORDERS_REORDER_I18N.conflict.detail
-            }
-        });
-    }
-    if (container && window.krtFetch && window.krtFetch.swap) {
-        await window.krtFetch.swap({
-            url: window.location.pathname + window.location.search,
-            container: container,
-            fragmentValue: 'results',
-            history: false,
-            preserveScroll: true
-        });
-    }
-    if (res.ok && typeof window.showFrontendSuccessToast === 'function') {
-        window.showFrontendSuccessToast(KRT_ORDERS_REORDER_I18N.success);
-    }
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    const container = document.getElementById('orders-results');
-    if (!container) return;
-
-    let draggedRow = null;
-    let oldIndex = -1;
-
-    container.addEventListener('dragstart', function(e) {
-        draggedRow = e.target.closest('tr.draggable-row');
-        if (!draggedRow) return;
-        
-        draggedRow.style.opacity = '0.5';
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', draggedRow.dataset.id);
-        
-        const rows = Array.from(container.querySelectorAll('tr.draggable-row'));
-        oldIndex = rows.indexOf(draggedRow);
-    });
-
-    container.addEventListener('dragend', function(e) {
-        if (!draggedRow) return;
-        draggedRow.style.opacity = '1';
-        draggedRow = null;
-        oldIndex = -1;
-    });
-
-    container.addEventListener('dragover', function(e) {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        
-        const targetRow = e.target.closest('tr.draggable-row');
-        if (!targetRow || targetRow === draggedRow) return;
-        
-        const bounding = targetRow.getBoundingClientRect();
-        const offset = bounding.y + (bounding.height / 2);
-        
-        if (e.clientY - offset > 0) {
-            targetRow.after(draggedRow);
-        } else {
-            targetRow.before(draggedRow);
+    // LOGISTICIAN-only: localized strings for the in-place queue drag-reorder (#575); consumed by the
+    // orders-index-reorder.js page module loaded immediately after this bootstrap (ADR-0069). Both
+    // this block and its module carry the same sec:authorize gate, so neither reaches non-logisticians.
+    const KRT_ORDERS_REORDER_I18N = {
+        success: /*[[#{success.joborder.priority}]]*/ 'Priority updated.',
+        error: /*[[#{error.joborder.priority.failed}]]*/ 'Could not update priority.',
+        conflict: {
+            title: /*[[#{orders.conflict.toast.title}]]*/ 'Conflict',
+            detail: /*[[#{orders.conflict.toast.detail}]]*/ 'The data changed in the meantime.',
+            reloadLabel: /*[[#{orders.conflict.action.reload}]]*/ 'Load current values',
+            reloadQuestion: /*[[#{orders.conflict.action.reload.question}]]*/ 'Load current values?',
+            dismissLabel: /*[[#{orders.conflict.action.dismiss}]]*/ 'Cancel'
         }
-    });
-
-    container.addEventListener('drop', function(e) {
-        e.preventDefault();
-        if (!draggedRow || oldIndex === -1) return;
-        
-        const rows = Array.from(container.querySelectorAll('tr.draggable-row'));
-        const newIndex = rows.indexOf(draggedRow);
-        
-        if (newIndex === oldIndex) return;
-        
-        let targetPriority = null;
-        if (newIndex > oldIndex) {
-            targetPriority = rows[newIndex - 1].dataset.priority;
-        } else if (newIndex < oldIndex) {
-            targetPriority = rows[newIndex + 1].dataset.priority;
-        }
-        
-        if (targetPriority) {
-            // Read the order id synchronously before the async write (dragend nulls draggedRow).
-            persistOrderReorder(draggedRow.dataset.id, targetPriority);
-        }
-    });
-});
+    };
 </script>
+<script sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)" th:src="@{/js/orders-index-reorder.js}" th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **Technisch: Inline-JavaScript der Auftragsseiten in statische Module ausgelagert.** Das JavaScript der Auftrags-Anlege-/Bearbeitungsseite und der Auftragsübersicht (samt der Logistiker-Drag-&-Drop-Priorisierung) wurde ohne Verhaltensänderung aus den Thymeleaf-Vorlagen in browser-zwischenspeicherbare, lint- und formatierbare Dateien unter `static/js/` verlagert (ADR-0069).
+
 - **Monitoring: Die Überwachungsebene erkennt jetzt eigene stille Ausfälle.** Neue Alarme decken fehlgeschlagene Config-Reloads (Prometheus/Alertmanager/Alloy/Blackbox), Regel- und Benachrichtigungsfehler (Prometheus + Loki-Ruler), stille Log-Ströme (Alloy tailt eine kritische Datei wie auth.log/audit.log nicht mehr) sowie cAdvisor-Aussetzer, Container-OOM-Kills und CPU-Drosselung ab. Dazu kommen eine Log-Pipeline-Zeile im Meta-Dashboard und korrigierte Scheduled-Job-Alarmtexte, die wieder den echten Job-Namen statt „basetool-backend" zeigen (REQ-OBS-014).
 
 - **Technisch: Inline-JavaScript der Raffinerie-Seiten in statische Module ausgelagert.** Das JavaScript der drei Raffinerie-Auftragsseiten (Übersicht, Anlegen, Detail) wurde ohne Verhaltensänderung aus den Thymeleaf-Vorlagen in browser-zwischenspeicherbare, lint- und formatierbare Dateien unter `static/js/` verlagert (ADR-0069).
