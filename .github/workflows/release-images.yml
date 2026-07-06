@@ -167,7 +167,7 @@ jobs:
       # manifest — those labels then ride along into the merged index.
       - name: Generate image labels
         id: meta
-        uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6.1.0
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}
           labels: |
@@ -318,7 +318,7 @@ jobs:
 
       - name: Generate image metadata (tags + OCI labels)
         id: meta
-        uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6.1.0
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}
           tags: |
@@ -453,7 +453,7 @@ jobs:
 
       - name: Generate image metadata (tags + OCI labels)
         id: meta
-        uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6.1.0
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-config
           # Identical tag scheme to the app images (merge job) so a release's
@@ -617,7 +617,7 @@ jobs:
 
       - name: Generate image metadata (tags + OCI labels)
         id: meta
-        uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6.1.0
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-keycloak-spi
           # Identical tag scheme to the app images so a release's provider JAR is
