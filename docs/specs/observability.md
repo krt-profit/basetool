@@ -127,6 +127,15 @@ rule — no blanket "everything is masked" claim:
   loopback-only — descoped as an accepted gap (REQ-OBS-010).
 - **PostgreSQL container logs** — ingested with `log_error_verbosity=terse` so `DETAIL`
   lines cannot leak row data.
+- **Monitoring-plane container stdout** (`app="mon-<service>"` for the monitoring services —
+  Prometheus, Grafana, Loki, Tempo, Alloy, Alertmanager, the exporters, the socket proxy; #1041
+  item 24) — shipped so a misbehaving monitoring component (Grafana and Tempo have OOM-looped in
+  prod) leaves evidence in Loki rather than only in the rotation-capped host docker-json logs. Two
+  streams carry PII and are masked **in the shipper**: `mon-grafana` (Keycloak-OIDC admin logins
+  log `uname=` + e-mail) and `mon-alertmanager` (SMTP-failure lines carry the recipient e-mail),
+  both scrubbed by Alloy `stage.replace` (gated by a `stage.match` on the app label) mirroring the
+  Keycloak mask. The streams inherit the global 744h retention — no REQ-OBS-010 IP-retention impact
+  once masked.
 - Loki labels stay low-cardinality (`app`, `level`, bounded `host`); log lines are never
   turned into per-user labels.
 
@@ -277,17 +286,21 @@ transaction per pass) rather than per-scrape.
 
 **Backend.**
 
-- `basetool_scheduled_job_executions_total{job,outcome}` counter,
-  `basetool_scheduled_job_duration_seconds{job}` timer,
-  `basetool_scheduled_job_last_success_timestamp_seconds{job}` gauge and — for the jobs that
-  process a countable batch — `basetool_scheduled_job_items_total{job}` counter for the seven
+- `basetool_scheduled_job_executions_total{task,outcome}` counter,
+  `basetool_scheduled_job_duration_seconds{task}` timer,
+  `basetool_scheduled_job_last_success_timestamp_seconds{task}` gauge and — for the jobs that
+  process a countable batch — `basetool_scheduled_job_items_total{task}` counter for the seven
   wrapped jobs (`user_sync`, `notification_retention`, `default_blueprint_provisioning`,
   `bank_ledger_integrity`, `uex_sync`, `scwiki_sync`, `business_metrics`) via `TaskMetrics` (`record`
   / `recordCounting`). The `business_metrics` job wraps `BusinessMetricsCollector.refresh()` (the 60s
   queue-depth sampler) so a wedged sampler surfaces via its frozen last-success (`BusinessMetricsStale`)
   instead of silently freezing every queue gauge under the `*ApprovalOverdue` alerts (#1041 item 3).
-  The scheduled-job timer publishes latency histogram buckets (bounded 10ms..600s, `job` label only)
-  so the operations dashboard charts per-job p95 duration. The last-success gauge is the source of the
+  The scheduled-job timer publishes latency histogram buckets (bounded 10ms..600s, `task` label only)
+  so the operations dashboard charts per-job p95 duration. The job-identity tag is `task`, NOT `job`
+  (#1041 item 23): a metric tag named `job` collides with the Prometheus scrape `job` label and gets
+  renamed to `exported_job` — so the alerts once matched `exported_job` and one silently never fired.
+  The rename splits the 180d history (old series carry `exported_job`, new ones `task`; a Grafana
+  annotation marks the cutover). The last-success gauge is the source of the
   staleness alerts — `UserSyncStale` (`user_sync`, > 15 min), `ExternalSyncStale` (the catalogue syncs,
 
   > 48 h), `ScheduledJobStale` (`notification_retention` / `default_blueprint_provisioning`, > 26 h),

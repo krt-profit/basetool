@@ -16,15 +16,16 @@ groups:
 
   - name: business-warning
     rules:
-      # NOTE: the backend tags basetool_scheduled_job_* with a `job` label (ScheduledJob.label()),
-      # which COLLIDES with Prometheus's own scrape `job` label (basetool-backend). On collision
-      # Prometheus keeps the scrape value and exposes the app value as `exported_job`, so the
-      # scheduled-job name must be matched on `exported_job` here, not `job` (which is always
-      # "basetool-backend"). Matching on `job` silently never fired. (Root-cause fix = rename the
-      # backend tag off the reserved `job` name; until then these use exported_job.)
+      # NOTE (#1041 item 23): the backend tags basetool_scheduled_job_* with a `task` label
+      # (ScheduledJob.label()). It was formerly `job`, which COLLIDED with Prometheus's own scrape
+      # `job` label (basetool-backend) — on collision Prometheus keeps the scrape value and renames
+      # the app tag to `exported_job`, so these alerts had to match the awkward `exported_job` and
+      # one silently never fired when it matched plain `job`. TAG_JOB was renamed to `task` to
+      # sidestep the reserved name, so match on `task`. The 180d history splits at the rename (old
+      # series carry `exported_job`, new ones `task`) — a Grafana annotation marks the cutover.
       # Role drift vs. Keycloak: the user sync last succeeded > 15 min ago (it runs every 5 min).
       - alert: UserSyncStale
-        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{exported_job="user_sync"}) > 900
+        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{task="user_sync"}) > 900
         for: 1m
         labels:
           severity: warning
@@ -33,13 +34,13 @@ groups:
           description: "The Keycloak user sync last succeeded more than 15 minutes ago — local roles/accounts may drift from Keycloak."
 
       - alert: ExternalSyncStale
-        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{exported_job=~"uex_sync|scwiki_sync"}) > 172800
+        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{task=~"uex_sync|scwiki_sync"}) > 172800
         for: 10m
         labels:
           severity: warning
         annotations:
-          summary: "External sync stale >48h ({{ $labels.exported_job }})"
-          description: "The {{ $labels.exported_job }} catalogue sync last succeeded more than 48 hours ago."
+          summary: "External sync stale >48h ({{ $labels.task }})"
+          description: "The {{ $labels.task }} catalogue sync last succeeded more than 48 hours ago."
 
       # (#1041 item 2) Swallowed upstream failures. Every UEX/SC-Wiki fetch/parse error is mapped to an
       # empty list, so the sync job still "succeeds" and last_success stays fresh — ExternalSyncStale /
@@ -61,21 +62,21 @@ groups:
       # scheduled_job_items_total is populated from the same per-run tallies as the sync-report
       # summary (UexItemSyncService upserts / the five SC-Wiki step counts). A 48h flatline at zero
       # while the job keeps succeeding means the catalogue is silently importing nothing. The `and on
-      # (exported_job)` guard matches the two series solely on the job name (their __name__/instance
+      # (task)` guard matches the two series solely on the job name (their __name__/instance
       # labels differ). The items series only exists once a counting run has recorded it, so this
       # cannot fire before the job's first successful run.
       # baseline-tune: 48h zero-items window is the issue's initial threshold (daily sync cadence).
       - alert: SyncZeroItems
         expr: |
-          increase(basetool_scheduled_job_items_total{exported_job=~"uex_sync|scwiki_sync"}[48h]) == 0
-          and on (exported_job)
-          (time() - basetool_scheduled_job_last_success_timestamp_seconds{exported_job=~"uex_sync|scwiki_sync"}) < 172800
+          increase(basetool_scheduled_job_items_total{task=~"uex_sync|scwiki_sync"}[48h]) == 0
+          and on (task)
+          (time() - basetool_scheduled_job_last_success_timestamp_seconds{task=~"uex_sync|scwiki_sync"}) < 172800
         for: 1h
         labels:
           severity: warning
         annotations:
-          summary: "Catalogue sync importing zero items ({{ $labels.exported_job }})"
-          description: "The {{ $labels.exported_job }} sync has processed zero items in 48h while still recording successful runs — the upstream catalogue is likely returning empty responses. Check the upstream API and the sync-report admin page."
+          summary: "Catalogue sync importing zero items ({{ $labels.task }})"
+          description: "The {{ $labels.task }} sync has processed zero items in 48h while still recording successful runs — the upstream catalogue is likely returning empty responses. Check the upstream API and the sync-report admin page."
 
       # (#1041 item 3) All-jobs staleness. UserSyncStale/ExternalSyncStale covered only user_sync and
       # the two catalogue syncs; the daily notification-retention purge and the hourly default-
@@ -83,13 +84,13 @@ groups:
       # lazily by TaskMetrics, so a job whose bean is config-gated off never publishes it and cannot
       # report a false stale (deliberate, per the issue).
       - alert: ScheduledJobStale
-        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{exported_job=~"notification_retention|default_blueprint_provisioning"}) > 93600
+        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{task=~"notification_retention|default_blueprint_provisioning"}) > 93600
         for: 10m
         labels:
           severity: warning
         annotations:
-          summary: "Scheduled job stale >26h ({{ $labels.exported_job }})"
-          description: "The {{ $labels.exported_job }} job last succeeded more than 26 hours ago — it may have stopped being scheduled."
+          summary: "Scheduled job stale >26h ({{ $labels.task }})"
+          description: "The {{ $labels.task }} job last succeeded more than 26 hours ago — it may have stopped being scheduled."
 
       # (#1041 item 3) The worst false silence in the stack: if the hourly bank ledger-integrity sweep
       # stops running, basetool_bank_ledger_integrity_violations FREEZES at its last value and
@@ -97,7 +98,7 @@ groups:
       # undetected. Tighter 6h window (the sweep is hourly) and critical, matching the severity of the
       # invariant it guards.
       - alert: BankLedgerIntegritySweepStale
-        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{exported_job="bank_ledger_integrity"}) > 21600
+        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{task="bank_ledger_integrity"}) > 21600
         for: 10m
         labels:
           severity: critical
@@ -109,7 +110,7 @@ groups:
       # depth gauge. If it wedges, the gauges FREEZE and the *ApprovalOverdue alerts silently consume
       # stale numbers. A last-success age > 10 min means ~10 missed samples — the sampler is stuck.
       - alert: BusinessMetricsStale
-        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{exported_job="business_metrics"}) > 600
+        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"}) > 600
         for: 5m
         labels:
           severity: warning
@@ -120,12 +121,12 @@ groups:
       # (#1041 item 3) Success-with-zero-work detector. user_sync runs every 5 min; a run that returns
       # successfully but synced zero users (Keycloak returned an empty roster) leaves last_success
       # fresh, so UserSyncStale never fires. Zero items across 30m while successful runs happened is
-      # the tell. The `and on (exported_job)` matches the two series on the job name only.
+      # the tell. The `and on (task)` matches the two series on the job name only.
       - alert: UserSyncZeroItems
         expr: |
-          increase(basetool_scheduled_job_items_total{exported_job="user_sync"}[30m]) == 0
-          and on (exported_job)
-          increase(basetool_scheduled_job_executions_total{exported_job="user_sync",outcome="success"}[30m]) > 0
+          increase(basetool_scheduled_job_items_total{task="user_sync"}[30m]) == 0
+          and on (task)
+          increase(basetool_scheduled_job_executions_total{task="user_sync",outcome="success"}[30m]) > 0
         for: 10m
         labels:
           severity: warning
@@ -139,8 +140,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Scheduled job failing repeatedly ({{ $labels.exported_job }})"
-          description: "Job '{{ $labels.exported_job }}' recorded {{ $value }} failed runs in the last hour."
+          summary: "Scheduled job failing repeatedly ({{ $labels.task }})"
+          description: "Job '{{ $labels.task }}' recorded {{ $value }} failed runs in the last hour."
 
       # Historical optimistic-locking regression indicator (the project's canonical 409 signal).
       - alert: OptimisticLockConflictSpike

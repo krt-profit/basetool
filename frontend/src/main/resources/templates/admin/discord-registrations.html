@@ -97,124 +97,14 @@
 </main>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-    document.addEventListener('DOMContentLoaded', function () {
-        if (!window.krtFetch) {
-            return;
-        }
-        const MSG = {
-            approved: /*[[#{admin.discordRegistrations.approved}]]*/ 'Registrierung freigegeben.',
-            rejected: /*[[#{admin.discordRegistrations.rejected}]]*/ 'Registrierung abgelehnt.',
-            approveError: /*[[#{error.admin.discordRegistrations.approve}]]*/ 'Freigabe fehlgeschlagen.',
-            rejectError: /*[[#{error.admin.discordRegistrations.reject}]]*/ 'Ablehnung fehlgeschlagen.',
-            empty: /*[[#{admin.discordRegistrations.empty}]]*/ 'Keine offenen Registrierungen.'
-        };
-        const body = document.getElementById('registrationsBody');
-        const modal = document.getElementById('reject-modal');
-        const reasonInput = document.getElementById('reject-reason');
-        let rejectTarget = null;
-
-        function removeRow(row) {
-            row.remove();
-            if (!body.querySelector('tr[data-id]')) {
-                const empty = document.createElement('tr');
-                empty.id = 'registrationsEmpty';
-                const cell = document.createElement('td');
-                cell.colSpan = 4;
-                cell.textContent = MSG.empty;
-                empty.appendChild(cell);
-                body.appendChild(empty);
-            }
-        }
-
-        function approve(row) {
-            const id = row.getAttribute('data-id');
-            const version = row.getAttribute('data-version');
-            window.krtFetch.write({
-                method: 'POST',
-                url: '/admin/discord-registrations/' + encodeURIComponent(id) + '/approve',
-                payload: { version: version == null ? null : Number(version) },
-                toast: false,
-                errorMessage: MSG.approveError,
-                onSuccess: function () {
-                    if (window.showFrontendSuccessToast) {
-                        window.showFrontendSuccessToast(MSG.approved);
-                    }
-                    removeRow(row);
-                }
-            });
-        }
-
-        function openReject(row) {
-            rejectTarget = row;
-            if (reasonInput) {
-                reasonInput.value = '';
-            }
-            modal.style.display = 'flex';
-        }
-
-        function closeReject() {
-            modal.style.display = 'none';
-            rejectTarget = null;
-        }
-
-        body.addEventListener('click', function (event) {
-            const btn = event.target.closest('button[data-action]');
-            if (!btn) {
-                return;
-            }
-            const row = btn.closest('tr[data-id]');
-            if (!row) {
-                return;
-            }
-            if (btn.getAttribute('data-action') === 'approve') {
-                approve(row);
-            } else {
-                openReject(row);
-            }
-        });
-
-        const cancelBtn = document.getElementById('reject-cancel');
-        if (cancelBtn) {
-            cancelBtn.addEventListener('click', closeReject);
-        }
-        const confirmBtn = document.getElementById('reject-confirm');
-        if (confirmBtn) {
-            confirmBtn.addEventListener('click', function () {
-                if (!rejectTarget) {
-                    return;
-                }
-                const row = rejectTarget;
-                const id = row.getAttribute('data-id');
-                const version = row.getAttribute('data-version');
-                const reason = reasonInput ? reasonInput.value.trim() : '';
-                window.krtFetch.write({
-                    method: 'POST',
-                    url: '/admin/discord-registrations/' + encodeURIComponent(id) + '/reject',
-                    payload: { reason: reason === '' ? null : reason, version: version == null ? null : Number(version) },
-                    toast: false,
-                    errorMessage: MSG.rejectError,
-                    onSuccess: function () {
-                        if (window.showFrontendSuccessToast) {
-                            window.showFrontendSuccessToast(MSG.rejected);
-                        }
-                        closeReject();
-                        removeRow(row);
-                    }
-                });
-            });
-        }
-
-        window.addEventListener('click', function (event) {
-            if (event.target === modal) {
-                closeReject();
-            }
-        });
-        document.addEventListener('keydown', function (event) {
-            if (event.key === 'Escape' && modal.style.display === 'flex') {
-                closeReject();
-            }
-        });
-    });
+    const DISCORD_MSG = {
+        approved: /*[[#{admin.discordRegistrations.approved}]]*/ 'Registrierung freigegeben.',
+        rejected: /*[[#{admin.discordRegistrations.rejected}]]*/ 'Registrierung abgelehnt.',
+        approveError: /*[[#{error.admin.discordRegistrations.approve}]]*/ 'Freigabe fehlgeschlagen.',
+        rejectError: /*[[#{error.admin.discordRegistrations.reject}]]*/ 'Ablehnung fehlgeschlagen.',
+        empty: /*[[#{admin.discordRegistrations.empty}]]*/ 'Keine offenen Registrierungen.'
+    };
 </script>
+<script th:src="@{/js/discord-registrations.js}" th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

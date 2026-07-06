@@ -539,7 +539,7 @@
         {
           "expr": "time() - basetool_scheduled_job_last_success_timestamp_seconds",
           "refId": "A",
-          "legendFormat": "{{exported_job}}",
+          "legendFormat": "{{task}}",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -585,9 +585,9 @@
       },
       "targets": [
         {
-          "expr": "sum by (exported_job) (rate(basetool_scheduled_job_executions_total{outcome=\"failure\"}[15m])) or vector(0)",
+          "expr": "sum by (task) (rate(basetool_scheduled_job_executions_total{outcome=\"failure\"}[15m])) or vector(0)",
           "refId": "A",
-          "legendFormat": "{{exported_job}}",
+          "legendFormat": "{{task}}",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -1001,9 +1001,9 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (exported_job, le) (rate(basetool_scheduled_job_duration_seconds_bucket[1h])))",
+          "expr": "histogram_quantile(0.95, sum by (task, le) (rate(basetool_scheduled_job_duration_seconds_bucket[1h])))",
           "refId": "A",
-          "legendFormat": "{{exported_job}}",
+          "legendFormat": "{{task}}",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -1049,9 +1049,9 @@
       },
       "targets": [
         {
-          "expr": "sum by (exported_job) (rate(basetool_scheduled_job_items_total[1h])) * 3600",
+          "expr": "sum by (task) (rate(basetool_scheduled_job_items_total[1h])) * 3600",
           "refId": "A",
-          "legendFormat": "{{exported_job}}",
+          "legendFormat": "{{task}}",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
