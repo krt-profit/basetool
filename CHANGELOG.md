@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **Technisch: Inline-JavaScript weiterer Material- und Lager-Seiten in statische Module ausgelagert.** Das JavaScript der Materialübersicht, der Material-Detailseite, der Material-Sammlung und der Lager-Einbuchung wurde ohne Verhaltensänderung aus den Thymeleaf-Vorlagen in browser-zwischenspeicherbare, lint- und formatierbare Dateien unter `static/js/` verlagert (ADR-0069).
+
 - **Technisch: Inline-JavaScript der Material-Adminseiten in statische Module ausgelagert.** Das JavaScript der Admin-Seiten für den Materialkatalog und die Material-Aliase wurde ohne Verhaltensänderung aus den Thymeleaf-Vorlagen in browser-zwischenspeicherbare, lint- und formatierbare Dateien unter `static/js/` verlagert (ADR-0069).
 
 - **Technisch: Inline-JavaScript der Auftragsseiten in statische Module ausgelagert.** Das JavaScript der Auftrags-Anlege-/Bearbeitungsseite und der Auftragsübersicht (samt der Logistiker-Drag-&-Drop-Priorisierung) wurde ohne Verhaltensänderung aus den Thymeleaf-Vorlagen in browser-zwischenspeicherbare, lint- und formatierbare Dateien unter `static/js/` verlagert (ADR-0069).
