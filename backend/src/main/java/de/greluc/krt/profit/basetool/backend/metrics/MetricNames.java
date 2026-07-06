@@ -74,6 +74,14 @@ public final class MetricNames {
   /** Counter {@code basetool_audit_events_total} — tag {@code domain} ({@code AuditDomain}). */
   public static final String AUDIT_EVENTS = "basetool.audit.events";
 
+  /**
+   * Counter {@code basetool_bank_audit_events_total} — tag {@code event_type} ({@code
+   * BankAuditEventType}). The bank keeps a physically separate {@code bank_audit_event} table
+   * excluded from {@code AuditDomain}, so this dedicated counter is the bank trail's only volume
+   * signal (counts only — never amounts or holder identities; #1041 item 10, REQ-OBS-011).
+   */
+  public static final String BANK_AUDIT_EVENTS = "basetool.bank.audit.events";
+
   // --- Rate-limit rejections (RateLimitingFilter) ----------------------------------------
 
   /** Counter {@code basetool_ratelimit_rejections_total} — tag {@code bucket}. */
@@ -157,7 +165,10 @@ public final class MetricNames {
   /** Tag key: the external-sync source system ({@code SyncSourceSystem#name()}). */
   public static final String TAG_SOURCE = "source";
 
-  /** Tag key: the external-sync event type ({@code SyncEventType#name()}). */
+  /**
+   * Tag key: the event type of a bounded event enum — the external-sync {@code SyncEventType} on
+   * {@link #SYNC_EVENTS}, or the {@code BankAuditEventType} on {@link #BANK_AUDIT_EVENTS}.
+   */
   public static final String TAG_EVENT_TYPE = "event_type";
 
   // --- Bounded tag values (not an application enum) --------------------------------------
