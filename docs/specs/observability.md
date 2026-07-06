@@ -265,19 +265,31 @@ transaction per pass) rather than per-scrape.
 - `basetool_scheduled_job_executions_total{job,outcome}` counter,
   `basetool_scheduled_job_duration_seconds{job}` timer,
   `basetool_scheduled_job_last_success_timestamp_seconds{job}` gauge and — for the jobs that
-  process a countable batch — `basetool_scheduled_job_items_total{job}` counter for the six batch
-  jobs (`user_sync`, `notification_retention`, `default_blueprint_provisioning`,
-  `bank_ledger_integrity`, `uex_sync`, `scwiki_sync`) via `TaskMetrics` (`record` /
-  `recordCounting`). The last-success gauge is the source of the "user sync stale > 15 min" alert
-  (`job="user_sync"`); it is registered lazily so a config-gated-off job never reports a
-  falsely-stale `0`. The items counter is present only for jobs that report a count: user sync,
-  notification retention, default-blueprint provisioning, and — since #1041 item 2 — `uex_sync` (the
-  `UexItemSyncService` `game_item` upsert tally) and `scwiki_sync` (the sum of the five SC-Wiki step
-  counts, a failing step contributing `0`). For the two catalogue syncs it is populated from the same
-  per-run tallies the sync-report summary uses and backs the `SyncZeroItems` alert, which fires when
-  a sync keeps succeeding but has processed zero rows for 48 h — the empty-200 catalogue outage that
-  neither `ExternalSyncStale` (last-success stays fresh) nor `ExternalFetchErrors` (an empty 200 is
-  not a fetch error) catches.
+  process a countable batch — `basetool_scheduled_job_items_total{job}` counter for the seven
+  wrapped jobs (`user_sync`, `notification_retention`, `default_blueprint_provisioning`,
+  `bank_ledger_integrity`, `uex_sync`, `scwiki_sync`, `business_metrics`) via `TaskMetrics` (`record`
+  / `recordCounting`). The `business_metrics` job wraps `BusinessMetricsCollector.refresh()` (the 60s
+  queue-depth sampler) so a wedged sampler surfaces via its frozen last-success (`BusinessMetricsStale`)
+  instead of silently freezing every queue gauge under the `*ApprovalOverdue` alerts (#1041 item 3).
+  The scheduled-job timer publishes latency histogram buckets (bounded 10ms..600s, `job` label only)
+  so the operations dashboard charts per-job p95 duration. The last-success gauge is the source of the
+  staleness alerts — `UserSyncStale` (`user_sync`, > 15 min), `ExternalSyncStale` (the catalogue syncs,
+
+  > 48 h), `ScheduledJobStale` (`notification_retention` / `default_blueprint_provisioning`, > 26 h),
+  > `BankLedgerIntegritySweepStale` (`bank_ledger_integrity`, > 6 h, **critical** — while stale the
+  > violations gauge freezes and `BankLedgerIntegrityViolation` cannot fire) and `BusinessMetricsStale`
+  > (`business_metrics`, > 10 min); it is registered lazily so a config-gated-off job never reports a
+  > falsely-stale `0`. The items counter is present only for jobs that report a count: user sync,
+  > notification retention, default-blueprint provisioning, and — since #1041 item 2 — `uex_sync` (the
+  > `UexItemSyncService` `game_item` upsert tally) and `scwiki_sync` (the sum of the five SC-Wiki step
+  > counts, a failing step contributing `0`). For the two catalogue syncs it is populated from the same
+  > per-run tallies the sync-report summary uses and backs the `SyncZeroItems` alert, which fires when
+  > a sync keeps succeeding but has processed zero rows for 48 h — the empty-200 catalogue outage that
+  > neither `ExternalSyncStale` (last-success stays fresh) nor `ExternalFetchErrors` (an empty 200 is
+  > not a fetch error) catches. The same success-with-zero-work idea backs `UserSyncZeroItems`
+  > (`user_sync` synced zero users for 30 min while successful runs happened — Keycloak returned an
+  > empty roster; #1041 item 3).
+
 - `basetool_sync_events_total{source,event_type}` counter at the three `SyncReportService`
   `log*Event` write sites (`source` = `SyncSourceSystem`, `event_type` = `SyncEventType`; both
   bounded enums — never the external asset name/uuid/detail).

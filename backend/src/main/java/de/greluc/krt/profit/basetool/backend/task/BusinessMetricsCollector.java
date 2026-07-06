@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.task;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
+import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestStatus;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
@@ -82,6 +84,7 @@ public class BusinessMetricsCollector {
   private final OperationRepository operationRepository;
   private final RefineryOrderRepository refineryOrderRepository;
   private final P4kImportJobRepository p4kImportJobRepository;
+  private final TaskMetrics taskMetrics;
 
   private final AtomicLong registrationPending = new AtomicLong();
   private final AtomicLong registrationOldestAge = new AtomicLong();
@@ -136,10 +139,28 @@ public class BusinessMetricsCollector {
    * Re-samples every queue depth and oldest-pending age into the gauge holders. Runs on a fixed
    * timer in a single read-only transaction; the first execution fires shortly after startup, so
    * the gauges leave their initial {@code 0} within moments of boot.
+   *
+   * <p>The sampling body is wrapped in {@link TaskMetrics#record} under {@link
+   * ScheduledJob#BUSINESS_METRICS} so a wedged sampler is not a silent failure: if a query throws,
+   * the run is recorded as a {@code failure}, its {@code last_success} timestamp freezes, and the
+   * {@code BusinessMetricsStale} alert fires — otherwise every {@code *_pending_*} / {@code
+   * *_open_*} gauge would freeze at its last value while the {@code *ApprovalOverdue} alerts kept
+   * evaluating stale numbers (#1041 item 3). The wrapper also swallows the exception so the
+   * scheduler thread survives.
    */
   @Scheduled(fixedRateString = "${app.monitoring.business-metrics.interval-ms:60000}")
   @Transactional(readOnly = true)
   public void refresh() {
+    taskMetrics.record(ScheduledJob.BUSINESS_METRICS, this::sample);
+  }
+
+  /**
+   * Runs the queue-depth / oldest-age queries once and writes the results into the gauge holders.
+   * Executes within the read-only transaction opened by {@link #refresh()} and carries no
+   * transaction annotation of its own; separated from {@code refresh()} only so the whole body can
+   * be handed to {@link TaskMetrics#record} as a single instrumented unit.
+   */
+  private void sample() {
     registrationPending.set(userRepository.countByApprovalStatus(ApprovalStatus.PENDING));
     registrationOldestAge.set(
         ageSeconds(userRepository.findOldestCreatedAtByApprovalStatus(ApprovalStatus.PENDING)));

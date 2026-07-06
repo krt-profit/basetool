@@ -304,12 +304,18 @@ management:
       # Publish latency histogram buckets for http.server.requests so the "HTTP p95 Latency"
       # dashboard panel can compute histogram_quantile (Spring Boot emits no buckets by
       # default). Bounded to 5ms..10s to keep the per-URI bucket cardinality in check (epic #936).
+      # basetool.scheduled.job.duration gets buckets too (bounded 10ms..600s) so the operations
+      # dashboard can chart per-job p95 duration (#1041 item 3); its only label is the bounded `job`
+      # enum (~7 values), so the added bucket cardinality is negligible.
       percentiles-histogram:
         "[http.server.requests]": true
+        "[basetool.scheduled.job.duration]": true
       minimum-expected-value:
         "[http.server.requests]": 5ms
+        "[basetool.scheduled.job.duration]": 10ms
       maximum-expected-value:
         "[http.server.requests]": 10s
+        "[basetool.scheduled.job.duration]": 600s
   tracing:
     export:
       otlp:

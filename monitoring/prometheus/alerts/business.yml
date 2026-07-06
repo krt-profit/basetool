@@ -77,6 +77,62 @@ groups:
           summary: "Catalogue sync importing zero items ({{ $labels.exported_job }})"
           description: "The {{ $labels.exported_job }} sync has processed zero items in 48h while still recording successful runs — the upstream catalogue is likely returning empty responses. Check the upstream API and the sync-report admin page."
 
+      # (#1041 item 3) All-jobs staleness. UserSyncStale/ExternalSyncStale covered only user_sync and
+      # the two catalogue syncs; the daily notification-retention purge and the hourly default-
+      # blueprint back-fill had no staleness guard. No absent() — the last-success gauge is registered
+      # lazily by TaskMetrics, so a job whose bean is config-gated off never publishes it and cannot
+      # report a false stale (deliberate, per the issue).
+      - alert: ScheduledJobStale
+        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{exported_job=~"notification_retention|default_blueprint_provisioning"}) > 93600
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Scheduled job stale >26h ({{ $labels.exported_job }})"
+          description: "The {{ $labels.exported_job }} job last succeeded more than 26 hours ago — it may have stopped being scheduled."
+
+      # (#1041 item 3) The worst false silence in the stack: if the hourly bank ledger-integrity sweep
+      # stops running, basetool_bank_ledger_integrity_violations FREEZES at its last value and
+      # BankLedgerIntegrityViolation (critical) can never fire — a broken bank invariant would go
+      # undetected. Tighter 6h window (the sweep is hourly) and critical, matching the severity of the
+      # invariant it guards.
+      - alert: BankLedgerIntegritySweepStale
+        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{exported_job="bank_ledger_integrity"}) > 21600
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Bank ledger-integrity sweep stale >6h"
+          description: "The hourly bank ledger-integrity sweep last succeeded more than 6 hours ago. While it is stale the violations gauge is frozen and BankLedgerIntegrityViolation cannot fire — the data-corruption detector is blind. Restore the sweep before trusting a 'no violations' reading."
+
+      # (#1041 item 3) BusinessMetricsCollector.refresh() (every 60s) feeds every approval/work-queue
+      # depth gauge. If it wedges, the gauges FREEZE and the *ApprovalOverdue alerts silently consume
+      # stale numbers. A last-success age > 10 min means ~10 missed samples — the sampler is stuck.
+      - alert: BusinessMetricsStale
+        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{exported_job="business_metrics"}) > 600
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Business-metrics sampler stale >10min"
+          description: "BusinessMetricsCollector.refresh() has not completed successfully in over 10 minutes — the approval/work-queue depth gauges are frozen and the queue-overdue alerts may be evaluating stale values. Check the backend logs for the sampler's failure."
+
+      # (#1041 item 3) Success-with-zero-work detector. user_sync runs every 5 min; a run that returns
+      # successfully but synced zero users (Keycloak returned an empty roster) leaves last_success
+      # fresh, so UserSyncStale never fires. Zero items across 30m while successful runs happened is
+      # the tell. The `and on (exported_job)` matches the two series on the job name only.
+      - alert: UserSyncZeroItems
+        expr: |
+          increase(basetool_scheduled_job_items_total{exported_job="user_sync"}[30m]) == 0
+          and on (exported_job)
+          increase(basetool_scheduled_job_executions_total{exported_job="user_sync",outcome="success"}[30m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "User sync succeeding but syncing zero users"
+          description: "The Keycloak user sync has run successfully but processed zero users for 30 minutes — Keycloak likely returned an empty roster. Check Keycloak and the sync path before local accounts drift from the directory."
+
       - alert: ScheduledJobFailureStreak
         expr: increase(basetool_scheduled_job_executions_total{outcome="failure"}[1h]) >= 3
         for: 5m
