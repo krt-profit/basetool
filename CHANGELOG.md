@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **Technisch: Inline-JavaScript der Material-Adminseiten in statische Module ausgelagert.** Das JavaScript der Admin-Seiten für den Materialkatalog und die Material-Aliase wurde ohne Verhaltensänderung aus den Thymeleaf-Vorlagen in browser-zwischenspeicherbare, lint- und formatierbare Dateien unter `static/js/` verlagert (ADR-0069).
+
 - **Technisch: Inline-JavaScript der Auftragsseiten in statische Module ausgelagert.** Das JavaScript der Auftrags-Anlege-/Bearbeitungsseite und der Auftragsübersicht (samt der Logistiker-Drag-&-Drop-Priorisierung) wurde ohne Verhaltensänderung aus den Thymeleaf-Vorlagen in browser-zwischenspeicherbare, lint- und formatierbare Dateien unter `static/js/` verlagert (ADR-0069).
 
 - **Monitoring: Fehlgeschlagene UEX-/SC-Wiki-Abrufe sind jetzt sichtbar.** Verschluckte Abruf- und Parse-Fehler der externen Kataloge werden nun gezählt (`basetool_external_fetch_errors_total`) und als `ExternalFetchErrors` alarmiert – bisher meldete der Sync trotz wochenlangem Ausfall weiter „Erfolg". Zusätzlich sind die ausgehenden Backend-Aufrufe jetzt an die Observation-Registry angebunden (Metriken + Spans, REQ-OBS-009/-011).
