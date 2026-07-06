@@ -322,7 +322,15 @@ transaction per pass) rather than per-scrape.
   `BankAuditSilenceAnomaly` (the bank analogue of `AuditSilenceAnomaly`) and a bank-volume panel on
   the operations dashboard.
 - `basetool_ratelimit_rejections_total{bucket}` counter at the `RateLimitingFilter` reject branch
-  (`bucket` = the rule name, or `global` for the umbrella `/api/**` budget).
+  (`bucket` = the rule name, or `global` for the umbrella `/api/**` budget), paired since #1041
+  item 19 with `basetool_ratelimit_requests_total{bucket}` bumped on **every** bucket evaluation, so
+  rejections/requests is a rejection ratio (`RateLimitRejectionRatioHigh`) rather than 429-only
+  detection.
+- `basetool_discord_precheck_total{outcome}` counter (`DiscordAccountExistenceController`, #1041
+  item 19; `outcome` = `ok` / `unauthorized` / `disabled`). The endpoint sits outside `/api/**`, the
+  rate limiter and the `basetool_http_error` funnel, so this is the only signal for secret-guessing
+  (`DiscordPrecheckUnauthorizedSpike`) or a blank-secret config drift after a rotation
+  (`DiscordPrecheckDisabledOnProd`); no PII, only the coarse outcome.
 - `basetool_bank_ledger_integrity_violations{category}` gauge fed by the hourly integrity sweep
   (six `category` values; **any value > 0 is CRITICAL** — the ledger broke an invariant).
 - Queue-depth gauges (`BusinessMetricsCollector`): `basetool_registration_pending_count` +
@@ -376,13 +384,19 @@ error code — never the raw error description**; on success `reason` = `none`) 
 the 403). They drive `FrontendLoginBroken` (failures with zero concurrent successes — the
 code-to-token / JWKS / state break `KeycloakLoginErrorSpike`'s event regex misses) and
 `CsrfRejectionSpike` (a systematic CSRF-wiring regression that `krtFetch`'s silent single-retry
-otherwise masks as intermittent failed writes).
+otherwise masks as intermittent failed writes). The pre-auth `BotProtectionFilter` adds
+`basetool_bot_blocked_total{rule}` (#1041 item 19; `rule` = `method` / `path_prefix` /
+`file_extension`) at its three reject branches, which were otherwise `log.debug`-only and
+prod-invisible — the counter also surfaces a self-inflicted false positive when a new legit route
+matches a blocked prefix. Panels only, all labels fixed literals.
 
 **Ingest.** `basetool_ingest_handoff_total{kind}` (accepted+staged handoffs per `HandoffKind`),
 `basetool_ingest_handoff_errors_total{reason}` (relay failures: `backend_reject` /
 `backend_unavailable` / `internal`; pre-relay rejections are not counted here), and
 `basetool_ratelimit_rejections_total{bucket}` (`bucket` = `ip` / `subject`; shares the metric name
-with the backend counter, the `application` common tag separating the modules).
+with the backend counter, the `application` common tag separating the modules) — paired since #1041
+item 19 with `basetool_ratelimit_requests_total{bucket}` on the per-IP filter and the per-subject
+limiter, feeding the same `RateLimitRejectionRatioHigh` ratio alert.
 
 **Deliberately excluded** (documented so the gap is intentional, not an oversight): notifications
 (no org-wide queue — only per-recipient unread, which is PII-adjacent), org units (no lifecycle

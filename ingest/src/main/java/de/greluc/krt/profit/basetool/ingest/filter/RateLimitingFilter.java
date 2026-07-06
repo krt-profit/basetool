@@ -84,6 +84,11 @@ public class RateLimitingFilter extends OncePerRequestFilter {
       throws ServletException, IOException {
     Bucket bucket = buckets.computeIfAbsent(clientIp(request), ip -> newBucket());
     ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
+    // Per-bucket evaluation counter (#1041 item 19) — every attempt, so rejections/requests gives
+    // the per-IP rejection ratio rather than 429-only detection. Bounded `ip` literal, not the IP.
+    meterRegistry
+        .counter(MetricNames.RATELIMIT_REQUESTS, MetricNames.TAG_BUCKET, MetricNames.BUCKET_IP)
+        .increment();
     if (!probe.isConsumed()) {
       // Pre-auth per-IP 429 (REQ-OBS-011). Labelled by the bounded `ip` bucket literal, never the
       // client IP itself (PII/unbounded).

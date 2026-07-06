@@ -20,9 +20,11 @@
 package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.config.DiscordSpiPrecheckProperties;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.dto.DiscordAccountExistenceRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.DiscordAccountExistenceResponse;
 import de.greluc.krt.profit.basetool.backend.service.DiscordAccountExistenceService;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.swagger.v3.oas.annotations.Hidden;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -72,6 +74,7 @@ public class DiscordAccountExistenceController {
 
   private final DiscordAccountExistenceService accountExistenceService;
   private final DiscordSpiPrecheckProperties properties;
+  private final MeterRegistry meterRegistry;
 
   /**
    * Answers whether an existing account collides with the supplied Discord identity.
@@ -95,16 +98,33 @@ public class DiscordAccountExistenceController {
     if (configuredSecret == null || configuredSecret.isBlank()) {
       // Feature not configured on this deployment → endpoint disabled. The SPI fails open.
       log.debug("Discord account-existence precheck called but no shared secret is configured.");
+      recordPrecheck(MetricNames.DISCORD_PRECHECK_DISABLED);
       return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
     }
     if (!constantTimeEquals(configuredSecret, providedSecret)) {
       log.warn("Discord account-existence precheck rejected: missing or invalid shared secret.");
+      recordPrecheck(MetricNames.DISCORD_PRECHECK_UNAUTHORIZED);
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
     }
     boolean exists =
         accountExistenceService.accountExistsForDiscordIdentity(
             request.username(), request.email(), request.serverNickname());
+    recordPrecheck(MetricNames.DISCORD_PRECHECK_OK);
     return ResponseEntity.ok(new DiscordAccountExistenceResponse(exists));
+  }
+
+  /**
+   * Bumps {@code basetool_discord_precheck_total} for one bounded {@code outcome}. Only the coarse
+   * outcome is recorded — never the candidate names or e-mail (PII), consistent with the endpoint's
+   * no-PII logging contract.
+   *
+   * @param outcome one of {@link MetricNames#DISCORD_PRECHECK_OK} / {@link
+   *     MetricNames#DISCORD_PRECHECK_UNAUTHORIZED} / {@link MetricNames#DISCORD_PRECHECK_DISABLED}
+   */
+  private void recordPrecheck(@NotNull String outcome) {
+    meterRegistry
+        .counter(MetricNames.DISCORD_PRECHECK, MetricNames.TAG_OUTCOME, outcome)
+        .increment();
   }
 
   /**
