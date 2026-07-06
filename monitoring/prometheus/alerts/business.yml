@@ -217,6 +217,35 @@ groups:
           summary: "No audit events recorded in 5d while backend is up"
           description: "The backend has been up but recorded zero audit events for 5 days — possible audit-logging regression (REQ-AUDIT-001)."
 
+      # (#1041 item 10) Bank audit silence. The bank — the most sensitive audited area — keeps its own
+      # bank_audit_event table (deliberately excluded from AuditDomain), so AuditSilenceAnomaly above
+      # is blind to it. Same 5-day-silence-while-up shape on the dedicated bank counter (counts only,
+      # no amounts). Resolves on the first bank audit event within any 5-day window.
+      - alert: BankAuditSilenceAnomaly
+        expr: (sum(increase(basetool_bank_audit_events_total[5d])) == 0) and on() (up{job="basetool-backend"} == 1)
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No bank audit events recorded in 5d while backend is up"
+          description: "The backend has been up but recorded zero bank audit events for 5 days — possible bank audit-logging regression (REQ-AUDIT-001). Every bank mutation must write a bank_audit_event row."
+
+      # (#1041 item 10) Per-domain audit silence. AuditSilenceAnomaly sums across all 8 domains, so one
+      # domain losing its audit wiring in a refactor (the exact REQ-AUDIT-001 failure mode) is masked
+      # as long as any other domain stays active. This fires per domain. PROMOTION / PERSONAL_INVENTORY
+      # are excluded — they legitimately stay quiet for weeks; their silence is reviewed on the 07
+      # "Audit events (14d) by domain" table instead of paged. A domain that never emitted has no
+      # series and cannot fire; only one that WAS active and went silent 14d does.
+      # baseline-tune: the 14d window suits an active org; a very quiet squadron may need it widened.
+      - alert: AuditDomainSilenceAnomaly
+        expr: (sum by (domain) (increase(basetool_audit_events_total{domain!~"PROMOTION|PERSONAL_INVENTORY"}[14d])) == 0) and on() (up{job="basetool-backend"} == 1)
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Audit domain silent 14d ({{ $labels.domain }})"
+          description: "The {{ $labels.domain }} audit domain recorded zero events in 14 days while the backend is up — this domain may have lost its audit wiring (REQ-AUDIT-001) even though other domains are still active."
+
       # Frontend → backend call failures (bounded reason/method), sustained.
       - alert: BackendCallFailureSustained
         expr: sum(rate(basetool_backend_client_errors_total[5m])) > 0.5

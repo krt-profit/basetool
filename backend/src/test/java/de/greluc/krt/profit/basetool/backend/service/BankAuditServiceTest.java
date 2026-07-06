@@ -27,12 +27,15 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.mapper.BankAuditEventMapper;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEvent;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -41,6 +44,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
@@ -57,6 +61,10 @@ class BankAuditServiceTest {
   @Mock private UserRepository userRepository;
   @Mock private BankAccountRepository accountRepository;
   @Mock private BankAuditEventMapper bankAuditEventMapper;
+
+  // A real registry (spied so @InjectMocks wires it) so record() genuinely increments the counter
+  // and the test can read it back.
+  @Spy private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
   @InjectMocks private BankAuditService bankAuditService;
 
@@ -87,6 +95,16 @@ class BankAuditServiceTest {
     assertEquals(accountId, row.getAccountId());
     assertEquals("+100 aUEC @greluc", row.getDetails());
     assertNotNull(row.getOccurredAt());
+    // The bank-trail volume counter is incremented, tagged by the bounded event type (#1041 item
+    // 10) — the only volume signal for the physically separate bank_audit_event table.
+    assertEquals(
+        1.0,
+        meterRegistry
+            .get(MetricNames.BANK_AUDIT_EVENTS)
+            .tag(MetricNames.TAG_EVENT_TYPE, BankAuditEventType.DEPOSIT_BOOKED.name())
+            .counter()
+            .count(),
+        "recording a bank audit event must increment basetool_bank_audit_events_total{event_type}");
   }
 
   @Test

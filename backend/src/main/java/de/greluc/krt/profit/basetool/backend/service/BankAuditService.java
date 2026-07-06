@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.mapper.BankAuditEventMapper;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEvent;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
@@ -29,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -66,9 +68,17 @@ public class BankAuditService {
   private final UserRepository userRepository;
   private final BankAccountRepository accountRepository;
   private final BankAuditEventMapper bankAuditEventMapper;
+  private final MeterRegistry meterRegistry;
 
   /**
    * Appends one audit event for the current caller within the surrounding business transaction.
+   *
+   * <p>Also increments {@code basetool_bank_audit_events_total{event_type}} — the bank trail's only
+   * volume signal, since the bank keeps a physically separate {@code bank_audit_event} table
+   * excluded from {@code AuditDomain} and so is invisible to the shared {@code
+   * basetool_audit_events_total} counter. Counts only: the label is the bounded {@link
+   * BankAuditEventType}, never an amount, account number or holder identity (REQ-OBS-006/-011,
+   * #1041 item 10).
    *
    * @param eventType what happened
    * @param accountId the affected account, or {@code null} for account-less events
@@ -103,7 +113,13 @@ public class BankAuditService {
             // (an AuditDetails composer or a raw String) is stringified byte-identically.
             .details(details == null ? null : details.toString())
             .build();
-    return auditEventRepository.save(event);
+    BankAuditEvent saved = auditEventRepository.save(event);
+    // Bank-trail volume signal (#1041 item 10): counts only, tagged by the bounded
+    // BankAuditEventType — never amounts, account numbers or holder identities (REQ-OBS-006/-011).
+    meterRegistry
+        .counter(MetricNames.BANK_AUDIT_EVENTS, MetricNames.TAG_EVENT_TYPE, eventType.name())
+        .increment();
+    return saved;
   }
 
   /**

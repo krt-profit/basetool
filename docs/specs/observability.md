@@ -308,8 +308,19 @@ transaction per pass) rather than per-scrape.
   with the `SERVICE_UNAVAILABLE` code from its own filter; the `application` common tag
   distinguishes the module.
 - `basetool_audit_events_total{domain}` counter at the single `AuditService.record` choke point
-  (`domain` = the 8 `AuditDomain` values; the physically separate Bank audit trail is out of
-  scope here).
+  (`domain` = the 8 `AuditDomain` values). Silence detection is two-tier: `AuditSilenceAnomaly`
+  (no audited mutation anywhere for 5 d while the backend is up) plus, since #1041 item 10,
+  `AuditDomainSilenceAnomaly` (a single domain silent for 14 d while others stay active — the
+  domain-lost-its-wiring failure mode the global sum masks; `PROMOTION` / `PERSONAL_INVENTORY` are
+  excluded as legitimately-quiet and reviewed on the operations dashboard's per-domain table
+  instead).
+- `basetool_bank_audit_events_total{event_type}` counter at the single `BankAuditService.record`
+  choke point (`event_type` = the bounded `BankAuditEventType` enum). The bank keeps a physically
+  separate `bank_audit_event` table excluded from `AuditDomain`, so before #1041 item 10 the most
+  sensitive audited area had **zero** volume signal; this counter is that signal — **counts only,
+  never amounts, account numbers or holder identities** (REQ-OBS-006). It backs
+  `BankAuditSilenceAnomaly` (the bank analogue of `AuditSilenceAnomaly`) and a bank-volume panel on
+  the operations dashboard.
 - `basetool_ratelimit_rejections_total{bucket}` counter at the `RateLimitingFilter` reject branch
   (`bucket` = the rule name, or `global` for the umbrella `/api/**` budget).
 - `basetool_bank_ledger_integrity_violations{category}` gauge fed by the hourly integrity sweep
