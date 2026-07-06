@@ -55,9 +55,13 @@ import org.springframework.web.context.WebApplicationContext;
  * <p>Pre-fix, the template called {@code /*[[${locations.![name]}]]*&#47;} inside a {@code
  * th:inline="javascript"} script, which truncated the rest of the script body. The page-local
  * {@code filterTable} function lived after that expression and therefore was never defined — the
- * filter input above the locations table did nothing. The fix replaces the inline expression with a
- * sibling {@code <datalist id="locationNames-data">}; this test pins that {@code filterTable}
- * survives in the rendered HTML and the response ends with the closing {@code </html>} tag.
+ * filter input above the locations table did nothing. The fix replaced the inline expression with a
+ * sibling {@code <datalist id="locationNames-data">}. Post-ADR-0069 the page logic lives in the
+ * extracted {@code locations.js} module (loaded via {@code th:src}) and the remaining interpolation
+ * (the AJAX toast/conflict strings) sits in a small inline bootstrap right before it; this test
+ * pins that the module's {@code th:src} tag — emitted AFTER that bootstrap — survives in the
+ * rendered HTML (so a re-introduced inline-truncation bug that ate the bootstrap and dropped the
+ * module tag is still caught) and the response ends with the closing {@code </html>} tag.
  */
 @SpringBootTest
 class AdminLocationsPageControllerMvcTest {
@@ -78,12 +82,13 @@ class AdminLocationsPageControllerMvcTest {
   }
 
   /**
-   * Asserts {@code function filterTable(...)} (which is defined AFTER the datalist in the script)
-   * appears in the rendered HTML — proof that the Thymeleaf truncation does not strike again.
+   * Asserts the extracted {@code locations.js} module tag (emitted AFTER the datalist and the
+   * interpolated bootstrap) appears in the rendered HTML — proof that the Thymeleaf inline
+   * truncation does not strike again.
    */
   @Test
   @WithMockUser(roles = "ADMIN")
-  void listData_ShouldRenderFilterTableFunction_AfterDatalist() throws Exception {
+  void listData_ShouldRenderModuleTag_AfterDatalist() throws Exception {
     LocationDto location =
         new LocationDto(UUID.randomUUID(), "ARC-L1", "Arc-Corp Lagrange 1", false, false, 0L);
     PageResponse<LocationDto> page =
@@ -99,7 +104,7 @@ class AdminLocationsPageControllerMvcTest {
         .andExpect(view().name("admin/locations"))
         .andExpect(content().string(containsString("id=\"locationNames-data\"")))
         .andExpect(content().string(containsString("value=\"ARC-L1\"")))
-        .andExpect(content().string(containsString("function filterTable(tableId, query)")))
+        .andExpect(content().string(containsString("src=\"/js/locations.js\"")))
         .andExpect(content().string(containsString("</html>")));
   }
 
