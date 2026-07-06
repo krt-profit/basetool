@@ -107,17 +107,40 @@ public class OrgUnitBankPageController {
       new ParameterizedTypeReference<>() {};
 
   /**
-   * Renders the overview page (or its {@code orgUnitBank} fragment for an in-place swap after a
-   * booking write).
+   * Renders the overview page (or one of its fragments for an in-place swap). The Konten list is
+   * shown as a card grid (default) or a dense table, chosen per user; the choice rides on the
+   * {@code layout} query parameter and is persisted client-side by {@code bank.js} (mirroring the
+   * dashboard, REQ-BANK-016, but without the by-Bereich grouping). An {@code orgUnitBankAccounts}
+   * fragment request re-renders just the switchable account list for the view-toggle swap
+   * (REQ-FE-005); an {@code orgUnitBank} fragment request re-renders the tabs + both request
+   * regions after a booking write.
    *
-   * @param fragment when {@code "orgUnitBank"} only the balances + own-request region is
-   *     re-rendered
+   * @param layout {@code table} for the dense table, otherwise the default card grid
+   * @param fragment when {@code "orgUnitBankAccounts"} only the switchable account list is
+   *     re-rendered (view-toggle swap); when {@code "orgUnitBank"} the tabs + own-request region
    * @param model Spring MVC model
-   * @return the template, or its {@code orgUnitBank} fragment view
+   * @return the template, or its {@code orgUnitBankAccounts} / {@code orgUnitBank} fragment view
    */
   @GetMapping("/org-unit-bank")
   @PreAuthorize(MEMBER_OR_ABOVE)
-  public String orgUnitBank(@RequestParam(required = false) String fragment, Model model) {
+  public String orgUnitBank(
+      @RequestParam(required = false) String layout,
+      @RequestParam(required = false) String fragment,
+      Model model) {
+    String effectiveLayout = "table".equals(layout) ? "table" : "card";
+    model.addAttribute("layout", effectiveLayout);
+
+    // Pure account-list sub-fragment swap (view toggle, REQ-BANK-021): only the balances + their
+    // scaled sparklines are rendered, so the own/foreign request lists + transfer targets the full
+    // page loads are skipped. Mirrors the account-detail method's pure sub-fragment short-circuits.
+    if ("orgUnitBankAccounts".equals(fragment)) {
+      List<OrgUnitBankBalanceDto> accounts =
+          BankAccountOrder.byName(fetchBalances(), OrgUnitBankBalanceDto::accountName);
+      model.addAttribute("balances", accounts);
+      model.addAttribute("sparks", sparksByAccountId(accounts));
+      return "org-unit-bank :: orgUnitBankAccounts";
+    }
+
     // Balances, own-requests, foreign-requests and the all-active-account list are independent
     // reads; fetch them concurrently via ParallelPageLoader (which relays the bearer token +
     // active-OrgUnit header to the worker threads) instead of serial round-trips. Each helper

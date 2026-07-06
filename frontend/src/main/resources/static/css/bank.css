@@ -1107,6 +1107,91 @@ tr.is-inert td {
     }
 }
 
+/* Konten toolbar (REQ-BANK-021/-046): the account-name filter grows, the view toggle trails, both
+   wrap onto their own line on a narrow viewport. */
+.ou-konten-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.ou-konten-toolbar .bank-acc-search {
+    flex: 1 1 220px;
+}
+
+/* Card view of the org-unit account list (REQ-BANK-021): the shared responsive .bank-acc-grid track
+   holds one .ou-card per account. Unlike the dashboard .kpi-card the whole card is NOT a link — the
+   name and the "Details" action are the click targets — so it carries no pointer cursor, only the
+   same hover-border affordance. */
+.ou-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 16px;
+    background: var(--color-bg-dark-gray);
+    border: var(--border-hairline);
+    transition: border-color 0.15s;
+}
+
+.ou-card:hover {
+    border-color: var(--color-primary);
+}
+
+.ou-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.ou-card-name {
+    font-weight: var(--fw-bold);
+    color: var(--color-white);
+    font-size: 0.95rem;
+    text-decoration: none;
+}
+
+.ou-card-name:hover {
+    color: var(--color-primary);
+}
+
+.ou-card-sub {
+    font-size: 0.68rem;
+    color: var(--color-gray-2);
+    font-variant-numeric: tabular-nums;
+    margin-top: 2px;
+}
+
+.ou-card-figures {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+}
+
+.ou-card-bal {
+    font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
+    font-size: 1.4rem;
+    color: var(--color-white);
+    font-variant-numeric: tabular-nums;
+}
+
+.ou-card-bal .unit {
+    color: var(--color-gray-2);
+    font-weight: 400;
+    font-size: 0.6em;
+}
+
+/* The action sits flush-bottom-right so cards with and without a target line up their buttons. */
+.ou-card-act {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: auto;
+}
+
 /* Org-unit account-detail facts: a 4-up kpi-total grid (NOT the shared .bank-facts strip,
    which two other bank pages keep using with .fact-key/.fact-value). */
 .ou-facts {
