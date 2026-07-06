@@ -307,6 +307,14 @@ transaction per pass) rather than per-scrape.
   (`successful_with_retry` > 0.2/s for 10m) — that fire before `circuit_open` / `bulkhead_full`, i.e.
   before users fail; plus a backend-call resilience row on `03-spring-apps.json` and a
   frontend-usage row (`basetool_active_sessions`, `basetool_mission_presence_missions`) on `07`.
+- JVM/Hikari depth (#1041 item 12, all Actuator-exported): `HikariConnectionTimeouts` (every
+  `hikaricp_connections_timeout_total` increment is a request that waited ~30s for a pool slot and
+  threw — can hide below `HikariPoolPending`'s window), `JvmFileDescriptorsHigh`
+  (`process_files_open_files` > 85% of max — FD leaks kill a JVM with confusing symptoms) and
+  `JvmGcOverheadHigh` (`rate(jvm_gc_pause_seconds_sum)` > 20% — GC thrash degrades latency before
+  `JvmHeapHigh`'s 90% trips). No metaspace rule (nonheap max is often -1 → NaN). Deepened
+  `03-spring-apps.json`: per-pool heap, GC pause max by action/cause, thread states, open FDs vs max,
+  per-app CPU.
 - `basetool_http_error_total{code}` counter at the `GlobalExceptionHandler` 409/401/403 methods
   (`OPTIMISTIC_LOCK` = optimistic-locking regression indicator, `PESSIMISTIC_LOCK`,
   `UNAUTHENTICATED`, `ACCESS_DENIED`) plus `SERVICE_UNAVAILABLE`, incremented directly by
