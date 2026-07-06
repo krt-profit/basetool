@@ -175,10 +175,20 @@ discovery.relabel "containers" {
 	// Keep only the container streams we ingest via the docker API (NPM stdout = operational logs
 	// — nginx reloads, cert renewals, [emerg]/[error]; NOT admin-UI logins, which NPM never writes
 	// to stdout; ingest JSON is masked at source; postgres runs with log_error_verbosity=terse).
+	// (#1041 item 24) The monitoring plane's OWN stdout is now shipped too: Grafana/Tempo have
+	// OOM-looped in prod, and that evidence otherwise lived only in host docker-json logs (lost after
+	// 5x10MB rotation, SSH-only). The regex is fully anchored, so `redis` never matches `redis-exporter`.
 	rule {
 		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
-		regex         = "ingest|npm|redis|db-backend|db-keycloak"
+		regex         = "ingest|npm|redis|db-backend|db-keycloak|prometheus|grafana|loki|tempo|alloy|alertmanager|node-exporter|cadvisor|socket-proxy|postgres-exporter-backend|postgres-exporter-keycloak|redis-exporter|blackbox-exporter"
 		action        = "keep"
+	}
+	// (#1041 item 24) Map every monitoring-plane service to a bounded `mon-<service>` app label.
+	rule {
+		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+		regex         = "(prometheus|grafana|loki|tempo|alloy|alertmanager|node-exporter|cadvisor|socket-proxy|postgres-exporter-backend|postgres-exporter-keycloak|redis-exporter|blackbox-exporter)"
+		target_label  = "app"
+		replacement   = "mon-$1"
 	}
 	// Map the compose service to a stable, low-cardinality app label.
 	rule {
@@ -206,5 +216,38 @@ discovery.relabel "containers" {
 loki.source.docker "containers" {
 	host       = "tcp://socket-proxy:2375"
 	targets    = discovery.relabel.containers.output
+	forward_to = [loki.process.mon_mask.receiver]
+}
+
+// (#1041 item 24) Shipper-side masking for the two monitoring streams that can carry PII
+// (REQ-OBS-004/-007), mirroring the Keycloak file-log mask above. Every other kept stream (the app
+// / edge / postgres operational logs) passes through untouched — the stage.match selectors gate the
+// replaces to the grafana / alertmanager apps only. The app JSON stays masked at source.
+loki.process "mon_mask" {
 	forward_to = [loki.write.default.receiver]
+
+	// Grafana logs its Keycloak-OIDC admin logins with `uname=` and the user's e-mail.
+	stage.match {
+		selector = "{app=\"mon-grafana\"}"
+
+		stage.replace {
+			expression = "(uname=)(\\S+)"
+			replace    = "${1}***"
+		}
+
+		stage.replace {
+			expression = "([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})"
+			replace    = "***"
+		}
+	}
+
+	// Alertmanager SMTP-delivery-failure lines can carry the recipient e-mail.
+	stage.match {
+		selector = "{app=\"mon-alertmanager\"}"
+
+		stage.replace {
+			expression = "([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})"
+			replace    = "***"
+		}
+	}
 }

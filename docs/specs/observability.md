@@ -127,6 +127,15 @@ rule — no blanket "everything is masked" claim:
   loopback-only — descoped as an accepted gap (REQ-OBS-010).
 - **PostgreSQL container logs** — ingested with `log_error_verbosity=terse` so `DETAIL`
   lines cannot leak row data.
+- **Monitoring-plane container stdout** (`app="mon-<service>"` for the monitoring services —
+  Prometheus, Grafana, Loki, Tempo, Alloy, Alertmanager, the exporters, the socket proxy; #1041
+  item 24) — shipped so a misbehaving monitoring component (Grafana and Tempo have OOM-looped in
+  prod) leaves evidence in Loki rather than only in the rotation-capped host docker-json logs. Two
+  streams carry PII and are masked **in the shipper**: `mon-grafana` (Keycloak-OIDC admin logins
+  log `uname=` + e-mail) and `mon-alertmanager` (SMTP-failure lines carry the recipient e-mail),
+  both scrubbed by Alloy `stage.replace` (gated by a `stage.match` on the app label) mirroring the
+  Keycloak mask. The streams inherit the global 744h retention — no REQ-OBS-010 IP-retention impact
+  once masked.
 - Loki labels stay low-cardinality (`app`, `level`, bounded `host`); log lines are never
   turned into per-user labels.
 
