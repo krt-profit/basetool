@@ -61,9 +61,11 @@ import org.springframework.web.context.WebApplicationContext;
  * was closed immediately after the JSON was emitted, so every byte that followed (the message
  * bundle inlines, the {@code openCreateModal} helper, and the {@code window.krtEvents.on('click',
  * 'ar-open-create', ...)} wiring) was dropped. The page still rendered 200 OK but with an
- * unterminated {@code <script>} block, leaving the create button orphaned. The contained-string
- * assertions below pin both ends of that script so a future change that re-introduces a writer-
- * closing serializer is caught at the test layer instead of in production.
+ * unterminated {@code <script>} block, leaving the create button orphaned. Post-ADR-0069 the map
+ * lives in the inline bootstrap with the page module loaded via {@code th:src} right after it; the
+ * assertions below pin the map's JSON and that following {@code th:src}, so a re-introduced writer-
+ * closing serializer (truncating the bootstrap and dropping the module tag) is still caught at the
+ * test layer instead of in production.
  */
 @SpringBootTest
 class PromotionAdminRankRequirementsPageMvcTest {
@@ -145,11 +147,12 @@ class PromotionAdminRankRequirementsPageMvcTest {
         // The create button must be present with its data-trigger so the inline JS wiring
         // can find it.
         .andExpect(content().string(containsString("data-trigger=\"ar-open-create\"")))
-        // The inline JS that wires the click must be rendered with a real nonce attribute
-        // and must contain the registration call.
+        // The page loads the extracted rank-requirements module (ADR-0069, rendered with a real
+        // nonce) whose tail wires the ar-* click handlers.
         .andExpect(
-            content().string(containsString("window.krtEvents.on('click', 'ar-open-create'")))
-        // The Thymeleaf-inlined categories map must be valid JSON, not the literal placeholder.
+            content().string(containsString("src=\"/js/promotion-admin-rank-requirements.js\"")))
+        // The Thymeleaf-inlined categories map (now in the bootstrap) must be valid JSON, not the
+        // literal placeholder.
         .andExpect(
             content()
                 .string(containsString("var AR_CATEGORIES_BY_TOPIC = {\"" + topicId + "\":[")));
