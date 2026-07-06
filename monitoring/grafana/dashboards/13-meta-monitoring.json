@@ -446,8 +446,8 @@
         "y": 32
       },
       "type": "timeseries",
-      "title": "Loki ingest bytes trend (1d rate)",
-      "description": "Loki ingest bytes/s averaged over 1 day — the slow trend behind the 31d log-retention footprint.",
+      "title": "Loki ingest bytes trend (7d rate)",
+      "description": "Loki ingest bytes/s averaged over 7 days — the slow trend behind the 31d log-retention footprint. The 7d window smooths daily bursts so the multi-week growth behind the retention footprint is what shows.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -473,7 +473,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(loki_distributor_bytes_received_total[1d]))",
+          "expr": "sum(rate(loki_distributor_bytes_received_total[7d]))",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
