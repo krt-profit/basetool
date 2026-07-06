@@ -7,23 +7,31 @@ groups:
   - name: ops-automation-critical
     rules:
       # A rollback or a failure that is newer than the last success = a promoted release did not ship.
+      # The `or (… unless …)` arm (#1041 item 21) guards the fresh-host / wiped-textfile-dir case: with
+      # no last_success series the bare `>` comparison matches nothing, so a failing FIRST deploy would
+      # alert nothing — `X unless last_success` fires when X exists and last_success does not. Mirrors
+      # the absent()-guards on the backup/restore rules below.
       - alert: DeployRolledBack
-        expr: basetool_deploy_last_rollback_timestamp > basetool_deploy_last_success_timestamp
+        expr: >-
+          basetool_deploy_last_rollback_timestamp > basetool_deploy_last_success_timestamp
+          or (basetool_deploy_last_rollback_timestamp unless basetool_deploy_last_success_timestamp)
         for: 0m
         labels:
           severity: critical
         annotations:
           summary: "Deploy rolled back (health gate reverted a promoted release)"
-          description: "The last deploy outcome was a rollback newer than the last successful deploy — the health gate reverted a promoted release."
+          description: "The last deploy outcome was a rollback newer than the last successful deploy (or a rollback with no successful deploy on record) — the health gate reverted a promoted release."
 
       - alert: DeployFailed
-        expr: basetool_deploy_last_failure_timestamp > basetool_deploy_last_success_timestamp
+        expr: >-
+          basetool_deploy_last_failure_timestamp > basetool_deploy_last_success_timestamp
+          or (basetool_deploy_last_failure_timestamp unless basetool_deploy_last_success_timestamp)
         for: 0m
         labels:
           severity: critical
         annotations:
           summary: "Deploy failed (newer than last success)"
-          description: "The last deploy attempt failed and is newer than the last successful deploy."
+          description: "The last deploy attempt failed and is newer than the last successful deploy (or failed with no successful deploy on record — a failing first install)."
 
       - alert: DeployConfigBlocked
         expr: basetool_deploy_config_blocked == 1

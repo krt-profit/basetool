@@ -77,9 +77,33 @@ receivers:
         send_resolved: true
 
 inhibit_rules:
-  # A critical alert on a target suppresses its warning-level siblings for the same alertname/job.
+  # (#1041 item 20) Root-cause suppression. The previous single rule required equal alertname AND job
+  # across severities — which never occurs (a critical and a warning never share an alertname), so it
+  # was a no-op: an app/exporter outage paged every derived warning separately, burying the cause.
+
+  # 1. An app scrape target being down suppresses that app's derived warnings. Both sides require a
+  #    non-empty application label (application=~".+") — otherwise Alertmanager's missing-label ==
+  #    missing-label equality would make an exporter TargetDown (which has no application label) inhibit
+  #    ALL application-less warnings.
   - source_matchers:
-      - severity = "critical"
+      - alertname = "TargetDown"
+      - application =~ ".+"
     target_matchers:
       - severity = "warning"
-    equal: ['alertname', 'job']
+      - application =~ ".+"
+    equal: ['application']
+
+  # 2. A failing liveness probe on an endpoint suppresses that endpoint's cert-expiry and edge-posture
+  #    alerts (they carry no signal while the endpoint is down), matched on the shared instance label.
+  - source_matchers:
+      - alertname = "BlackboxProbeFailed"
+    target_matchers:
+      - alertname =~ "CertificateExpiringSoon|Edge.*"
+    equal: ['instance']
+
+  # 3. A critical disk-full alert suppresses the warning tier for the same mountpoint.
+  - source_matchers:
+      - alertname = "HostDiskCritical"
+    target_matchers:
+      - alertname = "HostDiskWarning"
+    equal: ['mountpoint']
