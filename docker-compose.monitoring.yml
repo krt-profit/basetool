@@ -53,6 +53,10 @@ services:
       - --web.enable-admin-api
       - --web.config.file=/etc/prometheus/web.yml
       - --web.enable-lifecycle
+      # (#1041 item 22a) Accept the Tempo metrics-generator's remote_write of the service-graph
+      # series (traces_service_graph_*). Off by default in Prometheus 3.x. The receiver sits on the
+      # same basic-auth-protected web listener, so the generator authenticates as the `grafana` user.
+      - --web.enable-remote-write-receiver
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./monitoring/prometheus/alerts:/etc/prometheus/alerts:ro
@@ -181,7 +185,13 @@ services:
     container_name: tempo
     image: grafana/tempo:3.0.2
     cap_drop: [ALL]
-    command: ["-target=all", "-config.file=/etc/tempo/tempo.yaml"]
+    # -config.expand-env: expand ${PROMETHEUS_WEB_PASSWORD} in tempo.yaml so the metrics-generator's
+    # remote_write can basic-auth to Prometheus as the shared `grafana` user (#1041 item 22a).
+    command: ["-target=all", "-config.expand-env=true", "-config.file=/etc/tempo/tempo.yaml"]
+    environment:
+      # Consumed by the metrics-generator remote_write basic_auth (reuses the Prometheus `grafana`
+      # web-auth user — owner decision, #1041 item 22a). Same value Grafana uses for its datasource.
+      PROMETHEUS_WEB_PASSWORD: ${PROMETHEUS_WEB_PASSWORD:?PROMETHEUS_WEB_PASSWORD must be set for the monitoring stack}
     volumes:
       - ./monitoring/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
       - /var/iri/monitoring/data/tempo:/var/tempo

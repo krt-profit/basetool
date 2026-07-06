@@ -46,3 +46,42 @@ storage:
       path: /var/tempo/blocks
     wal:
       path: /var/tempo/wal
+
+# (#1041 item 22a) Metrics-generator — service-graph ONLY. Lighting the already-wired Grafana
+# serviceMap/nodeGraph panels (they read `traces_service_graph_*` from the Prometheus datasource).
+# The generator survives Tempo 3.0 and runs in-process under `-target=all` (the distributor pushes to
+# it directly; no Kafka). It remote-writes to Prometheus, which needs `--web.enable-remote-write-receiver`
+# AND — because the Prometheus web listener is basic-auth-protected — credentials: it reuses the
+# existing `grafana` user (owner decision, #1041 item 22a), so the container runs with
+# `-config.expand-env=true` and `${PROMETHEUS_WEB_PASSWORD}` is injected from the service env. Span-
+# metrics stays a NON-goal (server-side http_server_requests histograms back the latency alerts; the
+# RED dashboard uses TraceQL metrics on the Tempo datasource, zero new Prometheus series). Cardinality
+# is bounded by the trimmed 8-bucket histogram + max_active_series; the graph is tiny (~4 services), so
+# filter_policies are omitted for now. tempo.yaml needs a container RESTART. Memory: enabling the
+# embedded agent adds pressure on the 512M cap — a raise is tracked in #937 (ADR-0076), not reverted here.
+metrics_generator:
+  registry:
+    collection_interval: 15s
+    external_labels:
+      source: tempo
+  storage:
+    path: /var/tempo/generator/wal
+    remote_write:
+      - url: http://prometheus:9090/api/v1/write
+        basic_auth:
+          username: grafana
+          password: ${PROMETHEUS_WEB_PASSWORD}
+  processor:
+    service_graphs:
+      histogram_buckets: [0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4, 12.8]
+
+# Scoped overrides ONLY — 3.0 parses with yaml.UnmarshalStrict, so the legacy flat
+# `overrides: { metrics_generator_processors: [...] }` form makes Tempo REFUSE TO START. The
+# processors list uses HYPHENATED names (service-graphs), unlike the processor config block above
+# (service_graphs). max_active_series is the hard cardinality cap (default limiter_type: series).
+overrides:
+  defaults:
+    metrics_generator:
+      processors:
+        - service-graphs
+      max_active_series: 15000

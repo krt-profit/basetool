@@ -189,6 +189,32 @@ groups:
           summary: "Tempo live-store write path failing"
           description: "Tempo's live-store failed to complete or locally flush blocks in the last 15 minutes — accepted traces are being lost before they reach a persisted block. Check the Tempo log, disk space and I/O on the trace volume."
 
+      # (#1041 item 22a) Metrics-generator remote_write to Prometheus is failing — the service-graph
+      # series (traces_service_graph_*) are not reaching Prometheus, so the Grafana serviceMap/nodeGraph
+      # go stale. The most likely cause is the shared `grafana` basic-auth credential drifting (rotated
+      # in prometheus-web.yml but not in Tempo's env). Metric verified on a live 3.0.2 generator; it is
+      # the generator's embedded Prometheus agent, scraped on the Tempo target.
+      - alert: TempoGeneratorRemoteWriteFailing
+        expr: sum(rate(prometheus_remote_storage_samples_failed_total[15m])) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Tempo metrics-generator remote_write failing"
+          description: "The Tempo metrics-generator has been failing to remote_write service-graph samples to Prometheus for 10 minutes — the service map/node graph will go stale. Check the shared `grafana` web-auth credential (PROMETHEUS_WEB_PASSWORD in Tempo's env vs prometheus-web.yml) and Prometheus's remote-write receiver."
+
+      # Cardinality cap hit: the generator dropped series once the max_active_series limit was reached,
+      # so the service graph is incomplete. The plan's tempo_metrics_generator_registry_collections_failed_total
+      # does NOT exist on 3.0.2 — series_limited_total is the real cardinality signal (verified live).
+      - alert: TempoGeneratorSeriesLimited
+        expr: sum(increase(tempo_metrics_generator_registry_series_limited_total[1h])) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Tempo metrics-generator hit its active-series cap"
+          description: "The Tempo metrics-generator dropped series against its max_active_series cap in the last hour — the service graph is incomplete and cardinality is higher than provisioned. Raise the cap or add service-graph filter_policies (tempo.yaml)."
+
   # Log-pipeline liveness (#1041 item 5, REQ-OBS-014). All 9 Loki ruler alerts — including the
   # critical SSH-compromise and Postgres-FATAL detectors — silently stop firing if Alloy stops
   # tailing: rate() over an absent stream is EMPTY, not zero, and TargetDown cannot see a
