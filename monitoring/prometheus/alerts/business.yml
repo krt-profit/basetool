@@ -41,6 +41,20 @@ groups:
           summary: "External sync stale >48h ({{ $labels.exported_job }})"
           description: "The {{ $labels.exported_job }} catalogue sync last succeeded more than 48 hours ago."
 
+      # (#1041 item 2) Swallowed upstream failures. Every UEX/SC-Wiki fetch/parse error is mapped to an
+      # empty list, so the sync job still "succeeds" and last_success stays fresh — ExternalSyncStale /
+      # ScheduledJobFailureStreak never fire during a weeks-long catalogue outage. This counts the
+      # swallowed failures directly (basetool_external_fetch_errors_total{source}).
+      # baseline-tune: >3 errors in 6h is the issue's initial threshold.
+      - alert: ExternalFetchErrors
+        expr: sum by (source) (increase(basetool_external_fetch_errors_total[6h])) > 3
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "External fetch errors ({{ $labels.source }})"
+          description: "The {{ $labels.source }} client swallowed more than 3 fetch/parse errors in 6 hours — the catalogue sync may be silently importing nothing while still recording a success. Check the upstream API and the sync logs."
+
       - alert: ScheduledJobFailureStreak
         expr: increase(basetool_scheduled_job_executions_total{outcome="failure"}[1h]) >= 3
         for: 5m

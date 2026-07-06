@@ -29,6 +29,8 @@ import de.greluc.krt.profit.basetool.backend.config.UexProperties;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexCommodityDto;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexCommodityPriceDto;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexStarSystemDto;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import okhttp3.mockwebserver.MockResponse;
@@ -63,6 +65,7 @@ class UexClientTest {
   private MockWebServer server;
   private UexProperties properties;
   private UexClient client;
+  private SimpleMeterRegistry meterRegistry;
 
   @BeforeEach
   void setUp() throws Exception {
@@ -75,7 +78,8 @@ class UexClientTest {
     // already match the public UEX 2.0 API surface and are validated as
     // part of property-binding tests.
 
-    client = new UexClient(WebClient.builder(), properties);
+    meterRegistry = new SimpleMeterRegistry();
+    client = new UexClient(WebClient.builder(), properties, meterRegistry);
     client.initClient();
   }
 
@@ -130,6 +134,16 @@ class UexClientTest {
     // Then
     assertNotNull(commodities, "fallback must return empty list, not null");
     assertTrue(commodities.isEmpty());
+    // The swallowed upstream failure must still leave a metric trail (REQ-OBS-011, #1041 item 2).
+    assertEquals(
+        1.0,
+        meterRegistry
+            .get(MetricNames.EXTERNAL_FETCH_ERRORS)
+            .tag(MetricNames.TAG_SOURCE, MetricNames.SOURCE_UEX)
+            .counter()
+            .count(),
+        "a swallowed UEX fetch error must increment"
+            + " basetool_external_fetch_errors_total{source=uex}");
   }
 
   @Test
