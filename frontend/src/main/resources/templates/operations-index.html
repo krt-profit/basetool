@@ -187,25 +187,7 @@
         </div>
     </div>
 </main>
-<script th:attr="nonce=${cspNonce}">
-    function openDeleteModal(id) {
-        var deleteForm = document.getElementById('delete-operation-form');
-        deleteForm.action = window.safeSameOriginUrl('/operations/' + id + '/delete', deleteForm.action);
-        document.getElementById('delete-operation-modal').style.display = 'flex';
-    }
-
-    // CSP-safe delegated binding (replaces onclick="openDeleteModal(this.getAttribute('data-id'))").
-    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-        window.krtEvents.on('click', 'operations-open-delete', function (el) {
-            openDeleteModal(el.getAttribute('data-id'));
-        });
-    }
-</script>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-    // #576: create + delete an operation in place (no full-page reload). The classic POST->redirect
-    // forms stay the no-JS fallback; here we intercept the submit, write via the krtFetch
-    // X-Requested-With twin, then refresh the list fragment in place via window.krtOperationsReload
-    // (exposed by operations.js) so the active filter query is preserved.
     /*<![CDATA[*/
     const OPS_MSG = {
         createSuccess: /*[[#{operation.create.success}]]*/ 'Operation angelegt.',
@@ -219,82 +201,8 @@
         conflictQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
     };
     /*]]>*/
-
-    function opsConflictStrings() {
-        return {
-            title: OPS_MSG.conflictTitle,
-            reloadDetailFallback: OPS_MSG.conflictDetail,
-            reloadLabel: OPS_MSG.conflictReload,
-            dismissLabel: OPS_MSG.conflictDismiss,
-            reloadQuestion: OPS_MSG.conflictQuestion
-        };
-    }
-
-    function closeOperationModal(id) {
-        const modal = document.getElementById(id);
-        if (modal) modal.style.display = 'none';
-    }
-
-    function reloadOperationsList() {
-        if (typeof window.krtOperationsReload === 'function') window.krtOperationsReload();
-    }
-
-    (function () {
-        if (!window.krtFetch) return; // no-JS / no-foundation: the classic POST->redirect forms run.
-
-        const createForm = document.getElementById('create-operation-form');
-        if (createForm) {
-            createForm.addEventListener('submit', function (event) {
-                event.preventDefault();
-                const owner = createForm.querySelector('[name="owningOrgUnitId"]');
-                // Disable the submit while the write is in flight so a double-click cannot create
-                // the operation twice (the old POST->redirect flow blocked this via full navigation).
-                const submitBtn = createForm.querySelector('button[type="submit"]');
-                if (submitBtn) submitBtn.disabled = true;
-                window.krtFetch.write({
-                    method: 'POST',
-                    url: createForm.getAttribute('action'),
-                    payload: {
-                        name: createForm.querySelector('[name="name"]').value,
-                        description: createForm.querySelector('[name="description"]').value,
-                        status: createForm.querySelector('[name="status"]').value,
-                        owningOrgUnitId: owner && owner.value ? owner.value : null
-                    },
-                    successMessage: OPS_MSG.createSuccess,
-                    errorMessage: OPS_MSG.createError,
-                    conflict: opsConflictStrings(),
-                    onSuccess: function () {
-                        closeOperationModal('create-operation-modal');
-                        createForm.reset();
-                        reloadOperationsList();
-                    }
-                }).then(function () { if (submitBtn) submitBtn.disabled = false; });
-            });
-        }
-
-        const deleteForm = document.getElementById('delete-operation-form');
-        if (deleteForm) {
-            deleteForm.addEventListener('submit', function (event) {
-                event.preventDefault();
-                // Disable the submit while the write is in flight so a double-click cannot fire a
-                // second delete (whose stale version would 409 after the first one succeeded).
-                const submitBtn = deleteForm.querySelector('button[type="submit"]');
-                if (submitBtn) submitBtn.disabled = true;
-                window.krtFetch.write({
-                    method: 'POST',
-                    url: deleteForm.action,
-                    successMessage: OPS_MSG.deleteSuccess,
-                    errorMessage: OPS_MSG.deleteError,
-                    conflict: opsConflictStrings(),
-                    onSuccess: function () {
-                        closeOperationModal('delete-operation-modal');
-                        reloadOperationsList();
-                    }
-                }).then(function () { if (submitBtn) submitBtn.disabled = false; });
-            });
-        }
-    })();
 </script>
+<script th:src="@{/js/operations-index.js}" th:attr="nonce=${cspNonce}"></script>
 <script th:src="@{/js/operations.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>
