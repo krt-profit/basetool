@@ -301,8 +301,12 @@
     <!-- Direct-booking movement modal (REQ-BANK-017/-023, #997): outside the swapped requestQueue
          fragment, with a source-account selector; a successful booking re-renders the queue in place
          (unchanged, since a direct booking is not a request) and shows the saved toast. -->
-    <th:block th:if="${canBook}"
-              th:replace="~{fragments/bank-movement-modal :: movementModal('bank-movement-modal', 'requestQueue', null, true, false, true, true, true)}"></th:block>
+    <!-- th:if must NOT share an element with th:replace: th:replace (attribute precedence 1) runs
+         BEFORE th:if (3), so a same-element guard is dead and the modal renders even when canBook is
+         false. The condition gates an outer th:block, mirroring the correctly-gated CTA button above. -->
+    <th:block th:if="${canBook}">
+        <th:block th:replace="~{fragments/bank-movement-modal :: movementModal('bank-movement-modal', 'requestQueue', null, true, false, true, true, true)}"></th:block>
+    </th:block>
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />

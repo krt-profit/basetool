@@ -80,6 +80,14 @@ design:** Redis (sessions transparently re-login), logs, and the WireGuard `wg0.
 operator backs that key up **out-of-band** (it is irreplaceable but must not ride the same
 channel as the application data, by owner decision).
 
+Because `keystore.p12` is delivered root-owned and **not** world-readable (mode `0640` + a uid-1000
+POSIX ACL — REQ-OPS-016, #1018), the backup — which runs as the unprivileged `deploy` user — reads it
+through a throwaway **root helper container** (the same mechanism already used for the root-owned NPM
+bind mount and `grafana.db`), never a direct `cp`. A direct copy `EACCES`es and, under `set -e`, aborts
+the *entire* run — the 2026-07-06 regression, where tightening the keystore mode silently killed the
+whole off-site backup, DB dumps included. A keystore read failure is therefore logged and **skipped**,
+never fatal, so the irreplaceable database dumps always reach the repo.
+
 Because the host-config archive carries the live secrets (`.env`, `keystore.p12`, `realm-export.json`,
 the `keycloak/providers` JARs), a restore that follows a **suspected host compromise** (ransomware is
 a named DR driver, above) restores *potentially-exposed* secrets. Such a restore must therefore be

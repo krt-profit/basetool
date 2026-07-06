@@ -236,4 +236,25 @@ class BankRequestQueuePageControllerMvcTest {
         // A type-gated row is present for the JS to switch.
         .andExpect(content().string(Matchers.containsString("data-movement-types")));
   }
+
+  /**
+   * With no active account, {@code canBook} is false, so the direct-booking movement modal (and its
+   * CTA) must NOT render. Regression guard for the Thymeleaf attribute-precedence trap: {@code
+   * th:if="${canBook}"} shared its element with {@code th:replace}, so the modal rendered
+   * unconditionally even though the CTA that opens it was correctly hidden.
+   */
+  @Test
+  @WithMockUser(roles = {"BANK_EMPLOYEE"})
+  void queue_noActiveAccounts_omitsMovementModal() throws Exception {
+    // stubData() leaves the /api/v1/bank/accounts fetch on the null catch-all -> activeAccounts
+    // empty -> canBook false.
+    stubData();
+
+    mockMvc
+        .perform(get("/bank/requests"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content().string(Matchers.not(Matchers.containsString("id=\"bank-movement-modal\""))))
+        .andExpect(content().string(Matchers.not(Matchers.containsString("bank-movement-open"))));
+  }
 }
