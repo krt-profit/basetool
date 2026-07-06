@@ -39,15 +39,19 @@ import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.Bereich;
 import de.greluc.krt.profit.basetool.backend.model.Organisationsleitung;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
+import de.greluc.krt.profit.basetool.backend.model.dto.BankBalanceSeriesDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankCapabilitiesDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankAccountLifecycleRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateBankAccountRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateBankGrantRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.RenameBankAccountRequest;
+import de.greluc.krt.profit.basetool.backend.model.projection.BankPostingSlice;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -101,6 +105,32 @@ class BankAccountServiceTest {
     assertEquals(BankAccountStatus.ACTIVE, saved.getValue().getStatus());
     verify(bankAuditService)
         .record(eq(BankAuditEventType.ACCOUNT_CREATED), any(), any(), any(), any());
+  }
+
+  @Test
+  void getBalanceSeries_buildsSeriesFromOpeningSlicesAndTarget() {
+    // REQ-BANK-049: opening balance before the window + the window's postings, walked into an
+    // end-of-day series, plus the account's balance target for the reference line.
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = new BankAccount();
+    account.setBalanceTarget(new BigDecimal("500000"));
+    Instant from = Instant.parse("2026-06-01T00:00:00Z");
+    Instant to = Instant.parse("2026-06-03T23:59:59Z");
+    when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(postingRepository.accountBalanceBefore(accountId, from))
+        .thenReturn(new BigDecimal("1000"));
+    when(postingRepository.postingSlicesInRange(accountId, from, to))
+        .thenReturn(
+            List.of(
+                new BankPostingSlice(
+                    accountId, Instant.parse("2026-06-01T10:00:00Z"), new BigDecimal("500"))));
+
+    BankBalanceSeriesDto series = bankAccountService.getBalanceSeries(accountId, from, to);
+
+    assertEquals(0, series.balanceTarget().compareTo(new BigDecimal("500000")));
+    assertEquals(3, series.points().size());
+    assertEquals(0, series.points().get(0).balance().compareTo(new BigDecimal("1500")));
+    assertEquals(0, series.points().getLast().balance().compareTo(new BigDecimal("1500")));
   }
 
   @Test

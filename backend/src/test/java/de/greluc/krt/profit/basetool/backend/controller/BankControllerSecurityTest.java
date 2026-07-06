@@ -28,6 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.model.dto.BankBalanceSeriesDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankWipeResetResultDto;
 import de.greluc.krt.profit.basetool.backend.service.BankAccountService;
 import de.greluc.krt.profit.basetool.backend.service.BankAuditReportService;
@@ -40,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.service.BankManagementReportService
 import de.greluc.krt.profit.basetool.backend.service.BankSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.BankStatementReportService;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -191,6 +193,33 @@ class BankControllerSecurityTest {
                         .jwt(j -> j.subject(UUID.randomUUID().toString()))
                         .authorities(new SimpleGrantedAuthority("ROLE_BANK_MANAGEMENT"))))
         .andExpect(status().isCreated());
+  }
+
+  @Test
+  void balanceSeries_withoutAccess_isForbidden() throws Exception {
+    // REQ-BANK-049: the balance-series read is gated exactly like the booking history (canSee).
+    when(bankSecurityService.canSee(any(UUID.class), any())).thenReturn(false);
+    mockMvc
+        .perform(
+            get("/api/v1/bank/accounts/{id}/balance-series", UUID.randomUUID())
+                .param("from", "2026-06-01T00:00:00Z")
+                .param("to", "2026-07-01T00:00:00Z")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_BANK_EMPLOYEE"))))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void balanceSeries_withAccess_isAllowed() throws Exception {
+    when(bankSecurityService.canSee(any(UUID.class), any())).thenReturn(true);
+    when(bankAccountService.getBalanceSeries(any(UUID.class), any(), any()))
+        .thenReturn(new BankBalanceSeriesDto(List.of(), null));
+    mockMvc
+        .perform(
+            get("/api/v1/bank/accounts/{id}/balance-series", UUID.randomUUID())
+                .param("from", "2026-06-01T00:00:00Z")
+                .param("to", "2026-07-01T00:00:00Z")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_BANK_EMPLOYEE"))))
+        .andExpect(status().isOk());
   }
 
   @Test

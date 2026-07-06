@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankAccountDetailDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankAccountRefDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankApprovalLimitsDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.BankBalanceSeriesDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankCapabilitiesDto;
@@ -309,18 +310,45 @@ public class OrgUnitBankAccessService {
    *
    * @param accountId the account to read
    * @param pageable page, size and whitelisted sort
-   * @return one page of redacted booking rows
+   * @param from inclusive lower bound on the booking instant, or {@code null} for no lower bound
+   * @param to inclusive upper bound on the booking instant, or {@code null} for no upper bound
+   * @return one page of redacted booking rows inside the (optionally bounded) period
    * @throws NotFoundException when the account does not exist
    * @throws AccessDeniedException when the caller may not view the account
    */
   @NotNull
   @Transactional(readOnly = true)
   public Page<BankBookingDto> getViewableAccountBookings(
-      @NotNull UUID accountId, @NotNull Pageable pageable) {
+      @NotNull UUID accountId,
+      @NotNull Pageable pageable,
+      @Nullable Instant from,
+      @Nullable Instant to) {
     requireViewableAccount(accountId);
     return bankAccountService
-        .getBookings(accountId, pageable)
+        .getBookings(accountId, pageable, from, to)
         .map(OrgUnitBankAccessService::redact);
+  }
+
+  /**
+   * Returns the balance-over-time series of an account an org-unit viewer may see (REQ-BANK-049),
+   * for the detail page's balance chart. The org-unit view authorization is enforced here; the
+   * series itself is pure balance math with no holder/counterparty data, so nothing is redacted —
+   * every viewer who may see the account (and thus its current balance in the facts strip) may see
+   * how that balance moved over time.
+   *
+   * @param accountId the account
+   * @param from inclusive period start
+   * @param to inclusive period end
+   * @return the balance series and the account's balance target
+   * @throws NotFoundException when the account does not exist
+   * @throws AccessDeniedException when the caller may not view the account
+   */
+  @NotNull
+  @Transactional(readOnly = true)
+  public BankBalanceSeriesDto getViewableBalanceSeries(
+      @NotNull UUID accountId, @NotNull Instant from, @NotNull Instant to) {
+    requireViewableAccount(accountId);
+    return bankAccountService.getBalanceSeries(accountId, from, to);
   }
 
   /**

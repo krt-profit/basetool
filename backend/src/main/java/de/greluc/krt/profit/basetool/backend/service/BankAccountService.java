@@ -33,6 +33,8 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankAccountDetailDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankAccountDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.BankBalancePointDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.BankBalanceSeriesDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankCapabilitiesDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankAccountLifecycleRequest;
@@ -151,15 +153,23 @@ public class BankAccountService {
   /**
    * Pages over one account's booking history with the transfer counter-account resolved and the
    * holder annotation derived from the holder ledger, both in batched IN-queries (no per-row
-   * lookups, REQ-BANK-018, ADR-0039).
+   * lookups, REQ-BANK-018, ADR-0039). An optional inclusive {@code [from, to]} period narrows the
+   * history to that window (REQ-BANK-051); a {@code null} bound drops that side of the filter, so
+   * {@code (null, null)} pages the whole history.
    *
    * @param accountId the account
    * @param pageable page, size and whitelisted sort (default newest first)
-   * @return one page of booking rows
+   * @param from inclusive lower bound on the booking instant, or {@code null} for no lower bound
+   * @param to inclusive upper bound on the booking instant, or {@code null} for no upper bound
+   * @return one page of booking rows inside the (optionally bounded) period
    */
-  public Page<BankBookingDto> getBookings(@NotNull UUID accountId, @NotNull Pageable pageable) {
+  public Page<BankBookingDto> getBookings(
+      @NotNull UUID accountId,
+      @NotNull Pageable pageable,
+      @Nullable Instant from,
+      @Nullable Instant to) {
     requireAccount(accountId);
-    Page<BankBookingRow> rows = postingRepository.findBookings(accountId, pageable);
+    Page<BankBookingRow> rows = postingRepository.findBookings(accountId, from, to, pageable);
     List<UUID> txIds =
         rows.getContent().stream().map(BankBookingRow::transactionId).distinct().toList();
     List<UUID> transferTxIds =
@@ -179,6 +189,31 @@ public class BankAccountService {
             : holderPostingRepository.findHolderLegsByTransactionIds(txIds).stream()
                 .collect(Collectors.groupingBy(BankHolderLeg::transactionId));
     return rows.map(row -> toBookingDto(accountId, row, accountLegsByTx, holderLegsByTx));
+  }
+
+  /**
+   * Builds the account's balance-over-time series for a caller-chosen period plus its balance
+   * target (REQ-BANK-049), the data behind the detail page's SVG line chart. Reuses the statement
+   * math (REQ-BANK-014): the opening balance strictly before {@code from} plus the period's
+   * postings, walked into an end-of-day series by {@link BankBalanceSeriesCalculator}. A read-only,
+   * non-audited projection of the ledger — the balance is already visible in the facts strip, so
+   * the series adds no new information and needs no redaction on the org-unit surface.
+   *
+   * @param accountId the account
+   * @param from inclusive period start
+   * @param to inclusive period end
+   * @return the balance series (oldest first) and the account's balance target ({@code null} when
+   *     unset)
+   * @throws NotFoundException when the account does not exist
+   */
+  public BankBalanceSeriesDto getBalanceSeries(
+      @NotNull UUID accountId, @NotNull Instant from, @NotNull Instant to) {
+    BankAccount account = requireAccount(accountId);
+    BigDecimal opening = postingRepository.accountBalanceBefore(accountId, from);
+    List<BankBalancePointDto> points =
+        BankBalanceSeriesCalculator.compute(
+            opening, postingRepository.postingSlicesInRange(accountId, from, to), from, to);
+    return new BankBalanceSeriesDto(points, account.getBalanceTarget());
   }
 
   /**

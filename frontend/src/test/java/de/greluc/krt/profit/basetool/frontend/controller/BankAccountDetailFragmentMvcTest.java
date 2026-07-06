@@ -23,12 +23,15 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankBalancePointDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankBalanceSeriesDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBookingDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -106,9 +109,57 @@ class BankAccountDetailFragmentMvcTest {
         // REQ-BANK-045: the Begründung and Notiz render in the expandable per-row detail sub-row.
         .andExpect(content().string(containsString("Fragment reason")))
         .andExpect(content().string(containsString("class=\"pagination\"")))
-        .andExpect(content().string(containsString("/bank/accounts/" + accountId + "?page=1")))
+        // REQ-BANK-051: the pager link carries page=1; paginationBaseUrl now also carries the
+        // period.
+        .andExpect(content().string(containsString("page=1")))
+        // REQ-BANK-051: the page-size picker (10/50/100) renders once the total exceeds the
+        // smallest.
+        .andExpect(content().string(containsString("page-size-picker")))
         // Wrapper div and the page's modals live outside the fragment.
         .andExpect(content().string(not(containsString("id=\"bank-bookings-results\""))))
         .andExpect(content().string(not(containsString("bank-statement-submit"))));
+  }
+
+  // covers REQ-BANK-049 — fragment=balanceChart renders only the balance-chart block: the preset
+  // range selector (default 90d active), the inline SVG line + a target-line legend when a target
+  // is
+  // set. The swap-target wrapper (outside the fragment) is not.
+  @Test
+  @WithMockUser(roles = "BANK_EMPLOYEE")
+  void accountDetail_fragmentBalanceChart_rendersRangeSelectorAndChart() throws Exception {
+    UUID accountId = UUID.randomUUID();
+    when(backendApiClient.get(contains("/balance-series"), eq(BankBalanceSeriesDto.class)))
+        .thenReturn(
+            new BankBalanceSeriesDto(
+                List.of(
+                    new BankBalancePointDto(
+                        Instant.parse("2026-06-01T00:00:00Z"), new BigDecimal("100000")),
+                    new BankBalancePointDto(
+                        Instant.parse("2026-06-15T00:00:00Z"), new BigDecimal("300000"))),
+                new BigDecimal("500000")));
+
+    mockMvc
+        .perform(get("/bank/accounts/" + accountId).param("fragment", "balanceChart"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("bank-chart-range-90d")))
+        .andExpect(content().string(containsString("data-testid=\"bank-chart\"")))
+        .andExpect(content().string(containsString("bank-chart-line")))
+        .andExpect(content().string(containsString("bank-chart-target-legend")))
+        .andExpect(content().string(not(containsString("id=\"bank-chart-results\""))));
+  }
+
+  // covers REQ-BANK-049 — an empty series renders the chart's empty state, not the SVG.
+  @Test
+  @WithMockUser(roles = "BANK_EMPLOYEE")
+  void accountDetail_fragmentBalanceChart_emptySeries_rendersEmptyState() throws Exception {
+    UUID accountId = UUID.randomUUID();
+    when(backendApiClient.get(contains("/balance-series"), eq(BankBalanceSeriesDto.class)))
+        .thenReturn(new BankBalanceSeriesDto(List.of(), null));
+
+    mockMvc
+        .perform(get("/bank/accounts/" + accountId).param("fragment", "balanceChart"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("bank-chart-empty")))
+        .andExpect(content().string(not(containsString("data-testid=\"bank-chart\""))));
   }
 }
