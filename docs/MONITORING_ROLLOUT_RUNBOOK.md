@@ -51,7 +51,7 @@ every 5 minutes. The monitoring apply is **env-gated and non-gating**: once
 | Prometheus          | `prom/prometheus`                               | `v3.13.0` |
 | Grafana OSS         | `grafana/grafana-oss`                           | `13.0.2`  |
 | Loki                | `grafana/loki`                                  | `3.7.3`   |
-| Tempo               | `grafana/tempo`                                 | `2.10.7`  |
+| Tempo               | `grafana/tempo`                                 | `3.0.2`   |
 | Alloy               | `grafana/alloy`                                 | `v1.17.1` |
 | Alertmanager        | `quay.io/prometheus/alertmanager`               | `v0.33.0` |
 | node_exporter       | `quay.io/prometheus/node-exporter`              | `v1.11.1` |

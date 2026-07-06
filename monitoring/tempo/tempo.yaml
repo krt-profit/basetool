@@ -1,10 +1,17 @@
-# Tempo trace store, monolithic mode. Tempo 2.10.x LTS (config verified via `tempo -config.verify`;
-# NOT 3.0.x — that major is a breaking architecture rewrite whose monolithic config differs). #936.
+# Tempo trace store, monolithic mode. Tempo 3.x (config verified via `tempo -config.verify`). #936,
+# #1036, ADR-0076.
 #
-# Monolithic (`-target=all`, the default) runs all components in one process — NO Kafka (Kafka is
-# a microservices-only requirement in 3.0). Trace retention is short (14 days) and local-only; the
-# store is deliberately excluded from backups (ephemeral diagnostics, ADR-0072). The OTLP receivers
-# MUST bind 0.0.0.0 explicitly — Tempo defaults them to localhost, which Alloy could not reach.
+# Tempo 3.0 is a breaking architecture rewrite: the 2.x `ingester` and `compactor` blocks are gone
+# (the write path is now live-store + backend-scheduler/backend-worker) and Tempo parses config with
+# yaml.UnmarshalStrict, so a stale 2.x field is a hard startup failure. We stay MONOLITHIC
+# (`-target=all`, the default) — all components run in one process and NO Kafka is required (the
+# distributor pushes trace data in-process directly to the live-store; Kafka is a microservices-only
+# requirement in 3.x). The local filesystem backend remains supported in monolithic mode. Our span
+# volume (three low-traffic Spring apps + Keycloak on one host) is orders of magnitude below Grafana's
+# ~25-35 MB/s microservices threshold, so monolithic is the recommended and simplest mode for us
+# (ADR-0076, extends ADR-0072). Trace retention stays 14 days and local-only; the store is
+# deliberately excluded from backups (ephemeral diagnostics, ADR-0072). The OTLP receivers MUST bind
+# 0.0.0.0 explicitly — Tempo defaults them to localhost, which Alloy could not reach.
 server:
   http_listen_port: 3200
   grpc_listen_port: 9095
@@ -18,12 +25,18 @@ distributor:
         http:
           endpoint: "0.0.0.0:4318"
 
-ingester:
-  max_block_duration: 5m
+# 14-day retention (336h) — equals the 3.x default; set explicitly so the ADR-0072 retention decision
+# stays visible in config. In 3.x the backend-scheduler plans compaction/retention jobs and the
+# backend-worker executes them (both run in-process under -target=all), replacing the removed 2.x
+# compactor. Location per the official migrate-to-3 example.
+backend_scheduler:
+  provider:
+    compaction:
+      compaction:
+        block_retention: 336h
 
-compactor:
+backend_worker:
   compaction:
-    # 14-day retention (336h). Blocks older than this are deleted by the compactor.
     block_retention: 336h
 
 storage:

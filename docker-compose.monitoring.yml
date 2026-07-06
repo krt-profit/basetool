@@ -168,15 +168,18 @@ services:
 
   # ------------------------------------------------------------------------------------------
   # Tempo — trace store (14d), monolithic (-target=all, no Kafka).
-  # Pinned to the latest 2.x LTS line (2.10.7), NOT 3.0.x: Tempo 3.0 is a breaking architecture
-  # rewrite (backend-scheduler/worker/block-builder) whose monolithic config could not be
-  # config-verified for this deployment, whereas the 2.10.x config below passes `tempo -config.verify`
-  # and still needs no Kafka. Revisit 3.x with a verified 3.0 config as a follow-up (#937-adjacent).
+  # Pinned to the 3.x line (3.0.2): Tempo 3.0 is a breaking architecture rewrite (live-store +
+  # backend-scheduler/worker replace the removed 2.x ingester/compactor), migrated and config-verified
+  # for this deployment in #1036. We stay MONOLITHIC on the local filesystem backend — all components
+  # run in one process and NO Kafka is required (Kafka is a microservices-only requirement in 3.x); our
+  # span volume is far below Grafana's microservices threshold (ADR-0076, extends ADR-0072). The
+  # rewritten monolithic config in tempo.yaml passes `tempo -config.verify`. The existing vParquet4
+  # data dir is kept across the upgrade (3.0 reads 2.x RF3 blocks).
   # ------------------------------------------------------------------------------------------
   tempo:
     <<: *mon-base
     container_name: tempo
-    image: grafana/tempo:2.10.7
+    image: grafana/tempo:3.0.2
     cap_drop: [ALL]
     command: ["-target=all", "-config.file=/etc/tempo/tempo.yaml"]
     volumes:
