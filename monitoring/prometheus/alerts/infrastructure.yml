@@ -190,6 +190,29 @@ groups:
           summary: "Redis is evicting keys"
           description: "Redis evicted keys in the last 15 minutes — the 256 MB limit may be too small for the session set."
 
+      # (#1041 item 13) Redis memory approaching maxmemory — the leading indicator RedisEvictions
+      # misses: evictions fire only AFTER keys (sessions) are already dropped. Guard on
+      # redis_memory_max_bytes > 0 so an unlimited (maxmemory=0) instance never divides by zero.
+      - alert: RedisMemoryHigh
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.85 and redis_memory_max_bytes > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis memory >85% of maxmemory"
+          description: "Redis has used more than 85% of its configured maxmemory for 10 minutes — the session set is approaching the eviction boundary (users would be logged out). Check session growth against the 256 MB limit."
+
+      # Redis rejected new connections — the maxclients limit was reached (a connection leak or a
+      # client storm). New Spring Session reads/writes then fail, so this is a pre-outage signal.
+      - alert: RedisConnectionsRejected
+        expr: increase(redis_rejected_connections_total[15m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis rejected connections"
+          description: "Redis rejected new connections in the last 15 minutes — the maxclients limit was reached (a connection leak or storm). New sessions and Spring Session writes will start failing."
+
       - alert: PostgresDeadlocks
         expr: increase(pg_stat_database_deadlocks{datname!~"template.*"}[15m]) > 0
         for: 5m
@@ -198,6 +221,57 @@ groups:
         annotations:
           summary: "PostgreSQL deadlocks detected ({{ $labels.datname }})"
           description: "PostgreSQL recorded deadlocks in the last 15 minutes."
+
+      # (#1041 item 13) Long-running transaction — an idle-in-transaction session blocks autovacuum,
+      # which lets bloat and XID age grow toward wraparound (plausible given the codebase's multi-step
+      # transaction history). The metric IS genuinely in seconds and is 0 when none are open.
+      - alert: PostgresLongTransaction
+        expr: pg_long_running_transactions_oldest_timestamp_seconds > 3600
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL transaction open >1h"
+          description: "A transaction has been open for more than 1 hour — an idle-in-transaction session blocks autovacuum (bloat + XID-age growth toward wraparound). Find and terminate it via pg_stat_activity."
+
+      # Buffer-cache hit ratio below 90% means queries are hitting disk. Division is NaN when the DB is
+      # idle (both rates 0), so the alert only fires under real block-access load.
+      - alert: PostgresCacheHitLow
+        expr: |
+          sum by (datname) (rate(pg_stat_database_blks_hit{datname!~"template.*"}[30m]))
+            / (sum by (datname) (rate(pg_stat_database_blks_hit{datname!~"template.*"}[30m])) + sum by (datname) (rate(pg_stat_database_blks_read{datname!~"template.*"}[30m]))) < 0.9
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL cache hit ratio <90% ({{ $labels.datname }})"
+          description: "The buffer-cache hit ratio for {{ $labels.datname }} has been below 90% for 30 minutes — queries are reading from disk. Check shared_buffers sizing and recent query/plan changes."
+
+      # Temp-file spill: queries whose sort/hash exceeds work_mem spill to disk. > 1 GB/h points at an
+      # undersized work_mem or a bad plan.
+      - alert: PostgresTempFiles
+        expr: increase(pg_stat_database_temp_bytes{datname!~"template.*"}[1h]) > 1073741824
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL temp files >1GB/h ({{ $labels.datname }})"
+          description: "{{ $labels.datname }} wrote more than 1 GB of temp files in the last hour — queries are spilling to disk (work_mem too small, or a bad plan). Check the heavy queries."
+
+      # CRITICAL: transaction-ID wraparound. IMPORTANT — the metric value is an XID AGE COUNT
+      # (age(datfrozenxid)), NOT seconds: postgres_exporter names it *_seconds but the underlying SQL
+      # is age(datfrozenxid), which returns a transaction count. The hard wraparound limit is ~2.1e9;
+      # autovacuum_freeze_max_age defaults to 2e8, so a healthy DB stays well below that. > 1.5e9 means
+      # autovacuum has been failing to freeze for a very long time and the DB nears a forced read-only
+      # shutdown. Do NOT "fix" this threshold to a seconds value.
+      - alert: PostgresWraparoundCritical
+        expr: pg_database_wraparound_age_datfrozenxid_seconds > 1500000000
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL XID wraparound age critical ({{ $labels.datname }})"
+          description: "The oldest un-frozen transaction-ID age for {{ $labels.datname }} exceeds 1.5 billion of the ~2.1 billion wraparound limit — autovacuum is not keeping up and PostgreSQL will refuse writes as it nears the limit. Investigate autovacuum and long-idle transactions urgently."
 
       # Posture assertions (REQ-OBS-012). Same `and on()` outage guard as EdgeActuatorDenyBroken.
       - alert: EdgeForceSslRedirectBroken

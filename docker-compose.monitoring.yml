@@ -367,6 +367,13 @@ services:
   # spamming Loki. These are single-instance DBs with no streaming replicas, so the metric is dead
   # weight anyway; the flag (kingpin-only, no envar) disables the broken query. The valid `replication`
   # / `replication_slots` collectors stay on.
+  #
+  # --collector.database_wraparound + --collector.long_running_transactions (#1041 item 13): both are
+  # default-OFF built-in collectors. They add pg_database_wraparound_age_datfrozenxid_seconds (an XID
+  # AGE COUNT despite the _seconds name — the SQL is age(datfrozenxid)) and
+  # pg_long_running_transactions_oldest_timestamp_seconds (genuinely seconds), backing the wraparound /
+  # long-transaction alerts. Read-only queries against pg_database / pg_stat_activity — no extra grants
+  # beyond the existing pg_monitor role. Recreate both exporter containers on deploy to pick up the flags.
   # ------------------------------------------------------------------------------------------
   postgres-exporter-backend:
     <<: *mon-base
@@ -375,6 +382,8 @@ services:
     cap_drop: [ALL]
     command:
       - --no-collector.stat_replication
+      - --collector.database_wraparound
+      - --collector.long_running_transactions
     environment:
       DATA_SOURCE_NAME: "postgresql://${PG_EXPORTER_USER:-monitoring}:${PG_EXPORTER_BACKEND_PASSWORD:?PG_EXPORTER_BACKEND_PASSWORD must be set}@db-backend:15432/${POSTGRES_DB:?POSTGRES_DB must be set}?sslmode=disable"
     deploy:
@@ -392,8 +401,11 @@ services:
     image: quay.io/prometheuscommunity/postgres-exporter:v0.20.0
     cap_drop: [ALL]
     # --no-collector.stat_replication: see the backend exporter above — upstream slot_name bug.
+    # --collector.database_wraparound + --collector.long_running_transactions: see the backend exporter.
     command:
       - --no-collector.stat_replication
+      - --collector.database_wraparound
+      - --collector.long_running_transactions
     environment:
       DATA_SOURCE_NAME: "postgresql://${PG_EXPORTER_USER:-monitoring}:${PG_EXPORTER_KEYCLOAK_PASSWORD:?PG_EXPORTER_KEYCLOAK_PASSWORD must be set}@db-keycloak:15433/${KC_POSTGRES_DB:?KC_POSTGRES_DB must be set}?sslmode=disable"
     deploy:
