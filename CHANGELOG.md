@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **Technisch: Restliches Inline-JavaScript der Operationen-Übersicht in ein statisches Modul ausgelagert.** Das noch inline verbliebene JavaScript der Operationen-Übersicht (Lösch-Bestätigungsdialog sowie das In-Place-Anlegen und -Löschen von Operationen) wurde ohne Verhaltensänderung aus der Thymeleaf-Vorlage in eine browser-zwischenspeicherbare, lint- und formatierbare Datei unter `static/js/` verlagert; die lokalisierten Meldungstexte bleiben als schlanker Inline-Bootstrap erhalten (ADR-0069).
+
 - **Technisch: Inline-JavaScript der Schiffsdaten-Seite in ein statisches Modul ausgelagert.** Das JavaScript der Schiffsdaten-Seite (Hersteller-/Schiffstyp-Autovervollständigung, Namensfilter der Tabellen, Modal-Steuerung sowie das In-Place-Umschalten der Sichtbarkeit und das Zurücksetzen aller „fitted"-Markierungen) wurde ohne Verhaltensänderung aus der Thymeleaf-Vorlage in eine browser-zwischenspeicherbare, lint- und formatierbare Datei unter `static/js/` verlagert; die lokalisierten Meldungstexte und die Reset-URL bleiben als schlanker Inline-Bootstrap erhalten (ADR-0069).
 
 - **Technisch: Inline-JavaScript der Hangar-Seite in ein statisches Modul ausgelagert.** Das umfangreiche JavaScript der Hangar-Seite (Schiff anlegen/bearbeiten/löschen, Alle-löschen, Fleetview-Import, Home-Location setzen, Schiffstyp-nach-Hersteller-Filter sowie serverseitige Suche und Seitennummerierung) wurde ohne Verhaltensänderung aus der Thymeleaf-Vorlage in eine browser-zwischenspeicherbare, lint- und formatierbare Datei unter `static/js/` verlagert; die lokalisierten Meldungstexte bleiben als schlanker Inline-Bootstrap erhalten (ADR-0069).
