@@ -25,6 +25,47 @@ modules:
       tls_config:
         insecure_skip_verify: false
 
+  # Internal self-signed TLS probe (#1041 item 8, REQ-OBS-008). Validates the basetool-CA-signed
+  # keystore.p12 cert on the three app modules and emits probe_ssl_earliest_cert_expiry, so the
+  # (unfiltered) CertificateExpiringSoon alert catches the internal cert's expiry 14 days ahead —
+  # before it simultaneously breaks all three app scrapes, the frontend->backend WebClient and the
+  # NPM->Grafana re-encryption (today only a same-day TargetDown warns). The apps answer their root
+  # with an auth/redirect status, so any of 200/302/303/401/403 counts as reachable. follow_redirects
+  # stays false so a redirect target's cert is not probed instead.
+  https_internal:
+    prober: http
+    timeout: 10s
+    http:
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      valid_status_codes: [200, 302, 303, 401, 403]
+      method: GET
+      follow_redirects: false
+      fail_if_ssl: false
+      fail_if_not_ssl: false
+      preferred_ip_protocol: "ip4"
+      ip_protocol_fallback: false
+      tls_config:
+        ca_file: /etc/blackbox/certs/basetool-ca.crt
+
+  # Grafana serves its OWN self-signed cert (not basetool-CA-signed), so chain validation would fail;
+  # insecure_skip_verify lets the handshake complete while blackbox still emits
+  # probe_ssl_earliest_cert_expiry for the expiry alert. Same accepted status set (Grafana's
+  # OIDC-gated root redirects / 401s).
+  https_internal_insecure:
+    prober: http
+    timeout: 10s
+    http:
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      valid_status_codes: [200, 302, 303, 401, 403]
+      method: GET
+      follow_redirects: false
+      fail_if_ssl: false
+      fail_if_not_ssl: false
+      preferred_ip_protocol: "ip4"
+      ip_protocol_fallback: false
+      tls_config:
+        insecure_skip_verify: true
+
   # Auth-protected public endpoints (the ingest gateway answers 401 on its probed path). A 401 still
   # proves the endpoint is reachable AND the TLS cert is valid — exactly what this probe checks. A real
   # outage (timeout / connection error / 5xx) is NOT in the valid list and still fails the probe, so

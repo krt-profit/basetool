@@ -147,6 +147,18 @@ rule — no blanket "everything is masked" claim:
   that actually creates those networks. Rationale and residual risk live in ADR-0072.
 - The private key of the shared `keystore.p12` never leaves the four existing services;
   Grafana gets its own self-signed certificate.
+- **Internal-cert expiry is monitored.** The self-signed internal certs — the basetool-CA-signed
+  `keystore.p12` on the app modules and Grafana's own cert — are probed from inside the monitoring
+  plane by the blackbox `https_internal` / `https_internal_insecure` modules (the CA is mounted into
+  the blackbox exporter; Grafana uses the `insecure_skip_verify` variant since its cert is not
+  CA-signed, and `probe_ssl_earliest_cert_expiry` is still emitted). Their expiry gauge feeds the
+  unfiltered `CertificateExpiringSoon` alert so an internal-cert expiry — which would otherwise break
+  all three app scrapes, the frontend→backend WebClient and the NPM→Grafana re-encryption at once —
+  is caught ~14 days ahead instead of only by a same-day `TargetDown`. These probe jobs stay outside
+  `BlackboxProbeFailed`'s liveness include-list (a down app is already paged by `TargetDown`), so they
+  add no double-paging. Enforced by `monitoring/blackbox/blackbox.yml`,
+  `monitoring/prometheus/prometheus.yml` (`blackbox-internal-tls*` jobs) and the blackbox CA mount in
+  `docker-compose.monitoring.yml`.
 
 ### REQ-OBS-009 — Distributed tracing (OTLP via the monitoring plane only)
 

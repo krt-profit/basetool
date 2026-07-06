@@ -439,6 +439,10 @@ services:
       - --config.file=/etc/blackbox/blackbox.yml
     volumes:
       - ./monitoring/blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro
+      # Basetool CA for the https_internal module (#1041 item 8) — validates the app keystore.p12
+      # cert chain so probe_ssl_earliest_cert_expiry drives CertificateExpiringSoon on the internal
+      # certs. Same host-side CA that Prometheus mounts for its HTTPS app scrapes.
+      - /var/iri/monitoring/certs/basetool-ca.crt:/etc/blackbox/certs/basetool-ca.crt:ro
     deploy:
       resources:
         limits:
