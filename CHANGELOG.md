@@ -10,6 +10,8 @@
 
 - **Betrieb: Docker-Aufräumen läuft jetzt über einen systemd-Timer statt Cron.** Das wöchentliche `docker-cleanup.sh` (Samstag 02:00 UTC) wird nun vom systemd-Timer `iri-docker-cleanup.timer` ausgelöst – konsistent mit Backup, Deploy und Restore-Drill; damit laufen alle Wartungsjobs über systemd. Ausführung und Logs jetzt über `systemctl`/`journalctl`; die Monitoring-Textfile-Metriken und die zugehörige Warnung bleiben unverändert.
 
+- **Monitoring: Neue Geschäftsalarme, Deploy-Absicherung und Kapazitätsprognosen.** Neue Alarme für stille Ingest-Übergabefehler, einen nicht erreichbaren Identity-Provider (unerreichbare Keycloak-JWKS, als 503 gemeldet) und 403-Häufungen; die Deploy-Alarme schlagen jetzt auch bei einer fehlgeschlagenen Erstinstallation an, und die HTTP-Fehler-Kachel zeigt alle Fehlercodes. Neue Prognose-Kacheln zeigen Tage bis Platte bzw. TSDB voll und das DB-Wachstum, und die reparierte Alarm-Unterdrückung meldet bei einem Ausfall nur noch die Ursache statt jeder Folgewarnung (REQ-OBS-011).
+
 - **Monitoring: Grafana Tempo auf 3.x aktualisiert (monolithisch, ohne Kafka).** Der Trace-Speicher läuft jetzt auf Tempo 3.0.2 mit der für die neue 3.x-Architektur (Live-Store, Backend-Scheduler/-Worker statt Ingester/Compactor) neu geschriebenen Konfiguration; Speicherort, 14-Tage-Aufbewahrung und Verhalten bleiben unverändert, keine sichtbaren Auswirkungen für Nutzer (ADR-0076).
 
 ### Removed

@@ -604,7 +604,7 @@
         "y": 32
       },
       "type": "timeseries",
-      "title": "409 optimistic-lock conflict rate",
+      "title": "HTTP error codes by application/code",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -643,15 +643,25 @@
       },
       "targets": [
         {
-          "expr": "rate(basetool_http_error_total{code=\"OPTIMISTIC_LOCK\"}[5m]) or vector(0)",
+          "expr": "sum by (application, code) (rate(basetool_http_error_total[5m])) or vector(0)",
+          "legendFormat": "{{application}} {{code}}",
           "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "rate(basetool_http_error_total{code=\"OPTIMISTIC_LOCK\"}[5m])",
           "legendFormat": "OPTIMISTIC_LOCK",
+          "refId": "B",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           }
         }
-      ]
+      ],
+      "description": "All bounded RFC-7807 error codes (basetool_http_error_total) by application and code. The 0.1 threshold marks the OptimisticLockConflictSpike alert level for the dedicated OPTIMISTIC_LOCK series."
     },
     {
       "id": 13,
@@ -790,6 +800,162 @@
           "expr": "sum by (source) (rate(basetool_sync_events_total[15m]))",
           "refId": "A",
           "legendFormat": "{{source}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 48
+      },
+      "type": "timeseries",
+      "title": "Ingest handoff rate by kind",
+      "description": "Accepted+staged ingest handoffs/s per HandoffKind (basetool_ingest_handoff_total).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (kind) (rate(basetool_ingest_handoff_total[5m]))",
+          "legendFormat": "{{kind}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 48
+      },
+      "type": "timeseries",
+      "title": "Ingest handoff errors by reason",
+      "description": "Ingest relay failures/s by reason (basetool_ingest_handoff_errors_total). Backs IngestHandoffErrors / IngestBackendUnavailable.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.05
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (reason) (rate(basetool_ingest_handoff_errors_total[5m])) or vector(0)",
+          "legendFormat": "{{reason}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 48
+      },
+      "type": "stat",
+      "title": "Ingest handoff error ratio (10m)",
+      "description": "Share of ingest handoff attempts that failed to relay over 10m.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.01
+              },
+              {
+                "color": "red",
+                "value": 0.05
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {},
+      "targets": [
+        {
+          "expr": "sum(rate(basetool_ingest_handoff_errors_total[10m])) / clamp_min(sum(rate(basetool_ingest_handoff_total[10m])) + sum(rate(basetool_ingest_handoff_errors_total[10m])), 1)",
+          "refId": "A",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"

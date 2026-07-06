@@ -310,6 +310,15 @@ status queue without a gauge, or a renamed metric that silently breaks a dashboa
 incomplete (epic [#936](https://github.com/krt-profit/basetool/issues/936); the binding
 "monitoring moves with every feature" rule ships with the Phase-2 stack).
 
+**Alert coverage of these signals.** Previously-unalerted `basetool_*` signals now back named alerts
+so an exported metric cannot silently regress unnoticed: the ingest handoff metrics feed
+`IngestHandoffErrors` / `IngestBackendUnavailable`; the `basetool_http_error_total`
+`SERVICE_UNAVAILABLE` and `ACCESS_DENIED` codes feed `IdentityProviderUnavailable` /
+`AccessDeniedSpike` (and the all-codes HTTP-error panel on dashboard `07`); and
+`KeycloakEventMetricsAbsent` guards the `keycloak_user_events_total` series that
+`KeycloakLoginErrorSpike` depends on. Adding, renaming or removing one of these metrics keeps its
+alert in `monitoring/prometheus/alerts/business.yml` in sync in the same change.
+
 ### REQ-OBS-012 — Edge posture assertions (deny / redirect / HSTS probes)
 
 Security-relevant edge configuration lives only in the NPM admin database (per-host toggles and

@@ -351,6 +351,57 @@
           }
         }
       ]
+    },
+    {
+      "id": 9,
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 16
+      },
+      "type": "stat",
+      "title": "Days until GHCR token expiry",
+      "description": "Days until the production GHCR pull token's recorded expiry. Backs GhcrPullTokenExpiring/Expired. No data = a non-expiring token (no .expiry sidecar).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "d",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 14
+              },
+              {
+                "color": "green",
+                "value": 30
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {},
+      "targets": [
+        {
+          "expr": "(basetool_ghcr_token_expiry_timestamp - time()) / 86400",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
     }
   ]
 }

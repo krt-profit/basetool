@@ -60,6 +60,30 @@ groups:
           summary: "409 optimistic-lock conflict spike"
           description: "The backend is returning 409 optimistic-lock conflicts at an elevated rate — a likely locking/version-propagation regression."
 
+      # (#1041 item 6) SERVICE_UNAVAILABLE is incremented exactly when the backend/ingest re-maps an
+      # unreachable Keycloak JWKS to a retryable 503 (REQ-SEC-024) — the documented root cause of the
+      # past Http5xxRateHigh incident. Detects it minutes earlier and pre-diagnosed.
+      - alert: IdentityProviderUnavailable
+        expr: sum by (application) (rate(basetool_http_error_total{code="SERVICE_UNAVAILABLE"}[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Identity provider unavailable (503 spike, {{ $labels.application }})"
+          description: "{{ $labels.application }} is re-mapping unreachable-Keycloak-JWKS failures to 503 at an elevated rate — the root cause of the past Http5xxRateHigh incident. Check Keycloak reachability / DNS before 5xx surfaces to users."
+
+      # (#1041 item 6) Authorization-probing signal: 401 (UNAUTHENTICATED) is charted, 403 was not.
+      # baseline-tune: 0.2/s is an initial guess; 403s occur normally (guest field redaction), so tune
+      # against the baseline week.
+      - alert: AccessDeniedSpike
+        expr: sum by (application) (rate(basetool_http_error_total{code="ACCESS_DENIED"}[5m])) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "403 access-denied spike ({{ $labels.application }})"
+          description: "{{ $labels.application }} is returning 403 access-denied at an elevated rate — possible authorization probing or a broken permission gate after a deploy."
+
       - alert: RateLimitRejectionSpike
         expr: sum by (application) (rate(basetool_ratelimit_rejections_total[5m])) > 1
         for: 10m
@@ -111,6 +135,28 @@ groups:
           summary: "Sustained frontend→backend call failures"
           description: "The frontend's backend-call failure rate has been elevated for 10 minutes ({{ $value }}/s)."
 
+      # (#1041 item 1) Ingest handoff relay health. WoltLab is the account source of truth, so a dead
+      # relay means identity-data drift that otherwise only surfaces much later via user-sync staleness.
+      # The metrics (basetool_ingest_handoff_total/_errors_total) already ship from the ingest module.
+      # baseline-tune: 0.05/s error rate is the issue's initial threshold.
+      - alert: IngestHandoffErrors
+        expr: sum by (reason) (rate(basetool_ingest_handoff_errors_total[10m])) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Ingest handoff errors ({{ $labels.reason }})"
+          description: "The ingest gateway is failing to relay handoffs (reason: {{ $labels.reason }}) at an elevated rate — WoltLab identity data may be drifting from basetool."
+
+      - alert: IngestBackendUnavailable
+        expr: rate(basetool_ingest_handoff_errors_total{reason="backend_unavailable"}[5m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Ingest cannot reach the backend (handoffs failing)"
+          description: "The ingest gateway could not reach the backend to relay handoffs in the last 5 minutes — staged identity data is not being applied. Check backend health and the ingest→backend path."
+
       # Keycloak login errors / Discord IdP broker error spike (primary login path).
       - alert: KeycloakLoginErrorSpike
         expr: rate(keycloak_user_events_total{event=~"login_error|identity_provider_login_error"}[5m]) > 0.2
@@ -120,3 +166,15 @@ groups:
         annotations:
           summary: "Keycloak login-error spike"
           description: "Keycloak is emitting login_error / IdP-error events at an elevated rate."
+
+      # (#1041 item 6) KeycloakLoginErrorSpike reads keycloak_user_events_total; if Keycloak's event
+      # metrics subsystem stops exporting while Keycloak itself is up, that alert goes silent (not
+      # firing) with no other signal. This catches the absence directly.
+      - alert: KeycloakEventMetricsAbsent
+        expr: absent(keycloak_user_events_total) and on() (up{job="keycloak"} == 1)
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Keycloak user-event metrics absent while Keycloak is up"
+          description: "keycloak_user_events_total is not being exported while the Keycloak scrape is up — KeycloakLoginErrorSpike is blind. Check the Keycloak metrics/event listener config."
