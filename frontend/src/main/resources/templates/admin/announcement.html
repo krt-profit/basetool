@@ -68,102 +68,20 @@
     </div>
 </main>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-    document.addEventListener('DOMContentLoaded', function() {
-        const deleteModal = document.getElementById('delete-confirm-modal');
-        const triggerDeleteBtn = document.getElementById('trigger-delete-confirm');
-        const closeDeleteBtns = document.querySelectorAll('.close-delete-modal');
-        const updateForm = document.getElementById('announcement-update-form');
-        const deleteForm = document.getElementById('announcement-delete-form');
-
-        const MSG = {
-            saveSuccess:   /*[[#{notification.success.save}]]*/ 'Gespeichert.',
-            saveError:     /*[[#{notification.error.save}]]*/ 'Speichern fehlgeschlagen.',
-            deleteSuccess: /*[[#{notification.success.delete}]]*/ 'Gelöscht.',
-            deleteError:   /*[[#{notification.error.delete}]]*/ 'Löschen fehlgeschlagen.'
-        };
-        const CONFLICT = {
-            title:                /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt',
-            reloadDetailFallback: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Bitte neu laden.',
-            reloadLabel:          /*[[#{frontend.ajax.conflict.reload}]]*/ 'Aktuelle Werte laden',
-            dismissLabel:         /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
-            reloadQuestion:       /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
-        };
-
-        function closeDeleteModal() {
-            if (deleteModal) deleteModal.style.display = "none";
-        }
-
-        if (triggerDeleteBtn && deleteModal) {
-            triggerDeleteBtn.onclick = function() {
-                deleteModal.style.display = "flex";
-            };
-        }
-
-        closeDeleteBtns.forEach(function(btn) {
-            btn.onclick = closeDeleteModal;
-        });
-
-        window.onclick = function(event) {
-            if (event.target == deleteModal) {
-                closeDeleteModal();
-            }
-        };
-
-        // In-place save: post the update via the AJAX twin and write the bumped
-        // optimistic-lock version back into the hidden input so the next save
-        // does not 409. Without krtFetch (no-JS) the native POST->redirect runs.
-        if (updateForm) {
-            updateForm.addEventListener('submit', function(event) {
-                event.preventDefault();
-                if (!window.krtFetch) { updateForm.submit(); return; }
-                const versionInput = updateForm.querySelector('input[name="version"]');
-                const contentInput = updateForm.querySelector('textarea[name="content"]');
-                window.krtFetch.write({
-                    method: 'POST',
-                    url: updateForm.getAttribute('action'),
-                    payload: {
-                        content: contentInput ? contentInput.value : '',
-                        version: versionInput && versionInput.value !== ''
-                            ? Number(versionInput.value) : null
-                    },
-                    successMessage: MSG.saveSuccess,
-                    errorMessage: MSG.saveError,
-                    conflict: CONFLICT,
-                    onSuccess: function(body) {
-                        if (versionInput && body && body.version != null) {
-                            versionInput.value = body.version;
-                        }
-                    }
-                });
-            });
-        }
-
-        // In-place delete: on success the announcement is gone, so reset the form to
-        // its empty create state in place instead of reloading. The no-reload win is
-        // the failure path (inline toast, modal stays open).
-        if (deleteForm) {
-            deleteForm.addEventListener('submit', function(event) {
-                event.preventDefault();
-                if (!window.krtFetch) { deleteForm.submit(); return; }
-                window.krtFetch.write({
-                    method: 'POST',
-                    url: deleteForm.getAttribute('action'),
-                    successMessage: MSG.deleteSuccess,
-                    errorMessage: MSG.deleteError,
-                    conflict: CONFLICT,
-                    onSuccess: function() {
-                        if (updateForm) {
-                            const versionInput = updateForm.querySelector('input[name="version"]');
-                            const contentInput = updateForm.querySelector('textarea[name="content"]');
-                            if (contentInput) contentInput.value = '';
-                            if (versionInput) versionInput.value = '0';
-                        }
-                        closeDeleteModal();
-                    }
-                });
-            });
-        }
-    });
+    const ANNOUNCE_MSG = {
+        saveSuccess:   /*[[#{notification.success.save}]]*/ 'Gespeichert.',
+        saveError:     /*[[#{notification.error.save}]]*/ 'Speichern fehlgeschlagen.',
+        deleteSuccess: /*[[#{notification.success.delete}]]*/ 'Gelöscht.',
+        deleteError:   /*[[#{notification.error.delete}]]*/ 'Löschen fehlgeschlagen.'
+    };
+    const ANNOUNCE_CONFLICT = {
+        title:                /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt',
+        reloadDetailFallback: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Bitte neu laden.',
+        reloadLabel:          /*[[#{frontend.ajax.conflict.reload}]]*/ 'Aktuelle Werte laden',
+        dismissLabel:         /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
+        reloadQuestion:       /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
+    };
 </script>
+<script th:src="@{/js/announcement.js}" th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>
