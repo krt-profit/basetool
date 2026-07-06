@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Collection;
@@ -51,6 +54,27 @@ public class NotificationStreamService {
   private static final long EMITTER_TIMEOUT_MS = Duration.ofMinutes(30).toMillis();
 
   private final Map<UUID, Set<SseEmitter>> emittersBySub = new ConcurrentHashMap<>();
+  private final MeterRegistry meterRegistry;
+
+  /**
+   * Binds the {@code basetool_sse_connections} gauge to the live emitter registry (REQ-OBS-011) —
+   * the total number of open SSE subscriptions across all recipients on this instance, computed on
+   * scrape. Unlabelled: recipient {@code sub} is PII / unbounded. Zero here while the frontend
+   * still reports {@code basetool_active_sessions} means the push channel is dead ({@code
+   * SsePushChannelDead}), e.g. reverse-proxy buffering drift, and clients silently fell back to the
+   * unread-count poll.
+   *
+   * @param meterRegistry the Micrometer registry the SSE gauge and send-failure counter bind to
+   */
+  public NotificationStreamService(@NotNull MeterRegistry meterRegistry) {
+    this.meterRegistry = meterRegistry;
+    Gauge.builder(
+            MetricNames.SSE_CONNECTIONS,
+            emittersBySub,
+            map -> map.values().stream().mapToInt(Set::size).sum())
+        .description("Live SSE subscriber connections summed across all recipients.")
+        .register(meterRegistry);
+  }
 
   /**
    * Registers a new SSE subscription for a recipient and returns its emitter. The emitter
@@ -81,6 +105,7 @@ public class NotificationStreamService {
     try {
       emitter.send(SseEmitter.event().name("connected").data("ok"));
     } catch (IOException | RuntimeException e) {
+      recordSendFailure(MetricNames.SSE_EVENT_CONNECTED);
       remove(recipientSub, emitter);
     }
     return emitter;
@@ -102,6 +127,7 @@ public class NotificationStreamService {
         try {
           emitter.send(SseEmitter.event().name("notification").data("new"));
         } catch (IOException | RuntimeException e) {
+          recordSendFailure(MetricNames.SSE_EVENT_NOTIFICATION);
           remove(recipientSub, emitter);
         }
       }
@@ -127,6 +153,7 @@ public class NotificationStreamService {
                   try {
                     emitter.send(SseEmitter.event().name("heartbeat").data("ok"));
                   } catch (IOException | RuntimeException e) {
+                    recordSendFailure(MetricNames.SSE_EVENT_HEARTBEAT);
                     remove(recipientSub, emitter);
                   }
                 }));
@@ -142,6 +169,17 @@ public class NotificationStreamService {
   @NotNull
   protected SseEmitter newEmitter() {
     return new SseEmitter(EMITTER_TIMEOUT_MS);
+  }
+
+  /**
+   * Bumps {@code basetool_sse_send_failures_total} for a push that failed on the named SSE event,
+   * just before the dead emitter is dropped. The {@code event} tag is a fixed literal ({@code
+   * connected} / {@code notification} / {@code heartbeat}) — never recipient data.
+   *
+   * @param event the SSE event name whose send failed
+   */
+  private void recordSendFailure(@NotNull String event) {
+    meterRegistry.counter(MetricNames.SSE_SEND_FAILURES, MetricNames.TAG_EVENT, event).increment();
   }
 
   private void remove(@NotNull UUID recipientSub, @NotNull SseEmitter emitter) {

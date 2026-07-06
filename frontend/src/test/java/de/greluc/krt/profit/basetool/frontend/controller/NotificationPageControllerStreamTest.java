@@ -29,7 +29,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.function.Consumer;
@@ -69,7 +71,11 @@ class NotificationPageControllerStreamTest {
         mock(OAuth2AuthorizedClientRepository.class);
     NotificationPageController controller =
         new NotificationPageController(
-            backendApiClient, messageSource, sseWebClient, authorizedClientRepository);
+            backendApiClient,
+            messageSource,
+            sseWebClient,
+            authorizedClientRepository,
+            new SimpleMeterRegistry());
 
     HttpServletRequest request = mock(HttpServletRequest.class);
     Authentication authentication = mock(Authentication.class);
@@ -97,7 +103,11 @@ class NotificationPageControllerStreamTest {
         mock(OAuth2AuthorizedClientRepository.class);
     NotificationPageController controller =
         new NotificationPageController(
-            backendApiClient, messageSource, sseWebClient, authorizedClientRepository);
+            backendApiClient,
+            messageSource,
+            sseWebClient,
+            authorizedClientRepository,
+            new SimpleMeterRegistry());
 
     HttpServletRequest request = mock(HttpServletRequest.class);
     Authentication authentication = mock(Authentication.class);
@@ -129,7 +139,11 @@ class NotificationPageControllerStreamTest {
         mock(OAuth2AuthorizedClientRepository.class);
     NotificationPageController controller =
         new NotificationPageController(
-            backendApiClient, messageSource, sseWebClient, authorizedClientRepository);
+            backendApiClient,
+            messageSource,
+            sseWebClient,
+            authorizedClientRepository,
+            new SimpleMeterRegistry());
 
     HttpServletRequest request = mock(HttpServletRequest.class);
     Authentication authentication = mock(Authentication.class);
@@ -164,5 +178,49 @@ class NotificationPageControllerStreamTest {
     HttpHeaders applied = new HttpHeaders();
     headersCaptor.getValue().accept(applied);
     assertEquals("Bearer expired-access-token", applied.getFirst(HttpHeaders.AUTHORIZATION));
+  }
+
+  @Test
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  void stream_withOpenUpstream_countsTheRelayInTheConnectionsGauge() {
+    // Given a valid token and an upstream that never terminates (a live relay)
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    MessageSource messageSource = mock(MessageSource.class);
+    WebClient sseWebClient = mock(WebClient.class);
+    OAuth2AuthorizedClientRepository authorizedClientRepository =
+        mock(OAuth2AuthorizedClientRepository.class);
+    SimpleMeterRegistry registry = new SimpleMeterRegistry();
+    NotificationPageController controller =
+        new NotificationPageController(
+            backendApiClient, messageSource, sseWebClient, authorizedClientRepository, registry);
+    controller.registerRelayGauge();
+
+    HttpServletRequest request = mock(HttpServletRequest.class);
+    Authentication authentication = mock(Authentication.class);
+    OAuth2AuthorizedClient client = mock(OAuth2AuthorizedClient.class);
+    OAuth2AccessToken token =
+        new OAuth2AccessToken(
+            OAuth2AccessToken.TokenType.BEARER,
+            "live-token",
+            Instant.now(),
+            Instant.now().plusSeconds(300));
+    when(client.getAccessToken()).thenReturn(token);
+    when(authorizedClientRepository.loadAuthorizedClient(REGISTRATION_ID, authentication, request))
+        .thenReturn(client);
+
+    WebClient.RequestHeadersUriSpec uriSpec = mock(WebClient.RequestHeadersUriSpec.class);
+    WebClient.RequestHeadersSpec headersSpec = mock(WebClient.RequestHeadersSpec.class);
+    WebClient.ResponseSpec responseSpec = mock(WebClient.ResponseSpec.class);
+    when(sseWebClient.get()).thenReturn(uriSpec);
+    when(uriSpec.uri(anyString())).thenReturn(headersSpec);
+    when(headersSpec.headers(any())).thenReturn(headersSpec);
+    when(headersSpec.retrieve()).thenReturn(responseSpec);
+    when(responseSpec.bodyToFlux(anyTypeRef())).thenReturn(Flux.never());
+
+    // When the browser opens the stream
+    controller.stream(request, authentication);
+
+    // Then the live relay is reflected in the gauge — doFinally has not fired, the stream is open
+    assertEquals(1.0, registry.get(MetricNames.NOTIFICATION_RELAY_CONNECTIONS).gauge().value());
   }
 }

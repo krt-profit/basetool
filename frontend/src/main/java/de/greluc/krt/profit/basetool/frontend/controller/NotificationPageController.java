@@ -22,12 +22,16 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
 import de.greluc.krt.profit.basetool.frontend.exception.ReauthenticationRequiredException;
+import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationBulkResultDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationCountResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationViewDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.NotNull;
 import java.io.IOException;
@@ -38,6 +42,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
@@ -92,6 +97,25 @@ public class NotificationPageController {
   private final MessageSource messageSource;
   private final WebClient sseWebClient;
   private final OAuth2AuthorizedClientRepository authorizedClientRepository;
+  private final MeterRegistry meterRegistry;
+
+  /** Live browser-to-backend SSE relays open on this instance (relay-connections gauge source). */
+  private final AtomicInteger relayConnections = new AtomicInteger();
+
+  /**
+   * Binds the {@code basetool_notification_relay_connections} gauge to the live relay count once
+   * the bean is constructed (#1041 item 17). Zero here while users are online means the
+   * browser-to-backend notification push is dead and clients fell back to the unread-count poll.
+   */
+  @PostConstruct
+  void registerRelayGauge() {
+    Gauge.builder(
+            MetricNames.NOTIFICATION_RELAY_CONNECTIONS,
+            relayConnections,
+            AtomicInteger::doubleValue)
+        .description("Open browser-to-backend notification SSE relays on this instance.")
+        .register(meterRegistry);
+  }
 
   /**
    * Renders the full notifications page (most recent first), fail-soft to an empty list.
@@ -159,6 +183,10 @@ public class NotificationPageController {
       return emitter;
     }
     String bearerToken = authorizedClient.getAccessToken().getTokenValue();
+    // Count this relay for the whole lifetime of the upstream subscription. doFinally fires exactly
+    // once on any terminal signal — upstream complete/error, or a cancel when the browser
+    // disconnects and onCompletion/onTimeout dispose the subscription below — so it stays balanced.
+    relayConnections.incrementAndGet();
     Disposable subscription =
         sseWebClient
             .get()
@@ -166,6 +194,7 @@ public class NotificationPageController {
             .headers(headers -> headers.setBearerAuth(bearerToken))
             .retrieve()
             .bodyToFlux(SSE_TYPE)
+            .doFinally(signal -> relayConnections.decrementAndGet())
             .subscribe(
                 event -> forward(emitter, event),
                 error -> handleStreamError(emitter, error),
