@@ -44,9 +44,13 @@ existing, already-validated digest to `:stable`. The app images, the `basetool-c
 and the `basetool-keycloak-spi` provider-JAR bundle are promoted **in lock-step**, so the compose
 file, the Keycloak provider JAR and the image versions the host applies always match each other.
 
-A promotion passes two gates before it flips `:stable`: (1) a **human-approval** gate — the
-`promote` job is bound to the `production` GitHub Environment, so a repo-configured required reviewer
-must approve the run (workflow_dispatch alone lets anyone with Actions-write reach prod); and (2) the
+A promotion passes two gates before it flips `:stable`: (1) a **human-approval** gate — a dedicated
+`approve` job is bound to the `production` GitHub Environment, so a repo-configured required reviewer
+must approve the run before the promote matrix starts (workflow_dispatch alone lets anyone with
+Actions-write reach prod). The gate lives on its **own single job**, not on the promote matrix, so the
+run mints exactly one GitHub deployment record — a matrix-bound environment minted one deployment per
+leg, four of which `auto_inactive` then flipped to `inactive`, leaving the repo home page showing a
+misleading permanent "Inactive" badge for `production`. Gate (2) is the
 **signature** gate — cosign-verify the source digest against the release-images identity, so only an
 image built and signed by our own release pipeline can be promoted. `release-images.yml` scans every
 build with Trivy (SARIF uploaded to the Security tab for visibility) but the scan blocks neither the
@@ -58,8 +62,9 @@ build nor the promotion — a Trivy finding is surfaced, not enforced, at any st
   ingest/config/keycloak-spi).
 - [ ] `promote.yml` is `workflow_dispatch`-only and promotes `backend`, `frontend`, `ingest`,
   `config` and `keycloak-spi` together (`fail-fast: true`).
-- [ ] The `promote` job declares `environment: production`, so a required reviewer configured on
-  that environment gates the run before any `:stable` flip.
+- [ ] A dedicated `approve` job (not the promote matrix) declares `environment: production`, so a
+  required reviewer configured on that environment gates the run before any `:stable` flip, and the
+  run creates exactly one deployment record (no phantom "Inactive" badge on the repo home page).
 - [ ] The `promote` job cosign-verifies the resolved digest against the release-images identity
   before re-tagging; an image not signed by our own release pipeline cannot be promoted.
 

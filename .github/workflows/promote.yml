@@ -11,10 +11,11 @@ name: Promote to stable
 # host applies always match each other (see ADR-0049, ADR-0055).
 #
 # Trigger: workflow_dispatch only. Promotion is an intentional human decision,
-# never automatic from a CI build. The promote job is additionally bound to the
+# never automatic from a CI build. A dedicated `approve` job is bound to the
 # `production` GitHub Environment, so a repo-configured required reviewer approves
 # the run before any :stable flip happens — workflow_dispatch alone would let
-# anyone with Actions-write reach prod (REQ-OPS-002).
+# anyone with Actions-write reach prod (REQ-OPS-002). The gate is a single job (not
+# the promote matrix) so the run mints exactly one GitHub deployment record.
 #
 # Two gates guard a promotion, in order:
 #   1. cosign-verify the source digest's keyless signature against this repo's
@@ -67,20 +68,44 @@ jobs:
           echo "::error::version input is empty."
           exit 1
 
-  promote:
-    name: Promote ${{ matrix.module }}
+  # Single human-approval gate for the whole run. Promotion is the ONLY path to
+  # prod (REQ-OPS-002), and workflow_dispatch alone lets anyone with Actions-write
+  # flip :stable. Binding THIS job — and only this job — to the `production` GitHub
+  # Environment means a repo-configured *required reviewer* must approve the run
+  # before the promote matrix can start. Configure the reviewer under
+  # Settings → Environments → production → Required reviewers; without that config
+  # the environment reference is a harmless no-op.
+  #
+  # Why a dedicated gate job instead of `environment: production` on the matrix:
+  # every job that references an environment mints its own GitHub *deployment*
+  # record. Putting the environment on the 5-way promote matrix therefore created
+  # five deployments per run; GitHub's `auto_inactive` then flipped four of them to
+  # `inactive` as each leg finished, and the repo home-page environment widget
+  # surfaced one of those inactive records — so `production` showed a permanent,
+  # misleading "Inactive" badge. One gate job = exactly one deployment per run,
+  # which ends `success`/active and renders as "Active". Do NOT move `environment:`
+  # back onto the matrix.
+  approve:
+    name: Approve production promotion
     needs: validate-inputs
     runs-on: ubuntu-latest
     timeout-minutes: 10
-
-    # Human-approval gate. Promotion is the ONLY path to prod (REQ-OPS-002), and
-    # workflow_dispatch alone lets anyone with Actions-write flip :stable. Binding
-    # the job to the `production` GitHub Environment means a repo-configured
-    # *required reviewer* must approve the run before ANY promote matrix job
-    # proceeds (one approval covers the whole environment for the run). Configure
-    # the reviewer under Settings → Environments → production → Required reviewers;
-    # without that config the environment reference is a harmless no-op.
     environment: production
+    steps:
+      - name: Record approval
+        env:
+          VERSION: ${{ inputs.version }}
+        run: echo "Production promotion of '${VERSION}' approved — proceeding to re-tag :stable."
+
+  promote:
+    name: Promote ${{ matrix.module }}
+    # Gated behind the single `approve` job, which holds the production-environment
+    # required-reviewer gate. Deliberately NO `environment:` here — see the note on
+    # `approve` for why binding the matrix to the environment reintroduces the
+    # phantom "Inactive" deployment badge on the repo home page.
+    needs: approve
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     strategy:
       # If one promotion fails, do NOT carry on with the others — otherwise we
