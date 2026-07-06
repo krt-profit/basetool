@@ -248,16 +248,20 @@ Alertmanager does **not** expand environment variables, so the committed
 rendered on the host. Alert e-mails never contain user data. SMTP is 587 STARTTLS with
 `smtp_require_tls: true`.
 
-> **Order note:** this render needs two inputs you obtain later — the SMTP credentials and the **healthchecks.io ping URL** created in [Phase 4.7](#47-healthchecksio--watchdog-heartbeat-check). Create that check first, or come back and **re-run this render** once you have the URL. If the monitoring stack is already running, restart Alertmanager afterwards so it reloads the file: `docker compose -p iri-monitoring -f /var/iri/code/docker-compose.monitoring.yml up -d --force-recreate alertmanager`.
+> **Order note:** this render needs inputs you obtain later — the SMTP credentials, the **healthchecks.io ping URL** created in [Phase 4.7](#47-healthchecksio--watchdog-heartbeat-check), and the **Discord channel webhook URL** (the second alert channel, #1041 item 9). Create those first, or come back and **re-run this render** once you have them. If the monitoring stack is already running, restart Alertmanager afterwards so it reloads the file: `docker compose -p iri-monitoring -f /var/iri/code/docker-compose.monitoring.yml up -d --force-recreate alertmanager`.
 
 ```bash
-# Fill these from your SMTP provider + the healthchecks.io ping URL (created in Phase 4.7).
+# Fill these from your SMTP provider + the healthchecks.io ping URL (created in Phase 4.7) + the
+# Discord channel webhook (Server Settings -> Integrations -> Webhooks -> New Webhook -> Copy URL).
 export SMTP_SMARTHOST='smtp.example.net:587'
 export SMTP_FROM='monitoring@profit-base.online'
 export SMTP_AUTH_USERNAME='monitoring@profit-base.online'
 export SMTP_AUTH_PASSWORD='<smtp app password>'
 export ALERT_EMAIL_TO='ops@profit-base.online'
 export HEARTBEAT_URL='https://hc-ping.com/<your-check-uuid>'   # from Phase 4.7
+# Second alert channel (#1041 item 9): critical alerts + AlertmanagerNotificationsFailing also go
+# here, so an SMTP outage never silently loses a critical. Required — the render fails on an empty URL.
+export DISCORD_WEBHOOK_URL='https://discord.com/api/webhooks/<id>/<token>'
 
 envsubst < /var/iri/code/monitoring/alertmanager/alertmanager.yml.tmpl \
   | sudo tee /var/iri/monitoring/secrets/alertmanager.yml >/dev/null
@@ -270,7 +274,7 @@ docker run --rm \
 # expect: "Checking '/cfg.yml'  SUCCESS" and no unresolved ${...} placeholders.
 
 # Immediately unset the SMTP secrets from your shell environment.
-unset SMTP_SMARTHOST SMTP_FROM SMTP_AUTH_USERNAME SMTP_AUTH_PASSWORD ALERT_EMAIL_TO HEARTBEAT_URL
+unset SMTP_SMARTHOST SMTP_FROM SMTP_AUTH_USERNAME SMTP_AUTH_PASSWORD ALERT_EMAIL_TO HEARTBEAT_URL DISCORD_WEBHOOK_URL
 ```
 
 > If `amtool check-config` fails, do **not** ship — a bad config means alerts silently do not route.
@@ -771,8 +775,9 @@ sudo cat /var/iri/monitoring/textfile/restore_drill.prom
 
 **MUST extend `docs/deployment.md`'s keystore-rotation procedure.** When the shared
 `/var/iri/secrets/keystore.p12` is rotated, the exported public CA and Grafana's own cert do **not**
-auto-update, and a rotation will then **silently break every app scrape (Prometheus TLS handshake) and
-Grafana's TLS**. Add these two steps to the keystore-rotation runbook in `docs/deployment.md`:
+auto-update, and a rotation will then **silently break every app scrape (Prometheus TLS handshake),
+the internal-TLS expiry probes (blackbox `https_internal`, #1041 item 8) and Grafana's TLS**. Add these
+steps to the keystore-rotation runbook in `docs/deployment.md`:
 
 1. **Re-export the public CA** consumed by Prometheus (openssl prompts for the password; do not put
    it on the command line):
@@ -784,14 +789,16 @@ Grafana's TLS**. Add these two steps to the keystore-rotation runbook in `docs/d
    ```
 2. **Re-issue the Grafana self-signed cert** if its SANs/validity changed (Phase 3.7), keeping
    `chown 472:472`.
-3. Restart the affected monitoring services so they reload the new files:
+3. Restart the affected monitoring services so they reload the new files (`blackbox-exporter` mounts
+   the same CA for the `https_internal` probes):
 
    ```bash
    docker compose -p iri-monitoring -f /var/iri/code/docker-compose.monitoring.yml \
-     up -d --force-recreate prometheus grafana
+     up -d --force-recreate prometheus grafana blackbox-exporter
    ```
 
-   Then re-run Phase 8.1 (all targets UP) to confirm the app scrapes handshake against the new CA.
+   Then re-run Phase 8.1 (all targets UP) to confirm the app scrapes handshake against the new CA, and
+   check the `blackbox-internal-tls` job's `probe_success == 1` for the three app targets.
 
 ---
 

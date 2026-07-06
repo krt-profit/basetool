@@ -10,6 +10,10 @@
 
 - **Monitoring: Grafana Tempo auf 3.x aktualisiert (monolithisch, ohne Kafka).** Der Trace-Speicher läuft jetzt auf Tempo 3.0.2 mit der für die neue 3.x-Architektur (Live-Store, Backend-Scheduler/-Worker statt Ingester/Compactor) neu geschriebenen Konfiguration; Speicherort, 14-Tage-Aufbewahrung und Verhalten bleiben unverändert, keine sichtbaren Auswirkungen für Nutzer (ADR-0076).
 
+- **Monitoring: Ablauf der internen selbstsignierten Zertifikate wird jetzt überwacht.** Blackbox sondiert die App-Keystore- und Grafana-Zertifikate von innen und meldet über `CertificateExpiringSoon` einen bevorstehenden Ablauf rund 14 Tage im Voraus – bevor er gleichzeitig alle App-Scrapes, den Frontend-zu-Backend-Aufruf und die Grafana-Anbindung bricht (REQ-OBS-008).
+
+- **Monitoring: Zweiter Alarmkanal über Discord.** Kritische Alarme – und ein Ausfall des Mail-Versands selbst – gehen jetzt zusätzlich an einen Discord-Webhook, damit bei einem SMTP-Ausfall keine kritische Warnung stillschweigend verloren geht; die Webhook-URL wird beim Deploy als `${DISCORD_WEBHOOK_URL}`-Geheimnis eingesetzt und liegt nie im Repository.
+
 ### Removed
 
 - **Betrieb: täglicher VPN-Neustart (`vpn-restart`) entfernt.** Der Cron-Job, der die WireGuard-Schnittstelle `wg0` täglich um 04:00 neu startete, wird nicht mehr benötigt und wurde samt Skript sowie Cron- und logrotate-Konfiguration entfernt.

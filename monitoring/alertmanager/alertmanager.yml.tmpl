@@ -31,7 +31,22 @@ route:
       group_interval: 1m
       repeat_interval: 1m
       continue: false
-    # Critical alerts page immediately and repeat more often.
+    # (#1041 item 9) Second channel: mirror every critical to Discord first, then fall through
+    # (continue: true) to the critical e-mail route below, so an SMTP outage never silently loses a
+    # critical alert.
+    - matchers:
+        - severity = "critical"
+      receiver: 'discord'
+      group_wait: 0s
+      repeat_interval: 1h
+      continue: true
+    # AlertmanagerNotificationsFailing is itself e-mail-routed and thus circular when SMTP is the
+    # failure — send it to Discord explicitly. It is a warning, so it never matches the critical route.
+    - matchers:
+        - alertname = "AlertmanagerNotificationsFailing"
+      receiver: 'discord'
+      continue: false
+    # Critical alerts page e-mail immediately and repeat more often (reached via continue above).
     - matchers:
         - severity = "critical"
       receiver: 'email'
@@ -51,6 +66,15 @@ receivers:
     webhook_configs:
       - url: '${HEARTBEAT_URL}'
         send_resolved: false
+
+  # (#1041 item 9) Second human channel: native Discord webhook. The URL is a host .env secret
+  # (${DISCORD_WEBHOOK_URL}) rendered by envsubst at deploy time — never committed. If SMTP fails, a
+  # critical alert (and AlertmanagerNotificationsFailing itself) still reaches Discord. Alert
+  # annotations are PII-free (REQ-OBS-006/-007), so there is no privacy impact.
+  - name: 'discord'
+    discord_configs:
+      - webhook_url: '${DISCORD_WEBHOOK_URL}'
+        send_resolved: true
 
 inhibit_rules:
   # A critical alert on a target suppresses its warning-level siblings for the same alertname/job.
