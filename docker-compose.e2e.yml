@@ -93,6 +93,21 @@ services:
       - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
   frontend-dev:
     user: "0:0"
+    # Serve HTTP/1.1 (not HTTP/2) for the throwaway E2E stack. The suite's dominant flake is an
+    # HTTP/2 stream reset on the in-place AJAX writes under CI load: Tomcat logs "Client reset the
+    # stream before the request was fully read", the browser's fetch() rejects with a network error
+    # (not an HTTP response), the in-place handler shows its failure toast, and Playwright's
+    # waitForResponse never matches and hangs to its timeout (BankAdminResetE2eTest wipe /
+    # BankBookingE2eTest deposit). Firefox was dropped to HTTP/1.1 via a browser pref (see
+    # E2eSupport#launchFirefox), but WebKit has no Playwright-level HTTP/2 toggle, so the only
+    # uniform fix is at the server. Disabling h2 here removes the stream-reset class for ALL three
+    # engines at the source; every browser then uses well-trodden HTTP/1.1 with keep-alive. This is
+    # transport-only — it changes neither the app nor any assertion, so a genuine failure still
+    # fails, and prod (which keeps h2) is untouched. An env var (highest Spring property precedence)
+    # overrides application.yml's server.http2.enabled=true; the map merges with — does not replace —
+    # the base template's environment.
+    environment:
+      SERVER_HTTP2_ENABLED: "false"
     extra_hosts: !override []
     volumes: !override
       - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
