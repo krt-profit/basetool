@@ -118,9 +118,18 @@ public class UexItemSyncService {
    * Runs the full UEX item sync: ensures the category reference table is fresh, then walks every
    * game-related category. Empty UEX responses short-circuit per category without wiping local
    * data.
+   *
+   * <p>Returns the number of {@code game_item} rows upserted this run — the same {@code upserted}
+   * tally logged in the {@link SyncEventType#SYNC_RUN_SUMMARY} event. {@link UexScheduler} feeds it
+   * into {@code basetool_scheduled_job_items_total{job="uex_sync"}} via {@code
+   * TaskMetrics.recordCounting} so a catalogue outage that returns empty responses (0 upserts)
+   * while the sweep still "succeeds" is visible through the {@code SyncZeroItems} alert (#1041 item
+   * 2).
+   *
+   * @return the number of {@code game_item} rows upserted across all categories this run
    */
   @Transactional
-  public void syncItems() {
+  public int syncItems() {
     log.info("Starting synchronization of UEX items...");
     // final: the run id is captured at the start of the run but first used in the summary event at
     // the end, past the category loop — VariableDeclarationUsageDistance allows the gap when final.
@@ -206,6 +215,7 @@ public class UexItemSyncService {
                 itemsProcessed - itemsCreated,
                 marked));
     syncReportService.pruneRuns(SyncSourceSystem.UEX);
+    return itemsProcessed;
   }
 
   /**

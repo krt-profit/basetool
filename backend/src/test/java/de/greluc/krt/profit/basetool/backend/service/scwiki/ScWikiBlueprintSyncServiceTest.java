@@ -368,10 +368,12 @@ class ScWikiBlueprintSyncServiceTest {
   void syncBlueprints_emptyResponse_skipsOrphanSweep() {
     when(scWikiClient.fetchAllPages(any(), any(), eq("blueprints"))).thenReturn(List.of());
 
-    service.syncBlueprints();
+    int written = service.syncBlueprints();
 
     verify(blueprintRepository, never()).markScwikiDeleted(any(), any());
     verify(blueprintRepository, never()).save(any());
+    // An empty Wiki response upserts no blueprints → 0 items (#1041 item 2, SyncZeroItems).
+    assertEquals(0, written, "an empty Wiki response must report zero upserted blueprints");
   }
 
   @Test

@@ -8,6 +8,8 @@
 
 - **Monitoring: Fehlgeschlagene UEX-/SC-Wiki-Abrufe sind jetzt sichtbar.** Verschluckte Abruf- und Parse-Fehler der externen Kataloge werden nun gezählt (`basetool_external_fetch_errors_total`) und als `ExternalFetchErrors` alarmiert – bisher meldete der Sync trotz wochenlangem Ausfall weiter „Erfolg". Zusätzlich sind die ausgehenden Backend-Aufrufe jetzt an die Observation-Registry angebunden (Metriken + Spans, REQ-OBS-009/-011).
 
+- **Monitoring: Stille Null-Import-Ausfälle der Kataloge werden jetzt erkannt.** Die UEX- und SC-Wiki-Syncs melden nun die Zahl der pro Lauf geschriebenen Datensätze (`basetool_scheduled_job_items_total`); der neue Alarm `SyncZeroItems` schlägt an, wenn ein Sync 48 h lang „erfolgreich" läuft, dabei aber null Zeilen importiert – der Leere-200-Ausfall, den weder `ExternalSyncStale` noch `ExternalFetchErrors` erkennt (REQ-OBS-011).
+
 - **Monitoring: Die Überwachungsebene erkennt jetzt eigene stille Ausfälle.** Neue Alarme decken fehlgeschlagene Config-Reloads (Prometheus/Alertmanager/Alloy/Blackbox), Regel- und Benachrichtigungsfehler (Prometheus + Loki-Ruler), stille Log-Ströme (Alloy tailt eine kritische Datei wie auth.log/audit.log nicht mehr) sowie cAdvisor-Aussetzer, Container-OOM-Kills und CPU-Drosselung ab. Dazu kommen eine Log-Pipeline-Zeile im Meta-Dashboard und korrigierte Scheduled-Job-Alarmtexte, die wieder den echten Job-Namen statt „basetool-backend" zeigen (REQ-OBS-014).
 
 - **Technisch: Inline-JavaScript der Raffinerie-Seiten in statische Module ausgelagert.** Das JavaScript der drei Raffinerie-Auftragsseiten (Übersicht, Anlegen, Detail) wurde ohne Verhaltensänderung aus den Thymeleaf-Vorlagen in browser-zwischenspeicherbare, lint- und formatierbare Dateien unter `static/js/` verlagert (ADR-0069).
