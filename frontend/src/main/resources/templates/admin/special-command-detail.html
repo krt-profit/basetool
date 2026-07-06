@@ -177,7 +177,6 @@
 
 <!-- Add-Member modal wiring + in-place member CRUD (#582) -->
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-(function () {
     var MEMBER_MSG = {
         saved:   '[[#{notification.success.save}]]',
         deleted: '[[#{notification.success.delete}]]',
@@ -190,76 +189,7 @@
         dismissLabel:         '[[#{frontend.ajax.conflict.dismiss}]]',
         reloadQuestion:       '[[#{frontend.ajax.conflict.question}]]'
     };
-
-    var membersBox = document.getElementById('members-box');
-    var scId = membersBox ? membersBox.getAttribute('data-sc-id') : '';
-
-    // Re-renders the member roster fragment, refreshing role/lead badges and the fresh @Version on
-    // every form so the next member action does not 409.
-    function reswapMembers() {
-        if (!window.krtFetch || !scId) { return; }
-        window.krtFetch.swap({
-            url: '/admin/special-commands/' + encodeURIComponent(scId) + '?fragment=members',
-            container: '#members-results',
-            fragmentValue: 'members',
-            history: false
-        });
-    }
-
-    // FormData POST to a member AJAX twin (keeps the @ModelAttribute / @RequestParam binding) with
-    // X-Requested-With + CSRF + retry-once-on-403. On success re-swaps the roster; on failure
-    // delegates to krtFetch.handleProblem (already-member toast / OPTIMISTIC_LOCK reload-confirm).
-    // Migrated to krtFetch.submitForm (S10, REQ-FE-009): the shared foundation owns the CSRF header
-    // (no Content-Type so the browser sets the multipart boundary), the bare-403 refresh-and-retry,
-    // X-Reauthenticate, the success toast and the !ok handleProblem (already-member toast or
-    // OPTIMISTIC_LOCK reload-confirm). This helper keeps only its page behaviour: run onSuccess and
-    // re-swap the roster in place. Callers guard with if (!window.krtFetch) form.submit() so the
-    // classic POST->redirect stays the no-JS fallback.
-    function memberWrite(theForm, successMessage, onSuccess) {
-        window.krtFetch.submitForm({
-            form: theForm,
-            successMessage: successMessage,
-            errorMessage: MEMBER_MSG.error,
-            conflict: MEMBER_CONFLICT,
-            onSuccess: function () {
-                if (typeof onSuccess === 'function') { onSuccess(); }
-                reswapMembers();
-            },
-        });
-    }
-
-    // The flags / lead / remove forms live inside the swappable roster fragment, so they are
-    // document-delegated (survive a re-swap). Remove uses the delete message, the rest "saved".
-    document.addEventListener('submit', function (e) {
-        var memberForm = e.target.closest('#members-results form');
-        if (!memberForm) { return; }
-        e.preventDefault();
-        if (!window.krtFetch) { memberForm.submit(); return; }
-        var isRemove = memberForm.getAttribute('action').indexOf('/delete') !== -1;
-        memberWrite(memberForm, isRemove ? MEMBER_MSG.deleted : MEMBER_MSG.saved, null);
-    });
-
-    // Add-member modal (outside the fragment): open/close + in-place add.
-    var modal = document.getElementById('add-member-modal');
-    var openBtn = document.getElementById('add-member-btn');
-    var closeBtn = document.querySelector('#add-member-modal .close-add-member-modal');
-    if (modal && openBtn) {
-        openBtn.addEventListener('click', function () { modal.style.display = 'flex'; });
-        if (closeBtn) { closeBtn.addEventListener('click', function () { modal.style.display = 'none'; }); }
-        modal.addEventListener('click', function (e) { if (e.target === modal) { modal.style.display = 'none'; } });
-        var addForm = modal.querySelector('form');
-        if (addForm) {
-            addForm.addEventListener('submit', function (e) {
-                e.preventDefault();
-                if (!window.krtFetch) { addForm.submit(); return; }
-                memberWrite(addForm, MEMBER_MSG.saved, function () {
-                    modal.style.display = 'none';
-                    addForm.reset();
-                });
-            });
-        }
-    }
-})();
 </script>
+<script th:src="@{/js/special-command-detail.js}" th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>
