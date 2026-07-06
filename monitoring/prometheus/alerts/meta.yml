@@ -152,6 +152,43 @@ groups:
           summary: "Blackbox exporter config reload failed"
           description: "The blackbox exporter is running the LAST-GOOD module config because the most recent reload failed — new/changed probe modules from the last deploy are NOT active. Check the blackbox log and `blackbox.yml`."
 
+      # (#1041 item 22) Trace-pipeline health. Metric names verified against a live Tempo 3.0.2
+      # (scraped /metrics after sending test spans) — the plan's `tempo_discarded_spans_total` does
+      # NOT exist; the real refused-span counter is `tempo_receiver_refused_spans`, and
+      # `tempo_receiver_accepted_spans` has no `_total` suffix. REQ-OBS-013 keeps sink failures out of
+      # the app logs, so nothing else catches a dead tracing pipeline.
+      - alert: TempoSpansRefused
+        expr: sum(increase(tempo_receiver_refused_spans[15m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Tempo refused spans"
+          description: "Tempo's OTLP receiver could not push spans into the pipeline in the last 15 minutes (backpressure or an overloaded live-store) — traces are being dropped at ingest. Check the Tempo log and its memory limit."
+
+      # Silent-pipeline detector, robust to tracing being DISABLED: the accepted-spans counter stays 0
+      # (so `sum(...) > 0` is false) when MONITORING_TRACING_ENABLED is off, so this only fires when
+      # tracing WAS working (counter > 0 since Tempo start) but stopped for an hour.
+      - alert: TempoReceiverSilent
+        expr: sum(rate(tempo_receiver_accepted_spans[1h])) == 0 and sum(tempo_receiver_accepted_spans) > 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Tempo received no spans in 1h while tracing is enabled"
+          description: "Tempo accepted spans before but none in the last hour, while the accepted-spans counter is non-zero (tracing is enabled) — the OTLP export path from the apps/Keycloak or Alloy's OTLP forward is dead. Traces are not being stored."
+
+      # 3.x write-path health (replaces the removed 2.x ingester metrics): live-store blocks failing to
+      # complete or flush locally means accepted traces are lost before they reach a backend block.
+      - alert: TempoWritePathFailing
+        expr: sum(increase(tempo_live_store_failed_completions_total[15m])) > 0 or sum(increase(tempo_live_store_local_failed_flushes_total[15m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Tempo live-store write path failing"
+          description: "Tempo's live-store failed to complete or locally flush blocks in the last 15 minutes — accepted traces are being lost before they reach a persisted block. Check the Tempo log, disk space and I/O on the trace volume."
+
   # Log-pipeline liveness (#1041 item 5, REQ-OBS-014). All 9 Loki ruler alerts — including the
   # critical SSH-compromise and Postgres-FATAL detectors — silently stop firing if Alloy stops
   # tailing: rate() over an absent stream is EMPTY, not zero, and TargetDown cannot see a
