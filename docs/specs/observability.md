@@ -210,8 +210,12 @@ Tracing on the OTel SDK) behind a hard master gate:
   (`tempo_receiver_accepted_spans` rate 0 for 1h while the counter is non-zero, so it stays quiet
   when tracing is disabled) and `TempoWritePathFailing` (live-store completion/flush failures) —
   metric names verified against a live Tempo 3.0.2 scrape, since REQ-OBS-013 keeps sink failures out
-  of the app logs. The service-graph (node graph) needs the metrics-generator's `service-graphs`
-  processor + Prometheus remote-write, a separate follow-up (owner decision on the remote-write auth).
+  of the app logs. The service-graph (node graph) is lit by the metrics-generator's `service-graphs`
+  processor → Prometheus `remote_write` (#1041 item 22a, ADR-0076 amendment): it authenticates as the
+  shared `grafana` web-auth user (Tempo runs `-config.expand-env`), Prometheus adds
+  `--web.enable-remote-write-receiver`, cardinality is capped by `max_active_series`, and
+  `TempoGeneratorRemoteWriteFailing` / `TempoGeneratorSeriesLimited` alert on a credential drift or a
+  cardinality-cap hit. Span-metrics remote-write stays a non-goal.
 
 ### REQ-OBS-010 — Edge / host-auth log streams: 31-day IP retention + privacy-policy linkage
 

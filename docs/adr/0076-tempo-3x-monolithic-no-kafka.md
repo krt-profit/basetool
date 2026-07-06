@@ -69,3 +69,32 @@ We will **not** adopt microservices mode, Kafka/Redpanda/WarpStream, or an objec
 - **Rewrite the config with `tempo-cli migrate config`.** Rejected: it silently emits empty output
   when stdout is piped (grafana/tempo#7415); the 35-line config was rewritten manually instead.
 
+## Amendment 2026-07-06 (#1041 item 22a) — enable the service-graph metrics-generator
+
+Traces were ingested but the Grafana serviceMap/nodeGraph panels (already wired to the Prometheus
+datasource) stayed empty because nothing produced `traces_service_graph_*`. This amendment enables
+the Tempo **metrics-generator with only the `service-graphs` processor**, which survives 3.0 and runs
+in-process under `-target=all` (the distributor pushes to it directly — no Kafka).
+
+- **Config shape** (config-verified with `tempo -config.verify`; the generator + service-graph
+  metric names were also verified against a live 3.0.2 scrape): top-level `metrics_generator`
+  (`registry`, `storage.path` + `remote_write`, `processor.service_graphs.histogram_buckets`) plus
+  **scoped overrides only** — `overrides.defaults.metrics_generator.processors: ["service-graphs"]`
+  (hyphenated in the override list, unlike the `service_graphs` config block; the legacy flat form
+  makes 3.0 refuse to start under `yaml.UnmarshalStrict`).
+- **Remote-write auth (owner decision).** Prometheus's web listener is basic-auth-protected, so the
+  generator's `remote_write` reuses the **existing `grafana` web-auth user** rather than provisioning
+  a dedicated one (no host secret change). Tempo runs with `-config.expand-env=true` and
+  `${PROMETHEUS_WEB_PASSWORD}` is injected from the service env (the same value Grafana already uses).
+  Prometheus gains `--web.enable-remote-write-receiver`.
+- **Cardinality** is bounded by a trimmed 8-bucket histogram + `max_active_series: 15000`; the graph
+  is tiny (~4 services), so `filter_policies` are omitted for now. `TempoGeneratorSeriesLimited`
+  alerts if the cap is ever hit; `TempoGeneratorRemoteWriteFailing` alerts if the shared credential
+  drifts.
+- **Span-metrics remote_write stays a non-goal**: the server-side `http_server_requests` histograms
+  back the latency alerts, and the RED dashboard (`14-tracing.json`) uses TraceQL metrics on the
+  Tempo datasource directly (zero new Prometheus series).
+- **Memory:** the 512M cap is unchanged; the generator's embedded agent adds pressure, and a raise (if
+  needed) stays tracked under #937, not a revert. `tempo.yaml` needs a container **restart** (not a
+  SIGHUP) to pick up the generator.
+
