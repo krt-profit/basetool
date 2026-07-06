@@ -50,6 +50,8 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.model.Organisationsleitung;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
+import de.greluc.krt.profit.basetool.backend.model.dto.BankBalancePointDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.BankBalanceSeriesDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitBankBalanceDto;
@@ -421,10 +423,10 @@ class OrgUnitBankAccessServiceTest {
             BigDecimal.ZERO,
             "carol",
             "Staffel Rot");
-    when(bankAccountService.getBookings(eq(accountId), any()))
+    when(bankAccountService.getBookings(eq(accountId), any(), any(), any()))
         .thenReturn(new PageImpl<>(List.of(raw)));
 
-    var page = service.getViewableAccountBookings(accountId, PageRequest.of(0, 20));
+    var page = service.getViewableAccountBookings(accountId, PageRequest.of(0, 20), null, null);
 
     BankBookingDto redacted = page.getContent().getFirst();
     assertThat(redacted.holderHandle()).isNull();
@@ -451,7 +453,40 @@ class OrgUnitBankAccessServiceTest {
 
     assertThrows(
         AccessDeniedException.class,
-        () -> service.getViewableAccountBookings(accountId, PageRequest.of(0, 20)));
+        () -> service.getViewableAccountBookings(accountId, PageRequest.of(0, 20), null, null));
+    verifyNoInteractions(bankStatementReportService);
+  }
+
+  @Test
+  void getViewableBalanceSeries_delegatesForViewableAccount() {
+    // REQ-BANK-049: pure balance math for a viewable account — view-authorized, no redaction.
+    UUID staffelId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(ownerScopeService.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(staffelId)));
+    Instant from = Instant.parse("2026-06-01T00:00:00Z");
+    Instant to = Instant.parse("2026-07-01T00:00:00Z");
+    BankBalanceSeriesDto expected =
+        new BankBalanceSeriesDto(
+            List.of(new BankBalancePointDto(from, new BigDecimal("100"))), new BigDecimal("500"));
+    when(bankAccountService.getBalanceSeries(accountId, from, to)).thenReturn(expected);
+
+    assertThat(service.getViewableBalanceSeries(accountId, from, to)).isSameAs(expected);
+  }
+
+  @Test
+  void getViewableBalanceSeries_deniedWhenCallerMayNotView() {
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(UUID.randomUUID(), "Own", "OWN"));
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(ownerScopeService.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
+
+    assertThrows(
+        AccessDeniedException.class,
+        () -> service.getViewableBalanceSeries(accountId, Instant.now(), Instant.now()));
     verifyNoInteractions(bankStatementReportService);
   }
 

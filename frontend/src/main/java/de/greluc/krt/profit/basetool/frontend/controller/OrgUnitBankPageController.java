@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountRefDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankBalanceSeriesDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBookingDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitBankAccountDetailDto;
@@ -31,6 +32,7 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +49,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Renders the org-unit bank view (epic #666 + REQ-BANK-034..038): the balance cards of every
@@ -266,16 +269,23 @@ public class OrgUnitBankPageController {
   }
 
   /**
-   * Renders the read-only account drill-in (REQ-BANK-038) — history (Halter redacted) + the
-   * Kontoauszug export — plus, for the responsible holder / OL, the settings region (balance target
-   * + configurable visibility). The {@code orgUnitBankBookings} fragment re-renders the paginated
-   * history in place; the {@code orgUnitBankSettings} fragment re-renders the facts + settings
-   * region after a target/visibility write.
+   * Renders the read-only account drill-in (REQ-BANK-038) — the balance chart (REQ-BANK-049) +
+   * history (Halter redacted) with its period filter (REQ-BANK-051) + the Kontoauszug export —
+   * plus, for the responsible holder / OL, the settings region (balance target + configurable
+   * visibility). The {@code orgUnitBankBookings} fragment re-renders the paginated/filtered history
+   * in place, the {@code orgUnitBalanceChart} fragment re-renders the chart on a range change, and
+   * the {@code orgUnitBankSettings} fragment re-renders the facts + settings region after a
+   * target/visibility write.
    *
    * @param id the account id
    * @param page zero-based booking-history page index
-   * @param fragment {@code "orgUnitBankBookings"} (pager swap) or {@code "orgUnitBankSettings"}
-   *     (settings swap), else the full page
+   * @param size booking-history page size (10 / 50 / 100, default 50; REQ-BANK-051)
+   * @param from optional booking-history period start ({@code yyyy-MM-dd}); default last 90 days
+   * @param to optional booking-history period end ({@code yyyy-MM-dd}); default today
+   * @param chartRange balance-chart range key ({@code 30d}/{@code 90d}/{@code 365d}/{@code all})
+   * @param fragment {@code "orgUnitBankBookings"} (period/pager swap), {@code
+   *     "orgUnitBalanceChart"} (range swap) or {@code "orgUnitBankSettings"} (settings swap), else
+   *     the full page
    * @param model Spring MVC model
    * @return the template, or one of its fragment views
    */
@@ -284,19 +294,34 @@ public class OrgUnitBankPageController {
   public String orgUnitBankAccount(
       @PathVariable UUID id,
       @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String from,
+      @RequestParam(required = false) String to,
+      @RequestParam(required = false) String chartRange,
       @RequestParam(required = false) String fragment,
       Model model) {
+    // Pure sub-fragment swaps skip the detail/settings fetch they do not render.
+    if ("orgUnitBankBookings".equals(fragment)) {
+      addBookingsModel(id, page, size, from, to, model);
+      return "org-unit-bank-account-detail :: orgUnitBankBookings";
+    }
+    if ("orgUnitBalanceChart".equals(fragment)) {
+      OrgUnitBankAccountDetailDto chartDetail = null;
+      try {
+        chartDetail =
+            backendApiClient.get(
+                "/api/v1/org-units/bank/accounts/" + id, OrgUnitBankAccountDetailDto.class);
+      } catch (RuntimeException e) {
+        log.warn("Error loading org-unit account {} for balance-chart fragment", id, e);
+      }
+      addChartModel(id, chartRange, chartDetail, model);
+      return "org-unit-bank-account-detail :: orgUnitBalanceChart";
+    }
+
     OrgUnitBankAccountDetailDto detail =
         backendApiClient.get(
             "/api/v1/org-units/bank/accounts/" + id, OrgUnitBankAccountDetailDto.class);
-    int effectivePage = page == null || page < 0 ? 0 : page;
-    PageResponse<BankBookingDto> bookings =
-        backendApiClient.get(
-            "/api/v1/org-units/bank/accounts/" + id + "/transactions?page=" + effectivePage,
-            BANK_BOOKING_PAGE_TYPE);
     model.addAttribute("detail", detail);
-    model.addAttribute("bookings", bookings);
-    model.addAttribute("paginationBaseUrl", "/org-unit-bank/accounts/" + id);
 
     boolean canManage =
         detail != null
@@ -320,13 +345,102 @@ public class OrgUnitBankPageController {
     model.addAttribute("settings", settings);
     model.addAttribute("users", users);
 
-    if ("orgUnitBankBookings".equals(fragment)) {
-      return "org-unit-bank-account-detail :: orgUnitBankBookings";
-    }
     if ("orgUnitBankSettings".equals(fragment)) {
       return "org-unit-bank-account-detail :: orgUnitBankSettings";
     }
+    // Full page: also render the chart and the paged/filtered history.
+    addBookingsModel(id, page, size, from, to, model);
+    addChartModel(id, chartRange, detail, model);
     return "org-unit-bank-account-detail";
+  }
+
+  /**
+   * Resolves the booking-history period (default last 90 days) and fills the bookings + period +
+   * pagination model attributes shared by the full page and the {@code orgUnitBankBookings}
+   * fragment (REQ-BANK-051). A backend failure degrades to an empty page so the table shows its
+   * empty state.
+   *
+   * @param id the account id
+   * @param page zero-based page (clamped to 0)
+   * @param size requested page size, or {@code null} for the default
+   * @param from optional period start ({@code yyyy-MM-dd})
+   * @param to optional period end ({@code yyyy-MM-dd})
+   * @param model the model to populate
+   */
+  private void addBookingsModel(
+      UUID id, Integer page, Integer size, String from, String to, Model model) {
+    int effectivePage = page == null || page < 0 ? 0 : page;
+    int effectiveSize = size == null ? BankAccountDetailSupport.DEFAULT_PAGE_SIZE : size;
+    BankAccountDetailSupport.HistoryPeriod period =
+        BankAccountDetailSupport.resolveHistoryPeriod(from, to);
+    PageResponse<BankBookingDto> bookings = null;
+    try {
+      bookings =
+          backendApiClient.get(
+              UriComponentsBuilder.fromPath(
+                      "/api/v1/org-units/bank/accounts/" + id + "/transactions")
+                  .queryParam("page", effectivePage)
+                  .queryParam("size", effectiveSize)
+                  .queryParam("from", period.fromInstant())
+                  .queryParam("to", period.toInstant())
+                  .toUriString(),
+              BANK_BOOKING_PAGE_TYPE);
+    } catch (RuntimeException e) {
+      log.warn("Error loading org-unit bookings for account {}", id, e);
+    }
+    model.addAttribute("bookings", bookings);
+    model.addAttribute("historyFrom", period.fromDate());
+    model.addAttribute("historyTo", period.toDate());
+    model.addAttribute("pageSizes", BankAccountDetailSupport.PAGE_SIZES);
+    model.addAttribute("historyBaseUrl", "/org-unit-bank/accounts/" + id);
+    model.addAttribute(
+        "paginationBaseUrl",
+        UriComponentsBuilder.fromPath("/org-unit-bank/accounts/" + id)
+            .queryParam("from", period.fromDate())
+            .queryParam("to", period.toDate())
+            .toUriString());
+  }
+
+  /**
+   * Resolves the balance-chart range (default 90 days), fetches its balance series and fills the
+   * chart model attributes shared by the full page and the {@code orgUnitBalanceChart} fragment
+   * (REQ-BANK-049). A backend failure degrades to an empty chart.
+   *
+   * @param id the account id
+   * @param chartRange the requested range key
+   * @param detail the account detail (for the {@code "all"} range's start), or {@code null}
+   * @param model the model to populate
+   */
+  private void addChartModel(
+      UUID id, String chartRange, OrgUnitBankAccountDetailDto detail, Model model) {
+    String range = BankAccountDetailSupport.normalizeChartRange(chartRange);
+    Instant now = Instant.now();
+    Instant createdAt =
+        detail != null && detail.detail() != null && detail.detail().account() != null
+            ? detail.detail().account().createdAt()
+            : null;
+    Instant chartFrom = BankAccountDetailSupport.chartFromInstant(range, createdAt, now);
+    BankBalanceSeriesDto series = null;
+    try {
+      series =
+          backendApiClient.get(
+              UriComponentsBuilder.fromPath(
+                      "/api/v1/org-units/bank/accounts/" + id + "/balance-series")
+                  .queryParam("from", chartFrom)
+                  .queryParam("to", now)
+                  .toUriString(),
+              BankBalanceSeriesDto.class);
+    } catch (RuntimeException e) {
+      log.warn("Error loading org-unit balance series for account {}", id, e);
+    }
+    model.addAttribute(
+        "chart",
+        BankBalanceChart.of(
+            series == null ? null : series.points(),
+            series == null ? null : series.balanceTarget()));
+    model.addAttribute("chartRange", range);
+    model.addAttribute("chartRanges", BankAccountDetailSupport.CHART_RANGES);
+    model.addAttribute("chartBaseUrl", "/org-unit-bank/accounts/" + id);
   }
 
   /**

@@ -31,9 +31,9 @@
     </div>
 </main>
 
-<main th:if="${detail != null}"
+<main class="bank-detail" th:if="${detail != null}"
       th:with="d=${detail.detail()}, acct=${detail.detail().account()}, hasSettingsTab=${settings != null}"
-      th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed}">
+      th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-user-id=${#authentication.name}">
 
     <!-- Read-only account drill-in for org-unit viewers (REQ-BANK-038): history + Halter-redacted
          Kontoauszug; no deposit/withdraw/transfer. The responsible holder / OL additionally manages
@@ -310,19 +310,70 @@
     </th:block>
     </div>
 
-    <!-- BUCHUNGSHISTORIE tab panel (Halter redacted, REQ-BANK-038). The separate orgUnitBankBookings
-         swap below paginates in place via krtFetch. When a settings tab exists this is the
-         default-active tab panel (data-tabpanel=history, sits below the shared info tiles); otherwise
-         it renders plainly with its own heading. -->
-    <div class="bank-panel mt-2" data-testid="org-unit-bank-bookings-panel"
+    <!-- Buchungshistorie tab (REQ-BANK-038/-049/-051): the balance chart above the Halter-redacted
+         booking history with its period filter. When a settings tab exists this whole block is the
+         default-active tab panel; otherwise it renders plainly. Both inner panels are collapsible
+         (default expanded, per-user state persisted by bank.js). -->
+    <div class="mt-2 bank-detail-panels"
          th:attr="id=${hasSettingsTab} ? 'oud-panel-history' : null,
                   data-tabpanel=${hasSettingsTab} ? 'history' : null,
                   role=${hasSettingsTab} ? 'tabpanel' : null,
                   aria-labelledby=${hasSettingsTab} ? 'oud-tab-history' : null">
-        <div class="bank-panel-head" th:unless="${hasSettingsTab}">
-            <h2 th:text="#{bank.detail.history}">Buchungshistorie</h2>
+
+    <!-- Balance-over-time chart (REQ-BANK-049): collapsible; the range selector re-renders only
+         #org-unit-bank-chart-results via fragment=orgUnitBalanceChart. Shown to every viewer of the
+         account (pure balance math, no Halter data, no manage gate). -->
+    <div class="bank-panel" data-testid="org-unit-bank-chart-panel">
+        <button type="button" class="bank-panel-head bank-collapse-head"
+                data-trigger="bank-panel-collapse" data-collapse-key="chart" aria-expanded="true"
+                aria-controls="oud-chart-body" th:aria-label="#{bank.chart.toggle}"
+                data-testid="org-unit-bank-chart-toggle">
+            <span class="bank-collapse-title">
+                <svg class="krt-icon bank-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+                <span th:text="#{bank.chart.title}">Saldoverlauf</span>
+            </span>
+        </button>
+        <div class="bank-panel-body" id="oud-chart-body">
+            <div id="org-unit-bank-chart-results">
+            <th:block th:fragment="orgUnitBalanceChart">
+                <th:block th:replace="~{fragments/bank-balance-chart :: chartBody}"></th:block>
+            </th:block>
+            </div>
         </div>
-        <div class="bank-panel-body">
+    </div>
+
+    <!-- Booking history (Halter redacted, REQ-BANK-038): below the chart when stacked, to its right
+         when side by side (REQ-BANK-052). The separate orgUnitBankBookings swap paginates/filters in
+         place via krtFetch. -->
+    <div class="bank-panel" data-testid="org-unit-bank-bookings-panel">
+        <button type="button" class="bank-panel-head bank-collapse-head"
+                data-trigger="bank-panel-collapse" data-collapse-key="history" aria-expanded="true"
+                aria-controls="oud-history-body" th:aria-label="#{bank.history.toggle}"
+                data-testid="org-unit-bank-history-toggle">
+            <span class="bank-collapse-title">
+                <svg class="krt-icon bank-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+                <span th:text="#{bank.detail.history}">Buchungshistorie</span>
+            </span>
+        </button>
+        <div class="bank-panel-body" id="oud-history-body">
+            <!-- Period filter (REQ-BANK-051): outside the swap container so it persists across pager
+                 swaps; changing a date re-renders #org-unit-bank-bookings-results. -->
+            <form class="bank-history-filter" method="get" th:action="@{${historyBaseUrl}}"
+                  data-bank-history-filter>
+                <div class="bank-history-filter-field">
+                    <label for="oud-history-from" th:text="#{bank.filter.period.from}">Von</label>
+                    <input type="date" id="oud-history-from" name="from" th:value="${historyFrom}"
+                           data-testid="org-unit-bank-history-from">
+                </div>
+                <div class="bank-history-filter-field">
+                    <label for="oud-history-to" th:text="#{bank.filter.period.to}">Bis</label>
+                    <input type="date" id="oud-history-to" name="to" th:value="${historyTo}"
+                           data-testid="org-unit-bank-history-to">
+                </div>
+                <input type="hidden" name="size" th:value="${bookings != null ? bookings.size() : 50}">
+                <button type="submit" class="btn btn-outline btn-sm"
+                        data-testid="org-unit-bank-history-apply" th:text="#{bank.filter.period.apply}">Anwenden</button>
+            </form>
             <div id="org-unit-bank-bookings-results">
             <th:block th:fragment="orgUnitBankBookings">
             <div class="table-responsive" th:if="${bookings != null and !#lists.isEmpty(bookings.content())}">
@@ -402,10 +453,14 @@
             </div>
             <p class="text-center text-muted" th:if="${bookings == null or #lists.isEmpty(bookings.content())}"
                data-testid="org-unit-bank-bookings-empty" th:text="#{bank.detail.history.empty}">Noch keine Buchungen.</p>
-            <nav th:replace="~{fragments/pagination :: pagination(${bookings}, ${paginationBaseUrl})}"></nav>
+            <div class="pagination-controls" th:if="${bookings != null and bookings.totalElements() > 0}">
+                <nav th:replace="~{fragments/pagination :: pageSizePicker(${bookings}, ${paginationBaseUrl}, ${pageSizes})}"></nav>
+                <nav th:replace="~{fragments/pagination :: pagination(${bookings}, ${paginationBaseUrl})}"></nav>
+            </div>
             </th:block>
             </div>
         </div>
+    </div>
     </div>
 
     <!-- Statement export (REQ-BANK-038): period picker -> Halter-redacted PDF via the org-unit proxy. -->
@@ -458,20 +513,67 @@
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:src="@{/js/bank.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:attr="nonce=${cspNonce}">
-    // Booking-history pager -> in-place swap (REQ-FE-002): the page-btn links point at
-    // /org-unit-bank/accounts/{id}?page=N; krtFetch re-renders only #org-unit-bank-bookings-results
-    // via fragment=orgUnitBankBookings, re-localising .utc-time cells on krt:swapped.
-    function bindOrgUnitBankBookingsPager() {
+    // Booking-history pager/period filter + balance-chart range -> in-place swaps
+    // (REQ-FE-002/BANK-049/051). The bookings page-btn/size links (history:true) and the chart range
+    // links (history:false) are delegated-intercepted; re-bound on krt:swapped so they survive a
+    // settings-region re-render. .utc-time cells re-localise on krt:swapped.
+    function bindOrgUnitBankDetailSwaps() {
         if (window.krtFetch) {
             window.krtFetch.bindSwap({
                 container: '#org-unit-bank-bookings-results',
                 fragmentValue: 'orgUnitBankBookings',
                 history: true
             });
+            window.krtFetch.bindSwap({
+                container: '#org-unit-bank-chart-results',
+                fragmentValue: 'orgUnitBalanceChart',
+                history: false
+            });
         }
     }
-    bindOrgUnitBankBookingsPager();
-    document.addEventListener('krt:swapped', bindOrgUnitBankBookingsPager);
+    bindOrgUnitBankDetailSwaps();
+    document.addEventListener('krt:swapped', bindOrgUnitBankDetailSwaps);
+
+    // Booking-history period filter (REQ-BANK-051): the from/to date inputs re-render only the
+    // history fragment via krtFetch.swap. Document-delegated so it survives swaps; the current page
+    // size is read from the address bar (kept in sync by the history:true pager). No-JS falls back to
+    // the form's native GET.
+    function oudHistorySwapUrl(form) {
+        var base = form.getAttribute('action');
+        var params = new URLSearchParams();
+        var fromEl = form.querySelector('input[name="from"]');
+        var toEl = form.querySelector('input[name="to"]');
+        if (fromEl && fromEl.value) { params.set('from', fromEl.value); }
+        if (toEl && toEl.value) { params.set('to', toEl.value); }
+        var size = new URLSearchParams(window.location.search).get('size');
+        if (!size) { var hidden = form.querySelector('input[name="size"]'); size = hidden ? hidden.value : ''; }
+        if (size) { params.set('size', size); }
+        params.set('page', '0');
+        return base + '?' + params.toString();
+    }
+    function oudHistoryFilter(form) {
+        if (!window.krtFetch) { return; }
+        window.krtFetch.swap({
+            url: oudHistorySwapUrl(form),
+            container: '#org-unit-bank-bookings-results',
+            fragmentValue: 'orgUnitBankBookings',
+            history: true
+        });
+    }
+    document.addEventListener('submit', function (event) {
+        var form = event.target.closest ? event.target.closest('form[data-bank-history-filter]') : null;
+        if (!form || !window.krtFetch) { return; }
+        event.preventDefault();
+        oudHistoryFilter(form);
+    });
+    document.addEventListener('change', function (event) {
+        var input = event.target.closest
+            ? event.target.closest('form[data-bank-history-filter] input[type="date"]')
+            : null;
+        if (!input) { return; }
+        var form = input.closest('form[data-bank-history-filter]');
+        if (form) { oudHistoryFilter(form); }
+    });
 
     // Detail tab controller (REQ-BANK-038): Buchungshistorie | Verantwortung & Sichtbarkeit. The
     // shared info tiles stay above; only the two panels switch. The active tab is held in a closure so

@@ -89,6 +89,27 @@ public interface BankPostingRepository extends JpaRepository<BankPosting, UUID> 
       @Param("accountIds") Collection<UUID> accountIds, @Param("cutoff") Instant cutoff);
 
   /**
+   * One account's posting slices inside a closed period, reduced to the (createdAt, amount) columns
+   * the balance-over-time chart needs (REQ-BANK-049). The service adds the opening balance from
+   * {@link #accountBalanceBefore(UUID, Instant)} and derives the end-of-day series in memory
+   * ({@code BankBalanceSeriesCalculator}), mirroring the 30-day sparkline math. Both bounds are
+   * inclusive.
+   *
+   * @param accountId the account
+   * @param from inclusive period start
+   * @param to inclusive period end
+   * @return the account's posting slices inside {@code [from, to]}
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BankPostingSlice(p.account.id, p.createdAt, p.amount)
+      FROM BankPosting p
+      WHERE p.account.id = :accountId AND p.createdAt >= :from AND p.createdAt <= :to
+      """)
+  List<BankPostingSlice> postingSlicesInRange(
+      @Param("accountId") UUID accountId, @Param("from") Instant from, @Param("to") Instant to);
+
+  /**
    * One page of an account's booking history — the account posting joined with its header in a
    * single statement (REQ-BANK-018); newest first by default (whitelisted sort on {@code
    * createdAt}). Since ADR-0039 a {@code TRANSFER} always spans two different accounts, so an
@@ -96,18 +117,31 @@ public interface BankPostingRepository extends JpaRepository<BankPosting, UUID> 
    * holder annotation is resolved separately from the holder ledger (see {@code
    * BankAccountService}).
    *
+   * <p>Both period bounds are optional (REQ-BANK-051): a {@code null} {@code from} or {@code to}
+   * drops that side of the filter, so passing {@code (null, null)} pages the whole history exactly
+   * as before the period filter existed. The bounds are inclusive.
+   *
    * @param accountId the account
+   * @param from inclusive lower bound on the booking instant, or {@code null} for no lower bound
+   * @param to inclusive upper bound on the booking instant, or {@code null} for no upper bound
    * @param pageable page, size and whitelisted sort
-   * @return one page of booking rows
+   * @return one page of booking rows inside the (optionally bounded) period
    */
   @Query(
       """
       SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BankBookingRow(p.id, t.id, t.type, p.amount, t.note, t.justification, p.createdAt, rt.id,
       t.transferFee, t.counterpartyHandle, t.counterpartyOrgUnitName)
       FROM BankPosting p JOIN p.transaction t
-      LEFT JOIN t.reversedTransaction rt WHERE p.account.id = :accountId
+      LEFT JOIN t.reversedTransaction rt
+      WHERE p.account.id = :accountId
+      AND (:from IS NULL OR p.createdAt >= :from)
+      AND (:to IS NULL OR p.createdAt <= :to)
       """)
-  Page<BankBookingRow> findBookings(@Param("accountId") UUID accountId, Pageable pageable);
+  Page<BankBookingRow> findBookings(
+      @Param("accountId") UUID accountId,
+      @Param("from") Instant from,
+      @Param("to") Instant to,
+      Pageable pageable);
 
   /**
    * An account's booking rows inside a period, oldest first — the statement body (REQ-BANK-014).
