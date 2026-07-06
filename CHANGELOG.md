@@ -6,6 +6,8 @@
 
 - **Betrieb: Docker-Aufräumen läuft jetzt über einen systemd-Timer statt Cron.** Das wöchentliche `docker-cleanup.sh` (Samstag 02:00 UTC) wird nun vom systemd-Timer `iri-docker-cleanup.timer` ausgelöst – konsistent mit Backup, Deploy und Restore-Drill; damit laufen alle Wartungsjobs über systemd. Ausführung und Logs jetzt über `systemctl`/`journalctl`; die Monitoring-Textfile-Metriken und die zugehörige Warnung bleiben unverändert.
 
+- **Monitoring: Grafana Tempo auf 3.x aktualisiert (monolithisch, ohne Kafka).** Der Trace-Speicher läuft jetzt auf Tempo 3.0.2 mit der für die neue 3.x-Architektur (Live-Store, Backend-Scheduler/-Worker statt Ingester/Compactor) neu geschriebenen Konfiguration; Speicherort, 14-Tage-Aufbewahrung und Verhalten bleiben unverändert, keine sichtbaren Auswirkungen für Nutzer (ADR-0076).
+
 ### Removed
 
 - **Betrieb: täglicher VPN-Neustart (`vpn-restart`) entfernt.** Der Cron-Job, der die WireGuard-Schnittstelle `wg0` täglich um 04:00 neu startete, wird nicht mehr benötigt und wurde samt Skript sowie Cron- und logrotate-Konfiguration entfernt.
