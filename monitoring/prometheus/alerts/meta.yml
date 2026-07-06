@@ -42,3 +42,177 @@ groups:
         annotations:
           summary: "Loki is discarding log lines ({{ $labels.reason }})"
           description: "Loki dropped log lines in the last 10 minutes (reason: {{ $labels.reason }}) — likely a rate-cap or stream-limit hit."
+
+  # Monitoring-plane self-health (#1041 item 4, REQ-OBS-014). deploy.sh SIGHUP-reloads
+  # prometheus/alloy/blackbox on config change; a FAILED reload silently keeps the old config
+  # running and the Watchdog only proves the pipeline is alive, not that rules evaluate. These
+  # alerts make the plane notice its own reload/rule-eval/notification/TSDB failures. Metric
+  # names verified against the pinned images (prometheus v3.13.0, alertmanager v0.33.0,
+  # alloy v1.17.1, loki 3.7.3, blackbox v0.28.0, node-exporter v1.11.1).
+  - name: meta-self-health
+    rules:
+      - alert: PrometheusConfigReloadFailed
+        expr: prometheus_config_last_reload_successful == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus config reload failed"
+          description: "Prometheus is running the LAST-GOOD config because the most recent reload failed — new scrape jobs / alert rules from the last deploy are NOT active. Check `deploy.sh` and `promtool check config`."
+
+      - alert: PrometheusRuleEvaluationFailures
+        expr: rate(prometheus_rule_evaluation_failures_total[5m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus rule evaluations failing ({{ $labels.rule_group }})"
+          description: "Prometheus rule evaluations are failing — some alert rules are not being evaluated, so their alerts cannot fire. Check the rule group for a bad expression."
+
+      - alert: PrometheusNotificationsDropped
+        expr: rate(prometheus_notifications_dropped_total[5m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus is dropping alert notifications"
+          description: "Prometheus dropped notifications to Alertmanager — firing alerts may not be delivered. Check the Prometheus→Alertmanager connection and the notification queue."
+
+      - alert: PrometheusTsdbProblems
+        expr: >-
+          increase(prometheus_tsdb_wal_corruptions_total[1h]) > 0
+          or increase(prometheus_tsdb_compactions_failed_total[1h]) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus TSDB problems (WAL corruption / failed compaction)"
+          description: "Prometheus recorded a WAL corruption or a failed compaction in the last hour — metric history integrity is at risk. Check disk health/space on /var/iri and the Prometheus log."
+
+      - alert: AlertmanagerConfigReloadFailed
+        expr: alertmanager_config_last_reload_successful == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Alertmanager config reload failed"
+          description: "Alertmanager is running the LAST-GOOD config because the most recent reload failed — routing/receiver changes are NOT active and alerts may be misrouted. Check the rendered alertmanager.yml with `amtool check-config`."
+
+      - alert: NodeTextfileScrapeError
+        expr: node_textfile_scrape_error == 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "node_exporter textfile collector error"
+          description: "The node_exporter textfile collector failed to parse a .prom file in the ops-automation textfile dir — a deploy/backup/restore-drill metric may be stale or missing, blinding the ops-automation alerts."
+
+      - alert: AlloyConfigReloadFailed
+        expr: alloy_config_last_load_successful == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Alloy config reload failed"
+          description: "Alloy is running the LAST-GOOD config because the most recent reload failed — new log-shipping / trace-forwarding wiring from the last deploy is NOT active. Check the Alloy log and `alloy validate`."
+
+      - alert: AlloyComponentUnhealthy
+        expr: alloy_component_controller_running_components{health_type="unhealthy"} > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Alloy has unhealthy components"
+          description: "One or more Alloy components are in the unhealthy state — a log source or exporter may have stopped shipping. Open the Alloy UI/component graph to find the failing component."
+
+      - alert: LokiRuleEvaluationFailures
+        expr: rate(loki_prometheus_rule_evaluation_failures_total[5m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Loki ruler rule evaluations failing"
+          description: "The Loki ruler is failing to evaluate its LogQL rules — the log-derived alerts (SSH-compromise, Postgres-FATAL, …) may not fire. Check the Loki ruler log and the rule files."
+
+      - alert: LokiRulerNotificationsFailing
+        expr: rate(loki_prometheus_notifications_errors_total[5m]) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Loki ruler cannot notify Alertmanager"
+          description: "The Loki ruler failed to send alert notifications to Alertmanager — log-derived alerts are evaluating but not being delivered. Check the ruler→Alertmanager connection."
+
+      - alert: BlackboxConfigReloadFailed
+        expr: blackbox_exporter_config_last_reload_successful == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Blackbox exporter config reload failed"
+          description: "The blackbox exporter is running the LAST-GOOD module config because the most recent reload failed — new/changed probe modules from the last deploy are NOT active. Check the blackbox log and `blackbox.yml`."
+
+  # Log-pipeline liveness (#1041 item 5, REQ-OBS-014). All 9 Loki ruler alerts — including the
+  # critical SSH-compromise and Postgres-FATAL detectors — silently stop firing if Alloy stops
+  # tailing: rate() over an absent stream is EMPTY, not zero, and TargetDown cannot see a
+  # healthy-but-not-shipping Alloy. Metric names/labels verified against alloy v1.17.1 + loki 3.7.3.
+  - name: meta-log-pipeline
+    rules:
+      # Whole-pipeline silence: the 30s blackbox probes guarantee npm-access baseline traffic, so a
+      # 30-minute zero means the shipper or Loki ingest is dead. `or absent(...)` also catches the
+      # case where the counter never registered (Loki restarted, nothing pushing).
+      - alert: LokiIngestSilent
+        expr: >-
+          sum(rate(loki_distributor_lines_received_total[30m])) == 0
+          or absent(loki_distributor_lines_received_total)
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Loki received no log lines in 30m"
+          description: "Loki ingested zero log lines for 30 minutes while baseline edge traffic should keep the npm-access stream flowing — the Alloy shipper or Loki ingest path is likely dead. All log-derived alerts are blind until it recovers."
+
+      # Per-critical-path stream death. A tailed file keeps its loki_source_file_read_lines_total
+      # series present (flat when quiet — verified against alloy v1.17.1), so ABSENCE of the series
+      # means Alloy is not tailing the file at all — exactly the permission-drift failure config.alloy
+      # warns about ("would stay silently empty"). Read-rate==0 is deliberately NOT used: the auditd
+      # stream is legitimately quiet for days when healthy, so rate==0 would false-positive; total-flow
+      # silence is already covered by LokiIngestSilent above.
+      - alert: LogStreamSilent
+        expr: absent(loki_source_file_read_lines_total{path="/hostlog/auth.log"})
+        for: 1h
+        labels:
+          severity: warning
+          stream: host-auth
+        annotations:
+          summary: "Log stream not being tailed: host auth.log"
+          description: "Alloy is not tailing /hostlog/auth.log — the SSH failed-auth / root-login / password-on-key-only-host detectors are blind. Check the /var/log mount and file permissions (adm group readable)."
+
+      - alert: LogStreamSilent
+        expr: absent(loki_source_file_read_lines_total{path="/hostlog/audit/audit.log"})
+        for: 1h
+        labels:
+          severity: warning
+          stream: host-auditd
+        annotations:
+          summary: "Log stream not being tailed: host audit.log"
+          description: "Alloy is not tailing /hostlog/audit/audit.log — the sshd_config/authorized_keys tamper detector is blind. Confirm /var/log/audit is traversable (0750 root:adm) and log_group=adm in auditd.conf."
+
+      - alert: LogStreamSilent
+        expr: absent(loki_source_file_read_lines_total{path=~"/logs/npm/.+_access\\.log"})
+        for: 1h
+        labels:
+          severity: warning
+          stream: npm-access
+        annotations:
+          summary: "Log stream not being tailed: NPM access logs"
+          description: "Alloy is not tailing any /logs/npm/*_access.log — the edge 5xx/rate-limit/scan detectors and the npm-access baseline for LokiIngestSilent are blind. Check the NPM log mount."
+
+      - alert: LokiWriteFailing
+        expr: sum by (reason) (rate(loki_write_dropped_entries_total[15m])) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Alloy is dropping log entries on the write path ({{ $labels.reason }})"
+          description: "The Alloy loki.write client dropped log entries (reason: {{ $labels.reason }}) in the last 15 minutes — log lines are being lost before Loki. Check the Alloy→Loki connection and Loki ingest limits."

@@ -73,6 +73,24 @@ groups:
           summary: "Container restart loop: {{ $labels.name }}"
           description: "Container {{ $labels.name }} restarted more than 3 times in 15 minutes."
 
+      # cAdvisor named-series blackout (#1041 item 7, REQ-OBS-014). This shipped as a real incident
+      # (CHANGELOG v1.1.1): cAdvisor stayed "up" while emitting zero name-labelled series, silently
+      # blinding ContainerRestartLoop / ContainerWorkingSetHigh — TargetDown cannot catch it because
+      # the scrape still succeeds. The host runs ~20 containers, so a drop below 10 named series means
+      # cAdvisor lost its labels. `container_last_seen{name=~".+"}` metric verified against cadvisor
+      # v0.60.3.
+      # baseline-tune: the < 10 floor assumes the current ~20-container footprint.
+      - alert: ContainerMetricsMissing
+        expr: >-
+          count(container_last_seen{name=~".+"}) < 10
+          or absent(container_last_seen{name=~".+"})
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cAdvisor is emitting no named container series"
+          description: "cAdvisor reports fewer than 10 name-labelled containers (or none at all) while its scrape succeeds — the container-level alerts (restart loop, working-set, OOM, CPU throttle) are silently blind. Restart cAdvisor and check the docker-socket-proxy."
+
       - alert: PostgresConnectionsCritical
         expr: sum by (database) (pg_stat_activity_count) / on(database) pg_settings_max_connections > 0.80
         for: 5m
@@ -119,6 +137,49 @@ groups:
         annotations:
           summary: "Container working set >90% of limit: {{ $labels.name }}"
           description: "Container {{ $labels.name }} is within 10% of its memory limit — OOM early warning."
+
+      # A single core app container dropping out of cAdvisor (#1041 item 7, REQ-OBS-014). Complements
+      # the global ContainerMetricsMissing above: fires when fewer than the 7 core containers report a
+      # cAdvisor series (or all are gone), catching a single core container whose container-level
+      # metrics vanished while the plane keeps ~20 total series. Warning (not critical) because a truly
+      # down app container also pages TargetDown on its app scrape.
+      - alert: CoreContainerMetricsMissing
+        expr: >-
+          count(container_last_seen{name=~"backend|frontend|ingest|keycloak|db-backend|db-keycloak|redis"}) < 7
+          or absent(container_last_seen{name=~"backend|frontend|ingest|keycloak|db-backend|db-keycloak|redis"})
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "A core app container stopped reporting cAdvisor metrics"
+          description: "Fewer than the 7 core app containers (backend/frontend/ingest/keycloak/db-backend/db-keycloak/redis) report a cAdvisor series — one is down or cAdvisor lost its series. Cross-check TargetDown and the container's health."
+
+      # Single OOM kill (#1041 item 7, REQ-OBS-014). ContainerRestartLoop needs >3 restarts/15m; a
+      # one-off OOM kill slips under that threshold. `container_oom_events_total` verified present in
+      # cadvisor v0.60.3.
+      - alert: ContainerOomKilled
+        expr: increase(container_oom_events_total{name=~".+"}[15m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container OOM-killed: {{ $labels.name }}"
+          description: "Container {{ $labels.name }} recorded an out-of-memory kill in the last 15 minutes. Check its memory limit and working set; on the memory-capped host this is the designed sacrifice order — confirm it was the intended victim."
+
+      # Sustained CPU throttling (#1041 item 7, REQ-OBS-014). container_cpu_cfs_* is emitted only for
+      # containers with a CFS quota; the app containers all set cpus limits (backend 2.0, keycloak 2.0,
+      # …), so this ratio has data for them. Verified against cadvisor v0.60.3.
+      # baseline-tune: the 25% throttled-period ratio is the issue's initial threshold.
+      - alert: ContainerCpuThrottledHigh
+        expr: >-
+          rate(container_cpu_cfs_throttled_periods_total{name=~".+"}[15m])
+          / rate(container_cpu_cfs_periods_total{name=~".+"}[15m]) > 0.25
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container CPU throttled >25%: {{ $labels.name }}"
+          description: "Container {{ $labels.name }} had more than 25% of its CFS periods throttled for 15 minutes — it is CPU-starved against its limit, degrading latency. Consider raising its cpus limit."
 
       - alert: RedisEvictions
         expr: increase(redis_evicted_keys_total[15m]) > 0

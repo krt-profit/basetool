@@ -136,6 +136,15 @@ scrape_configs:
     static_configs:
       - targets: ["alloy:12345"]
 
+  # Blackbox exporter's OWN metrics (not /probe): exposes blackbox_exporter_config_last_reload_successful
+  # so BlackboxConfigReloadFailed (meta.yml) can catch a failed SIGHUP reload that silently keeps the old
+  # module config running. The /probe results are produced by the blackbox-* jobs below; this job scrapes
+  # the exporter's self-instrumentation on the same port.
+  - job_name: blackbox-exporter
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["blackbox-exporter:9115"]
+
   # --- Blackbox external probes: TLS + status of the public endpoints --------------------
   # Produces probe_success + probe_ssl_earliest_cert_expiry per target.
   - job_name: blackbox-http

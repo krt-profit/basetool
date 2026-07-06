@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-03.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-06.
 > **Owner area:** OBS · **Related:** [`security-and-access.md`](security-and-access.md), [`org-unit-tenancy.md`](org-unit-tenancy.md), [ADR-0072](../adr/0072-monitoring-stack-prometheus-grafana.md), monitoring epic [#936](https://github.com/krt-profit/basetool/issues/936)
 
 # Observability & logging
@@ -376,3 +376,48 @@ dead-man's switch, not by the app's own error log.
 **Enforced by:** `{backend,frontend,ingest}/src/main/resources/application.yml`
 (`logging.level."io.opentelemetry.exporter": WARN`) · `monitoring/prometheus/alerts/apps.yml`
 (`LogbackErrorSpike`)
+
+### REQ-OBS-014 — Monitoring-plane self-observation & pipeline liveness
+
+The monitoring plane must detect its **own** silent failures — a signal that stops flowing
+without any alert noticing (frozen gauges, failed config reloads, dead log streams, absent
+series). `deploy.sh` SIGHUP-reloads Prometheus/Alloy/blackbox on every config change and the
+Watchdog only proves the pipeline is alive, not that it is correct; the plane therefore alerts on:
+
+- **Config-reload failures.** A failed SIGHUP silently keeps the last-good config running.
+  Prometheus, Alertmanager, Alloy and the blackbox exporter each expose a
+  `*_config_last_reload_successful` / `alloy_config_last_load_successful` gauge;
+  `PrometheusConfigReloadFailed`, `AlertmanagerConfigReloadFailed`, `AlloyConfigReloadFailed` and
+  `BlackboxConfigReloadFailed` (critical) fire when the running config diverges from the deployed
+  one. The blackbox exporter's own metrics are scraped by a dedicated `blackbox-exporter` job (its
+  `/metrics`, distinct from the `/probe` posture/liveness jobs).
+- **Rule-evaluation & notification failures.** The two independent alert evaluators (Prometheus and
+  the Loki ruler) must keep evaluating and delivering. `PrometheusRuleEvaluationFailures`,
+  `PrometheusNotificationsDropped`, `LokiRuleEvaluationFailures`, `LokiRulerNotificationsFailing`
+  (warning) catch a broken rule or a severed Alertmanager link; `PrometheusTsdbProblems` (critical)
+  catches WAL corruption / failed compaction; `NodeTextfileScrapeError` and `AlloyComponentUnhealthy`
+  (warning) catch a broken ops-automation textfile metric and an unhealthy log/trace component.
+- **Log-pipeline liveness.** The log-derived alerts (SSH-compromise, Postgres-FATAL, …) silently
+  stop firing if Alloy stops tailing, because `rate()` over an absent stream is empty, not zero, and
+  `TargetDown` cannot see a healthy-but-not-shipping Alloy. `LokiIngestSilent` (whole-pipeline
+  silence), per-critical-path `LogStreamSilent` (auth.log / audit.log / npm-access, via `absent()` of
+  the file's `loki_source_file_read_lines_total` series — a tailed file keeps its series present even
+  when quiet, so absence means the file is not being tailed at all, the permission-drift failure
+  `config.alloy` warns about) and `LokiWriteFailing` (shipper-side entry drops) — all warning — cover
+  it.
+- **Container-metric blackout.** cAdvisor can stay "up" while emitting zero name-labelled series (a
+  real incident, CHANGELOG v1.1.1), silently blinding the container alerts. `ContainerMetricsMissing`
+  (critical) and `CoreContainerMetricsMissing` (warning) guard the named-series count;
+  `ContainerOomKilled` and `ContainerCpuThrottledHigh` (warning) surface a single OOM kill and
+  sustained CFS throttling that the coarse `ContainerRestartLoop` / `ContainerWorkingSetHigh` alerts
+  miss.
+
+All labels stay bounded (REQ-OBS-006): these alerts read only the exporters' own low-cardinality
+series (`job` / `instance` / `reason` / `name` / `path` / `health_type`), never per-user or
+free-text values.
+
+**Enforced by:** `monitoring/prometheus/alerts/meta.yml` (`meta-self-health` + `meta-log-pipeline`
+groups) · `monitoring/prometheus/alerts/infrastructure.yml` (container guards) ·
+`monitoring/prometheus/prometheus.yml` (the `blackbox-exporter` self-metrics scrape job) ·
+`monitoring/grafana/dashboards/13-meta-monitoring.json` (log-pipeline panels) ·
+`monitoring/README.md` (alert-response runbook).
