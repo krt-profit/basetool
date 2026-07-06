@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **Technisch: Inline-JavaScript der Beförderungs-Adminseiten in statische Module ausgelagert.** Das JavaScript der Beförderungs-Admin-Seiten (Themen/Kategorien und Rang-Anforderungen) wurde ohne Verhaltensänderung aus den Thymeleaf-Vorlagen in browser-zwischenspeicherbare, lint- und formatierbare Dateien unter `static/js/` verlagert (ADR-0069).
+
 - **Technisch: Inline-JavaScript des Organigramm-Editors in ein statisches Modul ausgelagert.** Das JavaScript der Organigramm-Seite (Positionen anlegen/umbesetzen/umbenennen/entfernen, Dialog-Fokusfalle und ARIA-Baum-Tastaturnavigation) wurde ohne Verhaltensänderung aus der Thymeleaf-Vorlage in eine browser-zwischenspeicherbare, lint- und formatierbare Datei unter `static/js/` verlagert (ADR-0069).
 
 - **Technisch: Inline-JavaScript weiterer Material- und Lager-Seiten in statische Module ausgelagert.** Das JavaScript der Materialübersicht, der Material-Detailseite, der Material-Sammlung und der Lager-Einbuchung wurde ohne Verhaltensänderung aus den Thymeleaf-Vorlagen in browser-zwischenspeicherbare, lint- und formatierbare Dateien unter `static/js/` verlagert (ADR-0069).
