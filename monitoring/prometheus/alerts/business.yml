@@ -328,6 +328,45 @@ groups:
           summary: "Elevated CSRF-token rejection rate"
           description: "The frontend has been rejecting CSRF tokens at more than 0.1/s for 15 minutes — likely a systematic CSRF-wiring regression rather than occasional stale tokens (which krtFetch self-heals). Check recent security/template changes and the /csrf endpoint."
 
+      # (#1041 item 19) Discord SPI precheck abuse. The endpoint sits outside /api/**, the rate
+      # limiter AND the http_error funnel, so secret-guessing was previously log-only. A sustained
+      # unauthorized rate is a brute-force attempt against the shared secret.
+      # baseline-tune: the SPI is called only during first-broker-login, so any steady 401 stream is
+      # already suspect; 0.1/s is a conservative starting threshold.
+      - alert: DiscordPrecheckUnauthorizedSpike
+        expr: sum(rate(basetool_discord_precheck_total{outcome="unauthorized"}[5m])) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Discord precheck unauthorized-rate elevated"
+          description: "The Discord account-existence precheck has been returning 401 at more than 0.1/s for 10 minutes — likely someone guessing the X-KRT-SPI-Secret. Verify the SPI's configured secret matches the backend and check for abuse."
+
+      # On prod the shared secret IS configured, so a `disabled` (503, blank-secret) outcome means
+      # the secret regressed to blank after a rotation — the SPI then fails open and every Discord
+      # login skips the duplicate-account precheck.
+      - alert: DiscordPrecheckDisabledOnProd
+        expr: sum(increase(basetool_discord_precheck_total{outcome="disabled"}[1h])) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Discord precheck disabled (blank secret) on prod"
+          description: "The Discord account-existence precheck answered 503 (no shared secret configured) on a deployment where it should be enabled — a config-drift regression after a secret rotation. The SPI is now failing open; restore the X-KRT-SPI-Secret."
+
+      # (#1041 item 19) Rate-limit rejection ratio. The rejections counter alone only fires AFTER
+      # 429s begin; requests_total gives the denominator so a rising ratio surfaces the pressure
+      # earlier. Per (application, bucket) so a single abusive bucket is not diluted by healthy ones.
+      # baseline-tune: 1% sustained is the issue's initial threshold.
+      - alert: RateLimitRejectionRatioHigh
+        expr: (sum by (application, bucket) (rate(basetool_ratelimit_rejections_total[10m])) / sum by (application, bucket) (rate(basetool_ratelimit_requests_total[10m]))) > 0.01
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Rate-limit rejection ratio >1% ({{ $labels.application }}/{{ $labels.bucket }})"
+          description: "More than 1% of rate-limit evaluations on {{ $labels.application }} bucket {{ $labels.bucket }} have been rejected for 15 minutes — sustained pressure or abuse against that budget. Check the source and whether the limit needs tuning."
+
       # Audit silence: backend up but zero audited mutations recorded across a 5-DAY window — a
       # REQ-AUDIT-001 signal that audit logging may be broken. 5d (not hours) so ordinary quiet periods
       # (weekends, maintenance windows) never trip it; only a genuine multi-day silence does. Resolves

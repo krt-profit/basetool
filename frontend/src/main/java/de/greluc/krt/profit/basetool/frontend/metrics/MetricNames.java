@@ -83,6 +83,15 @@ public final class MetricNames {
    */
   public static final String CSRF_REJECTIONS = "basetool.csrf.rejections";
 
+  /**
+   * Counter {@code basetool_bot_blocked_total} — tag {@code rule} ({@link #BOT_RULE_METHOD} /
+   * {@link #BOT_RULE_PATH_PREFIX} / {@link #BOT_RULE_FILE_EXTENSION}). {@code
+   * BotProtectionFilter}'s three reject branches are otherwise {@code log.debug}-only
+   * (prod-invisible); the counter also surfaces a self-inflicted false positive when a new legit
+   * route matches a blocked prefix (#1041 item 19).
+   */
+  public static final String BOT_BLOCKED = "basetool.bot.blocked";
+
   /** Tag key: the bounded backend-call failure reason (also the presence-drop / login reason). */
   public static final String TAG_REASON = "reason";
 
@@ -94,6 +103,18 @@ public final class MetricNames {
 
   /** Tag key: the login outcome on {@link #LOGIN}. */
   public static final String TAG_OUTCOME = "outcome";
+
+  /** Tag key: the bot-protection reject rule on {@link #BOT_BLOCKED}. */
+  public static final String TAG_RULE = "rule";
+
+  /** Bot-block rule: a disallowed HTTP method (answered 405). */
+  public static final String BOT_RULE_METHOD = "method";
+
+  /** Bot-block rule: a known bot/scanner path prefix (answered 404). */
+  public static final String BOT_RULE_PATH_PREFIX = "path_prefix";
+
+  /** Bot-block rule: a never-served file extension (answered 404). */
+  public static final String BOT_RULE_FILE_EXTENSION = "file_extension";
 
   /** Login outcome: authentication succeeded. */
   public static final String OUTCOME_SUCCESS = "success";

@@ -522,6 +522,17 @@ class RateLimitingFilterTest {
               .tag(MetricNames.TAG_BUCKET, MetricNames.BUCKET_GLOBAL)
               .counter()
               .count());
+      // (#1041 item 19) Every bucket evaluation — the successful consumptions AND the rejection —
+      // is counted under the same bounded bucket label, so requests > rejections here. This is the
+      // denominator for the rejection ratio.
+      assertTrue(
+          meterRegistry
+                  .get(MetricNames.RATELIMIT_REQUESTS)
+                  .tag(MetricNames.TAG_BUCKET, MetricNames.BUCKET_GLOBAL)
+                  .counter()
+                  .count()
+              > 1.0d,
+          "requests counter must include the successful evaluations, not just the rejection");
     }
 
     private MockHttpServletRequest copyRequest(MockHttpServletRequest src) {

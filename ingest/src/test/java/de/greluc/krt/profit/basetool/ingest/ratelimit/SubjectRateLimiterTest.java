@@ -64,6 +64,15 @@ class SubjectRateLimiterTest {
                 .counter()
                 .count())
         .isEqualTo(1.0d);
+    // (#1041 item 19) Both evaluations — the consumed one and the rejected one — are counted, so
+    // requests (2) > rejections (1); this is the rejection-ratio denominator.
+    assertThat(
+            meterRegistry
+                .get(MetricNames.RATELIMIT_REQUESTS)
+                .tag(MetricNames.TAG_BUCKET, MetricNames.BUCKET_SUBJECT)
+                .counter()
+                .count())
+        .isEqualTo(2.0d);
   }
 
   @Test
@@ -86,5 +95,7 @@ class SubjectRateLimiterTest {
               limiter.requireWithinLimit("sub-a");
             })
         .doesNotThrowAnyException();
+    // A disabled limiter returns before evaluating a bucket, so nothing is counted (#1041 item 19).
+    assertThat(meterRegistry.find(MetricNames.RATELIMIT_REQUESTS).counter()).isNull();
   }
 }

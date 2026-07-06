@@ -300,6 +300,11 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     for (BucketSlot slot : slots) {
       Bucket bucket = bucketCache.get(clientIp + "|" + slot.key(), k -> createNewBucket(slot));
       ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
+      // Per-bucket evaluation counter (#1041 item 19) — every attempt, consumed or not, so
+      // rejections/requests yields a rejection ratio rather than 429-only detection.
+      meterRegistry
+          .counter(MetricNames.RATELIMIT_REQUESTS, MetricNames.TAG_BUCKET, bucketLabel(slot.key()))
+          .increment();
       if (!probe.isConsumed()) {
         // Per-bucket 429 rejection counter (REQ-OBS-011). The label is the bounded rule name
         // (or `global` for the umbrella path budget) derived from the slot key — never the client
