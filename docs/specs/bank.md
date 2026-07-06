@@ -722,9 +722,23 @@ org-unit-blind.
 > that is re-applied after each swap. A booking request is raised from a **single page-level CTA**
 > whose modal carries an **account selector** filled only with the caller's requestable accounts
 > (`canRequest`); the CTA + modal are shown only when at least one such account is visible, replacing
-> the former per-card request button + "view only" label. Accounts render as compact list rows (linked
-> name, 30-day trend, balance, target progress, a single "Details" action) — no per-account status
-> chip and no per-card CTA.
+> the former per-card request button + "view only" label. Accounts render with a linked name, 30-day
+> trend, balance, target progress and a single "Details" action — no per-account status chip and no
+> per-card CTA.
+>
+> **Amendment (card/table view toggle):** the "Konten" list carries a **single per-user view toggle**
+> ("Tabellenansicht", `bank.dashboard.view.tableToggle`) that switches it between a **card grid**
+> (default) and the **dense table** (the former `.ou-list`), mirroring the dashboard's layout switch
+> (REQ-BANK-016) **but without the by-Bereich grouping** — this surface has no grouping option. The
+> choice is persisted per user in `localStorage` and replayed through the `layout` query parameter on
+> a dedicated `orgUnitBankAccounts` sub-fragment swap (`#ou-acc-results`), so a toggle re-renders only
+> the switchable account list in place (REQ-FE-005), never a reload. Like the dashboard, the layout
+> also rides in the address bar (`history:true`), and the `orgUnitBank` refresh target now **preserves
+> the query** so a request create/cancel swap re-renders the list in the caller's chosen layout
+> server-side (no client re-application needed). The toggle + the account-name filter (REQ-BANK-046)
+> live outside `#ou-acc-results` but inside the `orgUnitBank` fragment, so the checkbox keeps its
+> state across a layout swap and resets the filter on a request swap. Its `data-ou-view-*` attributes
+> are distinct from the dashboard's `data-bank-view-*` module so the two never cross-fire.
 
 **Acceptance**
 
@@ -739,10 +753,13 @@ org-unit-blind.
   never depends on `OwnerScopeService` (`bankClassesMustNotConsultOrgUnitScope`).
 - [x] A slim standalone page lists the overseen balances, gated to officers/leads, not
   `BANK_EMPLOYEE` (frontend `OrgUnitBankPageControllerMvcTest`).
-- [x] A client-side account-name live filter sits above the Konten list and hides non-matching rows
-  as the user types (REQ-BANK-046).
+- [x] A client-side account-name live filter sits above the Konten list and hides non-matching
+  card/table items as the user types (REQ-BANK-046).
+- [x] The Konten list defaults to a card grid and offers a single per-user "Tabellenansicht" toggle
+  (no by-Bereich grouping) that swaps the `orgUnitBankAccounts` sub-fragment in place, persisted in
+  `localStorage` and re-applied after an `orgUnitBank` swap (frontend `OrgUnitBankPageControllerMvcTest`).
 
-**Enforced by:** `OrgUnitBankAccessServiceTest`, `OrgUnitBankControllerTest`, `ArchitectureTest`, frontend `OrgUnitBankPageControllerMvcTest`, frontend `BankPageControllerTest` (sparkline scaling) · **Code:** `service/OrgUnitBankAccessService`, `service/BankTrendCalculator`, `controller/OrgUnitBankController`, `model/dto/OrgUnitBankBalanceDto`, `repository/BankAccountRepository#findByOrgUnitId`, `repository/BankPostingRepository#postingSlicesSince`, frontend `controller/OrgUnitBankPageController`, frontend `controller/BankSparkline`, `templates/org-unit-bank.html` · **Issues:** #666, #668, #669
+**Enforced by:** `OrgUnitBankAccessServiceTest`, `OrgUnitBankControllerTest`, `ArchitectureTest`, frontend `OrgUnitBankPageControllerMvcTest`, frontend `BankPageControllerTest` (sparkline scaling) · **Code:** `service/OrgUnitBankAccessService`, `service/BankTrendCalculator`, `controller/OrgUnitBankController`, `model/dto/OrgUnitBankBalanceDto`, `repository/BankAccountRepository#findByOrgUnitId`, `repository/BankPostingRepository#postingSlicesSince`, frontend `controller/OrgUnitBankPageController`, frontend `controller/BankSparkline`, `templates/org-unit-bank.html`, `templates/fragments/org-unit-bank-views.html`, `static/js/bank.js` (org-unit view-toggle module), `static/css/bank.css` · **Issues:** #666, #668, #669
 
 ### REQ-BANK-022 — Confirm-before-post booking requests: create & cancel
 
@@ -1918,8 +1935,9 @@ state, which a genuinely empty list keeps.
 
 - [x] Typing a term on the dashboard hides every `.kpi-card` whose name lacks it (case-insensitive)
   and keeps the matches; clearing the box restores all cards.
-- [x] The same filter above the org-unit "Konten" list hides/keeps `.ou-row` rows identically and
-  resets to "show all" after a request create/cancel fragment swap.
+- [x] The same filter above the org-unit "Konten" list hides/keeps the account items (card or table,
+  scoped to `#ou-acc-results`) identically and resets to "show all" after a request create/cancel
+  fragment swap.
 - [x] The filter performs **no** backend call (no `krtFetch`, no reload, no CSRF) and adds **no**
   audit event.
 - [x] Filtering every account down to none reveals the localized `bank.filter.empty` note; a

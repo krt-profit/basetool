@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--
+  Reusable account-rendering fragments for the org-unit bank "Konten" list (REQ-BANK-021): the card
+  grid (default) and the dense table, switchable per user via the view toggle (REQ-BANK-046 filter
+  applies across both). Kept in a dedicated fragments file so a full-page render never processes them
+  inline with unbound parameters, mirroring the dashboard's bank-account-views.html. Both expect the
+  A→Z-ordered OrgUnitBankBalanceDto list plus the account-id -> BankSparkline.Spark map. There is no
+  by-Bereich grouping here (unlike the dashboard, REQ-BANK-016). Each account item carries
+  data-filter-name for the shared live name filter and the unchanged org-unit-bank-card* testids.
+-->
+
+<!-- Card grid: one card per visible account (name, org-unit, balance, 30-day trend, target, action). -->
+<div th:fragment="ouAccGrid(balances, sparks)" class="bank-acc-grid ou-acc-grid mt-2">
+    <div th:each="b : ${balances}" class="ou-card" th:with="spark=${sparks.get(b.accountId())}"
+         data-testid="org-unit-bank-card"
+         th:attr="data-account-no=${b.accountNo()},data-filter-name=${b.accountName()}">
+        <div class="ou-card-top">
+            <div class="ou-card-ident">
+                <a class="ou-card-name" th:href="@{/org-unit-bank/accounts/{id}(id=${b.accountId()})}"
+                   th:text="${b.accountName()}">Staffel IRIDIUM</a>
+                <div class="ou-card-sub">
+                    <span th:text="${b.accountNo()}">KB-0001</span>
+                    <span> &middot; </span>
+                    <span th:if="${b.orgUnitId() != null}"
+                          th:text="${b.orgUnitShorthand() != null ? b.orgUnitShorthand() : b.orgUnitName()}">IRI</span>
+                    <span th:if="${b.orgUnitId() == null}"
+                          th:text="#{'bank.account.type.' + ${b.type()}}">Sonderkonto</span>
+                </div>
+            </div>
+            <!-- 30-day trend sparkline (decorative; the accessible figure rides on the delta below). -->
+            <svg th:if="${spark != null and spark.points() != null}" width="92" height="20" viewBox="0 0 96 26" aria-hidden="true">
+                <polyline th:attr="points=${spark.points()}"
+                          th:classappend="${spark.flat()} ? ' kpi-sparkline--flat' : ''"
+                          class="kpi-sparkline" fill="none" stroke-width="1.5"/>
+            </svg>
+        </div>
+        <div class="ou-card-figures">
+            <div class="ou-card-bal">
+                <span th:text="${#numbers.formatInteger(@moneyFormat.round(b.balance()), 1, 'POINT')}">1.850.000</span>
+                <span class="unit">aUEC</span>
+            </div>
+            <span class="kpi-delta"
+                  th:classappend="${b.delta30d().signum() > 0} ? ' kpi-delta--pos' : (${b.delta30d().signum() < 0} ? ' kpi-delta--neg' : ' kpi-delta--flat')"
+                  th:text="${b.delta30d().signum() > 0 ? '&#9650; +' : (b.delta30d().signum() < 0 ? '&#9660; ' : '&#177; ')} + ${#numbers.formatInteger(@moneyFormat.round(b.delta30d()), 1, 'POINT')}">&#9650; +420.000</span>
+        </div>
+        <!-- Ziel: mini progress bar + percentage when a balance target is set (REQ-BANK-036); a muted
+             "no target" note otherwise. Identical figures to the table view's "Ziel" column. -->
+        <div class="ou-target" data-testid="org-unit-bank-card-target"
+             th:if="${b.balanceTarget() != null and b.balanceTarget().signum() > 0}"
+             th:with="pct=${b.balance().doubleValue() / b.balanceTarget().doubleValue() * 100.0}">
+            <div class="bank-target-bar" aria-hidden="true">
+                <div class="bank-target-bar-fill"
+                     th:attr="style='width:' + ${pct > 100 ? 100 : (pct < 0 ? 0 : pct)} + '%'"></div>
+            </div>
+            <div class="ou-target-meta">
+                <b th:text="${#numbers.formatDecimal(pct, 1, 'NONE', 1, 'COMMA')} + ' %'">18,5 %</b>
+                <span th:text="${#numbers.formatInteger(@moneyFormat.round(b.balanceTarget()), 1, 'POINT')} + ' aUEC'">10.000.000 aUEC</span>
+            </div>
+        </div>
+        <div class="r-noziel" th:unless="${b.balanceTarget() != null and b.balanceTarget().signum() > 0}"
+             th:text="#{bank.orgUnit.noTarget}">&mdash; kein Ziel</div>
+        <!-- Aktion: the read-only drill-in (REQ-BANK-038); the holder/OL get the "manage" label. -->
+        <div class="ou-card-act">
+            <a class="btn btn-ghost btn-xs" data-testid="org-unit-bank-card-detail"
+               th:href="@{/org-unit-bank/accounts/{id}(id=${b.accountId()})}"
+               th:text="${b.canManageSettings()} ? #{bank.orgUnit.detail.manage} : #{bank.orgUnit.detail.open}">Details</a>
+        </div>
+    </div>
+</div>
+
+<!-- Dense table: one grid row per visible account, header strip on top (the former inline .ou-list). -->
+<div th:fragment="ouAccTable(balances, sparks)" class="ou-list mt-2">
+    <div class="ou-rowhead" aria-hidden="true">
+        <span th:text="#{bank.request.col.account}">Konto</span>
+        <span th:text="#{bank.orgUnit.col.trend}">Trend &middot; 30 T</span>
+        <span class="e" th:text="#{bank.orgUnit.balance}">Kontostand</span>
+        <span th:text="#{bank.orgUnit.balanceTarget}">Ziel</span>
+        <span class="e" th:text="#{bank.request.col.actions}">Aktion</span>
+    </div>
+    <div th:each="b : ${balances}" class="ou-row" th:with="spark=${sparks.get(b.accountId())}"
+         data-testid="org-unit-bank-card"
+         th:attr="data-account-no=${b.accountNo()},data-filter-name=${b.accountName()}">
+        <!-- Konto: name (linked to the drill-in) + account no and its org-unit shorthand (or name). A
+             special account (Sonderkonto, REQ-BANK-028) belongs to no org unit, so it is labelled by
+             its account-type label instead. -->
+        <div>
+            <div class="r-name">
+                <a th:href="@{/org-unit-bank/accounts/{id}(id=${b.accountId()})}"
+                   th:text="${b.accountName()}">Staffel IRIDIUM</a>
+            </div>
+            <div class="r-sub">
+                <span th:text="${b.accountNo()}">KB-0001</span>
+                <span> &middot; </span>
+                <span th:if="${b.orgUnitId() != null}"
+                      th:text="${b.orgUnitShorthand() != null ? b.orgUnitShorthand() : b.orgUnitName()}">IRI</span>
+                <span th:if="${b.orgUnitId() == null}"
+                      th:text="#{'bank.account.type.' + ${b.type()}}">Sonderkonto</span>
+            </div>
+        </div>
+        <!-- 30-day trend: sign-colored delta + inline SVG sparkline (REQ-BANK-016). The column header
+             conveys the window, so the per-row delta omits the "/ 30 T" suffix. -->
+        <div class="r-trend">
+            <span class="kpi-delta"
+                  th:classappend="${b.delta30d().signum() > 0} ? ' kpi-delta--pos' : (${b.delta30d().signum() < 0} ? ' kpi-delta--neg' : ' kpi-delta--flat')"
+                  th:text="${b.delta30d().signum() > 0 ? '&#9650; +' : (b.delta30d().signum() < 0 ? '&#9660; ' : '&#177; ')} + ${#numbers.formatInteger(@moneyFormat.round(b.delta30d()), 1, 'POINT')}">&#9650; +420.000</span>
+            <svg th:if="${spark != null and spark.points() != null}" width="92" height="20" viewBox="0 0 96 26" aria-hidden="true">
+                <polyline th:attr="points=${spark.points()}"
+                          th:classappend="${spark.flat()} ? ' kpi-sparkline--flat' : ''"
+                          class="kpi-sparkline" fill="none" stroke-width="1.5"/>
+            </svg>
+        </div>
+        <!-- Kontostand: neutral-light, right-aligned, tabular figures (orange is never used on a
+             data value). -->
+        <div class="r-bal">
+            <span th:text="${#numbers.formatInteger(@moneyFormat.round(b.balance()), 1, 'POINT')}">1.850.000</span>
+            <span class="unit">aUEC</span>
+        </div>
+        <!-- Ziel: mini progress bar + percentage when a balance target is set (REQ-BANK-036); a muted
+             "no target" note otherwise. -->
+        <div class="ou-target" data-testid="org-unit-bank-card-target"
+             th:if="${b.balanceTarget() != null and b.balanceTarget().signum() > 0}"
+             th:with="pct=${b.balance().doubleValue() / b.balanceTarget().doubleValue() * 100.0}">
+            <div class="bank-target-bar" aria-hidden="true">
+                <div class="bank-target-bar-fill"
+                     th:attr="style='width:' + ${pct > 100 ? 100 : (pct < 0 ? 0 : pct)} + '%'"></div>
+            </div>
+            <div class="ou-target-meta">
+                <b th:text="${#numbers.formatDecimal(pct, 1, 'NONE', 1, 'COMMA')} + ' %'">18,5 %</b>
+                <span th:text="${#numbers.formatInteger(@moneyFormat.round(b.balanceTarget()), 1, 'POINT')} + ' aUEC'">10.000.000 aUEC</span>
+            </div>
+        </div>
+        <div class="r-noziel" th:unless="${b.balanceTarget() != null and b.balanceTarget().signum() > 0}"
+             th:text="#{bank.orgUnit.noTarget}">&mdash; kein Ziel</div>
+        <!-- Aktion: the read-only drill-in (history + Halter-redacted statement, REQ-BANK-038); the
+             holder/OL get the "manage" label. Booking requests are raised from the single page-level
+             CTA, never per row. -->
+        <div class="r-act">
+            <a class="btn btn-ghost btn-xs" data-testid="org-unit-bank-card-detail"
+               th:href="@{/org-unit-bank/accounts/{id}(id=${b.accountId()})}"
+               th:text="${b.canManageSettings()} ? #{bank.orgUnit.detail.manage} : #{bank.orgUnit.detail.open}">Details</a>
+        </div>
+    </div>
+</div>
+</body>
+</html>
