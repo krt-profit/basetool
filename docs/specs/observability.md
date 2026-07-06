@@ -368,6 +368,16 @@ relay — the component that shipped the REQ-FE-010 staleness defect. A `changed
 `snapshot` frames keep flowing is the early indicator for that defect class (panels only, baselined
 before alerting). All labels are fixed literals, pure counts.
 
+The auth surfaces (#1041 item 18) add `basetool_login_total{outcome,reason}` (`SecurityConfig`'s
+OAuth2 success/failure handlers: `outcome` = `success` / `failure`; on failure `reason` =
+`invalid_state` / `provider_error` / `other`, **mapped from the exception type and bounded OAuth2
+error code — never the raw error description**; on success `reason` = `none`) and the unlabelled
+`basetool_csrf_rejections_total` (a custom `AccessDeniedHandler` counts CSRF-token rejections before
+the 403). They drive `FrontendLoginBroken` (failures with zero concurrent successes — the
+code-to-token / JWKS / state break `KeycloakLoginErrorSpike`'s event regex misses) and
+`CsrfRejectionSpike` (a systematic CSRF-wiring regression that `krtFetch`'s silent single-retry
+otherwise masks as intermittent failed writes).
+
 **Ingest.** `basetool_ingest_handoff_total{kind}` (accepted+staged handoffs per `HandoffKind`),
 `basetool_ingest_handoff_errors_total{reason}` (relay failures: `backend_reject` /
 `backend_unavailable` / `internal`; pre-relay rejections are not counted here), and
