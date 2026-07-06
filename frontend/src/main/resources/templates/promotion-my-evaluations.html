@@ -403,68 +403,6 @@
 </main>
 <th:block th:replace="~{fragments/toast :: toast}" />
 
-<script th:inline="javascript" th:attr="nonce=${cspNonce}" th:unless="${isAllSquadronsMode}">
-    /*<![CDATA[*/
-    /*
-     * Progress-bar fill: client-side because the aggregate "achievedTotal /
-     * requiredTotal" pair across all checks is not on the DTO and recomputing
-     * it server-side just to render a CSS width would be wasted work. We
-     * scrape the per-check fraction texts (already rendered in the table)
-     * with the same logic the user reads visually.
-     */
-    function meFillProgressBars() {
-        var cards = document.querySelectorAll('.eligibility-card');
-        cards.forEach(function (card) {
-            // Use class selectors instead of [class^="..."]: the spans are rendered by
-            // th:classappend on an element without an initial class attribute, which makes
-            // Thymeleaf emit class=" check-status-ok" with a leading space. The attribute
-            // prefix selector would then fail to match while the tokenised classList still
-            // works — so the aggregate read 0/0 even when individual rows had real values.
-            var fractions = card.querySelectorAll('.checks-table tbody tr .check-status-ok, .checks-table tbody tr .check-status-missing');
-            var achieved = 0, required = 0;
-            fractions.forEach(function (span) {
-                var parts = (span.textContent || '').split('/');
-                if (parts.length === 2) {
-                    var a = parseInt(parts[0].trim(), 10);
-                    var r = parseInt(parts[1].trim(), 10);
-                    if (Number.isFinite(a) && Number.isFinite(r)) {
-                        achieved += a;
-                        required += r;
-                    }
-                }
-            });
-            var pct = required > 0 ? Math.min(100, Math.round((achieved / required) * 100)) : 0;
-            var fill = card.querySelector('.eligibility-progress-fill');
-            var text = card.querySelector('.me-progress-text');
-            var bar  = card.querySelector('.eligibility-progress');
-            if (fill) fill.style.width = pct + '%';
-            if (text) text.textContent = achieved + ' / ' + required + ' (' + pct + '%)';
-            if (bar)  bar.setAttribute('aria-valuenow', String(pct));
-        });
-    }
-
-    /*
-     * Filter "nur offene Voraussetzungen": hides satisfied check rows when
-     * checked. Acts on .checks-table rows, not whole cards — even an "almost
-     * eligible" card may still have one missing check the user wants to see.
-     */
-    function meApplyOpenFilter() {
-        var input = document.getElementById('me-filter-open');
-        var onlyOpen = !!(input && input.checked);
-        var rows = document.querySelectorAll('.checks-table tbody tr[data-me-satisfied]');
-        rows.forEach(function (row) {
-            var satisfied = row.getAttribute('data-me-satisfied') === 'true';
-            row.classList.toggle('checks-row-hidden', onlyOpen && satisfied);
-        });
-    }
-
-    document.addEventListener('DOMContentLoaded', function () {
-        meFillProgressBars();
-        if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-            window.krtEvents.on('change', 'me-filter-open', meApplyOpenFilter);
-        }
-    });
-    /*]]>*/
-</script>
+<script th:src="@{/js/promotion-my-evaluations.js}" th:attr="nonce=${cspNonce}" th:unless="${isAllSquadronsMode}"></script>
 </body>
 </html>
