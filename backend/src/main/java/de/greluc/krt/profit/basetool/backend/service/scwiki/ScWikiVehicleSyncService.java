@@ -71,14 +71,23 @@ public class ScWikiVehicleSyncService {
   /**
    * Runs the full Wiki vehicle fill. No-op (with an INFO line) when the feature flag is off. An
    * empty Wiki response short-circuits before the orphan sweep.
+   *
+   * <p>Returns the number of {@code ship_type} rows this run wrote — matched rows linked plus fresh
+   * {@code WIKI_ONLY} rows created — which {@link ScWikiScheduler} accumulates into {@code
+   * basetool_scheduled_job_items_total{job="scwiki_sync"}}. The disabled and empty-response
+   * short-circuits return {@code 0} so a Wiki outage surfaces as a zero-item run ({@code
+   * SyncZeroItems}, #1041 item 2).
+   *
+   * @return the number of {@code ship_type} rows written this run ({@code linked} plus {@code
+   *     createdWikiOnly})
    */
   @Transactional
-  public void syncVehicles() {
+  public int syncVehicles() {
     if (!Boolean.TRUE.equals(properties.getVehicleSyncEnabled())) {
       log.info(
           "SC Wiki vehicle sync invoked but disabled "
               + "(krt.scwiki.vehicle-sync-enabled=false) — skipping.");
-      return;
+      return 0;
     }
 
     log.info("Starting SC Wiki vehicle sync...");
@@ -89,7 +98,7 @@ public class ScWikiVehicleSyncService {
             "vehicles");
     if (fetched.isEmpty()) {
       log.warn("No vehicles received from SC Wiki API. Aborting sync (no orphan sweep).");
-      return;
+      return 0;
     }
 
     Instant now = Instant.now();
@@ -140,6 +149,7 @@ public class ScWikiVehicleSyncService {
     syncReportService.pruneRuns(SyncSourceSystem.SCWIKI);
     log.info(
         "Finished SC Wiki vehicle sync: {} linked, {} created WIKI_ONLY.", linked, createdWikiOnly);
+    return linked + createdWikiOnly;
   }
 
   /**

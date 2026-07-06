@@ -48,7 +48,14 @@ public enum ScheduledJob {
   UEX_SYNC("uex_sync"),
 
   /** The ~daily Star Citizen wiki sync ({@code ScWikiScheduler}). */
-  SCWIKI_SYNC("scwiki_sync");
+  SCWIKI_SYNC("scwiki_sync"),
+
+  /**
+   * The 60-second approval/work-queue depth sampler ({@code BusinessMetricsCollector#refresh}).
+   * Wrapped so a wedged sampler surfaces (its {@code last_success} freezes) rather than silently
+   * feeding every {@code *ApprovalOverdue} alert stale queue gauges.
+   */
+  BUSINESS_METRICS("business_metrics");
 
   private final String label;
 

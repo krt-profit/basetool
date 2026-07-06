@@ -19,8 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
@@ -63,8 +67,12 @@ class UexSchedulerTest {
   // sweep synchronously, so the existing ordering/verify tests below exercise the real steps.
   @Spy private SyncCoordinator syncCoordinator = new SyncCoordinator(3_600_000);
 
+  // A real registry (held so tests can read the item counter) behind a real, spied TaskMetrics.
+  // Declared before taskMetrics so field initialisation order hands it the same instance.
+  private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+
   // A real TaskMetrics (spied) so the instrumentation wrapper genuinely runs the sweep body.
-  @Spy private TaskMetrics taskMetrics = new TaskMetrics(new SimpleMeterRegistry());
+  @Spy private TaskMetrics taskMetrics = new TaskMetrics(meterRegistry);
 
   @InjectMocks private UexScheduler scheduler;
 
@@ -156,6 +164,44 @@ class UexSchedulerTest {
     // Phase 3: refineries last (depend on materials)
     order.verify(uexRefinerySyncService).syncRefiningMethods();
     order.verify(uexRefinerySyncService).syncRefineryYields();
+  }
+
+  @Test
+  void scheduleTask_recordsItemCatalogueUpsertCount() {
+    // Given — the item sync reports the number of game_item rows it upserted this run.
+    when(uexItemSyncService.syncItems()).thenReturn(4242);
+
+    // When
+    scheduler.scheduleCommodityPriceUpdate();
+
+    // Then — that upsert tally becomes basetool_scheduled_job_items_total{job=uex_sync} (#1041 item
+    // 2), the representative "rows processed" signal the SyncZeroItems alert watches.
+    assertEquals(
+        4242,
+        meterRegistry
+            .get(MetricNames.SCHEDULED_JOB_ITEMS)
+            .tag(MetricNames.TAG_JOB, ScheduledJob.UEX_SYNC.label())
+            .counter()
+            .count(),
+        "basetool_scheduled_job_items_total{job=uex_sync} must equal the item-sync upsert count");
+  }
+
+  @Test
+  void scheduleTask_recordsNoItemCount_whenTheSweepFails() {
+    // Given — an early step throws, aborting the sweep before the item count is known.
+    doThrow(new RuntimeException("UEX 500")).when(uexUniverseSyncService).syncFactions();
+
+    // When
+    scheduler.scheduleCommodityPriceUpdate();
+
+    // Then — a failed run records a failure, NOT a zero item count: the items series stays absent,
+    // so SyncZeroItems (which needs a fresh success) cannot false-fire on an outright sync failure.
+    assertNull(
+        meterRegistry
+            .find(MetricNames.SCHEDULED_JOB_ITEMS)
+            .tag(MetricNames.TAG_JOB, ScheduledJob.UEX_SYNC.label())
+            .counter(),
+        "a failed sweep must not register an item count (distinct from a clean zero-item run)");
   }
 
   @Test

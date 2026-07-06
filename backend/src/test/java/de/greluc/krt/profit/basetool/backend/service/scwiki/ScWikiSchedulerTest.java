@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service.scwiki;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
@@ -28,6 +29,8 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.config.ScWikiProperties;
 import de.greluc.krt.profit.basetool.backend.integration.scwiki.ScWikiClient;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.service.MasterDataCacheEvictionService;
 import de.greluc.krt.profit.basetool.backend.service.SyncCoordinator;
@@ -55,8 +58,13 @@ class ScWikiSchedulerTest {
   // A real coordinator (spied so it can be told the gate is busy); its default runs the sweep.
   @Spy private SyncCoordinator syncCoordinator = new SyncCoordinator(3_600_000);
 
+  // A real registry (held so tests can read the item counter) behind a real, spied TaskMetrics so
+  // the instrumentation wrapper genuinely runs the sweep body and records into it. Declared before
+  // taskMetrics so field initialisation order hands it the same instance.
+  private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+
   // A real TaskMetrics (spied) so the instrumentation wrapper genuinely runs the sweep body.
-  @Spy private TaskMetrics taskMetrics = new TaskMetrics(new SimpleMeterRegistry());
+  @Spy private TaskMetrics taskMetrics = new TaskMetrics(meterRegistry);
 
   @InjectMocks private ScWikiScheduler scheduler;
 
@@ -85,6 +93,53 @@ class ScWikiSchedulerTest {
     verify(itemSyncService).syncItems();
     verify(blueprintSyncService).syncBlueprints();
     verify(manufacturerSyncService).syncManufacturers();
+  }
+
+  @Test
+  void schedule_recordsSummedItemCount_acrossAllSteps() {
+    // Given — each step reports how many catalogue rows it wrote this run.
+    when(properties.getSchedulerEnabled()).thenReturn(true);
+    when(commoditySyncService.syncCommodities()).thenReturn(3);
+    when(vehicleSyncService.syncVehicles()).thenReturn(5);
+    when(itemSyncService.syncItems()).thenReturn(11);
+    when(blueprintSyncService.syncBlueprints()).thenReturn(7);
+    when(manufacturerSyncService.syncManufacturers()).thenReturn(2);
+
+    // When
+    scheduler.scheduleScWikiSync();
+
+    // Then — the scwiki_sync item counter is the sum of the five step counts (#1041 item 2), the
+    // signal the SyncZeroItems alert watches (a clean run summing to 0 means an empty-200 outage).
+    assertEquals(
+        3 + 5 + 11 + 7 + 2,
+        meterRegistry
+            .get(MetricNames.SCHEDULED_JOB_ITEMS)
+            .tag(MetricNames.TAG_JOB, ScheduledJob.SCWIKI_SYNC.label())
+            .counter()
+            .count(),
+        "basetool_scheduled_job_items_total{job=scwiki_sync} must sum every step's written-row"
+            + " count");
+  }
+
+  @Test
+  void schedule_recordsZeroItems_whenAStepFailsAndTheRestWriteNothing() {
+    // Given — the item step throws (empty-200 outage or a transient error) and no step writes rows.
+    when(properties.getSchedulerEnabled()).thenReturn(true);
+    when(itemSyncService.syncItems()).thenThrow(new RuntimeException("Wiki 500"));
+
+    // When — the sweep must not propagate; the failing step contributes 0 to the tally.
+    scheduler.scheduleScWikiSync();
+
+    // Then — a successful run that wrote zero rows records 0, which is exactly what SyncZeroItems
+    // fires on (as opposed to the series being absent).
+    assertEquals(
+        0.0,
+        meterRegistry
+            .get(MetricNames.SCHEDULED_JOB_ITEMS)
+            .tag(MetricNames.TAG_JOB, ScheduledJob.SCWIKI_SYNC.label())
+            .counter()
+            .count(),
+        "a zero-write sweep must still register the item counter at 0");
   }
 
   @Test

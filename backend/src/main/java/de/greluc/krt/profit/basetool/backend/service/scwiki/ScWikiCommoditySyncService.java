@@ -111,14 +111,23 @@ public class ScWikiCommoditySyncService {
    * Runs the full Wiki commodity merge. No-op (with an INFO line) when {@code
    * krt.scwiki.commodity-sync-enabled} is {@code false}. An empty Wiki response short-circuits
    * before the orphan sweep so a transient outage never wipes the merge state.
+   *
+   * <p>Returns the number of {@code material} rows this run wrote — matched rows linked plus fresh
+   * {@code WIKI_ONLY} rows created (junk- and ambiguous-skips excluded) — which {@link
+   * ScWikiScheduler} accumulates into {@code
+   * basetool_scheduled_job_items_total{job="scwiki_sync"}}. The disabled and empty-response
+   * short-circuits return {@code 0} so a Wiki outage surfaces as a zero-item run ({@code
+   * SyncZeroItems}, #1041 item 2) rather than a fresh success.
+   *
+   * @return the number of {@code material} rows written this run ({@code linked + createdWikiOnly})
    */
   @Transactional
-  public void syncCommodities() {
+  public int syncCommodities() {
     if (!Boolean.TRUE.equals(properties.getCommoditySyncEnabled())) {
       log.info(
           "SC Wiki commodity sync invoked but disabled "
               + "(krt.scwiki.commodity-sync-enabled=false) — skipping.");
-      return;
+      return 0;
     }
 
     log.info("Starting SC Wiki commodity merge...");
@@ -129,7 +138,7 @@ public class ScWikiCommoditySyncService {
             "commodities");
     if (fetched.isEmpty()) {
       log.warn("No commodities received from SC Wiki API. Aborting merge (no orphan sweep).");
-      return;
+      return 0;
     }
 
     UUID runId = syncReportService.beginRun();
@@ -198,6 +207,7 @@ public class ScWikiCommoditySyncService {
         createdWikiOnly,
         skippedJunk,
         skippedAmbiguous);
+    return linked + createdWikiOnly;
   }
 
   /**

@@ -48,7 +48,8 @@
       },
       "targets": [
         {
-          "expr": "sum(jvm_memory_used_bytes{application=\"$application\",area=\"heap\"})/sum(jvm_memory_max_bytes{application=\"$application\",area=\"heap\"})*100",
+          "expr": "sum by (application) (jvm_memory_used_bytes{application=~\"$application\",area=\"heap\"})/sum by (application) (jvm_memory_max_bytes{application=~\"$application\",area=\"heap\"})*100",
+          "legendFormat": "{{application}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -82,8 +83,8 @@
       },
       "targets": [
         {
-          "expr": "rate(jvm_gc_pause_seconds_sum{application=\"$application\"}[5m])",
-          "legendFormat": "{{action}} / {{cause}}",
+          "expr": "rate(jvm_gc_pause_seconds_sum{application=~\"$application\"}[5m])",
+          "legendFormat": "{{application}} {{action}} / {{cause}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -115,7 +116,8 @@
       },
       "targets": [
         {
-          "expr": "jvm_threads_live_threads{application=\"$application\"}",
+          "expr": "jvm_threads_live_threads{application=~\"$application\"}",
+          "legendFormat": "{{application}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -147,8 +149,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (status) (rate(http_server_requests_seconds_count{application=\"$application\"}[5m]))",
-          "legendFormat": "{{status}}",
+          "expr": "sum by (application, status) (rate(http_server_requests_seconds_count{application=~\"$application\"}[5m]))",
+          "legendFormat": "{{application}} {{status}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -180,7 +182,8 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{application=\"$application\"}[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (application, le) (rate(http_server_requests_seconds_bucket{application=~\"$application\"}[5m])))",
+          "legendFormat": "{{application}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -212,7 +215,8 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(logback_events_total{application=\"$application\",level=\"error\"}[5m]))",
+          "expr": "sum by (application) (rate(logback_events_total{application=~\"$application\",level=\"error\"}[5m]))",
+          "legendFormat": "{{application}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -244,8 +248,8 @@
       },
       "targets": [
         {
-          "expr": "hikaricp_connections_active{application=\"$application\"}",
-          "legendFormat": "active {{pool}}",
+          "expr": "hikaricp_connections_active{application=~\"$application\"}",
+          "legendFormat": "{{application}} active {{pool}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -253,8 +257,8 @@
           }
         },
         {
-          "expr": "hikaricp_connections_pending{application=\"$application\"}",
-          "legendFormat": "pending {{pool}}",
+          "expr": "hikaricp_connections_pending{application=~\"$application\"}",
+          "legendFormat": "{{application}} pending {{pool}}",
           "refId": "B",
           "datasource": {
             "type": "prometheus",
@@ -286,7 +290,8 @@
       },
       "targets": [
         {
-          "expr": "tomcat_threads_busy_threads{application=\"$application\"}",
+          "expr": "tomcat_threads_busy_threads{application=~\"$application\"}",
+          "legendFormat": "{{application}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -318,8 +323,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (cache) (rate(cache_gets_total{application=\"$application\",result=\"hit\"}[5m])) / sum by (cache) (rate(cache_gets_total{application=\"$application\"}[5m]))",
-          "legendFormat": "{{cache}}",
+          "expr": "sum by (application, cache) (rate(cache_gets_total{application=~\"$application\",result=\"hit\"}[5m])) / sum by (application, cache) (rate(cache_gets_total{application=~\"$application\"}[5m]))",
+          "legendFormat": "{{application}} {{cache}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -353,8 +358,8 @@
       },
       "targets": [
         {
-          "expr": "resilience4j_circuitbreaker_state{application=\"$application\"}",
-          "legendFormat": "{{name}} {{state}}",
+          "expr": "resilience4j_circuitbreaker_state{application=~\"$application\"}",
+          "legendFormat": "{{application}} {{name}} {{state}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -386,8 +391,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (cache, cause) (rate(cache_evictions_total{application=\"$application\"}[5m]))",
-          "legendFormat": "{{cache}} {{cause}}",
+          "expr": "sum by (application, cache, cause) (rate(cache_evictions_total{application=~\"$application\"}[5m]))",
+          "legendFormat": "{{application}} {{cache}} {{cause}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -419,8 +424,8 @@
       },
       "targets": [
         {
-          "expr": "cache_size{application=\"$application\"}",
-          "legendFormat": "{{cache}}",
+          "expr": "cache_size{application=~\"$application\"}",
+          "legendFormat": "{{application}} {{cache}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -466,8 +471,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (cache) (rate(cache_gets_total{application=\"$application\",result=\"miss\"}[5m]))",
-          "legendFormat": "{{cache}}",
+          "expr": "sum by (application, cache) (rate(cache_gets_total{application=~\"$application\",result=\"miss\"}[5m]))",
+          "legendFormat": "{{application}} {{cache}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",

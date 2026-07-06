@@ -55,6 +55,84 @@ groups:
           summary: "External fetch errors ({{ $labels.source }})"
           description: "The {{ $labels.source }} client swallowed more than 3 fetch/parse errors in 6 hours — the catalogue sync may be silently importing nothing while still recording a success. Check the upstream API and the sync logs."
 
+      # (#1041 item 2) Zero-item catalogue outage. An upstream that returns empty 200s processes NO
+      # rows, yet the sweep still "succeeds" and last_success stays fresh — so ExternalSyncStale never
+      # fires and ExternalFetchErrors stays quiet (an empty 200 is not a fetch error). basetool_
+      # scheduled_job_items_total is populated from the same per-run tallies as the sync-report
+      # summary (UexItemSyncService upserts / the five SC-Wiki step counts). A 48h flatline at zero
+      # while the job keeps succeeding means the catalogue is silently importing nothing. The `and on
+      # (exported_job)` guard matches the two series solely on the job name (their __name__/instance
+      # labels differ). The items series only exists once a counting run has recorded it, so this
+      # cannot fire before the job's first successful run.
+      # baseline-tune: 48h zero-items window is the issue's initial threshold (daily sync cadence).
+      - alert: SyncZeroItems
+        expr: |
+          increase(basetool_scheduled_job_items_total{exported_job=~"uex_sync|scwiki_sync"}[48h]) == 0
+          and on (exported_job)
+          (time() - basetool_scheduled_job_last_success_timestamp_seconds{exported_job=~"uex_sync|scwiki_sync"}) < 172800
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Catalogue sync importing zero items ({{ $labels.exported_job }})"
+          description: "The {{ $labels.exported_job }} sync has processed zero items in 48h while still recording successful runs — the upstream catalogue is likely returning empty responses. Check the upstream API and the sync-report admin page."
+
+      # (#1041 item 3) All-jobs staleness. UserSyncStale/ExternalSyncStale covered only user_sync and
+      # the two catalogue syncs; the daily notification-retention purge and the hourly default-
+      # blueprint back-fill had no staleness guard. No absent() — the last-success gauge is registered
+      # lazily by TaskMetrics, so a job whose bean is config-gated off never publishes it and cannot
+      # report a false stale (deliberate, per the issue).
+      - alert: ScheduledJobStale
+        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{exported_job=~"notification_retention|default_blueprint_provisioning"}) > 93600
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Scheduled job stale >26h ({{ $labels.exported_job }})"
+          description: "The {{ $labels.exported_job }} job last succeeded more than 26 hours ago — it may have stopped being scheduled."
+
+      # (#1041 item 3) The worst false silence in the stack: if the hourly bank ledger-integrity sweep
+      # stops running, basetool_bank_ledger_integrity_violations FREEZES at its last value and
+      # BankLedgerIntegrityViolation (critical) can never fire — a broken bank invariant would go
+      # undetected. Tighter 6h window (the sweep is hourly) and critical, matching the severity of the
+      # invariant it guards.
+      - alert: BankLedgerIntegritySweepStale
+        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{exported_job="bank_ledger_integrity"}) > 21600
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Bank ledger-integrity sweep stale >6h"
+          description: "The hourly bank ledger-integrity sweep last succeeded more than 6 hours ago. While it is stale the violations gauge is frozen and BankLedgerIntegrityViolation cannot fire — the data-corruption detector is blind. Restore the sweep before trusting a 'no violations' reading."
+
+      # (#1041 item 3) BusinessMetricsCollector.refresh() (every 60s) feeds every approval/work-queue
+      # depth gauge. If it wedges, the gauges FREEZE and the *ApprovalOverdue alerts silently consume
+      # stale numbers. A last-success age > 10 min means ~10 missed samples — the sampler is stuck.
+      - alert: BusinessMetricsStale
+        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{exported_job="business_metrics"}) > 600
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Business-metrics sampler stale >10min"
+          description: "BusinessMetricsCollector.refresh() has not completed successfully in over 10 minutes — the approval/work-queue depth gauges are frozen and the queue-overdue alerts may be evaluating stale values. Check the backend logs for the sampler's failure."
+
+      # (#1041 item 3) Success-with-zero-work detector. user_sync runs every 5 min; a run that returns
+      # successfully but synced zero users (Keycloak returned an empty roster) leaves last_success
+      # fresh, so UserSyncStale never fires. Zero items across 30m while successful runs happened is
+      # the tell. The `and on (exported_job)` matches the two series on the job name only.
+      - alert: UserSyncZeroItems
+        expr: |
+          increase(basetool_scheduled_job_items_total{exported_job="user_sync"}[30m]) == 0
+          and on (exported_job)
+          increase(basetool_scheduled_job_executions_total{exported_job="user_sync",outcome="success"}[30m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "User sync succeeding but syncing zero users"
+          description: "The Keycloak user sync has run successfully but processed zero users for 30 minutes — Keycloak likely returned an empty roster. Check Keycloak and the sync path before local accounts drift from the directory."
+
       - alert: ScheduledJobFailureStreak
         expr: increase(basetool_scheduled_job_executions_total{outcome="failure"}[1h]) >= 3
         for: 5m
@@ -138,6 +216,35 @@ groups:
         annotations:
           summary: "No audit events recorded in 5d while backend is up"
           description: "The backend has been up but recorded zero audit events for 5 days — possible audit-logging regression (REQ-AUDIT-001)."
+
+      # (#1041 item 10) Bank audit silence. The bank — the most sensitive audited area — keeps its own
+      # bank_audit_event table (deliberately excluded from AuditDomain), so AuditSilenceAnomaly above
+      # is blind to it. Same 5-day-silence-while-up shape on the dedicated bank counter (counts only,
+      # no amounts). Resolves on the first bank audit event within any 5-day window.
+      - alert: BankAuditSilenceAnomaly
+        expr: (sum(increase(basetool_bank_audit_events_total[5d])) == 0) and on() (up{job="basetool-backend"} == 1)
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No bank audit events recorded in 5d while backend is up"
+          description: "The backend has been up but recorded zero bank audit events for 5 days — possible bank audit-logging regression (REQ-AUDIT-001). Every bank mutation must write a bank_audit_event row."
+
+      # (#1041 item 10) Per-domain audit silence. AuditSilenceAnomaly sums across all 8 domains, so one
+      # domain losing its audit wiring in a refactor (the exact REQ-AUDIT-001 failure mode) is masked
+      # as long as any other domain stays active. This fires per domain. PROMOTION / PERSONAL_INVENTORY
+      # are excluded — they legitimately stay quiet for weeks; their silence is reviewed on the 07
+      # "Audit events (14d) by domain" table instead of paged. A domain that never emitted has no
+      # series and cannot fire; only one that WAS active and went silent 14d does.
+      # baseline-tune: the 14d window suits an active org; a very quiet squadron may need it widened.
+      - alert: AuditDomainSilenceAnomaly
+        expr: (sum by (domain) (increase(basetool_audit_events_total{domain!~"PROMOTION|PERSONAL_INVENTORY"}[14d])) == 0) and on() (up{job="basetool-backend"} == 1)
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Audit domain silent 14d ({{ $labels.domain }})"
+          description: "The {{ $labels.domain }} audit domain recorded zero events in 14 days while the backend is up — this domain may have lost its audit wiring (REQ-AUDIT-001) even though other domains are still active."
 
       # Frontend → backend call failures (bounded reason/method), sustained.
       - alert: BackendCallFailureSustained

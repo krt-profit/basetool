@@ -23,6 +23,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
+import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestStatus;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
@@ -70,7 +72,8 @@ class BusinessMetricsCollectorTest {
             jobOrderRepository,
             operationRepository,
             refineryOrderRepository,
-            p4kImportJobRepository);
+            p4kImportJobRepository,
+            new TaskMetrics(registry));
     // @PostConstruct is not invoked for a plain unit-constructed bean.
     collector.registerGauges();
   }
@@ -108,11 +111,52 @@ class BusinessMetricsCollectorTest {
     assertThat(statusGauge(MetricNames.JOB_ORDER_OPEN, JobOrderStatus.OPEN.name())).isEqualTo(0.0d);
   }
 
+  @Test
+  void refresh_recordsSuccessfulRunThroughTaskMetrics() {
+    collector.refresh();
+
+    // The sampler is instrumented under business_metrics so a wedged refresh() is not a silent
+    // failure (#1041 item 3): one successful execution and a fresh last-success timestamp.
+    assertThat(execCount(MetricNames.OUTCOME_SUCCESS)).isEqualTo(1.0d);
+    assertThat(lastSuccess()).isGreaterThan(0.0d);
+  }
+
+  @Test
+  void refresh_recordsFailureAndDoesNotPropagate_whenAQueryThrows() {
+    when(userRepository.countByApprovalStatus(ApprovalStatus.PENDING))
+        .thenThrow(new RuntimeException("DB down"));
+
+    // Must not propagate — the scheduler thread has to survive.
+    collector.refresh();
+
+    // The failed sample is recorded as a failure and last_success stays 0, so BusinessMetricsStale
+    // fires instead of the queue gauges silently freezing while ApprovalOverdue reads stale values.
+    assertThat(execCount(MetricNames.OUTCOME_FAILURE)).isEqualTo(1.0d);
+    assertThat(lastSuccess()).isEqualTo(0.0d);
+  }
+
   private double gauge(String name) {
     return registry.get(name).gauge().value();
   }
 
   private double statusGauge(String name, String status) {
     return registry.get(name).tag(MetricNames.TAG_STATUS, status).gauge().value();
+  }
+
+  private double execCount(String outcome) {
+    return registry
+        .get(MetricNames.SCHEDULED_JOB_EXECUTIONS)
+        .tag(MetricNames.TAG_JOB, ScheduledJob.BUSINESS_METRICS.label())
+        .tag(MetricNames.TAG_OUTCOME, outcome)
+        .counter()
+        .count();
+  }
+
+  private double lastSuccess() {
+    return registry
+        .get(MetricNames.SCHEDULED_JOB_LAST_SUCCESS)
+        .tag(MetricNames.TAG_JOB, ScheduledJob.BUSINESS_METRICS.label())
+        .gauge()
+        .value();
   }
 }

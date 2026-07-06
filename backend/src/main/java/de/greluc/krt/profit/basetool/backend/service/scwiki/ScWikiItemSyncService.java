@@ -112,19 +112,25 @@ public class ScWikiItemSyncService {
    * Entry point invoked by {@link ScWikiScheduler}. No-op (with an INFO line) when {@code
    * item-sync-enabled} is off; otherwise dispatches to the full backfill (Mode B) when {@code
    * sync-all-items} is on, or to the closure fill (Mode A) when it is off.
+   *
+   * <p>Returns the number of {@code game_item} rows the dispatched mode wrote, which {@link
+   * ScWikiScheduler} accumulates into {@code
+   * basetool_scheduled_job_items_total{job="scwiki_sync"}}. The disabled short-circuit returns
+   * {@code 0} so a Wiki outage surfaces as a zero-item run ({@code SyncZeroItems}, #1041 item 2).
+   *
+   * @return the number of {@code game_item} rows written this run
    */
-  public void syncItems() {
+  public int syncItems() {
     if (!Boolean.TRUE.equals(properties.getItemSyncEnabled())) {
       log.info(
           "SC Wiki item sync invoked but disabled (krt.scwiki.item-sync-enabled=false) —"
               + " skipping.");
-      return;
+      return 0;
     }
     if (Boolean.TRUE.equals(properties.getSyncAllItems())) {
-      syncItemsBackfill();
-    } else {
-      syncItemsClosure();
+      return syncItemsBackfill();
     }
+    return syncItemsClosure();
   }
 
   /**
@@ -132,13 +138,16 @@ public class ScWikiItemSyncService {
    * {@code game_item} plus every blueprint-referenced item UUID — fetching each via {@code GET
    * /api/items/{uuid}}. A {@code null} response logs {@link SyncEventType#WIKI_MISSING} and leaves
    * the row {@code UEX_ONLY}. No orphan sweep (the full pool is never enumerated).
+   *
+   * @return the number of {@code game_item} rows written this run ({@code filled} existing rows
+   *     plus {@code created} new {@code WIKI_ONLY} rows); {@code 0} when there is nothing to fill
    */
-  private void syncItemsClosure() {
+  private int syncItemsClosure() {
     Set<UUID> targets = new LinkedHashSet<>(gameItemRepository.findAllExternalUuids());
     targets.addAll(blueprintRepository.findReferencedItemUuids());
     if (targets.isEmpty()) {
       log.info("SC Wiki item sync: no game_item UUIDs to fill — nothing to do.");
-      return;
+      return 0;
     }
 
     log.info("Starting SC Wiki item sync (closure mode) for {} item uuid(s)...", targets.size());
@@ -187,6 +196,7 @@ public class ScWikiItemSyncService {
         created,
         missing,
         deferred);
+    return filled + created;
   }
 
   /**
@@ -258,8 +268,12 @@ public class ScWikiItemSyncService {
    * {@code GENERIC} catch-all, accumulating one cross-kind seen set. The orphan sweep runs only
    * when every pass succeeded (returned non-empty, non-capped data) and the seen set is non-empty —
    * mirroring the {@code clearStalePrices} non-empty gate so an outage never wipes local data.
+   *
+   * @return the number of {@code game_item} rows written this run — new {@code WIKI_ONLY} rows
+   *     created, existing rows linked {@code UEX_ONLY → BOTH}, and uuid-less UEX rows reconciled by
+   *     name/slug ({@code ctx.created + ctx.linked + ctx.reconciled})
    */
-  private void syncItemsBackfill() {
+  private int syncItemsBackfill() {
     log.info("Starting SC Wiki item sync (FULL BACKFILL mode) — paging every kind endpoint...");
     boolean reconcile = Boolean.TRUE.equals(properties.getReconcileUuidlessByName());
     List<GameItem> uuidlessUexRows =
@@ -315,6 +329,7 @@ public class ScWikiItemSyncService {
         ctx.skipped,
         ctx.deferred,
         ctx.failedPasses);
+    return ctx.created + ctx.linked + ctx.reconciled;
   }
 
   /**

@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.service.MasterDataCacheEvictionService;
 import de.greluc.krt.profit.basetool.backend.service.SyncCoordinator;
+import java.util.function.IntSupplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -92,7 +93,8 @@ public class ScWikiScheduler {
       return;
     }
     syncCoordinator.runExclusively(
-        "SC Wiki", () -> taskMetrics.record(ScheduledJob.SCWIKI_SYNC, this::runAllSyncSteps));
+        "SC Wiki",
+        () -> taskMetrics.recordCounting(ScheduledJob.SCWIKI_SYNC, this::runAllSyncSteps));
   }
 
   /**
@@ -105,32 +107,46 @@ public class ScWikiScheduler {
    * {@code finally} ({@link MasterDataCacheEvictionService#evictScWikiSyncedMasterData()}) so
    * synced commodity / vehicle / manufacturer / blueprint-family changes are visible on the next
    * read rather than lagging the 12-hour TTL (CACHE-SYNC-EVICT-001, CACHE-DIST-03).
+   *
+   * <p>Returns the total number of rows the five steps wrote this run (a failing step contributes
+   * {@code 0}), which {@link #scheduleScWikiSync()} records into {@code
+   * basetool_scheduled_job_items_total{job="scwiki_sync"}} via {@code TaskMetrics.recordCounting}.
+   * A clean sweep that wrote zero rows across every step — the signature of a Wiki catalogue outage
+   * returning empty responses — records {@code 0}, which the {@code SyncZeroItems} alert watches
+   * for (#1041 item 2).
+   *
+   * @return the total number of catalogue rows written across all five steps this run
    */
-  private void runAllSyncSteps() {
+  private int runAllSyncSteps() {
     log.debug("Running scheduled SC Wiki sync against {}", scWikiClient.getClass().getSimpleName());
+    int total = 0;
     try {
-      runStep("commodity", commoditySyncService::syncCommodities);
-      runStep("vehicle", vehicleSyncService::syncVehicles);
-      runStep("item", itemSyncService::syncItems);
-      runStep("blueprint", blueprintSyncService::syncBlueprints);
-      runStep("manufacturer", manufacturerSyncService::syncManufacturers);
+      total += runStep("commodity", commoditySyncService::syncCommodities);
+      total += runStep("vehicle", vehicleSyncService::syncVehicles);
+      total += runStep("item", itemSyncService::syncItems);
+      total += runStep("blueprint", blueprintSyncService::syncBlueprints);
+      total += runStep("manufacturer", manufacturerSyncService::syncManufacturers);
     } finally {
       masterDataCacheEvictionService.evictScWikiSyncedMasterData();
     }
+    return total;
   }
 
   /**
    * Runs one sync step, swallowing and logging any exception so a single failing sync never aborts
-   * the remaining steps or suppresses the next scheduled tick.
+   * the remaining steps or suppresses the next scheduled tick. A failing step contributes {@code 0}
+   * to the run's item tally.
    *
    * @param label short name of the step for the error log line
-   * @param step the sync invocation
+   * @param step the sync invocation, returning the number of rows it wrote
+   * @return the step's written-row count, or {@code 0} if it threw
    */
-  private void runStep(String label, Runnable step) {
+  private int runStep(String label, IntSupplier step) {
     try {
-      step.run();
+      return step.getAsInt();
     } catch (Exception e) {
       log.error("Scheduled SC Wiki {} sync failed", label, e);
+      return 0;
     }
   }
 }
