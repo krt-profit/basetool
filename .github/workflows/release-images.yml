@@ -512,9 +512,23 @@ jobs:
                  -o -name '*.pem' -o -name '*.key' -o -name 'realm-export.json' \) -print >&2
             exit 1
           fi
-          test -f /tmp/config-bundle/docker-compose.yml \
-            || { echo "::error::config bundle is missing docker-compose.yml" >&2; exit 1; }
-          echo "config bundle OK: no secrets present, docker-compose.yml present"
+          # Presence guard: the bundle MUST carry every payload the host deploy consumes.
+          # A Dockerfile COPY narrowed by mistake (e.g. dropping docker-compose.monitoring.yml
+          # or the monitoring/ tree) would otherwise ship a bundle that silently omits the
+          # monitoring compose / config, leaving the host stuck on a stale definition - the
+          # exact class of the postgres_exporter stat_replication rollout gap (#1017). Fail
+          # the release instead (ADR-0049 config bundle, ADR-0072 monitoring stack).
+          missing=0
+          for f in docker-compose.yml docker-compose.monitoring.yml; do
+            test -f "/tmp/config-bundle/${f}" \
+              || { echo "::error::config bundle is missing file: ${f}" >&2; missing=1; }
+          done
+          for d in docker/maintenance keycloak-theme monitoring; do
+            test -d "/tmp/config-bundle/${d}" \
+              || { echo "::error::config bundle is missing directory: ${d}" >&2; missing=1; }
+          done
+          test "${missing}" -eq 0 || exit 1
+          echo "config bundle OK: no secrets present, all required payloads present"
 
       - name: Inspect pushed manifest
         id: inspect
