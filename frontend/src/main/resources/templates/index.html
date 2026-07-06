@@ -102,45 +102,6 @@
     </section>
 
 </main>
-<script th:attr="nonce=${cspNonce}">
-    function toggleInfo() {
-        const body = document.getElementById('info-body');
-        const icon = document.getElementById('info-toggle-icon');
-        if (body.style.display === 'none') {
-            body.style.display = 'block';
-            icon.innerText = '▼';
-        } else {
-            body.style.display = 'none';
-            icon.innerText = '▶';
-        }
-    }
-
-    // CSP-safe delegated binding (replaces the historical onclick="toggleInfo()" inline handler
-    // on #info-header — the form-inside-the-header keeps event-propagation isolated via the
-    // shared `stop-propagation` action declared on its `data-trigger` attribute).
-    if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-        window.krtEvents.on('click', 'index-toggle-info', toggleInfo);
-    }
-
-    // Mark-announcement-read in place (epic #571, REQ-FE-005): POST through krtFetch and remove the
-    // control on success instead of reloading. The id is passed as a query param so the existing
-    // @RequestParam twin binds it; the form keeps its action/method=post as the no-JS fallback.
-    var announcementForm = document.getElementById('announcement-read-form');
-    if (announcementForm && window.krtFetch) {
-        announcementForm.addEventListener('submit', function (event) {
-            event.preventDefault();
-            var idInput = announcementForm.querySelector('input[name="id"]');
-            var announcementId = idInput ? idInput.value : '';
-            window.krtFetch.write({
-                method: 'POST',
-                url: '/announcement/read?id=' + encodeURIComponent(announcementId),
-                toast: false,
-                onSuccess: function () {
-                    announcementForm.remove();
-                }
-            });
-        });
-    }
-</script>
+<script th:src="@{/js/index.js}" th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

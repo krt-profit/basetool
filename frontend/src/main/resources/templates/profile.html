@@ -152,84 +152,16 @@
   i.e. progressive enhancement with a no-JS fallback.
 -->
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-    (function () {
-        'use strict';
-        if (!window.krtFetch) {
-            return;
-        }
-        var i18n = {
-            saved: /*[[#{frontend.ajax.saved}]]*/ 'Saved successfully.',
-            error: /*[[#{error.profile.update.failed}]]*/ 'Update failed.',
-            conflictTitle: /*[[#{frontend.ajax.conflict.title}]]*/ 'Conflict',
-            conflictReload: /*[[#{frontend.ajax.conflict.reload}]]*/ 'Load current values',
-            conflictDismiss: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Close',
-            conflictQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Load current values?',
-            conflictDetail: /*[[#{frontend.ajax.conflict.detail}]]*/ 'The data was changed in the meantime.'
-        };
-
-        // The description form and the payout-preference form share ONE user-row version; sync
-        // every hidden version input on success so the next save (from either form) does not 409.
-        function syncAllVersions(version) {
-            if (version == null) {
-                return;
-            }
-            document.querySelectorAll('input[name="version"]').forEach(function (input) {
-                input.value = String(version);
-            });
-        }
-
-        function bindInPlaceSave(formId, buildPayload) {
-            var form = document.getElementById(formId);
-            if (!form) {
-                return;
-            }
-            form.addEventListener('submit', function (event) {
-                event.preventDefault();
-                var versionInput = form.querySelector('input[name="version"]');
-                window.krtFetch.write({
-                    method: 'POST',
-                    url: form.getAttribute('action'),
-                    payload: buildPayload(form, versionInput ? Number(versionInput.value) : 0),
-                    successMessage: i18n.saved,
-                    errorMessage: i18n.error,
-                    conflict: {
-                        title: i18n.conflictTitle,
-                        reloadLabel: i18n.conflictReload,
-                        dismissLabel: i18n.conflictDismiss,
-                        reloadQuestion: i18n.conflictQuestion,
-                        reloadDetailFallback: i18n.conflictDetail
-                    },
-                    onSuccess: function (body) {
-                        if (body) {
-                            syncAllVersions(body.version);
-                        }
-                    }
-                });
-            });
-        }
-
-        bindInPlaceSave('profile-description-form', function (form, version) {
-            return {
-                description: form.querySelector('#description').value,
-                displayName: form.querySelector('#displayName').value,
-                version: version
-            };
-        });
-        bindInPlaceSave('profile-payout-form', function (form, version) {
-            var select = form.querySelector('select[name="defaultPayoutPreference"]');
-            return {
-                defaultPayoutPreference: select ? select.value : null,
-                version: version
-            };
-        });
-        bindInPlaceSave('profile-blueprint-sharing-form', function (form, version) {
-            var checkbox = form.querySelector('input[name="shareBlueprintsGlobally"]');
-            return {
-                shareBlueprintsGlobally: checkbox ? checkbox.checked : false,
-                version: version
-            };
-        });
-    })();
+    window.krtProfileI18n = {
+        saved: /*[[#{frontend.ajax.saved}]]*/ 'Saved successfully.',
+        error: /*[[#{error.profile.update.failed}]]*/ 'Update failed.',
+        conflictTitle: /*[[#{frontend.ajax.conflict.title}]]*/ 'Conflict',
+        conflictReload: /*[[#{frontend.ajax.conflict.reload}]]*/ 'Load current values',
+        conflictDismiss: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Close',
+        conflictQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Load current values?',
+        conflictDetail: /*[[#{frontend.ajax.conflict.detail}]]*/ 'The data was changed in the meantime.'
+    };
 </script>
+<script th:src="@{/js/profile.js}" th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>
