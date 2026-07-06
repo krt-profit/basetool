@@ -67,7 +67,23 @@ public final class MetricNames {
    */
   public static final String PRESENCE_RELAY_DROPPED = "basetool.presence.relay.dropped";
 
-  /** Tag key: the bounded backend-call failure reason (also the presence-drop reason). */
+  /**
+   * Counter {@code basetool_login_total} — tags {@code outcome} ({@link #OUTCOME_SUCCESS} / {@link
+   * #OUTCOME_FAILURE}) and {@code reason} (on failure {@link #LOGIN_REASON_INVALID_STATE} / {@link
+   * #LOGIN_REASON_PROVIDER_ERROR} / {@link #LOGIN_REASON_OTHER}, else {@link #LOGIN_REASON_NONE}).
+   * The reason is mapped from the exception type, never the raw error string (#1041 item 18).
+   */
+  public static final String LOGIN = "basetool.login";
+
+  /**
+   * Counter {@code basetool_csrf_rejections_total} (unlabelled) — bumped by the access-denied
+   * handler on a CSRF-token rejection before it delegates the 403. {@code krtFetch}'s silent
+   * single-retry self-heal otherwise masks a systematic CSRF-wiring regression as intermittent
+   * failed writes (#1041 item 18).
+   */
+  public static final String CSRF_REJECTIONS = "basetool.csrf.rejections";
+
+  /** Tag key: the bounded backend-call failure reason (also the presence-drop / login reason). */
   public static final String TAG_REASON = "reason";
 
   /** Tag key: the HTTP verb of the failed backend call ({@code GET}/{@code POST}/…). */
@@ -75,6 +91,27 @@ public final class MetricNames {
 
   /** Tag key: the presence-relay frame type on {@link #PRESENCE_RELAY_FRAMES}. */
   public static final String TAG_TYPE = "type";
+
+  /** Tag key: the login outcome on {@link #LOGIN}. */
+  public static final String TAG_OUTCOME = "outcome";
+
+  /** Login outcome: authentication succeeded. */
+  public static final String OUTCOME_SUCCESS = "success";
+
+  /** Login outcome: authentication failed. */
+  public static final String OUTCOME_FAILURE = "failure";
+
+  /** Login failure reason: OAuth2 state / authorization-request mismatch (CSRF-of-the-flow). */
+  public static final String LOGIN_REASON_INVALID_STATE = "invalid_state";
+
+  /** Login failure reason: the IdP or the code-to-token exchange returned an error. */
+  public static final String LOGIN_REASON_PROVIDER_ERROR = "provider_error";
+
+  /** Login failure reason: any other authentication exception. */
+  public static final String LOGIN_REASON_OTHER = "other";
+
+  /** Login reason placeholder on a success (keeps the counter's label schema consistent). */
+  public static final String LOGIN_REASON_NONE = "none";
 
   /** Presence relay frame type: a peer-forwarded {@code changed} live-sync signal. */
   public static final String FRAME_CHANGED = "changed";
