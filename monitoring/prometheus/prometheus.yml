@@ -240,3 +240,45 @@ scrape_configs:
         target_label: instance
       - target_label: __address__
         replacement: blackbox-exporter:9115
+
+  # --- Internal self-signed TLS expiry probes (REQ-OBS-008, #1041 item 8) ----------------------------
+  # Probe the app modules' basetool-CA-signed keystore.p12 cert and Grafana's own self-signed cert from
+  # INSIDE the monitoring plane. Their probe_ssl_earliest_cert_expiry feeds the (unfiltered)
+  # CertificateExpiringSoon alert, catching an internal-cert expiry ~14 days before it breaks all three
+  # app scrapes + the frontend->backend WebClient + the NPM->Grafana re-encryption at once (today only a
+  # same-day TargetDown warns). These jobs are deliberately OUTSIDE BlackboxProbeFailed's liveness
+  # include-list (job=~"blackbox-http|blackbox-http-auth"), so a down app pages once via TargetDown, not
+  # again here.
+  - job_name: blackbox-internal-tls
+    metrics_path: /probe
+    params:
+      module: [https_internal]
+    static_configs:
+      - targets:
+          - https://backend:11261
+          - https://frontend:18081
+          - https://ingest:11262
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # Grafana serves its own self-signed cert (not basetool-CA-signed), so it uses the
+  # insecure_skip_verify variant; probe_ssl_earliest_cert_expiry is still emitted for the same alert.
+  - job_name: blackbox-internal-tls-grafana
+    metrics_path: /probe
+    params:
+      module: [https_internal_insecure]
+    static_configs:
+      - targets:
+          - https://grafana:3000
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
