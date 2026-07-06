@@ -38,8 +38,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "External sync stale >48h ({{ $labels.job }})"
-          description: "The {{ $labels.job }} catalogue sync last succeeded more than 48 hours ago."
+          summary: "External sync stale >48h ({{ $labels.exported_job }})"
+          description: "The {{ $labels.exported_job }} catalogue sync last succeeded more than 48 hours ago."
 
       - alert: ScheduledJobFailureStreak
         expr: increase(basetool_scheduled_job_executions_total{outcome="failure"}[1h]) >= 3
@@ -47,8 +47,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Scheduled job failing repeatedly ({{ $labels.job }})"
-          description: "Job '{{ $labels.job }}' recorded {{ $value }} failed runs in the last hour."
+          summary: "Scheduled job failing repeatedly ({{ $labels.exported_job }})"
+          description: "Job '{{ $labels.exported_job }}' recorded {{ $value }} failed runs in the last hour."
 
       # Historical optimistic-locking regression indicator (the project's canonical 409 signal).
       - alert: OptimisticLockConflictSpike

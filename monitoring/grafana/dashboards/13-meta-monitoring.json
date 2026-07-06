@@ -290,6 +290,101 @@
           }
         }
       ]
+    },
+    {
+      "id": 9,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 24
+      },
+      "type": "timeseries",
+      "title": "Log stream read rate (per tailed file)",
+      "description": "Lines/s Alloy reads per tailed file (loki_source_file_read_lines_total). A file going flat while others flow, or a path disappearing, is the LogStreamSilent signal.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {},
+      "targets": [
+        {
+          "expr": "sum by (path) (rate(loki_source_file_read_lines_total[5m]))",
+          "legendFormat": "{{path}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 24
+      },
+      "type": "timeseries",
+      "title": "Loki lines received rate",
+      "description": "Total lines/s Loki ingests (loki_distributor_lines_received_total). Zero for 30m while edge traffic flows is the LokiIngestSilent signal.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {},
+      "targets": [
+        {
+          "expr": "sum(rate(loki_distributor_lines_received_total[5m]))",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 24
+      },
+      "type": "timeseries",
+      "title": "Log shipper dropped entries (per reason)",
+      "description": "Entries/s the Alloy loki.write client drops before Loki (loki_write_dropped_entries_total). Any non-zero series is the LokiWriteFailing signal.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {},
+      "targets": [
+        {
+          "expr": "sum by (reason) (rate(loki_write_dropped_entries_total[5m]))",
+          "legendFormat": "{{reason}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
     }
   ]
 }
