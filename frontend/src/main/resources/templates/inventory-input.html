@@ -134,133 +134,19 @@
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-    document.addEventListener('DOMContentLoaded', function() {
-        const matSelect = document.getElementById('materialId');
-        if (matSelect) {
-            matSelect.addEventListener('change', function() {
-                filterJobOrdersByMaterial(this.value);
-                updateAmountFieldForMaterial(this);
-            });
-            // Initial filter if a material is already selected
-            if (matSelect.value) {
-                filterJobOrdersByMaterial(matSelect.value);
-                updateAmountFieldForMaterial(matSelect);
-            } else {
-                // If no material is selected, show all job orders initially
-                filterJobOrdersByMaterial('');
-            }
-        }
-    });
-
-    function updateAmountFieldForMaterial(selectElement) {
-        const amountInput = document.getElementById('amount');
-        const unitSpan = document.getElementById('amount-unit');
-        const scuHint = document.getElementById('amount-scu-hint');
-        if (!amountInput || !selectElement.selectedOptions || selectElement.selectedOptions.length === 0) return;
-
-        const qtType = selectElement.selectedOptions[0].getAttribute('data-quantity-type');
-
-        if (qtType === 'PIECE') {
-            amountInput.setAttribute('step', '1');
-            unitSpan.textContent = '([[#{material.quantity.piece}]])';
-            if (scuHint) scuHint.style.display = 'none';
-        } else if (qtType === 'SCU') {
-            amountInput.setAttribute('step', '0.001');
-            unitSpan.textContent = '([[#{material.quantity.scu}]])';
-            if (scuHint) scuHint.style.display = '';
-        } else {
-            amountInput.setAttribute('step', '0.001');
-            unitSpan.textContent = '';
-            if (scuHint) scuHint.style.display = 'none';
-        }
-    }
-
-    function filterJobOrdersByMaterial(matId) {
-        const jobSelect = document.getElementById('jobOrderId');
-        if (!jobSelect) return;
-        
-        let hasSelectedValidOption = false;
-        
-        for (let i = 1; i < jobSelect.options.length; i++) {
-            const option = jobSelect.options[i];
-            
-            if (!matId) {
-                // If no material is selected, show all active orders
-                option.style.display = '';
-                option.disabled = false;
-                if (option.selected) hasSelectedValidOption = true;
-            } else {
-                const materialsStr = option.getAttribute('data-materials');
-                if (materialsStr) {
-                    const materials = materialsStr.split(',');
-                    if (materials.includes(matId)) {
-                        option.style.display = '';
-                        option.disabled = false;
-                        if (option.selected) hasSelectedValidOption = true;
-                    } else {
-                        option.style.display = 'none';
-                        option.disabled = true;
-                    }
-                } else {
-                    option.style.display = 'none';
-                    option.disabled = true;
-                }
-            }
-        }
-        
-        if (jobSelect.selectedIndex > 0 && !hasSelectedValidOption) {
-            jobSelect.value = "";
-        }
-    }
+    // Thymeleaf-interpolated i18n strings only; the imperative logic (both former blocks, combined in
+    // document order) lives in the inventory-input.js page module loaded right after this bootstrap
+    // (ADR-0069). The two unit labels replace the former raw '([[#{...}]])' text-inline sites.
+    /*<![CDATA[*/
+    const MSG_UNIT_PIECE = /*[[#{material.quantity.piece}]]*/ 'Stueck';
+    const MSG_UNIT_SCU = /*[[#{material.quantity.scu}]]*/ 'SCU';
+    const INV_ADD_MSG = {
+        failed: /*[[#{error.inventory.add.failed}]]*/ 'Fehler.',
+        personalAssignment: /*[[#{error.inventory.personal.assignment}]]*/ 'Ungueltig.',
+        validation: /*[[#{error.validation.failed}]]*/ 'Eingaben pruefen.'
+    };
+    /*]]>*/
 </script>
-<script th:inline="javascript" th:attr="nonce=${cspNonce}">
-    // #577: book an item into the inventory in place. The classic POST->redirect stays the no-JS
-    // fallback; here we submit via the X-Requested-With twin and navigate to the source listing on
-    // success (navigate-after-AJAX), keeping the form + a toast on a validation/backend error
-    // instead of a flash-redirect. FormData submit lets the browser serialize the SCU-decimal amount
-    // + owner-picker exactly like the classic POST.
-    (function () {
-        if (!window.krtFetch) return; // no-JS / no-foundation: the classic POST->redirect runs.
-        const form = document.getElementById('inventory-input-form');
-        if (!form) return;
-        /*<![CDATA[*/
-        const INV_ADD_MSG = {
-            failed: /*[[#{error.inventory.add.failed}]]*/ 'Fehler.',
-            personalAssignment: /*[[#{error.inventory.personal.assignment}]]*/ 'Ungueltig.',
-            validation: /*[[#{error.validation.failed}]]*/ 'Eingaben pruefen.'
-        };
-        /*]]>*/
-        // Migrated to krtFetch.submitForm (S10, REQ-FE-009): the shared foundation owns the CSRF
-        // header (no Content-Type so the browser sets the multipart boundary), the bare-403
-        // refresh-and-retry, X-Reauthenticate and the double-submit guard. This handler keeps only
-        // its page behaviour: navigate-after-AJAX on success (toast:false — the destination renders
-        // its own toast) and the code-specific inline error toast (onError). The classic
-        // POST->redirect stays the no-JS fallback (the guard above returns before this listener).
-        form.addEventListener('submit', function (event) {
-            event.preventDefault();
-            window.krtFetch.submitForm({
-                form: form,
-                submitter: form.querySelector('button[type="submit"]'),
-                toast: false,
-                errorMessage: INV_ADD_MSG.failed,
-                onError: function (status, problem) {
-                    let msg = INV_ADD_MSG.failed;
-                    if (problem && problem.code === 'INVENTORY_PERSONAL_ASSIGNMENT') msg = INV_ADD_MSG.personalAssignment;
-                    else if (problem && problem.code === 'VALIDATION') msg = INV_ADD_MSG.validation;
-                    else if (problem && problem.detail) msg = problem.detail;
-                    if (window.showFrontendErrorToast) window.showFrontendErrorToast(msg);
-                    return true;
-                },
-                onSuccess: function (body) {
-                    // Navigate to the source listing carrying a success signal the destination's
-                    // toast fragment renders — a pre-navigation toast would be torn down by the load.
-                    const target = body && body.targetUrl ? body.targetUrl : '/inventory';
-                    window.location.assign(
-                        target + (target.indexOf('?') >= 0 ? '&' : '?') + 'success=success.inventory.add');
-                },
-            });
-        });
-    })();
-</script>
+<script th:src="@{/js/inventory-input.js}" th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>
