@@ -3114,7 +3114,7 @@ class MissionPageControllerMvcTest {
    * so that read is never reached here and cannot be asserted separately. {@code /users/lookup}
    * (not principal-guarded) is therefore the testable proxy for the whole mgmt-block gate.
    */
-  private void verifyNoManagerReads(UUID missionId) {
+  private void verifyNoManagerReads() {
     verify(backendApiClient, never()).get(eq("/api/v1/users/lookup"), anyTypeRef(), anyBoolean());
   }
 
@@ -3134,7 +3134,7 @@ class MissionPageControllerMvcTest {
 
     // A crew-board refetch renders neither finance data nor the manager/owner pickers.
     verifyNoFinanceReads(missionId);
-    verifyNoManagerReads(missionId);
+    verifyNoManagerReads();
   }
 
   @Test
@@ -3153,7 +3153,7 @@ class MissionPageControllerMvcTest {
 
     // The overview fragment needs none of finance / manager pickers / unit-ship options.
     verifyNoFinanceReads(missionId);
-    verifyNoManagerReads(missionId);
+    verifyNoManagerReads();
     verify(backendApiClient, never())
         .get(
             eq("/api/v1/missions/" + missionId + "/unit-ship-options"), anyTypeRef(), anyBoolean());
