@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **Technisch: Inline-JavaScript der Beförderungs-Übersichts- und Bewertungsseiten in statische Module ausgelagert.** Das JavaScript der Beförderungsübersicht (Alle-auf-/zuklappen) und der Seite „Meine Bewertungen" (Fortschrittsbalken, Filter „nur offene Voraussetzungen") wurde ohne Verhaltensänderung aus den Thymeleaf-Vorlagen in browser-zwischenspeicherbare, lint- und formatierbare Dateien unter `static/js/` verlagert (ADR-0069).
+
 - **Technisch: Inline-JavaScript der Beförderungs-Adminseiten in statische Module ausgelagert.** Das JavaScript der Beförderungs-Admin-Seiten (Themen/Kategorien und Rang-Anforderungen) wurde ohne Verhaltensänderung aus den Thymeleaf-Vorlagen in browser-zwischenspeicherbare, lint- und formatierbare Dateien unter `static/js/` verlagert (ADR-0069).
 
 - **Technisch: Inline-JavaScript des Organigramm-Editors in ein statisches Modul ausgelagert.** Das JavaScript der Organigramm-Seite (Positionen anlegen/umbesetzen/umbenennen/entfernen, Dialog-Fokusfalle und ARIA-Baum-Tastaturnavigation) wurde ohne Verhaltensänderung aus der Thymeleaf-Vorlage in eine browser-zwischenspeicherbare, lint- und formatierbare Datei unter `static/js/` verlagert (ADR-0069).
