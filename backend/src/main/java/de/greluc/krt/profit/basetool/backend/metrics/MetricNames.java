@@ -54,6 +54,16 @@ public final class MetricNames {
   /** Counter {@code basetool_sync_events_total} — tags {@code source}, {@code event_type}. */
   public static final String SYNC_EVENTS = "basetool.sync.events";
 
+  // --- External outbound-fetch failures (UexClient / ScWikiClient) -----------------------
+
+  /**
+   * Counter {@code basetool_external_fetch_errors_total} — tag {@code source} ({@link #SOURCE_UEX}
+   * / {@link #SOURCE_SCWIKI}). Incremented where an upstream fetch/parse error is swallowed into an
+   * empty result, so a weeks-long catalogue outage is visible even though the sync job still
+   * "succeeds" (REQ-OBS-011).
+   */
+  public static final String EXTERNAL_FETCH_ERRORS = "basetool.external.fetch.errors";
+
   // --- HTTP error rate (GlobalExceptionHandler) ------------------------------------------
 
   /** Counter {@code basetool_http_error_total} — tag {@code code} (stable RFC-7807 code). */
@@ -163,6 +173,12 @@ public final class MetricNames {
 
   /** Rate-limit bucket value for the global {@code /api/**} path budget. */
   public static final String BUCKET_GLOBAL = "global";
+
+  /** {@code source} value for the UEX API client ({@link #EXTERNAL_FETCH_ERRORS}). */
+  public static final String SOURCE_UEX = "uex";
+
+  /** {@code source} value for the Star Citizen Wiki client ({@link #EXTERNAL_FETCH_ERRORS}). */
+  public static final String SOURCE_SCWIKI = "scwiki";
 
   /** Integrity category: an account whose derived (SQL-summed) balance is negative. */
   public static final String CATEGORY_NEGATIVE_ACCOUNT_BALANCE = "negative_account_balance";

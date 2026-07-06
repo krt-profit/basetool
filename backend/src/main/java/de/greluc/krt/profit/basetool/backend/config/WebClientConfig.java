@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import io.micrometer.observation.ObservationRegistry;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
@@ -42,14 +43,24 @@ import org.springframework.web.reactive.function.client.WebClient;
 public class WebClientConfig {
 
   /**
-   * Returns a {@link WebClient.Builder} pre-configured with the Netty connector, bounded pool and
-   * timeouts; injected by services that talk to external HTTP endpoints.
+   * Returns a {@link WebClient.Builder} pre-configured with the Netty connector, bounded pool,
+   * timeouts and the Micrometer {@link ObservationRegistry}; injected by services that talk to
+   * external HTTP endpoints.
    *
-   * @return a {@link WebClient.Builder} pre-configured with the Netty connector, bounded pool and
-   *     timeouts; injected by services that talk to external HTTP endpoints
+   * <p>Wiring the {@code ObservationRegistry} into this hand-built builder (Boot's
+   * auto-configuration only instruments the auto-configured {@code WebClient.Builder}) makes every
+   * UEX / SC-Wiki outbound call emit {@code http_client_requests_seconds} metrics and OTLP client
+   * spans, with the {@code ObservationPrivacyFilter} scrubbing query strings and collapsing id path
+   * segments (REQ-OBS-009). Without it the backend was the only module leaving its outbound calls
+   * unobserved.
+   *
+   * @param observationRegistry the Micrometer observation registry (auto-configured by Boot)
+   * @return a {@link WebClient.Builder} pre-configured with the Netty connector, bounded pool,
+   *     timeouts and observation registry; injected by services that talk to external HTTP
+   *     endpoints
    */
   @Bean
-  public WebClient.Builder webClientBuilder() {
+  public WebClient.Builder webClientBuilder(ObservationRegistry observationRegistry) {
     reactor.netty.resources.ConnectionProvider provider =
         reactor.netty.resources.ConnectionProvider.builder("backend-pool")
             .maxConnections(50)
@@ -74,6 +85,7 @@ public class WebClientConfig {
 
     return WebClient.builder()
         .clientConnector(
-            new org.springframework.http.client.reactive.ReactorClientHttpConnector(httpClient));
+            new org.springframework.http.client.reactive.ReactorClientHttpConnector(httpClient))
+        .observationRegistry(observationRegistry);
   }
 }

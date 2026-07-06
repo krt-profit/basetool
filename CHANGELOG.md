@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **Monitoring: Fehlgeschlagene UEX-/SC-Wiki-Abrufe sind jetzt sichtbar.** Verschluckte Abruf- und Parse-Fehler der externen Kataloge werden nun gezählt (`basetool_external_fetch_errors_total`) und als `ExternalFetchErrors` alarmiert – bisher meldete der Sync trotz wochenlangem Ausfall weiter „Erfolg". Zusätzlich sind die ausgehenden Backend-Aufrufe jetzt an die Observation-Registry angebunden (Metriken + Spans, REQ-OBS-009/-011).
+
 - **Monitoring: Die Überwachungsebene erkennt jetzt eigene stille Ausfälle.** Neue Alarme decken fehlgeschlagene Config-Reloads (Prometheus/Alertmanager/Alloy/Blackbox), Regel- und Benachrichtigungsfehler (Prometheus + Loki-Ruler), stille Log-Ströme (Alloy tailt eine kritische Datei wie auth.log/audit.log nicht mehr) sowie cAdvisor-Aussetzer, Container-OOM-Kills und CPU-Drosselung ab. Dazu kommen eine Log-Pipeline-Zeile im Meta-Dashboard und korrigierte Scheduled-Job-Alarmtexte, die wieder den echten Job-Namen statt „basetool-backend" zeigen (REQ-OBS-014).
 
 - **Betrieb: Docker-Aufräumen läuft jetzt über einen systemd-Timer statt Cron.** Das wöchentliche `docker-cleanup.sh` (Samstag 02:00 UTC) wird nun vom systemd-Timer `iri-docker-cleanup.timer` ausgelöst – konsistent mit Backup, Deploy und Restore-Drill; damit laufen alle Wartungsjobs über systemd. Ausführung und Logs jetzt über `systemctl`/`journalctl`; die Monitoring-Textfile-Metriken und die zugehörige Warnung bleiben unverändert.
