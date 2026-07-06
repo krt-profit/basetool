@@ -1,6 +1,6 @@
 # ADR-0069 — Extract inline template JavaScript into static page modules (bootstrap-dict + verbatim module)
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-07-03
 - **Deciders:** Repository owner (@greluc)
 - **Related:** issue #924 (L5 part 2, epic #905) · ADR-0068 (the controller split of the same issue) · ADR-0012/0013 (krtFetch foundation) · REQ-FE-001…011 ([`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md)) · #574 (mission i18n-dict precedent)
