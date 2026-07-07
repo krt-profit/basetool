@@ -59,9 +59,10 @@ import org.springframework.web.context.WebApplicationContext;
 
 /**
  * MVC render + proxy test for {@link MaterialboersePageController}. Renders the real Thymeleaf
- * master-detail (catching any template error) with a mocked backend, proves the server-side Markdown
- * remark is rendered into the page, and proves the remark-edit proxy relays a backend optimistic-lock
- * conflict as a 409 with the problem code so {@code krtFetch} can offer the reload-confirm.
+ * master-detail (catching any template error) with a mocked backend, proves the server-side
+ * Markdown remark is rendered into the page, and proves the remark-edit proxy relays a backend
+ * optimistic-lock conflict as a 409 with the problem code so {@code krtFetch} can offer the
+ * reload-confirm.
  */
 @SpringBootTest
 class MaterialboersePageControllerMvcTest {
@@ -103,7 +104,8 @@ class MaterialboersePageControllerMvcTest {
         .thenReturn(new PageResponse<>(List.of(offer), 0, 200, 1, 1, List.of()));
     when(backendApiClient.get(contains("/material-exchange/counts"), anyClass()))
         .thenReturn(new MaterialExchangeCountsDto(1, 0));
-    when(backendApiClient.get(contains("/material-exchange/offers/"), anyClass())).thenReturn(offer);
+    when(backendApiClient.get(contains("/material-exchange/offers/"), anyClass()))
+        .thenReturn(offer);
   }
 
   /** The full page renders with the title, an offer row and the server-rendered Markdown remark. */
@@ -145,7 +147,9 @@ class MaterialboersePageControllerMvcTest {
         .andExpect(status().isOk());
   }
 
-  /** The remark-edit proxy relays a backend optimistic-lock conflict as 409 with the problem code. */
+  /**
+   * The remark-edit proxy relays a backend optimistic-lock conflict as 409 with the problem code.
+   */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void remarkProxy_backendConflict_relays409() throws Exception {

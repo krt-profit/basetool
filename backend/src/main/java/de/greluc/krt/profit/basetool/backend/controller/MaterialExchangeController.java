@@ -190,6 +190,19 @@ public class MaterialExchangeController {
   }
 
   /**
+   * Returns which of the given Lager rows currently carry an active board offer — the "Auf Börse"
+   * status flags for a batch of Mein-Lager leaf rows (no N+1).
+   *
+   * @param ids the Lager rows to check (repeated {@code ids} query params).
+   * @return the subset that have an active offer.
+   */
+  @GetMapping("/released-item-ids")
+  @Operation(summary = "Which of the given Lager rows currently carry an active offer.")
+  public List<UUID> releasedItemIds(@RequestParam(name = "ids", required = false) List<UUID> ids) {
+    return ids == null ? List.of() : List.copyOf(service.releasedInventoryItemIds(ids));
+  }
+
+  /**
    * Returns the caller's own Lager rows eligible for release, for the "Material anbieten" item
    * picker.
    *

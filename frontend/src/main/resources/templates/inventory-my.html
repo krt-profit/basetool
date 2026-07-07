@@ -3,6 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title>Mein Lager - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
+<link rel="stylesheet" th:href="@{/css/materialboerse.css}"/>
 <style th:attr="nonce=${cspNonce}">
         .actions-bar {
             display: flex;
@@ -493,6 +494,8 @@
 </div>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
+<!-- Shared Materialbörse release / edit modal, reused by the "Für Börse freigeben" leaf checkbox -->
+<th:block th:replace="~{fragments/materialboerse-modal :: releaseModal}"/>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     var stackEntriesI18n = {
         loading: /*[[#{inventory.stack.entries.loading}]]*/ 'Eintr\u00e4ge werden geladen\u2026',
@@ -554,8 +557,21 @@
         conflict: /*[[#{error.inventory.update.conflict}]]*/ 'Der Eintrag wurde in der Zwischenzeit von einem anderen Nutzer ge\u00e4ndert. Bitte lade die Seite neu.',
         failed: /*[[#{error.inventory.update.failed}]]*/ 'Fehler beim Aktualisieren des Lagers.'
     };
+
+    // "F\u00fcr B\u00f6rse freigeben" leaf-checkbox strings (inventory-materialboerse.js).
+    var materialboerseInventoryI18n = {
+        statusOn: /*[[#{materialboerse.inventory.forExchange.on}]]*/ 'Auf B\u00f6rse',
+        statusPrivate: /*[[#{materialboerse.inventory.forExchange.private}]]*/ 'privat',
+        deactivateTitle: /*[[#{materialboerse.action.deactivate.confirm.title}]]*/ 'Angebot deaktivieren?',
+        deactivateBody: /*[[#{materialboerse.action.deactivate.confirm.body}]]*/ 'Das Angebot ist danach nicht mehr \u00f6ffentlich sichtbar.',
+        confirmYes: /*[[#{materialboerse.action.deactivate.confirm.yes}]]*/ 'Deaktivieren',
+        confirmNo: /*[[#{materialboerse.modal.cancel}]]*/ 'Abbrechen',
+        deactivated: /*[[#{materialboerse.toast.deactivated}]]*/ 'Von der B\u00f6rse genommen.',
+        error: /*[[#{notification.error.save}]]*/ 'Fehler.'
+    };
 </script>
 <script th:src="@{/js/inventory-note-modal.js}" th:attr="nonce=${cspNonce}"></script>
 <script th:src="@{/js/inventory-my.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/inventory-materialboerse.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

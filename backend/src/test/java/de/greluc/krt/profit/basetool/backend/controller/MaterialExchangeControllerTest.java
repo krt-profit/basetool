@@ -146,6 +146,15 @@ class MaterialExchangeControllerTest {
   }
 
   @Test
+  void releasedItemIdsDelegates() {
+    UUID a = UUID.randomUUID();
+    UUID b = UUID.randomUUID();
+    when(service.releasedInventoryItemIds(List.of(a, b))).thenReturn(java.util.Set.of(a));
+
+    assertThat(controller.releasedItemIds(List.of(a, b))).containsExactly(a);
+  }
+
+  @Test
   void releasableItemsDelegates() {
     List<MaterialExchangeReleasableItemDto> items =
         List.of(
