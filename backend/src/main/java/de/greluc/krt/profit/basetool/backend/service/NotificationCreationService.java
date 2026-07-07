@@ -53,22 +53,27 @@ public class NotificationCreationService {
   private final RuleEvaluationService ruleEvaluationService;
   private final NotificationRepository notificationRepository;
   private final NotificationParamsCodec notificationParamsCodec;
-  private final NotificationStreamService notificationStreamService;
 
   /**
    * Resolves recipients for the event and writes one notification per recipient per produced type.
    *
+   * <p>Deliberately does NOT push the real-time SSE signal here (#1152): the push fires from {@link
+   * NotificationEventListener} <em>after</em> this transaction commits, so the client's
+   * unread-count refetch reads the committed rows (not a pre-commit stale count) and no Hikari
+   * connection is pinned across the blocking SSE fan-out. This method returns the recipients the
+   * listener publishes to.
+   *
    * @param event the fired event
-   * @return the number of notification rows created
+   * @return the deduplicated recipient {@code sub}s that received a notification (empty when none)
    */
   @Transactional
-  public int createFromEvent(@NotNull NotificationEvent event) {
+  public Set<UUID> createFromEvent(@NotNull NotificationEvent event) {
     Map<NotificationType, Set<UUID>> recipientsByType =
         ruleEvaluationService.resolveRecipients(event);
     if (recipientsByType.isEmpty()) {
       log.debug(
           "Event {} for entity {} resolved no recipients", event.eventType(), event.entityId());
-      return 0;
+      return Set.of();
     }
     String paramsJson = notificationParamsCodec.serialize(event.renderParams());
     List<Notification> toCreate = new ArrayList<>();
@@ -92,24 +97,8 @@ public class NotificationCreationService {
         toCreate.size(),
         event.eventType(),
         event.entityId());
-    pushRealtime(recipientsByType);
-    return toCreate.size();
-  }
-
-  /**
-   * Best-effort real-time push: notifies the live SSE subscribers of every recipient so their
-   * client refreshes its unread state. A push failure is swallowed — the frontend polling fallback
-   * keeps the unread badge correct regardless (REQ-NOTIF-010).
-   *
-   * @param recipientsByType the resolved recipients grouped by produced type
-   */
-  private void pushRealtime(Map<NotificationType, Set<UUID>> recipientsByType) {
     Set<UUID> recipientSubs = new HashSet<>();
     recipientsByType.values().forEach(recipientSubs::addAll);
-    try {
-      notificationStreamService.publish(recipientSubs);
-    } catch (RuntimeException e) {
-      log.debug("Real-time notification push failed; polling fallback remains", e);
-    }
+    return recipientSubs;
   }
 }

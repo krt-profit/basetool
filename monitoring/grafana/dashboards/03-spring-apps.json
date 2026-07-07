@@ -835,6 +835,41 @@
         "overrides": []
       },
       "options": {}
+    },
+    {
+      "id": 24,
+      "type": "timeseries",
+      "title": "Backend fan-out ratio (client calls / server request)",
+      "description": "Derived frontend->backend read-amplification (#1128): outbound backend client calls per inbound app request, per application. For the frontend this is backend GETs per page/fragment render; a per-render read-amplification regression (e.g. an un-gated page fan-out) spikes this ratio well before the late HikariPoolPending / HttpLatencyP95High signals fire. Backed by AppFanoutRatioHigh in apps.yml.",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 72
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (application) (rate(http_client_requests_seconds_count{application=~\"$application\"}[5m])) / clamp_min(sum by (application) (rate(http_server_requests_seconds_count{application=~\"$application\"}[5m])), 0.001)",
+          "legendFormat": "{{application}} fan-out",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {}
     }
   ]
 }

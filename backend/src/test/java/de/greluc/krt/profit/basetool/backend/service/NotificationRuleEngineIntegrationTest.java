@@ -137,9 +137,9 @@ class NotificationRuleEngineIntegrationTest {
 
     try {
       JobOrderCreatedEvent event = eventForRandomUnits();
-      int created = notificationCreationService.createFromEvent(event);
+      Set<UUID> recipients = notificationCreationService.createFromEvent(event);
 
-      assertThat(created).isGreaterThanOrEqualTo(1);
+      assertThat(recipients).isNotEmpty();
       assertThat(notificationRepository.findAllByRecipientSub(recipient, Pageable.unpaged()))
           .singleElement()
           .satisfies(
@@ -191,11 +191,11 @@ class NotificationRuleEngineIntegrationTest {
                 assertThat(s.getRoleCode()).isEqualTo("ADMIN");
               });
 
-      int created =
+      Set<UUID> recipients =
           notificationCreationService.createFromEvent(
               new DiscordRegistrationPendingEvent(newUserId, "newbie"));
 
-      assertThat(created).isGreaterThanOrEqualTo(1);
+      assertThat(recipients).isNotEmpty();
       assertThat(notificationRepository.findAllByRecipientSub(adminSub, Pageable.unpaged()))
           .singleElement()
           .satisfies(

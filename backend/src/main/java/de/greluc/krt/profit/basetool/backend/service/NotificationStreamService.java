@@ -24,11 +24,14 @@ import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -53,7 +56,25 @@ public class NotificationStreamService {
   /** How long a single SSE connection is held open before the client must reconnect. */
   private static final long EMITTER_TIMEOUT_MS = Duration.ofMinutes(30).toMillis();
 
-  private final Map<UUID, Set<SseEmitter>> emittersBySub = new ConcurrentHashMap<>();
+  /**
+   * Max concurrent SSE streams retained per recipient {@code sub} (#1156). Every browser tab /
+   * device opens its own stream; beyond this many the OLDEST is retired with a terminal {@code
+   * replaced} event the client treats as do-not-reconnect, so one user's many tabs cannot multiply
+   * against the org-wide relay pool (which was sized on one stream per viewer). Kept small — a
+   * handful of tabs / devices is normal; more is almost always stale tabs. Package-private for the
+   * test.
+   */
+  static final int MAX_EMITTERS_PER_SUB = 5;
+
+  /**
+   * A {@link Queue} (FIFO) per recipient rather than a bare set, so {@link #MAX_EMITTERS_PER_SUB}
+   * eviction can retire the OLDEST stream (poll head) while adds append to the tail. {@link
+   * ConcurrentLinkedQueue} keeps {@link #publish}/{@link #heartbeat} iteration weakly-consistent
+   * and lock-free while {@link #subscribe}/{@link #remove} mutate the queue atomically under the
+   * map entry's bin lock via {@code compute} (#1157).
+   */
+  private final Map<UUID, Queue<SseEmitter>> emittersBySub = new ConcurrentHashMap<>();
+
   private final MeterRegistry meterRegistry;
 
   /**
@@ -71,7 +92,7 @@ public class NotificationStreamService {
     Gauge.builder(
             MetricNames.SSE_CONNECTIONS,
             emittersBySub,
-            map -> map.values().stream().mapToInt(Set::size).sum())
+            map -> map.values().stream().mapToInt(Queue::size).sum())
         .description("Live SSE subscriber connections summed across all recipients.")
         .register(meterRegistry);
   }
@@ -86,7 +107,35 @@ public class NotificationStreamService {
   @NotNull
   public SseEmitter subscribe(@NotNull UUID recipientSub) {
     SseEmitter emitter = newEmitter();
-    emittersBySub.computeIfAbsent(recipientSub, key -> ConcurrentHashMap.newKeySet()).add(emitter);
+    // #1157: register under the map entry's bin lock so an old stream completing concurrently
+    // cannot
+    // evict the entry after this thread read the queue but before its add lands (which would orphan
+    // a
+    // live emitter — silently dead for up to EMITTER_TIMEOUT_MS). #1156: cap the streams per user;
+    // when full, evict the OLDEST (queue head) — retired outside the lambda below.
+    List<SseEmitter> evicted = new ArrayList<>();
+    emittersBySub.compute(
+        recipientSub,
+        (key, queue) -> {
+          Queue<SseEmitter> q = (queue != null) ? queue : new ConcurrentLinkedQueue<>();
+          while (q.size() >= MAX_EMITTERS_PER_SUB) {
+            SseEmitter oldest = q.poll();
+            if (oldest == null) {
+              break;
+            }
+            evicted.add(oldest);
+          }
+          q.add(emitter);
+          return q;
+        });
+    // Retire evicted emitters OUTSIDE the compute lambda: complete() fires onCompletion ->
+    // remove(),
+    // which re-enters compute() on the same key — illegal from within a ConcurrentHashMap
+    // remapping.
+    // They were already polled out, so that remove() is a harmless no-op.
+    for (SseEmitter old : evicted) {
+      retireReplaced(old);
+    }
     emitter.onCompletion(() -> remove(recipientSub, emitter));
     emitter.onTimeout(
         () -> {
@@ -119,7 +168,7 @@ public class NotificationStreamService {
    */
   public void publish(@NotNull Collection<UUID> recipientSubs) {
     for (UUID recipientSub : recipientSubs) {
-      Set<SseEmitter> emitters = emittersBySub.get(recipientSub);
+      Queue<SseEmitter> emitters = emittersBySub.get(recipientSub);
       if (emitters == null) {
         continue;
       }
@@ -182,13 +231,39 @@ public class NotificationStreamService {
     meterRegistry.counter(MetricNames.SSE_SEND_FAILURES, MetricNames.TAG_EVENT, event).increment();
   }
 
-  private void remove(@NotNull UUID recipientSub, @NotNull SseEmitter emitter) {
-    Set<SseEmitter> emitters = emittersBySub.get(recipientSub);
-    if (emitters != null) {
-      emitters.remove(emitter);
-      if (emitters.isEmpty()) {
-        emittersBySub.remove(recipientSub);
-      }
+  /**
+   * Retires an emitter evicted by the per-user cap (#1156): sends a terminal named {@code replaced}
+   * event the client treats as do-not-reconnect, then completes it. Both steps swallow failures —
+   * the emitter is being dropped regardless and may already be dead. Called only from {@link
+   * #subscribe}, after the evicted emitter was already removed from the queue.
+   *
+   * @param emitter the evicted (oldest) emitter to retire
+   */
+  private void retireReplaced(@NotNull SseEmitter emitter) {
+    try {
+      emitter.send(SseEmitter.event().name("replaced").data("ok"));
+    } catch (IOException | RuntimeException e) {
+      log.debug("Evicted SSE emitter already dead before 'replaced' event", e);
     }
+    try {
+      emitter.complete();
+    } catch (RuntimeException e) {
+      log.debug("Evicted SSE emitter completion raced its own teardown", e);
+    }
+  }
+
+  private void remove(@NotNull UUID recipientSub, @NotNull SseEmitter emitter) {
+    // #1157: remove-and-maybe-evict atomically under the entry's bin lock, so the empty-check
+    // cannot
+    // race a concurrent subscribe() into an orphaned queue.
+    emittersBySub.compute(
+        recipientSub,
+        (key, queue) -> {
+          if (queue == null) {
+            return null;
+          }
+          queue.remove(emitter);
+          return queue.isEmpty() ? null : queue;
+        });
   }
 }

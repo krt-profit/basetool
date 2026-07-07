@@ -47,6 +47,8 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator;
+import org.springframework.web.socket.handler.SessionLimitExceededException;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -82,10 +84,17 @@ import tools.jackson.databind.node.ObjectNode;
  * frames are presence snapshots and the relayed {@code changed} signal described above; the latter
  * is sanitised (unknown section keys dropped, count capped) before it is fanned out.
  *
- * <p><b>Concurrency:</b> the per-mission session map is a {@link ConcurrentHashMap}, but broadcasts
- * iterate over a defensive copy so that a slow consumer's {@link WebSocketSession#sendMessage} call
- * cannot block other broadcasts. Individual session writes are serialised via {@code
- * synchronized(session)} as required by the Spring WebSocket contract.
+ * <p><b>Concurrency &amp; backpressure:</b> the per-mission session map is a {@link
+ * ConcurrentHashMap}, and (un)registration mutates the per-mission set atomically under the map
+ * entry's bin lock ({@code compute}/{@code computeIfPresent}) so a concurrent open/close cannot
+ * strand a viewer in an orphaned set (#1150). Every socket is wrapped in a {@link
+ * ConcurrentWebSocketSessionDecorator} at registration (#1149): the decorator serialises concurrent
+ * sends (the Spring WebSocket contract forbids raw concurrent sends) <em>and</em> bounds a slow or
+ * dead consumer via a send-time and buffer-size limit — on overflow it TERMINATEs that one socket
+ * rather than blocking the broadcasting thread (a Tomcat container thread, or the single shared
+ * reaper) for up to Tomcat's ~20&nbsp;s blocking-send timeout. Broadcasts iterate a defensive
+ * {@code List.copyOf} of the decorators, so a wedged peer no longer wedges the fan-out for every
+ * other viewer and every other mission.
  */
 @Slf4j
 public class MissionPresenceWebSocketHandler extends TextWebSocketHandler {
@@ -119,10 +128,33 @@ public class MissionPresenceWebSocketHandler extends TextWebSocketHandler {
   /** Token-bucket refill rate for inbound {@code changed} frames, in tokens per second. */
   private static final double CHANGED_REFILL_PER_SEC = 10.0;
 
+  /**
+   * Max time (ms) a single presence send may block before the {@link
+   * ConcurrentWebSocketSessionDecorator} TERMINATEs a wedged peer instead of parking the
+   * broadcasting thread (#1149).
+   */
+  private static final int SEND_TIME_LIMIT_MS = 5_000;
+
+  /**
+   * Max bytes buffered for a slow peer before the decorator TERMINATEs it (#1149). Presence frames
+   * are tiny (a snapshot / a handful of section keys), so half a MB already tolerates a long burst
+   * before a genuinely dead consumer is dropped.
+   */
+  private static final int SEND_BUFFER_SIZE_LIMIT = 512 * 1024;
+
   private static final String ATTR_MISSION_ID = "missionPresence.missionId";
   private static final String ATTR_USER_ID = "missionPresence.userId";
   private static final String ATTR_DISPLAY_NAME = "missionPresence.displayName";
   private static final String ATTR_CHANGED_RATE = "missionPresence.changedRate";
+
+  /**
+   * Session-attribute key holding the {@link ConcurrentWebSocketSessionDecorator} wrapping the raw
+   * socket (#1149). The decorator — not the raw session — is what lives in {@link
+   * #sessionsByMission} and what every broadcast writes to; the close / relay paths resolve it back
+   * from the raw session Spring hands them via {@link #decorated(WebSocketSession)}. Stored in the
+   * attributes because the decorator shares the delegate's attribute map.
+   */
+  private static final String ATTR_DECORATED = "missionPresence.decorated";
 
   private final MissionPresenceService presenceService;
   private final ObjectMapper objectMapper;
@@ -218,10 +250,27 @@ public class MissionPresenceWebSocketHandler extends TextWebSocketHandler {
     session.getAttributes().put(ATTR_MISSION_ID, missionId);
     session.getAttributes().put(ATTR_USER_ID, userId);
     session.getAttributes().put(ATTR_DISPLAY_NAME, displayName);
-    sessionsByMission
-        .computeIfAbsent(missionId, ignored -> ConcurrentHashMap.newKeySet())
-        .add(session);
-    sendSnapshot(session, missionId);
+    // #1149: wrap the raw socket so a slow/dead peer is bounded by the decorator's send-time /
+    // buffer-size limits (TERMINATE on overflow) instead of blocking the fan-out. The decorator is
+    // what we register and broadcast to; it shares the raw session's attribute map.
+    WebSocketSession decorated =
+        new ConcurrentWebSocketSessionDecorator(
+            session,
+            SEND_TIME_LIMIT_MS,
+            SEND_BUFFER_SIZE_LIMIT,
+            ConcurrentWebSocketSessionDecorator.OverflowStrategy.TERMINATE);
+    session.getAttributes().put(ATTR_DECORATED, decorated);
+    // #1150: register under the map entry's bin lock so a concurrent afterConnectionClosed cannot
+    // unmap the set this add is about to land in (which would strand the viewer in an orphaned set,
+    // silently dead for the rest of the visit — the socket stays open, so no reconnect fires).
+    sessionsByMission.compute(
+        missionId,
+        (ignored, set) -> {
+          Set<WebSocketSession> mates = (set != null) ? set : ConcurrentHashMap.newKeySet();
+          mates.add(decorated);
+          return mates;
+        });
+    sendSnapshot(decorated, missionId);
   }
 
   /**
@@ -256,7 +305,9 @@ public class MissionPresenceWebSocketHandler extends TextWebSocketHandler {
     // "sectionKey" the focus/blur/heartbeat messages use.
     if ("changed".equals(type)) {
       if (allowChangedFrame(session)) {
-        broadcastChanged(missionId, node.get("sections"), session);
+        // Exclude the acting socket by its registered decorator (what the room set holds), not the
+        // raw session Spring handed us — otherwise origin exclusion misses and echoes back (#1149).
+        broadcastChanged(missionId, node.get("sections"), decorated(session));
       } else {
         droppedThrottled.increment();
       }
@@ -301,15 +352,20 @@ public class MissionPresenceWebSocketHandler extends TextWebSocketHandler {
     if (missionId == null || userId == null) {
       return;
     }
-    Set<WebSocketSession> mates = sessionsByMission.get(missionId);
-    if (mates != null) {
-      mates.remove(session);
-      if (mates.isEmpty()) {
-        sessionsByMission.remove(missionId, mates);
-      }
-    }
+    // #1150: remove-and-maybe-unmap in one atomic remapping under the entry's bin lock, so the
+    // "set became empty -> drop the entry" decision cannot race a concurrent registration into an
+    // orphaned set. Deregister the DECORATOR (what was registered), resolved from the raw session.
+    WebSocketSession decorated = decorated(session);
+    Set<WebSocketSession> mates =
+        sessionsByMission.computeIfPresent(
+            missionId,
+            (ignored, set) -> {
+              set.remove(decorated);
+              return set.isEmpty() ? null : set;
+            });
     // Only clear the user from presence if they have no OTHER live sessions on the same mission
-    // (multiple tabs from the same browser would otherwise wipe each other's heartbeats).
+    // (multiple tabs from the same browser would otherwise wipe each other's heartbeats). A null
+    // mates means the set is now empty (last session closed), so there is no other session.
     boolean hasOtherSession =
         mates != null
             && mates.stream().anyMatch(s -> userId.equals(s.getAttributes().get(ATTR_USER_ID)));
@@ -500,17 +556,35 @@ public class MissionPresenceWebSocketHandler extends TextWebSocketHandler {
     if (!session.isOpen()) {
       return false;
     }
-    // Spring WebSocket forbids concurrent sends on a single session; serialise here.
-    synchronized (session) {
-      try {
-        session.sendMessage(message);
-        return true;
-      } catch (IOException | IllegalStateException e) {
-        log.debug("Drop presence frame to closed/broken session {}", session.getId(), e);
-        droppedSendFailed.increment();
-        return false;
-      }
+    // `session` is a ConcurrentWebSocketSessionDecorator (#1149): it serialises concurrent sends
+    // internally and bounds a slow consumer via its send-time / buffer-size limits, so NO external
+    // synchronized is used here — that would re-introduce the blocking serial fan-out this fixes. A
+    // buffer/time overflow surfaces as SessionLimitExceededException and TERMINATEs that one
+    // socket.
+    try {
+      session.sendMessage(message);
+      return true;
+    } catch (IOException | IllegalStateException | SessionLimitExceededException e) {
+      log.debug("Drop presence frame to closed/broken/overflowed session {}", session.getId(), e);
+      droppedSendFailed.increment();
+      return false;
     }
+  }
+
+  /**
+   * Resolves the {@link ConcurrentWebSocketSessionDecorator} registered for a socket (#1149).
+   * Spring hands the handler the raw session on message / close callbacks, but the room set holds
+   * the decorator — this returns the decorator stored in the shared attribute map, falling back to
+   * the given session if none was recorded (e.g. a socket refused before wrapping).
+   *
+   * @param session the raw (or already-decorated) session
+   * @return the registered decorator, or {@code session} when none is stored
+   */
+  @NotNull
+  private static WebSocketSession decorated(@NotNull WebSocketSession session) {
+    return session.getAttributes().get(ATTR_DECORATED) instanceof WebSocketSession ws
+        ? ws
+        : session;
   }
 
   static UUID extractMissionId(URI uri) {

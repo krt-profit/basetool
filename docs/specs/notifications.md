@@ -233,6 +233,19 @@ the error through the MVC `@ExceptionHandler` and log a spurious ERROR per drop 
 stream failure never inflates the frontend error log (the dominant frontend ERROR source during a
 backend/Keycloak blip); the browser reconnects and the poll keeps the badge fresh.
 
+**Registry consistency & bounds (#1109 Wave 6).** The per-`sub` emitter registry is a FIFO `Queue`
+mutated atomically under the map entry's bin lock (`ConcurrentHashMap.compute`), so a new
+subscription and an old stream completing concurrently for the same `sub` can no longer orphan a live
+emitter in an unmapped set (silently dead for up to the 30-min timeout) — the same check-then-act
+race class fixed on the frontend presence registry (#1157 / #1150). The registry caps streams per
+`sub` (`MAX_EMITTERS_PER_SUB`); a subscription past the cap retires the OLDEST with a terminal named
+`replaced` event the client treats as **do-not-reconnect**, so a user's many tabs / devices cannot
+multiply against the org-wide `frontend-sse-pool` sized on one stream per viewer (#1156). And the
+real-time push fires from the `AFTER_COMMIT` listener (`NotificationEventListener`), **after** the
+notification-creation transaction commits — so the client's unread-count refetch reads committed rows
+(not a pre-commit stale count) and the blocking SSE fan-out never pins the creation transaction's
+Hikari connection (#1152).
+
 **Acceptance**
 
 - [x] A created notification pushes a `notification` SSE event to the recipient's live streams.
@@ -243,6 +256,13 @@ backend/Keycloak blip); the browser reconnects and the poll keeps the badge fres
   liveness watchdog, without waiting for an `error`.
 - [x] The 30-minute emitter timeout completes the emitter cleanly, so the stream is recorded as a
   normal completion and never as a phantom `503` on `http.server.requests`.
+- [x] The per-`sub` emitter registry is mutated atomically (`compute`), so a concurrent
+  subscribe/complete cannot strand a live emitter in an unmapped set (#1157).
+- [x] Streams per `sub` are capped; the oldest over the cap is retired with a terminal `replaced`
+  event and the client does not reconnect it (#1156).
+- [x] The real-time push fires after the notification-creation transaction commits (post-commit
+  listener), so the refetch reads committed rows and no DB connection is pinned across the SSE
+  fan-out (#1152).
 - [x] The frontend SSE relay uses a dedicated connection pool (`frontend-sse-pool`) sized well above
   the expected concurrent-viewer count, so many simultaneous viewers (200+) each keep their live push
   instead of the surplus blocking on the request pool's connection ceiling (ADR-0078).

@@ -352,6 +352,17 @@ transaction per pass) rather than per-scrape.
   (`successful_with_retry` > 0.2/s for 10m) — that fire before `circuit_open` / `bulkhead_full`, i.e.
   before users fail; plus a backend-call resilience row on `03-spring-apps.json` and a
   frontend-usage row (`basetool_active_sessions`, `basetool_mission_presence_missions`) on `07`.
+- Read-amplification fan-out (#1128): a derived panel on `03-spring-apps.json` plots the
+  frontend→backend fan-out ratio —
+  `sum(rate(http_client_requests_seconds_count{application="basetool-frontend"}[5m])) /
+  sum(rate(http_server_requests_seconds_count{application="basetool-frontend"}[5m]))`, the outbound
+  backend calls per inbound frontend request — and `FrontendBackendFanoutHigh` (`apps.yml`) warns on
+  a sustained step change (> 10 for 15m, an intentionally generous initial baseline). It catches a
+  per-render read-amplification regression (a page/fragment that lost its read-gating and fans out
+  into N backend GETs, the pre-ADR-0078 mission-page failure mode) early, before the lagging
+  `HikariPoolPending` / `HttpLatencyP95High` fire. Coarse by design — the frontend also serves
+  static assets / polls with no backend call, diluting the average down — so it is a regression
+  tripwire, not a precise per-route SLO.
 - JVM/Hikari depth (#1041 item 12, all Actuator-exported): `HikariConnectionTimeouts` (every
   `hikaricp_connections_timeout_total` increment is a request that waited ~30s for a pool slot and
   threw — can hide below `HikariPoolPending`'s window), `JvmFileDescriptorsHigh`

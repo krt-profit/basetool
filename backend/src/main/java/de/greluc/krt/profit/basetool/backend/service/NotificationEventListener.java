@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.AsyncConfig;
 import de.greluc.krt.profit.basetool.backend.event.NotificationEvent;
+import java.util.Set;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -48,23 +50,42 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class NotificationEventListener {
 
   private final NotificationCreationService notificationCreationService;
+  private final NotificationStreamService notificationStreamService;
 
   /**
-   * Creates notifications for an event after its originating transaction commits.
+   * Creates notifications for an event after its originating transaction commits, then pushes the
+   * real-time SSE signal to the resolved recipients.
+   *
+   * <p>The push runs here, <em>after</em> {@link NotificationCreationService#createFromEvent}
+   * returns — i.e. after that method's own transaction has committed (#1152) — so the client's
+   * unread-count refetch reads the committed rows rather than a pre-commit stale count, and the
+   * blocking SSE fan-out no longer pins the creation transaction's Hikari connection. The push is
+   * best-effort: a failure is swallowed because the frontend polling fallback keeps the badge
+   * correct (REQ-NOTIF-010).
    *
    * @param event the published notification event
    */
   @Async(AsyncConfig.NOTIFICATION_EXECUTOR)
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void onNotificationEvent(NotificationEvent event) {
+    Set<UUID> recipients;
     try {
-      notificationCreationService.createFromEvent(event);
+      recipients = notificationCreationService.createFromEvent(event);
     } catch (RuntimeException e) {
       log.error(
           "Failed to create notifications for event {} entity {}",
           event.eventType(),
           event.entityId(),
           e);
+      return;
+    }
+    if (recipients.isEmpty()) {
+      return;
+    }
+    try {
+      notificationStreamService.publish(recipients);
+    } catch (RuntimeException e) {
+      log.debug("Real-time notification push failed; polling fallback remains", e);
     }
   }
 }

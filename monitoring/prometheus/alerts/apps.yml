@@ -148,6 +148,25 @@ groups:
           summary: "p95 request latency >2s ({{ $labels.application }})"
           description: "The 95th-percentile request latency for {{ $labels.application }} exceeded 2 seconds for 10 minutes."
 
+      # (#1128) Frontend->backend read-amplification: outbound backend client calls per inbound
+      # frontend request. A per-render fan-out regression (a page/fragment that lost its read-gating
+      # and fans out into N backend GETs, like the pre-ADR-0078 mission page) inflates this ratio
+      # well before the late HikariPoolPending / HttpLatencyP95High signals fire. Frontend-scoped: the
+      # backend's client calls are to Keycloak/UEX, a different ratio. Coarse by design (the frontend
+      # also serves static assets / polls that make no backend call, diluting the average down), so
+      # the threshold is a generous INITIAL baseline tuned from the baseline week — a real regression
+      # is a step change, not a slow drift. Backs the "Backend fan-out ratio" panel on dashboard 03.
+      - alert: FrontendBackendFanoutHigh
+        expr: |
+          sum(rate(http_client_requests_seconds_count{application="basetool-frontend"}[5m]))
+            / clamp_min(sum(rate(http_server_requests_seconds_count{application="basetool-frontend"}[5m])), 0.1) > 10
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Frontend->backend fan-out ratio high (read amplification)"
+          description: "The frontend issued more than 10 backend calls per inbound request (5m avg) for 15 minutes — a per-render read-amplification regression (a page/fragment that lost its read-gating) inflates this well before HikariPoolPending / HttpLatencyP95High fire. Check recent frontend controller changes for an un-gated backend fan-out."
+
   - name: caches
     # Caffeine cache health. recordStats() is enabled on every cache (backend + frontend
     # CacheConfig), so Micrometer exports cache_gets_total{result}, cache_evictions_total{cause}
