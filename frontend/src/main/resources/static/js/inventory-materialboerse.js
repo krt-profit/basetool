@@ -12,13 +12,13 @@
 (function () {
     'use strict';
 
-    var i18n = window.materialboerseInventoryI18n || {};
+    let i18n = window.materialboerseInventoryI18n || {};
     if (!window.krtEvents || !window.krtMaterialRelease || !window.krtFetch) {
         return;
     }
 
     function setStatus(itemId, released) {
-        var chip = document.querySelector('[data-boerse-status-for="' + itemId + '"]');
+        let chip = document.querySelector('[data-boerse-status-for="' + itemId + '"]');
         if (!chip) {
             return;
         }
@@ -28,7 +28,7 @@
     }
 
     window.krtEvents.on('change', 'inv-boerse-toggle', function (el) {
-        var itemId = el.getAttribute('data-id');
+        let itemId = el.getAttribute('data-id');
         if (el.checked) {
             // Newly released: open the remark dialog pre-filled with this Lager item.
             window.krtMaterialRelease.open(

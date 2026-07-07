@@ -12,14 +12,14 @@
 (function () {
     'use strict';
 
-    var i18n = window.materialboerseI18n || {};
-    var modal = document.getElementById('mb-modal');
+    let i18n = window.materialboerseI18n || {};
+    let modal = document.getElementById('mb-modal');
     if (!modal || !window.krtFetch) {
         return;
     }
 
-    var SERIALIZE_KEY = 'materialboerse';
-    var state = {
+    let SERIALIZE_KEY = 'materialboerse';
+    let state = {
         mode: null,
         itemId: null,
         offerId: null,
@@ -27,8 +27,8 @@
         onDone: null,
         onCancel: null,
     };
-    var pickerItems = [];
-    var lastFocused = null;
+    let pickerItems = [];
+    let lastFocused = null;
 
     function fmt(template, value) {
         return String(template || '').replace('{0}', value);
@@ -39,14 +39,14 @@
     }
 
     function setText(sel, text) {
-        var el = q(sel);
+        let el = q(sel);
         if (el) {
             el.textContent = text;
         }
     }
 
     function toggle(sel, on) {
-        var el = q(sel);
+        let el = q(sel);
         if (el) {
             el.hidden = !on;
         }
@@ -59,7 +59,7 @@
     }
 
     function formatScu(amount) {
-        var n = Number(amount);
+        let n = Number(amount);
         if (isNaN(n)) {
             return String(amount);
         }
@@ -76,8 +76,8 @@
     }
 
     function updateCharCount() {
-        var ta = q('[data-mb-remark]');
-        var counter = q('[data-mb-charcount]');
+        let ta = q('[data-mb-remark]');
+        let counter = q('[data-mb-charcount]');
         if (ta && counter) {
             counter.textContent = fmt(
                 i18n.charCounter || '{0} / 20.000',
@@ -95,8 +95,8 @@
      */
     function open(mode, ctx, doneOrOpts) {
         ctx = ctx || {};
-        var onDone = null;
-        var onCancel = null;
+        let onDone = null;
+        let onCancel = null;
         if (typeof doneOrOpts === 'function') {
             onDone = doneOrOpts;
         } else if (doneOrOpts) {
@@ -111,14 +111,14 @@
             onDone: onDone,
             onCancel: onCancel,
         };
-        var isNew = mode === 'new';
-        var isEdit = mode === 'edit';
+        let isNew = mode === 'new';
+        let isEdit = mode === 'edit';
         setText('[data-mb-modal-title]', isEdit ? i18n.editTitle : i18n.releaseTitle);
         setText('[data-mb-submit-label]', isEdit ? i18n.submitSave : i18n.submitRelease);
         toggle('[data-mb-picker]', isNew);
         setFacts(ctx.material, ctx.quality, ctx.amount);
 
-        var ta = q('[data-mb-remark]');
+        let ta = q('[data-mb-remark]');
         ta.value = ctx.remark || '';
         updateCharCount();
 
@@ -128,7 +128,7 @@
 
         lastFocused = document.activeElement;
         modal.hidden = false;
-        var first = isNew ? q('[data-mb-picker-input]') : ta;
+        let first = isNew ? q('[data-mb-picker-input]') : ta;
         if (first) {
             first.focus();
         }
@@ -143,7 +143,7 @@
 
     /** Dismiss without submitting — fires the onCancel hook (e.g. to revert a Lager checkbox). */
     function cancel() {
-        var onCancel = state.onCancel;
+        let onCancel = state.onCancel;
         hide();
         resetState();
         if (onCancel) {
@@ -153,7 +153,7 @@
 
     /** Close after a successful submit — fires the onDone hook with the response body. */
     function finish(body) {
-        var onDone = state.onDone;
+        let onDone = state.onDone;
         hide();
         resetState();
         if (onDone) {
@@ -173,7 +173,7 @@
     }
 
     function loadPicker(query) {
-        var url =
+        let url =
             '/materialboerse/releasable-items' + (query ? '?q=' + encodeURIComponent(query) : '');
         fetch(url, {
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
@@ -193,7 +193,7 @@
     }
 
     function renderPicker() {
-        var list = q('[data-mb-picker-list]');
+        let list = q('[data-mb-picker-list]');
         if (!list) {
             return;
         }
@@ -205,7 +205,7 @@
         }
         list.innerHTML = pickerItems
             .map(function (it) {
-                var meta =
+                let meta =
                     'Q ' +
                     it.quality +
                     ' · ' +
@@ -239,31 +239,31 @@
             li.getAttribute('data-quality'),
             li.getAttribute('data-amount'),
         );
-        var input = q('[data-mb-picker-input]');
+        let input = q('[data-mb-picker-input]');
         if (input) {
             input.value = li.getAttribute('data-material');
         }
-        var list = q('[data-mb-picker-list]');
+        let list = q('[data-mb-picker-list]');
         if (list) {
             list.hidden = true;
         }
     }
 
     function renderPickerFiltered(query) {
-        var query2 = (query || '').toLowerCase();
-        var list = q('[data-mb-picker-list]');
+        let query2 = (query || '').toLowerCase();
+        let list = q('[data-mb-picker-list]');
         if (!list) {
             return;
         }
         list.querySelectorAll('.krt-combobox__option').forEach(function (li) {
-            var mat = (li.getAttribute('data-material') || '').toLowerCase();
+            let mat = (li.getAttribute('data-material') || '').toLowerCase();
             li.style.display = mat.indexOf(query2) >= 0 ? '' : 'none';
         });
         list.hidden = false;
     }
 
     function submit() {
-        var remark = q('[data-mb-remark]').value;
+        let remark = q('[data-mb-remark]').value;
         if (state.mode === 'edit') {
             window.krtFetch.write({
                 method: 'PUT',
@@ -319,7 +319,7 @@
             submit();
             return;
         }
-        var li = e.target.closest('[data-mb-picker-list] .krt-combobox__option');
+        let li = e.target.closest('[data-mb-picker-list] .krt-combobox__option');
         if (li) {
             pickItem(li);
         }
@@ -345,17 +345,17 @@
     });
 
     function trapFocus(e) {
-        var focusable = modal.querySelectorAll(
+        let focusable = modal.querySelectorAll(
             'button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])',
         );
-        var visible = Array.prototype.filter.call(focusable, function (el) {
+        let visible = Array.prototype.filter.call(focusable, function (el) {
             return el.offsetParent !== null && !el.hidden;
         });
         if (!visible.length) {
             return;
         }
-        var first = visible[0];
-        var last = visible[visible.length - 1];
+        let first = visible[0];
+        let last = visible[visible.length - 1];
         if (e.shiftKey && document.activeElement === first) {
             e.preventDefault();
             last.focus();

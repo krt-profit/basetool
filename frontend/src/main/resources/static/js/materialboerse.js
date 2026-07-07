@@ -12,14 +12,14 @@
 (function () {
     'use strict';
 
-    var i18n = window.materialboerseI18n || {};
+    let i18n = window.materialboerseI18n || {};
     if (!window.krtFetch || !document.getElementById('mb-board')) {
         return;
     }
 
-    var SERIALIZE_KEY = 'materialboerse';
-    var selectedId = readSelectedId();
-    var searchTimer = null;
+    let SERIALIZE_KEY = 'materialboerse';
+    let selectedId = readSelectedId();
+    let searchTimer = null;
 
     // -------- helpers --------------------------------------------------------
 
@@ -28,36 +28,36 @@
     }
 
     function readSelectedId() {
-        var active = document.querySelector('.mb-mrow.is-active[data-offer-id]');
+        let active = document.querySelector('.mb-mrow.is-active[data-offer-id]');
         return active ? active.getAttribute('data-offer-id') : null;
     }
 
     function val(selector) {
-        var el = document.querySelector(selector);
+        let el = document.querySelector(selector);
         return el ? el.value.trim() : '';
     }
 
     function activeTab() {
-        var tab = document.querySelector('.tab.active[data-mb-tab]');
+        let tab = document.querySelector('.tab.active[data-mb-tab]');
         return tab ? tab.getAttribute('data-mb-tab') : 'alle';
     }
 
     function params() {
-        var p = new URLSearchParams();
+        let p = new URLSearchParams();
         p.set('tab', activeTab());
-        var qv = val('[data-mb-search]');
+        let qv = val('[data-mb-search]');
         if (qv) {
             p.set('q', qv);
         }
-        var minQ = val('[data-mb-minquality]');
+        let minQ = val('[data-mb-minquality]');
         if (minQ) {
             p.set('minQuality', minQ);
         }
-        var minA = val('[data-mb-minamount]');
+        let minA = val('[data-mb-minamount]');
         if (minA) {
             p.set('minAmount', minA);
         }
-        var sort = val('[data-mb-sort]');
+        let sort = val('[data-mb-sort]');
         if (sort) {
             p.set('sort', sort);
         }
@@ -68,7 +68,7 @@
     }
 
     function swapList() {
-        var p = params();
+        let p = params();
         p.set('fragment', 'list');
         return window.krtFetch.swap({
             url: '/materialboerse?' + p.toString(),
@@ -79,7 +79,7 @@
     }
 
     function swapBoard() {
-        var p = params();
+        let p = params();
         p.set('fragment', 'board');
         return window.krtFetch.swap({
             url: '/materialboerse?' + p.toString(),
@@ -102,22 +102,22 @@
 
     function applyAgo(root) {
         (root || document).querySelectorAll('[data-mb-ago]').forEach(function (el) {
-            var ts = el.getAttribute('data-ts');
+            let ts = el.getAttribute('data-ts');
             if (!ts) {
                 return;
             }
-            var then = Date.parse(ts);
+            let then = Date.parse(ts);
             if (isNaN(then)) {
                 return;
             }
-            var hours = Math.floor((Date.now() - then) / 3600000);
-            var text;
+            let hours = Math.floor((Date.now() - then) / 3600000);
+            let text;
             if (hours < 1) {
                 text = i18n.agoNow || 'gerade eben';
             } else if (hours < 24) {
                 text = fmt(i18n.agoHours || 'vor {0} Std', hours);
             } else {
-                var days = Math.round(hours / 24);
+                let days = Math.round(hours / 24);
                 text =
                     days === 1
                         ? i18n.agoDayOne || 'vor 1 Tag'
@@ -131,7 +131,7 @@
 
     function setActiveTab(tab) {
         document.querySelectorAll('.tab[data-mb-tab]').forEach(function (btn) {
-            var on = btn.getAttribute('data-mb-tab') === tab;
+            let on = btn.getAttribute('data-mb-tab') === tab;
             btn.classList.toggle('active', on);
             btn.setAttribute('aria-selected', on ? 'true' : 'false');
         });
@@ -139,7 +139,7 @@
 
     function markActiveRow(id) {
         document.querySelectorAll('.mb-mrow[data-offer-id]').forEach(function (row) {
-            var on = row.getAttribute('data-offer-id') === id;
+            let on = row.getAttribute('data-offer-id') === id;
             row.classList.toggle('is-active', on);
             row.setAttribute('aria-pressed', on ? 'true' : 'false');
         });
@@ -156,7 +156,7 @@
     }
 
     function setInputVal(selector, value) {
-        var el = document.querySelector(selector);
+        let el = document.querySelector(selector);
         if (el) {
             el.value = value;
         }
@@ -165,8 +165,8 @@
     // -------- writes ---------------------------------------------------------
 
     function toggleInterest(button) {
-        var id = button.getAttribute('data-offer-id');
-        var interested = button.getAttribute('data-interested') === 'true';
+        let id = button.getAttribute('data-offer-id');
+        let interested = button.getAttribute('data-interested') === 'true';
         window.krtFetch.write({
             method: interested ? 'DELETE' : 'POST',
             url: '/materialboerse/offers/' + id + '/interest/ajax',
@@ -246,7 +246,7 @@
     // -------- delegated events -----------------------------------------------
 
     document.addEventListener('click', function (e) {
-        var el;
+        let el;
         if ((el = e.target.closest('[data-mb-tab]'))) {
             setActiveTab(el.getAttribute('data-mb-tab'));
             selectedId = null;
@@ -263,7 +263,7 @@
             return;
         }
         if (e.target.closest('[data-mb-deselect]')) {
-            var md = document.querySelector('.mb-md');
+            let md = document.querySelector('.mb-md');
             if (md) {
                 md.classList.remove('has-sel');
             }
@@ -281,7 +281,7 @@
         if ((el = e.target.closest('[data-mb-select]'))) {
             selectedId = el.getAttribute('data-offer-id');
             markActiveRow(selectedId);
-            var mdSel = document.querySelector('.mb-md');
+            let mdSel = document.querySelector('.mb-md');
             if (mdSel) {
                 mdSel.classList.add('has-sel');
             }
@@ -303,13 +303,13 @@
 
     // REQ-MARKET-010: a peer released / deactivated / registered interest — re-pull the board list.
     // Debounced; skipped while the release modal is open so an in-progress dialog is not disrupted.
-    var peerTimer = null;
+    let peerTimer = null;
     document.addEventListener('krt:materialboerse-changed', function () {
         if (peerTimer) {
             clearTimeout(peerTimer);
         }
         peerTimer = setTimeout(function () {
-            var modal = document.getElementById('mb-modal');
+            let modal = document.getElementById('mb-modal');
             if (modal && !modal.hidden) {
                 return;
             }

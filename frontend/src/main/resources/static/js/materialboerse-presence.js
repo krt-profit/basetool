@@ -18,20 +18,20 @@
         return;
     }
 
-    var socket = null;
-    var reconnectTimer = null;
-    var backoff = 1000;
-    var MAX_BACKOFF = 30000;
+    let socket = null;
+    let reconnectTimer = null;
+    let backoff = 1000;
+    let MAX_BACKOFF = 30000;
 
     function endpoint() {
-        var proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        let proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         return proto + '//' + window.location.host + '/ws/materialboerse/board';
     }
 
     function connect() {
         try {
             socket = new WebSocket(endpoint());
-        } catch (e) {
+        } catch (_e) {
             scheduleReconnect();
             return;
         }
@@ -39,10 +39,10 @@
             backoff = 1000;
         });
         socket.addEventListener('message', function (ev) {
-            var data;
+            let data;
             try {
                 data = JSON.parse(ev.data);
-            } catch (e) {
+            } catch (_e) {
                 return;
             }
             if (data && data.type === 'changed') {
@@ -57,7 +57,7 @@
         socket.addEventListener('error', function () {
             try {
                 socket.close();
-            } catch (e) {
+            } catch (_e) {
                 /* ignore */
             }
         });
@@ -78,7 +78,7 @@
         if (socket && socket.readyState === WebSocket.OPEN) {
             try {
                 socket.send(JSON.stringify({ type: 'changed', sections: sections || ['board'] }));
-            } catch (e) {
+            } catch (_e) {
                 /* best-effort */
             }
         }

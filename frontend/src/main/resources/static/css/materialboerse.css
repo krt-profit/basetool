@@ -119,7 +119,7 @@
     max-height: 560px;
     overflow-y: auto;
 }
-@media (max-width: 900px) {
+@media (width <= 900px) {
     .mb-md {
         grid-template-columns: 1fr;
     }
@@ -148,7 +148,7 @@
     cursor: pointer;
 }
 .mb-mrow.mb-mine {
-    border-left: 3px solid rgba(231, 126, 35, 0.4);
+    border-left: 3px solid rgb(231 126 35 / 40%);
 }
 .mb-mrow-main {
     display: flex;
@@ -242,7 +242,7 @@
 .mb-dp-back {
     display: none;
 }
-@media (max-width: 900px) {
+@media (width <= 900px) {
     .mb-dp-back {
         display: inline-flex;
     }
@@ -258,7 +258,7 @@
     align-items: start;
     padding: 16px 18px;
 }
-@media (max-width: 720px) {
+@media (width <= 720px) {
     .mb-dp-body {
         grid-template-columns: 1fr;
     }
