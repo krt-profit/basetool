@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.service;
 
 import de.greluc.krt.profit.basetool.frontend.logging.ActiveSquadronContext;
+import de.greluc.krt.profit.basetool.frontend.logging.ClientIpContext;
 import de.greluc.krt.profit.basetool.frontend.logging.CorrelationContext;
 import jakarta.annotation.PreDestroy;
 import java.util.Map;
@@ -41,17 +42,20 @@ import org.springframework.web.context.request.RequestContextHolder;
  * Helper for page controllers that need to fetch several independent backend resources to render a
  * single view. Wraps each supplier in a virtual-thread task that re-establishes the calling
  * thread's request-scoped context (SecurityContext, ServletRequestAttributes, the project's custom
- * {@link CorrelationContext} / {@link ActiveSquadronContext} thread-locals, and the SLF4J MDC map)
- * before running it.
+ * {@link CorrelationContext} / {@link ActiveSquadronContext} / {@link ClientIpContext}
+ * thread-locals, and the SLF4J MDC map) before running it.
  *
  * <p>Why all of this matters: the frontend's outbound WebClient pipeline reads from these
  * thread-locals at filter-assembly time — the OAuth2 bearer-token relay needs {@link
  * SecurityContextHolder} and {@link RequestContextHolder}, the squadron-relay header needs {@link
- * ActiveSquadronContext}, and the correlation-id propagation needs {@link CorrelationContext}. A
- * worker thread that does not see these would silently fall through to "no header" / "anonymous"
- * paths, which the backend would then resolve as "all squadrons" or reject as unauthenticated. The
- * propagation here mirrors the manual capture-and-restore pattern used elsewhere in the codebase
- * for cross-thread context flow (see {@link CorrelationContext}'s class Javadoc).
+ * ActiveSquadronContext}, the correlation-id propagation needs {@link CorrelationContext}, and the
+ * {@code X-Forwarded-For} relay that lets the backend's per-IP rate limiter see the real client
+ * (instead of collapsing every caller onto the one frontend-container IP and sharing a single
+ * org-wide bucket) needs {@link ClientIpContext}. A worker thread that does not see these would
+ * silently fall through to "no header" / "anonymous" paths, which the backend would then resolve as
+ * "all squadrons", one shared rate-limit bucket, or reject as unauthenticated. The propagation here
+ * mirrors the manual capture-and-restore pattern used elsewhere in the codebase for cross-thread
+ * context flow (see {@link CorrelationContext}'s class Javadoc).
  *
  * <p>Use only inside a servlet request: the helper assumes a live {@link RequestAttributes} on the
  * calling thread and a live {@link HttpServletRequest} for the duration of the parallel calls.
@@ -89,6 +93,7 @@ public class ParallelPageLoader {
   public <T> CompletableFuture<T> loadAsync(@NotNull Supplier<T> task) {
     UUID activeSquadron = ActiveSquadronContext.get();
     String correlationId = CorrelationContext.get();
+    String clientIp = ClientIpContext.get();
     SecurityContext securityContext = SecurityContextHolder.getContext();
     RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
     Map<String, String> mdc = MDC.getCopyOfContextMap();
@@ -96,7 +101,8 @@ public class ParallelPageLoader {
     return CompletableFuture.supplyAsync(
         () -> {
           try {
-            applyContext(activeSquadron, correlationId, securityContext, requestAttributes, mdc);
+            applyContext(
+                activeSquadron, correlationId, clientIp, securityContext, requestAttributes, mdc);
             return task.get();
           } finally {
             clearContext();
@@ -107,12 +113,13 @@ public class ParallelPageLoader {
 
   /**
    * Installs the captured request-scoped state on the current (virtual-worker) thread so the
-   * WebClient pipeline assembles requests with the same authentication, squadron, correlation id
-   * and logging context the originating request thread had.
+   * WebClient pipeline assembles requests with the same authentication, squadron, client IP,
+   * correlation id and logging context the originating request thread had.
    */
   private static void applyContext(
       @Nullable UUID activeSquadron,
       @Nullable String correlationId,
+      @Nullable String clientIp,
       @NotNull SecurityContext securityContext,
       @Nullable RequestAttributes requestAttributes,
       @Nullable Map<String, String> mdc) {
@@ -121,6 +128,9 @@ public class ParallelPageLoader {
     }
     if (correlationId != null) {
       CorrelationContext.set(correlationId);
+    }
+    if (clientIp != null) {
+      ClientIpContext.set(clientIp);
     }
     SecurityContextHolder.setContext(securityContext);
     if (requestAttributes != null) {
@@ -135,6 +145,7 @@ public class ParallelPageLoader {
   private static void clearContext() {
     ActiveSquadronContext.clear();
     CorrelationContext.clear();
+    ClientIpContext.clear();
     SecurityContextHolder.clearContext();
     RequestContextHolder.resetRequestAttributes();
     MDC.clear();

@@ -203,27 +203,39 @@ public class WebClientConfig {
         // viewer's relay would block on pendingAcquireTimeout and then fail, silently dropping that
         // user's live notification push. Sized at 1000 so a full mission audience (200+ viewers)
         // has ample headroom on the 16 GB host; mostly-idle long-lived TCP sockets are cheap. No
-        // maxLifeTime: a 30-minute stream must never be treated as "too old" to keep alive.
+        // maxLifeTime: a 30-minute stream must never be treated as "too old" to keep alive. The
+        // 10 s pendingAcquireTimeout is live here (unlike the request pool's): the SSE relay runs
+        // through NO Resilience4j TimeLimiter, so this is the only bound on an acquire wait once
+        // the
+        // 1000 ceiling is hit. metrics(true) exposes reactor.netty.connection.provider.* so pool
+        // saturation -- the silent 1001st-viewer drop -- is visible on the dashboard and alertable.
         provider =
             reactor.netty.resources.ConnectionProvider.builder("frontend-sse-pool")
                 .maxConnections(1000)
                 .maxIdleTime(java.time.Duration.ofSeconds(30))
                 .pendingAcquireTimeout(java.time.Duration.ofSeconds(10))
                 .evictInBackground(java.time.Duration.ofSeconds(30))
+                .metrics(true)
                 .build();
       } else {
         // Request/response pool sized at 100 connections: a single mission-detail render now fans
         // out to four parallel backend calls via `ParallelPageLoader`, so ~25 concurrent users can
-        // exhaust a 50-slot pool. 100 gives comfortable headroom; the `pendingAcquireTimeout` is
-        // raised from 5 s to 10 s so a transient backend slowdown queues rather than failing fast,
-        // which the page render cannot recover from gracefully. Idle/life timeouts unchanged.
+        // exhaust a 50-slot pool. 100 gives comfortable headroom. pendingAcquireTimeout is 5 s to
+        // MATCH the backendApi Resilience4j TimeLimiter (timeoutDuration 5 s, cancelRunningFuture),
+        // which wraps the whole exchange including pool acquisition: a longer acquire wait here was
+        // dead config (the TimeLimiter cancels the exchange at 5 s before it could ever elapse) and
+        // let the two budgets diverge. Keeping them equal means a saturation wait fails fast at the
+        // caller's real patience instead of the backend later running a query for a request the
+        // frontend already abandoned. metrics(true) exposes reactor.netty.connection.provider.* for
+        // pool observability. Idle/life timeouts unchanged.
         provider =
             reactor.netty.resources.ConnectionProvider.builder("frontend-pool")
                 .maxConnections(100)
                 .maxIdleTime(java.time.Duration.ofSeconds(20))
                 .maxLifeTime(java.time.Duration.ofSeconds(60))
-                .pendingAcquireTimeout(java.time.Duration.ofSeconds(10))
+                .pendingAcquireTimeout(java.time.Duration.ofSeconds(5))
                 .evictInBackground(java.time.Duration.ofSeconds(10))
+                .metrics(true)
                 .build();
       }
 
@@ -445,10 +457,10 @@ public class WebClientConfig {
 
   /**
    * Streaming WebClient for the notification SSE relay (REQ-NOTIF-010). Relays the correlation /
-   * active-org-unit / locale headers like {@link #webClient}, but deliberately omits both the
-   * Resilience4j chain (its 5-second {@code TimeLimiter} and retry would sever a long-lived stream)
-   * and the response / read timeouts (see {@link #connector(boolean)}) <b>and</b> the OAuth2 {@code
-   * oauth2Configuration()} exchange filter.
+   * active-org-unit / locale / client-IP headers like {@link #webClient}, but deliberately omits
+   * both the Resilience4j chain (its 5-second {@code TimeLimiter} and retry would sever a
+   * long-lived stream) and the response / read timeouts (see {@link #connector(boolean)})
+   * <b>and</b> the OAuth2 {@code oauth2Configuration()} exchange filter.
    *
    * <p>Dropping the OAuth2 filter is load-bearing for REQ-SEC-012 / ADR-0019. With the filter
    * applied, attaching an authorized client routes the call into {@code
@@ -461,6 +473,13 @@ public class WebClientConfig {
    * resolves the bearer read-only and sets it as a plain {@code Authorization} header instead, so
    * the relay is structurally refresh-incapable rather than depending on a warm cache. Used only by
    * the frontend stream relay; all request/response traffic still goes through {@link #webClient}.
+   *
+   * <p>The {@code X-Forwarded-For} client-IP relay is applied here just as on {@link #webClient}
+   * (REQ-SEC-011): without it every viewer's stream — and every browser reconnect after a frontend
+   * redeploy — is attributed to the one frontend-container IP and shares a single org-wide per-IP
+   * rate-limit bucket, so a reconnect burst can trip the shared limit and blank live push for
+   * everyone. The guest-edit-token relay is intentionally omitted: the notification stream is an
+   * authenticated-member surface with no anonymous guest path.
    *
    * <p>Also deliberately NOT wired to the observation registry (REQ-OBS-009): a ~30-minute SSE
    * relay would hold a single client observation/span open for the whole stream, skewing the
@@ -476,6 +495,7 @@ public class WebClientConfig {
         .filter(webClientLoggingFilter.correlationIdPropagation())
         .filter(activeSquadronRelayFilter.relayActiveSquadron())
         .filter(userLocaleRelayFilter.relayUserLocale())
+        .filter(clientIpRelayFilter.relayClientIp())
         .defaultHeaders(
             headers -> headers.setAccept(java.util.List.of(MediaType.TEXT_EVENT_STREAM)))
         .baseUrl(backendProperties.backendUrl())

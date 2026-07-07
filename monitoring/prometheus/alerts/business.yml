@@ -303,6 +303,22 @@ groups:
           summary: "Notification SSE push channel dead while users are online"
           description: "The backend has zero live SSE connections for 30 minutes while the frontend reports more than 3 active sessions — the notification push channel is down and clients fell back to polling. Check reverse-proxy SSE buffering and the /notifications/stream relay."
 
+      # (#1127) SSE relay pool near saturation — early warning for the silently-dropped-viewer
+      # failure. The frontend->backend notification relay runs on a dedicated 1000-connection pool
+      # (frontend-sse-pool in WebClientConfig); each live viewer holds one slot for as long as their
+      # page is open, and past the 1000th concurrent viewer a new relay blocks on pendingAcquireTimeout
+      # and then silently drops that user's live push. The basetool_notification_relay_connections
+      # gauge counts the open relays held on this instance; >0.8 of the 1000 ceiling for 10m warns the
+      # pool is about to start dropping viewers. Mirrors BulkheadNearSaturation (apps.yml).
+      - alert: SseRelayPoolNearSaturation
+        expr: basetool_notification_relay_connections > 800
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Notification SSE relay pool near saturation"
+          description: "The frontend has held more than 800 of its 1000 SSE relay slots for 10 minutes — past 1000 the next live viewer's push is silently dropped. Check the concurrent viewer count and per-user stream multiplication; consider raising frontend-sse-pool maxConnections or capping streams per user."
+
       # (#1041 item 18) Frontend login broken. A code-to-token / JWKS / state failure breaks ALL
       # logins with no other frontend signal, and KeycloakLoginErrorSpike's event regex misses
       # code-to-token errors. Fire when there are login failures but ZERO successes in the window.
