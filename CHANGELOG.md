@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.1.10](https://github.com/krt-profit/basetool/releases/tag/v1.1.10) - 2026-07-07
+
 ### Changed
 
 - **Fehler behoben: Bei fast gleichzeitiger Zuweisung konnten zwei verschiedene Teilnehmer eines Einsatzes zu Einsatzleitern werden.** Der Prüfschritt lief bisher nur im Speicher und hatte ein Zeitfenster, in dem zwei parallele Zuweisungen beide „noch kein Leiter" sahen. Ein Datenbank-Index (ein Einsatzleiter je Einsatz) fängt den Fall jetzt zusätzlich ab; der unterlegene Klick meldet sauber einen Konflikt (409). Analog ist per Datenbank-Index abgesichert, dass ein Teilnehmer nicht durch gleichzeitiges Zuweisen in zwei Crews landet (REQ-MISSION-013, #1109).
