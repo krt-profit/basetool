@@ -518,8 +518,32 @@
     }
 
     // Best-effort real-time push (REQ-NOTIF-010): refresh immediately when the server pushes a
-    // "notification" event. The browser EventSource auto-reconnects on error, and the polling
-    // above is the guaranteed fallback, so SSE never needs to be reliable for correctness.
+    // "notification" event. Reconnection is managed here rather than left to the native EventSource
+    // auto-reconnect so it can be JITTERED: after a frontend redeploy every open tab's stream errors
+    // at the same instant, and the browser's fixed ~3 s auto-reconnect would resynchronise them into
+    // one thundering herd that collapses onto the shared per-IP rate-limit bucket / the SSE relay
+    // pool (#1130 / #1110). The polling fallback above is the guaranteed correctness path, so SSE
+    // never needs to be reliable.
+    const SSE_RECONNECT_BASE_MS = 3000;
+    let sseSource = null;
+    let sseReconnectTimer = null;
+    let sseStopped = false;
+
+    function scheduleSseReconnect() {
+        // One pending reconnect at a time; never reconnect after a `reauth` handoff (the page is
+        // redirecting to the login flow).
+        if (sseReconnectTimer !== null || sseStopped) {
+            return;
+        }
+        // Full jitter in [base, 2*base): spreads reconnects across a ~3 s window instead of firing
+        // every tab on the same tick, matching the decorrelation the mission-presence reconnect uses.
+        const delay = SSE_RECONNECT_BASE_MS + Math.floor(Math.random() * SSE_RECONNECT_BASE_MS);
+        sseReconnectTimer = window.setTimeout(function () {
+            sseReconnectTimer = null;
+            startSse();
+        }, delay);
+    }
+
     function startSse() {
         if (
             typeof window.EventSource !== 'function' ||
@@ -527,17 +551,38 @@
         ) {
             return;
         }
+        // Tear down any prior stream so this module owns the reconnect policy (a lingering native
+        // auto-reconnect would race the jittered one).
+        if (sseSource !== null) {
+            try {
+                sseSource.close();
+            } catch (_error) {
+                /* already closed */
+            }
+            sseSource = null;
+        }
         try {
             const source = new EventSource('/notifications/stream');
+            sseSource = source;
             // Connection established → push is live: mark healthy (backs the poll off to the slow
             // keepalive on the flip) and arm the liveness watchdog.
             source.addEventListener('open', function () {
                 markSseHealthy();
             });
-            // Stream dropped (EventSource will auto-reconnect) → fall back to the fast poll. The
-            // reconnect-storm and tab-hidden guards live in markSseUnhealthy.
+            // Stream dropped → fall back to the fast poll and reconnect ourselves after a jittered
+            // delay. Close the source first so the browser does not ALSO auto-reconnect on its fixed
+            // cadence. The reconnect-storm and tab-hidden guards live in markSseUnhealthy.
             source.addEventListener('error', function () {
                 markSseUnhealthy();
+                try {
+                    source.close();
+                } catch (_error) {
+                    /* already closed */
+                }
+                if (sseSource === source) {
+                    sseSource = null;
+                }
+                scheduleSseReconnect();
             });
             // Named keepalive (REQ-NOTIF-010): pure proof of life. Resets the liveness watchdog and
             // re-promotes to the slow cadence if a half-open stall had demoted us. The payload is
@@ -555,9 +600,14 @@
                 }
             });
             // The server pushes a `reauth` event when the stream's session lost its OAuth2 token,
-            // then closes the stream: redirect to the Keycloak login flow instead of letting the
-            // EventSource reconnect-loop against a dead session (REQ-SEC-012).
+            // then closes the stream: redirect to the Keycloak login flow instead of reconnecting
+            // against a dead session (REQ-SEC-012).
             source.addEventListener('reauth', function (event) {
+                sseStopped = true;
+                if (sseReconnectTimer !== null) {
+                    window.clearTimeout(sseReconnectTimer);
+                    sseReconnectTimer = null;
+                }
                 if (window.krtReauth) {
                     window.krtReauth.redirect(event && event.data ? event.data : null);
                 }

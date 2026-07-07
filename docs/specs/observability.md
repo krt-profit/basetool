@@ -48,8 +48,9 @@ error response therefore carries the header, not just the ones that reach the se
 
 In `prod`, a PII-masking `LogstashEncoder` JSON appender writes `logs/{backend,frontend}.json`;
 errors split into `*-error.log` for fast triage. Configurable via `APP_LOGGING_*` env vars.
-The ingest gateway emits its prod JSON to stdout through the same `PiiMaskingLogstashEncoder`
-pattern (no file sink — its stream is collected via the Docker log API).
+The ingest gateway now logs the same way as backend/frontend — a PII-masking console + rolling
+text log + dedicated `*-error.log` in every profile, plus `logs/ingest.json` in prod — so its JSON
+is tailed from the file (`loki.source.file` → `app_json`), no longer via the Docker log API.
 
 ### REQ-OBS-004 — Never log PII
 
@@ -137,7 +138,11 @@ rule — no blanket "everything is masked" claim:
   Keycloak mask. The streams inherit the global 744h retention — no REQ-OBS-010 IP-retention impact
   once masked.
 - Loki labels stay low-cardinality (`app`, `level`, bounded `host`); log lines are never
-  turned into per-user labels.
+  turned into per-user labels. The `level` label is carried by the three JSON app streams
+  (`backend` / `frontend` / `ingest`), all tailed from their `logs/<app>.json` file sinks through the
+  shared `app_json` stage, and holds Logback's **uppercase** level string (`ERROR`, `WARN`, `INFO`, …)
+  verbatim. Loki `=` matchers are case-sensitive, so any dashboard/alert selecting by level must use a
+  case-insensitive matcher (`{level=~"(?i)error"}`), never `{level="error"}`.
 
 ### REQ-OBS-008 — Monitoring plane: admin-only access, isolated cleartext carve-out
 
@@ -418,7 +423,11 @@ transaction per pass) rather than per-scrape.
 
 **Frontend.** `basetool_mission_presence_missions` gauge (missions with a live editor; single-JVM
 edit-awareness, unlabelled), `basetool_active_sessions` gauge (active Spring Session sessions;
-`@Profile("!test")`), and `basetool_backend_client_errors_total{reason,method}` counter at the
+`@Profile("!test")`, maintained by `ActiveSessionsTracker` from Spring Session create/delete/expire
+events and seeded once at startup from the Redis session namespace — it MUST NOT sample the
+Redis-backed `SpringSessionBackedSessionRegistry`, whose `getAllPrincipals()` throws and left the
+gauge permanently `NaN`, silently disarming `SsePushChannelDead`, #1158), and
+`basetool_backend_client_errors_total{reason,method}` counter at the
 `BackendApiClient` failure funnels. `reason` is a fixed **local** enumeration
 (`backend_4xx`/`backend_5xx`/`circuit_open`/`bulkhead_full`/`timeout`/`unknown`) derived from the
 failure branch — never the backend's response-body code, which could be arbitrary — and `method`
@@ -430,7 +439,11 @@ is the HTTP verb. The push-channel surfaces (#1041 item 17) add `basetool_notifi
 `send_failed`) counters at the previously-silent throttle and send-failure branches of the presence
 relay — the component that shipped the REQ-FE-010 staleness defect. A `changed`-frame flatline while
 `snapshot` frames keep flowing is the early indicator for that defect class (panels only, baselined
-before alerting). All labels are fixed literals, pure counts.
+before alerting). All labels are fixed literals, pure counts. The `frontend-sse-pool` and
+`frontend-pool` Reactor-Netty connection pools additionally export `reactor.netty.connection.provider.*`
+(`.metrics(true)`, #1127); `basetool_notification_relay_connections` backs the
+`SseRelayPoolNearSaturation` alert (> 0.8 of the 1000-slot SSE pool for 10m) — the early warning
+before the pool starts silently dropping the 1001st live viewer.
 
 The auth surfaces (#1041 item 18) add `basetool_login_total{outcome,reason}` (`SecurityConfig`'s
 OAuth2 success/failure handlers: `outcome` = `success` / `failure`; on failure `reason` =

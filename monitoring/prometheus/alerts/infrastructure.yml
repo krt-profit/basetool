@@ -107,7 +107,7 @@ groups:
           severity: critical
         annotations:
           summary: "Redis RDB snapshot older than 1h"
-          description: "The last Redis RDB save was more than an hour ago — the session-loss window (OAuth2 refresh tokens) is growing."
+          description: "The last Redis RDB save was more than an hour ago. AOF (appendfsync everysec) is the primary durability layer, so this is not a data-loss signal on its own, but a stale RDB slows restart and usually means write activity has stalled or the snapshot fork is failing — check the redis logs."
 
       - alert: CertificateExpiringSoon
         expr: (probe_ssl_earliest_cert_expiry - time()) < 14 * 24 * 3600
@@ -273,11 +273,12 @@ groups:
           severity: warning
         annotations:
           summary: "Redis is evicting keys"
-          description: "Redis evicted keys in the last 15 minutes — the 256 MB limit may be too small for the session set."
+          description: "Redis evicted keys in the last 15 minutes. The session store runs maxmemory-policy noeviction, which never evicts — so any eviction means the policy was changed to an evicting one (allkeys-*/volatile-*), which silently logs users out. Restore noeviction and check what changed the config."
 
-      # (#1041 item 13) Redis memory approaching maxmemory — the leading indicator RedisEvictions
-      # misses: evictions fire only AFTER keys (sessions) are already dropped. Guard on
-      # redis_memory_max_bytes > 0 so an unlimited (maxmemory=0) instance never divides by zero.
+      # (#1041 item 13) Redis memory approaching maxmemory — the real leading indicator. Under the
+      # noeviction policy RedisEvictions never fires, so this ratio is the ONLY warning before Redis
+      # starts rejecting new writes (failed logins / session writes) at the 192mb ceiling. Guard on
+      # redis_memory_max_bytes > 0 so it stays inert if maxmemory is ever unset again (no divide-by-zero).
       - alert: RedisMemoryHigh
         expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.85 and redis_memory_max_bytes > 0
         for: 10m
@@ -285,7 +286,7 @@ groups:
           severity: warning
         annotations:
           summary: "Redis memory >85% of maxmemory"
-          description: "Redis has used more than 85% of its configured maxmemory for 10 minutes — the session set is approaching the eviction boundary (users would be logged out). Check session growth against the 256 MB limit."
+          description: "Redis has used more than 85% of its 192mb maxmemory for 10 minutes. Under noeviction, hitting the ceiling makes NEW session writes / logins fail (existing sessions survive) — investigate session growth or a leak before it does."
 
       # Redis rejected new connections — the maxclients limit was reached (a connection leak or a
       # client storm). New Spring Session reads/writes then fail, so this is a pre-outage signal.

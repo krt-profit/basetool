@@ -147,6 +147,7 @@ sudo mkdir -p /var/iri/code            # compose file, scripts
 sudo mkdir -p /var/iri/secrets         # keystore.p12 lives here
 sudo mkdir -p /var/iri/backend/log     # backend log dir (uid 10001)
 sudo mkdir -p /var/iri/frontend/log    # frontend log dir (uid 10001)
+sudo mkdir -p /var/iri/ingest/log      # ingest log dir (uid 10001)
 sudo mkdir -p /var/iri/db-backend      # postgres data
 sudo mkdir -p /var/iri/db-keycloak     # keycloak postgres data
 sudo mkdir -p /var/iri/keycloak/log    # keycloak file log
@@ -157,8 +158,8 @@ sudo mkdir -p /var/lib/iri             # deploy state
 sudo mkdir -p /etc/iri                 # token
 
 # Log dirs need to be writable by the in-container uid 10001 (set in the
-# backend / frontend Dockerfiles).
-sudo chown -R 10001:10001 /var/iri/backend/log /var/iri/frontend/log
+# backend / frontend / ingest Dockerfiles).
+sudo chown -R 10001:10001 /var/iri/backend/log /var/iri/frontend/log /var/iri/ingest/log
 sudo chown -R deploy:docker /var/lib/iri /var/iri/code
 
 # Docker config dir for the deploy user. `docker login` writes its

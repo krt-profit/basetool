@@ -341,22 +341,37 @@ x-redis: &redis-template
   # Same digest pin policy as the Postgres images. Refresh with
   # `docker buildx imagetools inspect redis:8-alpine`.
   image: redis:8-alpine@sha256:9d317178eceac8454a2284a9e6df2466b93c745529947f0cd42a0fa9609d7005
-  # Lightweight RDB persistence (re-enabled 2026-06 for the 30-day session
-  # goal). M-7 had turned all persistence off (`--save "" --appendonly no`) on
-  # the premise that a Redis restart only drops Spring Sessions, which
-  # SsoReAuthenticationEntryPoint rebuilds via a transparent `prompt=none`
-  # Keycloak redirect. That premise no longer holds: the Spring Session now
-  # carries the OAuth2 refresh token behind a rolling 30-day login, and losing
-  # it forces a re-auth round-trip that is only silent while the browser still
-  # holds a live Keycloak SSO cookie. RDB snapshots restore that durability
-  # cheaply via periodic background forks with NO per-write fsync -- the
-  # ~200 fsync/s AOF cost M-7 removed stays off (`--appendonly no`). The session
-  # dataset is tiny (OidcUser / OAuth2AuthorizedClient + flash attributes), so a
-  # fork-and-dump every few minutes is negligible I/O. `--save "300 1 60 1000"`
-  # snapshots after 300s if >=1 key changed (<=5 min worst-case loss) or after
-  # 60s under heavy churn; dump.rdb lands on the /var/iri/redis bind mount and
-  # is reloaded on restart.
-  command: redis-server --save "300 1 60 1000" --appendonly no --loglevel notice --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
+  # Persistence + memory policy for the Spring-Session / ingest-handoff store
+  # (REQ-OPS-018, ADR-0079).
+  #
+  # Durability is RDB + AOF (hybrid). M-7 had turned all persistence off
+  # (`--save "" --appendonly no`) on the premise that a Redis restart only drops
+  # Spring Sessions, silently rebuilt via a `prompt=none` Keycloak redirect. That
+  # premise no longer holds: the Spring Session now carries the OAuth2 refresh
+  # token behind a rolling 30-day login, and losing it forces a re-auth
+  # round-trip that is only silent while the browser still holds a live Keycloak
+  # SSO cookie -- worth persisting properly. AOF with `appendfsync everysec`
+  # costs ~1 fsync/s REGARDLESS of write volume and caps the worst-case loss at
+  # ~1s. (M-7 removed AOF because the pre-M-7 config ran the pathological
+  # `appendfsync always` -- one fsync per session write, ~200/s under load; the
+  # cheap `everysec` middle ground is what it should have dropped to instead of
+  # dropping AOF entirely.) RDB `--save "60 1"` keeps a compact, always-fresh
+  # snapshot (after 60s if >=1 key changed) for fast restart and to satisfy the
+  # RedisRdbStale probe; on restart Redis prefers the AOF. Both land on the
+  # /var/iri/redis bind mount. The session dataset is tiny (OidcUser /
+  # OAuth2AuthorizedClient + flash attributes), so both the AOF and the snapshot
+  # fork are negligible I/O.
+  #
+  # Memory: explicit `--maxmemory 192mb` (below the 256M cgroup, leaving
+  # copy-on-write fork + fragmentation headroom) with `--maxmemory-policy
+  # noeviction`. noeviction is MANDATORY for a session store -- evicting a
+  # session key is a silent logout -- so at the ceiling Redis refuses NEW writes
+  # rather than dropping live sessions, and the kernel OOM-killer never has to
+  # nuke the whole process (which would drop the in-flight set and force an
+  # AOF/RDB reload). A defined maxmemory also makes the RedisMemoryHigh
+  # leading-indicator alert functional: it self-guards on
+  # redis_memory_max_bytes > 0 and was therefore inert while maxmemory was unset.
+  command: redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 192mb --maxmemory-policy noeviction --loglevel notice --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
   restart: unless-stopped
   logging: *default-logging
   # Runtime-hardening baseline (REQ-OPS-014). The official redis entrypoint boots as root to chown
@@ -374,8 +389,9 @@ x-redis: &redis-template
     - SETUID
   stop_grace_period: 30s
   # Only stores Spring sessions (OidcUser / OAuth2AuthorizedClient + flash
-  # attributes). 256 MB is generous for our active-user count plus the
-  # copy-on-write headroom an RDB snapshot fork transiently needs.
+  # attributes) + the short-lived ingest handoffs. The 256M cgroup sits above the
+  # 192mb Redis maxmemory ceiling (see the command comment) so a transient RDB /
+  # AOF-rewrite fork's copy-on-write pages have headroom above the data set.
   deploy:
     resources:
       limits:
@@ -497,6 +513,9 @@ x-ingest: &ingest-template
     JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0
   volumes:
     - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
+    # Log dir mounted like backend/frontend (host dir pre-chowned to uid 10001) so the gateway can
+    # write logs/ingest.{log,json} and Alloy can tail logs/ingest.json for Loki (REQ-OBS-007).
+    - /var/iri/ingest/log:/app/logs
 
 services:
   redis:
@@ -510,7 +529,7 @@ services:
     # ACL file (provisioned on the host by the Phase-2 runbook BEFORE this deploy) MUST NOT define a
     # `default` user. A missing/empty ACL file makes redis exit at startup, which the deploy
     # health-gate turns into a clean rollback rather than a silent breakage. Untouched for redis-dev.
-    command: redis-server --save "300 1 60 1000" --appendonly no --loglevel notice --aclfile /etc/redis/users.acl --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
+    command: redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 192mb --maxmemory-policy noeviction --loglevel notice --aclfile /etc/redis/users.acl --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
     # A service-level `volumes:` replaces the merged template value, so the data volume is re-listed
     # alongside the read-only ACL mount.
     volumes:
