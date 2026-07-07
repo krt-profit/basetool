@@ -57,6 +57,7 @@ off-tool between players.
 Two screens are in scope.
 
 ### Screen A — `/materialboerse` (the Börse, master-detail)
+
 - **A1 Page head** (`.s-head` in the proto) — eyebrow "Flotte & Logistik", h3 "Materialbörse", and
   the single filled CTA **"Material anbieten"** (`.btn.btn--cta`, plus-icon). Opens the release
   modal in `mode:new`.
@@ -76,6 +77,7 @@ Two screens are in scope.
 - **A8 Loading indicator** — `.krt-loading-indicator` during async list/detail swaps.
 
 ### Screen B — Lager release integration (`/inventory/my`, the tree table)
+
 - **B1 "Für Börse" column** — a new checkbox column on the **leaf-entry** row (one `InventoryItem`)
   in the lazily-loaded fragment `fragments/inventory-stack-entries.html`.
 - **B2 Status cell** — `.chip.chip--primary` "Auf Börse" when an active offer exists for that item,
@@ -89,40 +91,40 @@ Two screens are in scope.
 
 ## 3. Element → DS class / token mapping (authoritative; prototype demo class → real DS class)
 
-| Prototype region / element | Prototype demo class | **Canonical DS class / token to use** |
-| :-- | :-- | :-- |
-| Page shell / head | `.s-head`, `.s-eyebrow`, `h3` | Standard page `<main>` head as in leitung/inventory: `.page-header`/`.panel-header` + `#{…}` title; eyebrow via existing head styling |
-| Primary CTA "Material anbieten" | `.btn.btn--cta` | `.btn.btn--cta` (unchanged — the one filled action per context) |
-| Tabs + counts | `.tab-nav`/`.tab`/`.tab-count` | `.tab-nav` / `.tab` / `.tab-count` (DS; `role=tablist`, arrow keys, `?tab=` deeplink) |
-| Search field | `.mb-search input[type=search]` | plain DS input (`styles.css` input) inside a composition wrapper; icon from sprite |
-| Min. Qualität / Min. Menge inputs | `.mb-filt input[range|number]` | DS number/range inputs; `.scu-hint` bubble on the SCU field; **composition** wrapper only |
-| Sort select | `.chip-select` | `.chip-select` (DS uppercase chip select w/ orange chevron) |
-| Master-detail shell | `.mb-md` | **`.master-detail`** |
-| Master list | `.mb-mlist` | **`.master-list`** |
-| Master row (active/own) | `.mrow`/`.active`/`.mine` | **`.master-row`** + `.is-active`; "own" marker via a `.chip`/left-rail composition class |
-| Squadron badge | `.squadron-badge(-foreign)` | `.squadron-badge` / `.squadron-badge-foreign` (unchanged) |
-| Mini interessenten count | `.int` + `icon(users)` | `.chip.chip--muted` / `.chip.chip--primary` with users sprite icon |
-| Detail pane | `.mb-detailpane` | **`.detail-pane`** |
-| Detail head title / "von {owner}" | `.dp-head`/`.dp-title` | `.detail-pane` head composition; title = existing headline styling |
-| "Dein Angebot" marker | `chip chip--primary` | `.chip.chip--primary` |
-| Facts strip (Qualität/Menge/Freigegeben) | `.dp-facts` + `.kvmini` | **`.facts-bar`** (or `.kv-compact`) — plain numbers, **no gauge, no "/1000", no Kategorie** |
-| Remark (rendered Markdown) | `.remark .md` | **`.markdown-content`** (server-rendered via `@markdown`) |
-| Anonymity note | `.anon-note` | small muted note composition + shield sprite icon |
-| Interessenten (owner) name chips | `.int-names .chip` | `.chip` list |
-| Interessenten (non-owner) count | `.intChip` | `.chip.chip--muted` / `.chip.chip--primary` |
-| Action: Interesse anmelden | `.btn-outline` | `.btn-outline` |
-| Action: Interesse zurückziehen | `.btn-ghost` | `.btn-ghost` |
-| Action: Bemerkung bearbeiten | `.btn-ghost` | `.btn-ghost` |
-| Action: Angebot deaktivieren | `.btn-quiet-danger` | `.btn-quiet-danger` |
-| Empty state | `.empty-state` | `.empty-state` (DS) |
-| Loading | (custom) | `.krt-loading-indicator` + `.krt-spinner` + `.krt-loading-label` |
-| Toast feedback | `.notification-toast` | `.notification-toast` via `showFrontendSuccessToast` / `…ErrorToast` |
-| Release/Bearbeiten modal | `.krt-modal*` | `.krt-modal-overlay` / `.krt-modal` (+ head/body/foot); focus-trap + Esc |
-| Modal fact strip | `.fg-context`/`.fg-fact` | `.facts-bar` / `.kv-compact` composition (read-only) |
-| Modal Markdown textarea + counter | `textarea` + `[data-charcount]` | DS textarea + a small counter element (composition) |
-| Lager "Für Börse" checkbox | `.lg-cb input` | DS checkbox inside the existing tree-table leaf row |
-| Lager status chip | `.chip.chip--primary` / muted | `.chip.chip--primary` "Auf Börse" / `.text-muted` "privat" |
-| Material select (mode:new) | `<select data-f=mat>` | **`.krt-combobox`** (searchable select, REQ-FE-011) |
+| Prototype region / element               | Prototype demo class            | **Canonical DS class / token to use**                                                                                                 |
+|:-----------------------------------------|:--------------------------------|:--------------------------------------------------------------------------------------------------------------------------------------|
+| Page shell / head                        | `.s-head`, `.s-eyebrow`, `h3`   | Standard page `<main>` head as in leitung/inventory: `.page-header`/`.panel-header` + `#{…}` title; eyebrow via existing head styling |
+| Primary CTA "Material anbieten"          | `.btn.btn--cta`                 | `.btn.btn--cta` (unchanged — the one filled action per context)                                                                       |
+| Tabs + counts                            | `.tab-nav`/`.tab`/`.tab-count`  | `.tab-nav` / `.tab` / `.tab-count` (DS; `role=tablist`, arrow keys, `?tab=` deeplink)                                                 |
+| Search field                             | `.mb-search input[type=search]` | plain DS input (`styles.css` input) inside a composition wrapper; icon from sprite                                                    |
+| Min. Qualität / Min. Menge inputs        | `.mb-filt input[range|number]`  | DS number/range inputs; `.scu-hint` bubble on the SCU field; **composition** wrapper only                                             |
+| Sort select                              | `.chip-select`                  | `.chip-select` (DS uppercase chip select w/ orange chevron)                                                                           |
+| Master-detail shell                      | `.mb-md`                        | **`.master-detail`**                                                                                                                  |
+| Master list                              | `.mb-mlist`                     | **`.master-list`**                                                                                                                    |
+| Master row (active/own)                  | `.mrow`/`.active`/`.mine`       | **`.master-row`** + `.is-active`; "own" marker via a `.chip`/left-rail composition class                                              |
+| Squadron badge                           | `.squadron-badge(-foreign)`     | `.squadron-badge` / `.squadron-badge-foreign` (unchanged)                                                                             |
+| Mini interessenten count                 | `.int` + `icon(users)`          | `.chip.chip--muted` / `.chip.chip--primary` with users sprite icon                                                                    |
+| Detail pane                              | `.mb-detailpane`                | **`.detail-pane`**                                                                                                                    |
+| Detail head title / "von {owner}"        | `.dp-head`/`.dp-title`          | `.detail-pane` head composition; title = existing headline styling                                                                    |
+| "Dein Angebot" marker                    | `chip chip--primary`            | `.chip.chip--primary`                                                                                                                 |
+| Facts strip (Qualität/Menge/Freigegeben) | `.dp-facts` + `.kvmini`         | **`.facts-bar`** (or `.kv-compact`) — plain numbers, **no gauge, no "/1000", no Kategorie**                                           |
+| Remark (rendered Markdown)               | `.remark .md`                   | **`.markdown-content`** (server-rendered via `@markdown`)                                                                             |
+| Anonymity note                           | `.anon-note`                    | small muted note composition + shield sprite icon                                                                                     |
+| Interessenten (owner) name chips         | `.int-names .chip`              | `.chip` list                                                                                                                          |
+| Interessenten (non-owner) count          | `.intChip`                      | `.chip.chip--muted` / `.chip.chip--primary`                                                                                           |
+| Action: Interesse anmelden               | `.btn-outline`                  | `.btn-outline`                                                                                                                        |
+| Action: Interesse zurückziehen           | `.btn-ghost`                    | `.btn-ghost`                                                                                                                          |
+| Action: Bemerkung bearbeiten             | `.btn-ghost`                    | `.btn-ghost`                                                                                                                          |
+| Action: Angebot deaktivieren             | `.btn-quiet-danger`             | `.btn-quiet-danger`                                                                                                                   |
+| Empty state                              | `.empty-state`                  | `.empty-state` (DS)                                                                                                                   |
+| Loading                                  | (custom)                        | `.krt-loading-indicator` + `.krt-spinner` + `.krt-loading-label`                                                                      |
+| Toast feedback                           | `.notification-toast`           | `.notification-toast` via `showFrontendSuccessToast` / `…ErrorToast`                                                                  |
+| Release/Bearbeiten modal                 | `.krt-modal*`                   | `.krt-modal-overlay` / `.krt-modal` (+ head/body/foot); focus-trap + Esc                                                              |
+| Modal fact strip                         | `.fg-context`/`.fg-fact`        | `.facts-bar` / `.kv-compact` composition (read-only)                                                                                  |
+| Modal Markdown textarea + counter        | `textarea` + `[data-charcount]` | DS textarea + a small counter element (composition)                                                                                   |
+| Lager "Für Börse" checkbox               | `.lg-cb input`                  | DS checkbox inside the existing tree-table leaf row                                                                                   |
+| Lager status chip                        | `.chip.chip--primary` / muted   | `.chip.chip--primary` "Auf Börse" / `.text-muted` "privat"                                                                            |
+| Material select (mode:new)               | `<select data-f=mat>`           | **`.krt-combobox`** (searchable select, REQ-FE-011)                                                                                   |
 
 **Master list note:** the prototype's `.master-row` shows two stacked lines + a right-side count.
 `.master-detail` in the DS specimen is a simpler `<span>…<span>` row. The row's internal
@@ -162,6 +164,7 @@ coding it (Auftrag §10).
 ## 5. Backend design
 
 ### 5.1 Data model (new area `MARKET`)
+
 Build on **`InventoryItem`** (Lager — the only model with material / quality 0–1000 / SCU amount /
 location; location stays private and is never joined into any Börse query).
 
@@ -189,20 +192,21 @@ location; location stays private and is never joined into any Börse query).
     unique-violation catch + treat-as-success is enough).
 
 ### 5.2 Endpoints (`/api/v1/material-exchange`, `MaterialExchangeController`)
+
 All read = **members only**; per-user writes gated on ownership/edit-scope in the service.
 - `GET  /offers?tab=alle|mein&q=&minQual=&minMenge=&sort=qual|menge|mat|neu&page=&size=` →
-  `PageResponse<MaterialExchangeOfferDto>` (board list; interessenten redacted per §5.4).
+`PageResponse<MaterialExchangeOfferDto>` (board list; interessenten redacted per §5.4).
 - `GET  /offers/{id}` → `MaterialExchangeOfferDto` (detail; names only if caller == owner).
 - `POST /offers` — release a Lager item: body `{ inventoryItemId, remark, version? }`; 201.
-  (`mode:new` from the CTA also lands here — it first needs the user to pick one of **their own**
-  Lager items via the combobox.)
+(`mode:new` from the CTA also lands here — it first needs the user to pick one of **their own**
+Lager items via the combobox.)
 - `PUT  /offers/{id}/remark` — edit remark: `{ remark, version }` → optimistic-lock via
-  `OptimisticLock.check(...)`.
+`OptimisticLock.check(...)`.
 - `POST /offers/{id}/deactivate` — set `DEACTIVATED` (un-check / "Angebot deaktivieren").
 - `POST /offers/{id}/interest` — register interest (upsert, idempotent).
 - `DELETE /offers/{id}/interest` — withdraw interest.
 - `GET  /my-releasable?q=` → the caller's own Lager items eligible for `mode:new` combobox (thin
-  reuse of the inventory read, owner-scoped).
+reuse of the inventory read, owner-scoped).
 
 `@PreAuthorize`: class-level `@PreAuthorize("isAuthenticated()")`; reads narrowed to
 `hasRole(Roles.KRT_MEMBER)` (exclude guests — decision D2); release/remark/deactivate gated
@@ -210,6 +214,7 @@ by `@ownerScopeService.canEditInventoryItem(#… )` / ownership of the offer; in
 `isAuthenticated()` (any member, but not on your own offer — enforced in service).
 
 ### 5.3 DTOs + mapper (`dto/`, `mapper/`)
+
 - `MaterialExchangeOfferDto(UUID id, MaterialReferenceDto material, String ownerHandle,
   SquadronReferenceDto squadron, boolean foreign, boolean mine, Integer quality, Double amount,
   Instant releasedAt, String remarkHtml?, int interestCount, List<String> interestedHandles?,
@@ -223,6 +228,7 @@ by `@ownerScopeService.canEditInventoryItem(#… )` / ownership of the offer; in
   the mapper.
 
 ### 5.4 Visibility & anonymity (server-enforced)
+
 - **Board is org-wide** — every `ACTIVE` offer is visible to every member regardless of
   `owningOrgUnit` (no org-scope filter; it is a global trade board — decision D3). The `foreign`
   flag = offer's squadron ≠ viewer's squadron (drives `.squadron-badge-foreign`).
@@ -231,12 +237,14 @@ by `@ownerScopeService.canEditInventoryItem(#… )` / ownership of the offer; in
   Location is **never** in the DTO or any query projection.
 
 ### 5.5 Optimistic locking
+
 - Offer remark edit / (item version echo on release) → `OptimisticLock.check(...)` (skip-when-null
   semantics) — **not** the Mission section-counter family.
 - Interest upsert/withdraw is a boolean-ish toggle → **no client version**; idempotent via the
   unique constraint (+ unique-violation-as-success), per the CLAUDE.md find-or-create rule.
 
 ### 5.6 Audit (new `AuditDomain.MARKET`, REQ-AUDIT-001)
+
 Add to `AuditDomain` (10th value) and `AuditEventType`:
 `MARKET_OFFER_RELEASED`, `MARKET_OFFER_DEACTIVATED`, `MARKET_REMARK_UPDATED`,
 `MARKET_INTEREST_REGISTERED`, `MARKET_INTEREST_WITHDRAWN`, plus the standard
@@ -248,6 +256,7 @@ Wire the frontend audit viewer: `DOMAINS` + `EVENT_TYPES_BY_DOMAIN` (still ≤10
 (`admin.audit.domain.MARKET`, `admin.audit.event.MARKET_*`). Reconcile REQ-AUDIT-001/002/003/004 text.
 
 ### 5.7 Monitoring (REQ-OBS-011)
+
 - `basetool_audit_events_total{domain=MARKET}` is auto-covered by adding the `AuditDomain`. Decide
   whether `MARKET` joins the `AuditDomainSilenceAnomaly` exclusion list (a young board may be quiet).
 - Add a queue gauge `basetool.material.exchange.active.count` (active offers) + optional
@@ -256,6 +265,7 @@ Wire the frontend audit viewer: `DOMAINS` + `EVENT_TYPES_BY_DOMAIN` (still ≤10
   Grafana dashboard `07-*.json`. No new public endpoint → no blackbox probe.
 
 ### 5.8 Migration `V210__add_material_exchange.sql` (next free version confirmed = V210)
+
 `CREATE TABLE material_exchange_offer` (UUID pk; `inventory_item_id UUID NOT NULL REFERENCES
 inventory_item(id) ON DELETE CASCADE`; `owner_id`, `owning_org_unit_id` FKs; `remark VARCHAR(20000)`;
 `status VARCHAR(16) NOT NULL`; `released_at TIMESTAMP WITH TIME ZONE NOT NULL`; `version BIGINT NOT
@@ -266,6 +276,7 @@ version/timestamps) + **unique `(offer_id, interested_user_id)`**. `ddl-auto=val
 match the entities exactly.
 
 ### 5.9 Validation
+
 `@Size(max=20000)` on remark (paired with `@Column(length=20000)`), `@NotNull` on
 `inventoryItemId`, `@NotNull @Min(0) Long version` on remark-update. Messages resolve from DE/EN
 bundles.
@@ -275,6 +286,7 @@ bundles.
 ## 6. Frontend design
 
 ### 6.1 Page (mirrors the Leitung slice)
+
 - `MaterialboersePageController` (`@Controller @RequestMapping("/materialboerse")`,
   `@PreAuthorize(hasRole KRT_MEMBER)`): `@GetMapping` serves full page or `?fragment=…` for AJAX
   swaps; `/ajax` `@ResponseBody` write proxies to `backendApiClient` relaying RFC-7807 as
@@ -290,6 +302,7 @@ bundles.
   then `th:utext` into `.markdown-content` (the operation-detail pattern). **No client Markdown lib.**
 
 ### 6.2 Static JS `static/js/materialboerse.js` (IIFE, `window.krtFetch`)
+
 - Tabs (arrow keys, `?tab=`), search/filter/sort → `krtFetch.swap` of the list fragment
   (per-container sequence guard REQ-FE-013).
 - Select a row → `krtFetch.swap` of the detail fragment.
@@ -301,6 +314,7 @@ bundles.
 - i18n strings via `window.materialboerseI18n` (`/*[[#{…}]]*/` idiom).
 
 ### 6.3 Lager checkbox integration (Screen B)
+
 - Add the "Für Börse" checkbox + status cell to `fragments/inventory-stack-entries.html` leaf rows
   (the fragment is lazily loaded on stack-expand — the checkbox must live **there**, not in
   `inventory-my.html`). Extend `--tree-cols` for the new column; keep numbers `tabular-nums`.
@@ -310,6 +324,7 @@ bundles.
 - Reuse `materialboerse.js`' modal, loaded on the inventory page too (or a shared small module).
 
 ### 6.4 Live update & multi-user sync (REQ-FE-001…014)
+
 - **Single-user live update**: every mutation updates the DOM in place via `krtFetch` — no full
   reload (only the sanctioned 409-confirm / bfcache). Derived UI (tab counts, Lager status cell)
   refreshed in the same flow.
@@ -321,6 +336,7 @@ bundles.
   board channel with opaque section keys `board` / `detail:{id}`. Fully satisfies REQ-FE-010.
 
 ### 6.5 Navigation
+
 Add one anchor under `data-group-key="logistics"` in `fragments/sidebar.html`:
 `<a th:href="@{/materialboerse}" data-testid="nav-materialboerse" th:text="#{nav.materialboerse}">`.
 Gate `sec:authorize="hasRole('KRT_MEMBER')"` (or `isAuthenticated()` per D2).
@@ -334,23 +350,23 @@ Namespace **`materialboerse.*`** (+ audit keys under `admin.audit.*`). Non-exhau
 - Page: `materialboerse.title`, `.eyebrow`, `.intro`, `.cta.offer`.
 - Tabs: `.tab.all`, `.tab.mine`.
 - Filters: `.filter.search.placeholder`, `.filter.minQuality`, `.filter.minAmount`, `.filter.sort`,
-  `.sort.qual`, `.sort.menge`, `.sort.mat`, `.sort.neu`.
+`.sort.qual`, `.sort.menge`, `.sort.mat`, `.sort.neu`.
 - List/detail: `.row.meta` pattern, `.detail.from`, `.detail.mine`, `.facts.quality`,
-  `.facts.amount`, `.facts.released`, `.remark.label`, `.anon.note`, `.interest.label`,
-  `.interest.count.zero`, `.interest.count.one`, `.interest.count.many`, `.interest.ownerNote`,
-  `.interest.viewerNote`.
+`.facts.amount`, `.facts.released`, `.remark.label`, `.anon.note`, `.interest.label`,
+`.interest.count.zero`, `.interest.count.one`, `.interest.count.many`, `.interest.ownerNote`,
+`.interest.viewerNote`.
 - Actions: `.action.interest`, `.action.interest.withdraw`, `.action.remark.edit`,
-  `.action.deactivate`, `.action.deactivate.confirm.title/body`.
+`.action.deactivate`, `.action.deactivate.confirm.title/body`.
 - Modal: `.modal.release.title`, `.modal.edit.title`, `.modal.remark.label`, `.modal.remark.hint`,
-  `.modal.remark.counter` (`{0} / 20.000`), `.modal.privacy.note`, `.modal.submit.release`,
-  `.modal.submit.save`, `.modal.material.label`.
+`.modal.remark.counter` (`{0} / 20.000`), `.modal.privacy.note`, `.modal.submit.release`,
+`.modal.submit.save`, `.modal.material.label`.
 - Lager: `inventory.forExchange` (column), `inventory.forExchange.on` ("Auf Börse"),
-  `inventory.forExchange.private` ("privat"), `inventory.forExchange.note` (the `.fb-note`).
+`inventory.forExchange.private` ("privat"), `inventory.forExchange.note` (the `.fb-note`).
 - Toasts: `.toast.released`, `.toast.deactivated`, `.toast.remarkSaved`, `.toast.interest.added`,
-  `.toast.interest.removed`; errors reuse `notification.error.*` + `frontend.ajax.conflict.*`.
+`.toast.interest.removed`; errors reuse `notification.error.*` + `frontend.ajax.conflict.*`.
 - Empty: `.empty.title`, `.empty.text`, `.empty.reset`.
 - Audit: `admin.audit.domain.MARKET`, `admin.audit.event.MARKET_OFFER_RELEASED` (+ the 4 others +
-  export/purge).
+export/purge).
 
 ---
 
@@ -379,6 +395,7 @@ Namespace **`materialboerse.*`** (+ audit keys under `admin.audit.*`). Non-exhau
 ---
 
 ## 9. Tests (every feature ships with tests)
+
 - Backend: `MaterialExchangeOfferServiceTest` (release/deactivate/remark opt-lock, interessenten
   redaction by viewer, org-wide visibility, **no location in any projection**, interest upsert
   idempotency + unique-violation-as-success), `MaterialExchangeInterestServiceTest`,
@@ -427,6 +444,7 @@ Namespace **`materialboerse.*`** (+ audit keys under `admin.audit.*`). Non-exhau
   section keys `board` / `detail:{id}`. Fully satisfies REQ-FE-010 as written.
 
 ## 12. Definition of Done (Auftrag)
+
 Submodule bumped ✅ · `/materialboerse` visually identical to the prototype (master-detail, tabs,
 filters incl. Material A–Z, facts without "/1000" and without Kategorie, "Dein Angebot", owner
 actions, interessenten anonymity) · Lager release (checkbox → Markdown dialog, 20 000 counter) +

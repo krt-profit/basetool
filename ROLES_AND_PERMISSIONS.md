@@ -683,6 +683,24 @@ Building on 3.11.1/3.11.2, still solely via the seam `OrgUnitBankAccessService` 
 - **"Mitglieder des Bereichs" audience (REQ-BANK-048):** a Bereichskonto (`AREA`) may additionally open its balance/limit to the **whole area cascade** (Bereichsleitung + all child Staffel/SK members) via the new `AREA_MEMBERS` bucket — alongside the existing Bereich sub-ranks, all-Bereichsleitung (`ALL_MEMBERS`) and individual users. Only the responsible holder / Bank Management / Admin configure it.
 - **"Alle Mitglieder" = the owning org unit, for limits (REQ-BANK-047):** the `ALL_MEMBERS` limit tier now applies **only to actual members of the account's owning org unit** (Staffel→Staffelmitglieder, SK→SK, Bereichskonto→Bereichsleitung, KRT→OL); an outsider who only holds an individual view grant is not covered and needs their own `USER` limit, else approval is required. The KRT account's all-member **visibility** (every Kartellmitglied, REQ-BANK-037) is unchanged.
 
+### 3.12 Materialbörse (material-exchange trade board, REQ-MARKET-\*)
+
+The Materialbörse (`/materialboerse`, Flotte & Logistik) is an **org-wide, member-only** trade board
+over the Lager. Reads are gated on `KRT_MEMBER` (authenticated-but-role-less **guests do not see it**);
+every write is **owner-scoped** in `MaterialExchangeService` (not by role). Interessenten names are
+disclosed only to the offer's owner; every other viewer sees only the count. The item's location is
+never exposed to the board (REQ-MARKET-004/006).
+
+| Action                                                                      | Guest | Member     | Log.       | MM         | Officer    | Admin      |
+|:----------------------------------------------------------------------------|:-----:|:-----------|:-----------|:-----------|:-----------|:-----------|
+| View board / offer detail (`hasRole('KRT_MEMBER')`)                         |   ❌   | ✅          | ✅          | ✅          | ✅          | ✅          |
+| Release own Lager row / edit own remark / deactivate own offer (owner-only) |   ❌   | ✅¹         | ✅¹         | ✅¹         | ✅¹         | ✅¹         |
+| Register / withdraw interest in a foreign offer                             |   ❌   | ✅          | ✅          | ✅          | ✅          | ✅          |
+| See interessenten names                                                     |   ❌   | owner only | owner only | owner only | owner only | owner only |
+
+¹ Only for the caller's **own** offers / own Lager items (enforced in the service, not by role).
+Every Materialbörse mutation is audited under `AuditDomain.MARKET` (see [`docs/specs/audit.md`](docs/specs/audit.md)).
+
 ---
 
 ## 4. Multi-OrgUnit visibility (scoping)

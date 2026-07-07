@@ -71,7 +71,8 @@ public class AdminAuditLogPageController {
           "MISSION",
           "OPERATION",
           "ROLE",
-          "PROMOTION");
+          "PROMOTION",
+          "MARKET");
 
   /** Message-bundle key prefix for the bank event-type labels (their own namespace). */
   private static final String BANK_EVENT_PREFIX = "admin.bank.audit.event.";
@@ -262,7 +263,16 @@ public class AdminAuditLogPageController {
               "PROMOTION_EVALUATION_UPDATED",
               "PROMOTION_EVALUATION_DELETED",
               "PROMOTION_AUDIT_EXPORTED",
-              "PROMOTION_AUDIT_PURGED"));
+              "PROMOTION_AUDIT_PURGED"),
+          "MARKET",
+          List.of(
+              "MARKET_OFFER_RELEASED",
+              "MARKET_OFFER_DEACTIVATED",
+              "MARKET_REMARK_UPDATED",
+              "MARKET_INTEREST_REGISTERED",
+              "MARKET_INTEREST_WITHDRAWN",
+              "MARKET_AUDIT_EXPORTED",
+              "MARKET_AUDIT_PURGED"));
 
   /**
    * Response type for one page of the bank audit trail ({@code /api/v1/bank/admin/audit}), read for

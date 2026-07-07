@@ -410,15 +410,16 @@ groups:
           summary: "No bank audit events recorded in 5d while backend is up"
           description: "The backend has been up but recorded zero bank audit events for 5 days — possible bank audit-logging regression (REQ-AUDIT-001). Every bank mutation must write a bank_audit_event row."
 
-      # (#1041 item 10) Per-domain audit silence. AuditSilenceAnomaly sums across all 8 domains, so one
+      # (#1041 item 10) Per-domain audit silence. AuditSilenceAnomaly sums across all domains, so one
       # domain losing its audit wiring in a refactor (the exact REQ-AUDIT-001 failure mode) is masked
-      # as long as any other domain stays active. This fires per domain. PROMOTION / PERSONAL_INVENTORY
-      # are excluded — they legitimately stay quiet for weeks; their silence is reviewed on the 07
-      # "Audit events (14d) by domain" table instead of paged. A domain that never emitted has no
-      # series and cannot fire; only one that WAS active and went silent 14d does.
+      # as long as any other domain stays active. This fires per domain. PROMOTION / PERSONAL_INVENTORY /
+      # MARKET are excluded — they legitimately stay quiet for weeks (the Materialbörse is a young,
+      # bursty trade board); their silence is reviewed on the 07 "Audit events (14d) by domain" table
+      # instead of paged. A domain that never emitted has no series and cannot fire; only one that WAS
+      # active and went silent 14d does.
       # baseline-tune: the 14d window suits an active org; a very quiet squadron may need it widened.
       - alert: AuditDomainSilenceAnomaly
-        expr: (sum by (domain) (increase(basetool_audit_events_total{domain!~"PROMOTION|PERSONAL_INVENTORY"}[14d])) == 0) and on() (up{job="basetool-backend"} == 1)
+        expr: (sum by (domain) (increase(basetool_audit_events_total{domain!~"PROMOTION|PERSONAL_INVENTORY|MARKET"}[14d])) == 0) and on() (up{job="basetool-backend"} == 1)
         for: 1h
         labels:
           severity: warning

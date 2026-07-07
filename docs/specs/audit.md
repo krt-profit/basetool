@@ -8,12 +8,13 @@ Area: `AUDIT` · Related: [`bank.md`](bank.md) (the bank's own audit trail, REQ-
 ## Context
 
 The Kartell bank already keeps an immutable, admin-only audit trail (REQ-BANK-012). The same
-guarantee is extended to eight more areas — **Lagerverwaltung** (`InventoryItem`),
+guarantee is extended to nine more areas — **Lagerverwaltung** (`InventoryItem`),
 **Auftragsverwaltung** (`JobOrder`), **Raffinerieverwaltung** (`RefineryOrder`), **Mein
 Inventar** (`PersonalInventoryItem`), **Missionen** (`Mission`), **Operationen** (`Operation`),
-**Rollen & Mitglieder** (`org_unit_membership`, epic #800) and **Beförderung** (the promotion
-catalogue + member gradings). Every activity in each area is captured into a separate, admin-only
-log; all nine logs (the eight here plus the bank's) are read on one page with a tab switcher, and
+**Rollen & Mitglieder** (`org_unit_membership`, epic #800), **Beförderung** (the promotion
+catalogue + member gradings) and **Materialbörse** (`MaterialExchangeOffer` /
+`MaterialExchangeInterest`). Every activity in each area is captured into a separate, admin-only
+log; all ten logs (the nine here plus the bank's) are read on one page with a tab switcher, and
 each can be exported as a PDF or JSON for a chosen period.
 
 The eight new areas share **one** physical table (`audit_event`) with a `domain` discriminator; the
@@ -83,6 +84,14 @@ Coverage is **complete**, including the cross-area writers and the system/automa
   `topic / category` label) and the **evaluated member** is the target reference. The details
   payload carries only the assigned `PromotionLevel` enum (evaluations) or the minimum level + count
   (rank requirements) — never a user handle, a member name or the free-text rubric description.
+- **Materialbörse** (`MaterialExchangeOffer` / `MaterialExchangeInterest`, `AuditDomain.MARKET`,
+  REQ-MARKET-008) — every trade-board mutation: offer release (`MARKET_OFFER_RELEASED`), offer
+  deactivate (`MARKET_OFFER_DEACTIVATED`), remark edit (`MARKET_REMARK_UPDATED`), interest register
+  (`MARKET_INTEREST_REGISTERED`) and interest withdraw (`MARKET_INTEREST_WITHDRAWN`). The subject is
+  the offer, labelled by the **material name** (a non-personal value); the anbieter is the target
+  reference. The details payload carries only bounded facts — the item id, quality, amount, the
+  remark **length**, and a re-release flag — **never** the remark body, the anbieter/interessent
+  handle, or the item's location.
 
 The audit table is **business data, not logging** — the [`observability.md`](observability.md) rule
 (never write names, emails or tokens to the **log stream**) is unaffected and still applies. User
@@ -133,10 +142,11 @@ per-domain emission assertions in the service tests · **Code:** `service/AuditS
 
 ### REQ-AUDIT-002 — Unified admin audit viewer
 
-All nine logs are read on **one** admin page (`/admin/audit-log`) with a **nine-way tab switcher**
+All ten logs are read on **one** admin page (`/admin/audit-log`) with a **ten-way tab switcher**
 (Bank · Lager · Aufträge · Raffinerie · Mein Inventar · Missionen · Operationen · Rollen ·
-Beförderung) built from the design-system `.tab-nav` component. The bank tab reads the existing
-`/api/v1/bank/admin/audit` endpoint; the eight area tabs read `/api/v1/audit/{domain}`; both DTO
+Beförderung · Materialbörse) built from the design-system `.tab-nav` component. The bank tab reads
+the existing `/api/v1/bank/admin/audit` endpoint; the nine area tabs read `/api/v1/audit/{domain}`;
+both DTO
 shapes are adapted into one uniform row view so a single
 template renders every tab. Each tab is paginated and filterable by **period** (the
 `datetime-split-group` picker), **actor** and **event type** (the per-area type list). Filtering and
@@ -145,7 +155,7 @@ redirects here with the bank tab preselected.
 
 **Acceptance**
 
-- [ ] An admin sees nine tabs; switching a tab loads that area's log; filtering/paging stays in place.
+- [ ] An admin sees ten tabs; switching a tab loads that area's log; filtering/paging stays in place.
 - [ ] `/admin/bank-audit` redirects to `/admin/audit-log?domain=BANK`.
 
 **Enforced by:** `AdminAuditLogPageControllerTest`, `AuditLogE2eTest` · **Code:**

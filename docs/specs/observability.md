@@ -380,12 +380,15 @@ transaction per pass) rather than per-scrape.
   with the `SERVICE_UNAVAILABLE` code from its own filter; the `application` common tag
   distinguishes the module.
 - `basetool_audit_events_total{domain}` counter at the single `AuditService.record` choke point
-  (`domain` = the 8 `AuditDomain` values). Silence detection is two-tier: `AuditSilenceAnomaly`
-  (no audited mutation anywhere for 5 d while the backend is up) plus, since #1041 item 10,
-  `AuditDomainSilenceAnomaly` (a single domain silent for 14 d while others stay active — the
-  domain-lost-its-wiring failure mode the global sum masks; `PROMOTION` / `PERSONAL_INVENTORY` are
-  excluded as legitimately-quiet and reviewed on the operations dashboard's per-domain table
-  instead).
+  (`domain` = the `AuditDomain` values, including `MARKET` since the Materialbörse). Silence
+  detection is two-tier: `AuditSilenceAnomaly` (no audited mutation anywhere for 5 d while the
+  backend is up) plus, since #1041 item 10, `AuditDomainSilenceAnomaly` (a single domain silent for
+  14 d while others stay active — the domain-lost-its-wiring failure mode the global sum masks;
+  `PROMOTION` / `PERSONAL_INVENTORY` / `MARKET` are excluded as legitimately-quiet and reviewed on
+  the operations dashboard's per-domain table instead).
+- `basetool_material_exchange_active_count{status="ACTIVE"}` gauge sampled by
+  `BusinessMetricsCollector` — the number of active Materialbörse offers on the board (REQ-MARKET-*,
+  REQ-OBS-011). Counts only; the board never emits a per-offer, per-user or location label.
 - `basetool_bank_audit_events_total{event_type}` counter at the single `BankAuditService.record`
   choke point (`event_type` = the bounded `BankAuditEventType` enum). The bank keeps a physically
   separate `bank_audit_event` table excluded from `AuditDomain`, so before #1041 item 10 the most
