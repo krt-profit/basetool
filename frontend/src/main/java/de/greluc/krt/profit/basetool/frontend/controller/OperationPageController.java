@@ -430,7 +430,9 @@ public class OperationPageController {
    *
    * @param id operation id (from the URL)
    * @param request participant key + new {@code paidOut} value
-   * @return refreshed payout row on success, or a 403 / 500 mirroring the backend status
+   * @return refreshed payout row on success, or a 403 / 404 / 409 / 500 mirroring the backend
+   *     status (a 409 is a same-row toggle race that survived the backend's retry — never a 500,
+   *     #1111)
    */
   @PostMapping("/{id}/payouts/paid-out")
   @PreAuthorize(
@@ -462,6 +464,13 @@ public class OperationPageController {
       }
       if (e.getStatusCode() == 404) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+      }
+      if (e.getStatusCode() == 409) {
+        // A same-row toggle race that survived the backend's bounded retry. Mirror it as a truthful
+        // 409 instead of collapsing every non-401/403/404 into a 500 — the toggle is a concurrency
+        // conflict, not a server fault, so the client reverts to the current value rather than
+        // showing a generic server-error toast (#1111).
+        return ResponseEntity.status(HttpStatus.CONFLICT).build();
       }
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     } catch (Exception e) {

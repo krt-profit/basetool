@@ -325,11 +325,12 @@
     }
 
     // Double-submit guard (app-wide): record the button that triggered the most recent form submit
-    // — capture phase, so it runs before the form's own preventDefault handler — so write() can
-    // disable it for the in-flight request without every call site threading it through. A microtask
-    // clears it right after the synchronous submit handler runs, and write() consumes it on first
-    // use, so an unrelated later write never inherits a stale submitter. Raw-fetch writes that do not
-    // go through write() guard their submit button explicitly instead.
+    // — capture phase, so it runs before the form's own preventDefault handler — so write() /
+    // submitForm() can disable it for the in-flight request without every call site threading it
+    // through. A microtask clears it right after the synchronous submit handler runs, and
+    // write()/submitForm() consume+disable it SYNCHRONOUSLY on first use (see resolveSubmitter), so
+    // an unrelated later write never inherits a stale submitter. Raw-fetch writes that do not go
+    // through write() guard their submit button explicitly instead.
     let pendingSubmitter = null;
     document.addEventListener(
         'submit',
@@ -351,6 +352,26 @@
         const s = pendingSubmitter;
         pendingSubmitter = null;
         return s;
+    }
+
+    // Resolve + disable the double-submit button SYNCHRONOUSLY. Called at the very top of write() and
+    // submitForm(), while the submit-event dispatch that captured pendingSubmitter is still on the
+    // stack — BEFORE runSerialized() defers exec() and BEFORE the capture listener's clearing
+    // microtask runs. This synchronous disable is the whole #1133 fix: it is what actually stops the
+    // browser from firing a second submit for the now-disabled button. The pre-fix code consumed the
+    // submitter inside the deferred send(), which since #970's serialization always ran AFTER the
+    // FIFO clearing microtask — so consumePendingSubmitter() there returned null, the button was
+    // never disabled, and the app-wide guard its own comments promised was dead code. An explicit
+    // opts.submitter (raw-fetch call sites that thread their own button) is honoured as-is; otherwise
+    // the auto-captured button is adopted. send() re-enables opts.submitter in its finally on every
+    // settle path, so a queued or in-flight write releases the button when it finishes.
+    function resolveSubmitter(opts) {
+        if (opts.submitter == null) {
+            opts.submitter = consumePendingSubmitter();
+        }
+        if (opts.submitter) {
+            opts.submitter.disabled = true;
+        }
     }
 
     // ---------------------------------------------- per-key write serialization
@@ -500,11 +521,13 @@
      * request retried exactly once before failing.
      */
     async function send(opts, buildInit, url) {
-        // In-flight double-submit guard: the explicit opts.submitter, else the button auto-captured
-        // from the triggering form submit. Disabled for the whole round-trip and re-enabled in the
-        // finally below on every success/error/network path, so a double-click cannot fire a second
-        // (duplicate-create / stale-version) write.
-        const submitter = opts.submitter || consumePendingSubmitter();
+        // In-flight double-submit guard: opts.submitter was resolved + disabled SYNCHRONOUSLY by
+        // resolveSubmitter() in write()/submitForm() (the #1133 fix); here we only keep it disabled
+        // for the whole round-trip and re-enable it in the finally below on every
+        // success/error/network path, so a double-click cannot fire a second (duplicate-create /
+        // stale-version) write. Consuming it here instead — as the code did before #1133 — always
+        // lost the microtask race to the capture listener's clear, leaving the button enabled.
+        const submitter = opts.submitter || null;
         if (submitter) {
             submitter.disabled = true;
         }
@@ -624,6 +647,10 @@
     async function write(opts) {
         const method = opts.method || 'PATCH';
 
+        // Disable the double-submit button NOW, synchronously — before runSerialized defers exec()
+        // and before the capture listener's clearing microtask runs (resolveSubmitter / #1133).
+        resolveSubmitter(opts);
+
         // Resolve url + payload lazily inside the serialized task so a queued write reads them — and
         // any version they embed — at the moment it is actually sent, not when it was queued.
         function exec() {
@@ -673,6 +700,10 @@
      */
     async function submitForm(opts) {
         const form = typeof opts.form === 'string' ? document.querySelector(opts.form) : opts.form;
+
+        // Disable the double-submit button NOW, synchronously — before runSerialized defers exec()
+        // and before the capture listener's clearing microtask runs (resolveSubmitter / #1133).
+        resolveSubmitter(opts);
 
         // Resolve url + snapshot the FormData inside the serialized task so a queued form submit
         // captures the form's hidden version input AFTER the preceding same-key write refreshed it.

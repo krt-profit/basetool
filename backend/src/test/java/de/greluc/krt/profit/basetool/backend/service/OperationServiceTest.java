@@ -29,6 +29,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -62,6 +64,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -69,6 +72,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -88,6 +93,14 @@ class OperationServiceTest {
   @Mock private AuthHelperService authHelperService;
 
   @Mock private AuditService auditService;
+
+  /**
+   * Self-proxy the payout toggle uses to open a fresh {@code REQUIRES_NEW} transaction per retry
+   * (#1111). In these unit tests it is stubbed to return the {@link #operationService} under test
+   * (or a spy of it) so the orchestrator delegates to the real / spied within-transaction body.
+   */
+  @Mock private ObjectProvider<OperationService> self;
+
   @InjectMocks private OperationService operationService;
 
   @Test
@@ -1607,6 +1620,14 @@ class OperationServiceTest {
     private static final Instant T0 = Instant.parse("2026-03-01T10:00:00Z");
     private static final Instant T0_PLUS_60M = T0.plus(60, ChronoUnit.MINUTES);
 
+    @BeforeEach
+    void delegateSelfToRealService() {
+      // setPayoutStatus now runs each attempt through self.getObject() so the retry gets a fresh
+      // REQUIRES_NEW transaction (#1111). In-process there is no proxy, so point self at the
+      // service under test — the orchestrator then invokes the real within-transaction body.
+      when(self.getObject()).thenReturn(operationService);
+    }
+
     @Test
     void throwsNotFound_whenOperationDoesNotExist() {
       when(operationRepository.existsById(OPERATION_ID)).thenReturn(false);
@@ -1761,6 +1782,89 @@ class OperationServiceTest {
       u.setId(UUID.randomUUID());
       u.setUsername(username);
       return u;
+    }
+  }
+
+  /**
+   * Tests the concurrency contract of the payout toggle (#1111): two leads ticking the same
+   * participant race on the unique constraint / {@code @Version}, and the loser must retry in a
+   * fresh transaction rather than 409 — so last-writer-wins actually holds. Drives the orchestrator
+   * ({@link OperationService#setPayoutStatus}) with a spied within-transaction body to simulate the
+   * race deterministically.
+   */
+  @Nested
+  class SetPayoutStatusConcurrencyTests {
+
+    private static final UUID OPERATION_ID = UUID.randomUUID();
+    private static final String KEY = "participant-key";
+
+    @Test
+    void retriesInAFreshTransaction_whenTheInsertRaceLoses() {
+      OperationService spied = spy(operationService);
+      when(self.getObject()).thenReturn(spied);
+      OperationPayoutDto expected = samplePayoutDto();
+      // First attempt loses the INSERT race (unique constraint), retry finds the row and wins.
+      doThrow(
+              new DataIntegrityViolationException(
+                  "uk_operation_payout_status_operation_participant"))
+          .doReturn(expected)
+          .when(spied)
+          .setPayoutStatusWithinTransaction(OPERATION_ID, KEY, true);
+
+      OperationPayoutDto result = operationService.setPayoutStatus(OPERATION_ID, KEY, true);
+
+      assertEquals(expected, result, "the winning retry's row must be returned");
+      verify(spied, times(2)).setPayoutStatusWithinTransaction(OPERATION_ID, KEY, true);
+    }
+
+    @Test
+    void retriesInAFreshTransaction_whenTheUpdateRaceLoses() {
+      OperationService spied = spy(operationService);
+      when(self.getObject()).thenReturn(spied);
+      OperationPayoutDto expected = samplePayoutDto();
+      // First attempt loses the @Version race on the existing row, retry reloads and wins.
+      doThrow(new ObjectOptimisticLockingFailureException(OperationPayoutStatus.class, null))
+          .doReturn(expected)
+          .when(spied)
+          .setPayoutStatusWithinTransaction(OPERATION_ID, KEY, false);
+
+      OperationPayoutDto result = operationService.setPayoutStatus(OPERATION_ID, KEY, false);
+
+      assertEquals(expected, result);
+      verify(spied, times(2)).setPayoutStatusWithinTransaction(OPERATION_ID, KEY, false);
+    }
+
+    @Test
+    void propagatesConflict_whenEveryAttemptLosesTheRace() {
+      OperationService spied = spy(operationService);
+      when(self.getObject()).thenReturn(spied);
+      // A pathological, never-winning race: the bounded retry gives up and surfaces the 409 so the
+      // proxy maps it to a conflict, never a 500.
+      doThrow(new ObjectOptimisticLockingFailureException(OperationPayoutStatus.class, null))
+          .when(spied)
+          .setPayoutStatusWithinTransaction(OPERATION_ID, KEY, true);
+
+      assertThrows(
+          ObjectOptimisticLockingFailureException.class,
+          () -> operationService.setPayoutStatus(OPERATION_ID, KEY, true));
+      // Exactly MAX_PAYOUT_TOGGLE_ATTEMPTS attempts (two swallowed + one propagating).
+      verify(spied, times(3)).setPayoutStatusWithinTransaction(OPERATION_ID, KEY, true);
+    }
+
+    private OperationPayoutDto samplePayoutDto() {
+      return new OperationPayoutDto(
+          KEY,
+          "Alice",
+          0.0,
+          PayoutPreference.PAYOUT,
+          BigDecimal.ZERO,
+          BigDecimal.ZERO,
+          BigDecimal.ZERO,
+          BigDecimal.ZERO,
+          BigDecimal.ZERO,
+          true,
+          null,
+          null);
     }
   }
 

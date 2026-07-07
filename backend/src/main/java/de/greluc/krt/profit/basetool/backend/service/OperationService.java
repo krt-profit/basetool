@@ -61,10 +61,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -135,6 +138,27 @@ public class OperationService {
   private final OwnerScopeService ownerScopeService;
   private final AuthHelperService authHelperService;
   private final AuditService auditService;
+
+  /**
+   * Self-reference used to invoke {@link #setPayoutStatusWithinTransaction} through the Spring
+   * proxy so each retry of {@link #setPayoutStatus} opens its OWN {@code REQUIRES_NEW} transaction.
+   * A direct {@code this} call would be self-invocation and skip the proxy, running every attempt
+   * in one transaction — which is fatal here, because a losing writer's {@link
+   * DataIntegrityViolationException} poisons the whole transaction so no same-transaction retry
+   * could ever commit. An {@link ObjectProvider} defers the lookup, avoiding an eager
+   * self-injection cycle at construction (#1111).
+   */
+  private final ObjectProvider<OperationService> self;
+
+  /**
+   * Total attempts (one initial + retries) the payout toggle makes against a concurrent same-row
+   * writer before giving up and surfacing the conflict. Three is ample: the first losing writer
+   * loses the INSERT / {@code @Version} race, but by the retry the winner has committed the row, so
+   * a second attempt loads it and UPDATEs in place. A further loss needs yet another writer
+   * toggling the exact same {@code (operation, participant)} within microseconds — vanishingly
+   * unlikely.
+   */
+  private static final int MAX_PAYOUT_TOGGLE_ATTEMPTS = 3;
 
   /**
    * Returns paged operation list.
@@ -549,10 +573,19 @@ public class OperationService {
   /**
    * Toggles the paid-out flag for a single participant of an operation, recording the acting user
    * and timestamp. Materializes a new {@link OperationPayoutStatus} row on the first toggle;
-   * subsequent toggles update the row in place. Last-writer-wins: no client-supplied version is
-   * required because the field is a boolean and concurrent toggles are intrinsically idempotent —
-   * repeated calls with the same value still refresh the {@code paidOutAt} / {@code paidOutByUser}
-   * audit trail so the most recent click is always recorded.
+   * subsequent toggles update the row in place.
+   *
+   * <p><b>Last-writer-wins under concurrency, for real.</b> The row carries a JPA {@code @Version}
+   * and a unique constraint on {@code (operation_id, participant_key)}, so two leads toggling the
+   * same never-yet-paid participant at once do NOT both succeed: one loses the INSERT (constraint)
+   * or the UPDATE ({@code @Version}) race and throws. This method therefore runs each attempt in
+   * its own {@code REQUIRES_NEW} transaction (via {@link #self}) and retries up to {@link
+   * #MAX_PAYOUT_TOGGLE_ATTEMPTS} times on {@link DataIntegrityViolationException} / {@link
+   * ObjectOptimisticLockingFailureException}: by the retry the winner has committed the row, so the
+   * loser reloads it and UPDATEs in place. No client-supplied version is required (the field is a
+   * boolean); the retry — not the field's nature — is what makes the toggle idempotent. Previously
+   * the Javadoc claimed this was intrinsic and the bare save simply 409'd the loser, which the
+   * frontend proxy then mis-mapped to a 500 (#1111).
    *
    * @param operationId operation primary key
    * @param participantKey opaque participant key produced by {@link #getOperationPayouts}
@@ -561,9 +594,53 @@ public class OperationService {
    *     single row in the caller's table
    * @throws NotFoundException when the operation does not exist or the participant key cannot be
    *     resolved against the operation's current participant list
+   * @throws ObjectOptimisticLockingFailureException only if every attempt loses the race — a
+   *     persistent hot-row contention the proxy still maps to a 409, never a 500
    */
-  @Transactional
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public OperationPayoutDto setPayoutStatus(
+      @NotNull UUID operationId, @NotNull String participantKey, boolean paidOut) {
+    // Retry the toggle across FRESH transactions. Each attempt is REQUIRES_NEW (see self): a losing
+    // writer's constraint / version violation poisons its own transaction, so the only correct
+    // retry
+    // is a brand-new one. All but the final attempt swallow the race and loop; the final attempt
+    // lets
+    // a persistent race propagate so the proxy surfaces a truthful 409, not a pretend success.
+    for (int attempt = 1; attempt < MAX_PAYOUT_TOGGLE_ATTEMPTS; attempt++) {
+      try {
+        return self.getObject()
+            .setPayoutStatusWithinTransaction(operationId, participantKey, paidOut);
+      } catch (DataIntegrityViolationException | ObjectOptimisticLockingFailureException race) {
+        log.debug(
+            "Concurrent payout toggle race (attempt {}/{}) for operation {} participant {} —"
+                + " retrying",
+            attempt,
+            MAX_PAYOUT_TOGGLE_ATTEMPTS,
+            operationId,
+            participantKey);
+      }
+    }
+    return self.getObject().setPayoutStatusWithinTransaction(operationId, participantKey, paidOut);
+  }
+
+  /**
+   * Performs one attempt of the payout toggle inside its own {@code REQUIRES_NEW} transaction — the
+   * find-or-create + save + audit + re-render body that {@link #setPayoutStatus} retries. Kept
+   * separate (and invoked through {@link #self}) precisely so a constraint / version violation
+   * rolls back only this attempt's transaction and the caller can retry in a clean one (#1111).
+   * Must never be called directly by application code — go through {@link #setPayoutStatus}.
+   *
+   * @param operationId operation primary key
+   * @param participantKey opaque participant key produced by {@link #getOperationPayouts}
+   * @param paidOut new flag value
+   * @return the freshly-rendered payout DTO for the updated participant
+   * @throws NotFoundException when the operation or participant key cannot be resolved
+   * @throws DataIntegrityViolationException when a concurrent writer already inserted the row
+   * @throws ObjectOptimisticLockingFailureException when a concurrent writer already updated the
+   *     row
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public OperationPayoutDto setPayoutStatusWithinTransaction(
       @NotNull UUID operationId, @NotNull String participantKey, boolean paidOut) {
     // Verify operation exists (cheap existence check — avoid loading the full graph here).
     if (!operationRepository.existsById(operationId)) {

@@ -642,6 +642,7 @@
                                         class="btn btn-ghost btn-icon edit-unit-btn"
                                         th:data-action="@{/missions/{id}/units/{uId}/update(id=${mission.id}, uId=${unit.id})}"
                                         th:data-unit-id="${unit.id}"
+                                        th:data-version="${unit.version}"
                                         th:data-name="${unit.name}"
                                         th:data-shiptype="${unit.shipType != null ? unit.shipType.id : ''}"
                                         th:data-ship="${unit.ship != null ? unit.ship.id : ''}"
@@ -1433,6 +1434,7 @@
                     th:with="jobIds=${crew.jobTypes != null ? crew.jobTypes.![id.toString()] : {}}"
                     th:attr="data-unit-id=${unit.id},
                              data-crew-id=${crew.id},
+                             data-version=${crew.version},
                              data-jobs=${crew.jobTypes != null ? #strings.listJoin(crew.jobTypes.![id], ',') : ''},
                              data-action-ajax=@{/missions/{id}/units/{uId}/crew/{cId}/ajax(id=${mission.id}, uId=${unit.id}, cId=${crew.id})},
                              data-current=${jobIds.size() == 1 ? jobIds[0] : (jobIds.size() > 1 ? '__multi' : '')}">

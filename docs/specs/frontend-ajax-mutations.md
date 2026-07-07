@@ -112,6 +112,18 @@ use `support.MutationResponseHelper.mutate(…)` for the `try → successToast /
 redirect` flash pattern. Handler-specific form re-population and `409`/concurrency-conflict branching
 stay in the handler (the helper carries only the generic toast).
 
+**App-wide double-submit guard (#1133).** The shared submit orchestration disables the triggering
+submit button for the whole in-flight round-trip and re-enables it when the request settles (success
+/ error / network), so a double-click cannot fire a second duplicate write — a silent duplicate
+finance-ledger row, a self-409 stale-version PUT, or a 404-toasting second DELETE over a succeeding
+navigation. The button is captured on the capture-phase document `submit` listener and MUST be
+consumed + disabled **synchronously** at the top of `write()` / `submitForm()`, during the same
+submit-event dispatch — **before** `runSerialized` defers the send **and before** the capture
+listener's clearing microtask runs. Consuming it later inside the deferred `send()` always loses the
+FIFO microtask race to the clear and leaves the button enabled (the dead-guard regression #970
+shipped and #1133 restored). A raw-`fetch` call site that does not go through `write`/`submitForm`
+MUST pass an explicit `submitter` (e.g. the operation-detail delete form).
+
 **Acceptance**
 
 - [ ] A new write call site uses `krtFetch.write` (JSON) or `krtFetch.submitForm` (FormData) /
@@ -119,9 +131,11 @@ stay in the handler (the helper carries only the generic toast).
 - [ ] No template or JS hard-codes the CSRF header name.
 - [ ] A `submitForm` write never sets `Content-Type` on the `FormData` body, keeps its no-JS
   native-submit fallback, and does not full-page reload on success.
+- [ ] A double-click on a submit button driving a `krtFetch.write` / `submitForm` fires exactly one
+  request; the button is disabled synchronously on first submit and re-enabled when it settles.
 
-**Enforced by:** code review + grep guard in review · **Code:** `krt-fetch.js` (`write`,
-`submitForm`, `send`) · **Issues:** #572, #916
+**Enforced by:** code review + grep guard in review, per-area double-submit e2e · **Code:**
+`krt-fetch.js` (`write`, `submitForm`, `send`, `resolveSubmitter`) · **Issues:** #572, #916, #1133
 
 ### REQ-FE-003 — `syncVersion` propagates the optimistic-lock version
 
@@ -144,6 +158,16 @@ optimistic-locking rules in `CLAUDE.md`. (A 2026-06 area audit added
 `JobOrderService.updateJobOrder` to the `saveAndFlush` set — its edit-modal version writeback
 otherwise 409s the next consecutive order edit.)
 
+**Every edit path MUST actually echo a version the backend can check (#1131).** `syncVersion`
+propagating the fresh version is moot if the write DTO never carried one in the first place: because
+the mission **unit** and **crew** full-form edits rewrite every field from the caller's snapshot, the
+child `@Version`'s Hibernate WHERE clause always matches the freshly-loaded row and never fires on a
+stale form — the client-echoed version is the only guard. `MissionUnitDto` / `MissionCrewDto` now
+expose `version`, the unit/crew edit buttons render `th:data-version`, and the unit-edit, crew-modal
+and crew quick-change payloads all echo it (`UpdateUnitRequest` / versioned `UpdateCrewRequest`), so a
+stale save 409s instead of silently clobbering a concurrent edit; the fresh version rides back on the
+`krtRefreshMissionSection('crew')` fragment re-render (the "re-render from a fresh GET" case above).
+
 **Acceptance**
 
 - [ ] A second consecutive action on the same row/aggregate after a successful write does not
@@ -151,9 +175,13 @@ otherwise 409s the next consecutive order edit.)
 - [ ] All related `[data-version]` attributes in the DOM context hold the new version after success.
 - [ ] A write whose response feeds an in-place version writeback returns the flushed
   (post-increment) version — `saveAndFlush` wherever the DTO is mapped inside the transaction.
+- [ ] The mission unit and crew edit forms echo the child `@Version`; a stale full-form unit/crew
+  save returns `409`, and the follow-up edit after a successful save (fresh version from the
+  fragment re-render) does not.
 
-**Enforced by:** per-area e2e "double-action" assertion · **Code:** `krt-fetch.js` (`syncVersion`)
-· **Issues:** #571
+**Enforced by:** per-area e2e "double-action" assertion, `MissionServiceCrewTest` (unit/crew
+version-mismatch 409) · **Code:** `krt-fetch.js` (`syncVersion`), `MissionStructureService`,
+`MissionUnitDto` / `MissionCrewDto` · **Issues:** #571, #1131
 
 ### REQ-FE-004 — CSRF stays session/meta-based with transparent retry-on-403
 

@@ -506,8 +506,16 @@ public class MissionParticipantService {
 
   /**
    * Marks a participant as checked in. Sets {@code startTime} to {@code now()} only if the
-   * participant has not been checked in before — repeated check-in is a no-op so the original
+   * participant has not been checked in before — a repeated check-in is a no-op so the original
    * arrival time is preserved.
+   *
+   * <p>The idempotency guard is a data-integrity requirement, not a nicety: {@code startTime} feeds
+   * the credited-time payout breakdown, so a second check-in that reset it to a later {@code now()}
+   * would silently shrink the participant's credited duration and skew the money distribution. The
+   * endpoint carries no client version and any stale crew-board view still renders the "Einchecken"
+   * button (REQ-FE-010 staleness window), so a duplicate delivery is realistic — the guard makes it
+   * harmless instead of a silent lost update (#1134). {@code checkOut} keeps the opposite,
+   * override-on-repeat semantics on purpose (late check-out corrections).
    */
   @Transactional
   public Mission checkIn(UUID missionId, UUID participantId) {
@@ -518,6 +526,12 @@ public class MissionParticipantService {
     MissionParticipant participant = getParticipant(missionId, participantId);
     if (mission.getActualStartTime() == null) {
       throw new IllegalArgumentException("Cannot check in before mission actual start time is set");
+    }
+    if (participant.getStartTime() != null) {
+      // Already checked in: preserve the original arrival timestamp and record nothing — a repeated
+      // check-in changed no state, so it must not overwrite startTime nor emit a second
+      // CHECKED_IN audit event that would imply an arrival that did not happen.
+      return mission;
     }
     participant.setStartTime(Instant.now());
     missionParticipantRepository.save(participant);

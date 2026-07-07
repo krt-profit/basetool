@@ -30,6 +30,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.core.AuthenticationException;
+import tools.jackson.databind.json.JsonMapper;
 
 class SsoReAuthenticationEntryPointTest {
 
@@ -38,7 +39,7 @@ class SsoReAuthenticationEntryPointTest {
 
   @BeforeEach
   void setUp() {
-    entryPoint = new SsoReAuthenticationEntryPoint();
+    entryPoint = new SsoReAuthenticationEntryPoint(JsonMapper.builder().build());
     authException = new InsufficientAuthenticationException("Not authenticated");
   }
 
@@ -162,5 +163,92 @@ class SsoReAuthenticationEntryPointTest {
     Cookie cookie = response.getCookie(SsoReAuthenticationEntryPoint.SSO_ATTEMPTED_COOKIE);
     assertNotNull(cookie);
     assertEquals(0, cookie.getMaxAge(), "Cookie should be cleared, not re-set");
+  }
+
+  // --- #1137: background requests get a 401 challenge, never a saved-request-clobbering redirect
+  // ---
+
+  @Test
+  void commence_shouldReturn401WithReauthHeader_forBackgroundFetch() throws Exception {
+    // Given – a fetch/XHR write: Sec-Fetch-Mode is not "navigate"
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.setRequestURI("/notifications/unread-count");
+    request.addHeader("Sec-Fetch-Mode", "cors");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    // When
+    entryPoint.commence(request, response, authException);
+
+    // Then – 401 + X-Reauthenticate, NO redirect and NO SSO cookie / saved-request mutation
+    assertEquals(401, response.getStatus(), "Background fetch must get a 401, not a 302 redirect");
+    assertNull(response.getRedirectedUrl(), "Background fetch must not be redirected");
+    assertEquals(
+        "/oauth2/authorization/keycloak",
+        response.getHeader("X-Reauthenticate"),
+        "X-Reauthenticate must carry the reauth path the JS helper redirects to");
+    assertNull(
+        response.getCookie(SsoReAuthenticationEntryPoint.SSO_ATTEMPTED_COOKIE),
+        "Background 401 must not touch the SSO_ATTEMPTED cookie / OAuth2 saved-request state");
+    assertTrue(
+        response.getContentAsString().contains("REAUTH_REQUIRED"),
+        "Body should mirror GlobalExceptionHandler's REAUTH_REQUIRED payload");
+  }
+
+  @Test
+  void commence_shouldReturn401_forEventStreamAcceptWithoutSecFetchMode() throws Exception {
+    // Given – an EventSource-style request on an older client (no Sec-Fetch-Mode metadata)
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.setRequestURI("/notifications/stream");
+    request.addHeader("Accept", "text/event-stream");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    // When
+    entryPoint.commence(request, response, authException);
+
+    // Then
+    assertEquals(401, response.getStatus());
+    assertEquals("/oauth2/authorization/keycloak", response.getHeader("X-Reauthenticate"));
+    assertNull(response.getRedirectedUrl());
+  }
+
+  @Test
+  void commence_shouldReturn401_forXmlHttpRequestMarker() throws Exception {
+    // Given – legacy XHR marker, no fetch metadata
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.setRequestURI("/missions/some-id/units/slim");
+    request.addHeader("X-Requested-With", "XMLHttpRequest");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    // When
+    entryPoint.commence(request, response, authException);
+
+    // Then
+    assertEquals(401, response.getStatus());
+    assertEquals("/oauth2/authorization/keycloak", response.getHeader("X-Reauthenticate"));
+    assertNull(response.getRedirectedUrl());
+  }
+
+  @Test
+  void commence_shouldStillRedirect_forTopLevelNavigation() throws Exception {
+    // Given – a genuine top-level navigation stamps Sec-Fetch-Mode: navigate
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.setRequestURI("/missions/some-id");
+    request.addHeader("Sec-Fetch-Mode", "navigate");
+    request.addHeader("Accept", "text/html,application/xhtml+xml");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    // When
+    entryPoint.commence(request, response, authException);
+
+    // Then – the silent-SSO redirect flow is preserved for real navigations
+    assertEquals(302, response.getStatus());
+    String redirectedUrl = response.getRedirectedUrl();
+    assertNotNull(redirectedUrl);
+    assertTrue(redirectedUrl.contains("prompt=none"), "Navigation should still use silent SSO");
+    assertNull(
+        response.getHeader("X-Reauthenticate"), "Navigation must not emit the AJAX challenge");
+    assertNotNull(
+        response.getCookie(SsoReAuthenticationEntryPoint.SSO_ATTEMPTED_COOKIE),
+        "Navigation still sets the SSO_ATTEMPTED loop-guard cookie");
   }
 }
