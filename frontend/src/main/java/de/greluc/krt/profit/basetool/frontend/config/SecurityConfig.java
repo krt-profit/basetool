@@ -344,6 +344,12 @@ public class SecurityConfig {
                     // session is reused by the WebSocket handshake.
                     .requestMatchers("/ws/missions/**")
                     .authenticated()
+                    // Materialbörse board live-sync WebSocket: authenticated members only. Only the
+                    // opaque "board" section key crosses the socket and each peer re-pulls its own
+                    // KRT_MEMBER-gated board fragment, so an authenticated guest learns nothing
+                    // here.
+                    .requestMatchers("/ws/materialboerse/**")
+                    .authenticated()
                     .requestMatchers("/operations", "/operations/")
                     .permitAll()
                     .requestMatchers("/operations/**")

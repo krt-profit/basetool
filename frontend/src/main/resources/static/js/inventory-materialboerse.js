@@ -71,6 +71,9 @@
                     serialize: 'materialboerse',
                     onSuccess: function () {
                         setStatus(itemId, false);
+                        if (window.krtMaterialboardPresence) {
+                            window.krtMaterialboardPresence.sendChanged(['board']);
+                        }
                     },
                     onError: function () {
                         el.checked = true;

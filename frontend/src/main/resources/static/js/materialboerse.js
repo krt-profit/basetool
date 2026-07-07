@@ -174,9 +174,16 @@
             errorMessage: i18n.error,
             serialize: SERIALIZE_KEY,
             onSuccess: function () {
+                notifyPeers();
                 return swapList();
             },
         });
+    }
+
+    function notifyPeers() {
+        if (window.krtMaterialboardPresence) {
+            window.krtMaterialboardPresence.sendChanged(['board']);
+        }
     }
 
     function deactivateOffer(id) {
@@ -198,6 +205,7 @@
                     errorMessage: i18n.error,
                     serialize: SERIALIZE_KEY,
                     onSuccess: function () {
+                        notifyPeers();
                         selectedId = null;
                         return swapBoard();
                     },
@@ -291,6 +299,22 @@
         if (e.target.matches('[data-mb-sort]')) {
             swapList();
         }
+    });
+
+    // REQ-MARKET-010: a peer released / deactivated / registered interest — re-pull the board list.
+    // Debounced; skipped while the release modal is open so an in-progress dialog is not disrupted.
+    var peerTimer = null;
+    document.addEventListener('krt:materialboerse-changed', function () {
+        if (peerTimer) {
+            clearTimeout(peerTimer);
+        }
+        peerTimer = setTimeout(function () {
+            var modal = document.getElementById('mb-modal');
+            if (modal && !modal.hidden) {
+                return;
+            }
+            swapList();
+        }, 400);
     });
 
     document.addEventListener('krt:swapped', function () {

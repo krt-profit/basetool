@@ -274,6 +274,7 @@
                 conflict: i18n.conflict,
                 serialize: SERIALIZE_KEY,
                 onSuccess: function (body) {
+                    notifyPeers();
                     return finish(body);
                 },
             });
@@ -290,9 +291,16 @@
             errorMessage: i18n.error,
             serialize: SERIALIZE_KEY,
             onSuccess: function (body) {
+                notifyPeers();
                 return finish(body);
             },
         });
+    }
+
+    function notifyPeers() {
+        if (window.krtMaterialboardPresence) {
+            window.krtMaterialboardPresence.sendChanged(['board']);
+        }
     }
 
     // -------- events (scoped to the modal DOM) --------
