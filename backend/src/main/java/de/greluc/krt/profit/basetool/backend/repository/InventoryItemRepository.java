@@ -484,4 +484,26 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds);
+
+  /**
+   * Loads the caller's own Lager rows for the Materialbörse "Material anbieten" item picker,
+   * optionally filtered by a material-name fragment and capped by the {@link Pageable}.
+   * Owner-scoped by {@code user.id} (a member may only offer their own stock), with material and
+   * location eager-loaded so the picker renders without an N+1, ordered by material name. Location
+   * is loaded here only because it is the owner's own picker — it is never exposed on the public
+   * board.
+   *
+   * @param userId the caller (the picker only ever shows the caller's own rows).
+   * @param query a pre-lowercased {@code %fragment%} matched against the material name, or {@code
+   *     null} for no filter.
+   * @param pageable the cap on the number of picker rows.
+   * @return the caller's matching Lager rows, never {@code null}.
+   */
+  @EntityGraph(attributePaths = {"material", "location"})
+  @Query(
+      "SELECT i FROM InventoryItem i WHERE i.user.id = :userId "
+          + "AND (:query IS NULL OR LOWER(i.material.name) LIKE :query) "
+          + "ORDER BY i.material.name ASC")
+  List<InventoryItem> findReleasableForUser(
+      @Param("userId") UUID userId, @Param("query") String query, Pageable pageable);
 }

@@ -91,6 +91,22 @@
                 <span th:case="*"><span th:text="${entry.amount != null ? #numbers.formatDecimal(entry.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'}">10.500</span> <span class="tree-unit" th:text="#{material.quantity.scu}">SCU</span></span>
             </div>
             <div class="tree-cell tree-cell--actions">
+                <label class="inv-boerse-toggle"
+                       th:with="released=${releasedItemIds != null and releasedItemIds.contains(entry.id)}"
+                       th:title="#{materialboerse.inventory.forExchange}">
+                    <input type="checkbox" class="inv-boerse-checkbox"
+                           th:checked="${released}"
+                           th:data-id="${entry.id}"
+                           th:data-material="${entry.material.name}"
+                           th:data-quality="${entry.quality}"
+                           th:data-amount="${entry.amount}"
+                           data-trigger="inv-boerse-toggle"
+                           th:aria-label="#{materialboerse.inventory.forExchange}"/>
+                    <span class="inv-boerse-status chip"
+                          th:data-boerse-status-for="${entry.id}"
+                          th:classappend="${released} ? 'chip--primary' : 'chip--muted'"
+                          th:text="${released} ? #{materialboerse.inventory.forExchange.on} : #{materialboerse.inventory.forExchange.private}">privat</span>
+                </label>
                 <button type="button" class="btn btn-outline btn-xs btn-icon"
                         th:data-id="${entry.id}"
                         th:data-amount="${entry.amount}"

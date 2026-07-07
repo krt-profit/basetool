@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="de">
+<body>
+<!--
+  Shared Materialbörse release / edit modal (REQ-MARKET-002/007). Included on the
+  Materialbörse board page and the Mein-Lager page. The logic lives in
+  materialboerse-release.js (window.krtMaterialRelease); strings come from
+  window.materialboerseI18n (bootstrapped below, merged so a host page can add its own).
+-->
+<th:block th:fragment="releaseModal">
+    <div id="mb-modal" class="krt-modal-overlay" hidden>
+        <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true"
+             aria-labelledby="mb-modal-title" data-mb-modal>
+            <div class="krt-modal-head">
+                <h2 id="mb-modal-title" data-mb-modal-title
+                    th:text="#{materialboerse.modal.release.title}">Material für die Börse freigeben</h2>
+                <button type="button" class="btn btn-ghost btn-icon" data-mb-modal-close
+                        th:aria-label="#{materialboerse.modal.close}">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg>
+                </button>
+            </div>
+            <div class="krt-modal-body">
+                <div class="mb-modal-picker" data-mb-picker hidden>
+                    <label class="form-label-sm" th:text="#{materialboerse.modal.material.label}">Material</label>
+                    <div class="krt-combobox" data-mb-combobox>
+                        <input class="krt-combobox__input" type="text" data-mb-picker-input autocomplete="off"
+                               th:placeholder="#{materialboerse.modal.material.placeholder}"/>
+                        <ul class="krt-combobox__listbox" role="listbox" data-mb-picker-list hidden></ul>
+                    </div>
+                </div>
+                <div class="facts-bar mb-modal-facts">
+                    <span><span class="fact-k" th:text="#{materialboerse.facts.material}">Material</span><span class="fact-v" data-mb-fact-material>—</span></span>
+                    <span><span class="fact-k" th:text="#{materialboerse.facts.quality}">Qualität</span><span class="fact-v" data-mb-fact-quality>—</span></span>
+                    <span><span class="fact-k" th:text="#{materialboerse.facts.amount}">Menge</span><span class="fact-v" data-mb-fact-amount>—</span></span>
+                </div>
+                <label class="form-label-sm mb-modal-remark-label" for="mb-remark">
+                    <span th:text="#{materialboerse.modal.remark.label}">Bemerkung</span>
+                    <span class="mb-modal-remark-hint" th:text="#{materialboerse.modal.remark.hint}">— was suchst du im Gegenzug? (Markdown, max. 20.000 Zeichen)</span>
+                </label>
+                <textarea id="mb-remark" data-mb-remark rows="8" maxlength="20000"
+                          th:placeholder="#{materialboerse.modal.remark.placeholder}"></textarea>
+                <div class="mb-modal-footnote">
+                    <span class="mb-modal-privacy">
+                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-info"/></svg>
+                        <span th:text="#{materialboerse.modal.privacy.note}">Standort/Übergabeort bleiben privat.</span>
+                    </span>
+                    <span data-mb-charcount>0 / 20.000</span>
+                </div>
+            </div>
+            <div class="krt-modal-foot">
+                <button type="button" class="btn btn-ghost" data-mb-modal-close th:text="#{materialboerse.modal.cancel}">Abbrechen</button>
+                <button type="button" class="btn btn--cta" data-mb-modal-submit>
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-check"/></svg>
+                    <span data-mb-submit-label th:text="#{materialboerse.modal.submit.release}">Freigeben</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    <script th:inline="javascript" th:attr="nonce=${cspNonce}">
+        window.materialboerseI18n = Object.assign(window.materialboerseI18n || {}, {
+            releaseTitle: /*[[#{materialboerse.modal.release.title}]]*/ 'Material für die Börse freigeben',
+            editTitle: /*[[#{materialboerse.modal.edit.title}]]*/ 'Bemerkung bearbeiten',
+            submitRelease: /*[[#{materialboerse.modal.submit.release}]]*/ 'Freigeben',
+            submitSave: /*[[#{materialboerse.modal.submit.save}]]*/ 'Speichern',
+            released: /*[[#{materialboerse.toast.released}]]*/ 'Auf die Börse gestellt.',
+            remarkSaved: /*[[#{materialboerse.toast.remarkSaved}]]*/ 'Bemerkung gespeichert.',
+            error: /*[[#{notification.error.save}]]*/ 'Fehler.',
+            charCounter: /*[[#{materialboerse.modal.remark.counter}]]*/ '{0} / 20.000',
+            pickerEmpty: /*[[#{materialboerse.modal.material.empty}]]*/ 'Keine freigebbaren Lager-Posten gefunden.',
+            pickerAlready: /*[[#{materialboerse.modal.material.already}]]*/ 'bereits auf der Börse',
+            conflict: window.materialboerseI18n && window.materialboerseI18n.conflict ? window.materialboerseI18n.conflict : {
+                title: /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt',
+                reloadDetailFallback: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Neu laden.',
+                reloadLabel: /*[[#{frontend.ajax.conflict.reload}]]*/ 'Neu laden',
+                dismissLabel: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
+                reloadQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Neu laden?'
+            }
+        });
+    </script>
+    <script th:src="@{/js/materialboerse-release.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <script th:src="@{/js/materialboerse-presence.js}" defer th:attr="nonce=${cspNonce}"></script>
+</th:block>
+</body>
+</html>

@@ -1,0 +1,366 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * Materialbörse (Flotte & Logistik) — page composition ONLY (grid / spacing /
+ * alignment). No new colours, radii, shadows or component looks: every visible
+ * element maps to an existing DAS-KARTELL design-system class/token; this file
+ * only lays those components out on the page. Square corners throughout.
+ */
+
+/* ---- page head + primary CTA ---- */
+.mb-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+.mb-head-title {
+    min-width: 0;
+}
+.mb-eyebrow {
+    margin: 0 0 4px;
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--color-gray-2);
+}
+.mb-intro {
+    margin: 12px 2px 18px;
+    font-size: 14px;
+    font-weight: 300;
+    line-height: 1.6;
+    color: var(--color-gray-1);
+    max-width: 100ch;
+}
+
+/* ---- toolbar (tabs + search + filters) ---- */
+.mb-toolbar {
+    background: var(--color-bg-dark-gray);
+    border: 1px solid var(--color-gray-3);
+    border-bottom: none;
+}
+.mb-tabrow {
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--color-gray-3);
+}
+.mb-tabrow .tab-nav {
+    border-bottom: none;
+    flex: 1;
+    min-width: 0;
+    padding: 0 6px;
+}
+.mb-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    flex: 0 1 300px;
+    min-width: 200px;
+}
+.mb-search .krt-icon {
+    width: 16px;
+    height: 16px;
+    color: var(--color-gray-2);
+    flex: none;
+}
+.mb-search input {
+    width: 100%;
+    height: 38px;
+}
+.mb-filters {
+    display: flex;
+    align-items: center;
+    gap: 14px 20px;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    background: var(--color-surface-input);
+    border-bottom: 1px solid var(--color-gray-3);
+}
+.mb-filt {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+.mb-filt-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+    color: var(--color-gray-2);
+    white-space: nowrap;
+}
+.mb-filt-unit {
+    font-size: 11px;
+    color: var(--color-gray-2);
+}
+.mb-filt input[type='number'] {
+    width: 96px;
+    height: 34px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---- master-detail layout ---- */
+.mb-md {
+    grid-template-columns: 320px 1fr;
+    gap: 14px;
+    align-items: start;
+    margin-top: 0;
+}
+.mb-mlist {
+    max-height: 560px;
+    overflow-y: auto;
+}
+@media (width <= 900px) {
+    .mb-md {
+        grid-template-columns: 1fr;
+    }
+    /* Narrow screens collapse to list -> detail navigation: the list shows first,
+       selecting a row reveals the detail (has-sel) with a "Liste" back button. */
+    .mb-md .mb-detailpane {
+        display: none;
+    }
+    .mb-md.has-sel .mb-mlist {
+        display: none;
+    }
+    .mb-md.has-sel .mb-detailpane {
+        display: block;
+    }
+}
+
+/* ---- master row (2-line composition inside .master-row) ---- */
+.mb-mrow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    box-sizing: border-box;
+    text-align: left;
+    cursor: pointer;
+}
+.mb-mrow.mb-mine {
+    border-left: 3px solid rgb(231 126 35 / 40%);
+}
+.mb-mrow-main {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+.mb-mrow-mat {
+    font-weight: 700;
+    color: var(--color-white);
+    font-size: 13.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.mb-mrow.is-active .mb-mrow-mat {
+    color: var(--color-primary);
+}
+.mb-mrow-sub {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--color-gray-2);
+    min-width: 0;
+}
+.mb-mrow-owner {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.mb-mrow-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--color-gray-2);
+    font-variant-numeric: tabular-nums;
+}
+.mb-dot {
+    color: var(--color-gray-3);
+}
+.mb-mrow-int {
+    flex: none;
+}
+
+/* ---- detail pane ---- */
+.mb-detailpane {
+    min-height: 300px;
+    padding: 0;
+}
+.mb-detail-empty {
+    border: none;
+    margin: 24px 0;
+}
+.mb-dp-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--color-gray-3);
+}
+.mb-dp-title {
+    min-width: 0;
+}
+.mb-dp-title h2 {
+    font-family: var(--font-headline);
+    font-weight: 700;
+    color: var(--color-white);
+    font-size: 21px;
+    margin: 0 0 4px;
+    text-transform: none;
+    letter-spacing: 0;
+}
+.mb-dp-owner {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: var(--color-gray-2);
+}
+.mb-dp-owner-name {
+    color: var(--color-gray-1);
+    font-weight: 700;
+}
+.mb-dp-mine {
+    margin-top: 7px;
+}
+.mb-dp-back {
+    display: none;
+}
+@media (width <= 900px) {
+    .mb-dp-back {
+        display: inline-flex;
+    }
+}
+.mb-dp-facts {
+    margin: 0;
+    padding: 12px 18px;
+}
+.mb-dp-body {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: 16px 22px;
+    align-items: start;
+    padding: 16px 18px;
+}
+@media (width <= 720px) {
+    .mb-dp-body {
+        grid-template-columns: 1fr;
+    }
+}
+.mb-dp-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+    color: var(--color-gray-2);
+    margin: 0 0 6px;
+}
+.mb-anon-note,
+.mb-owner-note {
+    font-size: 11px;
+    color: var(--color-gray-2);
+    font-weight: 300;
+    line-height: 1.45;
+    margin: 10px 0 0;
+    display: flex;
+    gap: 7px;
+    align-items: flex-start;
+}
+.mb-anon-note .krt-icon {
+    width: 13px;
+    height: 13px;
+    flex: none;
+    margin-top: 2px;
+}
+.mb-dp-side {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.mb-int-names {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.mb-int-empty {
+    font-size: 12.5px;
+    color: var(--color-gray-2);
+}
+.mb-dp-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* ---- release / edit modal composition ---- */
+.mb-modal-picker {
+    margin-bottom: 14px;
+}
+.mb-modal-facts {
+    margin-bottom: 14px;
+}
+.mb-modal-remark-label {
+    display: block;
+    margin-bottom: 5px;
+}
+.mb-modal-remark-hint {
+    color: var(--color-gray-2);
+    font-weight: 400;
+    text-transform: none;
+}
+#mb-modal textarea {
+    width: 100%;
+    box-sizing: border-box;
+}
+.mb-modal-footnote {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--color-gray-2);
+    font-variant-numeric: tabular-nums;
+}
+.mb-modal-privacy {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.mb-modal-privacy .krt-icon {
+    width: 13px;
+    height: 13px;
+}
+
+/* ---- Mein-Lager "Für Börse freigeben" leaf toggle ---- */
+.inv-boerse-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.inv-boerse-toggle .inv-boerse-checkbox {
+    width: 1.1rem;
+    height: 1.1rem;
+    flex: none;
+}
+.inv-boerse-status {
+    font-size: 10px;
+}

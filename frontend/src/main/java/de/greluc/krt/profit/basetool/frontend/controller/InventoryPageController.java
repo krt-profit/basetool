@@ -32,7 +32,9 @@ import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
@@ -84,6 +86,10 @@ public class InventoryPageController {
    */
   private static final ParameterizedTypeReference<PageResponse<InventoryItemDto>>
       INVENTORY_ITEM_PAGE = new ParameterizedTypeReference<PageResponse<InventoryItemDto>>() {};
+
+  /** Response type for the Materialbörse released-item-ids lookup (the "Auf Börse" flags). */
+  private static final ParameterizedTypeReference<List<UUID>> UUID_LIST =
+      new ParameterizedTypeReference<List<UUID>>() {};
 
   /**
    * Response type for the grouped {@code /my} and {@code /all} list views ({@code .../grouped}),
@@ -510,7 +516,43 @@ public class InventoryPageController {
       uriBuilder.queryParam("size", size);
     }
     fetchStackEntriesIntoModel(uriBuilder.build().toUriString(), model);
+    addReleasedItemIds(model);
     return "fragments/inventory-stack-entries :: stackEntriesMy";
+  }
+
+  /**
+   * Adds the {@code releasedItemIds} model attribute — the subset of the just-loaded Mein-Lager
+   * leaf rows that currently carry an active Materialbörse offer — so the leaf template renders the
+   * "Für Börse" checkbox as checked / "Auf Börse". Best-effort: a Materialbörse backend failure
+   * leaves the set empty (the checkboxes simply render unchecked) rather than breaking the Lager.
+   *
+   * @param model the model already populated with the {@code entries} leaf list.
+   */
+  private void addReleasedItemIds(Model model) {
+    Set<UUID> released = new HashSet<>();
+    if (model.getAttribute("entries") instanceof List<?> entries && !entries.isEmpty()) {
+      org.springframework.web.util.UriComponentsBuilder uri =
+          org.springframework.web.util.UriComponentsBuilder.fromPath(
+              "/api/v1/material-exchange/released-item-ids");
+      boolean any = false;
+      for (Object entry : entries) {
+        if (entry instanceof InventoryItemDto item && item.id() != null) {
+          uri.queryParam("ids", item.id());
+          any = true;
+        }
+      }
+      if (any) {
+        try {
+          List<UUID> result = backendApiClient.get(uri.build().toUriString(), UUID_LIST);
+          if (result != null) {
+            released.addAll(result);
+          }
+        } catch (Exception e) {
+          log.error("Failed to load Materialbörse released-item ids", e);
+        }
+      }
+    }
+    model.addAttribute("releasedItemIds", released);
   }
 
   /**

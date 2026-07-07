@@ -147,6 +147,9 @@ public final class MetricNames {
   public static final String REFINERY_ORDER_OPEN_OLDEST_AGE =
       "basetool.refinery.order.open.oldest.age";
 
+  /** Gauge {@code basetool_material_exchange_active_count} — active Materialbörse offers. */
+  public static final String MATERIAL_EXCHANGE_ACTIVE = "basetool.material.exchange.active.count";
+
   /** Gauge {@code basetool_p4k_import_job_pending_count} — tag {@code status}. */
   public static final String P4K_IMPORT_JOB_PENDING = "basetool.p4k.import.job.pending.count";
 

@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Neue Materialbörse (Flotte & Logistik).** Ein zentraler, für alle Mitglieder sichtbarer Marktplatz: Spieler geben Überschüsse aus ihrem Lager frei (Checkbox „Für Börse freigeben" mit Markdown-Bemerkung, max. 20.000 Zeichen) und andere melden Interesse an. Angezeigt wird nur, wer welches Material in welcher Qualität und Menge anbietet — Standort und Übergabeort bleiben privat, und Interessenten-Namen sieht ausschließlich der Anbieter. Verhandlung und Übergabe laufen direkt zwischen den Spielern (REQ-MARKET-001…010, ADR-0082).
+- **Materialbörse im Audit-Log.** Freigabe, Deaktivierung, Bemerkungs-Bearbeitung sowie An- und Abmelden von Interesse werden protokolliert; das Admin-Audit-Log erhält einen eigenen „Materialbörse"-Tab.
+
 ### Changed
 
 - **Verbesserung: Die Operationsseite lädt schneller und belastet Datenbank und Verbindungspool unter hoher Gleichzeitigkeit deutlich weniger.** Die Finanzübersicht einer Operation ermittelt ihre Summen jetzt über schlanke Datenbank-Aggregate, statt sämtliche Finanz- und Raffinerieeinträge aller Einsätze zu laden; die Aufschlüsselung je Einsatz wird erst beim Aufklappen nachgeladen, die vier Detail-Abfragen laufen parallel, und der „Bezahlt"-Schalter aktualisiert nur noch die betroffene Zeile, statt die gesamte Auszahlung neu zu berechnen. Die Operationsauswahl auf der Einsatzseite wird zudem nur noch beim vollständigen Seitenaufbau geladen und auf aktuelle Operationen begrenzt (#1109).
