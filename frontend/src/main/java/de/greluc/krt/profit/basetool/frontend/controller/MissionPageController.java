@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobTypeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionCrewDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto;
@@ -140,6 +141,10 @@ public class MissionPageController {
   /** Response type for the {@code /api/v1/refinery-orders/mission/{id}} order-list read. */
   private static final ParameterizedTypeReference<List<RefineryOrderListDto>> REFINERY_ORDER_LIST =
       new ParameterizedTypeReference<List<RefineryOrderListDto>>() {};
+
+  /** Response type for the {@code /api/v1/inventory/mission/{id}} item-list read (#1138). */
+  private static final ParameterizedTypeReference<List<InventoryItemDto>> INVENTORY_ITEM_LIST =
+      new ParameterizedTypeReference<List<InventoryItemDto>>() {};
 
   /** Response type for the untyped-JSON {@code participants/unassigned} passthrough read. */
   private static final ParameterizedTypeReference<Object> OBJECT =
@@ -755,7 +760,16 @@ public class MissionPageController {
                   () ->
                       backendApiClient.get(
                           "/api/v1/refinery-orders/mission/" + id, REFINERY_ORDER_LIST, false));
-          CompletableFuture.allOf(totalsFuture, entriesFuture, refineryFuture).join();
+          // #1138: the mission inventory list moved off the embedded MissionDto field onto its own
+          // dedicated read; fetch it in parallel with the finance/refinery reads for the Wirtschaft
+          // "Lagereinträge" table.
+          CompletableFuture<List<InventoryItemDto>> inventoryFuture =
+              parallelPageLoader.loadAsync(
+                  () ->
+                      backendApiClient.get(
+                          "/api/v1/inventory/mission/" + id, INVENTORY_ITEM_LIST, false));
+          CompletableFuture.allOf(totalsFuture, entriesFuture, refineryFuture, inventoryFuture)
+              .join();
 
           // Summary strip (Gesamtsumme / Einnahmen / Ausgaben / je Anteil) straight from the
           // aggregate — the expense figures already fold in refinery-order expenses backend-side.
@@ -777,9 +791,11 @@ public class MissionPageController {
                           java.math.RoundingMode.HALF_UP)
                   : null);
 
-          // Bounded entries table + the (small, bounded) refinery-order list for the ledger table.
+          // Bounded entries table + the (small, bounded) refinery-order list for the ledger table,
+          // plus the mission inventory list for the Wirtschaft "Lagereinträge" table (#1138).
           model.addAttribute("financeEntries", entriesFuture.join().content());
           model.addAttribute("refineryOrders", refineryFuture.join());
+          model.addAttribute("inventoryEntries", inventoryFuture.join());
         } catch (Exception e) {
           // join() reports a supplier failure wrapped in a CompletionException; log its concrete
           // cause so the line still names the real backend exception. Any failure collapses the
@@ -788,7 +804,7 @@ public class MissionPageController {
               (e instanceof java.util.concurrent.CompletionException && e.getCause() != null)
                   ? e.getCause()
                   : e;
-          log.error("Error loading finance entries or refinery orders", cause);
+          log.error("Error loading finance entries, refinery orders or mission inventory", cause);
         }
       }
 
@@ -894,9 +910,6 @@ public class MissionPageController {
             null,
             null,
             false,
-            null,
-            null,
-            null,
             null,
             null,
             null,

@@ -52,14 +52,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 /** MapStruct mapper between Mission entities and DTOs. */
 @Mapper(
     config = CentralMapperConfig.class,
-    uses = {
-      ShipMapper.class,
-      UserMapper.class,
-      InventoryItemMapper.class,
-      RefineryOrderMapper.class,
-      OperationMapper.class,
-      SquadronMapper.class
-    })
+    uses = {ShipMapper.class, UserMapper.class, OperationMapper.class, SquadronMapper.class})
 public abstract class MissionMapper {
 
   // MapStruct generates a concrete subclass via the annotation processor; the generated subclass

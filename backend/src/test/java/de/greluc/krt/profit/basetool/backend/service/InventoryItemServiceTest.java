@@ -121,6 +121,25 @@ class InventoryItemServiceTest {
   }
 
   @Test
+  void getMissionInventory_mapsEveryItemLinkedToTheMission() {
+    // #1138: the mission economy moved off the embedded MissionDto.inventoryEntries field onto a
+    // dedicated read that lists every item linked to the mission and maps each to its display DTO.
+    UUID missionId = UUID.randomUUID();
+    InventoryItem a = new InventoryItem();
+    InventoryItem b = new InventoryItem();
+    InventoryItemDto da = mock(InventoryItemDto.class);
+    InventoryItemDto db = mock(InventoryItemDto.class);
+    when(inventoryItemRepository.findByMissionId(missionId)).thenReturn(List.of(a, b));
+    when(inventoryItemMapper.toDto(a)).thenReturn(da);
+    when(inventoryItemMapper.toDto(b)).thenReturn(db);
+
+    List<InventoryItemDto> result = inventoryItemService.getMissionInventory(missionId);
+
+    assertEquals(List.of(da, db), result);
+    verify(inventoryItemRepository).findByMissionId(missionId);
+  }
+
+  @Test
   void updateInventoryItem_savesInPlaceWithoutMerging() {
     // Append-only Lager: an update edits the targeted row in place and never folds it into another
     // matching stack. Even when a sibling row with the same stock identity exists, the edited row's

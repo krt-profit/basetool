@@ -44,6 +44,12 @@ import java.util.UUID;
  * <p>{@code owningOrgUnitVersion} mirrors the backend's section-scoped optimistic-lock counter for
  * the owning-org-unit reassignment control in the Verwaltung tab (REQ-ORG-018); the detail template
  * pins it into the reassignment form so a concurrent change surfaces a 409.
+ *
+ * <p><strong>Slimmed detail payload (#1138).</strong> The formerly-embedded {@code subMissions}
+ * (rendered nowhere), {@code inventoryEntries} and {@code refineryOrders} were removed from the
+ * mission detail DTO. The Wirtschaft block fetches the mission economy on demand instead — refinery
+ * via the finance section's existing {@code refineryOrders} model attribute and inventory via a
+ * dedicated {@code inventoryEntries} fetch ({@code GET /api/v1/inventory/mission/{id}}).
  */
 public record MissionDto(
     UUID id,
@@ -60,9 +66,6 @@ public record MissionDto(
     Set<MissionParticipantDto> participants,
     List<MissionUnitDto> assignedUnits,
     List<MissionFrequencyDto> frequencies,
-    Set<MissionDto> subMissions,
-    List<InventoryItemDto> inventoryEntries,
-    List<RefineryOrderDto> refineryOrders,
     OperationDto operation,
     UserReferenceDto owner,
     Set<UserReferenceDto> managers,

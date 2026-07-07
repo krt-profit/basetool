@@ -811,10 +811,12 @@
                 </div>
             </div>
 
-            <!-- Wirtschaft (authenticated viewers, only when data exists — same gate as before) -->
-            <th:block sec:authorize="isAuthenticated()" th:if="${(mission?.refineryOrders != null and !#lists.isEmpty(mission.refineryOrders)) or (mission?.inventoryEntries != null and !#lists.isEmpty(mission.inventoryEntries))}">
-                <details class="hud-details" open th:if="${mission?.refineryOrders != null and !#lists.isEmpty(mission.refineryOrders)}">
-                    <summary><span th:text="#{mission.refinery_orders}">Raffinerieauftr&auml;ge</span> <span class="chip chip--data chip-xs" th:text="${#lists.size(mission.refineryOrders)}">2</span></summary>
+            <!-- Wirtschaft (authenticated viewers, only when data exists — same gate as before).
+                 #1138: the refinery + inventory lists moved off the embedded MissionDto fields onto
+                 the finance section's dedicated ${refineryOrders} / ${inventoryEntries} reads. -->
+            <th:block sec:authorize="isAuthenticated()" th:if="${(refineryOrders != null and !#lists.isEmpty(refineryOrders)) or (inventoryEntries != null and !#lists.isEmpty(inventoryEntries))}">
+                <details class="hud-details" open th:if="${refineryOrders != null and !#lists.isEmpty(refineryOrders)}">
+                    <summary><span th:text="#{mission.refinery_orders}">Raffinerieauftr&auml;ge</span> <span class="chip chip--data chip-xs" th:text="${#lists.size(refineryOrders)}">2</span></summary>
                     <div class="table-responsive">
                         <table>
                             <thead>
@@ -827,7 +829,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr th:each="order : ${mission.refineryOrders}">
+                                <tr th:each="order : ${refineryOrders}">
                                     <td th:text="${order.owner != null ? order.owner.effectiveName : '-'}">Nutzer</td>
                                     <td th:text="${order.location != null ? order.location.name : '-'}">Standort</td>
                                     <td>
@@ -865,8 +867,8 @@
                     </div>
                 </details>
 
-                <details class="hud-details" open th:if="${mission?.inventoryEntries != null and !#lists.isEmpty(mission.inventoryEntries)}">
-                    <summary><span th:text="#{mission.inventory_entries}">Lagereintr&auml;ge</span> <span class="chip chip--data chip-xs" th:text="${#lists.size(mission.inventoryEntries)}">3</span></summary>
+                <details class="hud-details" open th:if="${inventoryEntries != null and !#lists.isEmpty(inventoryEntries)}">
+                    <summary><span th:text="#{mission.inventory_entries}">Lagereintr&auml;ge</span> <span class="chip chip--data chip-xs" th:text="${#lists.size(inventoryEntries)}">3</span></summary>
                     <div class="table-responsive">
                         <table>
                             <thead>
@@ -880,7 +882,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr th:each="item : ${mission.inventoryEntries}">
+                                <tr th:each="item : ${inventoryEntries}">
                                     <td th:text="${item.user != null ? item.user.effectiveName : '-'}">Nutzer</td>
                                     <td th:text="${item.location != null ? item.location.name : '-'}">Standort</td>
                                     <td th:text="${item.material != null ? item.material.name : '-'}">Material</td>

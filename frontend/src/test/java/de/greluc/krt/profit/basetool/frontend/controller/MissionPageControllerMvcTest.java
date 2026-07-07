@@ -294,9 +294,6 @@ class MissionPageControllerMvcTest {
         Collections.emptySet(),
         Collections.emptyList(),
         Collections.emptyList(),
-        Collections.emptySet(),
-        Collections.emptyList(),
-        Collections.emptyList(),
         null,
         null,
         java.util.Set.of(manager),
@@ -362,9 +359,6 @@ class MissionPageControllerMvcTest {
         null,
         null,
         false,
-        Collections.emptySet(),
-        Collections.emptyList(),
-        Collections.emptyList(),
         Collections.emptySet(),
         Collections.emptyList(),
         Collections.emptyList(),
@@ -447,9 +441,6 @@ class MissionPageControllerMvcTest {
         false,
         participants,
         units,
-        Collections.emptyList(),
-        Collections.emptySet(),
-        Collections.emptyList(),
         Collections.emptyList(),
         null,
         null,
@@ -593,9 +584,6 @@ class MissionPageControllerMvcTest {
             java.util.Set.of(participant),
             Collections.emptyList(),
             Collections.emptyList(),
-            Collections.emptySet(),
-            Collections.emptyList(),
-            Collections.emptyList(),
             null,
             null,
             Collections.emptySet(),
@@ -666,9 +654,6 @@ class MissionPageControllerMvcTest {
             null,
             false,
             java.util.Set.of(participant),
-            Collections.emptyList(),
-            Collections.emptyList(),
-            Collections.emptySet(),
             Collections.emptyList(),
             Collections.emptyList(),
             null,
@@ -745,8 +730,11 @@ class MissionPageControllerMvcTest {
     // (formatRefineryEndLocalTimes) rewrites it to the browser's local zone on load.
     UUID missionId = UUID.randomUUID();
 
-    de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderDto order =
-        new de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderDto(
+    // #1138: the Wirtschaft refinery <details> now renders the finance section's fetched
+    // ${refineryOrders} (RefineryOrderListDto) instead of the removed MissionDto.refineryOrders
+    // field, so the order is stubbed on the /refinery-orders/mission/{id} read below.
+    de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderListDto order =
+        new de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderListDto(
             UUID.randomUUID(),
             null,
             null,
@@ -758,11 +746,10 @@ class MissionPageControllerMvcTest {
             null,
             null,
             null,
+            null,
             Collections.emptyList(),
             null,
-            null,
-            1L,
-            null);
+            1L);
     long expectedEndsAtMillis = order.getEndsAt().toEpochMilli();
 
     MissionDto mission =
@@ -781,9 +768,6 @@ class MissionPageControllerMvcTest {
             Collections.emptySet(),
             Collections.emptyList(),
             Collections.emptyList(),
-            Collections.emptySet(),
-            Collections.emptyList(),
-            List.of(order),
             null,
             null,
             Collections.emptySet(),
@@ -809,6 +793,13 @@ class MissionPageControllerMvcTest {
         .thenReturn(mission);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
         .thenReturn(Collections.emptyList());
+    // #1138: the Wirtschaft block sources ${refineryOrders} from the finance section's dedicated
+    // read, so the finance fetches must succeed (else the panel collapses) and the refinery read
+    // must carry the order under test.
+    stubEmptyFinance(missionId);
+    when(backendApiClient.get(
+            eq("/api/v1/refinery-orders/mission/" + missionId), anyTypeRef(), eq(false)))
+        .thenReturn(List.of(order));
 
     mockMvc
         .perform(get("/missions/" + missionId))
@@ -894,9 +885,6 @@ class MissionPageControllerMvcTest {
             java.util.Set.of(p1, p2, p3),
             Collections.emptyList(),
             Collections.emptyList(),
-            Collections.emptySet(),
-            Collections.emptyList(),
-            Collections.emptyList(),
             null,
             null,
             Collections.emptySet(),
@@ -963,9 +951,6 @@ class MissionPageControllerMvcTest {
             null,
             false,
             java.util.Set.of(participant),
-            Collections.emptyList(),
-            Collections.emptyList(),
-            Collections.emptySet(),
             Collections.emptyList(),
             Collections.emptyList(),
             null,
@@ -1054,9 +1039,6 @@ class MissionPageControllerMvcTest {
             Collections.emptySet(),
             Collections.emptyList(),
             Collections.emptyList(),
-            Collections.emptySet(),
-            Collections.emptyList(),
-            Collections.emptyList(),
             null,
             null,
             Collections.emptySet(),
@@ -1091,9 +1073,6 @@ class MissionPageControllerMvcTest {
             null,
             null,
             false,
-            Collections.emptySet(),
-            Collections.emptyList(),
-            Collections.emptyList(),
             Collections.emptySet(),
             Collections.emptyList(),
             Collections.emptyList(),
@@ -1155,9 +1134,6 @@ class MissionPageControllerMvcTest {
             null,
             null,
             false,
-            Collections.emptySet(),
-            Collections.emptyList(),
-            Collections.emptyList(),
             Collections.emptySet(),
             Collections.emptyList(),
             Collections.emptyList(),
@@ -1842,9 +1818,6 @@ class MissionPageControllerMvcTest {
             java.util.Set.of(participant),
             Collections.emptyList(),
             Collections.emptyList(),
-            Collections.emptySet(),
-            Collections.emptyList(),
-            Collections.emptyList(),
             null,
             null,
             Collections.emptySet(),
@@ -1961,9 +1934,6 @@ class MissionPageControllerMvcTest {
             null,
             false,
             java.util.Set.of(participant),
-            Collections.emptyList(),
-            Collections.emptyList(),
-            Collections.emptySet(),
             Collections.emptyList(),
             Collections.emptyList(),
             null,
@@ -2164,9 +2134,6 @@ class MissionPageControllerMvcTest {
             java.util.Set.of(participant),
             Collections.emptyList(),
             Collections.emptyList(),
-            Collections.emptySet(),
-            Collections.emptyList(),
-            Collections.emptyList(),
             null,
             null,
             Collections.emptySet(),
@@ -2335,9 +2302,6 @@ class MissionPageControllerMvcTest {
             java.util.Set.of(participant),
             List.of(assignedUnit),
             Collections.emptyList(),
-            Collections.emptySet(),
-            Collections.emptyList(),
-            Collections.emptyList(),
             null,
             null,
             Collections.emptySet(),
@@ -2464,9 +2428,6 @@ class MissionPageControllerMvcTest {
             Collections.emptySet(),
             List.of(alphaUnit, bravoUnit),
             List.of(befehlFrequency),
-            Collections.emptySet(),
-            Collections.emptyList(),
-            Collections.emptyList(),
             null,
             null,
             Collections.emptySet(),
@@ -2586,9 +2547,6 @@ class MissionPageControllerMvcTest {
             Collections.emptySet(),
             Collections.emptyList(),
             List.of(befehlFrequency),
-            Collections.emptySet(),
-            Collections.emptyList(),
-            Collections.emptyList(),
             null,
             null,
             Collections.emptySet(),
@@ -2705,9 +2663,6 @@ class MissionPageControllerMvcTest {
             Collections.emptySet(),
             Collections.emptyList(),
             Collections.emptyList(),
-            Collections.emptySet(),
-            Collections.emptyList(),
-            Collections.emptyList(),
             null,
             null,
             Collections.emptySet(),
@@ -2758,6 +2713,11 @@ class MissionPageControllerMvcTest {
     // PageResponse stub (which would ClassCastException inside the finance try-block).
     when(backendApiClient.get(
             eq("/api/v1/refinery-orders/mission/" + missionId), anyTypeRef(), eq(false)))
+        .thenReturn(Collections.emptyList());
+    // #1138: same for the new mission-inventory read (else the broad emptyPage stub breaks
+    // #lists.isEmpty in the Wirtschaft block).
+    when(backendApiClient.get(
+            eq("/api/v1/inventory/mission/" + missionId), anyTypeRef(), eq(false)))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -2835,9 +2795,6 @@ class MissionPageControllerMvcTest {
             false,
             java.util.Set.of(participant),
             List.of(unit),
-            Collections.emptyList(),
-            Collections.emptySet(),
-            Collections.emptyList(),
             Collections.emptyList(),
             null,
             null,
@@ -2924,9 +2881,6 @@ class MissionPageControllerMvcTest {
             Collections.emptySet(),
             Collections.emptyList(),
             Collections.emptyList(),
-            Collections.emptySet(),
-            Collections.emptyList(),
-            Collections.emptyList(),
             null,
             null,
             Collections.emptySet(),
@@ -2977,9 +2931,6 @@ class MissionPageControllerMvcTest {
         null,
         null,
         false,
-        Collections.emptySet(),
-        Collections.emptyList(),
-        Collections.emptyList(),
         Collections.emptySet(),
         Collections.emptyList(),
         Collections.emptyList(),
@@ -3108,6 +3059,10 @@ class MissionPageControllerMvcTest {
             anyBoolean());
     verify(backendApiClient, never())
         .get(eq("/api/v1/refinery-orders/mission/" + missionId), anyTypeRef(), anyBoolean());
+    // #1138: the mission inventory list moved onto its own read, fetched only for the finance
+    // fragment — a non-finance fragment must not issue it.
+    verify(backendApiClient, never())
+        .get(eq("/api/v1/inventory/mission/" + missionId), anyTypeRef(), anyBoolean());
   }
 
   /**
@@ -3192,6 +3147,10 @@ class MissionPageControllerMvcTest {
             eq(false));
     verify(backendApiClient)
         .get(eq("/api/v1/refinery-orders/mission/" + missionId), anyTypeRef(), eq(false));
+    // #1138: the finance fragment also fetches the mission inventory list for the Wirtschaft table
+    // (formerly embedded in the MissionDto payload).
+    verify(backendApiClient)
+        .get(eq("/api/v1/inventory/mission/" + missionId), anyTypeRef(), eq(false));
   }
 
   @Test

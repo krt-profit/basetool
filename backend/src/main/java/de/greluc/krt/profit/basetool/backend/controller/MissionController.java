@@ -318,10 +318,11 @@ public class MissionController {
   }
 
   /**
-   * Redacts a mission DTO for an anonymous viewer: strips owner/managers, internal inventory and
-   * refinery orders, clears edit/manage flags, and recursively cleans each participant and
-   * sub-mission. This is the only path that controls what leaves the API for guests — never lift
-   * data into the controller layer without thinking about this method first.
+   * Redacts a mission DTO for an anonymous viewer: strips owner/managers, clears edit/manage flags,
+   * and recursively cleans each participant. The mission economy (inventory / refinery orders) is
+   * no longer part of this DTO (#1138) — it is member-gated at its own endpoints — so there is
+   * nothing to strip here for it. This is the only path that controls what leaves the API for
+   * guests — never lift data into the controller layer without thinking about this method first.
    *
    * @param dto the full mission DTO
    * @return a redacted copy safe for unauthenticated callers
@@ -332,13 +333,6 @@ public class MissionController {
             ? null
             : dto.participants().stream()
                 .map(this::cleanupParticipantForGuest)
-                .collect(Collectors.toSet());
-
-    Set<MissionDto> cleanedSubMissions =
-        dto.subMissions() == null
-            ? null
-            : dto.subMissions().stream()
-                .map(this::cleanupMissionForGuest)
                 .collect(Collectors.toSet());
 
     return new MissionDto(
@@ -356,9 +350,6 @@ public class MissionController {
         cleanedParticipants,
         dto.assignedUnits(),
         dto.frequencies(),
-        cleanedSubMissions,
-        Collections.emptyList(), // inventoryEntries
-        Collections.emptyList(), // refineryOrders
         dto.operation(),
         null, // owner
         null, // managers
@@ -395,9 +386,9 @@ public class MissionController {
    * Redaction for mission "outsiders" — anonymous callers AND authenticated but role-less {@code
    * GUEST} accounts (see {@link
    * de.greluc.krt.profit.basetool.backend.service.AuthHelperService#isMemberOrAbove()}). It applies
-   * the member-peer {@link #cleanupMissionForGuest} pass (owner / managers / internal inventory /
-   * refinery orders cleared, participant PII stripped to the public callsign tuple) and
-   * additionally hides only the free-text <b>description</b>.
+   * the member-peer {@link #cleanupMissionForGuest} pass (owner / managers cleared, participant PII
+   * stripped to the public callsign tuple) and additionally hides only the free-text
+   * <b>description</b>.
    *
    * <p>By explicit product decision an outsider <b>does</b> see — on a non-internal mission — the
    * owning <b>organisation</b> ({@code owningSquadron}), the <b>participant roster</b> with each
@@ -405,22 +396,17 @@ public class MissionController {
    * <b>units</b> and the mission <b>frequencies</b>. The only things kept from an outsider beyond
    * the member-peer redaction are the description (here) and the finance ledger (the {@code
    * /finance-entries} endpoints stay member-only — they are a separate surface, not part of this
-   * DTO). Sub-missions are redacted recursively at the same outsider level so their descriptions
-   * are hidden too. The {@code ForGuest} suffix + the delegated {@link #cleanupMissionForGuest}
-   * call satisfy the {@code anonymousReadableMissionEndpointsMustRedactGuestPii} ArchUnit rule.
+   * DTO). The mission economy (inventory / refinery orders) is no longer part of this DTO (#1138)
+   * and is member-gated at its own endpoints, so it is never on the outsider surface at all. The
+   * {@code ForGuest} suffix + the delegated {@link #cleanupMissionForGuest} call satisfy the {@code
+   * anonymousReadableMissionEndpointsMustRedactGuestPii} ArchUnit rule.
    *
    * @param dto the full mission DTO straight from the mapper
-   * @return a copy with participant PII + owner/managers/internal economy stripped and the
-   *     description hidden, but organisation, roster, units, frequencies and payout preference kept
+   * @return a copy with participant PII + owner/managers stripped and the description hidden, but
+   *     organisation, roster, units, frequencies and payout preference kept
    */
   private MissionDto cleanupOutsiderMissionForGuest(MissionDto dto) {
     MissionDto peer = cleanupMissionForGuest(dto);
-    Set<MissionDto> outsiderSubMissions =
-        dto.subMissions() == null
-            ? null
-            : dto.subMissions().stream()
-                .map(this::cleanupOutsiderMissionForGuest)
-                .collect(Collectors.toSet());
 
     // ADR-0034: the anonymous outsider view drops each participant's payoutPreference + free-text
     // comment (kept on the member-peer view). The peer roster is already PII-stripped; strip these
@@ -449,9 +435,6 @@ public class MissionController {
         outsiderParticipants, // roster kept, but payout + comment stripped (ADR-0034)
         peer.assignedUnits(), // units kept
         peer.frequencies(), // frequencies kept
-        outsiderSubMissions,
-        peer.inventoryEntries(), // already empty
-        peer.refineryOrders(), // already empty
         peer.operation(),
         peer.owner(), // already null
         peer.managers(), // already null

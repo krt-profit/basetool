@@ -208,8 +208,11 @@ What a mission outsider (anonymous OR GUEST) **may** do — and nothing more:
 
 The outsider mission detail (`MissionController.cleanupOutsiderMissionForGuest`) applies the
 member-peer redaction (participant PII stripped to the public callsign tuple
-username/displayName/rank; owner, managers and internal inventory/refinery cleared) and
-**additionally hides only the free-text `description`**. By explicit product decision an
+username/displayName/rank; owner and managers cleared) and **additionally hides only the free-text
+`description`**. The mission **economy** (inventory entries / refinery orders) is no longer part of
+the `MissionDto` at all (#1138) — it is served member-gated at its own endpoints
+(`/api/v1/inventory/mission/{id}`, `/api/v1/refinery-orders/mission/{id}`, both behind the member-role
+filter) — so there is nothing economy-related on the outsider surface to redact. By explicit product decision an
 outsider **does** see, on a non-internal mission, the owning **organisation**
 (`owningSquadron`), the **participant roster** (PII-stripped) with each participant's
 **payout preference**, the assigned **units** and the mission **frequencies**. PII (email,
@@ -226,9 +229,9 @@ read). Finance-entry creation is therefore no longer anonymous.
 - [ ] Anonymous and GUEST callers can `POST /api/v1/orders` (+`/items`) but receive empty
   list / 403 on every order read/edit/delete path.
 - [ ] A mission outsider's `GET /api/v1/missions/{id}` on a non-internal mission returns a DTO
-  with `description`, `owner`, `managers` null and internal inventory/refinery empty, but WITH
-  the participant roster (PII stripped — no email/roles), `owningSquadron`, `assignedUnits` and
-  `frequencies` present; internal/past → 403.
+  with `description`, `owner`, `managers` null and no `inventoryEntries`/`refineryOrders` fields at
+  all (#1138), but WITH the participant roster (PII stripped — no email/roles), `owningSquadron`,
+  `assignedUnits` and `frequencies` present; internal/past → 403.
 - [ ] An outsider can add and edit an unlinked guest participant; editing a *linked*
   participant they do not own → 403.
 - [ ] Anonymous create on `POST /api/v1/finance-entries` → 401; GUEST → 403; member → 201.

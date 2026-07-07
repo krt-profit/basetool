@@ -51,6 +51,14 @@ import java.util.UUID;
  * REQ-ORG-018). The frontend echoes it back on the next reassignment so two managers editing the
  * same mission surface a 409 instead of silently overwriting; the assigned org unit itself is
  * carried by {@link #owningSquadron}.
+ *
+ * <p><strong>Slimmed detail payload (#1138).</strong> The formerly-embedded {@code subMissions} (a
+ * <em>recursively</em> mapped {@code Set<MissionDto>}), {@code inventoryEntries} and {@code
+ * refineryOrders} were removed: {@code subMissions} was rendered nowhere, and the two economy lists
+ * are unbounded and member-only. The mission economy is served on demand instead — refinery via
+ * {@code GET /api/v1/refinery-orders/mission/{id}} and inventory via {@code GET
+ * /api/v1/inventory/mission/{id}} — so the hottest mission read no longer drags an unbounded,
+ * recursive payload through every detail GET and every mutator response.
  */
 public record MissionDto(
     UUID id,
@@ -67,9 +75,6 @@ public record MissionDto(
     Set<MissionParticipantDto> participants,
     List<MissionUnitDto> assignedUnits,
     List<MissionFrequencyDto> frequencies,
-    Set<MissionDto> subMissions,
-    List<InventoryItemDto> inventoryEntries,
-    List<RefineryOrderDto> refineryOrders,
     OperationDto operation,
     UserReferenceDto owner,
     Set<UserReferenceDto> managers,
