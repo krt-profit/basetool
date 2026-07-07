@@ -264,13 +264,14 @@ x-backend: &backend-template
   # Biggest workload on the host: every API call goes through this JVM, Flyway
   # runs at startup, and Hibernate caches L1/L2 + Caffeine caches live here.
   # MaxRAMPercentage=75 (set further down in JAVA_TOOL_OPTIONS) maps to roughly
-  # 1.1 GB heap inside the 1536M limit, the remaining ~400 MB cover Metaspace,
+  # 1.5 GB heap inside the 2048M limit, the remaining ~512 MB cover Metaspace,
   # the JIT code cache, native libs (openpdf, postgres jdbc) and a working
-  # buffer for the Tomcat thread pool.
+  # buffer for the Tomcat thread pool. Raised from 1536M for precautionary
+  # headroom against restart / peak-load spikes; the 16 GB host has room.
   deploy:
     resources:
       limits:
-        memory: 1536M
+        memory: 2048M
         cpus: '2.0'
         # JVM threads count as tasks toward this ceiling; 2048 is generous headroom over Tomcat +
         # Hikari + scheduler + GC/JIT threads, so it is a runaway ceiling, not a limit hit under load.
@@ -403,13 +404,14 @@ x-frontend: &frontend-template
   cap_drop: [ALL]
   stop_grace_period: 30s
   # Thymeleaf SSR + WebClient proxy to the backend; no JPA, no business logic,
-  # so the working set is well below the backend's. 768 MB → ~576 MB heap with
-  # MaxRAMPercentage=75 is enough for Tomcat, the Spring Session client cache
-  # and the Caffeine-backed reference-data cache.
+  # so the working set is well below the backend's. 1024 MB → ~768 MB heap with
+  # MaxRAMPercentage=75 covers Tomcat, the Spring Session client cache and the
+  # Caffeine-backed reference-data cache, with precautionary headroom over the
+  # previous 768M.
   deploy:
     resources:
       limits:
-        memory: 768M
+        memory: 1024M
         cpus: '1.0'
         # JVM thread ceiling — generous headroom (see the backend template).
         pids: 2048

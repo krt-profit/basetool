@@ -599,12 +599,17 @@ class MissionPageControllerTest {
 
   @Test
   void missionDetail_Member_FetchesFinanceTrioViaParallelLoader() {
-    // For a member, the finance-entries / finance-sum / refinery-orders trio is fetched via the
-    // ParallelPageLoader. This asserts all three independent reads still happen on the member path
-    // (it does not — and cannot deterministically — assert they overlap in time): the real PARALLEL
-    // loader runs each supplier against the mocked client, so verifying the three calls proves the
-    // parallel block issues them all (#2 / live-sync #755 amplifies this on peer fragment
-    // re-fetches).
+    // For a member, the finance-summary / finance-entries page / refinery-orders trio is fetched
+    // via
+    // the ParallelPageLoader. Since ADR-0078 the summary strip reads its totals from the SQL
+    // aggregate (/finance-entries/summary) instead of the whole ledger, and the entries table is
+    // bounded to a page (size=200) instead of the old size=1000 load-all. This asserts all three
+    // independent reads still happen on the member path (it does not — and cannot deterministically
+    // —
+    // assert they overlap in time): the real PARALLEL loader runs each supplier against the mocked
+    // client, so verifying the three calls proves the parallel block issues them all (#2 /
+    // live-sync
+    // #755 amplifies this on peer fragment re-fetches).
     UUID id = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     FrontendAuthHelperService authHelper = mock(FrontendAuthHelperService.class);
@@ -662,27 +667,33 @@ class MissionPageControllerTest {
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), eq(true)))
         .thenReturn(Collections.emptyList());
     when(backendApiClient.get(
-            eq("/api/v1/missions/" + id + "/finance-entries?size=1000"), anyTypeRef(), eq(false)))
+            eq("/api/v1/missions/" + id + "/finance-entries/summary"),
+            eq(de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceTotalsDto.class),
+            eq(false)))
+        .thenReturn(
+            new de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceTotalsDto(
+                java.math.BigDecimal.ZERO,
+                java.math.BigDecimal.ZERO,
+                0L,
+                java.math.BigDecimal.ZERO,
+                0L));
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + id + "/finance-entries?size=200"), anyTypeRef(), eq(false)))
         .thenReturn(
             new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
-                Collections.emptyList(), 0, 1000, 0, 0, Collections.emptyList()));
-    when(backendApiClient.get(
-            eq("/api/v1/missions/" + id + "/finance-entries/sum"),
-            eq(java.math.BigDecimal.class),
-            eq(false)))
-        .thenReturn(java.math.BigDecimal.ZERO);
+                Collections.emptyList(), 0, 200, 0, 0, Collections.emptyList()));
     when(backendApiClient.get(eq("/api/v1/refinery-orders/mission/" + id), anyTypeRef(), eq(false)))
         .thenReturn(Collections.emptyList());
 
     controller.missionDetail(id, model, null, null);
 
     verify(backendApiClient)
-        .get(eq("/api/v1/missions/" + id + "/finance-entries?size=1000"), anyTypeRef(), eq(false));
-    verify(backendApiClient)
         .get(
-            eq("/api/v1/missions/" + id + "/finance-entries/sum"),
-            eq(java.math.BigDecimal.class),
+            eq("/api/v1/missions/" + id + "/finance-entries/summary"),
+            eq(de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceTotalsDto.class),
             eq(false));
+    verify(backendApiClient)
+        .get(eq("/api/v1/missions/" + id + "/finance-entries?size=200"), anyTypeRef(), eq(false));
     verify(backendApiClient)
         .get(eq("/api/v1/refinery-orders/mission/" + id), anyTypeRef(), eq(false));
   }

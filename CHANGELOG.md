@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Monitoring/Betrieb: RAM-Limits angehoben und Prometheus zusätzlich gegen OOM abgesichert.** Backend 1536M→2048M, Frontend 768M→1024M und Prometheus 512M→1024M, damit Neustart-Spitzen (u. a. Prometheus' WAL-Replay, das mit 512M direkt nach einem Neustart ans Limit lief) und Lastspitzen nicht mehr ans Container-Limit stoßen. Prometheus bekommt zusätzlich `GOMEMLIMIT=900MiB`, damit der Go-Garbage-Collector unter Druck früher greift und einen harten OOM schon innerhalb des 1G-Budgets vermeidet. Greift beim nächsten Deploy (Container werden neu erstellt); der 16-GB-Host hat weiterhin reichlich Puffer.
+
 ## [v1.1.9](https://github.com/krt-profit/basetool/releases/tag/v1.1.9) - 2026-07-06
 
 ### Added
