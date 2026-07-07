@@ -346,7 +346,11 @@ document.addEventListener('krt:swapped', function (ev) {
     function schedule(sectionKey) {
         pendingNow[sectionKey] = true;
         if (!timer) {
-            timer = setTimeout(flushTimer, COALESCE_MS);
+            // #1125: full-jitter the coalesce window so peers that all received the same `changed`
+            // frame within microseconds do not fire their fragment refetches in one synchronized
+            // burst. Mirrors the reconnect path's decorrelation jitter (mission-presence.js); the
+            // debounce semantics are unchanged (worst case ~2x COALESCE_MS instead of COALESCE_MS).
+            timer = setTimeout(flushTimer, COALESCE_MS + Math.random() * COALESCE_MS);
         }
     }
 

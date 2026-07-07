@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationPayoutDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.OperationPayoutStatusDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationPayoutSummaryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationUpdateDto;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
@@ -47,6 +48,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -54,6 +57,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -103,6 +107,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class OperationService {
 
   private static final BigDecimal ONE_HUNDRED = new BigDecimal("100");
+
+  /**
+   * How many months back a {@code COMPLETED} / {@code CANCELED} operation stays in the
+   * operation-picker reference lookup ({@link #findAllReference}). Terminal operations older than
+   * this drop out of the picker so it cannot grow unbounded with the total operation count (#1124);
+   * mirrors the 3-month terminal cutoff of the mission reference picker.
+   */
+  private static final int REFERENCE_TERMINAL_CUTOFF_MONTHS = 3;
 
   /**
    * Key under which the in-game banking fee rate is stored in {@code system_setting}. Seeded by
@@ -226,23 +238,33 @@ public class OperationService {
   }
 
   /**
-   * Returns the slim id + name projection of every operation in the caller's squadron scope, sorted
-   * by name. Used by the mission-detail page's operation-picker dropdown so the page render does
-   * not need to pull the full {@code OperationDto} payload for every option.
+   * Returns the slim id + name projection of the operations in the caller's squadron scope that are
+   * still picker-relevant, sorted by name. Used by the mission-detail page's operation-picker
+   * dropdown so the page render does not need to pull the full {@code OperationDto} payload for
+   * every option. Bounded by status + recency (#1124): {@code PLANNED} / {@code ACTIVE} always,
+   * {@code COMPLETED} / {@code CANCELED} only within the last {@link
+   * #REFERENCE_TERMINAL_CUTOFF_MONTHS} months (by {@code createdAt}), so the picker cannot grow
+   * unbounded with the total operation count — mirrors {@code
+   * MissionService.findAllActiveReference}.
    *
    * @return slim {@link de.greluc.krt.profit.basetool.backend.model.dto.OperationReferenceDto}
-   *     list, filtered by the caller's squadron scope
+   *     list, filtered by the caller's squadron scope and the status/recency bound
    */
   @NotNull
   public java.util.List<de.greluc.krt.profit.basetool.backend.model.dto.OperationReferenceDto>
       findAllReference() {
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    Instant terminalCutoff =
+        OffsetDateTime.now(ZoneOffset.UTC)
+            .minusMonths(REFERENCE_TERMINAL_CUTOFF_MONTHS)
+            .toInstant();
     return operationRepository.findAllReferenceScoped(
         scope.adminAllScope(),
         scope.activeOrgUnitId(),
         scope.memberOrgUnitIds(),
         authHelperService.isMemberOrAbove(),
-        authHelperService.currentUserId().orElse(null));
+        authHelperService.currentUserId().orElse(null),
+        terminalCutoff);
   }
 
   /**
@@ -590,15 +612,15 @@ public class OperationService {
    * @param operationId operation primary key
    * @param participantKey opaque participant key produced by {@link #getOperationPayouts}
    * @param paidOut new flag value
-   * @return the freshly-rendered payout DTO for the updated participant, suitable for replacing a
-   *     single row in the caller's table
+   * @return the paid-out status block for the updated participant, for patching a single "Bezahlt"
+   *     cell without re-running the full payout computation
    * @throws NotFoundException when the operation does not exist or the participant key cannot be
    *     resolved against the operation's current participant list
    * @throws ObjectOptimisticLockingFailureException only if every attempt loses the race — a
    *     persistent hot-row contention the proxy still maps to a 409, never a 500
    */
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
-  public OperationPayoutDto setPayoutStatus(
+  public OperationPayoutStatusDto setPayoutStatus(
       @NotNull UUID operationId, @NotNull String participantKey, boolean paidOut) {
     // Retry the toggle across FRESH transactions. Each attempt is REQUIRES_NEW (see self): a losing
     // writer's constraint / version violation poisons its own transaction, so the only correct
@@ -633,30 +655,44 @@ public class OperationService {
    * @param operationId operation primary key
    * @param participantKey opaque participant key produced by {@link #getOperationPayouts}
    * @param paidOut new flag value
-   * @return the freshly-rendered payout DTO for the updated participant
+   * @return the paid-out status block for the updated participant
    * @throws NotFoundException when the operation or participant key cannot be resolved
    * @throws DataIntegrityViolationException when a concurrent writer already inserted the row
    * @throws ObjectOptimisticLockingFailureException when a concurrent writer already updated the
    *     row
    */
   @Transactional(propagation = Propagation.REQUIRES_NEW)
-  public OperationPayoutDto setPayoutStatusWithinTransaction(
+  public OperationPayoutStatusDto setPayoutStatusWithinTransaction(
       @NotNull UUID operationId, @NotNull String participantKey, boolean paidOut) {
-    // Verify operation exists (cheap existence check — avoid loading the full graph here).
-    if (!operationRepository.existsById(operationId)) {
-      throw new NotFoundException("Operation not found");
+    // Load the operation with its mission-participant graph (bounded by participant count, NOT the
+    // finance ledger) to validate the key and attach the status row to a managed operation. The
+    // paid-out toggle does NOT re-run the full payout computation (the double finance/refinery
+    // load-all + the money math) — flipping the flag never changes any amount, so the caller
+    // patches
+    // just the "Bezahlt" cell from the returned status block (#1121, operation-side ADR-0078 gap).
+    Operation operation =
+        Entities.require(
+            operationRepository.findWithMissionsAndParticipantsById(operationId),
+            "Operation not found");
+
+    // Same key set the read path exposes (both derive from computeParticipationBreakdown), so the
+    // 404-on-unknown-participant behavior is preserved without re-running getOperationPayouts.
+    Set<String> validKeys = computeParticipationBreakdown(operation).participantNames().keySet();
+    if (!validKeys.contains(participantKey)) {
+      throw new NotFoundException(
+          "Participant '" + participantKey + "' is not part of operation " + operationId);
     }
 
-    Optional<OperationPayoutStatus> existing =
-        payoutStatusRepository.findByOperationIdAndParticipantKey(operationId, participantKey);
     OperationPayoutStatus status =
-        existing.orElseGet(
-            () -> {
-              OperationPayoutStatus s = new OperationPayoutStatus();
-              s.setOperation(operationRepository.getReferenceById(operationId));
-              s.setParticipantKey(participantKey);
-              return s;
-            });
+        payoutStatusRepository
+            .findByOperationIdAndParticipantKey(operationId, participantKey)
+            .orElseGet(
+                () -> {
+                  OperationPayoutStatus s = new OperationPayoutStatus();
+                  s.setOperation(operation);
+                  s.setParticipantKey(participantKey);
+                  return s;
+                });
 
     status.setPaidOut(paidOut);
     if (paidOut) {
@@ -672,18 +708,14 @@ public class OperationService {
     auditService.record(
         AuditEventType.OPERATION_PAYOUT_TOGGLED,
         operationId,
-        status.getOperation() != null ? status.getOperation().getName() : null,
+        operation.getName(),
         null,
         AuditDetails.of("paidOut", paidOut));
 
-    // Re-render the full row so the caller can patch its DOM without a second round-trip. We use
-    // the same canonical path as the read endpoint to guarantee the displayed amount stays in
-    // lock-step with what the backend just persisted.
-    return Entities.require(
-        getOperationPayouts(operationId).stream()
-            .filter(dto -> participantKey.equals(dto.participantId()))
-            .findFirst(),
-        () -> "Participant '" + participantKey + "' is not part of operation " + operationId);
+    String paidOutByName =
+        status.getPaidOutByUser() != null ? status.getPaidOutByUser().getEffectiveName() : null;
+    return new OperationPayoutStatusDto(
+        participantKey, status.isPaidOut(), status.getPaidOutAt(), paidOutByName);
   }
 
   /**

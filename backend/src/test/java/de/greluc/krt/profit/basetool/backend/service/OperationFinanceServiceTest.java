@@ -20,15 +20,21 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.MissionMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.RefineryOrderMapper;
 import de.greluc.krt.profit.basetool.backend.model.*;
 import de.greluc.krt.profit.basetool.backend.model.dto.*;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceGroupAggregate;
 import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
+import de.greluc.krt.profit.basetool.backend.repository.RefineryMissionProfitAggregate;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import java.math.BigDecimal;
 import java.util.List;
@@ -166,5 +172,93 @@ class OperationFinanceServiceTest {
 
     // Then: 350 + (-150) + (-25) = 175
     assertEquals(0, BigDecimal.valueOf(175.0).compareTo(result.totalSum()));
+  }
+
+  @Test
+  void getOperationFinanceSummary_aggregatesPerMissionTotalsFromGroupedQueries() {
+    // Given: two missions; totals come from the grouped SQL aggregates, not a row load-all (#1121).
+    UUID operationId = UUID.randomUUID();
+    Operation operation = new Operation();
+    operation.setId(operationId);
+    Mission alpha = new Mission();
+    alpha.setId(UUID.randomUUID());
+    alpha.setName("Alpha");
+    Mission bravo = new Mission();
+    bravo.setId(UUID.randomUUID());
+    bravo.setName("Bravo");
+    operation.setMissions(Set.of(alpha, bravo));
+
+    when(operationRepository.findById(operationId)).thenReturn(Optional.of(operation));
+    // Alpha: 500 income - 100 expense + 350 refinery profit = 750.
+    // Bravo: no income (null sum) - 200 expense + no refinery = -200.
+    when(financeEntryRepository.aggregateFinanceByMissionIds(any()))
+        .thenReturn(
+            List.of(
+                new MissionFinanceGroupAggregate(
+                    alpha.getId(), BigDecimal.valueOf(500), BigDecimal.valueOf(100)),
+                new MissionFinanceGroupAggregate(bravo.getId(), null, BigDecimal.valueOf(200))));
+    when(refineryOrderRepository.aggregateProfitByMissionIds(any()))
+        .thenReturn(List.of(new RefineryMissionProfitAggregate(alpha.getId(), 350.0)));
+
+    // When
+    OperationFinanceSummaryDto result =
+        operationFinanceService.getOperationFinanceSummary(operationId);
+
+    // Then: operation total 750 + (-200) = 550, breakdown ordered by mission name (Alpha, Bravo).
+    assertEquals(0, BigDecimal.valueOf(550).compareTo(result.totalSum()));
+    assertFalse(result.truncated());
+    assertEquals(2, result.missions().size());
+    OperationMissionFinanceDto alphaLine = result.missions().get(0);
+    assertEquals(alpha.getId(), alphaLine.missionId());
+    assertEquals(0, BigDecimal.valueOf(750).compareTo(alphaLine.totalSum()));
+    OperationMissionFinanceDto bravoLine = result.missions().get(1);
+    assertEquals(bravo.getId(), bravoLine.missionId());
+    assertEquals(0, BigDecimal.valueOf(-200).compareTo(bravoLine.totalSum()));
+  }
+
+  @Test
+  void getMissionFinanceDetail_emptyMission_returnsZeroTotalAndEmptyLists() {
+    // Given: a mission of the operation with no finance entries and no refinery orders.
+    UUID operationId = UUID.randomUUID();
+    Operation operation = new Operation();
+    operation.setId(operationId);
+    Mission msn = new Mission();
+    msn.setId(UUID.randomUUID());
+    msn.setName("Detail Mission");
+    operation.setMissions(Set.of(msn));
+
+    when(operationRepository.findById(operationId)).thenReturn(Optional.of(operation));
+    when(financeEntryRepository.findAllByMissionId(msn.getId())).thenReturn(List.of());
+    when(refineryOrderRepository.findByMissionId(msn.getId())).thenReturn(List.of());
+
+    // When
+    MissionFinanceSummaryDto result =
+        operationFinanceService.getMissionFinanceDetail(operationId, msn.getId());
+
+    // Then
+    assertEquals(msn.getId(), result.missionId());
+    assertEquals(0, BigDecimal.ZERO.compareTo(result.totalSum()));
+    assertTrue(result.entries().isEmpty());
+    assertTrue(result.refineryOrders().isEmpty());
+  }
+
+  @Test
+  void getMissionFinanceDetail_missionNotPartOfOperation_throwsNotFound() {
+    // Given: the requested mission id is not one of the operation's child missions.
+    UUID operationId = UUID.randomUUID();
+    Operation operation = new Operation();
+    operation.setId(operationId);
+    Mission owned = new Mission();
+    owned.setId(UUID.randomUUID());
+    owned.setName("Owned");
+    operation.setMissions(Set.of(owned));
+
+    when(operationRepository.findById(operationId)).thenReturn(Optional.of(operation));
+
+    // When / Then
+    UUID foreignMissionId = UUID.randomUUID();
+    assertThrows(
+        NotFoundException.class,
+        () -> operationFinanceService.getMissionFinanceDetail(operationId, foreignMissionId));
   }
 }

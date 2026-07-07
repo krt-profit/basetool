@@ -639,8 +639,10 @@ re-fetch amplification even within a mission it can see.
 An incoming refresh must **never yank a section out from under an active edit**: while a modal is open
 (or focus sits inside the target section's container) the refresh is deferred behind a DS-styled
 "Aktualisierungen verfügbar" pill (no native dialog) that applies the held-back sections on click.
-Bursts are coalesced (debounce), and a dropped-then-reconnected socket triggers a one-shot resync of
-every visible section to recover signals missed while offline.
+Bursts are coalesced (a debounce window jittered like the reconnect backoff — `COALESCE_MS +
+random()*COALESCE_MS` — so peers that all received the same `changed` frame within microseconds do
+not fire their fragment refetches in one synchronized spike, #1125), and a dropped-then-reconnected
+socket triggers a one-shot resync of every visible section to recover signals missed while offline.
 
 **Single-instance, like presence.** The relay reuses the in-memory per-mission session map, so it is
 correct only for a single frontend replica (the current deployment). Scaling the frontend out

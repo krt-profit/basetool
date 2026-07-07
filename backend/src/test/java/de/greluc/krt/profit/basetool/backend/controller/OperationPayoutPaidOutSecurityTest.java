@@ -29,11 +29,9 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationPayoutDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.OperationPayoutStatusDto;
 import de.greluc.krt.profit.basetool.backend.service.OperationService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
-import java.math.BigDecimal;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -83,20 +81,8 @@ class OperationPayoutPaidOutSecurityTest {
     return new SimpleGrantedAuthority("ROLE_MISSION_MANAGER");
   }
 
-  private static OperationPayoutDto refreshedRow(String key) {
-    return new OperationPayoutDto(
-        key,
-        "Alice",
-        100.0,
-        PayoutPreference.PAYOUT,
-        BigDecimal.ZERO,
-        BigDecimal.ZERO,
-        BigDecimal.ZERO,
-        BigDecimal.ZERO,
-        BigDecimal.ZERO,
-        true,
-        null,
-        null);
+  private static OperationPayoutStatusDto refreshedRow(String key) {
+    return new OperationPayoutStatusDto(key, true, null, null);
   }
 
   private static String body(String key, boolean paidOut) {

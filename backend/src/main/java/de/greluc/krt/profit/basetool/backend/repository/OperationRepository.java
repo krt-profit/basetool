@@ -107,6 +107,13 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
    * size=1000} was the previous shape and exhausted DB and serialisation budget on every mission
    * page render. Uses the same R6.c scope-predicate triple as {@link #findAllScoped}.
    *
+   * <p><b>Status / recency bound (#1124).</b> The picker returns {@code PLANNED} / {@code ACTIVE}
+   * operations always, but {@code COMPLETED} / {@code CANCELED} ones only when created on or after
+   * {@code cutoff}. Without this the lookup grew unbounded with the total operation count and was
+   * re-fetched on every mission-detail render — mirrors {@link
+   * MissionRepository#findAllActiveReference}. Operations have no {@code plannedStartTime} of their
+   * own (it lives on the linked missions), so recency is bounded on {@code createdAt}.
+   *
    * @param isAdminAllScope {@code true} iff the caller is admin without an active OrgUnit selection
    *     — disables the scope filter entirely.
    * @param activeOrgUnitId the single OrgUnit the caller is pinned to, or {@code null}.
@@ -117,12 +124,17 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
    *     NULL}, V145) in the picker for members-or-above only.
    * @param viewerUserId the caller's user id, or {@code null} for an anonymous caller; surfaces
    *     operations the caller participated in (#500) in the picker.
+   * @param cutoff inclusive lower bound on {@code createdAt} for {@code COMPLETED} / {@code
+   *     CANCELED} operations; {@code PLANNED} / {@code ACTIVE} operations are returned regardless.
    * @return slim reference DTOs, sorted by name ascending
    */
   @org.springframework.data.jpa.repository.Query(
       """
       SELECT new de.greluc.krt.profit.basetool.backend.model.dto.OperationReferenceDto(o.id,
-      o.name) FROM Operation o WHERE
+      o.name) FROM Operation o WHERE (
+        o.status IN ('PLANNED', 'ACTIVE')
+        OR (o.status IN ('COMPLETED', 'CANCELED') AND o.createdAt >= :cutoff)
+      ) AND
       """
           + ScopeSpecifications.OPERATION_SCOPE_PREDICATE
           + " ORDER BY o.name ASC")
@@ -133,7 +145,8 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
           java.util.Collection<UUID> memberOrgUnitIds,
       @org.springframework.data.repository.query.Param("viewerIsMemberOrAbove")
           boolean viewerIsMemberOrAbove,
-      @org.springframework.data.repository.query.Param("viewerUserId") UUID viewerUserId);
+      @org.springframework.data.repository.query.Param("viewerUserId") UUID viewerUserId,
+      @org.springframework.data.repository.query.Param("cutoff") Instant cutoff);
 
   /**
    * Free-text + status + time-range + scope search across operations. Mirrors the contract of

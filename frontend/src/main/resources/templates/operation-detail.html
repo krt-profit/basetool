@@ -351,12 +351,34 @@
                 <div class="sum"><div class="sk" th:text="#{operation.finances.donations}">Gespendet</div><div class="sv donate" th:text="${operationDonationTotal != null ? #numbers.formatInteger(@moneyFormat.round(operationDonationTotal), 1, 'POINT') : '0'}">0</div><div class="sd">aUEC</div></div>
             </div>
             <th:block th:if="${operationFinance != null and operationFinance.missions != null and !operationFinance.missions.isEmpty()}">
-                <details class="hud-details" th:each="msnFin : ${operationFinance.missions}" style="margin-top: 12px;">
+                <!-- #1121: each mission's per-entry breakdown loads lazily on first expand via
+                     GET /operations/{id}/finance/{missionId} (injected into .op-finance-detail-body
+                     by operation-detail.js), so the full render no longer materializes every finance
+                     entry / refinery order across every child mission. -->
+                <details class="hud-details" th:each="msnFin : ${operationFinance.missions}" style="margin-top: 12px;"
+                         th:attr="data-op-finance-mission=${msnFin.missionId}">
                     <summary>
                         <span th:text="${msnFin.missionName}">Einsatz</span>
                         <span class="data-value" th:classappend="${msnFin.totalSum != null and msnFin.totalSum.signum() < 0} ? 'neg'"
                               th:text="${#numbers.formatInteger(@moneyFormat.round(msnFin.totalSum), 1, 'POINT')} + ' aUEC'">0 aUEC</span>
                     </summary>
+                    <div class="op-finance-detail-body" data-loaded="false">
+                        <p class="desc" style="padding-top: 8px;" th:text="#{operation.finance.detail.loading}">Details werden geladen&hellip;</p>
+                    </div>
+                </details>
+                <p th:if="${operationFinance.truncated}" class="desc" style="margin-top: 8px;"
+                   th:text="#{operation.finance.truncated}">Es werden nur die ersten Eins&auml;tze angezeigt.</p>
+            </th:block>
+            <p th:if="${operationFinance == null or operationFinance.missions == null or operationFinance.missions.isEmpty()}" class="desc" th:text="#{mission.empty}">Keine Missionen vorhanden.</p>
+
+            <!-- Lazy per-mission finance breakdown fragment (#1121): rendered only for the AJAX
+                 GET /operations/{id}/finance/{missionId} request. Both inner guards are false on the
+                 full page render (financeDetail + financeDetailError unset), so this th:block emits
+                 nothing inline. -->
+            <th:block th:fragment="financeDetail">
+                <p th:if="${financeDetailError != null}" class="desc" style="padding-top: 8px; color: var(--color-danger-text);"
+                   th:text="#{operation.finance.detail.error}">Details konnten nicht geladen werden.</p>
+                <th:block th:if="${financeDetailError == null and financeDetail != null}">
                     <div class="table-responsive">
                         <table style="margin-top: 8px;">
                             <thead>
@@ -368,7 +390,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr th:each="entry : ${msnFin.entries}">
+                                <tr th:each="entry : ${financeDetail.entries}">
                                     <td>
                                         <span th:if="${entry.type.name() == 'INCOME'}" class="chip chip--success chip-xs" th:text="#{mission.finance.type.income}">Einnahme</span>
                                         <span th:if="${entry.type.name() == 'EXPENSE'}" class="chip chip--danger chip-xs" th:text="#{mission.finance.type.expense}">Ausgabe</span>
@@ -377,7 +399,7 @@
                                     <td th:text="${entry.note}">Notiz</td>
                                     <td class="num" th:text="${(entry.type.name() == 'INCOME' ? '+' : '&minus;') + #numbers.formatInteger(@moneyFormat.round(entry.amount), 1, 'POINT')} + ' aUEC'">0 aUEC</td>
                                 </tr>
-                                <tr th:each="order : ${msnFin.refineryOrders}" th:if="${order.expenses != null and order.expenses > 0}">
+                                <tr th:each="order : ${financeDetail.refineryOrders}" th:if="${order.expenses != null and order.expenses > 0}">
                                     <td><span class="chip chip--danger chip-xs" th:text="#{mission.finance.type.expense}">Ausgabe</span></td>
                                     <td th:text="${order.owner != null ? order.owner.effectiveName : '-'}">User</td>
                                     <td><a th:href="@{/refinery-orders/{id}(id=${order.id})}" th:text="#{mission.finance.refinery_order}" style="color: var(--color-dept-profit); text-decoration: underline;">Raffinerieauftrag</a></td>
@@ -386,10 +408,9 @@
                             </tbody>
                         </table>
                     </div>
-                    <p th:if="${(msnFin.entries == null or msnFin.entries.isEmpty()) and (msnFin.refineryOrders == null or msnFin.refineryOrders.isEmpty())}" class="desc" style="padding-top: 8px;" th:text="#{mission.finance.empty}">Keine Eintr&auml;ge.</p>
-                </details>
+                    <p th:if="${(financeDetail.entries == null or financeDetail.entries.isEmpty()) and (financeDetail.refineryOrders == null or financeDetail.refineryOrders.isEmpty())}" class="desc" style="padding-top: 8px;" th:text="#{mission.finance.empty}">Keine Eintr&auml;ge.</p>
+                </th:block>
             </th:block>
-            <p th:if="${operationFinance == null or operationFinance.missions == null or operationFinance.missions.isEmpty()}" class="desc" th:text="#{mission.empty}">Keine Missionen vorhanden.</p>
         </section>
 
         <!-- ================= Tab 5: Verwaltung (editor-only) ================= -->
@@ -485,6 +506,7 @@
     const MSG_PAYOUT_PAID_ERROR = /*[[#{operation.payout.paid.error}]]*/ 'Auszahlungsstatus konnte nicht aktualisiert werden.';
     const MSG_PAYOUT_PAID_FORBIDDEN = /*[[#{operation.payout.paid.forbidden}]]*/ 'Keine Berechtigung.';
     const MSG_PAYOUT_PAID_UNSET_LOCKED = /*[[#{operation.payout.paid.unset.locked}]]*/ 'Nur Offiziere und Admins koennen den Bezahlt-Status zuruecksetzen.';
+    const OPS_FINANCE_DETAIL_ERROR = /*[[#{operation.finance.detail.error}]]*/ 'Details konnten nicht geladen werden.';
     /*]]>*/
 </script>
 <script th:src="@{/js/operation-detail.js}" th:attr="nonce=${cspNonce}"></script>

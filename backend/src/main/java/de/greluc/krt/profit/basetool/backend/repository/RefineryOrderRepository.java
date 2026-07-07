@@ -107,6 +107,28 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   List<RefineryOrder> findByMissionIdIn(List<UUID> missionIds);
 
   /**
+   * Aggregates the refinery profit/loss of several missions into one {@code (missionId, profitSum)}
+   * row per mission in ONE grouped query, so the operation finance roll-up folds refinery profit
+   * into each mission's total without materializing every refinery-order row across every child
+   * mission. Each order contributes {@code oreSales − expenses − otherExpenses} (legacy null fields
+   * coalesced to 0, identical to the in-memory roll-up it replaces). Backs the operation finance
+   * summary (the operation-side ADR-0078 gap, #1121). A mission with no refinery order yields no
+   * row and the caller treats it as zero profit.
+   *
+   * @param missionIds the missions to aggregate (typically an operation's child missions)
+   * @return one profit aggregate per mission that has at least one refinery order; the sum may be
+   *     {@code null}
+   */
+  @Query(
+      "select new de.greluc.krt.profit.basetool.backend.repository.RefineryMissionProfitAggregate("
+          + "r.mission.id,"
+          + " sum(coalesce(r.oreSales, 0.0) - coalesce(r.expenses, 0.0)"
+          + " - coalesce(r.otherExpenses, 0.0)))"
+          + " from RefineryOrder r where r.mission.id in :missionIds group by r.mission.id")
+  List<RefineryMissionProfitAggregate> aggregateProfitByMissionIds(
+      @Param("missionIds") List<UUID> missionIds);
+
+  /**
    * Derived Spring-Data query - returns entities matching {@code OwnerId}. Eagerly fetches the
    * configured relations via {@code @EntityGraph}.
    */

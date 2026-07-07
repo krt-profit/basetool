@@ -469,6 +469,55 @@ cache, and a write evicts both); `TerminalServiceCachingTest` / `PoiServiceCachi
 `MaterialService` / `TerminalService` / `PoiService` / `OutpostService` (`@Cacheable` reads + `@CacheEvict`
 mutators).
 
+### REQ-DATA-012 — Operation-detail + job-order read-shape hardening (operation-side ADR-0078, #1109)
+
+The operation-detail page (`/operations/{id}`) is the operation-aggregate mirror of the mission-page
+scale hardening (ADR-0078, REQ-DATA-003): under many concurrent viewers it must not scan and
+materialize an operation's whole finance / refinery ledger under a held Hikari connection.
+
+- **Finance roll-up via a grouped SQL aggregate, not a ledger load-all.** The operation-detail
+  overview (the "Ergebnis je Einsatz" bars + the Gesamtergebnis) reads `GET
+  /api/v1/operations/{id}/finance-summary` — one grouped finance aggregate
+  (`aggregateFinanceByMissionIds`) plus one grouped refinery-profit aggregate
+  (`aggregateProfitByMissionIds`), per-mission `SUM`med in the DB — instead of `findAllByMissionIdIn`
+  over every child mission. The per-mission breakdown is capped (`MAX_FINANCE_SUMMARY_MISSIONS = 500`,
+  `truncated` flag surfaced in the UI — never a silent cap). The full-detail endpoint `GET
+  .../finances` (with the embedded per-entry lists) survives for API consumers but is off the render
+  path.
+- **Per-mission entry detail loads lazily.** Each finance-tab `<details>` fetches its own mission's
+  entry / refinery breakdown on first expand via `GET /api/v1/operations/{id}/finances/{missionId}`
+  (operation-scoped `canSeeOperation` authz), so the initial render never materializes every entry.
+- **Parallel + fragment-gated operation reads.** The four independent operation-detail reads
+  (operation, missions page, finance-summary, payouts) run concurrently via `ParallelPageLoader`; the
+  `fragment=missions` pager swap fetches neither finance-summary nor payouts (the regression fence is a
+  MockMvc `never()` guard, mirroring ADR-0078).
+- **Payout toggle stays O(1).** `PUT .../payouts/paid-out` returns only the participant's paid-out
+  status block (`OperationPayoutStatusDto`) and validates the key against the bounded participant
+  graph — it never re-runs the full per-participant payout computation (double ledger load-all + money
+  math) just to hand back one row.
+- **Operation-picker reference lookup is status / recency-bounded.**
+  `OperationRepository.findAllReferenceScoped` returns PLANNED / ACTIVE always but COMPLETED / CANCELED
+  only within the last 3 months (by `createdAt`), and the mission-detail controller fetches it only on
+  a full render (not on fragment refetches) — the operation analogue of the mission
+  `findAllActiveReference` bound.
+- **Job-order detail gates its uncached users read.** `JobOrderPageController.viewOrderDetail` fetches
+  `/api/v1/users?size=1000` only on the full page (the assignee picker lives in the full-page-only
+  `assigneesSection`), not on any in-place section swap — pre-empting the same read-amplification once
+  order live-sync lands.
+
+**Acceptance**: `OperationFinanceServiceTest` (grouped per-mission totals; lazy per-mission detail;
+404 for a foreign mission); `MissionFinanceEntryRepositoryIntegrationTest` (the grouped finance /
+refinery / picker JPQL execute against real Postgres); `OperationServiceTest` (the payout toggle
+validates the key via the participant graph and returns the slim status DTO without re-computing);
+`OperationPageControllerMvcTest` (the missions fragment issues no finance-summary / payout read; the
+per-mission finance fragment renders the breakdown and an error state).
+
+**Enforced by:** `OperationFinanceService.getOperationFinanceSummary` / `getMissionFinanceDetail`,
+`OperationController` (`/finance-summary`, `/finances/{missionId}`), `OperationPageController`
+(`ParallelPageLoader` + lazy `operationMissionFinance`), `OperationService.setPayoutStatus`
+(`OperationPayoutStatusDto`), `OperationRepository.findAllReferenceScoped` (status / recency bound),
+`JobOrderPageController.viewOrderDetail` (users gated to the full render). See ADR-0081.
+
 ## Out of scope
 
 **Material-amount SCU-scale storage and rounding** (the `@PrePersist`/`@PreUpdate` HALF_UP-to-three-
