@@ -135,6 +135,10 @@ groups:
           description: "{{ $labels.application }} has been succeeding only after a retry at more than 0.2/s for 10 minutes — the frontend→backend hop is flaky (transient resets) even though the circuit breaker is still closed. Check backend health and the network path."
 
       - alert: HttpLatencyP95High
+        # The notification SSE endpoints (/…/notifications/stream) are excluded at the source —
+        # each module's NotificationStreamObservationPredicate drops them from http.server.requests
+        # so their ~30-minute lifetime never enters this histogram (REQ-OBS-009). Do NOT re-add a
+        # per-URI filter here; the metric is already clean.
         expr: |
           histogram_quantile(0.95, sum by (application, le) (rate(http_server_requests_seconds_bucket[5m]))) > 2
         for: 10m

@@ -6,6 +6,8 @@
 
 - **Monitoring/Betrieb: RAM-Limits angehoben und Prometheus zusätzlich gegen OOM abgesichert.** Backend 1536M→2048M, Frontend 768M→1024M und Prometheus 512M→1024M, damit Neustart-Spitzen (u. a. Prometheus' WAL-Replay, das mit 512M direkt nach einem Neustart ans Limit lief) und Lastspitzen nicht mehr ans Container-Limit stoßen. Prometheus bekommt zusätzlich `GOMEMLIMIT=900MiB`, damit der Go-Garbage-Collector unter Druck früher greift und einen harten OOM schon innerhalb des 1G-Budgets vermeidet. Greift beim nächsten Deploy (Container werden neu erstellt); der 16-GB-Host hat weiterhin reichlich Puffer.
 
+- **Monitoring: Fehlalarm behoben — die sporadischen `HttpLatencyP95High`-Warn-Mails (p95-Antwortzeit >2s) für Backend und Frontend.** Der Benachrichtigungs-Stream (SSE) hält seine Verbindung bis zu 30 Minuten offen; Spring verbucht diese komplette Lebensdauer als eine einzelne Request-Latenz in `http.server.requests`, wodurch das aggregierte p95 in verkehrsarmen Zeiten über die 2-Sekunden-Schwelle sprang, obwohl keine reale Verlangsamung vorlag. Die SSE-Endpunkte (`/api/v1/notifications/stream`, `/notifications/stream`) werden jetzt an der Quelle aus der Latenz-Metrik ausgeschlossen — symmetrisch zum bereits nicht beobachteten SSE-Client; die Stream-Gesundheit bleibt über die eigenen `basetool_sse_*`-Metriken sichtbar (REQ-OBS-009). Greift beim nächsten Deploy.
+
 ## [v1.1.9](https://github.com/krt-profit/basetool/releases/tag/v1.1.9) - 2026-07-06
 
 ### Added
