@@ -72,4 +72,47 @@ public interface MissionParticipantRepository extends JpaRepository<MissionParti
   @org.springframework.data.jpa.repository.Query(
       "UPDATE MissionParticipant mp SET mp.user = null WHERE mp.user.id = :userId")
   void unlinkUser(@org.springframework.data.repository.query.Param("userId") java.util.UUID userId);
+
+  /**
+   * Clears the derived {@code is_mission_lead_participant} flag on every participant whose planned
+   * job type is the given (now no-longer-mission-lead) job type. Called when an admin moves or
+   * removes the single Einsatzleiter designation from a job type ({@code
+   * JobTypeService.applyMissionLeadDesignation}) so a stale flag on a demoted type cannot falsely
+   * trip the {@code uq_mission_participant_single_lead} partial unique index and block a legitimate
+   * new lead assignment (#1113). Bulk update — the participant collections it touches are not
+   * loaded in the job-type transaction, so no persistence-context reconciliation is needed.
+   *
+   * @param jobTypeId the job type that is no longer the mission lead.
+   * @return the number of participant rows whose flag was cleared.
+   */
+  @org.springframework.data.jpa.repository.Modifying
+  @org.springframework.data.jpa.repository.Query(
+      "UPDATE MissionParticipant p SET p.missionLeadParticipant = false "
+          + "WHERE p.plannedMissionJobType.id = :jobTypeId AND p.missionLeadParticipant = true")
+  int clearMissionLeadFlagForJobType(
+      @org.springframework.data.repository.query.Param("jobTypeId") UUID jobTypeId);
+
+  /**
+   * Atomically clamps the {@code endTime} of every checked-in participant of a mission to {@code
+   * end} in a single set-based statement, bumping each touched row's {@code @Version} so it stays
+   * consistent. Used by the schedule-close path when {@code actualEndTime} is set, replacing the
+   * per-row entity loop that (a) 409'd the whole schedule write if any of up-to-500 rows was
+   * concurrently modified and (b) 409'd concurrent check-outs at their own commit (#1146, the
+   * CLAUDE.md bulk-update rule). Only rows still checked in ({@code startTime} set) and either not
+   * yet checked out or checked out later than {@code end} are touched. {@code flushAutomatically}
+   * so a pending schedule-scalar change lands first; deliberately NOT {@code clearAutomatically} —
+   * the managed mission is still needed by the caller after this runs.
+   *
+   * @param missionId the mission whose checked-in participants to clamp.
+   * @param end the mission's actual end time to clamp late/open check-outs to.
+   * @return the number of participant rows clamped.
+   */
+  @org.springframework.data.jpa.repository.Modifying(flushAutomatically = true)
+  @org.springframework.data.jpa.repository.Query(
+      "UPDATE MissionParticipant p SET p.endTime = :end, p.version = p.version + 1 "
+          + "WHERE p.mission.id = :missionId AND p.startTime IS NOT NULL "
+          + "AND (p.endTime IS NULL OR p.endTime > :end)")
+  int clampCheckedInEndTimes(
+      @org.springframework.data.repository.query.Param("missionId") UUID missionId,
+      @org.springframework.data.repository.query.Param("end") java.time.Instant end);
 }

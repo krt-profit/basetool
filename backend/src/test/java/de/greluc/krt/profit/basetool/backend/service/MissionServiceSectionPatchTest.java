@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.MissionOwnershipRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.time.Instant;
@@ -75,6 +76,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 class MissionServiceSectionPatchTest {
 
   @Mock private MissionRepository missionRepository;
+
+  @Mock private MissionParticipantRepository missionParticipantRepository;
 
   @Mock private MissionOwnershipRepository missionOwnershipRepository;
 
@@ -213,6 +216,21 @@ class MissionServiceSectionPatchTest {
     assertEquals(4L, result.getCoreVersion());
     assertEquals(6L, result.getScheduleVersion());
     assertEquals(6L, result.getFlagsVersion());
+  }
+
+  @Test
+  void updateScheduleSection_whenActualEndTimeSet_clampsParticipantsViaSingleBulkUpdate() {
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
+    when(missionRepository.save(any(Mission.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    Instant actualStart = Instant.parse("2030-01-01T10:00:00Z");
+    Instant actualEnd = Instant.parse("2030-01-01T12:00:00Z");
+
+    missionService.updateScheduleSection(missionId, null, null, null, actualStart, actualEnd, 5L);
+
+    // #1146: the O(roster) per-participant entity loop is replaced by ONE atomic set-based clamp so
+    // the schedule close cannot 409 against concurrent check-outs and vice versa.
+    verify(missionParticipantRepository).clampCheckedInEndTimes(missionId, actualEnd);
   }
 
   @Test

@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.model.JobType;
 import de.greluc.krt.profit.basetool.backend.model.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobTypeDto;
 import de.greluc.krt.profit.basetool.backend.repository.JobTypeRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.List;
 import java.util.UUID;
@@ -53,6 +54,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class JobTypeService {
 
   private final JobTypeRepository jobTypeRepository;
+
+  /**
+   * Used to clear the derived {@code is_mission_lead_participant} flag on participants whose
+   * planned job type loses the Einsatzleiter designation, so a stale flag cannot falsely trip the
+   * {@code uq_mission_participant_single_lead} partial unique index (#1113).
+   */
+  private final MissionParticipantRepository missionParticipantRepository;
 
   /**
    * Returns the unpaged active job-type list for a dropdown, optionally filtered by archetype.
@@ -228,6 +236,11 @@ public class JobTypeService {
   private void applyMissionLeadDesignation(@NotNull JobType jobType, boolean wants) {
     if (!wants) {
       jobType.setMissionLead(false);
+      // #1113: a job type losing the designation must drop the derived participant flag too, else a
+      // stale is_mission_lead_participant=true row keeps tripping the partial unique index.
+      if (jobType.getId() != null) {
+        missionParticipantRepository.clearMissionLeadFlagForJobType(jobType.getId());
+      }
       return;
     }
     if (jobType.getArchetype() != JobTypeArchetype.MISSION || !jobType.isLeadershipRole()) {
@@ -238,6 +251,8 @@ public class JobTypeService {
       if (jobType.getId() == null || !jobType.getId().equals(current.getId())) {
         current.setMissionLead(false);
         jobTypeRepository.save(current);
+        // The demoted type's participants must lose their derived mission-lead flag too (#1113).
+        missionParticipantRepository.clearMissionLeadFlagForJobType(current.getId());
       }
     }
     jobType.setMissionLead(true);

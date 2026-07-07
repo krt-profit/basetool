@@ -1429,31 +1429,20 @@ document.addEventListener('DOMContentLoaded', function () {
                                 .forEach(function (editBtn) {
                                     editBtn.setAttribute('data-current-value', String(match.value));
                                 });
-                            // Per-frequency data-version sync: keeps the row's optimistic-lock
-                            // counter fresh so a follow-up edit on the same frequency does not
-                            // ship a stale version.
-                            if (match.version != null) {
-                                document
-                                    .querySelectorAll(
-                                        '[data-freq-type-id="' +
-                                            typeId +
-                                            '"]:not(.freq-value-display):not(.set-freq-btn)',
-                                    )
-                                    .forEach(function (rowContainer) {
-                                        rowContainer.setAttribute(
-                                            'data-version',
-                                            String(match.version),
-                                        );
-                                    });
-                            }
+                            // #1148: the typed-frequency edit is a last-writer-wins upsert — the
+                            // payload (frequencyTypeId + value) never echoes a version, so the backend
+                            // takes no client version and cannot 409 on an existing row. The former
+                            // per-row data-version sync here was dead state nothing ever sent; removed
+                            // so the contract is coherent (the custom-frequency twin, which DOES echo
+                            // and check a version, keeps its data-version handling below).
                         }
                     }
                     window.krtModalClose(frequencyModal);
-                    // The in-place patch above keeps the Verwaltung row (value + data-version for the
-                    // next edit) current, but the Übersicht Funk panel now only renders frequencies
-                    // that carry a value (#816): a frequency set for the first time has no row to
-                    // patch there, so re-render the overview section in place. krtRefreshMissionSection
-                    // also broadcasts 'overview' to peers (REQ-FE-010), replacing the prior notify.
+                    // The in-place patch above keeps the Verwaltung row value current, but the
+                    // Übersicht Funk panel now only renders frequencies that carry a value (#816): a
+                    // frequency set for the first time has no row to patch there, so re-render the
+                    // overview section in place. krtRefreshMissionSection also broadcasts 'overview'
+                    // to peers (REQ-FE-010), replacing the prior notify.
                     if (window.krtRefreshMissionSection) {
                         window.krtRefreshMissionSection('overview');
                     } else if (window.krtNotifyMissionChanged) {

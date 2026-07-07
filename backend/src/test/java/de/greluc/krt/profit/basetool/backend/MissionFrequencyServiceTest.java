@@ -70,6 +70,35 @@ class MissionFrequencyServiceTest {
   }
 
   @Test
+  void addOrUpdateTypedFrequency_isRaceFreeIdempotentUpsert() {
+    Mission mission = new Mission();
+    mission.setName("Freq Upsert Mission " + UUID.randomUUID());
+    mission.setStatus("PLANNED");
+    mission = missionRepository.save(mission);
+
+    FrequencyType type = new FrequencyType();
+    type.setName("Kommando " + UUID.randomUUID());
+    type.setDescription("Command channel");
+    type = frequencyTypeRepository.save(type);
+
+    final UUID mid = mission.getId();
+    final UUID tid = type.getId();
+
+    // First set: the INSERT branch of the atomic ON CONFLICT upsert.
+    missionService.addOrUpdateMissionFrequency(mid, tid, new BigDecimal("100.00"));
+
+    // Setting the SAME channel again hits ON CONFLICT DO UPDATE — no duplicate row and no phantom
+    // 409 (the typed upsert takes no client version; last-writer-wins by design, #1148). The former
+    // find-then-insert would have needed a retry here under a real race.
+    Mission updated =
+        assertDoesNotThrow(
+            () -> missionService.addOrUpdateMissionFrequency(mid, tid, new BigDecimal("222.50")));
+
+    assertEquals(1, updated.getFrequencies().size(), "upsert must not create a duplicate row");
+    assertEquals(new BigDecimal("222.50"), updated.getFrequencies().iterator().next().getValue());
+  }
+
+  @Test
   void testAddCustomMissionFrequency() {
     Mission mission = newPlannedMission("Custom Freq Add Mission");
 

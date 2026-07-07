@@ -24,7 +24,6 @@ import static de.greluc.krt.profit.basetool.backend.support.MissionSectionVersio
 
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
-import de.greluc.krt.profit.basetool.backend.model.FrequencyType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFrequency;
 import de.greluc.krt.profit.basetool.backend.model.MissionObjectiveKind;
@@ -40,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionRequ
 import de.greluc.krt.profit.basetool.backend.repository.FrequencyTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFrequencyRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionOwnershipRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
@@ -90,6 +90,7 @@ public class MissionService {
   public static final int MAX_PARTICIPANTS_PER_MISSION = 500;
 
   private final MissionRepository missionRepository;
+  private final MissionParticipantRepository missionParticipantRepository;
   private final UserRepository userRepository;
   private final FrequencyTypeRepository frequencyTypeRepository;
   private final MissionFrequencyRepository missionFrequencyRepository;
@@ -614,19 +615,22 @@ public class MissionService {
     mission.setActualStartTime(actualStartTime);
     mission.setActualEndTime(actualEndTime);
 
-    if (actualEndTime != null) {
-      for (MissionParticipant participant : mission.getParticipants()) {
-        if (participant.getStartTime() != null) {
-          if (participant.getEndTime() == null || participant.getEndTime().isAfter(actualEndTime)) {
-            participant.setEndTime(actualEndTime);
-          }
-        }
-      }
-    }
-
     validateMissionTimes(mission);
     bumpSectionVersion(mission, MissionSection.SCHEDULE);
     Mission saved = missionRepository.save(mission);
+
+    if (actualEndTime != null) {
+      // Single set-based clamp instead of an O(roster) entity loop (#1146, CLAUDE.md bulk-update
+      // rule): the per-row loop gave every checked-in participant a versioned UPDATE at commit, so
+      // the whole schedule write 409'd if any of up-to-500 rows was concurrently modified, and
+      // every
+      // in-flight check-out racing this sweep 409'd at its own commit. One atomic UPDATE (row locks
+      // serialize it; flushAutomatically lands the schedule scalars first) cannot 409 against
+      // concurrent participant writes and shrinks the transaction from O(roster) to one statement.
+      // The slim schedule response carries scalars only, so the now-stale in-memory participant
+      // endTimes do not affect it.
+      missionParticipantRepository.clampCheckedInEndTimes(missionId, actualEndTime);
+    }
     auditService.record(
         AuditEventType.MISSION_UPDATED,
         mission.getId(),
@@ -1225,8 +1229,28 @@ public class MissionService {
   }
 
   /**
-   * Creates or updates a radio frequency entry on a mission. Single endpoint for both because the
-   * form's id field discriminates (null = create, non-null = update).
+   * Creates or updates a <em>typed</em> radio frequency entry on a mission. Single endpoint for
+   * both because the {@code (mission, frequencyType)} pair discriminates: the row is inserted on
+   * the first set of a channel and updated in place thereafter.
+   *
+   * <p><b>Race-free, last-writer-wins by design (#1148).</b> The former find-in-memory-then-save
+   * was a check-then-act TOCTOU against {@code UNIQUE(mission_id, frequency_type_id)}: two managers
+   * setting a never-set channel near-simultaneously both missed the find, both INSERTed, and the
+   * loser got an unresolvable 409 (the endpoint exposes no version to refresh) though a plain retry
+   * would have succeeded. It now goes through a single atomic {@code INSERT … ON CONFLICT DO
+   * UPDATE} ({@link MissionFrequencyRepository#upsertTypedFrequency}), so a concurrent
+   * first-time-set never conflicts and the typed upsert's documented last-writer-wins semantics
+   * hold for an existing row too — matching the frequencies collection being
+   * {@code @OptimisticLock(excluded = true)} (a frequency change never 409s a concurrent
+   * core/schedule/flags edit). The custom-frequency twin, which carries a real client version,
+   * keeps its explicit optimistic-lock check.
+   *
+   * @param missionId the mission to set the channel on.
+   * @param frequencyTypeId the typed channel.
+   * @param value the frequency value (range-validated at the boundary).
+   * @return the managed mission, re-fetched so its {@code frequencies} collection reflects the
+   *     upserted row (the native upsert cleared the persistence context).
+   * @throws NotFoundException when the mission or the frequency type is unknown.
    */
   @Transactional
   public Mission addOrUpdateMissionFrequency(
@@ -1235,41 +1259,25 @@ public class MissionService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
+    String missionName = mission.getName();
 
-    FrequencyType frequencyType =
-        frequencyTypeRepository
-            .findById(frequencyTypeId)
-            .orElseThrow(() -> new NotFoundException("FrequencyType not found"));
-
-    // Null-guard the type reference: since REQ-MISSION-014 the frequencies collection also holds
-    // custom rows (frequencyType == null), so an unguarded getFrequencyType().getId() would NPE
-    // when the mission already carries a custom frequency and a typed one is upserted.
-    Optional<MissionFrequency> existingOpt =
-        mission.getFrequencies().stream()
-            .filter(f -> f.getFrequencyType() != null)
-            .filter(f -> f.getFrequencyType().getId().equals(frequencyTypeId))
-            .findFirst();
-
-    if (existingOpt.isPresent()) {
-      MissionFrequency existing = existingOpt.orElseThrow();
-      existing.setValue(value);
-      missionFrequencyRepository.save(existing);
-    } else {
-      MissionFrequency newFreq = new MissionFrequency();
-      newFreq.setMission(mission);
-      newFreq.setFrequencyType(frequencyType);
-      newFreq.setValue(value);
-      mission.getFrequencies().add(newFreq);
-      missionFrequencyRepository.save(newFreq);
+    if (!frequencyTypeRepository.existsById(frequencyTypeId)) {
+      throw new NotFoundException("FrequencyType not found");
     }
+
+    missionFrequencyRepository.upsertTypedFrequency(missionId, frequencyTypeId, value);
 
     auditService.record(
         AuditEventType.MISSION_FREQUENCY_CHANGED,
-        mission.getId(),
-        mission.getName(),
+        missionId,
+        missionName,
         null,
         AuditDetails.of("frequencyType", frequencyTypeId));
-    return mission;
+    // The native upsert bypassed the persistence context (clearAutomatically), so re-load a fresh
+    // managed mission whose frequencies collection includes the upserted row for the response.
+    return missionRepository
+        .findById(missionId)
+        .orElseThrow(() -> new NotFoundException("Mission not found"));
   }
 
   /**

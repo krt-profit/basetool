@@ -4,6 +4,14 @@
 
 ### Changed
 
+- **Fehler behoben: Bei fast gleichzeitiger Zuweisung konnten zwei verschiedene Teilnehmer eines Einsatzes zu Einsatzleitern werden.** Der Prüfschritt lief bisher nur im Speicher und hatte ein Zeitfenster, in dem zwei parallele Zuweisungen beide „noch kein Leiter" sahen. Ein Datenbank-Index (ein Einsatzleiter je Einsatz) fängt den Fall jetzt zusätzlich ab; der unterlegene Klick meldet sauber einen Konflikt (409). Analog ist per Datenbank-Index abgesichert, dass ein Teilnehmer nicht durch gleichzeitiges Zuweisen in zwei Crews landet (REQ-MISSION-013, #1109).
+
+- **Fehler behoben: Nach dem Ein-/Auschecken oder Bearbeiten eines Teilnehmers löste die unmittelbar nächste Bearbeitung sporadisch einen Konflikt (409) aus.** Die Antwort trug eine um eins veraltete Versionsnummer, weil der Teilnehmer erst beim Commit (nach dem Erstellen der Antwort) endgültig gespeichert wurde. Der Schreibvorgang wird jetzt sofort abgeschlossen, sodass die zurückgegebene Version stimmt und eine Folgebearbeitung nicht mehr grundlos kollidiert (REQ-FE-003, #1109).
+
+- **Fehler behoben: Das Setzen des Einsatzendes („Ende jetzt") konnte bei vielen gleichzeitigen Aus-Checks eine Welle von Konflikten (409) auslösen.** Das Abschließen setzte das Endedatum bislang teilnehmerweise in einer Schleife (bis zu 500 Zeilen), die mit gleichzeitigen Aus-Checks kollidierte. Es läuft jetzt als eine einzige Datenbank-Anweisung, die weder das Abschließen noch die parallelen Aus-Checks blockiert (#1109).
+
+- **Fehler behoben: Das erstmalige Setzen einer Standard-Funkfrequenz konnte bei fast gleichzeitiger Eingabe zweier Manager mit einem Konflikt (409) fehlschlagen.** Das Anlegen war ein „erst suchen, dann einfügen"-Race gegen den Eindeutigkeits-Index; es läuft jetzt als eine atomare „Einfügen-oder-Aktualisieren"-Anweisung, sodass ein gleichzeitiges Erstsetzen desselben Kanals nicht mehr kollidiert. Der typisierte Kanal ist bewusst „letzter gewinnt" (die frühere, nie gesendete Versions-Synchronisation im Frontend wurde entfernt); der benutzerdefinierte Kanal behält seine Versionsprüfung (#1109).
+
 - **Fehler behoben: Der „Bezahlt"-Schalter in der Operations-Auszahlung schlug bei fast gleichzeitigem Klick zweier Berechtigter mit „Serverfehler" (500) fehl und verwarf still einen der beiden Klicks.** Der Schreibvorgang wird jetzt bei einer Kollision automatisch in einer frischen Transaktion wiederholt, sodass der zuletzt Klickende gewinnt; ein anhaltender Konflikt äußert sich sauber als Konflikt (409) statt als Serverfehler (P0, Epic #1109).
 
 - **Fehler behoben: Ein erneutes Einchecken eines Teilnehmers überschrieb dessen ursprüngliche Ankunftszeit.** Da die Ankunftszeit in die zeitanteilige Auszahlung einfließt, verkürzte ein zweites Einchecken (etwa aus einer veralteten Crew-Ansicht heraus) die angerechnete Zeit still. Ein wiederholtes Einchecken ist jetzt wirkungslos und bewahrt die ursprüngliche Zeit; das Auschecken bleibt bewusst korrigierbar (#1109).

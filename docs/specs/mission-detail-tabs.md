@@ -347,11 +347,27 @@ designated mission-lead `plannedMissionJobType` to a second participant is rejec
 (`BusinessConflictException`) — the editor must first clear the existing one. JobType is not an audited
 area, so no audit event is added.
 
+The in-memory reject is only the friendly fast path; it has a TOCTOU window where two managers make
+two *different* participants the Einsatzleiter at once (each write hits a different row, so nothing
+serializes them). The **DB backstop** is a derived `is_mission_lead_participant` flag (maintained
+whenever the planned job type changes, and cleared for a job type that loses the designation) plus a
+**partial unique index** `uq_mission_participant_single_lead ON mission_participant (mission_id) WHERE
+is_mission_lead_participant` (V206): the raced second assignment fails the index as a
+`DataIntegrityViolationException`, which `GlobalExceptionHandler` maps to the same **409** — so at
+most one Einsatzleiter per mission is guaranteed even under concurrency (#1113, following the V96 /
+V200 precedent). The sibling per-crew invariant — a participant sits in at most one crew — gets the
+same treatment: a **unique index** `uq_mission_crew_participant ON mission_crew
+(mission_participant_id)` (V207) backstops the in-memory `anyMatch` in `MissionStructureService`, so
+two managers dragging the same participant onto two units concurrently no longer double-seat them
+(#1132).
+
 **Treffpunkt.** The mission's `meetingPoint` (Treffpunkt) is surfaced in two more places: a facts-bar
 cell (map-pin icon) **after the planned-end time** on the detail page, and on the **home-page mission
 tile** (Einsatzkachel) **between the status and the TeamSpeak meeting time**. The latter requires
 `meetingPoint` on `MissionListDto` (backend + frontend, auto-mapped from the entity). Both render only
-when a meeting point is set. Migration: V200 (`job_type.is_mission_lead`).
+when a meeting point is set. Migrations: V200 (`job_type.is_mission_lead`), V206
+(`mission_participant.is_mission_lead_participant` + `uq_mission_participant_single_lead`), V207
+(`uq_mission_crew_participant`).
 
 ### REQ-MISSION-014 — Custom (mission-specific) radio frequencies
 
@@ -363,6 +379,18 @@ it is either **typed** (references a global `FrequencyType`, no `name`) or **cus
 constraint (V201, which also makes `frequency_type_id` nullable and adds the `name VARCHAR(100)`
 column); the existing `(mission_id, frequency_type_id)` unique constraint still bounds typed rows to
 one per type, while multiple custom rows are allowed (each NULL `frequency_type_id` is distinct).
+
+**Typed upsert is atomic and last-writer-wins (#1148).** The **typed** channel's set-or-update
+endpoint takes no client version by design and now goes through a single atomic `INSERT … ON
+CONFLICT (mission_id, frequency_type_id) DO UPDATE`
+(`MissionFrequencyRepository.upsertTypedFrequency`) instead of a find-in-memory-then-save. That
+removes the check-then-act TOCTOU where two managers setting a never-set channel near-simultaneously
+both INSERTed and the loser got an unresolvable 409 (a plain retry would have won); a concurrent
+first-time-set can no longer conflict, and last-writer-wins holds for an existing row too — matching
+the frequencies collection being `@OptimisticLock(excluded = true)` (a frequency change never 409s a
+concurrent core/schedule/flags edit). The former per-row `data-version` sync in the typed edit
+handler was dead state the payload never sent and is removed. The **custom** channel keeps its real
+client-version optimistic-lock check (it echoes a `data-version`), so the two paths are now coherent.
 
 The **value carries the same input limits as the typed frequencies** — up to three integer digits and
 two decimals (0 – 999.99), matching the `precision = 5, scale = 2` column and the frontend
