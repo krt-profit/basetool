@@ -138,7 +138,7 @@ class MissionSecurityServiceTest {
   void canManageManagers_Owner_ShouldReturnTrue() {
     when(authentication.isAuthenticated()).thenReturn(true);
     when(authentication.getAuthorities()).thenReturn(Collections.emptyList());
-    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+    when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
     when(userService.getCurrentUser()).thenReturn(Optional.of(user));
     mission.setOwner(user);
 
@@ -149,7 +149,7 @@ class MissionSecurityServiceTest {
   void canManageManagers_CoManager_ShouldReturnTrue() {
     when(authentication.isAuthenticated()).thenReturn(true);
     when(authentication.getAuthorities()).thenReturn(Collections.emptyList());
-    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+    when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
     when(userService.getCurrentUser()).thenReturn(Optional.of(user));
     mission.getManagers().add(user);
 
@@ -160,7 +160,7 @@ class MissionSecurityServiceTest {
   void canManageManagers_RegularUser_ShouldReturnFalse() {
     when(authentication.isAuthenticated()).thenReturn(true);
     when(authentication.getAuthorities()).thenReturn(Collections.emptyList());
-    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+    when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
     when(userService.getCurrentUser()).thenReturn(Optional.of(user));
 
     assertFalse(missionSecurityService.canManageManagers(missionId, authentication));
@@ -208,7 +208,7 @@ class MissionSecurityServiceTest {
     when(authentication.getPrincipal()).thenReturn("some-jwt-principal");
     when(authentication.getAuthorities())
         .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
-    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+    when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
     when(userService.getCurrentUser()).thenReturn(Optional.of(user));
 
     // When / Then: foreign edit forbidden
@@ -263,7 +263,7 @@ class MissionSecurityServiceTest {
         .thenAnswer(
             i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
     when(ownerScopeService.canEditMission(missionId)).thenReturn(false);
-    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+    when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
     when(userService.getCurrentUser()).thenReturn(Optional.of(user));
 
     // When / Then: cross-OrgUnit mission-manager is denied
@@ -449,7 +449,7 @@ class MissionSecurityServiceTest {
     when(authentication.getAuthorities())
         .thenAnswer(
             i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
-    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+    when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
     when(userService.getCurrentUser()).thenReturn(Optional.of(user));
     // user is NOT the owner.
 
@@ -465,7 +465,7 @@ class MissionSecurityServiceTest {
     when(authentication.getPrincipal()).thenReturn("real-jwt-sub");
     when(authentication.getAuthorities())
         .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
-    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+    when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
     when(userService.getCurrentUser()).thenReturn(Optional.of(user));
     mission.getManagers().add(user); // user is a co-manager
     // user is NOT the owner
@@ -481,7 +481,7 @@ class MissionSecurityServiceTest {
     when(authentication.getPrincipal()).thenReturn("real-jwt-sub");
     when(authentication.getAuthorities())
         .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
-    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+    when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
     when(userService.getCurrentUser()).thenReturn(Optional.of(user));
     mission.setOwner(user);
 
@@ -509,7 +509,7 @@ class MissionSecurityServiceTest {
     when(authentication.getPrincipal()).thenReturn("real-jwt-sub");
     when(authentication.getAuthorities())
         .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
-    when(missionRepository.findById(missionId)).thenReturn(Optional.empty());
+    when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.empty());
     when(userService.getCurrentUser()).thenReturn(Optional.of(user));
 
     assertFalse(
@@ -527,7 +527,7 @@ class MissionSecurityServiceTest {
     differentOwner.setId(UUID.randomUUID());
     mission.setOwner(differentOwner);
 
-    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+    when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
     when(userService.getCurrentUser()).thenReturn(Optional.of(user));
 
     assertFalse(missionSecurityService.canChangeOwner(missionId, authentication));

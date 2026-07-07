@@ -19,11 +19,15 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -76,12 +80,93 @@ public class CustomJwtGrantedAuthoritiesConverter
   private static final int MAX_SYNC_ATTEMPTS = 3;
   private static final long RETRY_BACKOFF_MILLIS = 50L;
 
+  /**
+   * Short memoisation window for the assembled authorities (#1141). Bounds the staleness of a
+   * mid-token role / permission / approval / membership change to ~30&nbsp;s — the same order as
+   * the periodic Keycloak sync ({@code app.keycloak.sync}, ~1&nbsp;m) — while collapsing the
+   * per-request {@code syncUser} + role-lookup + membership query storm to once per token issuance.
+   */
+  private static final Duration AUTHORITIES_CACHE_TTL = Duration.ofSeconds(30);
+
+  /** Upper bound on distinct cached {@code (sub, issuedAt)} entries. */
+  private static final long AUTHORITIES_CACHE_MAX_SIZE = 10_000;
+
   private final UserService userService;
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
   private final OrgUnitCascadeService orgUnitCascadeService;
 
+  /**
+   * Per-{@code (sub, token issued-at)} memoisation of the fully-assembled authority collection
+   * (#1141). The resource-server authorities converter runs on <em>every</em> authenticated API
+   * call — every fragment refetch, every live-sync coalesce burst, every check-in — and each miss
+   * pays {@link UserService#syncUser(Jwt)} (a write-capable transaction) plus ~5&ndash;8 SELECTs
+   * (user load, {@code user_roles}, one role lookup per realm role, and the membership read).
+   * Keying on the token's {@code issuedAt} means a fresh login always misses and re-reads, so a
+   * re-authentication picks up new authorities immediately; within one token's life the {@link
+   * #AUTHORITIES_CACHE_TTL} bounds staleness. Only successful results are cached (an exception
+   * propagates uncached), the cached value is an immutable copy so a downstream mutation cannot
+   * corrupt it, and a token missing {@code sub} or {@code issuedAt} bypasses the cache entirely
+   * (always recomputed).
+   */
+  private final Cache<String, Collection<GrantedAuthority>> authoritiesCache =
+      Caffeine.newBuilder()
+          .maximumSize(AUTHORITIES_CACHE_MAX_SIZE)
+          .expireAfterWrite(AUTHORITIES_CACHE_TTL)
+          .build();
+
+  /**
+   * Resolves the authorities for {@code jwt}, memoised per {@code (sub, issuedAt)} for {@link
+   * #AUTHORITIES_CACHE_TTL} (#1141). On a cache hit the whole {@link #assembleAuthorities(Jwt)}
+   * pipeline — {@code syncUser} and its query storm — is skipped; on a miss (or an unkeyable token)
+   * it is assembled fresh and, when keyable, cached as an immutable copy.
+   *
+   * @param jwt the validated Keycloak access token; never {@code null}.
+   * @return the authorities Spring Security checks against {@code @PreAuthorize}.
+   */
   @Override
   public Collection<GrantedAuthority> convert(@NonNull Jwt jwt) {
+    String cacheKey = authoritiesCacheKey(jwt);
+    if (cacheKey != null) {
+      Collection<GrantedAuthority> cached = authoritiesCache.getIfPresent(cacheKey);
+      if (cached != null) {
+        return cached;
+      }
+    }
+    Collection<GrantedAuthority> authorities = List.copyOf(assembleAuthorities(jwt));
+    if (cacheKey != null) {
+      authoritiesCache.put(cacheKey, authorities);
+    }
+    return authorities;
+  }
+
+  /**
+   * Builds the {@code (sub, issuedAt)} memoisation key, or {@code null} when either claim is absent
+   * — in which case {@link #convert(Jwt)} bypasses the cache and always recomputes. Keying on the
+   * token's issued-at epoch millis guarantees a freshly-issued token (re-login, refresh) is a
+   * distinct key and therefore a miss, so authority changes take effect on re-authentication.
+   *
+   * @param jwt the access token.
+   * @return the cache key, or {@code null} to bypass caching for this token.
+   */
+  private static String authoritiesCacheKey(@NonNull Jwt jwt) {
+    String sub = jwt.getSubject();
+    Instant issuedAt = jwt.getIssuedAt();
+    if (sub == null || issuedAt == null) {
+      return null;
+    }
+    return sub + '|' + issuedAt.toEpochMilli();
+  }
+
+  /**
+   * Assembles the authorities from scratch: syncs the local user (retried on optimistic-lock
+   * contention), short-circuits a non-approved registration to {@code ROLE_PENDING_APPROVAL}, and
+   * otherwise merges realm-role, permission and membership-derived authorities. Extracted from
+   * {@link #convert(Jwt)} so the cache wraps exactly this work (#1141).
+   *
+   * @param jwt the access token.
+   * @return the freshly assembled authorities.
+   */
+  private Collection<GrantedAuthority> assembleAuthorities(@NonNull Jwt jwt) {
     ObjectOptimisticLockingFailureException lastLockingFailure = null;
     for (int attempt = 1; attempt <= MAX_SYNC_ATTEMPTS; attempt++) {
       try {

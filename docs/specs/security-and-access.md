@@ -147,6 +147,18 @@ does so by delegating its management branch to `canManageMission` rather than sh
 bare `ROLE_MISSION_MANAGER` authority. (Unlinked **guest** participants stay openly editable per
 REQ-SEC-009; this scope gate applies only to *user-linked* participants.)
 
+**Authority resolution is memoised per token, not per request (#1141).** `CustomJwtGrantedAuthoritiesConverter`
+runs on *every* authenticated API call, and each miss pays `UserService.syncUser` (a write-capable
+transaction) plus ~5–8 SELECTs (user load, `user_roles`, one role lookup per realm role, and the
+membership read). The assembled authority collection is memoised in-process keyed on `(sub, token
+issuedAt)` for a short window (~30&nbsp;s), so that work is paid once per token issuance instead of on
+every fragment refetch / live-sync burst / check-in. Keying on `issuedAt` makes a freshly issued token
+(re-login, refresh) a distinct key and therefore a miss, so an authority change takes effect on
+re-authentication; within one token's life a mid-token role / permission / approval / membership
+change reflects after at most the cache TTL — the same bounded-staleness order as the periodic
+`app.keycloak.sync` (~1&nbsp;min), and never longer than the token lifetime. Only successful results
+are cached; a token missing `sub`/`issuedAt` bypasses the cache and is always recomputed.
+
 > **Amended by epic #692 (REQ-SEC-015 / REQ-ORG-015):** Bereich/OL leadership memberships
 > (`is_bereichsleiter`/`koordinator`/`operator`, `is_ol_member`) also mint the flat
 > `LOGISTICIAN`/`MISSION_MANAGER` authorities **and** contextual `…@orgUnitId` authorities — but one per

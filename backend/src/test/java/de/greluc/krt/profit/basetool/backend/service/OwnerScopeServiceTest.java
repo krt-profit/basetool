@@ -598,7 +598,7 @@ class OwnerScopeServiceTest {
     void memberSeesOwnSquadronMission() {
       UUID missionId = UUID.randomUUID();
       Mission mission = newMission(missionId, squadronA, false);
-      when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+      when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
       stubMemberInSquadronA();
 
       assertTrue(service.canSeeMission(missionId));
@@ -608,7 +608,7 @@ class OwnerScopeServiceTest {
     void memberSeesPublicMissionOfOtherSquadron_viaIsInternalEscape() {
       UUID missionId = UUID.randomUUID();
       Mission mission = newMission(missionId, squadronB, false);
-      when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+      when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
       stubMemberInSquadronA();
 
       assertTrue(service.canSeeMission(missionId));
@@ -618,7 +618,7 @@ class OwnerScopeServiceTest {
     void memberRejectsInternalMissionOfOtherSquadron() {
       UUID missionId = UUID.randomUUID();
       Mission mission = newMission(missionId, squadronB, true);
-      when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+      when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
       stubMemberInSquadronA();
 
       assertFalse(service.canSeeMission(missionId));
@@ -631,7 +631,7 @@ class OwnerScopeServiceTest {
       // the create flow stamps for a membershipless leadership owner.
       UUID missionId = UUID.randomUUID();
       Mission mission = newMission(missionId, null, false);
-      when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+      when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
 
       assertTrue(service.canSeeMission(missionId));
     }
@@ -643,7 +643,7 @@ class OwnerScopeServiceTest {
       // to its Staffel.
       UUID missionId = UUID.randomUUID();
       Mission mission = newMission(missionId, null, true);
-      when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+      when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
       when(authHelper.isMemberOrAbove()).thenReturn(true);
 
       assertTrue(service.canSeeMission(missionId));
@@ -655,7 +655,7 @@ class OwnerScopeServiceTest {
       // ownerless mission, mirroring how internal Staffel missions stay hidden from outsiders.
       UUID missionId = UUID.randomUUID();
       Mission mission = newMission(missionId, null, true);
-      when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+      when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
       when(authHelper.isMemberOrAbove()).thenReturn(false);
 
       assertFalse(service.canSeeMission(missionId));
@@ -664,7 +664,7 @@ class OwnerScopeServiceTest {
     @Test
     void unknownMission_returnsFalse() {
       UUID missionId = UUID.randomUUID();
-      when(missionRepository.findById(missionId)).thenReturn(Optional.empty());
+      when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.empty());
 
       assertFalse(service.canSeeMission(missionId));
     }
@@ -677,7 +677,7 @@ class OwnerScopeServiceTest {
     void memberCannotEditPublicMissionOfOtherSquadron() {
       UUID missionId = UUID.randomUUID();
       Mission mission = newMission(missionId, squadronB, false);
-      when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+      when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
       stubMemberInSquadronA();
 
       assertFalse(service.canEditMission(missionId));
@@ -687,7 +687,7 @@ class OwnerScopeServiceTest {
     void memberCanEditOwnSquadronMission() {
       UUID missionId = UUID.randomUUID();
       Mission mission = newMission(missionId, squadronA, true);
-      when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+      when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
       stubMemberInSquadronA();
 
       assertTrue(service.canEditMission(missionId));
@@ -700,7 +700,7 @@ class OwnerScopeServiceTest {
       // MissionSecurityService.canManageMission's role/owner gate (see MissionSecurityServiceTest).
       UUID missionId = UUID.randomUUID();
       Mission mission = newMission(missionId, null, false);
-      when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+      when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
 
       assertTrue(service.canEditMission(missionId));
     }
@@ -708,7 +708,7 @@ class OwnerScopeServiceTest {
     @Test
     void unknownMission_returnsFalse() {
       UUID missionId = UUID.randomUUID();
-      when(missionRepository.findById(missionId)).thenReturn(Optional.empty());
+      when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.empty());
 
       assertFalse(service.canEditMission(missionId));
     }

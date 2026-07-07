@@ -57,13 +57,32 @@ memoised on the `HttpServletRequest` so it resolves once: `OwnerScopeService.can
 Staffel-membership lookup so its three derived-field resolvers share one query (falling back to a
 direct query outside an HTTP request).
 
+A **by-id aggregate load must never fetch-join two sibling collections.** `@EntityGraph` on a `findBy`
+that graphs two `@OneToMany`s produces a `|childA| × |childB|` cartesian result — every parent scalar
+(including any TEXT column) repeated across the row product. Graph at most one collection and let the
+other batch-load under `hibernate.default_batch_fetch_size` (`MissionRepository.findById` graphs only
+`participants`; `assignedUnits` batch-loads — #1138). The **paged** list variant graphs neither (it
+maps only scalars + `@ManyToOne`s, and a collection fetch-join forces in-memory pagination, `HHH000104`).
+
+An **authorization gate must not load the aggregate its decision does not read.** A `@PreAuthorize`
+gate that inspects only a couple of `@ManyToOne`s / a small association (mission `owningOrgUnit` /
+`parent` chain, or `owner` / `managers`) resolves the entity through an `EntityManager.find`
+repository fragment (`MissionRepository.findByIdForAuthorization`) — no collection graph, so the
+roster is never loaded, and `em.find` (unlike a JPQL query) is first-level-cache aware and never
+auto-flushes, so the gate never re-runs the heavy aggregate query it would otherwise pay twice per
+request (gate + handler transaction, #1139). A **point write** that mutates a single child row
+likewise resolves that child directly and reads the parent's scalars through the child's `@ManyToOne`
+rather than loading the parent aggregate to stream it (`MissionParticipantService.checkIn` / `checkOut`
+/ `updatePayoutPreference` via `getParticipant` + `participant.getMission()`, #1140).
+
 **Acceptance**: `JobOrderServiceAssigneeAndListTest` (one batched stock query per page with no per-
 material `SUM` on the list path, plus the in-memory sum reproducing the native per-bucket semantics
 at each quality floor), `JobOrderMaterialStockRowQueryDataTest` (the batched projection runs on the
 real Postgres schema, returns only order-linked rows, and its floor sum equals the native
 `sumAmountByMaterialAndJobOrderAndMinQuality` aggregate), `OwnerScopeServiceTest` (profit-eligibility
 count runs once across repeated `canViewJobOrders()`), `UserMapperTest` (one membership lookup per
-user within a request, direct-query fallback without one).
+user within a request, direct-query fallback without one), `MissionServicePayoutTest` (check-in/out/
+payout resolve the participant without an aggregate load).
 
 ### REQ-DATA-004 — UEX duplicate companies of one brand merge onto a single manufacturer; the sync is per-company resilient
 

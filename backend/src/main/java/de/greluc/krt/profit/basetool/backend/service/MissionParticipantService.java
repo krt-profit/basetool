@@ -534,11 +534,12 @@ public class MissionParticipantService {
    */
   @Transactional
   public Mission checkIn(UUID missionId, UUID participantId) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    // #1140: resolve the one participant and read the mission scalars through its @ManyToOne — a
+    // single-row load, not the graphed roster/units aggregate. getParticipant already validates the
+    // participant belongs to this mission (and navigates getMission() for that check), so there is
+    // no separate missionRepository.findById; the aggregate it used to load was pure waste here.
     MissionParticipant participant = getParticipant(missionId, participantId);
+    Mission mission = participant.getMission();
     if (mission.getActualStartTime() == null) {
       throw new IllegalArgumentException("Cannot check in before mission actual start time is set");
     }
@@ -567,11 +568,10 @@ public class MissionParticipantService {
    */
   @Transactional
   public Mission checkOut(UUID missionId, UUID participantId) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    // #1140: single-participant resolve + mission scalars via participant.getMission() (no roster
+    // aggregate load — the point write touches only this one participant row).
     MissionParticipant participant = getParticipant(missionId, participantId);
+    Mission mission = participant.getMission();
     if (mission.getActualEndTime() != null && Instant.now().isAfter(mission.getActualEndTime())) {
       if (participant.getStartTime() != null
           && mission.getActualEndTime().isBefore(participant.getStartTime())) {
@@ -602,15 +602,11 @@ public class MissionParticipantService {
   @Transactional
   public Mission updatePayoutPreference(
       UUID missionId, UUID participantId, PayoutPreference preference) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-    MissionParticipant participant =
-        mission.getParticipants().stream()
-            .filter(p -> p.getId().equals(participantId))
-            .findFirst()
-            .orElseThrow(() -> new NotFoundException("Participant not found in mission"));
+    // #1140: a payout-preference toggle needs no roster — resolve the single participant directly
+    // and read the mission scalars (id/name for the audit record) via its @ManyToOne, instead of
+    // loading the graphed aggregate just to stream its participants for one row.
+    MissionParticipant participant = getParticipant(missionId, participantId);
+    Mission mission = participant.getMission();
 
     if (preference != null) {
       participant.setPayoutPreference(preference);
