@@ -1,4 +1,4 @@
-# ADR-0081 — Materialbörse offer model, visibility and live-read facts
+# ADR-0082 — Materialbörse offer model, visibility and live-read facts
 
 - **Status:** Accepted
 - **Date:** 2026-07-07

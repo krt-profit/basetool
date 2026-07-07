@@ -1,4 +1,4 @@
--- Materialbörse — material exchange marketplace (Flotte & Logistik), REQ-MARKET-001…, ADR-0081.
+-- Materialbörse — material exchange marketplace (Flotte & Logistik), REQ-MARKET-001…, ADR-0082.
 -- A central, org-wide-visible trade board: a player releases a Lager row (inventory_item) for trade
 -- with a free-form Markdown remark; the board shows only WHICH player offers WHICH material in WHICH
 -- quality and quantity. Material / quality / amount are read LIVE from the linked inventory_item; the

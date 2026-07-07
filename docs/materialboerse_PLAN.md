@@ -1,6 +1,6 @@
 > **Doc type:** Living plan — kept in sync with `main` while the Materialbörse epic is in flight;
 > freeze and point at `docs/specs/materialboerse.md` once it ships. Last reviewed: 2026-07-07.
-> **Owner area:** MARKET · **Related:** design proposal `.claude/skills/das-kartell-design/proposals/materialboerse-final.html` + `…/materialboerse-final.js`, ADR-0081 (to be written), REQ-MARKET-001…
+> **Owner area:** MARKET · **Related:** design proposal `.claude/skills/das-kartell-design/proposals/materialboerse-final.html` + `…/materialboerse-final.js`, ADR-0082 (to be written), REQ-MARKET-001…
 
 # Materialbörse — Implementation Plan (Flotte & Logistik)
 
@@ -376,7 +376,7 @@ export/purge).
    interest model, org-wide visibility, interessenten anonymity, no-location invariant, 20 000-char
    Markdown remark, master-detail UI binding, release-in-Lager flow. Register the row in
    `docs/specs/INDEX.md` and add `MARKET` to the area vocabulary.
-2. **ADR** `docs/adr/0081-materialboerse-offer-model.md` — the data-model + visibility + anonymity
+2. **ADR** `docs/adr/0082-materialboerse-offer-model.md` — the data-model + visibility + anonymity
    decision (offer-over-InventoryItem vs columns; live-read vs snapshot; org-wide public board;
    signal-only no stock mutation). Add the index row in `docs/adr/README.md`.
 3. **Audit** `docs/specs/audit.md` — new Materialbörse bullet in REQ-AUDIT-001; 10-way viewer

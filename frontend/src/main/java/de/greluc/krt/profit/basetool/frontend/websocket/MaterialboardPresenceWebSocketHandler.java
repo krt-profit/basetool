@@ -37,7 +37,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The Materialbörse board live-sync relay (REQ-MARKET-010, ADR-0081 D4). One global room: every
+ * The Materialbörse board live-sync relay (REQ-MARKET-010, ADR-0082 D4). One global room: every
  * authenticated viewer of {@code /materialboerse} joins {@code /ws/materialboerse/board}. When a
  * member's release / deactivate / interest write succeeds, its client sends a {@code
  * {"type":"changed","sections":["board"]}} frame; this relay fans that frame out to <b>every

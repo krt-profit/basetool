@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-07.
-> **Owner area:** MARKET · **Related ADRs:** ADR-0081
+> **Owner area:** MARKET · **Related ADRs:** ADR-0082
 
 # Materialbörse — material-exchange trade board
 
@@ -12,7 +12,7 @@ on the existing Lager (`InventoryItem`): a member releases one of their own stoc
 free-form Markdown remark ("was suchst du im Gegenzug?"), other members register interest, and the
 anbieter takes the negotiation from there. The design is fixed by the DAS KARTELL design proposal
 `proposals/materialboerse-final.html` (locked master-detail layout). Data model + visibility
-decisions are recorded in ADR-0081.
+decisions are recorded in ADR-0082.
 
 ## Requirements
 
@@ -140,7 +140,7 @@ Complies with `docs/specs/frontend-ajax-mutations.md` (REQ-FE-001…014).
 
 Because the board is a surface several members see at once, a peer's release / deactivate / interest
 change propagates to other viewers without a manual reload, over a dedicated Materialbörse presence
-relay (ADR-0081, decision D4), mirroring the REQ-FE-010 three-mirror-point contract (acting-client
+relay (ADR-0082, decision D4), mirroring the REQ-FE-010 three-mirror-point contract (acting-client
 broadcast ↔ server relay accept-list ↔ receiving-client apply map). Only opaque section keys cross
 the socket; each peer re-pulls its own authorization-checked fragment.
 

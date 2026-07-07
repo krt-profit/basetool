@@ -29,7 +29,7 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Wires the Materialbörse board live-sync WebSocket endpoint (REQ-MARKET-010, ADR-0081 D4).
+ * Wires the Materialbörse board live-sync WebSocket endpoint (REQ-MARKET-010, ADR-0082 D4).
  *
  * <p>Exposes {@code /ws/materialboerse/board} as a native Spring WebSocket endpoint — one global
  * room served by a single {@link MaterialboardPresenceWebSocketHandler}. The WebSocket machinery is
