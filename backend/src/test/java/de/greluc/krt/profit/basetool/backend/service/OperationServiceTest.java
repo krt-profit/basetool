@@ -48,6 +48,7 @@ import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationPayoutDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.OperationPayoutStatusDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationPayoutSummaryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationUpdateDto;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
@@ -1630,7 +1631,8 @@ class OperationServiceTest {
 
     @Test
     void throwsNotFound_whenOperationDoesNotExist() {
-      when(operationRepository.existsById(OPERATION_ID)).thenReturn(false);
+      when(operationRepository.findWithMissionsAndParticipantsById(OPERATION_ID))
+          .thenReturn(Optional.empty());
 
       assertThrows(
           NotFoundException.class,
@@ -1642,15 +1644,12 @@ class OperationServiceTest {
       User alice = newUser("alice");
       String key = alice.getId().toString();
 
-      when(operationRepository.existsById(OPERATION_ID)).thenReturn(true);
       when(payoutStatusRepository.findByOperationIdAndParticipantKey(OPERATION_ID, key))
           .thenReturn(Optional.empty());
-      Operation opRef = new Operation();
-      opRef.setId(OPERATION_ID);
-      when(operationRepository.getReferenceById(OPERATION_ID)).thenReturn(opRef);
 
-      // Stub the re-read so setPayoutStatus can return the refreshed row.
-      stubOperationWithParticipant(alice);
+      // The toggle validates the key against — and attaches the new status row to — the operation
+      // loaded via findWithMissionsAndParticipantsById (no separate getReferenceById, #1121).
+      Operation op = stubOperationWithParticipant(alice);
 
       User actor = newUser("officer");
       actor.setDisplayName("Officer Bob");
@@ -1666,7 +1665,7 @@ class OperationServiceTest {
       assertTrue(saved.isPaidOut());
       assertNotNull(saved.getPaidOutAt(), "paid_out_at must be stamped on transition to true");
       assertEquals(actor, saved.getPaidOutByUser());
-      assertEquals(opRef, saved.getOperation());
+      assertEquals(op, saved.getOperation());
     }
 
     @Test
@@ -1679,7 +1678,6 @@ class OperationServiceTest {
       existing.setParticipantKey(key);
       existing.setPaidOut(false);
 
-      when(operationRepository.existsById(OPERATION_ID)).thenReturn(true);
       when(payoutStatusRepository.findByOperationIdAndParticipantKey(OPERATION_ID, key))
           .thenReturn(Optional.of(existing));
 
@@ -1713,7 +1711,6 @@ class OperationServiceTest {
       existing.setPaidOutAt(previouslyPaidAt);
       existing.setPaidOutByUser(previouslyAuditedBy);
 
-      when(operationRepository.existsById(OPERATION_ID)).thenReturn(true);
       when(payoutStatusRepository.findByOperationIdAndParticipantKey(OPERATION_ID, key))
           .thenReturn(Optional.of(existing));
       stubOperationWithParticipant(alice);
@@ -1738,14 +1735,9 @@ class OperationServiceTest {
     @Test
     void throwsNotFound_whenParticipantKeyIsUnknownInTheOperation() {
       String unknownKey = "guest_someone-who-was-never-in-this-op";
-      when(operationRepository.existsById(OPERATION_ID)).thenReturn(true);
-      when(payoutStatusRepository.findByOperationIdAndParticipantKey(OPERATION_ID, unknownKey))
-          .thenReturn(Optional.empty());
-      Operation opRef = new Operation();
-      opRef.setId(OPERATION_ID);
-      when(operationRepository.getReferenceById(OPERATION_ID)).thenReturn(opRef);
 
-      // The participant set does NOT include this key.
+      // The participant set does NOT include this key; the toggle rejects it before it ever
+      // looks up or creates a status row (#1121).
       stubOperationWithParticipant(newUser("alice"));
 
       assertThrows(
@@ -1753,7 +1745,7 @@ class OperationServiceTest {
           () -> operationService.setPayoutStatus(OPERATION_ID, unknownKey, true));
     }
 
-    private void stubOperationWithParticipant(User user) {
+    private Operation stubOperationWithParticipant(User user) {
       Mission m = new Mission();
       m.setId(UUID.randomUUID());
       m.setActualStartTime(T0);
@@ -1775,6 +1767,7 @@ class OperationServiceTest {
 
       when(operationRepository.findWithMissionsAndParticipantsById(OPERATION_ID))
           .thenReturn(Optional.of(op));
+      return op;
     }
 
     private User newUser(String username) {
@@ -1802,7 +1795,7 @@ class OperationServiceTest {
     void retriesInAFreshTransaction_whenTheInsertRaceLoses() {
       OperationService spied = spy(operationService);
       when(self.getObject()).thenReturn(spied);
-      OperationPayoutDto expected = samplePayoutDto();
+      OperationPayoutStatusDto expected = sampleStatusDto();
       // First attempt loses the INSERT race (unique constraint), retry finds the row and wins.
       doThrow(
               new DataIntegrityViolationException(
@@ -1811,7 +1804,7 @@ class OperationServiceTest {
           .when(spied)
           .setPayoutStatusWithinTransaction(OPERATION_ID, KEY, true);
 
-      OperationPayoutDto result = operationService.setPayoutStatus(OPERATION_ID, KEY, true);
+      OperationPayoutStatusDto result = operationService.setPayoutStatus(OPERATION_ID, KEY, true);
 
       assertEquals(expected, result, "the winning retry's row must be returned");
       verify(spied, times(2)).setPayoutStatusWithinTransaction(OPERATION_ID, KEY, true);
@@ -1821,14 +1814,14 @@ class OperationServiceTest {
     void retriesInAFreshTransaction_whenTheUpdateRaceLoses() {
       OperationService spied = spy(operationService);
       when(self.getObject()).thenReturn(spied);
-      OperationPayoutDto expected = samplePayoutDto();
+      OperationPayoutStatusDto expected = sampleStatusDto();
       // First attempt loses the @Version race on the existing row, retry reloads and wins.
       doThrow(new ObjectOptimisticLockingFailureException(OperationPayoutStatus.class, null))
           .doReturn(expected)
           .when(spied)
           .setPayoutStatusWithinTransaction(OPERATION_ID, KEY, false);
 
-      OperationPayoutDto result = operationService.setPayoutStatus(OPERATION_ID, KEY, false);
+      OperationPayoutStatusDto result = operationService.setPayoutStatus(OPERATION_ID, KEY, false);
 
       assertEquals(expected, result);
       verify(spied, times(2)).setPayoutStatusWithinTransaction(OPERATION_ID, KEY, false);
@@ -1851,20 +1844,8 @@ class OperationServiceTest {
       verify(spied, times(3)).setPayoutStatusWithinTransaction(OPERATION_ID, KEY, true);
     }
 
-    private OperationPayoutDto samplePayoutDto() {
-      return new OperationPayoutDto(
-          KEY,
-          "Alice",
-          0.0,
-          PayoutPreference.PAYOUT,
-          BigDecimal.ZERO,
-          BigDecimal.ZERO,
-          BigDecimal.ZERO,
-          BigDecimal.ZERO,
-          BigDecimal.ZERO,
-          true,
-          null,
-          null);
+    private OperationPayoutStatusDto sampleStatusDto() {
+      return new OperationPayoutStatusDto(KEY, true, null, null);
     }
   }
 

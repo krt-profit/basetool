@@ -20,9 +20,15 @@
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 import java.math.BigDecimal;
-import java.util.List;
 import java.util.UUID;
 
-/** Data transfer record carrying Operation Finance payload. */
-public record OperationFinanceDto(
-    UUID operationId, BigDecimal totalSum, List<MissionFinanceSummaryDto> missions) {}
+/**
+ * Frontend mirror of the backend {@code OperationMissionFinanceDto}: one mission's roll-up line in
+ * the operation finance summary — its id + name and signed bottom line. Carries no per-entry lists;
+ * the operation-detail page lazy-loads each mission's breakdown on demand (#1121).
+ *
+ * @param missionId the mission's id (links the row to its lazy-loaded detail)
+ * @param missionName the mission's display name
+ * @param totalSum the mission's signed bottom line in aUEC (income − expense + refinery profit)
+ */
+public record OperationMissionFinanceDto(UUID missionId, String missionName, BigDecimal totalSum) {}

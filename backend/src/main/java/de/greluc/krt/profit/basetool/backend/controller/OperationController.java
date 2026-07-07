@@ -20,10 +20,12 @@
 package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.mapper.OperationMapper;
+import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceSummaryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationFinanceDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.OperationPayoutDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.OperationFinanceSummaryDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.OperationPayoutStatusDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationPayoutStatusUpdateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationPayoutSummaryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationReferenceDto;
@@ -248,19 +250,29 @@ public class OperationController {
   }
 
   /**
-   * Aggregated finance roll-up across all missions of the operation.
+   * Aggregated finance roll-up across all missions of the operation, with the full per-entry /
+   * per-refinery-order breakdown embedded per mission.
+   *
+   * <p>This is the heavy full-detail variant: it materializes every finance entry and refinery
+   * order across every child mission in one shot. The operation-detail render no longer uses it —
+   * it reads the cheap {@link #getOperationFinanceSummary} roll-up and lazy-loads each mission's
+   * breakdown via {@link #getMissionFinanceDetail} instead (#1121). Kept for API consumers that
+   * want the whole operation ledger in a single call.
    *
    * @param id operation id
-   * @return finance summary DTO
+   * @return finance summary DTO with the full per-mission breakdown
    */
   @GetMapping("/{id}/finances")
   @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeOperation(#id)")
   @Operation(
-      summary = "Get aggregated finances for an operation",
+      summary = "Get aggregated finances for an operation (full breakdown)",
       description =
           "Sums income, expenses and refinery profit/loss across all missions "
-              + "that belong to the operation. Refinery order profit is calculated as "
-              + "`oreSales - expenses - otherExpenses`; null values are treated as 0.")
+              + "that belong to the operation, embedding each mission's full finance-entry + "
+              + "refinery-order breakdown. Refinery order profit is calculated as "
+              + "`oreSales - expenses - otherExpenses`; null values are treated as 0. This is the "
+              + "heavy full-detail variant; prefer `/finance-summary` (roll-up totals) plus "
+              + "`/finances/{missionId}` (per-mission detail on demand) for the interactive page.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Finance summary returned."),
     @ApiResponse(responseCode = "401", description = "Caller is not authenticated."),
@@ -269,6 +281,68 @@ public class OperationController {
   @Transactional(readOnly = true)
   public OperationFinanceDto getOperationFinances(@PathVariable UUID id) {
     return operationFinanceService.getOperationFinances(id);
+  }
+
+  /**
+   * Lightweight finance roll-up: the operation-wide total plus one total line per mission, computed
+   * from grouped SQL aggregates rather than the {@link #getOperationFinances} ledger load-all.
+   * Drives the operation-detail "Ergebnis je Einsatz" bars and the Gesamtergebnis; each mission's
+   * per-entry breakdown loads on demand via {@link #getMissionFinanceDetail}. The operation-side
+   * mirror of the mission finance summary aggregate (ADR-0078, #1121).
+   *
+   * @param id operation id
+   * @return the operation-wide total plus the capped per-mission roll-up lines
+   */
+  @GetMapping("/{id}/finance-summary")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeOperation(#id)")
+  @Operation(
+      summary = "Get the finance roll-up for an operation (totals only)",
+      description =
+          "Returns the operation-wide signed total and one total line per mission (id + name + "
+              + "signed result), computed from grouped SQL aggregates instead of materializing "
+              + "every finance entry / refinery order. The per-mission breakdown is capped at 500 "
+              + "missions (`truncated=true` when clipped). Pair it with `/finances/{missionId}` to "
+              + "load a single mission's per-entry detail on demand.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Finance roll-up returned."),
+    @ApiResponse(responseCode = "401", description = "Caller is not authenticated."),
+    @ApiResponse(responseCode = "404", description = "Operation not found.")
+  })
+  @Transactional(readOnly = true)
+  public OperationFinanceSummaryDto getOperationFinanceSummary(@PathVariable UUID id) {
+    return operationFinanceService.getOperationFinanceSummary(id);
+  }
+
+  /**
+   * One mission's full finance detail (its finance entries + refinery orders), for the lazy
+   * per-mission breakdown of the operation finance panel. Authorized at the operation scope ({@code
+   * canSeeOperation}) and validated to belong to the operation, so a viewer of the operation can
+   * expand any of its missions' breakdowns without a separate mission-scope gate (#1121).
+   *
+   * @param id operation id (authorization scope)
+   * @param missionId the mission whose finance detail to load; must belong to the operation
+   * @return the mission's finance detail (entries + refinery orders + recomputed total)
+   */
+  @GetMapping("/{id}/finances/{missionId}")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeOperation(#id)")
+  @Operation(
+      summary = "Get one mission's finance detail within an operation",
+      description =
+          "Returns a single mission's finance entries and refinery orders (plus its recomputed "
+              + "signed total) for the lazy per-mission breakdown of the operation finance panel. "
+              + "The mission must be one of the operation's child missions. Authorized at the "
+              + "operation scope, so it needs no separate mission-scope check.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Mission finance detail returned."),
+    @ApiResponse(responseCode = "401", description = "Caller is not authenticated."),
+    @ApiResponse(
+        responseCode = "404",
+        description = "Operation not found, or the mission is not part of the operation.")
+  })
+  @Transactional(readOnly = true)
+  public MissionFinanceSummaryDto getMissionFinanceDetail(
+      @PathVariable UUID id, @PathVariable UUID missionId) {
+    return operationFinanceService.getMissionFinanceDetail(id, missionId);
   }
 
   /**
@@ -318,8 +392,8 @@ public class OperationController {
    *
    * @param id operation id
    * @param dto request body with the participant key and new paid-out value
-   * @return the refreshed payout row for the participant, so the caller can patch a single row of
-   *     its table without re-fetching the whole breakdown
+   * @return the refreshed paid-out status block for the participant, so the caller can patch the
+   *     single "Bezahlt" cell without re-fetching (or the backend re-computing) the whole breakdown
    */
   // Asymmetric authorization: any mission manager (or higher via the role
   // hierarchy) can SET paidOut=true, but only OFFICER / ADMIN can clear it
@@ -347,7 +421,9 @@ public class OperationController {
               + "`paidOutByUser`) are always refreshed when `paidOut=true`; setting "
               + "`paidOut=false` keeps the last audit fields as a historical record. The "
               + "participantKey matches the opaque key returned by `/payouts` (real user UUID "
-              + "stringified or `guest_<name>`).")
+              + "stringified or `guest_<name>`). Returns only the participant's paid-out status "
+              + "block (flag + audit trace) — a toggle never changes any amount, so the payout "
+              + "computation is not re-run.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Paid-out flag updated."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),
@@ -361,7 +437,7 @@ public class OperationController {
         responseCode = "404",
         description = "Operation not found, or participantKey is not part of the operation.")
   })
-  public OperationPayoutDto setPayoutStatus(
+  public OperationPayoutStatusDto setPayoutStatus(
       @PathVariable UUID id, @Valid @RequestBody OperationPayoutStatusUpdateDto dto) {
     return operationService.setPayoutStatus(id, dto.participantKey(), dto.paidOut());
   }

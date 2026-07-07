@@ -67,6 +67,30 @@ public interface MissionFinanceEntryRepository extends JpaRepository<MissionFina
           + " from MissionFinanceEntry e where e.mission.id = :missionId")
   FinanceEntryAggregate aggregateFinanceByMission(@Param("missionId") UUID missionId);
 
+  /**
+   * Aggregates the finance entries of several missions into one {@code (missionId, incomeSum,
+   * expenseSum)} row per mission in ONE grouped query, so the operation finance roll-up no longer
+   * materializes every entry across every child mission. Backs the operation-detail "Ergebnis je
+   * Einsatz" bars + Gesamtergebnis (the operation-side ADR-0078 gap, #1121): the previous {@code
+   * findAllByMissionIdIn} load-all pinned a database connection across the math + serialization on
+   * every render and every payout toggle. Missions with no entry of a given type simply do not
+   * contribute to that {@code SUM} (a SQL {@code SUM} over an empty set is {@code NULL}); a mission
+   * with no entries at all yields no row and the caller treats it as zero.
+   *
+   * @param missionIds the missions to aggregate (typically an operation's child missions)
+   * @return one aggregate per mission that has at least one entry; sums may be {@code null}
+   */
+  @Query(
+      "select new de.greluc.krt.profit.basetool.backend.repository.MissionFinanceGroupAggregate("
+          + "e.mission.id,"
+          + " sum(case when e.type ="
+          + " de.greluc.krt.profit.basetool.backend.model.FinanceType.INCOME then e.amount end),"
+          + " sum(case when e.type ="
+          + " de.greluc.krt.profit.basetool.backend.model.FinanceType.EXPENSE then e.amount end))"
+          + " from MissionFinanceEntry e where e.mission.id in :missionIds group by e.mission.id")
+  List<MissionFinanceGroupAggregate> aggregateFinanceByMissionIds(
+      @Param("missionIds") List<UUID> missionIds);
+
   /** Derived Spring-Data delete - removes every row matching {@code MissionIdIn}. */
   @Modifying
   @Query("DELETE FROM MissionFinanceEntry m WHERE m.mission.id IN :missionIds")

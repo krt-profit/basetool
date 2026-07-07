@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Verbesserung: Die Operationsseite lädt schneller und belastet Datenbank und Verbindungspool unter hoher Gleichzeitigkeit deutlich weniger.** Die Finanzübersicht einer Operation ermittelt ihre Summen jetzt über schlanke Datenbank-Aggregate, statt sämtliche Finanz- und Raffinerieeinträge aller Einsätze zu laden; die Aufschlüsselung je Einsatz wird erst beim Aufklappen nachgeladen, die vier Detail-Abfragen laufen parallel, und der „Bezahlt"-Schalter aktualisiert nur noch die betroffene Zeile, statt die gesamte Auszahlung neu zu berechnen. Die Operationsauswahl auf der Einsatzseite wird zudem nur noch beim vollständigen Seitenaufbau geladen und auf aktuelle Operationen begrenzt (#1109).
+
+- **Verbesserung: Gleichzeitige Live-Aktualisierungen und Teilansichten belasten den Server etwas weniger.** Erhalten viele Betrachter einer Mission gleichzeitig dieselbe Änderung, laufen ihre Nachlade-Anfragen jetzt zeitlich leicht gestreut statt in einer Welle; die Auftrags-Detailseite lädt die Nutzerliste nur noch beim vollständigen Seitenaufbau (#1109).
+
 ## [v1.1.11](https://github.com/krt-profit/basetool/releases/tag/v1.1.11) - 2026-07-07
 
 ### Changed

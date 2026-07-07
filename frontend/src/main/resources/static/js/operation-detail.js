@@ -32,7 +32,7 @@
  * module reads.
  */
 
-/* global OPS_DETAIL_MSG, MSG_PAYOUT_PAID_ERROR, MSG_PAYOUT_PAID_FORBIDDEN, MSG_PAYOUT_PAID_UNSET_LOCKED */
+/* global OPS_DETAIL_MSG, MSG_PAYOUT_PAID_ERROR, MSG_PAYOUT_PAID_FORBIDDEN, MSG_PAYOUT_PAID_UNSET_LOCKED, OPS_FINANCE_DETAIL_ERROR */
 
 // ---- Tab switching (deeplink ?tab= + localStorage fallback, WAI-ARIA tabs) -----------------
 (function () {
@@ -394,3 +394,49 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 });
+
+// ---- Lazy per-mission finance breakdown (#1121) ----
+// Each finance-tab <details> starts collapsed with just its mission total; the entry/refinery
+// breakdown loads on first expand via GET /operations/{id}/finance/{missionId} and is injected in
+// place, so the full page render never materializes every finance entry across every child mission.
+(function () {
+    const opId = window.operationId;
+    if (!opId) return;
+    function loadDetail(details) {
+        if (!details.open) return;
+        const body = details.querySelector('.op-finance-detail-body');
+        if (!body || body.getAttribute('data-loaded') !== 'false') return; // loaded or in flight
+        const missionId = details.getAttribute('data-op-finance-mission');
+        if (!missionId) return;
+        body.setAttribute('data-loaded', 'loading');
+        const url =
+            '/operations/' + encodeURIComponent(opId) + '/finance/' + encodeURIComponent(missionId);
+        fetch(url, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin',
+        })
+            .then((r) => (r.ok ? r.text() : Promise.reject(r.status)))
+            .then((html) => {
+                body.innerHTML = html;
+                body.setAttribute('data-loaded', 'true');
+            })
+            .catch(() => {
+                // Reset to 'false' so re-opening retries; show the error inline in the meantime.
+                body.setAttribute('data-loaded', 'false');
+                const msg =
+                    typeof OPS_FINANCE_DETAIL_ERROR !== 'undefined' ? OPS_FINANCE_DETAIL_ERROR : '';
+                const p = document.createElement('p');
+                p.className = 'desc';
+                p.style.paddingTop = '8px';
+                p.style.color = 'var(--color-danger-text)';
+                p.textContent = msg;
+                body.textContent = '';
+                body.appendChild(p);
+            });
+    }
+    document.querySelectorAll('details[data-op-finance-mission]').forEach(function (details) {
+        details.addEventListener('toggle', function () {
+            loadDetail(details);
+        });
+    });
+})();

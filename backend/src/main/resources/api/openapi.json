@@ -6942,7 +6942,7 @@
       "put" : {
         "tags" : [ "Operations" ],
         "summary" : "Toggle the per-participant paid-out flag for an operation",
-        "description" : "Records that a mission manager has marked the participant as paid out (or unset it). Setting `paidOut=true` requires the MISSION_MANAGER role (admins and officers satisfy it via the role hierarchy). Setting `paidOut=false` is reserved for ADMIN and OFFICER — a plain mission manager cannot undo a paid-out confirmation. Last-writer-wins: no client-supplied version is required because the field is a boolean. The audit fields (`paidOutAt`, `paidOutByUser`) are always refreshed when `paidOut=true`; setting `paidOut=false` keeps the last audit fields as a historical record. The participantKey matches the opaque key returned by `/payouts` (real user UUID stringified or `guest_<name>`).",
+        "description" : "Records that a mission manager has marked the participant as paid out (or unset it). Setting `paidOut=true` requires the MISSION_MANAGER role (admins and officers satisfy it via the role hierarchy). Setting `paidOut=false` is reserved for ADMIN and OFFICER — a plain mission manager cannot undo a paid-out confirmation. Last-writer-wins: no client-supplied version is required because the field is a boolean. The audit fields (`paidOutAt`, `paidOutByUser`) are always refreshed when `paidOut=true`; setting `paidOut=false` keeps the last audit fields as a historical record. The participantKey matches the opaque key returned by `/payouts` (real user UUID stringified or `guest_<name>`). Returns only the participant's paid-out status block (flag + audit trace) — a toggle never changes any amount, so the payout computation is not re-run.",
         "operationId" : "setPayoutStatus",
         "parameters" : [ {
           "name" : "id",
@@ -6969,7 +6969,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/OperationPayoutDto"
+                  "$ref" : "#/components/schemas/OperationPayoutStatusDto"
                 }
               }
             }
@@ -39076,8 +39076,8 @@
     "/api/v1/operations/{id}/finances" : {
       "get" : {
         "tags" : [ "Operations" ],
-        "summary" : "Get aggregated finances for an operation",
-        "description" : "Sums income, expenses and refinery profit/loss across all missions that belong to the operation. Refinery order profit is calculated as `oreSales - expenses - otherExpenses`; null values are treated as 0.",
+        "summary" : "Get aggregated finances for an operation (full breakdown)",
+        "description" : "Sums income, expenses and refinery profit/loss across all missions that belong to the operation, embedding each mission's full finance-entry + refinery-order breakdown. Refinery order profit is calculated as `oreSales - expenses - otherExpenses`; null values are treated as 0. This is the heavy full-detail variant; prefer `/finance-summary` (roll-up totals) plus `/finances/{missionId}` (per-mission detail on demand) for the interactive page.",
         "operationId" : "getOperationFinances",
         "parameters" : [ {
           "name" : "id",
@@ -39109,6 +39109,226 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/OperationFinanceDto"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/operations/{id}/finances/{missionId}" : {
+      "get" : {
+        "tags" : [ "Operations" ],
+        "summary" : "Get one mission's finance detail within an operation",
+        "description" : "Returns a single mission's finance entries and refinery orders (plus its recomputed signed total) for the lazy per-mission breakdown of the operation finance panel. The mission must be one of the operation's child missions. Authorized at the operation scope, so it needs no separate mission-scope check.",
+        "operationId" : "getMissionFinanceDetail",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "missionId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Mission finance detail returned.",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MissionFinanceSummaryDto"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/operations/{id}/finance-summary" : {
+      "get" : {
+        "tags" : [ "Operations" ],
+        "summary" : "Get the finance roll-up for an operation (totals only)",
+        "description" : "Returns the operation-wide signed total and one total line per mission (id + name + signed result), computed from grouped SQL aggregates instead of materializing every finance entry / refinery order. The per-mission breakdown is capped at 500 missions (`truncated=true` when clipped). Pair it with `/finances/{missionId}` to load a single mission's per-entry detail on demand.",
+        "operationId" : "getOperationFinanceSummary",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Finance roll-up returned.",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OperationFinanceSummaryDto"
                 }
               }
             }
@@ -50586,37 +50806,11 @@
         },
         "required" : [ "participantKey" ]
       },
-      "OperationPayoutDto" : {
+      "OperationPayoutStatusDto" : {
         "type" : "object",
         "properties" : {
-          "participantId" : {
+          "participantKey" : {
             "type" : "string"
-          },
-          "participantName" : {
-            "type" : "string"
-          },
-          "participationPercentage" : {
-            "type" : "number",
-            "format" : "double"
-          },
-          "payoutPreference" : {
-            "type" : "string",
-            "enum" : [ "PAYOUT", "DONATE" ]
-          },
-          "personalExpenses" : {
-            "type" : "number"
-          },
-          "shareAmount" : {
-            "type" : "number"
-          },
-          "donatedAmount" : {
-            "type" : "number"
-          },
-          "transferFee" : {
-            "type" : "number"
-          },
-          "payoutAmount" : {
-            "type" : "number"
           },
           "paidOut" : {
             "type" : "boolean"
@@ -56706,6 +56900,50 @@
           }
         }
       },
+      "OperationPayoutDto" : {
+        "type" : "object",
+        "properties" : {
+          "participantId" : {
+            "type" : "string"
+          },
+          "participantName" : {
+            "type" : "string"
+          },
+          "participationPercentage" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "payoutPreference" : {
+            "type" : "string",
+            "enum" : [ "PAYOUT", "DONATE" ]
+          },
+          "personalExpenses" : {
+            "type" : "number"
+          },
+          "shareAmount" : {
+            "type" : "number"
+          },
+          "donatedAmount" : {
+            "type" : "number"
+          },
+          "transferFee" : {
+            "type" : "number"
+          },
+          "payoutAmount" : {
+            "type" : "number"
+          },
+          "paidOut" : {
+            "type" : "boolean"
+          },
+          "paidOutAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "paidOutByName" : {
+            "type" : "string"
+          }
+        }
+      },
       "OperationPayoutSummaryDto" : {
         "type" : "object",
         "properties" : {
@@ -56762,6 +57000,42 @@
             "items" : {
               "$ref" : "#/components/schemas/MissionFinanceSummaryDto"
             }
+          }
+        }
+      },
+      "OperationFinanceSummaryDto" : {
+        "type" : "object",
+        "properties" : {
+          "operationId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "totalSum" : {
+            "type" : "number"
+          },
+          "missions" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OperationMissionFinanceDto"
+            }
+          },
+          "truncated" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "OperationMissionFinanceDto" : {
+        "type" : "object",
+        "properties" : {
+          "missionId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "missionName" : {
+            "type" : "string"
+          },
+          "totalSum" : {
+            "type" : "number"
           }
         }
       },

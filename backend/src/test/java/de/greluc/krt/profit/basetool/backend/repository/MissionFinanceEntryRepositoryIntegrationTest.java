@@ -28,6 +28,8 @@ import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,6 +51,13 @@ import org.springframework.transaction.annotation.Transactional;
  * the aggregate is scoped to one mission — assertions only see the rows created here. Class-level
  * {@code @Transactional} rolls each test back; the aggregate query auto-flushes the pending inserts
  * before it runs, so it sees them within the same transaction.
+ *
+ * <p>Also covers the operation finance roll-up queries added in #1121/#1124: the grouped
+ * per-mission finance aggregate ({@link
+ * MissionFinanceEntryRepository#aggregateFinanceByMissionIds}), the grouped refinery profit
+ * aggregate ({@code RefineryOrderRepository#aggregateProfitByMissionIds}) and the
+ * status/recency-bounded operation picker ({@code OperationRepository#findAllReferenceScoped}) —
+ * all raw JPQL that only executes for real against the container.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -59,6 +68,8 @@ class MissionFinanceEntryRepositoryIntegrationTest {
   @Autowired private MissionRepository missionRepository;
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private MissionParticipantRepository participantRepository;
+  @Autowired private RefineryOrderRepository refineryOrderRepository;
+  @Autowired private OperationRepository operationRepository;
 
   @Test
   void aggregateFinanceByMission_sumsAndCountsPerType() {
@@ -101,6 +112,58 @@ class MissionFinanceEntryRepositoryIntegrationTest {
     assertThat(agg.incomeCount()).isEqualTo(0L);
     assertThat(agg.expenseSum()).isNull();
     assertThat(agg.expenseCount()).isEqualTo(0L);
+  }
+
+  @Test
+  void aggregateFinanceByMissionIds_groupsSumsPerMission() {
+    // #1121: the operation finance roll-up sums per mission in ONE grouped query. Validates the
+    // grouped constructor-expression JPQL against real Postgres (the unit tests only mock it).
+    Mission m1 = newMission();
+    MissionParticipant p1 = newParticipant(m1);
+    saveEntry(m1, p1, FinanceType.INCOME, new BigDecimal("500.00"));
+    saveEntry(m1, p1, FinanceType.EXPENSE, new BigDecimal("100.00"));
+
+    Mission m2 = newMission();
+    MissionParticipant p2 = newParticipant(m2);
+    saveEntry(m2, p2, FinanceType.EXPENSE, new BigDecimal("200.00"));
+
+    Mission m3 = newMission(); // no entries -> no aggregate row at all
+
+    List<MissionFinanceGroupAggregate> aggs =
+        financeEntryRepository.aggregateFinanceByMissionIds(
+            List.of(m1.getId(), m2.getId(), m3.getId()));
+
+    assertThat(aggs).hasSize(2); // m3 contributes no row
+    MissionFinanceGroupAggregate a1 =
+        aggs.stream().filter(a -> a.missionId().equals(m1.getId())).findFirst().orElseThrow();
+    assertThat(a1.incomeSum()).isEqualByComparingTo("500");
+    assertThat(a1.expenseSum()).isEqualByComparingTo("100");
+    MissionFinanceGroupAggregate a2 =
+        aggs.stream().filter(a -> a.missionId().equals(m2.getId())).findFirst().orElseThrow();
+    // No INCOME row for m2 -> SUM over the empty set is NULL (coalesced to zero by the service).
+    assertThat(a2.incomeSum()).isNull();
+    assertThat(a2.expenseSum()).isEqualByComparingTo("200");
+  }
+
+  @Test
+  void aggregateProfitByMissionIds_parsesAndExecutes() {
+    // #1121: smoke-test the grouped refinery profit JPQL (coalesce(sales) - coalesce(expenses) -
+    // coalesce(other), grouped per mission). A random, never-persisted mission id yields no row —
+    // enough to prove Hibernate parses and executes the query on real Postgres.
+    List<RefineryMissionProfitAggregate> aggs =
+        refineryOrderRepository.aggregateProfitByMissionIds(List.of(UUID.randomUUID()));
+    assertThat(aggs).isEmpty();
+  }
+
+  @Test
+  void findAllReferenceScoped_withStatusRecencyBound_parsesAndExecutes() {
+    // #1124: smoke-test the operation-picker query after adding the PLANNED/ACTIVE-always +
+    // terminal-within-cutoff status bound. Admin-all-scope + a now cutoff exercises the new WHERE;
+    // the assertion only proves the JPQL parses and executes (rows from other suites may appear).
+    assertThat(
+            operationRepository.findAllReferenceScoped(
+                true, null, List.of(), false, null, Instant.now()))
+        .isNotNull();
   }
 
   private Mission newMission() {

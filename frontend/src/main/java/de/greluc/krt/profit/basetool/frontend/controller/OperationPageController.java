@@ -21,10 +21,12 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionListDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.OperationFinanceDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.OperationPayoutDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OperationFinanceSummaryDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OperationMissionFinanceDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OperationPayoutStatusDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationPayoutStatusUpdateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationPayoutSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
@@ -34,6 +36,7 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.service.MarkdownRenderer;
+import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.math.BigDecimal;
 import java.net.URLEncoder;
@@ -41,6 +44,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -85,6 +89,7 @@ public class OperationPageController {
   private final BackendApiClient backendApiClient;
   private final MarkdownRenderer markdown;
   private final FrontendAuthHelperService authHelper;
+  private final ParallelPageLoader parallelPageLoader;
 
   /** Response type for one paginated page of the operations search endpoint. */
   private static final ParameterizedTypeReference<PageResponse<OperationDto>> OPERATION_PAGE_TYPE =
@@ -204,11 +209,13 @@ public class OperationPageController {
   }
 
   /**
-   * Renders the operation detail page. Pulls operation, embedded missions, finance and payouts in
-   * sequence; any backend failure aborts the render and redirects back to the list with a flash
-   * error. Computes {@code canEdit} at the HTTP boundary by reading the authorities off the {@link
-   * Authentication} object — keeps the template free of role-expression checks and mirrors what the
-   * backend's PUT endpoint will accept.
+   * Renders the operation detail page. Pulls operation, embedded missions, the finance roll-up and
+   * payouts <em>concurrently</em> via {@link ParallelPageLoader} (#1123); any backend failure
+   * aborts the render and redirects back to the list with a flash error. The finance read is the
+   * cheap {@code /finance-summary} roll-up (#1121) — each mission's per-entry breakdown loads
+   * lazily via {@link #operationMissionFinance}. Computes {@code canEdit} at the HTTP boundary by
+   * reading the authorities off the {@link Authentication} object — keeps the template free of
+   * role-expression checks and mirrors what the backend's PUT endpoint will accept.
    *
    * @param id operation id
    * @param page zero-based page index for the embedded missions table
@@ -234,22 +241,43 @@ public class OperationPageController {
       return missionsFragment(id, page, size, model);
     }
     try {
-      OperationDto operation =
-          backendApiClient.get("/api/v1/operations/" + id, OperationDto.class, false);
+      // #1123: fetch the four independent reads concurrently on virtual threads (ParallelPageLoader
+      // replays the request-scoped context — auth, active-org-unit pin, correlation id, client IP)
+      // instead of blocking through them in series. The finance read is the cheap /finance-summary
+      // roll-up (#1121, the operation-side ADR-0078 gap); each mission's per-entry breakdown loads
+      // lazily via GET /operations/{id}/finance/{missionId} when its panel is expanded.
+      CompletableFuture<OperationDto> operationF =
+          parallelPageLoader.loadAsync(
+              () -> backendApiClient.get("/api/v1/operations/" + id, OperationDto.class, false));
+      CompletableFuture<PageResponse<MissionListDto>> missionsF =
+          parallelPageLoader.loadAsync(() -> fetchMissionsPage(id, page, size));
+      CompletableFuture<OperationFinanceSummaryDto> financeF =
+          parallelPageLoader.loadAsync(
+              () ->
+                  backendApiClient.get(
+                      "/api/v1/operations/" + id + "/finance-summary",
+                      OperationFinanceSummaryDto.class,
+                      false));
+      CompletableFuture<OperationPayoutSummaryDto> payoutsF =
+          parallelPageLoader.loadAsync(
+              () ->
+                  backendApiClient.get(
+                      "/api/v1/operations/" + id + "/payouts",
+                      OperationPayoutSummaryDto.class,
+                      false));
+      CompletableFuture.allOf(operationF, missionsF, financeF, payoutsF).join();
+
+      OperationDto operation = operationF.join();
       model.addAttribute("operation", operation);
 
-      PageResponse<MissionListDto> missionsPage = fetchMissionsPage(id, page, size);
+      PageResponse<MissionListDto> missionsPage = missionsF.join();
       model.addAttribute("missions", missionsPage.content());
       model.addAttribute("missionsPage", missionsPage);
 
-      OperationFinanceDto operationFinance =
-          backendApiClient.get(
-              "/api/v1/operations/" + id + "/finances", OperationFinanceDto.class, false);
+      OperationFinanceSummaryDto operationFinance = financeF.join();
       model.addAttribute("operationFinance", operationFinance);
 
-      OperationPayoutSummaryDto payoutSummary =
-          backendApiClient.get(
-              "/api/v1/operations/" + id + "/payouts", OperationPayoutSummaryDto.class, false);
+      OperationPayoutSummaryDto payoutSummary = payoutsF.join();
       model.addAttribute("operationPayouts", payoutSummary.payouts());
       model.addAttribute("operationDonationTotal", payoutSummary.totalDonations());
 
@@ -260,9 +288,7 @@ public class OperationPageController {
           operationFinance.missions() == null
               ? BigDecimal.ZERO
               : operationFinance.missions().stream()
-                  .map(
-                      de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceSummaryDto
-                          ::totalSum)
+                  .map(OperationMissionFinanceDto::totalSum)
                   .filter(Objects::nonNull)
                   .max(BigDecimal::compareTo)
                   .orElse(BigDecimal.ZERO);
@@ -339,6 +365,39 @@ public class OperationPageController {
             + "&sort=plannedStartTime,asc",
         MISSION_PAGE_TYPE,
         false);
+  }
+
+  /**
+   * Renders one mission's finance breakdown fragment for the lazy per-mission {@code <details>} on
+   * the operation-detail finance tab (#1121). The operation-detail page fetches this on first
+   * expand and injects the returned HTML in place, so the full page render no longer materializes
+   * every finance entry / refinery order across every child mission. Authorized like the rest of
+   * the operation page (the backend re-checks {@code canSeeOperation} and that the mission belongs
+   * to the operation); a backend failure degrades to an inline error message inside the panel
+   * rather than a redirect, so one flaky expand never takes down the whole page.
+   *
+   * @param id operation id
+   * @param missionId the mission whose breakdown to load (must belong to the operation)
+   * @param model Thymeleaf model populated with {@code financeDetail} (or {@code
+   *     financeDetailError})
+   * @return the {@code operation-detail :: financeDetail} fragment view
+   */
+  @GetMapping("/{id}/finance/{missionId}")
+  @PreAuthorize("isAuthenticated()")
+  public String operationMissionFinance(
+      @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID missionId, Model model) {
+    try {
+      MissionFinanceSummaryDto detail =
+          backendApiClient.get(
+              "/api/v1/operations/" + id + "/finances/" + missionId,
+              MissionFinanceSummaryDto.class,
+              false);
+      model.addAttribute("financeDetail", detail);
+    } catch (Exception e) {
+      log.error("Error loading finance detail for operation {} mission {}", id, missionId, e);
+      model.addAttribute("financeDetailError", true);
+    }
+    return "operation-detail :: financeDetail";
   }
 
   private static boolean hasMissionManagerRole(Authentication authentication) {
@@ -430,9 +489,9 @@ public class OperationPageController {
    *
    * @param id operation id (from the URL)
    * @param request participant key + new {@code paidOut} value
-   * @return refreshed payout row on success, or a 403 / 404 / 409 / 500 mirroring the backend
-   *     status (a 409 is a same-row toggle race that survived the backend's retry — never a 500,
-   *     #1111)
+   * @return refreshed paid-out status block on success, or a 403 / 404 / 409 / 500 mirroring the
+   *     backend status (a 409 is a same-row toggle race that survived the backend's retry — never a
+   *     500, #1111)
    */
   @PostMapping("/{id}/payouts/paid-out")
   @PreAuthorize(
@@ -444,14 +503,14 @@ public class OperationPageController {
           + Roles.OFFICER
           + "'))")
   @ResponseBody
-  public ResponseEntity<OperationPayoutDto> updatePayoutStatus(
+  public ResponseEntity<OperationPayoutStatusDto> updatePayoutStatus(
       @PathVariable @NotNull UUID id, @RequestBody OperationPayoutStatusUpdateDto request) {
     try {
-      OperationPayoutDto updated =
+      OperationPayoutStatusDto updated =
           backendApiClient.put(
               "/api/v1/operations/" + id + "/payouts/paid-out",
               request,
-              OperationPayoutDto.class,
+              OperationPayoutStatusDto.class,
               false);
       return ResponseEntity.ok(updated);
     } catch (BackendServiceException e) {

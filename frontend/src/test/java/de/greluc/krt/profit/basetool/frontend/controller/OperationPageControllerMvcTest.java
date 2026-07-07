@@ -27,6 +27,8 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -36,10 +38,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.model.PayoutPreference;
+import de.greluc.krt.profit.basetool.frontend.model.dto.FinanceType;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceEntryDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionListDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.OperationFinanceDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OperationFinanceSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationPayoutDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OperationPayoutStatusDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationPayoutSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -187,10 +193,10 @@ class OperationPageControllerMvcTest {
             contains("/api/v1/missions/search?operationId=" + opId), anyTypeRef(), anyBoolean()))
         .thenReturn(new PageResponse<>(List.<MissionListDto>of(), 0, 10, 0L, 0, List.of()));
     when(backendApiClient.get(
-            eq("/api/v1/operations/" + opId + "/finances"),
-            eq(OperationFinanceDto.class),
+            eq("/api/v1/operations/" + opId + "/finance-summary"),
+            eq(OperationFinanceSummaryDto.class),
             anyBoolean()))
-        .thenReturn(new OperationFinanceDto(opId, BigDecimal.ZERO, List.of()));
+        .thenReturn(new OperationFinanceSummaryDto(opId, BigDecimal.ZERO, List.of(), false));
     when(backendApiClient.get(
             eq("/api/v1/operations/" + opId + "/payouts"),
             eq(OperationPayoutSummaryDto.class),
@@ -239,10 +245,10 @@ class OperationPageControllerMvcTest {
 
     // Empty finance/payout stubs so the page renders without NPE.
     when(backendApiClient.get(
-            eq("/api/v1/operations/" + opId + "/finances"),
-            eq(OperationFinanceDto.class),
+            eq("/api/v1/operations/" + opId + "/finance-summary"),
+            eq(OperationFinanceSummaryDto.class),
             anyBoolean()))
-        .thenReturn(new OperationFinanceDto(opId, BigDecimal.ZERO, List.of()));
+        .thenReturn(new OperationFinanceSummaryDto(opId, BigDecimal.ZERO, List.of(), false));
     when(backendApiClient.get(
             eq("/api/v1/operations/" + opId + "/payouts"),
             eq(OperationPayoutSummaryDto.class),
@@ -312,6 +318,68 @@ class OperationPageControllerMvcTest {
         // Wrapper div and sibling detail columns live outside the fragment.
         .andExpect(content().string(not(containsString("id=\"op-missions-results\""))))
         .andExpect(content().string(not(containsString("id=\"col-payout\""))));
+
+    // #1123: the missions-fragment path must not pay the finance-summary or payout backend reads
+    // (mirrors the #1104 mission-page fragment-gating guard).
+    verify(backendApiClient, never())
+        .get(
+            eq("/api/v1/operations/" + opId + "/finance-summary"),
+            eq(OperationFinanceSummaryDto.class),
+            anyBoolean());
+    verify(backendApiClient, never())
+        .get(
+            eq("/api/v1/operations/" + opId + "/payouts"),
+            eq(OperationPayoutSummaryDto.class),
+            anyBoolean());
+  }
+
+  // #1121: the per-mission finance breakdown loads lazily via GET /operations/{id}/finance/{mid}
+  // and is injected into the collapsed <details>. The endpoint renders the financeDetail fragment.
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void operationMissionFinance_rendersEntryBreakdownFragment() throws Exception {
+    UUID opId = UUID.randomUUID();
+    UUID missionId = UUID.randomUUID();
+    MissionFinanceEntryDto entry =
+        new MissionFinanceEntryDto(
+            UUID.randomUUID(),
+            missionId,
+            null,
+            "Wave5DetailNote",
+            FinanceType.INCOME,
+            new BigDecimal("500"),
+            0L);
+    when(backendApiClient.get(
+            eq("/api/v1/operations/" + opId + "/finances/" + missionId),
+            eq(MissionFinanceSummaryDto.class),
+            anyBoolean()))
+        .thenReturn(
+            new MissionFinanceSummaryDto(
+                missionId, "Mission A", new BigDecimal("500"), List.of(entry), List.of()));
+
+    mockMvc
+        .perform(get("/operations/" + opId + "/finance/" + missionId).locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("Wave5DetailNote")))
+        // Fragment only — the full-page shell (tab nav) must not be rendered.
+        .andExpect(content().string(not(containsString("id=\"pane-op-fin\""))));
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void operationMissionFinance_backendFailure_rendersErrorFragment() throws Exception {
+    UUID opId = UUID.randomUUID();
+    UUID missionId = UUID.randomUUID();
+    when(backendApiClient.get(
+            eq("/api/v1/operations/" + opId + "/finances/" + missionId),
+            eq(MissionFinanceSummaryDto.class),
+            anyBoolean()))
+        .thenThrow(new RuntimeException("backend down"));
+
+    mockMvc
+        .perform(get("/operations/" + opId + "/finance/" + missionId).locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("Details konnten nicht geladen werden")));
   }
 
   @Test
@@ -429,22 +497,9 @@ class OperationPageControllerMvcTest {
     when(backendApiClient.put(
             eq("/api/v1/operations/" + opId + "/payouts/paid-out"),
             any(),
-            eq(OperationPayoutDto.class),
+            eq(OperationPayoutStatusDto.class),
             anyBoolean()))
-        .thenReturn(
-            new OperationPayoutDto(
-                participantId.toString(),
-                "Alice",
-                100.0,
-                PayoutPreference.PAYOUT,
-                BigDecimal.ZERO,
-                BigDecimal.ZERO,
-                BigDecimal.ZERO,
-                BigDecimal.ZERO,
-                BigDecimal.ZERO,
-                false,
-                null,
-                null));
+        .thenReturn(new OperationPayoutStatusDto(participantId.toString(), false, null, null));
 
     mockMvc
         .perform(
@@ -464,22 +519,9 @@ class OperationPageControllerMvcTest {
     when(backendApiClient.put(
             eq("/api/v1/operations/" + opId + "/payouts/paid-out"),
             any(),
-            eq(OperationPayoutDto.class),
+            eq(OperationPayoutStatusDto.class),
             anyBoolean()))
-        .thenReturn(
-            new OperationPayoutDto(
-                participantId.toString(),
-                "Alice",
-                100.0,
-                PayoutPreference.PAYOUT,
-                BigDecimal.ZERO,
-                BigDecimal.ZERO,
-                BigDecimal.ZERO,
-                BigDecimal.ZERO,
-                BigDecimal.ZERO,
-                true,
-                null,
-                null));
+        .thenReturn(new OperationPayoutStatusDto(participantId.toString(), true, null, null));
 
     mockMvc
         .perform(
@@ -500,7 +542,7 @@ class OperationPageControllerMvcTest {
     when(backendApiClient.put(
             eq("/api/v1/operations/" + opId + "/payouts/paid-out"),
             any(),
-            eq(OperationPayoutDto.class),
+            eq(OperationPayoutStatusDto.class),
             anyBoolean()))
         .thenThrow(new BackendServiceException("payout toggle race", null, 409));
 

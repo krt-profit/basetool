@@ -408,13 +408,19 @@ public class JobOrderPageController {
       model.addAttribute("isLogistician", canAssign);
 
       if (canAssign) {
-        // These four logistician-only lookups are independent; fetch them concurrently (two are
-        // uncached round-trips — the user list and the all-kinds org-unit picker) and apply the
+        // These logistician-only lookups are independent; fetch them concurrently and apply the
         // results on the request thread. Each fetch helper swallows its own failure and returns an
         // empty list, so join() never throws and the page degrades exactly as the serial version
-        // did.
+        // did. Of the four only fetchUsers() is an uncached round-trip (/users?size=1000) — the
+        // materials / squadrons / all-kinds org-unit lookups are cache-backed catalogue reads.
+        // #1126: the user list feeds the assignee picker, which lives in the full-page-only
+        // assigneesSection (no section-swap fragment re-emits it), so skip that uncached read on
+        // in-place section refetches — otherwise every section swap re-ran the /users load-all.
+        boolean needUsers = fragment == null;
         CompletableFuture<List<UserDto>> usersFuture =
-            parallelPageLoader.loadAsync(this::fetchUsers);
+            needUsers
+                ? parallelPageLoader.loadAsync(this::fetchUsers)
+                : CompletableFuture.<List<UserDto>>completedFuture(new ArrayList<>());
         CompletableFuture<List<MaterialDto>> materialsFuture =
             parallelPageLoader.loadAsync(this::fetchMaterials);
         CompletableFuture<List<SquadronDto>> squadronsFuture =

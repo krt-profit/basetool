@@ -633,7 +633,12 @@ public class MissionPageController {
       // Prefill the "join as me" participant form (an uncached /users/me read) only on a full-page
       // render — fragment refetches never paint the add-participant modal it feeds (#1142).
       addFormsToModel(model, principal, fullRender);
-      addOperationsToModel(model, authHelperService.isAnonymous());
+      // The operation-picker options feed the mission edit form only (rendered on the full page,
+      // never inside a swapped fragment). Skip the uncapped /operations/lookup read on fragment
+      // refetches that never repaint the picker (#1124, mirrors the #1142 users/me gate above).
+      if (fullRender) {
+        addOperationsToModel(model, authHelperService.isAnonymous());
+      }
 
       // roundingMode only feeds the finance/refinery display; skip its backend read for non-finance
       // fragment refetches. The "UP" default matches fetchRoundingMode's own fallback.
