@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-05.
-> **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md)
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-07.
+> **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md)
 
 # Deployment delivery & promotion
 
@@ -375,6 +375,47 @@ The deploy path is hardened at the host layer, beyond running as an unprivileged
 **Enforced by:** `scripts/iri-deploy.service` (sandbox) · `scripts/deploy.sh` (`write_token_expiry_metric`,
 `HOME` for the cosign cache) · `monitoring/prometheus/alerts/ops-automation.yml` (token alerts) ·
 **Runbook:** `docs/deployment.md` → *5.2 PKCS12 keystore*, *Docker access hardening*, *Token rotation*
+
+### REQ-OPS-018 — Redis session store: durable persistence and a session-safe memory ceiling
+
+The Redis instance backing Spring Session (frontend) and the ingest handoff staging runs with a
+durability and memory posture matched to a store whose loss forces users to re-login — **not** a
+throwaway cache (Redis is session-store only, ADR-0074):
+
+- **Durable persistence — RDB + AOF.** `--appendonly yes --appendfsync everysec` makes AOF the
+  primary durability layer (~1 fsync/s regardless of write volume; ~1 s worst-case loss on a crash),
+  and `--save "60 1"` keeps a compact RDB snapshot for fast restart and to keep the `RedisRdbStale`
+  probe green. On restart Redis loads the AOF. Both files live on the `/var/iri/redis` bind mount and
+  are **excluded from off-site backups** (REQ-OPS-010 — sessions transparently re-login). The
+  `appendfsync always` mode (one fsync per write, the pre-M-7 pathology) is deliberately **not** used.
+- **Bounded memory — explicit ceiling below the cgroup.** `--maxmemory 192mb` sits below the 256 MB
+  container limit, leaving copy-on-write headroom for the RDB / AOF-rewrite forks and fragmentation,
+  so Redis manages the boundary itself instead of ceding it to the kernel OOM-killer.
+- **Session-safe eviction — `noeviction`.** `--maxmemory-policy noeviction` is **mandatory**:
+  evicting a session key is a silent logout, so at the ceiling Redis refuses **new** writes (a failed
+  login) while every live session survives. An evicting policy (`allkeys-*` / `volatile-*`) is a
+  defect here.
+
+Both command lines — the `redis-dev` template and the `redis` prod override (which additionally
+carries `--aclfile`) — stay in lockstep on these persistence/memory flags. The posture is
+**observable**: because `--maxmemory` is set (`redis_memory_max_bytes > 0`), the `RedisMemoryHigh`
+leading-indicator alert is functional (it self-guards on that being non-zero and was inert while
+maxmemory was unset), and `RedisEvictions` is a misconfiguration tripwire (any eviction under
+`noeviction` means the policy was wrongly changed) — both in the alert catalog (REQ-OBS-005).
+
+**Acceptance**
+
+- [ ] Both redis command lines in `docker-compose.yml` set `--appendonly yes --appendfsync everysec`,
+  `--save "60 1"`, `--maxmemory 192mb`, and `--maxmemory-policy noeviction`; the prod override keeps
+  `--aclfile` and the two lines carry identical persistence/memory flags.
+- [ ] `--maxmemory` (192mb) is strictly below the container memory limit (256M) so a snapshot /
+  AOF-rewrite fork has copy-on-write headroom.
+- [ ] The eviction policy is `noeviction`; no `allkeys-*` / `volatile-*` policy is configured.
+- [ ] `RedisMemoryHigh`, `RedisEvictions`, and `RedisRdbStale` exist in `infrastructure.yml` and
+  their descriptions match this posture (192mb maxmemory, noeviction semantics, AOF-primary durability).
+
+**Enforced by:** `docker-compose.yml` (`x-redis` template + `redis` prod override) ·
+`monitoring/prometheus/alerts/infrastructure.yml` (Redis memory/persistence alerts) · **Decision:** ADR-0079
 
 ## Out of scope
 
