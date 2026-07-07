@@ -2,14 +2,22 @@
 
 ## [Unreleased]
 
+## [v1.1.11](https://github.com/krt-profit/basetool/releases/tag/v1.1.11) - 2026-07-07
+
 ### Changed
 
 - **Fehler behoben: Gleichzeitiges Bearbeiten einer Mission konnte unbeteiligte Abschnitte blockieren oder Änderungen still überschreiben.** Die Abschnitts-Versionsprüfung (Kern, Zeitplan, Sichtbarkeit, Partyleiter, Org-Einheit, Ablauf, Ziele) lief nur im Speicher: Sie löste teils einen Konflikt (409) bei einer parallelen Bearbeitung eines *anderen* Abschnitts aus, während zwei gleichzeitige Zuweisungen von Partyleiter/Org-Einheit einander still überschrieben und zwei gleichzeitig angelegte Ablauf-Schritte/Ziele dieselbe Position erhalten konnten. Die Prüfung läuft jetzt atomar in der Datenbank (samt Eindeutigkeits-Index für die Schritt-/Ziel-Reihenfolge): verschiedene Abschnitte stören sich nicht mehr, und gleichzeitige Bearbeitungen desselben Abschnitts melden sauber einen Konflikt (409) statt zu blockieren oder zu überschreiben (REQ-MISSION-017, #1109).
+
 - **Fehler behoben: Schnelle Eingaben auf einer Missions- oder Operationsseite konnten einen Konflikt (409) mit den eigenen, noch laufenden Speichervorgängen auslösen.** Teilnehmer-, Finanz-, Frequenz-, Auszahlungsart-, Ist-Zeit-, Partyleiter- sowie die Missions- und Operations-Kernspeicherung übernehmen die aktuelle Version jetzt zuverlässig erst beim Absenden bzw. reihen sich sauber nacheinander ein. Die Missions-Bearbeitungsmaske speichert nur noch die tatsächlich geänderten Abschnitte, sodass eine gleichzeitige Bearbeitung eines anderen Abschnitts keinen Konflikt mehr erzeugt (REQ-FE-003/012/014, #1109).
+
 - **Fehler behoben: Bei gleichzeitigen In-Place-Aktualisierungen konnte eine ältere, langsamere Antwort eine neuere Ansicht überschreiben und veraltete Daten anzeigen.** Aktualisierungen einer Liste oder eines Abschnitts landen jetzt in der Reihenfolge ihrer Auslösung — die zuletzt angeforderte gewinnt —, sodass eine verzögerte Antwort keine frischeren Daten mehr verdrängt (REQ-FE-013, #1109).
+
 - **Verbesserung: Die Auszahlungs-Umschaltung auf der Operationsseite wiederholt sich bei abgelaufenem Sicherheits-Token automatisch, und Teil-Aktualisierungen der Missions-Detailseite laden keine überflüssigen Nutzerdaten mehr nach.** Das senkt die unnötige Backend-Last unter hoher Gleichzeitigkeit (#1109).
+
 - **Verbesserung: Missionsseiten belasten Datenbank und Verbindungspool unter hoher Gleichzeitigkeit deutlich weniger.** Das Laden einer Mission vermeidet jetzt unnötig große Verbund-Abfragen (Teilnehmer × Einheiten), Berechtigungsprüfungen laden die Mission nicht mehr doppelt, und das Ein-/Auschecken eines Teilnehmers lädt nicht mehr die gesamte Mission. Ein wiederhergestellter Index beschleunigt zudem das Filtern und Suchen der Missionsliste nach Status (#1109).
+
 - **Verbesserung: Aus dem Anmelde-Token abgeleitete Berechtigungen werden je Token kurz zwischengespeichert** statt bei jeder angemeldeten Anfrage neu aus der Datenbank ermittelt. Eine Rollen- oder Rechteänderung wirkt dadurch spätestens nach etwa 30 Sekunden oder sofort nach erneuter Anmeldung — im selben Rahmen wie die bestehende periodische Keycloak-Synchronisation (#1109).
+
 - **Verbesserung: Die Missions-Detailseite überträgt keine unnötig großen Wirtschaftsdaten mehr in ihrer Grundabfrage.** Verschachtelte Untermissionen sowie die Lager- und Raffinerielisten wurden aus der Missions-Antwort entfernt; die Wirtschaftsübersicht lädt die Lager- und Raffinerieeinträge jetzt über eigene, gezielte Abfragen. Das verkleinert die häufigste Missionsabfrage spürbar, ohne die angezeigten Daten zu verändern (#1138).
 
 ## [v1.1.10](https://github.com/krt-profit/basetool/releases/tag/v1.1.10) - 2026-07-07
