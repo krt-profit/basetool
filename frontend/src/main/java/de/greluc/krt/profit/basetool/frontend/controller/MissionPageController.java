@@ -201,14 +201,24 @@ public class MissionPageController {
    * callers additionally get their own user record stuffed into the participant form so the "join
    * as me" default works without an extra fetch in the template.
    *
+   * <p>The "join as me" prefill costs an uncached backend {@code GET /api/v1/users/me}, and the
+   * add-participant modal it feeds is rendered only by the full page — never by any {@code
+   * *-results} fragment. {@code prefillParticipantUser} therefore gates that fetch: fragment
+   * refetches (which start with a fresh model and would otherwise re-issue the lookup on every
+   * live-sync burst for a form no fragment dereferences, REQ-OBS/ADR-0078) pass {@code false} and
+   * get an empty {@link ParticipantForm} instead, so no model attribute is missing (#1142).
+   *
    * @param model Thymeleaf model populated with the seeded forms
    * @param principal authenticated OIDC user, or {@code null} for guests
+   * @param prefillParticipantUser {@code true} to fetch {@code /users/me} and prefill the "join as
+   *     me" participant form (full-page renders only); {@code false} to seed an empty form and skip
+   *     the backend read (fragment refetches)
    */
-  public void addFormsToModel(Model model, OidcUser principal) {
+  public void addFormsToModel(Model model, OidcUser principal, boolean prefillParticipantUser) {
     if (!model.containsAttribute("participantForm")) {
       ParticipantForm form =
           new ParticipantForm(null, "", null, null, "", List.of(), null, null, null, null);
-      if (principal != null) {
+      if (principal != null && prefillParticipantUser) {
         try {
           UserDto me = backendApiClient.get("/api/v1/users/me", UserDto.class);
           if (me != null) {
@@ -606,11 +616,18 @@ public class MissionPageController {
                 // Ziele / Ablauf are edited via their own AJAX section editors on the edit page,
                 // never through the create form's JSON carriers.
                 null,
-                null));
+                null,
+                // dirtyCore / dirtySchedule / dirtyFlags default to true so the no-JS fallback
+                // saves every section; the edit JS overwrites them with the real state (#1136).
+                true,
+                true,
+                true));
       }
       model.addAttribute("isNew", false);
       model.addAttribute("authUserId", principal != null ? principal.getSubject() : null);
-      addFormsToModel(model, principal);
+      // Prefill the "join as me" participant form (an uncached /users/me read) only on a full-page
+      // render — fragment refetches never paint the add-participant modal it feeds (#1142).
+      addFormsToModel(model, principal, fullRender);
       addOperationsToModel(model, authHelperService.isAnonymous());
 
       // roundingMode only feeds the finance/refinery display; skip its backend read for non-finance
@@ -855,7 +872,12 @@ public class MissionPageController {
               // objectivesJson / stepsJson: empty on a fresh create form; the client fills them
               // from the Ziele / Ablauf rows on submit.
               null,
-              null));
+              null,
+              // dirtyCore / dirtySchedule / dirtyFlags are unused on the create path (it does not
+              // fan out section PATCHes); default to true for consistency with the edit form.
+              true,
+              true,
+              true));
     }
     model.addAttribute("isNew", true);
     model.addAttribute(
@@ -899,7 +921,8 @@ public class MissionPageController {
             java.util.List.of(),
             0L,
             null));
-    addFormsToModel(model, principal);
+    // Create page: always a full-page render, so prefill the "join as me" participant form.
+    addFormsToModel(model, principal, true);
     addOperationsToModel(model, false);
     model.addAttribute("ownerOptions", fetchCallerMembershipOptions(principal));
     return "mission-detail";

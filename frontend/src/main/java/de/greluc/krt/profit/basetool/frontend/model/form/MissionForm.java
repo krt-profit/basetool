@@ -51,6 +51,16 @@ import java.util.UUID;
  * AJAX section editors — and the write controller parses them into the backend create request's
  * nested {@code objectives} / {@code steps} lists. Binding them as form fields makes them survive a
  * validation-failure re-render / error re-flash exactly like the other inputs.
+ *
+ * <p>{@code dirtyCore} / {@code dirtySchedule} / {@code dirtyFlags} drive the dirty-section-aware
+ * edit save (#1136, REQ-FE-014): the edit page's JavaScript sets each flag to whether the user
+ * actually touched that header section, and {@code applyMissionUpdate} then skips the PATCH for any
+ * untouched section. This stops a peer's concurrent schedule bump (the "Jetzt" actual-time stamp or
+ * a PLANNED&nbsp;→&nbsp;ACTIVE auto-transition) from 409ing a name-only edit that never touched the
+ * schedule, and it never re-writes untouched schedule/flags values. They default to {@code true} in
+ * the rendered form so the no-JavaScript classic fallback still saves every section; a {@code null}
+ * value (an older cached page, or the create path where the flags are unused) likewise means "save
+ * this section".
  */
 public record MissionForm(
     @NotBlank(message = "{validation.name.required}") @Size(max = 255) String name,
@@ -73,4 +83,7 @@ public record MissionForm(
     UUID owningOrgUnitId,
     @Size(max = 200) String meetingPoint,
     @Size(max = 65535) String objectivesJson,
-    @Size(max = 65535) String stepsJson) {}
+    @Size(max = 65535) String stepsJson,
+    Boolean dirtyCore,
+    Boolean dirtySchedule,
+    Boolean dirtyFlags) {}

@@ -240,12 +240,21 @@ function opsDetailConflict() {
             window.krtFetch.write({
                 method: 'POST',
                 url: form.getAttribute('action'),
-                payload: {
-                    name: form.querySelector('[name="name"]').value,
-                    description: form.querySelector('[name="description"]').value,
-                    status: form.querySelector('[name="status"]').value,
-                    version: versionInput ? Number(versionInput.value) : null,
-                    owningOrgUnitId: null,
+                // #1117: serialize on 'operation:core' and read the payload (version included) in a
+                // thunk at SEND time. A double-click / rapid re-save then queues instead of firing
+                // two concurrent POSTs with the same version — the second re-reads the version the
+                // first bumped back into the input (onSuccess below), so it no longer self-409s. The
+                // explicit submitter also disables the button while the first save is in flight.
+                serialize: 'operation:core',
+                submitter: form.querySelector('button[type="submit"]'),
+                payload: function () {
+                    return {
+                        name: form.querySelector('[name="name"]').value,
+                        description: form.querySelector('[name="description"]').value,
+                        status: form.querySelector('[name="status"]').value,
+                        version: versionInput ? Number(versionInput.value) : null,
+                        owningOrgUnitId: null,
+                    };
                 },
                 successMessage: OPS_DETAIL_MSG.updateSuccess,
                 errorMessage: OPS_DETAIL_MSG.updateError,
@@ -328,50 +337,54 @@ function refreshPayoutPaidStatusCell(row, dto) {
     }
 }
 
-function handlePayoutPaidToggle(checkbox) {
+async function handlePayoutPaidToggle(checkbox) {
     const url = payoutPaidUrl();
     if (!url) return;
     const participantKey = checkbox.getAttribute('data-participant-id');
     if (!participantKey) return;
     const desired = checkbox.checked;
     const previous = !desired;
-    const headers = window.krtCsrf
-        ? window.krtCsrf.headers()
-        : { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+    // Disable the checkbox for the round-trip (it is not a submit button, so it cannot ride
+    // krtFetch's double-submit guard — the guard also re-enables unconditionally, which would break
+    // the "locked once paid" state below). Re-enabled in the finally with the conditional rule.
     checkbox.disabled = true;
-    fetch(url, {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify({ participantKey: participantKey, paidOut: desired }),
-    })
-        .then((response) => {
-            if (!response.ok) {
+    // #1119: route through krtFetch.write (REQ-FE-001) instead of a raw fetch + manual CSRF. This
+    // gains the bare-403 refresh-and-retry the raw fetch lacked and the unified problem+json
+    // handling, and pairs with the backend's idempotent 409->200 toggle (#1111). No version is
+    // shipped — the paid-out flag is a documented idempotent boolean (last-writer-wins).
+    try {
+        const result = await window.krtFetch.write({
+            method: 'POST',
+            url: url,
+            payload: { participantKey: participantKey, paidOut: desired },
+            toast: false,
+            onError: function (status) {
                 checkbox.checked = previous;
-                if (response.status === 401 || response.status === 403) {
-                    if (window.showFrontendErrorToast)
-                        window.showFrontendErrorToast(MSG_PAYOUT_PAID_FORBIDDEN);
-                } else {
-                    if (window.showFrontendErrorToast)
-                        window.showFrontendErrorToast(MSG_PAYOUT_PAID_ERROR);
+                if (window.showFrontendErrorToast) {
+                    window.showFrontendErrorToast(
+                        status === 401 || status === 403
+                            ? MSG_PAYOUT_PAID_FORBIDDEN
+                            : MSG_PAYOUT_PAID_ERROR,
+                    );
                 }
-                return null;
-            }
-            return response.json();
-        })
-        .then((dto) => {
-            if (!dto) return;
-            refreshPayoutPaidStatusCell(checkbox.closest('tr[data-participant-id]'), dto);
-        })
-        .catch((err) => {
-            console.error('payout paid-out toggle failed', err);
-            checkbox.checked = previous;
-            if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_PAYOUT_PAID_ERROR);
-        })
-        .finally(() => {
-            if (!(checkbox.checked && !canUnsetPaidOut())) {
-                checkbox.disabled = false;
-            }
+                return true; // handled: skip krtFetch's default problem+json toast/reload-confirm
+            },
+            onNetworkError: function () {
+                checkbox.checked = previous;
+                if (window.showFrontendErrorToast) {
+                    window.showFrontendErrorToast(MSG_PAYOUT_PAID_ERROR);
+                }
+                return true;
+            },
         });
+        if (result && result.ok && result.body) {
+            refreshPayoutPaidStatusCell(checkbox.closest('tr[data-participant-id]'), result.body);
+        }
+    } finally {
+        if (!(checkbox.checked && !canUnsetPaidOut())) {
+            checkbox.disabled = false;
+        }
+    }
 }
 
 document.addEventListener('DOMContentLoaded', function () {

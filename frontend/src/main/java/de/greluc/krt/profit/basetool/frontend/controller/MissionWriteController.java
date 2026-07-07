@@ -906,58 +906,78 @@ public class MissionWriteController {
    * auto-bump leaves {@code scheduleVersion} stale on the caller's side, the AJAX twin re-reads the
    * mission afterwards to return the four fresh versions.
    *
+   * <p><b>Dirty-section-aware (#1136, REQ-FE-014).</b> Each section's PATCH is skipped when {@code
+   * form.dirtyCore()} / {@code dirtySchedule()} / {@code dirtyFlags()} is explicitly {@code false};
+   * the edit page's JS sets these to whether the user actually touched that header section. This
+   * stops a peer's concurrent schedule bump from 409ing a name-only edit that never touched the
+   * schedule, and it never re-writes untouched schedule/flags values (so a PLANNED → ACTIVE
+   * auto-stamped {@code actualStartTime} is not silently erased by a later core-only save). A
+   * {@code null} flag (the no-JavaScript classic fallback, or an older cached page) means "save
+   * this section", preserving the pre-#1136 full-fan-out behaviour. The schedule-before-core
+   * ordering is kept for saves that genuinely touch both.
+   *
    * @param id the mission id
    * @param form the validated submitted form
    */
   private void applyMissionUpdate(@NotNull UUID id, MissionForm form) {
-    Instant meetingTime =
-        (form.meetingTime() != null && !form.meetingTime().isBlank())
-            ? parseToInstant(form.meetingTime())
-            : null;
-    Instant plannedStartTime =
-        (form.plannedStartTime() != null && !form.plannedStartTime().isBlank())
-            ? parseToInstant(form.plannedStartTime())
-            : null;
-    Instant plannedEndTime =
-        (form.plannedEndTime() != null && !form.plannedEndTime().isBlank())
-            ? parseToInstant(form.plannedEndTime())
-            : null;
-    Instant actualStartTime =
-        (form.actualStartTime() != null && !form.actualStartTime().isBlank())
-            ? parseToInstant(form.actualStartTime())
-            : null;
-    Instant actualEndTime =
-        (form.actualEndTime() != null && !form.actualEndTime().isBlank())
-            ? parseToInstant(form.actualEndTime())
-            : null;
+    boolean saveSchedule = form.dirtySchedule() == null || form.dirtySchedule();
+    boolean saveCore = form.dirtyCore() == null || form.dirtyCore();
+    boolean saveFlags = form.dirtyFlags() == null || form.dirtyFlags();
 
-    Map<String, Object> schedulePatch = new java.util.LinkedHashMap<>();
-    schedulePatch.put("meetingTime", meetingTime);
-    schedulePatch.put("plannedStartTime", plannedStartTime);
-    schedulePatch.put("plannedEndTime", plannedEndTime);
-    schedulePatch.put("actualStartTime", actualStartTime);
-    schedulePatch.put("actualEndTime", actualEndTime);
-    schedulePatch.put("version", form.scheduleVersion());
-    backendApiClient.patch("/api/v1/missions/" + id + "/schedule", schedulePatch, Void.class);
+    if (saveSchedule) {
+      Instant meetingTime =
+          (form.meetingTime() != null && !form.meetingTime().isBlank())
+              ? parseToInstant(form.meetingTime())
+              : null;
+      Instant plannedStartTime =
+          (form.plannedStartTime() != null && !form.plannedStartTime().isBlank())
+              ? parseToInstant(form.plannedStartTime())
+              : null;
+      Instant plannedEndTime =
+          (form.plannedEndTime() != null && !form.plannedEndTime().isBlank())
+              ? parseToInstant(form.plannedEndTime())
+              : null;
+      Instant actualStartTime =
+          (form.actualStartTime() != null && !form.actualStartTime().isBlank())
+              ? parseToInstant(form.actualStartTime())
+              : null;
+      Instant actualEndTime =
+          (form.actualEndTime() != null && !form.actualEndTime().isBlank())
+              ? parseToInstant(form.actualEndTime())
+              : null;
 
-    UUID operationId =
-        (form.operationId() != null && !form.operationId().isBlank())
-            ? UUID.fromString(form.operationId())
-            : null;
-    Map<String, Object> corePatch = new java.util.LinkedHashMap<>();
-    corePatch.put("name", form.name());
-    corePatch.put("description", form.description());
-    corePatch.put("calendarLink", form.calendarLink());
-    corePatch.put("status", form.status());
-    corePatch.put("operationId", operationId);
-    corePatch.put("meetingPoint", form.meetingPoint());
-    corePatch.put("version", form.coreVersion());
-    backendApiClient.patch("/api/v1/missions/" + id + "/core", corePatch, Void.class);
+      Map<String, Object> schedulePatch = new java.util.LinkedHashMap<>();
+      schedulePatch.put("meetingTime", meetingTime);
+      schedulePatch.put("plannedStartTime", plannedStartTime);
+      schedulePatch.put("plannedEndTime", plannedEndTime);
+      schedulePatch.put("actualStartTime", actualStartTime);
+      schedulePatch.put("actualEndTime", actualEndTime);
+      schedulePatch.put("version", form.scheduleVersion());
+      backendApiClient.patch("/api/v1/missions/" + id + "/schedule", schedulePatch, Void.class);
+    }
 
-    Map<String, Object> flagsPatch = new java.util.LinkedHashMap<>();
-    flagsPatch.put("isInternal", form.isInternal() != null && form.isInternal());
-    flagsPatch.put("version", form.flagsVersion());
-    backendApiClient.patch("/api/v1/missions/" + id + "/flags", flagsPatch, Void.class);
+    if (saveCore) {
+      UUID operationId =
+          (form.operationId() != null && !form.operationId().isBlank())
+              ? UUID.fromString(form.operationId())
+              : null;
+      Map<String, Object> corePatch = new java.util.LinkedHashMap<>();
+      corePatch.put("name", form.name());
+      corePatch.put("description", form.description());
+      corePatch.put("calendarLink", form.calendarLink());
+      corePatch.put("status", form.status());
+      corePatch.put("operationId", operationId);
+      corePatch.put("meetingPoint", form.meetingPoint());
+      corePatch.put("version", form.coreVersion());
+      backendApiClient.patch("/api/v1/missions/" + id + "/core", corePatch, Void.class);
+    }
+
+    if (saveFlags) {
+      Map<String, Object> flagsPatch = new java.util.LinkedHashMap<>();
+      flagsPatch.put("isInternal", form.isInternal() != null && form.isInternal());
+      flagsPatch.put("version", form.flagsVersion());
+      backendApiClient.patch("/api/v1/missions/" + id + "/flags", flagsPatch, Void.class);
+    }
   }
 
   /**

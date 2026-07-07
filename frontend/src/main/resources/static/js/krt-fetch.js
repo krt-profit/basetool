@@ -809,10 +809,48 @@
         const paramValue = opts.fragmentValue || 'results';
         const url = withFragmentParam(opts.url, paramName, paramValue);
         const scrollY = window.scrollY;
+
+        // Per-container in-flight sequencing (#1151, REQ-FE-013): several independent triggers overlap swaps on
+        // ONE container — the local write's onSuccess refresh, a peer's coalesced live-sync refresh,
+        // the reconnect resync burst, a debounced filter, a create/delete reload. Under the load-
+        // induced latency variance that caused the outage (150 ms vs multi-second), an OLDER request
+        // can resolve LAST and overwrite a newer render with a staler DB snapshot — regressing the
+        // rows' data-version attributes and re-arming the "stale version -> 409 on next click"
+        // landmine, and (with history:true) leaving the address bar on whichever response landed
+        // last. Each swap claims the next sequence number for its container; when it resolves it only
+        // touches the DOM / history / krt:swapped / indicator if it is STILL the latest swap. The
+        // superseded in-flight request is aborted so a slow older read stops wasting a backend
+        // round-trip. The write-side runSerialized() orders writes, never these read-side swaps.
+        const seq = (container._krtSwapSeq = (container._krtSwapSeq || 0) + 1);
+        if (container._krtSwapAbort) {
+            container._krtSwapAbort.abort();
+        }
+        const aborter = typeof AbortController === 'function' ? new AbortController() : null;
+        container._krtSwapAbort = aborter;
+        function isCurrent() {
+            return container._krtSwapSeq === seq;
+        }
+        // Only the latest swap owns the indicator: a superseded response must not hide it while a
+        // newer swap is still in flight, so hide it strictly when we are still current.
+        function hideIndicatorIfCurrent() {
+            if (indicator && isCurrent()) {
+                indicator.style.display = 'none';
+            }
+        }
+        // Release our aborter slot once we settle, unless a newer swap has already claimed it.
+        function releaseAborter() {
+            if (container._krtSwapAbort === aborter) {
+                container._krtSwapAbort = null;
+            }
+        }
+
         if (indicator) {
             indicator.style.display = 'block';
         }
-        return fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        return fetch(url, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            signal: aborter ? aborter.signal : undefined,
+        })
             .then(function (res) {
                 // Session lost its OAuth2 token: redirect to re-login rather than painting an
                 // error/empty fragment (REQ-SEC-012).
@@ -831,9 +869,14 @@
                 return res.text();
             })
             .then(function (html) {
-                if (indicator) {
-                    indicator.style.display = 'none';
+                // A newer swap superseded this one while it was in flight: drop the response
+                // wholesale (no innerHTML, no history, no krt:swapped, no indicator toggle) so the
+                // latest render wins and the older snapshot never clobbers it (#1151).
+                if (!isCurrent()) {
+                    return false;
                 }
+                hideIndicatorIfCurrent();
+                releaseAborter();
                 if (html === null) {
                     // Optional caller-supplied (already-localized) toast; krt-fetch.js never
                     // hardcodes user-visible strings. The stale container is left as-is.
@@ -863,9 +906,11 @@
                 return true;
             })
             .catch(function () {
-                if (indicator) {
-                    indicator.style.display = 'none';
-                }
+                // Aborted-by-supersession (a newer swap called abort()) or a genuine transport
+                // error: never paint anything, and only clear the indicator if a newer swap has not
+                // already taken ownership of it.
+                hideIndicatorIfCurrent();
+                releaseAborter();
                 return false;
             });
     }

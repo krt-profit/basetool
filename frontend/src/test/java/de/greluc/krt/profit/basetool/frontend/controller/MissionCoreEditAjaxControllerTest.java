@@ -169,6 +169,114 @@ class MissionCoreEditAjaxControllerTest {
   }
 
   @Test
+  void updateMissionAjax_onlyCoreDirty_skipsScheduleAndFlagsPatches() throws Exception {
+    // #1136: a name-only edit marks dirtyCore=true, dirtySchedule=false, dirtyFlags=false. Only the
+    // core section must be PATCHed, so a peer's concurrent scheduleVersion bump cannot 409 this
+    // save
+    // and the untouched schedule/flags values are not re-written.
+    MissionDto refreshed = mock(MissionDto.class);
+    when(refreshed.version()).thenReturn(1L);
+    when(refreshed.coreVersion()).thenReturn(2L);
+    when(refreshed.scheduleVersion()).thenReturn(3L);
+    when(refreshed.flagsVersion()).thenReturn(4L);
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + MISSION_ID), eq(MissionDto.class), eq(false)))
+        .thenReturn(refreshed);
+
+    mockMvc
+        .perform(
+            post("/missions/" + MISSION_ID)
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(oidcLogin())
+                .with(csrf())
+                .param("name", "Renamed Only")
+                .param("status", "PLANNED")
+                .param("coreVersion", "2")
+                .param("scheduleVersion", "5")
+                .param("flagsVersion", "1")
+                .param("dirtyCore", "true")
+                .param("dirtySchedule", "false")
+                .param("dirtyFlags", "false"))
+        .andExpect(status().isOk());
+
+    verify(backendApiClient)
+        .patch(eq("/api/v1/missions/" + MISSION_ID + "/core"), any(), eq(Void.class));
+    verify(backendApiClient, never())
+        .patch(eq("/api/v1/missions/" + MISSION_ID + "/schedule"), any(), eq(Void.class));
+    verify(backendApiClient, never())
+        .patch(eq("/api/v1/missions/" + MISSION_ID + "/flags"), any(), eq(Void.class));
+  }
+
+  @Test
+  void updateMissionAjax_onlyScheduleDirty_skipsCoreAndFlagsPatches() throws Exception {
+    // #1136: a schedule-only edit patches only the schedule section (schedule still runs first for
+    // a
+    // both-touched save; here core/flags are skipped entirely).
+    MissionDto refreshed = mock(MissionDto.class);
+    when(refreshed.version()).thenReturn(1L);
+    when(refreshed.coreVersion()).thenReturn(1L);
+    when(refreshed.scheduleVersion()).thenReturn(2L);
+    when(refreshed.flagsVersion()).thenReturn(1L);
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + MISSION_ID), eq(MissionDto.class), eq(false)))
+        .thenReturn(refreshed);
+
+    mockMvc
+        .perform(
+            post("/missions/" + MISSION_ID)
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(oidcLogin())
+                .with(csrf())
+                .param("name", "Unchanged Name")
+                .param("status", "PLANNED")
+                .param("plannedStartTime", "2026-06-21T11:59:58.222717")
+                .param("scheduleVersion", "5")
+                .param("dirtyCore", "false")
+                .param("dirtySchedule", "true")
+                .param("dirtyFlags", "false"))
+        .andExpect(status().isOk());
+
+    verify(backendApiClient)
+        .patch(eq("/api/v1/missions/" + MISSION_ID + "/schedule"), any(), eq(Void.class));
+    verify(backendApiClient, never())
+        .patch(eq("/api/v1/missions/" + MISSION_ID + "/core"), any(), eq(Void.class));
+    verify(backendApiClient, never())
+        .patch(eq("/api/v1/missions/" + MISSION_ID + "/flags"), any(), eq(Void.class));
+  }
+
+  @Test
+  void updateMissionAjax_dirtyFlagsAbsent_stillPatchesEverySection() throws Exception {
+    // #1136: the no-JavaScript classic fallback submits no dirty flags -> they bind to null, which
+    // means "save this section", preserving the pre-#1136 full three-section fan-out.
+    MissionDto refreshed = mock(MissionDto.class);
+    when(refreshed.version()).thenReturn(1L);
+    when(refreshed.coreVersion()).thenReturn(1L);
+    when(refreshed.scheduleVersion()).thenReturn(1L);
+    when(refreshed.flagsVersion()).thenReturn(1L);
+    when(backendApiClient.get(
+            eq("/api/v1/missions/" + MISSION_ID), eq(MissionDto.class), eq(false)))
+        .thenReturn(refreshed);
+
+    mockMvc
+        .perform(
+            post("/missions/" + MISSION_ID)
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(oidcLogin())
+                .with(csrf())
+                .param("name", "Edited Mission")
+                .param("status", "PLANNED")
+                .param("scheduleVersion", "5"))
+        .andExpect(status().isOk());
+
+    verify(backendApiClient)
+        .patch(eq("/api/v1/missions/" + MISSION_ID + "/schedule"), any(), eq(Void.class));
+    verify(backendApiClient)
+        .patch(eq("/api/v1/missions/" + MISSION_ID + "/core"), any(), eq(Void.class));
+    verify(backendApiClient)
+        .patch(eq("/api/v1/missions/" + MISSION_ID + "/flags"), any(), eq(Void.class));
+  }
+
+  @Test
   void updateMissionAjax_blankNameAndStatus_returns422FieldMapWithoutBackendCall()
       throws Exception {
     mockMvc
