@@ -174,6 +174,20 @@ class MaterialExchangeServiceTest {
     verify(offerRepository, never()).saveAndFlush(any());
   }
 
+  /** The tab counts return the board total and the caller's own active-offer count. */
+  @Test
+  void counts_returnsAllAndMine() {
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(offerRepository.countByStatus(MaterialExchangeOfferStatus.ACTIVE)).thenReturn(7L);
+    when(offerRepository.countByStatusAndOwnerId(MaterialExchangeOfferStatus.ACTIVE, ownerId))
+        .thenReturn(3L);
+
+    var counts = service.counts();
+
+    assertThat(counts.all()).isEqualTo(7);
+    assertThat(counts.mine()).isEqualTo(3);
+  }
+
   /** A missing offer on detail raises a not-found. */
   @Test
   void detail_missingOffer_notFound() {

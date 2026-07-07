@@ -25,6 +25,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeCountsDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeOfferDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleasableItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleaseRequest;
@@ -67,6 +68,14 @@ class MaterialExchangeControllerTest {
 
     assertThat(result).isSameAs(page);
     verify(service).board("mein", "agri", 600, 100.0, "menge", 0, 50);
+  }
+
+  @Test
+  void countsDelegates() {
+    MaterialExchangeCountsDto counts = new MaterialExchangeCountsDto(5, 2);
+    when(service.counts()).thenReturn(counts);
+
+    assertThat(controller.counts()).isSameAs(counts);
   }
 
   @Test

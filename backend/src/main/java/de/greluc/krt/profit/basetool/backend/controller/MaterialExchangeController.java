@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeCountsDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeOfferDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleasableItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleaseRequest;
@@ -86,6 +87,17 @@ public class MaterialExchangeController {
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size) {
     return service.board(tab, q, minQuality, minAmount, sort, page, size);
+  }
+
+  /**
+   * Returns the board tab counts (all active offers / the caller's own active offers).
+   *
+   * @return the tab counts.
+   */
+  @GetMapping("/counts")
+  @Operation(summary = "Materialbörse board tab counts.")
+  public MaterialExchangeCountsDto counts() {
+    return service.counts();
   }
 
   /**

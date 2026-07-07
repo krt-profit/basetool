@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeInterest;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOffer;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeCountsDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeInterestCount;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeOfferDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleasableItemDto;
@@ -171,6 +172,23 @@ public class MaterialExchangeService {
                     interested.contains(offer.getId()),
                     null));
     return PageResponse.of(dtos);
+  }
+
+  /**
+   * Returns the board tab counts (all active offers, and the caller's own active offers). These are
+   * board totals — deliberately unaffected by the search/quality/amount filters.
+   *
+   * @return the tab counts.
+   */
+  @Transactional(readOnly = true)
+  public MaterialExchangeCountsDto counts() {
+    UUID viewerId = authHelperService.currentUserId().orElse(null);
+    long all = offerRepository.countByStatus(MaterialExchangeOfferStatus.ACTIVE);
+    long mine =
+        viewerId == null
+            ? 0
+            : offerRepository.countByStatusAndOwnerId(MaterialExchangeOfferStatus.ACTIVE, viewerId);
+    return new MaterialExchangeCountsDto(all, mine);
   }
 
   /**

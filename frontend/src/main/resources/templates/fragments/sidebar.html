@@ -54,6 +54,9 @@
                     <div class="sidebar-sublinks">
                         <a th:href="@{/hangar}" data-testid="nav-hangar" th:text="#{nav.hangar}">Hangar</a>
                         <a th:href="@{/inventory}" th:text="#{nav.inventory}">Lager</a>
+                        <a th:href="@{/materialboerse}" data-testid="nav-materialboerse"
+                           sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).KRT_MEMBER)"
+                           th:text="#{nav.materialboerse}">Materialbörse</a>
                         <a th:href="@{/refinery-orders}" data-testid="nav-refinery" th:text="#{nav.refinery}">Raffinerie</a>
                         <a th:href="@{/orders}" th:if="${canViewJobOrders}" data-testid="nav-orders" th:text="#{nav.orders}">Aufträge</a>
                         <a th:href="@{/orders/create}" th:unless="${canViewJobOrders}" data-testid="nav-orders-create" th:text="#{orders.create.link}">Auftrag anlegen</a>
