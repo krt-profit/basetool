@@ -207,7 +207,19 @@ Tracing on the OTel SDK) behind a hard master gate:
   (`basetool-{backend,frontend,ingest}`); hand-built `WebClient`s are explicitly wired to
   the observation registry (Boot's customizer only covers the auto-configured builder).
   The frontend's SSE relay client is deliberately not observed (a ~30-minute stream would
-  hold one span open for its whole lifetime).
+  hold one span open for its whole lifetime). The **server side** of that same stream is
+  excluded symmetrically: each module's `NotificationStreamObservationPredicate` drops the
+  `http.server.requests` observation for its notification SSE endpoint
+  (`/api/v1/notifications/stream` on the backend, `/notifications/stream` on the frontend).
+  Spring MVC books an async request's whole lifetime into `http.server.requests` on completion,
+  so without this every closed stream recorded an ~1800s latency sample that fell in the
+  histogram's `+Inf` bucket (capped at the 10s `maximum-expected-value`) and — once stream
+  turnover exceeded ~5% of requests in a scrape window — pinned the aggregate
+  `histogram_quantile(0.95, …)` to the top bucket, firing `HttpLatencyP95High` on both modules
+  with no real user-facing slowness. Skipping the observation keeps the SSE lifetime out of the
+  latency metric and its p95 alert / dashboard panels; stream health stays visible through the
+  dedicated `basetool_sse_connections`, `basetool_sse_send_failures_total` and
+  `basetool_notification_relay_connections` meters.
 - Trace retention is short (14 days, Tempo, Phase 2) and access is admin-only via Grafana
   (REQ-OBS-008).
 - **Traces are consumed** (#1041 item 22): the `14-tracing.json` dashboard runs TraceQL-metrics
