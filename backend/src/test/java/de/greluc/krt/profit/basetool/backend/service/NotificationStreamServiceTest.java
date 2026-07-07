@@ -19,18 +19,22 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -66,6 +70,32 @@ class NotificationStreamServiceTest {
     @Override
     protected SseEmitter newEmitter() {
       return emitter;
+    }
+  }
+
+  /**
+   * A service whose {@link #newEmitter()} yields a fresh distinct mock per subscription, recorded
+   * in {@link #created} in subscription order — so a test can assert WHICH emitter the per-user cap
+   * retires (#1156).
+   */
+  private static final class DistinctEmitterStreamService extends NotificationStreamService {
+    private final List<SseEmitter> created = new ArrayList<>();
+    private final SimpleMeterRegistry registry;
+
+    DistinctEmitterStreamService() {
+      this(new SimpleMeterRegistry());
+    }
+
+    private DistinctEmitterStreamService(SimpleMeterRegistry registry) {
+      super(registry);
+      this.registry = registry;
+    }
+
+    @Override
+    protected SseEmitter newEmitter() {
+      SseEmitter e = mock(SseEmitter.class);
+      created.add(e);
+      return e;
     }
   }
 
@@ -190,6 +220,36 @@ class NotificationStreamServiceTest {
             .counter()
             .count());
     assertEquals(0.0, sseConnections(service));
+  }
+
+  @Test
+  void subscribe_capsEmittersPerSub_retiresOldestWithNamedReplacedEvent() throws Exception {
+    // #1156: one subscription past the per-user cap (all of a user's tabs/devices on one sub).
+    DistinctEmitterStreamService service = new DistinctEmitterStreamService();
+    UUID sub = UUID.randomUUID();
+    int count = NotificationStreamService.MAX_EMITTERS_PER_SUB + 1;
+    for (int i = 0; i < count; i++) {
+      service.subscribe(sub);
+    }
+
+    // The registry holds exactly the cap — the extra subscription evicted the oldest, not grew it.
+    assertEquals(
+        (double) NotificationStreamService.MAX_EMITTERS_PER_SUB,
+        service.registry.get(MetricNames.SSE_CONNECTIONS).gauge().value());
+
+    // The OLDEST emitter (first subscribed) is retired: a terminal named `replaced` event (which
+    // the
+    // client treats as do-not-reconnect) followed by complete().
+    SseEmitter oldest = service.created.get(0);
+    ArgumentCaptor<SseEmitter.SseEventBuilder> captor =
+        ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
+    verify(oldest, atLeastOnce()).send(captor.capture());
+    assertThat(captor.getAllValues())
+        .anySatisfy(builder -> assertThat(render(builder)).contains("event:replaced"));
+    verify(oldest).complete();
+
+    // The newest (retained) emitter is not retired.
+    verify(service.created.get(count - 1), never()).complete();
   }
 
   /**

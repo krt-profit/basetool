@@ -35,6 +35,8 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.model.PayoutPreference;
@@ -554,6 +556,49 @@ class OperationPageControllerMvcTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"participantKey\":\"" + participantId + "\",\"paidOut\":true}"))
         .andExpect(status().isConflict());
+  }
+
+  // ── /operations/{id}/update — classic (no-JS) fallback 409 mapping (#1155) ──
+
+  @Test
+  @WithMockUser(roles = "MISSION_MANAGER")
+  void updateOperation_classicForm_maps409ToOptimisticLockingFlash() throws Exception {
+    UUID opId = UUID.randomUUID();
+    // A stale-version save: the backend echoes 409, which BackendApiClient surfaces as a
+    // BackendServiceException (never a WebClientResponseException) — the dead catch missed it
+    // (#1155).
+    when(backendApiClient.put(eq("/api/v1/operations/" + opId), any(), eq(Void.class)))
+        .thenThrow(new BackendServiceException("stale operation version", null, 409));
+
+    mockMvc
+        .perform(
+            post("/operations/" + opId + "/update")
+                .with(csrf())
+                .param("name", "Op")
+                .param("status", "ACTIVE")
+                .param("version", "3"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/operations"))
+        .andExpect(flash().attribute("errorMessage", "error.optimistic.locking"));
+  }
+
+  @Test
+  @WithMockUser(roles = "MISSION_MANAGER")
+  void updateOperation_classicForm_mapsOtherErrorsToGenericFlash() throws Exception {
+    UUID opId = UUID.randomUUID();
+    when(backendApiClient.put(eq("/api/v1/operations/" + opId), any(), eq(Void.class)))
+        .thenThrow(new BackendServiceException("backend down", null, 500));
+
+    mockMvc
+        .perform(
+            post("/operations/" + opId + "/update")
+                .with(csrf())
+                .param("name", "Op")
+                .param("status", "ACTIVE")
+                .param("version", "3"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/operations"))
+        .andExpect(flash().attribute("errorMessage", "operation.update.error"));
   }
 
   // ── /operations/{id} — canUnsetPaidOut model attribute ─────────────────

@@ -52,7 +52,6 @@ class NotificationCreationServiceTest {
   @Mock private RuleEvaluationService ruleEvaluationService;
   @Mock private NotificationRepository notificationRepository;
   @Mock private NotificationParamsCodec notificationParamsCodec;
-  @Mock private NotificationStreamService notificationStreamService;
   @InjectMocks private NotificationCreationService service;
 
   private static JobOrderCreatedEvent event() {
@@ -74,9 +73,11 @@ class NotificationCreationServiceTest {
         .thenReturn(Map.of(NotificationType.JOB_ORDER_CREATED, Set.of(A, B)));
     when(notificationParamsCodec.serialize(any())).thenReturn("{\"displayId\":\"9\"}");
 
-    int created = service.createFromEvent(event);
+    Set<UUID> recipients = service.createFromEvent(event);
 
-    assertThat(created).isEqualTo(2);
+    // #1152: createFromEvent now returns the deduped recipients (the listener publishes to them
+    // after commit) rather than a row count; the row count stays covered by the saveAll capture.
+    assertThat(recipients).containsExactlyInAnyOrder(A, B);
     ArgumentCaptor<List<Notification>> captor = ArgumentCaptor.captor();
     verify(notificationRepository).saveAll(captor.capture());
     List<Notification> saved = captor.getValue();
@@ -98,9 +99,9 @@ class NotificationCreationServiceTest {
     JobOrderCreatedEvent event = event();
     when(ruleEvaluationService.resolveRecipients(event)).thenReturn(Map.of());
 
-    int created = service.createFromEvent(event);
+    Set<UUID> recipients = service.createFromEvent(event);
 
-    assertThat(created).isZero();
+    assertThat(recipients).isEmpty();
     verify(notificationRepository, never()).saveAll(any());
   }
 }

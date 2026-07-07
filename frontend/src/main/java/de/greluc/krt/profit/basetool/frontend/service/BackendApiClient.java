@@ -174,7 +174,7 @@ public class BackendApiClient {
    * @param <T> the response body type
    * @return the decoded (possibly cached) response body
    */
-  @Cacheable(cacheResolver = "catalogCacheResolver", key = "#catalog.name()")
+  @Cacheable(cacheResolver = "catalogCacheResolver", key = "#catalog.name()", sync = true)
   public <T> T getCached(CachedCatalog catalog, ParameterizedTypeReference<T> responseType) {
     return getCached(catalog, responseType, false);
   }
@@ -189,7 +189,7 @@ public class BackendApiClient {
    * @param <T> the response body type
    * @return the decoded (possibly cached) response body
    */
-  @Cacheable(cacheResolver = "catalogCacheResolver", key = "#catalog.name()")
+  @Cacheable(cacheResolver = "catalogCacheResolver", key = "#catalog.name()", sync = true)
   public <T> T getCached(
       CachedCatalog catalog, ParameterizedTypeReference<T> responseType, boolean isPublic) {
     return executeGet(isPublic ? publicWebClient : webClient, catalog.getUri(), responseType);
@@ -203,7 +203,7 @@ public class BackendApiClient {
    * @param <T> the response body type
    * @return the decoded (possibly cached) response body
    */
-  @Cacheable(cacheResolver = "catalogCacheResolver", key = "#catalog.name()")
+  @Cacheable(cacheResolver = "catalogCacheResolver", key = "#catalog.name()", sync = true)
   public <T> T getCached(CachedCatalog catalog, Class<T> responseType) {
     return getCached(catalog, responseType, false);
   }
@@ -218,7 +218,7 @@ public class BackendApiClient {
    * @param <T> the response body type
    * @return the decoded (possibly cached) response body
    */
-  @Cacheable(cacheResolver = "catalogCacheResolver", key = "#catalog.name()")
+  @Cacheable(cacheResolver = "catalogCacheResolver", key = "#catalog.name()", sync = true)
   public <T> T getCached(CachedCatalog catalog, Class<T> responseType, boolean isPublic) {
     return executeGet(isPublic ? publicWebClient : webClient, catalog.getUri(), responseType);
   }

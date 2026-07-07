@@ -649,6 +649,17 @@ correct only for a single frontend replica (the current deployment). Scaling the
 horizontally requires moving both presence and this relay behind a Redis pub/sub fan-out — the
 swap-out point is `MissionPresenceService` / `MissionPresenceWebSocketHandler` (ADR-0031).
 
+**Backpressure & registry consistency (#1109 Wave 6).** Every socket is wrapped in a
+`ConcurrentWebSocketSessionDecorator` at registration (send-time + buffer-size bounded, TERMINATE on
+overflow), so one slow/dead consumer — a suspended laptop whose TCP window is exhausted — is dropped
+rather than blocking the serial broadcast loop on the caller's Tomcat thread (or the single shared
+reaper) for up to Tomcat's ~20 s send timeout, which previously stalled every mission's presence /
+relay org-wide (#1149). The per-mission session set is mutated atomically under the map entry's bin
+lock (`compute` / `computeIfPresent`), so a viewer connecting at the same instant the last viewer
+disconnects can no longer be stranded in an orphaned set — silently receiving no further peer edits
+with the socket still open (no reconnect), the REQ-FE-010 staleness this rule forbids (#1150). The
+notification SSE registry carries the same two fixes (#1157 / #1156, see REQ-NOTIF-010).
+
 **Acceptance**
 
 - [ ] With the same mission open in two sessions, a mutation by user A (participant add, crew move,

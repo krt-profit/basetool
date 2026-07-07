@@ -78,8 +78,16 @@ public class WebClientConfig {
    * {@code DataBufferLimitException}. Sized for the heaviest read path — the materials trade matrix
    * ({@code /api/v1/materials/matrix?size=100000}) returns one verbose row per material×terminal
    * price and grows with the UEX catalog; at 16 MB a large universe tipped the buffer and the
-   * overview page failed outright. 64 MB leaves generous headroom (still well inside the frontend's
-   * ~576 MB heap, even with the 10-minute matrix cache holding one such response).
+   * overview page failed outright. 64 MB leaves headroom for one such response.
+   *
+   * <p>Only ONE such response is ever buffered concurrently per catalogue: every {@code
+   * BackendApiClient.getCached} overload is {@code @Cacheable(sync = true)} (#1154), so Caffeine
+   * single-flights the loader and a cold-cache stampede (N users on the materials overview right
+   * after a deploy / domain evict) collapses to a single in-flight fetch instead of N parallel
+   * multi-ten-MB buffers + their decoded DTO graphs — which, on the ~768 MB heap the compose stack
+   * grants ({@code mem_limit: 1024m} × {@code MaxRAMPercentage=75}), could otherwise OOM-kill the
+   * single frontend instance and drop every live SSE relay / presence socket at once. If another
+   * &gt;10 MB catalogue is added, additionally guard the matrix path with a small semaphore.
    */
   private static final int MAX_IN_MEMORY_BYTES = 64 * 1024 * 1024;
 

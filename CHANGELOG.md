@@ -6,7 +6,13 @@
 
 - **Verbesserung: Die Operationsseite lädt schneller und belastet Datenbank und Verbindungspool unter hoher Gleichzeitigkeit deutlich weniger.** Die Finanzübersicht einer Operation ermittelt ihre Summen jetzt über schlanke Datenbank-Aggregate, statt sämtliche Finanz- und Raffinerieeinträge aller Einsätze zu laden; die Aufschlüsselung je Einsatz wird erst beim Aufklappen nachgeladen, die vier Detail-Abfragen laufen parallel, und der „Bezahlt"-Schalter aktualisiert nur noch die betroffene Zeile, statt die gesamte Auszahlung neu zu berechnen. Die Operationsauswahl auf der Einsatzseite wird zudem nur noch beim vollständigen Seitenaufbau geladen und auf aktuelle Operationen begrenzt (#1109).
 
-- **Verbesserung: Gleichzeitige Live-Aktualisierungen und Teilansichten belasten den Server etwas weniger.** Erhalten viele Betrachter einer Mission gleichzeitig dieselbe Änderung, laufen ihre Nachlade-Anfragen jetzt zeitlich leicht gestreut statt in einer Welle; die Auftrags-Detailseite lädt die Nutzerliste nur noch beim vollständigen Seitenaufbau (#1109).
+- **Verbesserung: Live-Aktualisierungen auf der Missionsseite bleiben stabil, auch wenn einzelne Betrachter eine hängende Verbindung haben.** Ein „eingefrorener" Betrachter (etwa ein zugeklapptes Notebook mit noch offener Verbindung) blockiert nicht mehr die Echtzeit-Aktualisierungen aller übrigen Betrachter; zudem werden gleichzeitig verbindende und trennende Betrachter jetzt zuverlässig erfasst, sodass niemand mehr still eine veraltete Ansicht behält (#1109).
+
+- **Fehler behoben: Der Benachrichtigungs-Zähler konnte unmittelbar nach einer Aktion kurz einen veralteten Stand anzeigen.** Die Echtzeit-Benachrichtigung wird jetzt erst nach dem endgültigen Speichern ausgelöst, sodass die anschließende Aktualisierung den korrekten ungelesenen Stand liest (#1109).
+
+- **Fehler behoben: Beim Bearbeiten einer Operation ohne JavaScript zeigte ein Bearbeitungskonflikt eine irreführende allgemeine Fehlermeldung.** Ein Konflikt (gleichzeitige Bearbeitung durch jemand anderen) meldet jetzt korrekt, dass neu geladen werden muss, statt einen unklaren Fehler anzuzeigen (#1109).
+
+- **Verbesserung: Die Oberfläche ist unter hoher Last stabiler.** Sehr große Katalog-Abfragen (etwa die Materialübersicht) werden bei gleichzeitigem Zugriff nur noch einmal geladen statt mehrfach parallel, und die Zahl gleichzeitiger Echtzeit-Verbindungen pro Nutzer (viele offene Tabs) wird begrenzt (#1109). Gleichzeitige Live-Aktualisierungen und Teilansichten belasten den Server zudem etwas weniger, und die Auftrags-Detailseite lädt die Nutzerliste nur noch beim vollständigen Seitenaufbau (#1109).
 
 ## [v1.1.11](https://github.com/krt-profit/basetool/releases/tag/v1.1.11) - 2026-07-07
 

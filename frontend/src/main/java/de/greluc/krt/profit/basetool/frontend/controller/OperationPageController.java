@@ -66,7 +66,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
@@ -465,9 +464,19 @@ public class OperationPageController {
     try {
       backendApiClient.put("/api/v1/operations/" + id, form, Void.class);
       redirectAttributes.addFlashAttribute("successMessage", "operation.update.success");
-    } catch (WebClientResponseException.Conflict e) {
-      log.warn("Optimistic locking failure updating operation: {}", id);
-      redirectAttributes.addFlashAttribute("errorMessage", "error.optimistic.locking");
+    } catch (BackendServiceException e) {
+      // #1155: BackendApiClient never lets WebClientResponseException escape — it always rethrows a
+      // parsed BackendServiceException — so the former catch(WebClientResponseException.Conflict)
+      // was
+      // dead and a stale-version 409 flashed the generic error, misleading the losing editor into a
+      // blind retry. Branch on the actual status the client throws.
+      if (e.getStatusCode() == 409) {
+        log.warn("Optimistic locking failure updating operation: {}", id);
+        redirectAttributes.addFlashAttribute("errorMessage", "error.optimistic.locking");
+      } else {
+        log.error("Error updating operation {}: status {}", id, e.getStatusCode(), e);
+        redirectAttributes.addFlashAttribute("errorMessage", "operation.update.error");
+      }
     } catch (Exception e) {
       log.error("Error updating operation", e);
       redirectAttributes.addFlashAttribute("errorMessage", "operation.update.error");

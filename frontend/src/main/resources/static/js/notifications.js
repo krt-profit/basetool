@@ -612,6 +612,26 @@
                     window.krtReauth.redirect(event && event.data ? event.data : null);
                 }
             });
+            // #1156: the server retires the OLDEST of this user's streams with a `replaced` event
+            // once they exceed the per-user cap (too many tabs/devices). Yield the live channel to
+            // the newer tab: stop reconnecting on THIS stream and fall back to the polling path here
+            // (the count endpoint still keeps this tab correct). Unlike `reauth` there is no redirect.
+            source.addEventListener('replaced', function () {
+                sseStopped = true;
+                if (sseReconnectTimer !== null) {
+                    window.clearTimeout(sseReconnectTimer);
+                    sseReconnectTimer = null;
+                }
+                markSseUnhealthy();
+                try {
+                    source.close();
+                } catch (_error) {
+                    /* already closed */
+                }
+                if (sseSource === source) {
+                    sseSource = null;
+                }
+            });
         } catch (_error) {
             /* SSE unavailable; the polling fallback remains */
         }
