@@ -37,7 +37,8 @@ import org.springframework.stereotype.Repository;
 
 /** Spring Data repository for Mission. */
 @Repository
-public interface MissionRepository extends JpaRepository<Mission, UUID> {
+public interface MissionRepository
+    extends JpaRepository<Mission, UUID>, MissionRepositoryAuthorizationFragment {
 
   /**
    * Returns slim {@link de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto}s for
@@ -92,11 +93,25 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
       @Param("cutoff") Instant cutoff);
 
   /**
-   * Derived Spring-Data query - returns entities matching {@code Id}. Eagerly fetches the
-   * configured relations via {@code @EntityGraph}.
+   * Loads a mission by id, eagerly fetching only the {@code participants} collection via
+   * {@code @EntityGraph}.
+   *
+   * <p><strong>Single-collection graph on purpose (#1138).</strong> Graphing <em>two</em> sibling
+   * collections ({@code participants} <em>and</em> {@code assignedUnits}) fetch-joins them into a
+   * {@code |participants| x |assignedUnits|} cartesian product — every mission scalar (including
+   * the TEXT {@code description}) repeated across thousands of rows on a large operation, on the
+   * hottest mission query (detail GET, every mutator, and — before #1139 — the authorization
+   * gates). {@code assignedUnits} is therefore left lazy: with {@code
+   * hibernate.default_batch_fetch_size=100} it loads in a single bounded {@code IN} query when the
+   * DTO mapper touches it, eliminating the row product with no N+1. The mapping runs inside the
+   * class-{@code @Transactional} controller, so the lazy fetch is always inside an open persistence
+   * context.
+   *
+   * @param id the mission id
+   * @return the mission with its participants pre-loaded, or empty when none exists
    */
   @Override
-  @EntityGraph(attributePaths = {"participants", "assignedUnits"})
+  @EntityGraph(attributePaths = {"participants"})
   Optional<Mission> findById(UUID id);
 
   /**

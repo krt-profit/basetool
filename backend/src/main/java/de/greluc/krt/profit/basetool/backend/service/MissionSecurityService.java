@@ -264,8 +264,10 @@ public class MissionSecurityService {
       return true;
     }
 
+    // Owner/manager fall-through reads only owner + managers, never the roster: use the
+    // via em.find so the gate loads no roster and never auto-flushes (#1139).
     return missionRepository
-        .findById(missionId)
+        .findByIdForAuthorization(missionId)
         .map(mission -> isOwnerOrManager(mission, authentication))
         .orElse(false);
   }
@@ -322,8 +324,9 @@ public class MissionSecurityService {
       return true;
     }
 
+    // Owner/manager fall-through reads only owner + managers via em.find (#1139): no roster load.
     return missionRepository
-        .findById(missionId)
+        .findByIdForAuthorization(missionId)
         .map(
             mission -> {
               boolean result = isOwnerOrManager(mission, authentication);
@@ -376,8 +379,9 @@ public class MissionSecurityService {
     if (userId == null) {
       return false;
     }
+    // Owner check reads only owner via em.find (#1139): no roster load.
     return missionRepository
-        .findById(missionId)
+        .findByIdForAuthorization(missionId)
         .map(Mission::getOwner)
         .map(owner -> owner.getId().equals(userId))
         .orElse(false);

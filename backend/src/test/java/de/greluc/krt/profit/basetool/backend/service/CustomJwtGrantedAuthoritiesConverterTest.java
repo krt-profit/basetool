@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -35,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
@@ -80,6 +83,53 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     m.setId(new OrgUnitMembershipId(USER_ID, orgUnitId));
     m.setKind(kind);
     return m;
+  }
+
+  @Test
+  void convert_sameToken_memoisesAuthorities_assemblesOnce() {
+    // #1141: two calls with the SAME token (same sub + issuedAt) must resolve the authorities once
+    // and serve the second from the cache — no second syncUser / membership read.
+    when(jwt.getSubject()).thenReturn("sub-1");
+    when(jwt.getIssuedAt()).thenReturn(Instant.ofEpochSecond(1_700_000_000L));
+    when(userService.syncUser(jwt)).thenReturn(userWithNoRoles());
+    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+
+    Collection<GrantedAuthority> first = converter.convert(jwt);
+    Collection<GrantedAuthority> second = converter.convert(jwt);
+
+    assertEquals(first, second, "the memoised result must equal the freshly assembled one");
+    verify(userService, times(1)).syncUser(jwt);
+    verify(orgUnitMembershipRepository, times(1)).findAllByIdUserId(USER_ID);
+  }
+
+  @Test
+  void convert_freshlyIssuedToken_missesCache_reassembles() {
+    // A re-login / token refresh carries a new issuedAt, so the key differs and the authorities are
+    // re-read — a role/approval change takes effect on re-authentication (#1141).
+    when(jwt.getSubject()).thenReturn("sub-1");
+    when(jwt.getIssuedAt())
+        .thenReturn(Instant.ofEpochSecond(1_700_000_000L), Instant.ofEpochSecond(1_700_000_300L));
+    when(userService.syncUser(jwt)).thenReturn(userWithNoRoles());
+    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+
+    converter.convert(jwt);
+    converter.convert(jwt);
+
+    verify(userService, times(2)).syncUser(jwt);
+  }
+
+  @Test
+  void convert_tokenWithoutIssuedAt_bypassesCache() {
+    // An unkeyable token (missing issuedAt) must never be cached — always recompute, never risk
+    // serving a stale result under a degenerate key (#1141).
+    when(jwt.getSubject()).thenReturn("sub-1");
+    when(userService.syncUser(jwt)).thenReturn(userWithNoRoles());
+    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+
+    converter.convert(jwt);
+    converter.convert(jwt);
+
+    verify(userService, times(2)).syncUser(jwt);
   }
 
   @Test

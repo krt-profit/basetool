@@ -59,7 +59,8 @@ class MissionServicePayoutTest {
     p.setMission(mission);
     mission.getParticipants().add(p);
 
-    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+    // #1140: check-in/out resolve the single participant and read mission scalars via
+    // participant.getMission() — they no longer load the mission aggregate via missionRepository.
     when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(p));
 
     // When
@@ -93,7 +94,8 @@ class MissionServicePayoutTest {
     p.setStartTime(originalArrival); // already checked in earlier
     mission.getParticipants().add(p);
 
-    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+    // #1140: check-in/out resolve the single participant and read mission scalars via
+    // participant.getMission() — they no longer load the mission aggregate via missionRepository.
     when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(p));
 
     // When — a second check-in arrives
@@ -123,7 +125,8 @@ class MissionServicePayoutTest {
     p.setStartTime(Instant.now().minusSeconds(3600));
     mission.getParticipants().add(p);
 
-    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+    // #1140: check-in/out resolve the single participant and read mission scalars via
+    // participant.getMission() — they no longer load the mission aggregate via missionRepository.
     when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(p));
 
     // When
@@ -152,7 +155,9 @@ class MissionServicePayoutTest {
     p.setPayoutPreference(PayoutPreference.PAYOUT);
     mission.getParticipants().add(p);
 
-    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+    // #1140: updatePayoutPreference resolves the single participant (via getParticipant) instead of
+    // loading the aggregate and streaming its roster.
+    when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(p));
 
     // When
     Mission updatedMission =
