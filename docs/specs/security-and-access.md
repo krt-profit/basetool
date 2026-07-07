@@ -280,16 +280,30 @@ forged `X-Forwarded-For` can no longer mint a fresh per-IP bucket per request; a
 real NPM subnet (override via `APP_CLIENT_IP_TRUSTED_PROXIES`); a mismatch collapses every bucket onto
 NPM's address — no leak, but the limiter is ineffective.
 
+**Off-servlet-thread coverage (#1130 / #1110).** The relay reads `ClientIpContext` at WebClient
+filter-assembly time, so it only fires when that thread-local is present on the thread the exchange
+subscribes on. Two paths subscribe off the servlet thread and MUST therefore re-establish the holder:
+`ParallelPageLoader` runs a page's independent backend reads on virtual-thread workers and captures /
+restores `ClientIpContext` alongside the other relay thread-locals — without it every parallelized
+read (missions, hangar, inventory, refinery, bank, job orders) silently re-collapsed onto the single
+frontend-container bucket on the async path; and the notification SSE relay's `sseWebClient` carries
+`ClientIpRelayFilter` like the request / public clients, so a browser reconnect burst after a redeploy
+is attributed per user instead of tripping the shared bucket. A missing capture on either path is the
+DOS-1 collapse re-introduced on a code path the request-scoped filters do not reach.
+
 **Acceptance**
 
 - [x] A backend call issued for a browser request carries `X-Forwarded-For` with the real client IP.
 - [x] Two distinct clients hitting the same anonymous endpoint consume separate per-IP buckets.
 - [x] A client-supplied `X-Forwarded-For` cannot change the resolved/relayed client IP (SEC-02): the
   frontend ignores it unless it arrives from a trusted proxy and always takes the proxy-appended peer.
+- [x] A backend read fired through `ParallelPageLoader`'s virtual-thread worker, and the notification
+  SSE relay, both carry the real client IP rather than the frontend-container IP (#1130 / #1110).
 
-**Enforced by:** `ClientIpRelayFilterTest`, `ClientIpContextFilterTest` · **Code:** `ClientIpRelayFilter`
-/ `ClientIpContextFilter` / `ClientIpProperties` / `ForwardedHeaderConfig` /
-`RateLimitingFilter.resolveClientIp` · **Issues:** security audit DOS-1, SEC-02
+**Enforced by:** `ClientIpRelayFilterTest`, `ClientIpContextFilterTest`, `ParallelPageLoaderTest`
+· **Code:** `ClientIpRelayFilter` / `ClientIpContextFilter` / `ClientIpProperties` /
+`ForwardedHeaderConfig` / `RateLimitingFilter.resolveClientIp` / `ParallelPageLoader` /
+`WebClientConfig.sseWebClient` · **Issues:** security audit DOS-1, SEC-02, #1130, #1110
 
 ### REQ-SEC-012 — Re-authentication on lost frontend OAuth2 token
 

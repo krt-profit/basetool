@@ -26,12 +26,14 @@ spring:
       # Flyway + admin sessions all fit with headroom and cannot exhaust the server or OOM
       # the container. The complementary defences are cutting the per-fragment read fan-out
       # (the primary fix) and the finance-summary SQL aggregate that stops a 1000-row load-
-      # all from pinning a connection per render. connection-timeout 10 s: long enough to
-      # absorb legitimate transient pool pressure, short enough that a runaway query no
-      # longer makes a fresh request hang for half a minute before failing.
+      # all from pinning a connection per render. connection-timeout 5 s (was 10 s): aligned
+      # with the frontend caller's real patience -- the backendApi Resilience4j TimeLimiter
+      # cancels the exchange at 5 s, so a request that cannot get a JDBC connection inside that
+      # window must fail fast (5xx) rather than acquire a slot 5 s later and run its query as an
+      # orphan for a client that already gave up, deepening the pool pressure under saturation.
       maximum-pool-size: 100
       minimum-idle: 2
-      connection-timeout: 10000
+      connection-timeout: 5000
       idle-timeout: 600000
       max-lifetime: 1800000
   jpa:
