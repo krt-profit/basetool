@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.Mission;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -28,6 +29,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -318,4 +321,135 @@ public interface MissionRepository extends JpaRepository<Mission, UUID> {
       :operationId AND (m.actualStartTime IS NULL OR m.actualEndTime IS NULL)
       """)
   boolean existsByOperationIdWithUnfinishedActualTime(@Param("operationId") UUID operationId);
+
+  // ---------------------------------------------------------------------------------------------
+  // DB-enforced section-counter bumps (#1112/#1114/#1147). Each mission edit section carries its
+  // own plain BIGINT *Version counter (NOT the row @Version). Before mutating a section, its
+  // service calls the matching bump below: an atomic conditional UPDATE that increments the
+  // counter iff the caller's echoed value still matches the persisted one. Zero rows affected
+  // means a concurrent same-section writer already moved it → the service maps that to a 409.
+  // Because the UPDATE also takes a row lock, two racing same-section writers are serialised (the
+  // loser blocks, re-reads the now-bumped counter and gets 0 rows), which closes the check-then-act
+  // window the in-memory guard alone could not (see MissionSectionVersions.enforceSectionVersion).
+  // These are bulk UPDATEs: they bypass Hibernate's dirty-checking and the row @Version, so the
+  // counter columns stay @OptimisticLock(excluded = true) and no cross-section 409 is produced.
+  // ---------------------------------------------------------------------------------------------
+
+  /**
+   * Atomically bumps {@code coreVersion} iff it still equals {@code expected}; the mission-core
+   * section guard.
+   *
+   * @param id the mission id.
+   * @param expected the core-section version the caller echoed back.
+   * @return {@code 1} when the counter matched and was incremented, {@code 0} on a stale echo.
+   */
+  @Modifying
+  @Query(
+      "UPDATE Mission m SET m.coreVersion = m.coreVersion + 1 WHERE m.id = :id"
+          + " AND m.coreVersion = :expected")
+  int bumpCoreVersionIfMatches(@Param("id") UUID id, @Param("expected") long expected);
+
+  /**
+   * Atomically bumps {@code scheduleVersion} iff it still equals {@code expected}; the schedule
+   * section guard.
+   *
+   * @param id the mission id.
+   * @param expected the schedule-section version the caller echoed back.
+   * @return {@code 1} when the counter matched and was incremented, {@code 0} on a stale echo.
+   */
+  @Modifying
+  @Query(
+      "UPDATE Mission m SET m.scheduleVersion = m.scheduleVersion + 1 WHERE m.id = :id"
+          + " AND m.scheduleVersion = :expected")
+  int bumpScheduleVersionIfMatches(@Param("id") UUID id, @Param("expected") long expected);
+
+  /**
+   * Atomically bumps {@code flagsVersion} iff it still equals {@code expected}; the flags section
+   * guard.
+   *
+   * @param id the mission id.
+   * @param expected the flags-section version the caller echoed back.
+   * @return {@code 1} when the counter matched and was incremented, {@code 0} on a stale echo.
+   */
+  @Modifying
+  @Query(
+      "UPDATE Mission m SET m.flagsVersion = m.flagsVersion + 1 WHERE m.id = :id"
+          + " AND m.flagsVersion = :expected")
+  int bumpFlagsVersionIfMatches(@Param("id") UUID id, @Param("expected") long expected);
+
+  /**
+   * Atomically bumps {@code partyLeadVersion} iff it still equals {@code expected}; the party-lead
+   * section guard. Closes the P0-3 silent lost update (#1112) — its whole write set is excluded, so
+   * without this the in-memory check let two overlapping reassignments both win.
+   *
+   * @param id the mission id.
+   * @param expected the party-lead-section version the caller echoed back.
+   * @return {@code 1} when the counter matched and was incremented, {@code 0} on a stale echo.
+   */
+  @Modifying
+  @Query(
+      "UPDATE Mission m SET m.partyLeadVersion = m.partyLeadVersion + 1 WHERE m.id = :id"
+          + " AND m.partyLeadVersion = :expected")
+  int bumpPartyLeadVersionIfMatches(@Param("id") UUID id, @Param("expected") long expected);
+
+  /**
+   * Atomically bumps {@code stepsVersion} iff it still equals {@code expected}; the Ablauf-steps
+   * section guard. Serialises concurrent step adds/reorders so the {@code max+1} order-index
+   * computation and the reorder id-set check become race-free (#1147).
+   *
+   * @param id the mission id.
+   * @param expected the steps-section version the caller echoed back.
+   * @return {@code 1} when the counter matched and was incremented, {@code 0} on a stale echo.
+   */
+  @Modifying
+  @Query(
+      "UPDATE Mission m SET m.stepsVersion = m.stepsVersion + 1 WHERE m.id = :id"
+          + " AND m.stepsVersion = :expected")
+  int bumpStepsVersionIfMatches(@Param("id") UUID id, @Param("expected") long expected);
+
+  /**
+   * Atomically bumps {@code objectivesVersion} iff it still equals {@code expected}; the goals
+   * (Ziele) section guard. Serialises concurrent goal adds/reorders like its steps twin (#1147).
+   *
+   * @param id the mission id.
+   * @param expected the goals-section version the caller echoed back.
+   * @return {@code 1} when the counter matched and was incremented, {@code 0} on a stale echo.
+   */
+  @Modifying
+  @Query(
+      "UPDATE Mission m SET m.objectivesVersion = m.objectivesVersion + 1 WHERE m.id = :id"
+          + " AND m.objectivesVersion = :expected")
+  int bumpObjectivesVersionIfMatches(@Param("id") UUID id, @Param("expected") long expected);
+
+  /**
+   * Atomically bumps {@code owningOrgUnitVersion} iff it still equals {@code expected}; the
+   * owning-org-unit reassignment guard. The other half of the P0-3 fix (#1112): the association is
+   * fully excluded, so the DB check is what makes two concurrent re-homings collide.
+   *
+   * @param id the mission id.
+   * @param expected the owning-org-unit-section version the caller echoed back.
+   * @return {@code 1} when the counter matched and was incremented, {@code 0} on a stale echo.
+   */
+  @Modifying
+  @Query(
+      "UPDATE Mission m SET m.owningOrgUnitVersion = m.owningOrgUnitVersion + 1 WHERE m.id = :id"
+          + " AND m.owningOrgUnitVersion = :expected")
+  int bumpOwningOrgUnitVersionIfMatches(@Param("id") UUID id, @Param("expected") long expected);
+
+  /**
+   * Loads a mission for the legacy full-replace path ({@code MissionService.updateMission}, {@code
+   * PUT /missions/{id}}) under {@link LockModeType#OPTIMISTIC_FORCE_INCREMENT}. Since #1114 every
+   * mutable mission scalar is {@code @OptimisticLock(excluded = true)}, so a whole-mission
+   * overwrite would no longer bump the row {@code @Version} on its own; forcing the increment here
+   * restores the "two concurrent full overwrites 409 against each other" guarantee that path always
+   * had. The same {@code participants} / {@code assignedUnits} graph as {@link #findById(UUID)} is
+   * fetched because the full-replace re-clamps participant end-times in memory.
+   *
+   * @param id the mission id.
+   * @return the graphed mission under a forced version increment, or empty when unknown.
+   */
+  @Lock(LockModeType.OPTIMISTIC_FORCE_INCREMENT)
+  @EntityGraph(attributePaths = {"participants", "assignedUnits"})
+  @Query("SELECT m FROM Mission m WHERE m.id = :id")
+  Optional<Mission> findByIdForFullReplace(@Param("id") UUID id);
 }

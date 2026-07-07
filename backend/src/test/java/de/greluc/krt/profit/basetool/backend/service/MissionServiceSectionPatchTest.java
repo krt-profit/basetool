@@ -27,8 +27,10 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -122,6 +124,26 @@ class MissionServiceSectionPatchTest {
     existing.setIsInternal(false);
     existing.setPlannedStartTime(Instant.parse("2030-01-01T10:00:00Z"));
     existing.setPlannedEndTime(Instant.parse("2030-01-01T12:00:00Z"));
+
+    // Since #1112/#1114 the section guard is DB-enforced: enforceSectionVersion runs the matching
+    // missionRepository.bump*VersionIfMatches conditional UPDATE. Default the bumps to "1 row
+    // affected" (the version matched) so happy-path tests pass; each conflict test below overrides
+    // the specific stale echo to return 0 so enforceSectionVersion raises the 409.
+    lenient()
+        .when(missionRepository.bumpCoreVersionIfMatches(eq(missionId), anyLong()))
+        .thenReturn(1);
+    lenient()
+        .when(missionRepository.bumpScheduleVersionIfMatches(eq(missionId), anyLong()))
+        .thenReturn(1);
+    lenient()
+        .when(missionRepository.bumpFlagsVersionIfMatches(eq(missionId), anyLong()))
+        .thenReturn(1);
+    lenient()
+        .when(missionRepository.bumpPartyLeadVersionIfMatches(eq(missionId), anyLong()))
+        .thenReturn(1);
+    lenient()
+        .when(missionRepository.bumpOwningOrgUnitVersionIfMatches(eq(missionId), anyLong()))
+        .thenReturn(1);
   }
 
   @Test
@@ -162,6 +184,7 @@ class MissionServiceSectionPatchTest {
 
     // Stale coreVersion (mission has 4, caller sends 3) must fail — even though the global
     // Mission.version (7) and the other section counters (schedule=5, flags=6) are untouched.
+    when(missionRepository.bumpCoreVersionIfMatches(missionId, 3L)).thenReturn(0);
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
         () -> missionService.updateCoreSection(missionId, "X", null, null, null, null, null, 3L));
@@ -237,6 +260,7 @@ class MissionServiceSectionPatchTest {
   void updateScheduleSection_shouldThrow409_whenScheduleVersionMismatch() {
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
 
+    when(missionRepository.bumpScheduleVersionIfMatches(missionId, 4L)).thenReturn(0);
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
         () -> missionService.updateScheduleSection(missionId, null, null, null, null, null, 4L));
@@ -276,6 +300,7 @@ class MissionServiceSectionPatchTest {
   void updateFlagsSection_shouldThrow409_whenFlagsVersionMismatch() {
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
 
+    when(missionRepository.bumpFlagsVersionIfMatches(missionId, 999L)).thenReturn(0);
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
         () -> missionService.updateFlagsSection(missionId, true, 999L));
@@ -483,6 +508,7 @@ class MissionServiceSectionPatchTest {
     existing.setOwningOrgUnitVersion(3L);
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
 
+    when(missionRepository.bumpOwningOrgUnitVersionIfMatches(missionId, 2L)).thenReturn(0);
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
         () -> missionService.updateOwningOrgUnit(missionId, UUID.randomUUID(), 2L));
@@ -594,6 +620,7 @@ class MissionServiceSectionPatchTest {
 
     // Mission partyLeadVersion is 0 (fresh Mission); a stale expected version must fail with 409
     // even though every other counter is untouched.
+    when(missionRepository.bumpPartyLeadVersionIfMatches(missionId, 5L)).thenReturn(0);
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
         () -> missionService.setPartyLead(missionId, null, "Whoever", 5L));

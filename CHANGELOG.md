@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Fehler behoben: Gleichzeitiges Bearbeiten einer Mission konnte unbeteiligte Abschnitte blockieren oder Änderungen still überschreiben.** Die Abschnitts-Versionsprüfung (Kern, Zeitplan, Sichtbarkeit, Partyleiter, Org-Einheit, Ablauf, Ziele) lief nur im Speicher: Sie löste teils einen Konflikt (409) bei einer parallelen Bearbeitung eines *anderen* Abschnitts aus, während zwei gleichzeitige Zuweisungen von Partyleiter/Org-Einheit einander still überschrieben und zwei gleichzeitig angelegte Ablauf-Schritte/Ziele dieselbe Position erhalten konnten. Die Prüfung läuft jetzt atomar in der Datenbank (samt Eindeutigkeits-Index für die Schritt-/Ziel-Reihenfolge): verschiedene Abschnitte stören sich nicht mehr, und gleichzeitige Bearbeitungen desselben Abschnitts melden sauber einen Konflikt (409) statt zu blockieren oder zu überschreiben (REQ-MISSION-017, #1109).
+
 ## [v1.1.10](https://github.com/krt-profit/basetool/releases/tag/v1.1.10) - 2026-07-07
 
 ### Changed

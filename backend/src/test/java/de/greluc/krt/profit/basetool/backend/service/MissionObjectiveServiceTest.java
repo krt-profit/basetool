@@ -23,8 +23,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -86,6 +88,11 @@ class MissionObjectiveServiceTest {
                 goal(goal2Id, "Keine Eskalation", MissionObjectiveKind.NON_GOAL, 1))));
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+    // Since #1147 enforceSectionVersion runs the DB-enforced conditional bump; default it to "1 row
+    // affected" (version matched) so happy paths pass. The stale-version test overrides it to 0.
+    lenient()
+        .when(missionRepository.bumpObjectivesVersionIfMatches(eq(missionId), anyLong()))
+        .thenReturn(1);
   }
 
   private static MissionObjective goal(
@@ -130,6 +137,7 @@ class MissionObjectiveServiceTest {
 
   @Test
   void addObjective_throws409_whenObjectivesVersionStale() {
+    when(missionRepository.bumpObjectivesVersionIfMatches(missionId, 2L)).thenReturn(0);
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
         () -> timelineService.addObjective(missionId, "Ziel", MissionObjectiveKind.PRIMARY, 2L));

@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import static de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.assertSectionVersion;
 import static de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.bumpSectionVersion;
+import static de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.enforceSectionVersion;
 
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
@@ -439,9 +439,14 @@ public class MissionService {
    */
   @Transactional
   public Mission updateMission(@NotNull UUID missionId, @NotNull UpdateMissionRequest request) {
+    // Since #1114 every mutable mission scalar is @OptimisticLock(excluded = true), so a full
+    // overwrite no longer bumps the row @Version by itself. Load under OPTIMISTIC_FORCE_INCREMENT
+    // so the flush still increments+checks @Version (WHERE version = loaded) — that keeps this
+    // legacy whole-mission path's "two concurrent overwrites 409 against each other" guarantee. The
+    // client-echo check below additionally rejects a form that was already stale at load time.
     Mission mission =
         missionRepository
-            .findById(missionId)
+            .findByIdForFullReplace(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
 
     if (!mission.getVersion().equals(request.version())) {
@@ -543,7 +548,8 @@ public class MissionService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertSectionVersion(mission, MissionSection.CORE, expectedCoreVersion, missionId);
+    enforceSectionVersion(
+        missionRepository, mission, MissionSection.CORE, expectedCoreVersion, missionId);
 
     // Cross-section auto-stamp FIRST, before mutating mission.status — the condition reads the
     // OLD status, so it must run before the setter below. Setting actualStartTime here is safe
@@ -572,7 +578,10 @@ public class MissionService {
       mission.setOperation(null);
     }
 
-    bumpSectionVersion(mission, MissionSection.CORE);
+    // coreVersion was already bumped atomically by enforceSectionVersion above; the flush writes
+    // the
+    // dirtied core scalars (+ the advanced counter) via @DynamicUpdate without touching other
+    // sections' columns.
     Mission saved = missionRepository.save(mission);
     auditService.record(
         AuditEventType.MISSION_UPDATED,
@@ -608,15 +617,16 @@ public class MissionService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertSectionVersion(mission, MissionSection.SCHEDULE, expectedScheduleVersion, missionId);
+    enforceSectionVersion(
+        missionRepository, mission, MissionSection.SCHEDULE, expectedScheduleVersion, missionId);
     mission.setMeetingTime(meetingTime);
     mission.setPlannedStartTime(plannedStartTime);
     mission.setPlannedEndTime(plannedEndTime);
     mission.setActualStartTime(actualStartTime);
     mission.setActualEndTime(actualEndTime);
 
+    // A failed time-order validation rolls the transaction back, undoing the counter bump above.
     validateMissionTimes(mission);
-    bumpSectionVersion(mission, MissionSection.SCHEDULE);
     Mission saved = missionRepository.save(mission);
 
     if (actualEndTime != null) {
@@ -654,9 +664,9 @@ public class MissionService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertSectionVersion(mission, MissionSection.FLAGS, expectedFlagsVersion, missionId);
+    enforceSectionVersion(
+        missionRepository, mission, MissionSection.FLAGS, expectedFlagsVersion, missionId);
     mission.setIsInternal(isInternal);
-    bumpSectionVersion(mission, MissionSection.FLAGS);
     Mission saved = missionRepository.save(mission);
     auditService.record(
         AuditEventType.MISSION_UPDATED,
@@ -678,6 +688,14 @@ public class MissionService {
    */
   private void bumpActualStartTimeOnActivationWithinTransaction(@NotNull Mission mission) {
     mission.setActualStartTime(Instant.now());
+    // Deliberate in-memory (unconditional) schedule bump, NOT the DB-enforced
+    // enforceSectionVersion:
+    // the activation carries no client-echoed scheduleVersion, so there is nothing to check
+    // against.
+    // @DynamicUpdate flushes only actual_start_time + schedule_version; a concurrent schedule
+    // editor
+    // that echoed the pre-activation version still 409s (its conditional bump matches 0 rows once
+    // this commits first), which is the invalidation this cross-section poke exists to produce.
     bumpSectionVersion(mission, MissionSection.SCHEDULE);
   }
 
@@ -1525,13 +1543,16 @@ public class MissionService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertSectionVersion(
-        mission, MissionSection.OWNING_ORG_UNIT, expectedOwningOrgUnitVersion, missionId);
+    enforceSectionVersion(
+        missionRepository,
+        mission,
+        MissionSection.OWNING_ORG_UNIT,
+        expectedOwningOrgUnitVersion,
+        missionId);
 
     OrgUnit previous = mission.getOwningOrgUnit();
     OrgUnit target = ownerScopeService.resolveReassignTargetOrgUnit(targetOrgUnitId);
     mission.setOwningOrgUnit(target);
-    bumpSectionVersion(mission, MissionSection.OWNING_ORG_UNIT);
     Mission saved = missionRepository.save(mission);
     // Audit detail carries org-unit identifiers + kinds only — no PII, no user free text (the
     // mission name is the entity label, handled separately by the audit record).

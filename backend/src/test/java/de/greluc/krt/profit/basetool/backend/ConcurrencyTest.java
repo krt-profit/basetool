@@ -24,8 +24,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.service.MissionService;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -53,9 +55,14 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  *
  * <p>This rewrite launches several worker threads, makes them all load the same entity, holds them
  * at a {@link CountDownLatch} until everyone has the same stale version, then releases them to
- * attempt a save simultaneously. Postgres serialises the UPDATE statements via row-level locks;
- * exactly one thread sees its {@code UPDATE … WHERE version = N} return rows-affected = 1
- * (success), and every other thread sees rows-affected = 0 which Hibernate translates to {@link
+ * attempt a full-replace update ({@code MissionService.updateMission}) simultaneously. Since #1114
+ * every mutable {@code Mission} scalar is {@code @OptimisticLock(excluded = true)} so a bare scalar
+ * save no longer bumps the row {@code @Version} (that decoupling is what stops a core edit from
+ * 409-ing a concurrent schedule edit); the whole-mission "exactly one wins" guarantee now rides on
+ * {@code updateMission}, which force-increments {@code @Version} via {@code
+ * OPTIMISTIC_FORCE_INCREMENT}. Postgres serialises the resulting {@code UPDATE … WHERE version = N}
+ * via row-level locks; exactly one thread's returns rows-affected = 1 (success), and every other
+ * thread sees rows-affected = 0 which Hibernate translates to {@link
  * ObjectOptimisticLockingFailureException}.
  *
  * <p>The test is deliberately <strong>not</strong> annotated with {@code @Transactional} — a
@@ -76,6 +83,8 @@ class ConcurrencyTest {
   private Squadron iridium;
 
   @Autowired private MissionRepository missionRepository;
+
+  @Autowired private MissionService missionService;
 
   @MockitoBean private JwtDecoder jwtDecoder;
 
@@ -118,15 +127,38 @@ class ConcurrencyTest {
             pool.submit(
                 () -> {
                   try {
-                    Mission stale = missionRepository.findById(id).orElseThrow();
+                    // Since #1114 every mutable Mission scalar is @OptimisticLock(excluded=true),
+                    // so a
+                    // bare save after mutating one scalar no longer bumps the row @Version (that is
+                    // what stops a core edit from 409-ing a concurrent schedule edit). The
+                    // row-level
+                    // "exactly one wins" guarantee now lives on the legacy full-replace path
+                    // (updateMission), which force-increments @Version via
+                    // OPTIMISTIC_FORCE_INCREMENT
+                    // — this test exercises that path.
+                    Long staleVersion = missionRepository.findById(id).orElseThrow().getVersion();
                     ready.countDown();
                     if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
                       otherErrorCount.incrementAndGet();
                       return;
                     }
-                    stale.setName("Updated by thread " + idx);
+                    UpdateMissionRequest request =
+                        new UpdateMissionRequest(
+                            "Updated by thread " + idx,
+                            null,
+                            null,
+                            "PLANNED",
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            staleVersion,
+                            null);
                     try {
-                      missionRepository.save(stale);
+                      missionService.updateMission(id, request);
                       successCount.incrementAndGet();
                     } catch (ObjectOptimisticLockingFailureException expected) {
                       conflictCount.incrementAndGet();

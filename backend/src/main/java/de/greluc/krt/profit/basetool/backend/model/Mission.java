@@ -44,10 +44,34 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.OptimisticLock;
 
-/** Mission JPA entity. */
+/**
+ * Mission JPA entity.
+ *
+ * <p><strong>Fine-grained concurrency model (REQ-ORG-018, #1112/#1114/#1147).</strong> A mission is
+ * edited section-by-section (core / schedule / flags / party-lead / owning-org-unit / Ablauf steps
+ * / goals), and an edit to one section must never 409 a concurrent edit to another. To achieve
+ * that, <em>every</em> mutable business column and association is {@code @OptimisticLock(excluded =
+ * true)}, so touching it does NOT bump the inherited row {@link AbstractEntity#getVersion()}; each
+ * section instead carries its own plain {@code *Version} counter which is bumped through an atomic,
+ * DB-enforced conditional {@code UPDATE … WHERE id = ? AND xVersion = ?} (see {@code
+ * MissionRepository.bump*VersionIfMatches} and {@code
+ * MissionSectionVersions.enforceSectionVersion}). Because the section writes only ever dirty the
+ * columns they own, the class is {@code @DynamicUpdate}: Hibernate narrows each flush {@code
+ * UPDATE} to the actually-dirtied columns, so two concurrent section writers never clobber each
+ * other's untouched columns with a stale full-row snapshot (the silent lost update a non-dynamic
+ * full-row UPDATE would cause once the scalars are excluded).
+ *
+ * <p>With every mutable column excluded, the row {@code @Version} no longer moves on a section
+ * edit; it now guards exactly one path — the legacy full-replace {@code
+ * MissionService.updateMission} ({@code PUT /missions/{id}}), which force-increments it (JPA {@code
+ * OPTIMISTIC_FORCE_INCREMENT}) so two concurrent whole-mission overwrites still surface a 409
+ * against each other.
+ */
 @Entity
+@DynamicUpdate
 @Getter
 @Setter
 @NoArgsConstructor
@@ -68,9 +92,16 @@ public class Mission extends AbstractEntity<UUID> {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
+  // The core/schedule/flags business scalars below are all @OptimisticLock(excluded = true): a
+  // section edit dirties only its own columns and must NOT bump the row @Version (which would 409 a
+  // concurrent edit to an unrelated section). Their per-section counters + @DynamicUpdate provide
+  // the real concurrency guard instead — see the class Javadoc (#1114).
+
+  @OptimisticLock(excluded = true)
   private String name;
 
   @Column(columnDefinition = "TEXT")
+  @OptimisticLock(excluded = true)
   private String description;
 
   /**
@@ -78,20 +109,33 @@ public class Mission extends AbstractEntity<UUID> {
    * Nullable. Part of the {@code core} section (guarded by {@link #coreVersion}).
    */
   @Column(name = "meeting_point", length = 200)
+  @OptimisticLock(excluded = true)
   private String meetingPoint;
 
   @Column(length = 2048)
+  @OptimisticLock(excluded = true)
   private String calendarLink;
 
+  @OptimisticLock(excluded = true)
   private String status; // e.g., PLANNED, ACTIVE, COMPLETED
 
+  @OptimisticLock(excluded = true)
   private Instant meetingTime;
+
+  @OptimisticLock(excluded = true)
   private Instant plannedStartTime;
+
+  @OptimisticLock(excluded = true)
   private Instant actualStartTime;
+
+  @OptimisticLock(excluded = true)
   private Instant plannedEndTime;
+
+  @OptimisticLock(excluded = true)
   private Instant actualEndTime;
 
   @Column(name = "is_internal", nullable = false)
+  @OptimisticLock(excluded = true)
   private Boolean isInternal = false;
 
   /**
