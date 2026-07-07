@@ -232,9 +232,6 @@ class RefineryOrderMapperTest {
             null,
             null,
             null,
-            null,
-            null,
-            null,
             null, // isInternal, participants, units, frequencies, subMissions, inventoryEntries,
             // refineryOrders
             null,

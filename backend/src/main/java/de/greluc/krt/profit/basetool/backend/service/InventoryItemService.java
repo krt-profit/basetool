@@ -369,6 +369,23 @@ public class InventoryItemService {
   }
 
   /**
+   * Lists every inventory item linked to {@code missionId} as display DTOs for the mission-detail
+   * Wirtschaft "Lagereinträge" table (#1138). Replaces the former eagerly embedded {@code
+   * MissionDto.inventoryEntries} with a dedicated read. Deliberately unscoped among members — it
+   * reproduces exactly the removed field's behaviour, the shared mission-stockpile view visible to
+   * any member (the {@code /api/v1/inventory/**} filter rule already keeps guests out).
+   *
+   * @param missionId the mission whose linked inventory to list
+   * @return the mission's inventory items as DTOs (empty when none)
+   */
+  @Transactional(readOnly = true)
+  public List<InventoryItemDto> getMissionInventory(UUID missionId) {
+    return inventoryItemRepository.findByMissionId(missionId).stream()
+        .map(inventoryItemMapper::toDto)
+        .toList();
+  }
+
+  /**
    * Creates a new inventory item. Resolves every shallow id reference (material, location, owner,
    * mission, job order) and rejects with 404 / 400 for unknown ids. Job-order link triggers an
    * eligibility check (material must match the order's material list).

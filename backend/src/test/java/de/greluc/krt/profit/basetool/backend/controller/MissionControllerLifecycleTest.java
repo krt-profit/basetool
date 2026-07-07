@@ -177,9 +177,6 @@ class MissionControllerLifecycleTest {
         Set.of(participant),
         List.of(),
         List.of(),
-        Set.of(),
-        List.of(),
-        List.of(),
         null,
         owner,
         Set.of(manager),
@@ -546,8 +543,8 @@ class MissionControllerLifecycleTest {
     assertThat(result.managers()).isNull();
     assertThat(result.canEdit()).isFalse();
     assertThat(result.canManageManagers()).isFalse();
-    assertThat(result.inventoryEntries()).isEmpty();
-    assertThat(result.refineryOrders()).isEmpty();
+    // #1138: the mission economy (inventory / refinery orders) is no longer part of MissionDto —
+    // there is nothing to assert empty here; it is served member-gated at its own endpoints.
     // The participant roster IS visible to outsiders — but PII is stripped to the public callsign
     // tuple (username / displayName / rank), never email or roles.
     assertThat(result.participants()).hasSize(1);

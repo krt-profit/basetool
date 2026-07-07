@@ -42826,6 +42826,113 @@
         }
       }
     },
+    "/api/v1/inventory/mission/{missionId}" : {
+      "get" : {
+        "tags" : [ "inventory-item-controller" ],
+        "operationId" : "getMissionInventory",
+        "parameters" : [ {
+          "name" : "missionId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/InventoryItemDto"
+                  }
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/inventory/material/{materialId}" : {
       "get" : {
         "tags" : [ "inventory-item-controller" ],
@@ -50744,64 +50851,6 @@
           }
         }
       },
-      "InventoryItemDto" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "user" : {
-            "$ref" : "#/components/schemas/UserReferenceDto"
-          },
-          "material" : {
-            "$ref" : "#/components/schemas/MaterialReferenceDto"
-          },
-          "location" : {
-            "$ref" : "#/components/schemas/LocationReferenceDto"
-          },
-          "quality" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "amount" : {
-            "type" : "number",
-            "format" : "double"
-          },
-          "personal" : {
-            "type" : "boolean"
-          },
-          "jobOrderId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "jobOrderDisplayId" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "missionId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "missionName" : {
-            "type" : "string"
-          },
-          "note" : {
-            "type" : "string"
-          },
-          "owningSquadron" : {
-            "$ref" : "#/components/schemas/SquadronReferenceDto"
-          },
-          "version" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "createdAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          }
-        }
-      },
       "JobTypeDto" : {
         "type" : "object",
         "properties" : {
@@ -50839,34 +50888,6 @@
           }
         },
         "required" : [ "archetype", "name" ]
-      },
-      "LocationReferenceDto" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "name" : {
-            "type" : "string"
-          }
-        }
-      },
-      "MaterialReferenceDto" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "name" : {
-            "type" : "string"
-          },
-          "quantityType" : {
-            "type" : "string",
-            "enum" : [ "SCU", "PIECE" ]
-          }
-        }
       },
       "MissionCrewDto" : {
         "type" : "object",
@@ -50955,25 +50976,6 @@
             "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/MissionFrequencyDto"
-            }
-          },
-          "subMissions" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/MissionDto"
-            },
-            "uniqueItems" : true
-          },
-          "inventoryEntries" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/InventoryItemDto"
-            }
-          },
-          "refineryOrders" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/RefineryOrderDto"
             }
           },
           "operation" : {
@@ -51696,6 +51698,92 @@
           }
         },
         "required" : [ "amount", "locationId", "materialId", "quality" ]
+      },
+      "InventoryItemDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "user" : {
+            "$ref" : "#/components/schemas/UserReferenceDto"
+          },
+          "material" : {
+            "$ref" : "#/components/schemas/MaterialReferenceDto"
+          },
+          "location" : {
+            "$ref" : "#/components/schemas/LocationReferenceDto"
+          },
+          "quality" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "amount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "personal" : {
+            "type" : "boolean"
+          },
+          "jobOrderId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "jobOrderDisplayId" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "missionId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "missionName" : {
+            "type" : "string"
+          },
+          "note" : {
+            "type" : "string"
+          },
+          "owningSquadron" : {
+            "$ref" : "#/components/schemas/SquadronReferenceDto"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "LocationReferenceDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        }
+      },
+      "MaterialReferenceDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "quantityType" : {
+            "type" : "string",
+            "enum" : [ "SCU", "PIECE" ]
+          }
+        }
       },
       "InventoryItemNoteUpdateRequest" : {
         "type" : "object",

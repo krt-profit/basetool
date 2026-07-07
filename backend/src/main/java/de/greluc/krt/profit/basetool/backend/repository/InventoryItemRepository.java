@@ -52,6 +52,20 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   Page<InventoryItem> findByUser(User user, Pageable pageable);
 
   /**
+   * Lists every inventory item (shared and personal) linked to {@code missionId} — the
+   * mission-detail Wirtschaft "Lagereinträge" table (#1138). Replaces the former eagerly embedded
+   * {@code MissionDto.inventoryEntries} field with a dedicated read; the display associations the
+   * table renders (material / location / user / job order) are graphed to avoid an N+1.
+   * Deliberately unscoped among members (the shared mission-stockpile view), matching the removed
+   * field's behaviour exactly.
+   *
+   * @param missionId the mission whose linked inventory to load; never {@code null}.
+   * @return the mission's inventory rows; never {@code null}, possibly empty.
+   */
+  @EntityGraph(attributePaths = {"material", "location", "user", "jobOrder"})
+  List<InventoryItem> findByMissionId(UUID missionId);
+
+  /**
    * Loads every non-personal (shared) inventory row owned by the given user as managed entities.
    * Used by {@link de.greluc.krt.profit.basetool.backend.service.InventoryOrgUnitReconciler} to
    * re-stamp and dedupe a user's shared stock when they gain their first or lose their last

@@ -226,6 +226,24 @@ public class InventoryItemController {
   }
 
   /**
+   * Lists every inventory item linked to a mission — the mission-detail Wirtschaft "Lagereinträge"
+   * table (#1138). Replaces the former eagerly embedded {@code MissionDto.inventoryEntries} field
+   * with a dedicated read so the hottest mission GET no longer drags an unbounded list through its
+   * payload. Member-visible: the {@code /api/v1/inventory/**} security rule already requires a
+   * member role, so guests never reach it (matching the removed field, which was cleared for
+   * guests). Deliberately unscoped among members — the shared mission-stockpile view, reproducing
+   * the removed field's behaviour exactly.
+   *
+   * @param missionId the mission whose linked inventory to list
+   * @return the mission's inventory items
+   */
+  @GetMapping("/mission/{missionId}")
+  @Transactional(readOnly = true)
+  public List<InventoryItemDto> getMissionInventory(@PathVariable @NotNull UUID missionId) {
+    return inventoryItemService.getMissionInventory(missionId);
+  }
+
+  /**
    * Squadron-wide grouped variant — same shape as {@link #getMyGroupedInventory} but scoped to all
    * users.
    *

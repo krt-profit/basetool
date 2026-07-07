@@ -72,7 +72,10 @@ or check-in change never leaves the bar stale (REQ-FE-010). The four tabs:
    aggregate endpoint (`GET /api/v1/missions/{id}/finance-entries/summary`, same member+ /
    `canSeeMission` gate as the ledger), and the ledger table is fetched as a bounded page rather than
    loading every entry — so a live-update finance render costs one small query, not a full-ledger
-   load-all (ADR-0078).
+   load-all (ADR-0078). The Wirtschaft `<details>` refinery/inventory lists are **no longer embedded
+   in the mission DTO** (#1138): they are fetched with the rest of the finance section from
+   `GET /api/v1/refinery-orders/mission/{id}` and `GET /api/v1/inventory/mission/{id}` (both
+   member-gated), so the hottest mission GET no longer drags an unbounded, recursive economy payload.
 4. **Verwaltung** — role-gated (`canEdit` or `canManageManagers`); hidden otherwise. The left column is
    the mission **details** form (the "Link zum Kalendereintrag" sits **last**, after the actual
    start/end); the right column stacks four cards in the order **Ziele → Ablauf → Organisation →

@@ -116,8 +116,11 @@ public class MissionDataLeakTest {
             .andExpect(jsonPath("$.name").value("Public Mission"))
             .andExpect(jsonPath("$.description").value(nullValue()))
             .andExpect(jsonPath("$.owner").value(nullValue()))
-            .andExpect(jsonPath("$.refineryOrders").isEmpty())
-            .andExpect(jsonPath("$.inventoryEntries").isEmpty())
+            // #1138: the mission economy is no longer embedded in the DTO — the fields are absent
+            // from the payload entirely (served member-gated at their own endpoints), so a guest
+            // can never see them here.
+            .andExpect(jsonPath("$.refineryOrders").doesNotExist())
+            .andExpect(jsonPath("$.inventoryEntries").doesNotExist())
             .andReturn()
             .getResponse()
             .getContentAsString();
