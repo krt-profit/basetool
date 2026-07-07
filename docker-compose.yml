@@ -513,6 +513,9 @@ x-ingest: &ingest-template
     JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0
   volumes:
     - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
+    # Log dir mounted like backend/frontend (host dir pre-chowned to uid 10001) so the gateway can
+    # write logs/ingest.{log,json} and Alloy can tail logs/ingest.json for Loki (REQ-OBS-007).
+    - /var/iri/ingest/log:/app/logs
 
 services:
   redis:
