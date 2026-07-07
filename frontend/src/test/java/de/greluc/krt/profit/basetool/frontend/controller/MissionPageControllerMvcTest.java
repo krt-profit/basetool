@@ -509,12 +509,12 @@ class MissionPageControllerMvcTest {
             null);
     de.greluc.krt.profit.basetool.frontend.model.dto.MissionCrewDto realCrew =
         new de.greluc.krt.profit.basetool.frontend.model.dto.MissionCrewDto(
-            realCrewId, realParticipantId, "Real Crew", null);
+            realCrewId, realParticipantId, "Real Crew", null, null);
     // Crew entry whose participant is NOT in the participants set -> participantsById lookup is
     // null.
     de.greluc.krt.profit.basetool.frontend.model.dto.MissionCrewDto ghostCrew =
         new de.greluc.krt.profit.basetool.frontend.model.dto.MissionCrewDto(
-            ghostCrewId, missingParticipantId, "Ghost", null);
+            ghostCrewId, missingParticipantId, "Ghost", null, null);
     de.greluc.krt.profit.basetool.frontend.model.dto.MissionUnitDto unit =
         new de.greluc.krt.profit.basetool.frontend.model.dto.MissionUnitDto(
             UUID.randomUUID(),
@@ -523,6 +523,7 @@ class MissionPageControllerMvcTest {
             null,
             null,
             false,
+            null,
             null,
             null,
             java.util.List.of(realCrew, ghostCrew));
@@ -2315,6 +2316,7 @@ class MissionPageControllerMvcTest {
             false,
             null,
             null,
+            null,
             Collections.emptyList());
 
     MissionDto mission =
@@ -2431,6 +2433,7 @@ class MissionPageControllerMvcTest {
             false,
             null,
             null,
+            null,
             Collections.emptyList());
     de.greluc.krt.profit.basetool.frontend.model.dto.MissionUnitDto bravoUnit =
         new de.greluc.krt.profit.basetool.frontend.model.dto.MissionUnitDto(
@@ -2440,6 +2443,7 @@ class MissionPageControllerMvcTest {
             null,
             null,
             false,
+            null,
             null,
             null,
             Collections.emptyList());
@@ -2811,10 +2815,10 @@ class MissionPageControllerMvcTest {
             jobTypeId, "Gunner", null, "CREW", null, true, false, false, 1L);
     de.greluc.krt.profit.basetool.frontend.model.dto.MissionCrewDto crew =
         new de.greluc.krt.profit.basetool.frontend.model.dto.MissionCrewDto(
-            crewId, participantId, "Crewman", java.util.Set.of(gunner));
+            crewId, participantId, "Crewman", null, java.util.Set.of(gunner));
     de.greluc.krt.profit.basetool.frontend.model.dto.MissionUnitDto unit =
         new de.greluc.krt.profit.basetool.frontend.model.dto.MissionUnitDto(
-            unitId, "Alpha", null, null, null, true, null, null, List.of(crew));
+            unitId, "Alpha", null, null, null, true, null, null, null, List.of(crew));
 
     MissionDto mission =
         new MissionDto(

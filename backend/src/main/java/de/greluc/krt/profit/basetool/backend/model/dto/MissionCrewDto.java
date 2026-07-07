@@ -22,6 +22,10 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.util.Set;
 import java.util.UUID;
 
-/** Data transfer record carrying Mission Crew payload. */
+/**
+ * Data transfer record carrying Mission Crew payload. {@code version} is the crew's
+ * {@code @Version}, surfaced so the crew edit form can echo it back on the next save and the
+ * optimistic-lock check can reject a stale job-type overwrite (#1131).
+ */
 public record MissionCrewDto(
-    UUID id, UUID participantId, String participantName, Set<JobTypeDto> jobTypes) {}
+    UUID id, UUID participantId, String participantName, Long version, Set<JobTypeDto> jobTypes) {}

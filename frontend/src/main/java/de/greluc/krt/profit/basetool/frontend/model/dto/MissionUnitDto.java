@@ -25,7 +25,10 @@ import java.util.UUID;
 /**
  * Data transfer record carrying Mission Unit payload. {@code responsibleUser} is the explicit
  * responsible person (PII-free reference tuple); when {@code null} the view falls back to the
- * assigned ship's owner. {@code note} is the unit's free-text planning note.
+ * assigned ship's owner. {@code note} is the unit's free-text planning note. {@code version} is the
+ * unit's optimistic-lock {@code @Version}, surfaced so the edit form can echo it back on the next
+ * save and a stale full-form overwrite is rejected (#1131). Mirrors the backend {@code
+ * MissionUnitDto} field-for-field (DtoMirrorConsistencyTest).
  */
 public record MissionUnitDto(
     UUID id,
@@ -36,4 +39,5 @@ public record MissionUnitDto(
     Boolean highValueUnit,
     UserReferenceDto responsibleUser,
     String note,
+    Long version,
     List<MissionCrewDto> crew) {}

@@ -22,5 +22,14 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.util.Set;
 import java.util.UUID;
 
-/** Inbound request payload for the Update Crew operation. */
-public record UpdateCrewRequest(Set<UUID> jobTypeIds) {}
+/**
+ * Inbound request payload for the Update Crew operation.
+ *
+ * <p>{@code jobTypeIds} is the full replacement set of job types for the crew. {@code version} is
+ * the {@code MissionCrew.@Version} the client last saw, echoed back so a stale save is rejected
+ * with a 409 rather than silently reverting a concurrent edit of the same crew (#1131). {@code
+ * version} is nullable so a legacy caller that omits it skips the check via {@link
+ * de.greluc.krt.profit.basetool.backend.support.OptimisticLock#checkOptionalClient}; a present,
+ * mismatching value 409s.
+ */
+public record UpdateCrewRequest(Set<UUID> jobTypeIds, Long version) {}

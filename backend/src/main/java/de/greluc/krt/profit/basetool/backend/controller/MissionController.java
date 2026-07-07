@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.ShipDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateCrewRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateParticipantRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdatePayoutPreferenceRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.UpdateUnitRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
@@ -810,11 +811,12 @@ public class MissionController {
   public MissionDto updateUnit(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID unitId,
-      @jakarta.validation.Valid @RequestBody @NotNull AddUnitRequest request) {
+      @jakarta.validation.Valid @RequestBody @NotNull UpdateUnitRequest request) {
     return missionMapper.toDto(
         missionService.updateMissionUnit(
             id,
             unitId,
+            request.version(),
             request.name(),
             request.shipTypeId(),
             request.shipId(),
@@ -911,7 +913,7 @@ public class MissionController {
     java.util.Set<UUID> jobTypeIds =
         request.jobTypeIds() != null ? request.jobTypeIds() : java.util.Collections.emptySet();
     return missionMapper.toDto(
-        missionService.updateCrewInShip(id, missionUnitId, crewId, jobTypeIds));
+        missionService.updateCrewInShip(id, missionUnitId, crewId, request.version(), jobTypeIds));
   }
 
   /**
@@ -1758,11 +1760,12 @@ public class MissionController {
   public MissionUnitDto updateUnitSlim(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID unitId,
-      @jakarta.validation.Valid @RequestBody @NotNull AddUnitRequest request) {
+      @jakarta.validation.Valid @RequestBody @NotNull UpdateUnitRequest request) {
     var mission =
         missionService.updateMissionUnit(
             id,
             unitId,
+            request.version(),
             request.name(),
             request.shipTypeId(),
             request.shipId(),
@@ -2098,7 +2101,8 @@ public class MissionController {
       @RequestBody @jakarta.validation.Valid @NotNull UpdateCrewRequest request) {
     java.util.Set<UUID> jobTypeIds =
         request.jobTypeIds() != null ? request.jobTypeIds() : java.util.Collections.emptySet();
-    var mission = missionService.updateCrewInShip(id, missionUnitId, crewId, jobTypeIds);
+    var mission =
+        missionService.updateCrewInShip(id, missionUnitId, crewId, request.version(), jobTypeIds);
     return missionMapper.toDto(findCrew(findUnit(mission, missionUnitId), crewId));
   }
 

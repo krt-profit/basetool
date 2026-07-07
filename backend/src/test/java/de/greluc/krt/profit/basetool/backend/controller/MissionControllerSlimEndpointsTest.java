@@ -133,7 +133,7 @@ class MissionControllerSlimEndpointsTest {
     UUID unitId = UUID.randomUUID();
     when(missionSecurityService.canManageMission(any(UUID.class), any())).thenReturn(true);
     when(missionService.updateMissionUnit(
-            any(), any(), any(), any(), any(), anyBoolean(), any(), any(), any()))
+            any(), any(), any(), any(), any(), any(), anyBoolean(), any(), any(), any()))
         .thenReturn(missionWithUnit(unitId));
 
     mockMvc

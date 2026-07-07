@@ -923,13 +923,16 @@ public class MissionService {
   }
 
   /**
-   * Updates a unit's name and the assigned ship. Per-unit optimistic lock — concurrent unit edits
-   * across the mission don't collide.
+   * Updates a unit's name and the assigned ship. Per-unit optimistic lock via the client-echoed
+   * {@code expectedVersion} — concurrent unit edits across the mission don't collide, and a stale
+   * full-form save is rejected with a 409 (#1131). Thin delegation to {@link
+   * MissionStructureService}.
    */
   @Transactional
   public Mission updateMissionUnit(
       @NotNull UUID missionId,
       @NotNull UUID unitId,
+      Long expectedVersion,
       String name,
       UUID shipTypeId,
       UUID shipId,
@@ -940,6 +943,7 @@ public class MissionService {
     return missionStructureService.updateMissionUnit(
         missionId,
         unitId,
+        expectedVersion,
         name,
         shipTypeId,
         shipId,
@@ -1159,14 +1163,20 @@ public class MissionService {
         missionId, missionUnitId, participantId, jobTypeIds);
   }
 
-  /** Updates a crew's name, role, and assigned ship. */
+  /**
+   * Updates a crew's assigned job types, guarded by the client-echoed {@code expectedVersion} so a
+   * stale save 409s instead of silently reverting a concurrent edit (#1131). Thin delegation to
+   * {@link MissionStructureService}.
+   */
   @Transactional
   public Mission updateCrewInShip(
       @NotNull UUID missionId,
       @NotNull UUID missionUnitId,
       @NotNull UUID crewId,
+      Long expectedVersion,
       @NotNull Set<UUID> jobTypeIds) {
-    return missionStructureService.updateCrewInShip(missionId, missionUnitId, crewId, jobTypeIds);
+    return missionStructureService.updateCrewInShip(
+        missionId, missionUnitId, crewId, expectedVersion, jobTypeIds);
   }
 
   /**

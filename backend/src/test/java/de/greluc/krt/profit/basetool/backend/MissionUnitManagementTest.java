@@ -223,6 +223,7 @@ class MissionUnitManagementTest {
             missionService.updateMissionUnit(
                 mission.getId(),
                 unit.getId(),
+                null,
                 "Initial Unit",
                 outsiderShip.getShipType().getId(),
                 outsiderShip.getId(),
@@ -248,6 +249,7 @@ class MissionUnitManagementTest {
     missionService.updateMissionUnit(
         mission.getId(),
         unit.getId(),
+        null,
         "Renamed Unit",
         ship.getShipType().getId(),
         ship.getId(),
@@ -352,6 +354,7 @@ class MissionUnitManagementTest {
         missionService.updateMissionUnit(
             mission.getId(),
             created.getId(),
+            null,
             "Responsible Unit",
             null,
             null,
