@@ -256,6 +256,7 @@ services:
       # Log sources (read-only). App JSON is masked at source; NPM access + host auth.log keep IPs.
       - /var/iri/backend/log:/logs/backend:ro
       - /var/iri/frontend/log:/logs/frontend:ro
+      - /var/iri/ingest/log:/logs/ingest:ro
       - /var/iri/keycloak/log:/logs/keycloak:ro
       - /var/iri/npm/data/logs:/logs/npm:ro
       - /var/log:/hostlog:ro

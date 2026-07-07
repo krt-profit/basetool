@@ -836,10 +836,10 @@ time-limiter timeouts) via a dedicated `ResilienceEventLogger` so that
 degraded-backend symptoms such as `SERVICE_UNAVAILABLE` / `BACKEND_TIMEOUT`
 always carry a matching log entry explaining why.
 
-In the `prod` profile both applications additionally write a structured
-JSON log (`logs/backend.json` / `logs/frontend.json`) via `LogstashEncoder`,
-making the logs ready for ELK / Loki / CloudWatch ingestion. Error events
-are rolled into dedicated `*-error.log` files for fast incident triage.
+In the `prod` profile all three modules additionally write a structured
+JSON log (`logs/backend.json` / `logs/frontend.json` / `logs/ingest.json`) via
+`LogstashEncoder`, making the logs ready for ELK / Loki / CloudWatch ingestion. Error
+events are rolled into dedicated `*-error.log` files for fast incident triage.
 
 ### 5.6 API conventions
 

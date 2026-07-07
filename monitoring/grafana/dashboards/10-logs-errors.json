@@ -24,7 +24,7 @@
         "y": 0
       },
       "type": "timeseries",
-      "title": "Error rate per app",
+      "title": "Error & warning rate per app",
       "datasource": {
         "type": "loki",
         "uid": "loki"
@@ -36,8 +36,8 @@
       "options": {},
       "targets": [
         {
-          "expr": "sum by (app) (rate({level=\"error\"}[5m]))",
-          "legendFormat": "{{app}}",
+          "expr": "sum by (app, level) (rate({level=~\"(?i)(error|warn)\"}[5m]))",
+          "legendFormat": "{{app}} {{level}}",
           "refId": "A",
           "datasource": {
             "type": "loki",
@@ -55,7 +55,7 @@
         "y": 0
       },
       "type": "logs",
-      "title": "App errors",
+      "title": "App errors & warnings",
       "datasource": {
         "type": "loki",
         "uid": "loki"
@@ -67,7 +67,7 @@
       "options": {},
       "targets": [
         {
-          "expr": "{level=\"error\"}",
+          "expr": "{level=~\"(?i)(error|warn)\"}",
           "refId": "A",
           "datasource": {
             "type": "loki",

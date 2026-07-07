@@ -48,8 +48,9 @@ error response therefore carries the header, not just the ones that reach the se
 
 In `prod`, a PII-masking `LogstashEncoder` JSON appender writes `logs/{backend,frontend}.json`;
 errors split into `*-error.log` for fast triage. Configurable via `APP_LOGGING_*` env vars.
-The ingest gateway emits its prod JSON to stdout through the same `PiiMaskingLogstashEncoder`
-pattern (no file sink — its stream is collected via the Docker log API).
+The ingest gateway now logs the same way as backend/frontend — a PII-masking console + rolling
+text log + dedicated `*-error.log` in every profile, plus `logs/ingest.json` in prod — so its JSON
+is tailed from the file (`loki.source.file` → `app_json`), no longer via the Docker log API.
 
 ### REQ-OBS-004 — Never log PII
 
@@ -137,7 +138,11 @@ rule — no blanket "everything is masked" claim:
   Keycloak mask. The streams inherit the global 744h retention — no REQ-OBS-010 IP-retention impact
   once masked.
 - Loki labels stay low-cardinality (`app`, `level`, bounded `host`); log lines are never
-  turned into per-user labels.
+  turned into per-user labels. The `level` label is carried by the three JSON app streams
+  (`backend` / `frontend` / `ingest`), all tailed from their `logs/<app>.json` file sinks through the
+  shared `app_json` stage, and holds Logback's **uppercase** level string (`ERROR`, `WARN`, `INFO`, …)
+  verbatim. Loki `=` matchers are case-sensitive, so any dashboard/alert selecting by level must use a
+  case-insensitive matcher (`{level=~"(?i)error"}`), never `{level="error"}`.
 
 ### REQ-OBS-008 — Monitoring plane: admin-only access, isolated cleartext carve-out
 
