@@ -1573,6 +1573,24 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             if (result.ok) {
                 window.krtModalClose(customFreqModal);
+                // On an edit, fan the bumped @Version from the response out to the row (and the
+                // hidden modal version input) BEFORE the async frequencies swap lands, so a rapid
+                // re-open of the same custom frequency within the (load-inflated) swap window reads
+                // the fresh version instead of self-409ing into the reload-confirm (#1144). The slim
+                // PUT returns the updated List<MissionFrequencyDto>; find this row's entry by id.
+                if (isEdit && Array.isArray(result.body) && window.krtFetch) {
+                    const updated = result.body.find(function (e) {
+                        return e && e.id === fid;
+                    });
+                    if (updated && updated.version != null) {
+                        document
+                            .querySelectorAll('.custom-freq-row[data-custom-freq-id="' + fid + '"]')
+                            .forEach(function (row) {
+                                window.krtFetch.syncVersion(row, updated.version);
+                            });
+                        versionInput.value = updated.version;
+                    }
+                }
                 if (window.krtRefreshMissionSection) {
                     window.krtRefreshMissionSection(['frequencies', 'overview']);
                 }
@@ -1918,6 +1936,25 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
                 if (res.ok) {
                     window.krtModalClose(editForm.closest('.krt-modal-overlay'));
+                    // Propagate the fresh @Version from the slim response to EVERY container/button
+                    // for this participant SYNCHRONOUSLY, before the async fragment refetch lands —
+                    // mirroring the check-in/out fan-out below. Without it a rapid re-edit of the
+                    // same participant within the (load-inflated) swap window re-reads the pre-edit
+                    // data-version and self-409s into the reload-confirm (#1116). The PUT /ajax proxy
+                    // returns the updated MissionParticipantDto, which carries the bumped version.
+                    const dto = res.body;
+                    if (
+                        dto &&
+                        dto.version !== undefined &&
+                        dto.version !== null &&
+                        window.krtFetch
+                    ) {
+                        document
+                            .querySelectorAll('[data-participant-id="' + pId + '"]')
+                            .forEach(function (c) {
+                                window.krtFetch.syncVersion(c, dto.version);
+                            });
+                    }
                     // 'overview' too: editing a participant's planned mission job type can change
                     // who the Einsatzleiter is, and the facts-bar "Leiter" is patched off the
                     // overview fragment's data-leader (REQ-MISSION-013).
@@ -2295,16 +2332,25 @@ document.addEventListener('DOMContentLoaded', function () {
         partyLeadForm.addEventListener('submit', async function (ev) {
             ev.preventDefault();
             const versionInput = document.getElementById('party-lead-version');
+            // Snapshot THIS submit's userId/guestName intent now, but read the version live at send
+            // time (#1143). A static payload baked in the pre-bump partyLeadVersion, so a set
+            // immediately followed by Clear queued a second write with a stale version that 409'd,
+            // leaving the wrong lead assigned. Only the version is re-read in the thunk — re-reading
+            // userId/guestName would let a queued Clear wipe a queued set's captured value.
+            const submittedUserId = partyLeadUserId.value || null;
+            const submittedGuestName = partyLeadInput.value || null;
             const res = await window.krtMissionWrite({
                 method: 'PUT',
                 url: '/missions/' + window.missionId + '/party-lead/ajax',
-                payload: {
-                    userId: partyLeadUserId.value || null,
-                    guestName: partyLeadInput.value || null,
-                    version:
-                        versionInput && versionInput.value !== ''
-                            ? parseInt(versionInput.value, 10)
-                            : 0,
+                payload: function () {
+                    return {
+                        userId: submittedUserId,
+                        guestName: submittedGuestName,
+                        version:
+                            versionInput && versionInput.value !== ''
+                                ? parseInt(versionInput.value, 10)
+                                : 0,
+                    };
                 },
                 sectionKey: 'party_lead',
             });
@@ -2400,7 +2446,17 @@ async function saveActualTimeInPlace(field, nowDate) {
     await window.krtMissionWrite({
         method: 'POST',
         url: '/missions/' + encodeURIComponent(currentMissionId) + '/actual-time',
-        payload: { field: field, value: nowDate.toISOString(), version: Number(version) },
+        // Thunk, not a static object (#1143): the schedule version is re-read at SEND time so two
+        // queued schedule writes ('Jetzt' on Beginn then Ende, or a double-click) each pick up the
+        // version the previous one bumped via its onSuccess writeback below. A static payload would
+        // bake in the pre-bump version and the second write would self-409 into the reload-confirm.
+        payload: function () {
+            return {
+                field: field,
+                value: nowDate.toISOString(),
+                version: Number(versionInput ? versionInput.value : version),
+            };
+        },
         sectionKey: 'schedule',
         toast: false,
         onSuccess: function (dto) {
@@ -2673,6 +2729,13 @@ async function updatePayoutPreference(selectElement) {
         method: 'POST',
         url: url,
         payload: { preference: value },
+        // Join the participant section's serial chain (#1145): check-in/out and the participant edit
+        // form all serialize on 'section:participant' because they bump and re-sync the SAME
+        // MissionParticipant @Version. A bare select 'change' write ran outside that chain, so two
+        // rapid toggles could commit in reverse order (persisting the user's FIRST choice) and an
+        // older payout response could win the version fan-out over a newer check-in. Serializing
+        // orders them one-at-a-time in submission order.
+        serialize: 'section:participant',
         toast: false,
         errorMessage:
             typeof MSG_ERROR_PAYOUT_UPDATE !== 'undefined'
@@ -2709,11 +2772,18 @@ async function updatePayoutPreference(selectElement) {
             // <tr> AND on its board person-row (plus their action buttons/modals). Every container
             // carrying the participant id is synced so a follow-up click anywhere in the page
             // never ships a stale version (spurious 409).
-            if (updatedParticipant.version !== undefined) {
+            if (updatedParticipant.version != null) {
                 document
                     .querySelectorAll('[data-participant-id="' + participantId + '"]')
                     .forEach((container) => {
-                        window.krtFetch.syncVersion(container, updatedParticipant.version);
+                        // Monotonic guard (#1145): under load a payout response can resolve AFTER a
+                        // newer check-in response that already synced version N+1. Without this, the
+                        // stale payout version N would overwrite it and re-arm the very spurious-409
+                        // the fan-out exists to prevent — so only ever advance, never regress.
+                        const current = parseInt(container.getAttribute('data-version'), 10);
+                        if (Number.isNaN(current) || updatedParticipant.version > current) {
+                            window.krtFetch.syncVersion(container, updatedParticipant.version);
+                        }
                     });
             }
         }
@@ -2782,6 +2852,24 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             if (res.ok) {
                 window.krtModalClose(editForm.closest('.krt-modal-overlay'));
+                // Fan the bumped @Version from the response out to the finance edit button (and the
+                // hidden modal input) BEFORE the async finance swap lands, so a rapid re-open of the
+                // same entry within the (load-inflated) swap window reads the fresh version instead
+                // of self-conflicting (finance 409 = BUSINESS_CONFLICT, an unrecoverable error toast
+                // until the swap catches up; #1144). The PUT /ajax proxy returns the updated
+                // MissionFinanceEntryDto with its bumped version.
+                const dto = res.body;
+                if (dto && dto.version != null && window.krtFetch) {
+                    document
+                        .querySelectorAll('.edit-finance-btn[data-id="' + entryId + '"]')
+                        .forEach(function (btn) {
+                            window.krtFetch.syncVersion(btn, dto.version);
+                        });
+                    const hiddenVersion = document.getElementById('edit-finance-version');
+                    if (hiddenVersion) {
+                        hiddenVersion.value = dto.version;
+                    }
+                }
                 refreshFinanceAndBadge();
             }
         });
@@ -3066,15 +3154,6 @@ if (document.readyState === 'loading') {
     const SAVED = msg('mission.save.section.ok', 'Gespeichert.');
     const FAILED = msg('mission.save.section.error', 'Speichern fehlgeschlagen.');
 
-    function buildHeaders() {
-        const h = { 'X-Requested-With': 'XMLHttpRequest' };
-        if (window.krtCsrf) {
-            const t = window.krtCsrf.token();
-            const n = window.krtCsrf.headerName();
-            if (t && n) h[n] = t;
-        }
-        return h;
-    }
     function writeVersions(v) {
         if (!v) return;
         function set(id, val) {
@@ -3124,82 +3203,107 @@ if (document.readyState === 'loading') {
             );
         }
     }
-    let inFlight = false;
+    // Dirty-section tracking (#1136): the save fans out to up to three backend PATCHes
+    // (schedule / core / flags), and applyMissionUpdate skips the PATCH for any section the user
+    // left untouched. Skipping stops a peer's concurrent schedule bump (a 'Jetzt' actual-time stamp
+    // or a PLANNED->ACTIVE auto-transition) from 409ing a name-only edit, and never re-writes an
+    // untouched section's (possibly auto-stamped) values. We snapshot each section's fields at load
+    // and, at submit, mark a section dirty iff its current values differ, writing the result into
+    // the hidden dirtyCore/dirtySchedule/dirtyFlags inputs the FormData carries.
+    const SECTION_FIELDS = {
+        core: ['name', 'description', 'calendarLink', 'status', 'operationId', 'meetingPoint'],
+        schedule: [
+            'meetingTime',
+            'plannedStartTime',
+            'plannedEndTime',
+            'actualStartTime',
+            'actualEndTime',
+        ],
+        flags: ['isInternal'],
+    };
+    function sectionSnapshot(fd, fields) {
+        // getAll yields [] (-> '') for an absent field (e.g. an unchecked isInternal checkbox), so
+        // the per-section compare is a plain, stable string equality.
+        return fields
+            .map(function (n) {
+                return n + '=' + fd.getAll(n).join(',');
+            })
+            .join('|');
+    }
+    const initialSnapshot = {};
+    (function captureInitialSnapshot() {
+        const fd0 = new FormData(form);
+        Object.keys(SECTION_FIELDS).forEach(function (sec) {
+            initialSnapshot[sec] = sectionSnapshot(fd0, SECTION_FIELDS[sec]);
+        });
+    })();
+    function markDirtySections() {
+        const fd = new FormData(form);
+        function setFlag(id, dirty) {
+            const el = document.getElementById(id);
+            if (el) el.value = dirty ? 'true' : 'false';
+        }
+        setFlag(
+            'mission-dirty-core',
+            sectionSnapshot(fd, SECTION_FIELDS.core) !== initialSnapshot.core,
+        );
+        setFlag(
+            'mission-dirty-schedule',
+            sectionSnapshot(fd, SECTION_FIELDS.schedule) !== initialSnapshot.schedule,
+        );
+        setFlag(
+            'mission-dirty-flags',
+            sectionSnapshot(fd, SECTION_FIELDS.flags) !== initialSnapshot.flags,
+        );
+    }
+
     async function submitInPlace() {
-        if (!window.krtCsrf) {
+        // No-JS / no-krtFetch fallback: let the native POST->redirect (updateMission) run.
+        if (!window.krtFetch) {
             form.submit();
             return;
         }
-        if (inFlight) return; // ignore a rapid second submit while one is still in flight
-        inFlight = true;
-        const submitBtn = document.querySelector('button[type="submit"][form="mission-form"]');
-        if (submitBtn) submitBtn.disabled = true;
-        try {
-            const fd = new FormData(form);
-            let res;
-            try {
-                res = await fetch(form.action, {
-                    method: 'POST',
-                    body: fd,
-                    headers: buildHeaders(),
-                });
-                if (res.status === 403 && window.krtCsrf.refresh) {
-                    const refreshed = await window.krtCsrf.refresh();
-                    if (refreshed)
-                        res = await fetch(form.action, {
-                            method: 'POST',
-                            body: fd,
-                            headers: buildHeaders(),
-                        });
+        // Compute the dirty flags into the hidden inputs BEFORE submitForm snapshots the FormData at
+        // send time (#1136).
+        markDirtySections();
+        // #1118: route through krtFetch.submitForm instead of a hand-rolled fetch + manual CSRF +
+        // retry-on-403 loop. serialize:'section:schedule' joins the whole save to the same serial
+        // chain as the actual-time ('Jetzt') writer — which also bumps scheduleVersion — so the two
+        // never self-collide; submitForm rebuilds the FormData inside the serialized task, so a
+        // queued save re-reads the fresh scheduleVersion the prior schedule write wrote back. CSRF
+        // construction and the 403-refresh-retry are inherited from krtFetch (REQ-FE-001), and the
+        // captured submit button is the double-submit guard (replacing the old inFlight boolean).
+        await window.krtFetch.submitForm({
+            form: form,
+            url: form.action,
+            serialize: 'section:schedule',
+            successMessage: SAVED,
+            errorMessage: FAILED,
+            submitter: document.querySelector('button[type="submit"][form="mission-form"]'),
+            onError: function (status, body) {
+                if (status === 422) {
+                    renderFieldErrors(body || {});
+                    return true;
                 }
-            } catch {
-                if (window.showFrontendErrorToast) window.showFrontendErrorToast(FAILED);
-                return;
-            }
-            if (res.status === 422) {
-                let map = {};
-                try {
-                    map = await res.json();
-                } catch {
-                    /* non-JSON body */
+                if (status === 409) {
+                    handleConflict(body || {});
+                    return true;
                 }
-                renderFieldErrors(map);
-                return;
-            }
-            if (res.status === 409) {
-                let problem = {};
-                try {
-                    problem = await res.json();
-                } catch {
-                    /* non-JSON body */
+                return false; // let krtFetch surface the generic error toast
+            },
+            onSuccess: function (body) {
+                writeVersions(body);
+                clearFieldErrors();
+                // Re-render the overview pane (name / status / schedule / flags mirror the edited
+                // core data) and signal peers to do the same (live multi-user sync, REQ-FE-010).
+                // Returning the refresh promise makes the serialized chain wait for the version
+                // holders to be rewritten before the next queued schedule write runs.
+                if (window.krtRefreshMissionSection) {
+                    return window.krtRefreshMissionSection('overview');
                 }
-                handleConflict(problem);
-                return;
-            }
-            if (!res.ok) {
-                if (window.showFrontendErrorToast) window.showFrontendErrorToast(FAILED);
-                return;
-            }
-            let versions = null;
-            try {
-                versions = await res.json();
-            } catch {
-                /* non-JSON body */
-            }
-            writeVersions(versions);
-            clearFieldErrors();
-            if (window.showFrontendSuccessToast) window.showFrontendSuccessToast(SAVED);
-            // Re-render the overview pane (name / status / schedule / flags mirror the edited
-            // core data) and signal peers to do the same (live multi-user sync, REQ-FE-010). The
-            // form lives in the Verwaltung tab, so swapping the hidden overview pane is invisible
-            // to this user but keeps it consistent and fixes the prior stale-overview behaviour.
-            if (window.krtRefreshMissionSection) {
-                window.krtRefreshMissionSection('overview');
-            }
-        } finally {
-            inFlight = false;
-            if (submitBtn) submitBtn.disabled = false;
-        }
+                return undefined;
+            },
+        });
     }
     form.addEventListener('submit', function (e) {
         e.preventDefault();

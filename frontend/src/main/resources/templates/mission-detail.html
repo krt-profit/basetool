@@ -920,6 +920,13 @@
                         <input type="hidden" id="mission-core-version" name="coreVersion" th:field="*{coreVersion}">
                         <input type="hidden" id="mission-schedule-version" name="scheduleVersion" th:field="*{scheduleVersion}">
                         <input type="hidden" id="mission-flags-version" name="flagsVersion" th:field="*{flagsVersion}">
+                        <!-- Dirty-section flags (#1136, REQ-FE-014): the edit JS sets each to whether the user
+                             touched that header section; applyMissionUpdate skips the PATCH for any section left
+                             "false". They default to "true" so the no-JavaScript classic submit still saves every
+                             section. -->
+                        <input type="hidden" id="mission-dirty-core" name="dirtyCore" value="true">
+                        <input type="hidden" id="mission-dirty-schedule" name="dirtySchedule" value="true">
+                        <input type="hidden" id="mission-dirty-flags" name="dirtyFlags" value="true">
 
             <div class="form-group">
                 <label th:text="#{mission.name}">Name</label>

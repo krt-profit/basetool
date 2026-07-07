@@ -186,10 +186,28 @@ stale save 409s instead of silently clobbering a concurrent edit; the fresh vers
 - [ ] A participant edit / check-in / check-out immediately followed by a second edit of the same
   participant does not 409 (the slim response carries the committed, post-flush `@Version`).
 
+**Synchronous fan-out before the async refresh.** A handler that re-opens the same entity's modal
+within the (load-inflated) fragment-swap window would snapshot the pre-write `data-version` still on
+the row/button and self-409 on the second save. So — mirroring the check-in/out fan-out — the
+**participant edit** modal (#1116), the **finance-entry** edit (#1144) and the **custom-frequency**
+edit (#1144) now propagate the bumped `@Version` from the write response to their row/button (and
+the finance/frequency hidden modal input) **synchronously in the `res.ok` block, before** the async
+`krtRefreshMissionSection` swap lands. The **payout-preference** fan-out additionally guards each
+write with a monotonic check (only advance, never regress, a container's `data-version`) so an older
+payout response landing after a newer check-in cannot re-arm the stale-version 409 (#1145).
+
+**Acceptance (fan-out)**
+
+- [ ] Editing a participant / finance entry / custom frequency and re-opening the **same** entity's
+  modal before the section swap lands and saving again does not 409.
+- [ ] A payout-preference toggle whose response resolves after a newer same-participant write never
+  lowers that participant's `data-version`.
+
 **Enforced by:** per-area e2e "double-action" assertion, `MissionServiceCrewTest` (unit/crew
 version-mismatch 409), `MissionServicePayoutTest` (check-in/out flush) · **Code:** `krt-fetch.js`
 (`syncVersion`), `MissionStructureService`, `MissionUnitDto` / `MissionCrewDto`,
-`MissionParticipantService` · **Issues:** #571, #1131, #1135
+`MissionParticipantService`, `mission-detail.js` (participant-edit / finance / custom-frequency /
+payout-preference response fan-out) · **Issues:** #571, #1131, #1135, #1116, #1144, #1145
 
 ### REQ-FE-004 — CSRF stays session/meta-based with transparent retry-on-403
 
@@ -769,12 +787,95 @@ serialized second toggle would silently revert the first).
 - [ ] Editing two **disjoint** sections/scopes concurrently does not serialize them against each
   other.
 
+**Residual call sites swept in (2026-07).** A round-2 audit found four writers still outside the
+contract: (a) the **actual-time** ("Jetzt") stamp and the **party-lead** set/clear baked their
+section version into a **static** payload read at handler-fire, so a queued second write shipped the
+pre-bump version — both now read the version in a **send-time thunk** (#1143); (b) the mission
+**payout-preference** select-change ran with **no** `serialize` key, so two rapid toggles could commit
+in reverse order and an older response could win the version fan-out — now serialized on
+`section:participant` with a monotonic fan-out guard (#1145); (c) the **operation core-edit** save
+snapshotted its version eagerly with no serialize key — now `serialize:'operation:core'` + a thunk
+payload (#1117); (d) the mission **core-edit modal** hand-rolled a raw `fetch` (outside `krtFetch`,
+unserialized against the actual-time writer that shares `scheduleVersion`) — now routed through
+`krtFetch.submitForm` with `serialize:'section:schedule'`, so the FormData (and its version inputs) is
+rebuilt at send time and the two never collide (#1118, which also drops the bespoke CSRF/403 loop per
+REQ-FE-002).
+
+- [ ] The actual-time "Jetzt" stamps (Beginn then Ende), the party-lead set-then-clear, a rapid
+  payout-preference re-toggle, a double-submit of the operation core-edit, and a mission core-edit
+  saved while a "Jetzt" stamp is in flight each save without a self-inflicted 409.
+
 **Enforced by:** code review + the per-area double-action e2e assertions (REQ-FE-003) extended to the
 type-then-add race · **Code:** `krt-fetch.js` (`runSerialized`, lazy `url`/`payload` in `write` /
 `submitForm`, awaited `onSuccess`, the `sectionWrite` `serialize` default, exposed `krtFetch.serialize`),
-`mission-detail.js` (`objectivesVersion` / `stepsVersion` lazy readers), `bank.js`, `inventory-my.js`,
+`mission-detail.js` (`objectivesVersion` / `stepsVersion` lazy readers, actual-time / party-lead
+thunks, payout-preference `section:participant`, core-edit `submitForm` on `section:schedule`),
+`operation-detail.js` (`operation:core` serialize + thunk), `bank.js`, `inventory-my.js`,
 `inventory-admin.js`, `inventory-note-modal.js`, `orders-detail.js` (`krtOrderWrite` serialize default
-+ `_orderVersion`), `admin-org-structure.js`, `leitung.js` · **ADR:** ADR-0071
++ `_orderVersion`), `admin-org-structure.js`, `leitung.js` · **ADR:** ADR-0071 · **Issues:** #1143,
+
+# 1145, #1117, #1118
+
+### REQ-FE-013 — `krtFetch.swap` lands responses in issue order, not completion order
+
+Several independent triggers overlap fragment swaps on **one** container: the local write's
+`onSuccess` refresh, a peer's coalesced live-sync refresh (REQ-FE-010), the reconnect resync burst, a
+debounced list filter, and a create/delete-driven reload. Under the load-induced latency variance that
+caused the 2026-07 outage (150 ms vs multi-second), an **older** GET can resolve **last** and overwrite
+a newer render with a staler DB snapshot — regressing the rows' `data-version` attributes (re-arming
+the "stale version → 409 on next click" landmine of REQ-FE-003) and, with `history:true`, leaving the
+address bar on whichever response landed last. `runSerialized` (REQ-FE-012) orders **writes**, never
+these read-side swaps.
+
+`swap` therefore carries a **per-container monotonic sequence guard**: each call claims the next
+sequence number for its container (`container._krtSwapSeq`); when its response resolves it touches the
+DOM (`innerHTML`), the `history.replaceState`, the `krt:swapped` dispatch and the loading indicator
+**only if it is still the latest** swap for that container. A superseded response is dropped whole. The
+previous in-flight request is `AbortController`-aborted so a slow older read stops wasting a backend
+round-trip. Living in `krt-fetch.js`, the guard covers **every** consumer (missions, operations, and
+any future stack) with no call-site change.
+
+**Acceptance**
+
+- [ ] Two swaps issued for one container with the **first** response delayed leave the container — and,
+  for a `history:true` swap, the address bar — reflecting the **second** (last-issued) request.
+- [ ] A superseded swap performs no `innerHTML` write, no `history.replaceState`, no `krt:swapped`
+  dispatch, and does not hide the indicator out from under the newer in-flight swap.
+- [ ] Disjoint containers are unaffected (the guard is per-container).
+
+**Enforced by:** code review + e2e (a peer edit landing during a slow local refresh does not regress
+the board) · **Code:** `krt-fetch.js` (`swap` sequence guard + `AbortController`) · **Issue:** #1151
+
+### REQ-FE-014 — The mission edit modal saves only the sections the user changed
+
+The mission edit form fans out to up to three section PATCHes (`schedule` → `core` → `flags`), each
+carrying its own optimistic-lock counter. Sending **all three** on every save — regardless of which
+fields changed — makes any concurrent schedule-section write by a peer 409 an unrelated edit: the
+"Jetzt" actual-time stamp and a `PLANNED → ACTIVE` auto-transition both bump `scheduleVersion`, so a
+name-only edit aborts at the (first-run) schedule PATCH before the core PATCH the user actually cares
+about is attempted. It also silently re-writes untouched schedule/flags values — e.g. erasing an
+auto-stamped `actualStartTime` on a later core-only save.
+
+The save is therefore **dirty-section-aware**: the edit JS snapshots each header section's fields at
+load and, at submit, sets the hidden `dirtyCore` / `dirtySchedule` / `dirtyFlags` inputs to whether the
+section actually changed; `applyMissionUpdate` **skips the PATCH for any section flagged `false`**. A
+`null` flag (the no-JavaScript classic fallback, or an older cached page) means "save this section", so
+the classic path still saves everything. The `schedule → core` ordering is kept for saves that touch
+both.
+
+**Acceptance**
+
+- [ ] A name-only edit issues **only** the core PATCH; a peer's concurrent `scheduleVersion` bump does
+  not 409 it.
+- [ ] The no-JavaScript classic `POST /missions/{id}` still saves every section (all flags default
+  `true` / absent).
+- [ ] A core-only save that triggers `PLANNED → ACTIVE` does not erase the server-auto-stamped
+  `actualStartTime` (its schedule PATCH is skipped).
+
+**Enforced by:** `MissionWriteControllerTest` (dirty-flag-gated PATCH fan-out) + e2e · **Code:**
+`MissionForm` (`dirtyCore` / `dirtySchedule` / `dirtyFlags`), `MissionWriteController`
+(`applyMissionUpdate`), `mission-detail.html` (hidden dirty inputs), `mission-detail.js` (section
+snapshot + `markDirtySections`) · **Issue:** #1136
 
 ## Out of scope
 

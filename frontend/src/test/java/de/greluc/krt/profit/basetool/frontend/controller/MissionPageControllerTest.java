@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.MissionForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ParticipantForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -91,6 +92,43 @@ class MissionPageControllerTest {
     assertEquals("", missionForm.meetingTime());
     assertEquals("", missionForm.plannedStartTime());
     assertEquals("", missionForm.plannedEndTime());
+  }
+
+  @Test
+  void addFormsToModel_fragmentRefetch_skipsUsersMeParticipantPrefill() {
+    // #1142: a fragment refetch (prefillParticipantUser=false) must NOT issue the uncached
+    // GET /api/v1/users/me that prefills the "join as me" participant form — the add-participant
+    // modal it feeds is rendered only by the full page. An empty ParticipantForm is still seeded.
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    MissionPageController controller =
+        new MissionPageController(
+            backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL);
+    Model model = new ConcurrentModel();
+    OidcUser principal = mock(OidcUser.class);
+
+    controller.addFormsToModel(model, principal, false);
+
+    verify(backendApiClient, never()).get(eq("/api/v1/users/me"), eq(UserDto.class));
+    assertTrue(model.containsAttribute("participantForm"));
+  }
+
+  @Test
+  void addFormsToModel_fullRender_prefillsUsersMeParticipantForm() {
+    // #1142: a full-page render (prefillParticipantUser=true) still fetches the caller's user
+    // record
+    // to prefill the "join as me" default.
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(null);
+    MissionPageController controller =
+        new MissionPageController(
+            backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL);
+    Model model = new ConcurrentModel();
+    OidcUser principal = mock(OidcUser.class);
+
+    controller.addFormsToModel(model, principal, true);
+
+    verify(backendApiClient).get(eq("/api/v1/users/me"), eq(UserDto.class));
+    assertTrue(model.containsAttribute("participantForm"));
   }
 
   @Test
