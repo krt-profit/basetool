@@ -208,6 +208,66 @@ Two crew-board writes that REQ-MISSION-007 assumed already lock-safe were not, a
 `MissionUnitDto` / `MissionCrewDto` / `UpdateUnitRequest` / `UpdateCrewRequest`, `mission-detail.html`,
 `mission-detail.js`. **Issues:** #1134, #1131 (epic #1109).
 
+### REQ-MISSION-017 — DB-enforced mission section-lock counters and row-version decoupling
+
+The per-section optimistic-lock counters (`coreVersion` / `scheduleVersion` / `flagsVersion` /
+`partyLeadVersion` / `stepsVersion` / `objectivesVersion` / `owningOrgUnitVersion`, REQ-MISSION-009 /
+-012 / -016) were checked and bumped **in memory** (`assertSectionVersion` + `bumpSectionVersion`).
+That read-then-write has a TOCTOU window under concurrency, and the mission's business scalars were
+not excluded from the row lock. Three concrete defects (round-2 audit, epic #1109):
+
+- **Silent lost update on the fully-excluded sections (#1112).** `setPartyLead` and
+  `updateOwningOrgUnit` mutate only `@OptimisticLock(excluded = true)` fields, so their `save`
+  issued a non-versioned UPDATE; two overlapping reassignments both passed the in-memory check and
+  the later commit silently overwrote the other — no 409.
+- **Cross-section 409 on the header sections (#1114).** `name` / `description` / `meetingPoint` /
+  `calendarLink` / `status` / the schedule timestamps / `isInternal` were **not** excluded, so any
+  core/schedule/flags edit bumped the row `@Version` and 409-ed an *unrelated* concurrent
+  section edit — the coarse, screen-wide lock CLAUDE.md flags as a defect.
+- **Duplicate `orderIndex` on steps/goals (#1147).** Two concurrent `addStep`/`addObjective` both
+  computed `orderIndex = max + 1` on the same snapshot and both committed, so `@OrderBy` rendered a
+  nondeterministic tie; concurrent reorders/deletes interleaved into gaps.
+
+**Fix.** Each section's check-and-bump is now a **single DB-enforced atomic conditional**
+`UPDATE Mission … SET xVersion = xVersion + 1 WHERE id = :id AND xVersion = :expected`
+(`MissionRepository.bump*VersionIfMatches`, dispatched by the private `MissionSection` enum through
+`MissionSectionVersions.enforceSectionVersion`); **0 rows affected → 409**. The statement row-locks
+the mission, so two racing same-section writers genuinely serialise — the loser blocks, re-reads the
+bumped counter and 409s. This is safe only because **every mutable `Mission` scalar and association is
+`@OptimisticLock(excluded = true)` and the entity is `@DynamicUpdate`**: a section edit dirties only
+its own columns, so it never bumps the row `@Version` (no cross-section 409) and the column-narrowed
+flush never clobbers a concurrent other-section change. The legacy full-replace `updateMission`
+(`PUT /missions/{id}`), whose only remaining guard once the scalars are excluded is the row
+`@Version`, force-increments it via JPA `OPTIMISTIC_FORCE_INCREMENT` (`findByIdForFullReplace`), so
+two concurrent whole-mission overwrites still 409. Steps and goals additionally gain a **deferrable
+unique `(mission_id, order_index)` constraint** (V208) as the DB backstop — `DEFERRABLE INITIALLY
+DEFERRED` so a reorder's transient in-flush collision is tolerated, yet a genuinely duplicate ordinal
+is rejected at commit. The two unconditional cross-section pokes with no client echo keep the
+in-memory `bumpSectionVersion`: the legacy full-replace and the activation auto-stamp of
+`actualStartTime`.
+
+**Acceptance**
+
+- [ ] Two concurrent same-section writers (append step / reassign party lead) against the same start
+  version: exactly one commits, the rest 409 (no duplicate `orderIndex`, no lost party-lead).
+- [ ] A core edit and a concurrent schedule edit on the same mission both succeed — neither 409s the
+  other, and neither bumps the row `@Version`.
+- [ ] A stale section-version echo returns 409; a matching echo advances only that section's counter.
+- [ ] A reorder that swaps ordinals commits without a unique violation; a duplicate `(mission_id,
+  order_index)` is rejected once the deferred constraint is checked.
+- [ ] Two concurrent legacy full-replace `updateMission` saves: exactly one wins, the rest 409.
+
+**Enforced by:** `MissionSectionLockConcurrencyTest` (real-contention same-section one-winner +
+cross-section no-collision), `MissionSectionLockDbEnforcementTest` (conditional bump, row-version
+decoupling, deferred-constraint tolerance + backstop), `MissionUniqueIndexBackstopTest`,
+`ConcurrencyTest` (full-replace one-winner), and the extended `MissionServiceSectionPatchTest` /
+`MissionStepServiceTest` / `MissionObjectiveServiceTest`. **Code:** `Mission` (`@DynamicUpdate` +
+per-scalar `@OptimisticLock(excluded = true)`), `MissionRepository.bump*VersionIfMatches` /
+`findByIdForFullReplace`, `MissionSectionVersions.enforceSectionVersion`, `MissionService` /
+`MissionTimelineService` / `MissionParticipantService`, migration `V208`. **Issues:** #1112, #1114,
+
+# 1147 (epic #1109).
+
 ### REQ-MISSION-009 — Ablauf (procedure timeline) steps
 
 A mission carries an ordered, reorderable list of **Ablauf** steps — a procedure timeline. Each step

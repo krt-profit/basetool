@@ -385,7 +385,7 @@ class MissionServiceTest {
         new UpdateMissionRequest(
             "Test", null, null, "ACTIVE", null, null, null, null, null, null, null, 0L, null);
 
-    when(missionRepository.findById(id)).thenReturn(Optional.of(existing));
+    when(missionRepository.findByIdForFullReplace(id)).thenReturn(Optional.of(existing));
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
 
     Mission updated = missionService.updateMission(id, details);
@@ -418,7 +418,7 @@ class MissionServiceTest {
             0L,
             null);
 
-    when(missionRepository.findById(id)).thenReturn(Optional.of(existing));
+    when(missionRepository.findByIdForFullReplace(id)).thenReturn(Optional.of(existing));
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
 
     Mission updated = missionService.updateMission(id, details);
@@ -439,7 +439,7 @@ class MissionServiceTest {
         new UpdateMissionRequest(
             "Test", null, null, "ACTIVE", null, null, null, null, null, null, null, 0L, null);
 
-    when(missionRepository.findById(id)).thenReturn(Optional.of(existing));
+    when(missionRepository.findByIdForFullReplace(id)).thenReturn(Optional.of(existing));
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
 
     Mission updated = missionService.updateMission(id, details);
@@ -471,7 +471,7 @@ class MissionServiceTest {
             0L,
             null);
 
-    when(missionRepository.findById(id)).thenReturn(Optional.of(existing));
+    when(missionRepository.findByIdForFullReplace(id)).thenReturn(Optional.of(existing));
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
 
     Mission updated = missionService.updateMission(id, details);

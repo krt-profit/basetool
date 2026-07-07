@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.support;
 
 import de.greluc.krt.profit.basetool.backend.model.Mission;
+import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import java.util.UUID;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
@@ -40,11 +41,23 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
  * counter reads as {@code 0L} here — the value a fresh section renders and echoes back, so the
  * first edit validates against {@code 0L}.
  *
+ * <p><strong>DB-enforced since #1112/#1114/#1147.</strong> The primary section guard is {@link
+ * #enforceSectionVersion(MissionRepository, Mission, MissionSection, Long, UUID)}: it runs the
+ * section's atomic conditional {@code UPDATE … WHERE id = ? AND xVersion = ?} on the repository, so
+ * the check-and-bump is a single row-locked statement instead of an in-memory read-then-write. That
+ * closes the millisecond window in which two managers racing the <em>same</em> section both passed
+ * the old in-memory check-then-bump and both committed — the silent lost update on party-lead /
+ * owning-org-unit (whose entire write set is excluded) and the duplicate order-index on steps /
+ * goals. The in-memory {@link #bumpSectionVersion} survives only for the two unconditional
+ * cross-section pokes that carry no client echo: the legacy full-replace ({@code
+ * MissionService.updateMission}) and the activation auto-stamp of {@code actualStartTime}.
+ *
  * <p>Lives in the dependency-leaf {@code support} package: it depends only on the {@link Mission}
- * entity, never on {@code service}. The core/schedule/flags/owning-org-unit sections are driven
- * from {@code MissionService}, steps/objectives from {@code MissionTimelineService}, and party-lead
- * from {@code MissionParticipantService} — all through this single guard, so the counter semantics
- * stay identical across the split.
+ * entity and its {@link MissionRepository}, never on {@code service}. The
+ * core/schedule/flags/owning-org-unit sections are driven from {@code MissionService},
+ * steps/objectives from {@code MissionTimelineService}, and party-lead from {@code
+ * MissionParticipantService} — all through this single guard, so the counter semantics stay
+ * identical across the split.
  */
 public final class MissionSectionVersions {
 
@@ -52,25 +65,47 @@ public final class MissionSectionVersions {
   private MissionSectionVersions() {}
 
   /**
-   * A mission's independently-versioned edit sections. Each constant binds the getter/setter of one
-   * manual {@code *Version} counter on {@link Mission}, letting {@link #assertSectionVersion} and
-   * {@link #bumpSectionVersion} operate on any section without a per-section helper.
+   * A mission's independently-versioned edit sections. Each constant binds the getter/setter and
+   * the repository conditional-bump of one manual {@code *Version} counter on {@link Mission},
+   * letting {@link #enforceSectionVersion} and {@link #bumpSectionVersion} operate on any section
+   * without a per-section helper.
    */
   public enum MissionSection {
     /** The mission core (name, description, status, owner-visible identity). */
-    CORE(Mission::getCoreVersion, Mission::setCoreVersion),
+    CORE(
+        Mission::getCoreVersion,
+        Mission::setCoreVersion,
+        MissionRepository::bumpCoreVersionIfMatches),
     /** The mission schedule (planned/actual start and end times). */
-    SCHEDULE(Mission::getScheduleVersion, Mission::setScheduleVersion),
+    SCHEDULE(
+        Mission::getScheduleVersion,
+        Mission::setScheduleVersion,
+        MissionRepository::bumpScheduleVersionIfMatches),
     /** The mission flags (e.g. the internal/public visibility toggle). */
-    FLAGS(Mission::getFlagsVersion, Mission::setFlagsVersion),
+    FLAGS(
+        Mission::getFlagsVersion,
+        Mission::setFlagsVersion,
+        MissionRepository::bumpFlagsVersionIfMatches),
     /** The mission party-lead assignment. */
-    PARTY_LEAD(Mission::getPartyLeadVersion, Mission::setPartyLeadVersion),
+    PARTY_LEAD(
+        Mission::getPartyLeadVersion,
+        Mission::setPartyLeadVersion,
+        MissionRepository::bumpPartyLeadVersionIfMatches),
     /** The Ablauf steps timeline. */
-    STEPS(Mission::getStepsVersion, Mission::setStepsVersion),
+    STEPS(
+        Mission::getStepsVersion,
+        Mission::setStepsVersion,
+        MissionRepository::bumpStepsVersionIfMatches),
     /** The mission objectives (Ziele). */
-    OBJECTIVES(Mission::getObjectivesVersion, Mission::setObjectivesVersion),
+    OBJECTIVES(
+        Mission::getObjectivesVersion,
+        Mission::setObjectivesVersion,
+        MissionRepository::bumpObjectivesVersionIfMatches),
     /** The owning-org-unit assignment. */
-    OWNING_ORG_UNIT(Mission::getOwningOrgUnitVersion, Mission::setOwningOrgUnitVersion);
+    OWNING_ORG_UNIT(
+        Mission::getOwningOrgUnitVersion,
+        Mission::setOwningOrgUnitVersion,
+        MissionRepository::bumpOwningOrgUnitVersionIfMatches);
 
     /** Reads the raw (nullable) counter value from a mission. */
     private final transient Function<Mission, Long> getter;
@@ -78,15 +113,25 @@ public final class MissionSectionVersions {
     /** Writes the counter value back onto a mission. */
     private final transient BiConsumer<Mission, Long> setter;
 
+    /** Runs this section's atomic conditional counter bump on the repository. */
+    private final transient SectionCounterBump dbBump;
+
     /**
-     * Binds a section constant to its {@code *Version} counter accessors on {@link Mission}.
+     * Binds a section constant to its {@code *Version} counter accessors on {@link Mission} and its
+     * atomic conditional bump on {@link MissionRepository}.
      *
      * @param getter reads the raw (nullable) counter value.
      * @param setter writes the counter value back.
+     * @param dbBump runs the section's {@code UPDATE … WHERE id = ? AND xVersion = ?} and returns
+     *     the affected row count.
      */
-    MissionSection(Function<Mission, Long> getter, BiConsumer<Mission, Long> setter) {
+    MissionSection(
+        Function<Mission, Long> getter,
+        BiConsumer<Mission, Long> setter,
+        SectionCounterBump dbBump) {
       this.getter = getter;
       this.setter = setter;
+      this.dbBump = dbBump;
     }
 
     /**
@@ -113,28 +158,58 @@ public final class MissionSectionVersions {
     }
   }
 
+  /** Runs a section's atomic conditional counter bump on the repository. */
+  @FunctionalInterface
+  private interface SectionCounterBump {
+
+    /**
+     * Executes the section's {@code UPDATE Mission … SET xVersion = xVersion + 1 WHERE id = ? AND
+     * xVersion = ?}.
+     *
+     * @param repository the mission repository.
+     * @param missionId the mission id.
+     * @param expected the counter value the caller echoed back.
+     * @return the affected row count ({@code 1} on a match, {@code 0} on a stale echo).
+     */
+    int bump(MissionRepository repository, UUID missionId, long expected);
+  }
+
   /**
-   * Checks the expected value of a mission's fine-grained {@link MissionSection} version counter
-   * against its current value, raising a 409 on mismatch so two managers racing on the
-   * <em>same</em> section surface a conflict instead of one silently overwriting the other, while a
-   * concurrent edit to an <em>unrelated</em> section never collides (REQ-ORG-018). An absent
-   * (never-bumped) counter reads as {@code 0L}, matching the value a fresh section renders and
-   * echoes back.
+   * Atomically validates and bumps a mission's fine-grained {@link MissionSection} version counter
+   * in a single row-locked {@code UPDATE … WHERE id = ? AND xVersion = ?}, raising a 409 when the
+   * echoed version is stale so two managers racing on the <em>same</em> section surface a conflict
+   * instead of one silently overwriting the other, while a concurrent edit to an <em>unrelated</em>
+   * section never collides (REQ-ORG-018). Unlike the former in-memory check-then-bump this leaves
+   * no window between the check and the write: the loser of a same-section race blocks on the row
+   * lock, re-reads the now-incremented counter and gets {@code 0} affected rows
+   * (#1112/#1114/#1147).
    *
-   * @param mission the managed mission whose counter to check.
+   * <p>On success the managed {@code mission}'s in-memory counter is advanced to {@code
+   * expectedVersion + 1} so the mapped response echoes the fresh version and the subsequent
+   * dirty-checking flush writes the same value (idempotent with the bump above). Callers must
+   * invoke this <strong>before</strong> mutating the section — the bump takes the row lock that
+   * serialises the writers.
+   *
+   * @param repository the mission repository that owns the conditional bump query.
+   * @param mission the managed mission whose in-memory counter to advance on success.
    * @param section the section the caller echoed a version back for.
    * @param expectedVersion the version the caller echoed back from the rendered page.
-   * @param missionId the mission id, for the conflict exception identifier.
-   * @throws ObjectOptimisticLockingFailureException when the expected version is stale.
+   * @param missionId the mission id, for the conditional bump and the conflict exception
+   *     identifier.
+   * @throws ObjectOptimisticLockingFailureException when the expected version is stale (0 rows
+   *     affected).
    */
-  public static void assertSectionVersion(
+  public static void enforceSectionVersion(
+      @NotNull MissionRepository repository,
       @NotNull Mission mission,
       @NotNull MissionSection section,
       @NotNull Long expectedVersion,
       @NotNull UUID missionId) {
-    if (!expectedVersion.equals(section.current(mission))) {
+    int updated = section.dbBump.bump(repository, missionId, expectedVersion);
+    if (updated == 0) {
       throw new ObjectOptimisticLockingFailureException(Mission.class, missionId);
     }
+    section.set(mission, expectedVersion + 1L);
   }
 
   /**

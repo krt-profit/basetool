@@ -19,8 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import static de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.assertSectionVersion;
-import static de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.bumpSectionVersion;
+import static de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.enforceSectionVersion;
 
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
@@ -101,7 +100,8 @@ public class MissionTimelineService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertSectionVersion(mission, MissionSection.STEPS, expectedStepsVersion, missionId);
+    enforceSectionVersion(
+        missionRepository, mission, MissionSection.STEPS, expectedStepsVersion, missionId);
 
     MissionStep step = new MissionStep();
     step.setTitle(title == null ? null : title.trim());
@@ -111,7 +111,6 @@ public class MissionTimelineService {
     mission.addStep(step);
     missionStepRepository.save(step);
 
-    bumpSectionVersion(mission, MissionSection.STEPS);
     missionRepository.save(mission);
     auditService.record(
         AuditEventType.MISSION_STEP_ADDED,
@@ -170,13 +169,13 @@ public class MissionTimelineService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertSectionVersion(mission, MissionSection.STEPS, expectedStepsVersion, missionId);
+    enforceSectionVersion(
+        missionRepository, mission, MissionSection.STEPS, expectedStepsVersion, missionId);
 
     MissionStep step = findStep(mission, stepId);
     step.setTitle(title == null ? null : title.trim());
     step.setMeta(normalizeStepMeta(meta));
 
-    bumpSectionVersion(mission, MissionSection.STEPS);
     missionRepository.save(mission);
     auditService.record(
         AuditEventType.MISSION_STEP_UPDATED,
@@ -201,7 +200,8 @@ public class MissionTimelineService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertSectionVersion(mission, MissionSection.STEPS, expectedStepsVersion, missionId);
+    enforceSectionVersion(
+        missionRepository, mission, MissionSection.STEPS, expectedStepsVersion, missionId);
 
     boolean removed = mission.removeStep(stepId);
     if (!removed) {
@@ -209,7 +209,6 @@ public class MissionTimelineService {
     }
     repackStepOrder(mission);
 
-    bumpSectionVersion(mission, MissionSection.STEPS);
     missionRepository.save(mission);
     auditService.record(
         AuditEventType.MISSION_STEP_REMOVED,
@@ -224,8 +223,12 @@ public class MissionTimelineService {
    * Reorders the mission's Ablauf steps. {@code orderedStepIds} must be exactly the mission's step
    * ids in the desired order; {@code orderIndex} is reassigned 0..n-1 by dirty-checking the managed
    * children (no per-child save, no bulk {@code clearAutomatically} query — so no detach/merge
-   * double-version bump). The {@code stepsVersion} optimistic guard serialises concurrent reorders,
-   * making a pessimistic lock unnecessary. Records a single reorder event (count only, no titles).
+   * double-version bump). Since #1147 the {@code stepsVersion} guard is DB-enforced: {@code
+   * enforceSectionVersion} runs an atomic conditional {@code UPDATE … WHERE stepsVersion = ?} that
+   * row-locks the mission, so concurrent reorders are genuinely serialised (the loser blocks,
+   * re-reads the bumped counter and 409s) — making a pessimistic lock unnecessary — and the
+   * deferrable unique {@code (mission_id, order_index)} index (V208) backstops any duplicate
+   * ordinal. Records a single reorder event (count only, no titles).
    *
    * @throws IllegalArgumentException when the id set does not match the mission's steps exactly
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
@@ -240,7 +243,8 @@ public class MissionTimelineService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertSectionVersion(mission, MissionSection.STEPS, expectedStepsVersion, missionId);
+    enforceSectionVersion(
+        missionRepository, mission, MissionSection.STEPS, expectedStepsVersion, missionId);
 
     Set<UUID> existingIds =
         mission.getSteps().stream().map(MissionStep::getId).collect(Collectors.toSet());
@@ -255,7 +259,6 @@ public class MissionTimelineService {
       byId.get(orderedStepIds.get(i)).setOrderIndex(i);
     }
 
-    bumpSectionVersion(mission, MissionSection.STEPS);
     missionRepository.save(mission);
     auditService.record(
         AuditEventType.MISSION_STEP_REORDERED,
@@ -284,12 +287,12 @@ public class MissionTimelineService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertSectionVersion(mission, MissionSection.STEPS, expectedStepsVersion, missionId);
+    enforceSectionVersion(
+        missionRepository, mission, MissionSection.STEPS, expectedStepsVersion, missionId);
 
     MissionStep step = findStep(mission, stepId);
     step.setDone(done);
 
-    bumpSectionVersion(mission, MissionSection.STEPS);
     missionRepository.save(mission);
     auditService.record(
         AuditEventType.MISSION_STEP_DONE_CHANGED,
@@ -367,7 +370,12 @@ public class MissionTimelineService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertSectionVersion(mission, MissionSection.OBJECTIVES, expectedObjectivesVersion, missionId);
+    enforceSectionVersion(
+        missionRepository,
+        mission,
+        MissionSection.OBJECTIVES,
+        expectedObjectivesVersion,
+        missionId);
 
     MissionObjective objective = new MissionObjective();
     objective.setTitle(title == null ? null : title.trim());
@@ -376,7 +384,6 @@ public class MissionTimelineService {
     mission.addObjective(objective);
     missionObjectiveRepository.save(objective);
 
-    bumpSectionVersion(mission, MissionSection.OBJECTIVES);
     missionRepository.save(mission);
     auditService.record(
         AuditEventType.MISSION_OBJECTIVE_ADDED,
@@ -435,13 +442,17 @@ public class MissionTimelineService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertSectionVersion(mission, MissionSection.OBJECTIVES, expectedObjectivesVersion, missionId);
+    enforceSectionVersion(
+        missionRepository,
+        mission,
+        MissionSection.OBJECTIVES,
+        expectedObjectivesVersion,
+        missionId);
 
     MissionObjective objective = findObjective(mission, objectiveId);
     objective.setTitle(title == null ? null : title.trim());
     objective.setKind(kind);
 
-    bumpSectionVersion(mission, MissionSection.OBJECTIVES);
     missionRepository.save(mission);
     auditService.record(
         AuditEventType.MISSION_OBJECTIVE_UPDATED,
@@ -466,7 +477,12 @@ public class MissionTimelineService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertSectionVersion(mission, MissionSection.OBJECTIVES, expectedObjectivesVersion, missionId);
+    enforceSectionVersion(
+        missionRepository,
+        mission,
+        MissionSection.OBJECTIVES,
+        expectedObjectivesVersion,
+        missionId);
 
     boolean removed = mission.removeObjective(objectiveId);
     if (!removed) {
@@ -474,7 +490,6 @@ public class MissionTimelineService {
     }
     repackObjectiveOrder(mission);
 
-    bumpSectionVersion(mission, MissionSection.OBJECTIVES);
     missionRepository.save(mission);
     auditService.record(
         AuditEventType.MISSION_OBJECTIVE_REMOVED,
@@ -489,8 +504,12 @@ public class MissionTimelineService {
    * Reorders the mission's goals. {@code orderedObjectiveIds} must be exactly the mission's goal
    * ids in the desired order; {@code orderIndex} is reassigned 0..n-1 by dirty-checking the managed
    * children (no per-child save, no bulk {@code clearAutomatically} query — so no detach/merge
-   * double-version bump). The {@code objectivesVersion} optimistic guard serialises concurrent
-   * reorders, making a pessimistic lock unnecessary. Records a single reorder event (count only).
+   * double-version bump). Since #1147 the {@code objectivesVersion} guard is DB-enforced: {@code
+   * enforceSectionVersion} runs an atomic conditional {@code UPDATE … WHERE objectivesVersion = ?}
+   * that row-locks the mission, so concurrent reorders are genuinely serialised (the loser blocks,
+   * re-reads the bumped counter and 409s) — making a pessimistic lock unnecessary — and the
+   * deferrable unique {@code (mission_id, order_index)} index (V208) backstops any duplicate
+   * ordinal. Records a single reorder event (count only).
    *
    * @throws IllegalArgumentException when the id set does not match the mission's goals exactly
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
@@ -505,7 +524,12 @@ public class MissionTimelineService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertSectionVersion(mission, MissionSection.OBJECTIVES, expectedObjectivesVersion, missionId);
+    enforceSectionVersion(
+        missionRepository,
+        mission,
+        MissionSection.OBJECTIVES,
+        expectedObjectivesVersion,
+        missionId);
 
     Set<UUID> existingIds =
         mission.getObjectives().stream().map(MissionObjective::getId).collect(Collectors.toSet());
@@ -520,7 +544,6 @@ public class MissionTimelineService {
       byId.get(orderedObjectiveIds.get(i)).setOrderIndex(i);
     }
 
-    bumpSectionVersion(mission, MissionSection.OBJECTIVES);
     missionRepository.save(mission);
     auditService.record(
         AuditEventType.MISSION_OBJECTIVE_REORDERED,

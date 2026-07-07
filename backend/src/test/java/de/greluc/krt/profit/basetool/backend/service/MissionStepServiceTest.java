@@ -24,8 +24,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -82,6 +84,11 @@ class MissionStepServiceTest {
         new LinkedHashSet<>(List.of(step(step1Id, "Briefing", 0), step(step2Id, "Mining", 1))));
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+    // Since #1147 enforceSectionVersion runs the DB-enforced conditional bump; default it to "1 row
+    // affected" (version matched) so happy paths pass. The stale-version test overrides it to 0.
+    lenient()
+        .when(missionRepository.bumpStepsVersionIfMatches(eq(missionId), anyLong()))
+        .thenReturn(1);
   }
 
   private static MissionStep step(UUID id, String title, int orderIndex) {
@@ -123,6 +130,7 @@ class MissionStepServiceTest {
 
   @Test
   void addStep_throws409_whenStepsVersionStale() {
+    when(missionRepository.bumpStepsVersionIfMatches(missionId, 2L)).thenReturn(0);
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
         () -> timelineService.addStep(missionId, "Eskorte", null, 2L));

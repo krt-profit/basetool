@@ -78,7 +78,14 @@ class V199MigrationTest {
     List<String> indexes =
         jdbcTemplate.queryForList(
             "SELECT indexname FROM pg_indexes WHERE tablename = 'mission_objective'", String.class);
-    assertTrue(indexes.contains("idx_mission_objective_mission_order"));
+    // V208 (#1147) replaced the plain V199 index idx_mission_objective_mission_order with the
+    // deferrable UNIQUE constraint uq_mission_objective_mission_order; its backing index still
+    // covers the (mission_id, order_index) lookups this test guards, and additionally enforces
+    // ordinal uniqueness. The context boots the full migration chain, so we assert the end state.
+    assertTrue(
+        indexes.contains("uq_mission_objective_mission_order"),
+        "the (mission_id, order_index) ordering must stay indexed (now via the V208 unique"
+            + " constraint's backing index)");
   }
 
   private Map<String, String> dataTypesOf(String tableName) {

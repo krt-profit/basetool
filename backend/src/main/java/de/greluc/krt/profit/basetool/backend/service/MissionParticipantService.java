@@ -19,8 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import static de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.assertSectionVersion;
-import static de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.bumpSectionVersion;
+import static de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.enforceSectionVersion;
 
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
@@ -654,7 +653,8 @@ public class MissionParticipantService {
         missionRepository
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
-    assertSectionVersion(mission, MissionSection.PARTY_LEAD, expectedPartyLeadVersion, missionId);
+    enforceSectionVersion(
+        missionRepository, mission, MissionSection.PARTY_LEAD, expectedPartyLeadVersion, missionId);
 
     if (userId != null) {
       User user =
@@ -671,7 +671,6 @@ public class MissionParticipantService {
       mission.setPartyLeadGuestName(null);
     }
 
-    bumpSectionVersion(mission, MissionSection.PARTY_LEAD);
     Mission saved = missionRepository.save(mission);
     auditService.record(
         AuditEventType.MISSION_PARTY_LEAD_CHANGED,
