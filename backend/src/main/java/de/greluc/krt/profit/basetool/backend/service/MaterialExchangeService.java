@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeInterestCount;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeOfferDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleasableItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleaseRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeRemarkUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto;
@@ -92,6 +93,9 @@ public class MaterialExchangeService {
 
   /** Upper bound on the board page size — the list is scrollable, not deeply paginated. */
   private static final int MAX_PAGE_SIZE = 500;
+
+  /** Cap on the number of rows the "Material anbieten" item picker returns. */
+  private static final int PICKER_LIMIT = 50;
 
   private final MaterialExchangeOfferRepository offerRepository;
   private final MaterialExchangeInterestRepository interestRepository;
@@ -416,6 +420,35 @@ public class MaterialExchangeService {
     }
     return offerRepository.findInventoryItemIdsWithStatus(
         MaterialExchangeOfferStatus.ACTIVE, inventoryItemIds);
+  }
+
+  /**
+   * Returns the caller's own Lager rows eligible for release, for the "Material anbieten" item
+   * picker — optionally filtered by a material-name fragment and capped at {@value #PICKER_LIMIT}
+   * rows. Each entry flags whether it already carries an active offer.
+   *
+   * @param query a material-name fragment, or {@code null}/blank for the caller's whole stock.
+   * @return the caller's releasable items (owner-scoped), never {@code null}.
+   */
+  @Transactional(readOnly = true)
+  public List<MaterialExchangeReleasableItemDto> myReleasableItems(@Nullable String query) {
+    UUID viewerId = requireViewerId();
+    List<InventoryItem> items =
+        inventoryItemRepository.findReleasableForUser(
+            viewerId, normalizeQuery(query), PageRequest.of(0, PICKER_LIMIT));
+    Set<UUID> released =
+        releasedInventoryItemIds(items.stream().map(InventoryItem::getId).toList());
+    return items.stream()
+        .map(
+            item ->
+                new MaterialExchangeReleasableItemDto(
+                    item.getId(),
+                    item.getMaterial().getName(),
+                    item.getQuality(),
+                    item.getAmount(),
+                    item.getLocation() == null ? null : item.getLocation().getName(),
+                    released.contains(item.getId())))
+        .toList();
   }
 
   /**
