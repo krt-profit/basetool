@@ -31,6 +31,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 @ExtendWith(MockitoExtension.class)
 class MissionServiceCrewTest {
@@ -72,7 +73,8 @@ class MissionServiceCrewTest {
     when(jobTypeRepository.findById(jobTypeId)).thenReturn(Optional.of(jobType));
 
     Mission updatedMission =
-        missionStructureService.updateCrewInShip(missionId, unitId, crewId, Set.of(jobTypeId));
+        missionStructureService.updateCrewInShip(
+            missionId, unitId, crewId, null, Set.of(jobTypeId));
 
     assertNotNull(updatedMission);
     MissionUnit updatedUnit = updatedMission.getAssignedUnits().iterator().next();
@@ -94,7 +96,7 @@ class MissionServiceCrewTest {
         RuntimeException.class,
         () ->
             missionStructureService.updateCrewInShip(
-                missionId, UUID.randomUUID(), UUID.randomUUID(), Collections.emptySet()));
+                missionId, UUID.randomUUID(), UUID.randomUUID(), null, Collections.emptySet()));
   }
 
   @Test
@@ -109,7 +111,7 @@ class MissionServiceCrewTest {
         RuntimeException.class,
         () ->
             missionStructureService.updateCrewInShip(
-                missionId, UUID.randomUUID(), UUID.randomUUID(), Collections.emptySet()));
+                missionId, UUID.randomUUID(), UUID.randomUUID(), null, Collections.emptySet()));
   }
 
   @Test
@@ -130,7 +132,92 @@ class MissionServiceCrewTest {
         RuntimeException.class,
         () ->
             missionStructureService.updateCrewInShip(
-                missionId, unitId, UUID.randomUUID(), Collections.emptySet()));
+                missionId, unitId, UUID.randomUUID(), null, Collections.emptySet()));
+  }
+
+  @Test
+  void updateCrewInShip_throwsConflict_whenClientVersionStale() {
+    // #1131: a stale full-set crew save must 409 rather than silently revert a concurrent edit.
+    UUID missionId = UUID.randomUUID();
+    UUID unitId = UUID.randomUUID();
+    UUID crewId = UUID.randomUUID();
+
+    Mission mission = new Mission();
+    mission.setId(missionId);
+    MissionUnit unit = new MissionUnit();
+    unit.setId(unitId);
+    mission.getAssignedUnits().add(unit);
+    MissionCrew crew = new MissionCrew();
+    crew.setId(crewId);
+    crew.setVersion(5L); // persisted version
+    unit.getCrew().add(crew);
+
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+
+    // Client echoes a stale version (4 != 5) -> optimistic-lock conflict, before any job-type
+    // fetch.
+    assertThrows(
+        ObjectOptimisticLockingFailureException.class,
+        () ->
+            missionStructureService.updateCrewInShip(
+                missionId, unitId, crewId, 4L, Set.of(UUID.randomUUID())));
+    verify(missionCrewRepository, never()).save(any());
+  }
+
+  @Test
+  void updateCrewInShip_passes_whenClientVersionMatches() {
+    UUID missionId = UUID.randomUUID();
+    UUID unitId = UUID.randomUUID();
+    UUID crewId = UUID.randomUUID();
+    UUID jobTypeId = UUID.randomUUID();
+
+    Mission mission = new Mission();
+    mission.setId(missionId);
+    MissionUnit unit = new MissionUnit();
+    unit.setId(unitId);
+    mission.getAssignedUnits().add(unit);
+    MissionCrew crew = new MissionCrew();
+    crew.setId(crewId);
+    crew.setVersion(7L);
+    unit.getCrew().add(crew);
+
+    JobType jobType = new JobType();
+    jobType.setId(jobTypeId);
+    jobType.setArchetype(JobTypeArchetype.CREW);
+
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+    when(jobTypeRepository.findById(jobTypeId)).thenReturn(Optional.of(jobType));
+
+    Mission result =
+        missionStructureService.updateCrewInShip(missionId, unitId, crewId, 7L, Set.of(jobTypeId));
+
+    assertNotNull(result);
+    MissionCrew updated = result.getAssignedUnits().iterator().next().getCrew().iterator().next();
+    assertEquals(1, updated.getJobTypes().size());
+    verify(missionCrewRepository).save(crew);
+  }
+
+  @Test
+  void updateMissionUnit_throwsConflict_whenClientVersionStale() {
+    // #1131: the same guard on the unit full-form save — a stale snapshot must 409, not clobber.
+    UUID missionId = UUID.randomUUID();
+    UUID unitId = UUID.randomUUID();
+
+    Mission mission = new Mission();
+    mission.setId(missionId);
+    MissionUnit unit = new MissionUnit();
+    unit.setId(unitId);
+    unit.setVersion(9L);
+    mission.getAssignedUnits().add(unit);
+
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+
+    // Stale client version (8 != 9) -> 409 at the check, before any ship / name resolution.
+    assertThrows(
+        ObjectOptimisticLockingFailureException.class,
+        () ->
+            missionStructureService.updateMissionUnit(
+                missionId, unitId, 8L, "Alpha", null, null, false, null, null, null));
   }
 
   @Test

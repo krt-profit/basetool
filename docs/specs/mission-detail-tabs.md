@@ -169,6 +169,45 @@ by edit permission). Backend endpoints, DTOs and the optimistic-locking flow (`v
 `data-version` DOM sync, 409 handling via `MissionSubresource`) are unchanged. Mission data shown
 read-only to non-editors in the old Details panel remains visible via the Übersicht tab.
 
+### REQ-MISSION-016 — Crew-board write concurrency: idempotent check-in and versioned unit/crew edits
+
+Two crew-board writes that REQ-MISSION-007 assumed already lock-safe were not, and are hardened here
+(round-2 audit, epic #1109):
+
+- **Check-in is idempotent (#1134).** A participant's `startTime` feeds the credited-time payout
+  breakdown, so it MUST NOT be overwritten by a repeated check-in. `checkIn` sets `startTime` to
+  `now()` **only** when it is still `null`; a second check-in (a duplicate delivery, or a stale crew
+  board — REQ-FE-010 window — that still renders the "Einchecken" button) is a **no-op** that
+  preserves the original arrival time and emits **no** second `MISSION_PARTICIPANT_CHECKED_IN` audit
+  event (a no-op is not a state mutation). `checkOut` keeps its opposite, override-on-repeat semantics
+  (late check-out corrections) on purpose.
+- **Unit and crew edits carry a real optimistic-lock version (#1131).** REQ-MISSION-007's "`version`
+  echo / `data-version` DOM sync" did **not** in fact exist for `MissionUnit` / `MissionCrew`: their
+  `@Version` was never surfaced in a DTO, the edit forms echoed nothing, and because the update
+  rewrites every field from the caller's snapshot the entity `@Version` could never fire on a stale
+  form — a two-manager edit silently lost one update. The unit/crew edit paths now echo the child
+  `@Version` end-to-end (`MissionUnitDto` / `MissionCrewDto` expose it, the edit buttons render
+  `th:data-version`, `UpdateUnitRequest` / versioned `UpdateCrewRequest` carry it, the service checks
+  it via `OptimisticLock.checkOptionalClient`), so a stale full-form save returns `409` instead of
+  clobbering; the fresh version rides back on the `crew` fragment re-render. Client-side contract:
+  REQ-FE-003.
+
+**Acceptance**
+
+- [ ] A repeated check-in preserves the original `startTime` and records no second `CHECKED_IN` audit
+  event; a first check-in still stamps `startTime` and audits once.
+- [ ] A stale mission unit or crew edit (client-echoed `@Version` behind the persisted row) returns
+  `409`; a matching version succeeds and the follow-up edit does not 409 (fresh version from the
+  fragment re-render).
+- [ ] A per-unit / per-crew edit never 409s a concurrent core/schedule/flags/participant edit
+  (per-row lock scope preserved).
+
+**Enforced by:** `MissionServicePayoutTest` (repeated check-in preserves `startTime`),
+`MissionServiceCrewTest` (unit/crew version-mismatch 409, matching-version success). **Code:**
+`MissionParticipantService#checkIn`, `MissionStructureService#updateMissionUnit`/`#updateCrewInShip`,
+`MissionUnitDto` / `MissionCrewDto` / `UpdateUnitRequest` / `UpdateCrewRequest`, `mission-detail.html`,
+`mission-detail.js`. **Issues:** #1134, #1131 (epic #1109).
+
 ### REQ-MISSION-009 — Ablauf (procedure timeline) steps
 
 A mission carries an ordered, reorderable list of **Ablauf** steps — a procedure timeline. Each step

@@ -323,6 +323,23 @@ circuit breaker) — is applied in a **single pass at the WebClient exchange fil
 `backendApi` instance; the formerly redundant method-level `@Retry`/`@CircuitBreaker` AOP layer on
 `BackendApiClient` (a separate `backend` instance) was removed (ADR-0032).
 
+**2026-07-07 — the entry point must not clobber the saved authorization request on background
+requests (#1137).** `SsoReAuthenticationEntryPoint` (REQ-SEC-008) is the entry point for *genuinely
+unauthenticated* requests (an `AuthenticationException`, distinct from the
+`ClientAuthorizationException` token-loss path above). It MUST discriminate request type: only a
+**top-level navigation** (`Sec-Fetch-Mode: navigate`, or — for pre-fetch-metadata clients — a request
+with no XHR/JSON/SSE marker) commences the `prompt=none` silent-SSO `302`. Every **background** request
+— a `fetch`/XHR write, the `EventSource` stream, a WebSocket handshake (`Sec-Fetch-Mode` ≠ `navigate`,
+or the `X-Requested-With: XMLHttpRequest` / `Accept: application/json` / `Accept: text/event-stream`
+fallback) — MUST instead receive a `401` carrying the `X-Reauthenticate` header (mirroring the
+token-loss AJAX contract) and MUST NOT be redirected. Rationale:
+`HttpSessionOAuth2AuthorizationRequestRepository` stores exactly one saved authorization request per
+session, so redirecting a background call overwrites the slot the user's genuine navigation needs, and
+the interactive re-login then fails with `authorization_request_not_found` — a nondeterministic
+mid-session lockout whenever any app tab (its SSE auto-reconnect in particular) stays open after
+session loss. The JS side needs no change: `krtFetch.maybeReauthenticate` and `notifications.js`
+already turn a `401 + X-Reauthenticate` into one controlled window redirect.
+
 To stop the in-session refresh race that produces this (parallel page + SSE + poll requests each
 replaying the same refresh token, which Keycloak's rotation + reuse detection then revokes — see
 `INGEST_KEYCLOAK_SETUP.md` step 4), the `OAuth2AuthorizedClientManager` is wrapped in a
@@ -416,13 +433,19 @@ it MUST hold regardless of either.
   `scope=all|mine`) never reaches Keycloak as the refresh-token grant scope: the
   `DefaultOAuth2AuthorizedClientManager` `contextAttributesMapper` returns an empty map, so a token
   refresh coinciding with such a request is not rejected with `invalid_scope`.
+- [ ] An unauthenticated **background** request (`Sec-Fetch-Mode` ≠ `navigate`, or an
+  `X-Requested-With: XMLHttpRequest` / `Accept: application/json` / `Accept: text/event-stream`
+  fallback) to `SsoReAuthenticationEntryPoint` returns `401 + X-Reauthenticate` and is NOT redirected,
+  leaving the session's single saved OAuth2 authorization request untouched; a top-level navigation
+  still commences the `prompt=none` silent SSO and sets the `SSO_ATTEMPTED` loop-guard cookie.
 
 **Enforced by:** `SingleFlightAuthorizedClientManagerTest`, `OAuth2ScopeRequestParamLeakTest`,
 `NotificationPageControllerStreamTest`, `GlobalExceptionHandlerTest`,
-`BackendApiClientResilienceTest` · **Code:** `SingleFlightAuthorizedClientManager`, `WebClientConfig`,
-`ReauthenticationRequiredException`, `BackendApiClient`, `GlobalExceptionHandler`,
-`NotificationPageController`, `krt-fetch.js` · **Issues:** ingest-rollout
-regression · **ADR:** ADR-0019
+`BackendApiClientResilienceTest`, `SsoReAuthenticationEntryPointTest` · **Code:**
+`SingleFlightAuthorizedClientManager`, `WebClientConfig`, `ReauthenticationRequiredException`,
+`BackendApiClient`, `GlobalExceptionHandler`, `NotificationPageController`,
+`SsoReAuthenticationEntryPoint`, `krt-fetch.js` · **Issues:** ingest-rollout
+regression, #1137 · **ADR:** ADR-0019
 
 ### REQ-SEC-013 — Frontend role checks read the Authentication token, not the OidcUser principal
 

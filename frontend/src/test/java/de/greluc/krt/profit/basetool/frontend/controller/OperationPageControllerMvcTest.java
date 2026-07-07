@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.OperationPayoutDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationPayoutSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Locale;
@@ -487,6 +488,30 @@ class OperationPageControllerMvcTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"participantKey\":\"" + participantId + "\",\"paidOut\":true}"))
         .andExpect(status().isOk());
+  }
+
+  @Test
+  @WithMockUser(roles = "MISSION_MANAGER")
+  void updatePayoutStatus_mapsBackend409ToConflict_notServerError() throws Exception {
+    UUID opId = UUID.randomUUID();
+    UUID participantId = UUID.randomUUID();
+
+    // A same-row toggle race that survived the backend's bounded retry surfaces as a backend 409.
+    when(backendApiClient.put(
+            eq("/api/v1/operations/" + opId + "/payouts/paid-out"),
+            any(),
+            eq(OperationPayoutDto.class),
+            anyBoolean()))
+        .thenThrow(new BackendServiceException("payout toggle race", null, 409));
+
+    // The proxy must mirror it as 409, not collapse it into a 500 (#1111).
+    mockMvc
+        .perform(
+            post("/operations/" + opId + "/payouts/paid-out")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"participantKey\":\"" + participantId + "\",\"paidOut\":true}"))
+        .andExpect(status().isConflict());
   }
 
   // ── /operations/{id} — canUnsetPaidOut model attribute ─────────────────

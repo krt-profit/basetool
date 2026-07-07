@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -55,12 +56,21 @@ import org.springframework.transaction.annotation.Transactional;
  * MissionCrew}s (ship-level participant groupings). Extracted from {@code MissionService} (L1 step
  * 2, #920) so the units/crews responsibility no longer shares that god-class's dependencies.
  *
- * <p>Units and crews are locked per row via their own JPA {@code @Version} (not a mission section
- * counter), so a unit/crew edit never collides with a concurrent core/schedule/flags/participant
- * edit. Each mutator persists the smallest owning child ({@code MissionUnit} / {@code MissionCrew})
- * and never {@code save(mission)}, keeping the mission row's {@code @Version} stable. {@code
- * MissionService} keeps its public unit/crew methods as thin delegations, so the controller and
- * transaction boundaries are unchanged.
+ * <p>Units and crews are locked per row (not via a mission section counter), so a unit/crew edit
+ * never collides with a concurrent core/schedule/flags/participant edit. Each mutator persists the
+ * smallest owning child ({@code MissionUnit} / {@code MissionCrew}) and never {@code
+ * save(mission)}, keeping the mission row's {@code @Version} stable. {@code MissionService} keeps
+ * its public unit/crew methods as thin delegations, so the controller and transaction boundaries
+ * are unchanged.
+ *
+ * <p><b>The child {@code @Version} alone does NOT prevent a stale-form lost update.</b> Both {@code
+ * updateMissionUnit} and {@code updateCrewInShip} rewrite <em>every</em> field from the caller's
+ * full-form snapshot, so the entity {@code @Version}'s Hibernate WHERE clause always matches the
+ * freshly loaded row and never fires on a stale form — it only catches two flushes overlapping
+ * in-flight. The real guard is the client-echoed {@code expectedVersion} these mutators check via
+ * {@link OptimisticLock#checkOptionalClient} (#1131); without that echo two managers editing the
+ * same unit/crew would silently clobber each other. {@code addUnitToMission} / {@code
+ * addCrewToShip} create fresh rows and carry no such check.
  */
 @Service
 @RequiredArgsConstructor
@@ -215,13 +225,33 @@ public class MissionStructureService {
   }
 
   /**
-   * Updates a unit's name and the assigned ship. Per-unit optimistic lock — concurrent unit edits
-   * across the mission don't collide.
+   * Updates a unit's name and the assigned ship. Guarded by the client-echoed {@code
+   * expectedVersion} (the {@code MissionUnit.@Version} the edit form last saw): because the update
+   * rewrites every unit field from the caller's full-form snapshot, the entity {@code @Version}'s
+   * own WHERE clause can never fire on a stale form (the fresh {@code findById} always matches the
+   * current row version), so this explicit check is the only thing that turns a two-manager lost
+   * update into a 409 instead of a silent clobber (#1131). A {@code null} {@code expectedVersion}
+   * skips the check (legacy / force-save). Per-unit scope — a rejected unit edit never blocks a
+   * concurrent core / schedule / flags / participant / crew edit.
+   *
+   * @param missionId owning mission
+   * @param unitId the unit to update
+   * @param expectedVersion the {@code MissionUnit.@Version} the client last saw, or {@code null} to
+   *     skip the optimistic-lock check
+   * @param name new display name (blank derives from ship / ship type)
+   * @param shipTypeId new ship type, or {@code null}
+   * @param shipId new ship, or {@code null}
+   * @param highValueUnit new high-value-unit flag
+   * @param frequency new comms frequency (100.00–999.99), or {@code null}
+   * @param responsibleUserId explicit responsible person, or {@code null}
+   * @param note free-text planning note
+   * @return the owning mission (unchanged {@code @Version} — only the child unit row is written)
    */
   @Transactional
   public Mission updateMissionUnit(
       @NotNull UUID missionId,
       @NotNull UUID unitId,
+      Long expectedVersion,
       String name,
       UUID shipTypeId,
       UUID shipId,
@@ -239,6 +269,9 @@ public class MissionStructureService {
             .filter(u -> u.getId().equals(unitId))
             .findFirst()
             .orElseThrow(() -> new NotFoundException("MissionUnit not found"));
+
+    OptimisticLock.checkOptionalClient(
+        missionUnit.getVersion(), expectedVersion, MissionUnit.class, unitId);
 
     missionUnit.setHighValueUnit(highValueUnit);
     missionUnit.setResponsibleUser(resolveResponsibleUser(responsibleUserId));
@@ -455,12 +488,27 @@ public class MissionStructureService {
     return mission;
   }
 
-  /** Updates a crew's name, role, and assigned ship. */
+  /**
+   * Updates a crew's assigned job types. Guarded by the client-echoed {@code expectedVersion} (the
+   * {@code MissionCrew.@Version} the edit form last saw) so two leads editing the same crew's job
+   * types concurrently get a 409 for the loser instead of a silent last-write-wins revert (#1131).
+   * A {@code null} {@code expectedVersion} skips the check (legacy / force-save). Per-crew scope —
+   * a rejected crew edit never blocks a concurrent unit / core / schedule / participant edit.
+   *
+   * @param missionId owning mission
+   * @param missionUnitId owning unit
+   * @param crewId the crew to update
+   * @param expectedVersion the {@code MissionCrew.@Version} the client last saw, or {@code null} to
+   *     skip the optimistic-lock check
+   * @param jobTypeIds the full replacement set of job type ids
+   * @return the owning mission (unchanged {@code @Version} — only the child crew row is written)
+   */
   @Transactional
   public Mission updateCrewInShip(
       @NotNull UUID missionId,
       @NotNull UUID missionUnitId,
       @NotNull UUID crewId,
+      Long expectedVersion,
       @NotNull Set<UUID> jobTypeIds) {
     Mission mission =
         missionRepository
@@ -478,6 +526,9 @@ public class MissionStructureService {
             .filter(c -> c.getId().equals(crewId))
             .findFirst()
             .orElseThrow(() -> new NotFoundException("Crew member not found in this unit"));
+
+    OptimisticLock.checkOptionalClient(
+        crew.getVersion(), expectedVersion, MissionCrew.class, crewId);
 
     Set<JobType> jobTypes = validateAndFetchJobTypes(jobTypeIds);
     crew.setJobTypes(jobTypes);

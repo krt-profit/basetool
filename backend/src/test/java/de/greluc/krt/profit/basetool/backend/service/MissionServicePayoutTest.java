@@ -75,6 +75,41 @@ class MissionServicePayoutTest {
   }
 
   @Test
+  void repeatedCheckIn_preservesOriginalStartTime_andIsANoOp() {
+    // #1134: a second check-in (stale crew board, duplicate delivery) must NOT reset startTime —
+    // startTime feeds the credited-time payout breakdown, so a reset to a later now() would
+    // silently
+    // shrink the participant's credited duration and skew the money distribution.
+    UUID missionId = UUID.randomUUID();
+    UUID participantId = UUID.randomUUID();
+    Mission mission = new Mission();
+    mission.setId(missionId);
+    mission.setActualStartTime(Instant.now().minusSeconds(7200));
+
+    Instant originalArrival = Instant.now().minusSeconds(3600);
+    MissionParticipant p = new MissionParticipant();
+    p.setId(participantId);
+    p.setMission(mission);
+    p.setStartTime(originalArrival); // already checked in earlier
+    mission.getParticipants().add(p);
+
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+    when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(p));
+
+    // When — a second check-in arrives
+    Mission updatedMission = missionParticipantService.checkIn(missionId, participantId);
+
+    // Then — the original arrival time is preserved and the no-op neither persists nor re-audits
+    MissionParticipant updatedParticipant = updatedMission.getParticipants().iterator().next();
+    assertSame(
+        originalArrival,
+        updatedParticipant.getStartTime(),
+        "repeated check-in must preserve the original arrival timestamp");
+    verify(missionParticipantRepository, never()).save(any(MissionParticipant.class));
+    verifyNoInteractions(auditService);
+  }
+
+  @Test
   void shouldCheckOutParticipant() {
     // Given
     UUID missionId = UUID.randomUUID();

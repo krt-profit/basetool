@@ -267,9 +267,14 @@ function opsDetailConflict() {
     if (deleteForm) {
         deleteForm.addEventListener('submit', function (event) {
             event.preventDefault();
+            // Explicit submitter (bank.js pattern) so a double-click on Löschen cannot fire a second
+            // DELETE that 404s and toasts "Fehler beim Löschen" over the succeeding navigation
+            // (#1133). The synchronous resolveSubmitter guard in write() would auto-capture it too,
+            // but threading it explicitly keeps the guard robust if the auto-capture ever misses.
             window.krtFetch.write({
                 method: 'POST',
                 url: deleteForm.action,
+                submitter: deleteForm.querySelector('button[type="submit"]'),
                 successMessage: OPS_DETAIL_MSG.deleteSuccess,
                 errorMessage: OPS_DETAIL_MSG.deleteError,
                 conflict: opsDetailConflict(),

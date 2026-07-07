@@ -7634,7 +7634,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/AddUnitRequest"
+                "$ref" : "#/components/schemas/UpdateUnitRequest"
               }
             }
           },
@@ -7838,7 +7838,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/AddUnitRequest"
+                "$ref" : "#/components/schemas/UpdateUnitRequest"
               }
             }
           },
@@ -50882,6 +50882,10 @@
           "participantName" : {
             "type" : "string"
           },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
           "jobTypes" : {
             "type" : "array",
             "items" : {
@@ -51200,6 +51204,10 @@
           "note" : {
             "type" : "string"
           },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
           "crew" : {
             "type" : "array",
             "items" : {
@@ -51261,7 +51269,7 @@
           }
         }
       },
-      "AddUnitRequest" : {
+      "UpdateUnitRequest" : {
         "type" : "object",
         "properties" : {
           "name" : {
@@ -51292,6 +51300,10 @@
             "type" : "string",
             "maxLength" : 500,
             "minLength" : 0
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         },
         "required" : [ "name" ]
@@ -51306,6 +51318,10 @@
               "format" : "uuid"
             },
             "uniqueItems" : true
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         }
       },
@@ -53059,6 +53075,41 @@
           }
         },
         "required" : [ "title" ]
+      },
+      "AddUnitRequest" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "shipTypeId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "shipId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "highValueUnit" : {
+            "type" : "boolean"
+          },
+          "frequency" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "responsibleUserId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "note" : {
+            "type" : "string",
+            "maxLength" : 500,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "name" ]
       },
       "AddCrewRequest" : {
         "type" : "object",

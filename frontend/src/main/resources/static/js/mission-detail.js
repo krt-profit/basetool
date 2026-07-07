@@ -1687,6 +1687,13 @@ document.addEventListener('DOMContentLoaded', function () {
                         'data-unit-id',
                         this.getAttribute('data-unit-id') || '',
                     );
+                    // #1131: carry the unit's @Version so the save echoes it back for the
+                    // optimistic-lock check. The crew fragment refresh on success re-renders this
+                    // button with the bumped version, so a follow-up edit reads the fresh one.
+                    editUnitForm.setAttribute(
+                        'data-version',
+                        this.getAttribute('data-version') || '',
+                    );
                     editUnitName.value = this.getAttribute('data-name') || '';
                     const shiptypeVal = this.getAttribute('data-shiptype') || '';
                     const shipVal = this.getAttribute('data-ship') || '';
@@ -1779,6 +1786,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     return;
                 }
                 const fd = new FormData(editForm);
+                const versionAttr = editForm.getAttribute('data-version');
                 const payload = {
                     name: fd.get('name') || '',
                     shipTypeId: fd.get('shipTypeId') || null,
@@ -1787,6 +1795,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     frequency: fd.get('frequency') ? parseFloat(fd.get('frequency')) : null,
                     responsibleUserId: fd.get('responsibleUserId') || null,
                     note: fd.get('note') || null,
+                    // #1131: echo the unit @Version for the optimistic-lock check (409 on stale form).
+                    version: versionAttr ? Number(versionAttr) : null,
                 };
                 const res = await window.krtMissionWrite({
                     method: 'PUT',
@@ -2010,6 +2020,8 @@ document.addEventListener('DOMContentLoaded', function () {
             );
             editCrewForm.setAttribute('data-unit-id', source.getAttribute('data-unit-id') || '');
             editCrewForm.setAttribute('data-crew-id', source.getAttribute('data-crew-id') || '');
+            // #1131: carry the crew's @Version so the save echoes it for the optimistic-lock check.
+            editCrewForm.setAttribute('data-version', source.getAttribute('data-version') || '');
             const jobIds = (source.getAttribute('data-jobs') || '').split(',');
 
             for (let i = 0; i < editCrewJobs.options.length; i++) {
@@ -2056,8 +2068,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     return; // fall back to classical submit
                 }
                 ev.preventDefault();
+                const versionAttr = editForm.getAttribute('data-version');
                 const payload = {
                     jobTypeIds: collectJobTypeIds(editForm),
+                    // #1131: echo the crew @Version for the optimistic-lock check (409 on stale form).
+                    version: versionAttr ? Number(versionAttr) : null,
                 };
                 const res = await window.krtMissionWrite({
                     method: 'PUT',
@@ -3448,10 +3463,16 @@ if (document.readyState === 'loading') {
         }
         const ajaxUrl = sel.getAttribute('data-action-ajax');
         if (!ajaxUrl || !window.krtMissionWrite) return;
+        const versionAttr = sel.getAttribute('data-version');
         const res = await window.krtMissionWrite({
             method: 'PUT',
             url: ajaxUrl,
-            payload: { jobTypeIds: value ? [value] : [] },
+            // #1131: the quick single-function change also rewrites the crew's whole job-type set,
+            // so it echoes the crew @Version too; a stale select 409s instead of clobbering.
+            payload: {
+                jobTypeIds: value ? [value] : [],
+                version: versionAttr ? Number(versionAttr) : null,
+            },
             sectionKey: 'crew',
         });
         if (res.ok) {

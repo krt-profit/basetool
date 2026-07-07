@@ -71,7 +71,8 @@ class MissionControllerSecurityTest {
 
     when(missionSecurityService.canManageMission(any(UUID.class), ArgumentMatchers.any()))
         .thenReturn(true);
-    when(missionService.updateCrewInShip(any(), any(), any(), any())).thenReturn(new Mission());
+    when(missionService.updateCrewInShip(any(), any(), any(), any(), any()))
+        .thenReturn(new Mission());
 
     mockMvc
         .perform(
