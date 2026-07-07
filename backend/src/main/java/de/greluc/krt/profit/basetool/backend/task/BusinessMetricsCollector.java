@@ -25,11 +25,13 @@ import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestStatus;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus;
 import de.greluc.krt.profit.basetool.backend.model.OperationStatus;
 import de.greluc.krt.profit.basetool.backend.model.P4kImportJobStatus;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.repository.BankBookingRequestRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.P4kImportJobRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
@@ -84,6 +86,7 @@ public class BusinessMetricsCollector {
   private final OperationRepository operationRepository;
   private final RefineryOrderRepository refineryOrderRepository;
   private final P4kImportJobRepository p4kImportJobRepository;
+  private final MaterialExchangeOfferRepository materialExchangeOfferRepository;
   private final TaskMetrics taskMetrics;
 
   private final AtomicLong registrationPending = new AtomicLong();
@@ -102,6 +105,7 @@ public class BusinessMetricsCollector {
   private final AtomicLong p4kPending = new AtomicLong();
   private final AtomicLong p4kRunning = new AtomicLong();
   private final AtomicLong p4kOldestAge = new AtomicLong();
+  private final AtomicLong materialExchangeActive = new AtomicLong();
 
   /**
    * Registers every queue-depth and oldest-age gauge against its holder once at startup, so each
@@ -133,6 +137,11 @@ public class BusinessMetricsCollector {
     countGauge(MetricNames.P4K_IMPORT_JOB_PENDING, p4kPending, P4kImportJobStatus.PENDING.name());
     countGauge(MetricNames.P4K_IMPORT_JOB_PENDING, p4kRunning, P4kImportJobStatus.RUNNING.name());
     ageGauge(MetricNames.P4K_IMPORT_JOB_PENDING_OLDEST_AGE, p4kOldestAge);
+
+    countGauge(
+        MetricNames.MATERIAL_EXCHANGE_ACTIVE,
+        materialExchangeActive,
+        MaterialExchangeOfferStatus.ACTIVE.name());
   }
 
   /**
@@ -191,6 +200,9 @@ public class BusinessMetricsCollector {
     p4kRunning.set(p4kImportJobRepository.countByStatus(P4kImportJobStatus.RUNNING));
     p4kOldestAge.set(
         ageSeconds(p4kImportJobRepository.findOldestCreatedAtByStatus(P4kImportJobStatus.PENDING)));
+
+    materialExchangeActive.set(
+        materialExchangeOfferRepository.countByStatus(MaterialExchangeOfferStatus.ACTIVE));
   }
 
   /**

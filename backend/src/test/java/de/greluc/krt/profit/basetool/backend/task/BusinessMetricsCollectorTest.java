@@ -28,9 +28,11 @@ import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestStatus;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus;
 import de.greluc.krt.profit.basetool.backend.model.P4kImportJobStatus;
 import de.greluc.krt.profit.basetool.backend.repository.BankBookingRequestRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.P4kImportJobRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
@@ -57,6 +59,7 @@ class BusinessMetricsCollectorTest {
   @Mock private OperationRepository operationRepository;
   @Mock private RefineryOrderRepository refineryOrderRepository;
   @Mock private P4kImportJobRepository p4kImportJobRepository;
+  @Mock private MaterialExchangeOfferRepository materialExchangeOfferRepository;
 
   private SimpleMeterRegistry registry;
   private BusinessMetricsCollector collector;
@@ -73,6 +76,7 @@ class BusinessMetricsCollectorTest {
             operationRepository,
             refineryOrderRepository,
             p4kImportJobRepository,
+            materialExchangeOfferRepository,
             new TaskMetrics(registry));
     // @PostConstruct is not invoked for a plain unit-constructed bean.
     collector.registerGauges();
@@ -88,6 +92,8 @@ class BusinessMetricsCollectorTest {
     when(jobOrderRepository.countByStatus(JobOrderStatus.OPEN)).thenReturn(5L);
     when(jobOrderRepository.countByStatus(JobOrderStatus.IN_PROGRESS)).thenReturn(2L);
     when(p4kImportJobRepository.countByStatus(P4kImportJobStatus.PENDING)).thenReturn(1L);
+    when(materialExchangeOfferRepository.countByStatus(MaterialExchangeOfferStatus.ACTIVE))
+        .thenReturn(7L);
 
     collector.refresh();
 
@@ -99,6 +105,10 @@ class BusinessMetricsCollectorTest {
         .isEqualTo(2.0d);
     assertThat(statusGauge(MetricNames.P4K_IMPORT_JOB_PENDING, P4kImportJobStatus.PENDING.name()))
         .isEqualTo(1.0d);
+    assertThat(
+            statusGauge(
+                MetricNames.MATERIAL_EXCHANGE_ACTIVE, MaterialExchangeOfferStatus.ACTIVE.name()))
+        .isEqualTo(7.0d);
   }
 
   @Test

@@ -63,5 +63,14 @@ public enum AuditDomain {
    * gradings. Every catalogue or evaluation mutation is captured here. For an evaluation the
    * subject is the graded category (its non-personal label); the member is the target reference.
    */
-  PROMOTION
+  PROMOTION,
+
+  /**
+   * Materialbörse — the material-exchange trade board (Flotte &amp; Logistik, REQ-MARKET-001…): a
+   * player releasing a Lager row for trade, editing its remark, deactivating the offer, and members
+   * registering or withdrawing interest. The subject is the offer (labelled by material, a
+   * non-personal value); the anbieter is the target reference. Interessenten identities are never
+   * recorded — only counts and lengths.
+   */
+  MARKET
 }

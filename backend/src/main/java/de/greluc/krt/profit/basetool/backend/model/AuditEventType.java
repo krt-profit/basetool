@@ -421,7 +421,29 @@ public enum AuditEventType {
   PROMOTION_AUDIT_EXPORTED(AuditDomain.PROMOTION),
 
   /** Promotion audit rows older than an admin-chosen cutoff were purged (retention). */
-  PROMOTION_AUDIT_PURGED(AuditDomain.PROMOTION);
+  PROMOTION_AUDIT_PURGED(AuditDomain.PROMOTION),
+
+  // ------------------------------------------------------------- MARKET (Materialbörse) --
+  /** A Lager row was released to the Materialbörse (an offer became publicly listed). */
+  MARKET_OFFER_RELEASED(AuditDomain.MARKET),
+
+  /** An offer was taken off the board (deactivated) by its owner. */
+  MARKET_OFFER_DEACTIVATED(AuditDomain.MARKET),
+
+  /** An offer's trade remark was edited by its owner. */
+  MARKET_REMARK_UPDATED(AuditDomain.MARKET),
+
+  /** A member registered interest in an offer ("Interesse anmelden"). */
+  MARKET_INTEREST_REGISTERED(AuditDomain.MARKET),
+
+  /** A member withdrew their interest from an offer ("Interesse zurückziehen"). */
+  MARKET_INTEREST_WITHDRAWN(AuditDomain.MARKET),
+
+  /** The Materialbörse audit log was exported as a PDF or JSON for a period. */
+  MARKET_AUDIT_EXPORTED(AuditDomain.MARKET),
+
+  /** Materialbörse audit rows older than an admin-chosen cutoff were purged (retention). */
+  MARKET_AUDIT_PURGED(AuditDomain.MARKET);
 
   /** The functional area this event type belongs to; pins the persisted {@code domain} column. */
   private final AuditDomain domain;
