@@ -142,7 +142,12 @@ already current in the DTO regardless of flush timing, nor to writes whose handl
 fragment from a fresh server `GET` (the re-swap re-reads the committed version). See the
 optimistic-locking rules in `CLAUDE.md`. (A 2026-06 area audit added
 `JobOrderService.updateJobOrder` to the `saveAndFlush` set — its edit-modal version writeback
-otherwise 409s the next consecutive order edit.)
+otherwise 409s the next consecutive order edit. A 2026-07 audit added the participant write path —
+`MissionParticipantService.updateParticipantAttributes` / `checkIn` / `checkOut` — for the same
+reason: `MissionController` is class-`@Transactional` and maps the slim participant DTO inside the
+transaction, so a plain `save()` shipped a version stale by one to the S1 check-in/edit writeback,
+and the participant's own next edit self-409'd. The mid-method payout flush was dropped into the
+single end-of-method flush so the version bumps exactly once, #1135.)
 
 **Acceptance**
 
@@ -151,9 +156,13 @@ otherwise 409s the next consecutive order edit.)
 - [ ] All related `[data-version]` attributes in the DOM context hold the new version after success.
 - [ ] A write whose response feeds an in-place version writeback returns the flushed
   (post-increment) version — `saveAndFlush` wherever the DTO is mapped inside the transaction.
+- [ ] A participant edit / check-in / check-out immediately followed by a second edit of the same
+  participant does not 409 (the slim response carries the committed, post-flush `@Version`).
 
-**Enforced by:** per-area e2e "double-action" assertion · **Code:** `krt-fetch.js` (`syncVersion`)
-· **Issues:** #571
+**Enforced by:** per-area e2e "double-action" assertion, `MissionServicePayoutTest` (check-in/out
+flush) · **Code:** `krt-fetch.js` (`syncVersion`), `MissionParticipantService` · **Issues:** #571,
+
+# 1135
 
 ### REQ-FE-004 — CSRF stays session/meta-based with transparent retry-on-403
 

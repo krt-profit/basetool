@@ -409,9 +409,15 @@ public class MissionParticipantService {
     }
 
     if (payoutPreference != null) {
+      // #1135: no mid-method flush here. The single end-of-method saveAndFlush is the only flush,
+      // so
+      // the participant @Version bumps exactly once and the DTO mapped by the class-@Transactional
+      // controller carries the committed (post-increment) version (REQ-FE-003). The old flush here
+      // —
+      // before the orgUnits / planned-job-type mutations below — bumped the version a second time
+      // at
+      // commit, AFTER the DTO was mapped, so the S1 check-in/edit writeback stamped a stale value.
       participant.setPayoutPreference(payoutPreference);
-      missionParticipantRepository.save(participant);
-      missionParticipantRepository.flush();
     }
 
     if (desiredMissionJobTypeId != null) {
@@ -473,8 +479,15 @@ public class MissionParticipantService {
         }
       }
       participant.setPlannedMissionJobType(jt);
+      // #1113: keep the derived mission-lead flag in lock-step with the planned job type so the
+      // partial unique index (uq_mission_participant_single_lead) is the DB backstop for the
+      // in-memory anyMatch above — a concurrent second assignment that the anyMatch's stale
+      // snapshot
+      // misses now fails the index at flush (saveAndFlush below) as a 409 instead of a second lead.
+      participant.setMissionLeadParticipant(jt.isMissionLead());
     } else {
       participant.setPlannedMissionJobType(null);
+      participant.setMissionLeadParticipant(false);
     }
 
     participant.setComment(comment);
@@ -493,8 +506,11 @@ public class MissionParticipantService {
     participant.setStartTime(startTime);
     participant.setEndTime(endTime);
 
-    // Persist the participant explicitly; avoid save(mission) to keep Mission.version stable.
-    missionParticipantRepository.save(participant);
+    // Persist the participant explicitly (avoid save(mission) to keep Mission.@Version stable) and
+    // flush now so the @Version increment lands BEFORE the class-@Transactional controller maps the
+    // slim DTO — otherwise the response (and the S1 writeback that consumes it) carries the stale
+    // pre-flush version and the next consecutive edit self-409s (#1135, REQ-FE-003).
+    missionParticipantRepository.saveAndFlush(participant);
     auditService.record(
         AuditEventType.MISSION_PARTICIPANT_UPDATED,
         mission.getId(),
@@ -520,7 +536,9 @@ public class MissionParticipantService {
       throw new IllegalArgumentException("Cannot check in before mission actual start time is set");
     }
     participant.setStartTime(Instant.now());
-    missionParticipantRepository.save(participant);
+    // saveAndFlush so the @Version increment lands before the controller maps the slim DTO, so the
+    // S1 check-in writeback stamps the committed version, not a stale pre-flush one (#1135).
+    missionParticipantRepository.saveAndFlush(participant);
     auditService.record(
         AuditEventType.MISSION_PARTICIPANT_CHECKED_IN,
         mission.getId(),
@@ -551,7 +569,9 @@ public class MissionParticipantService {
     } else {
       participant.setEndTime(Instant.now());
     }
-    missionParticipantRepository.save(participant);
+    // saveAndFlush so the @Version increment lands before the controller maps the slim DTO, so the
+    // S1 check-out writeback stamps the committed version, not a stale pre-flush one (#1135).
+    missionParticipantRepository.saveAndFlush(participant);
     auditService.record(
         AuditEventType.MISSION_PARTICIPANT_CHECKED_OUT,
         mission.getId(),

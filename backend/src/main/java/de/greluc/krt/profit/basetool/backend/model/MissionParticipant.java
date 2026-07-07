@@ -107,6 +107,19 @@ public class MissionParticipant extends AbstractEntity<UUID> {
   @JoinColumn(name = "planned_task_job_type_id")
   private JobType plannedMissionJobType;
 
+  /**
+   * Derived flag: {@code true} exactly when {@link #plannedMissionJobType} is the designated
+   * mission-lead ("Einsatzleiter") job type ({@code JobType.isMissionLead}). Maintained by the
+   * service wherever the planned job type changes and backed by a partial unique index ({@code
+   * uq_mission_participant_single_lead}, V206) on {@code (mission_id) WHERE
+   * is_mission_lead_participant} so two managers cannot concurrently make two different
+   * participants of the same mission the Einsatzleiter (REQ-MISSION-013, #1113). Stored (not
+   * computed) because the partial unique index needs a column and the invariant depends on a join
+   * to {@code job_type}.
+   */
+  @Column(name = "is_mission_lead_participant", nullable = false)
+  private boolean missionLeadParticipant = false;
+
   @Column(columnDefinition = "TEXT")
   private String comment;
 

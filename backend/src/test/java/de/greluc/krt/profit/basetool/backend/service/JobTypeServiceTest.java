@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.model.JobType;
 import de.greluc.krt.profit.basetool.backend.model.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobTypeDto;
 import de.greluc.krt.profit.basetool.backend.repository.JobTypeRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -48,6 +49,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class JobTypeServiceTest {
 
   @Mock private JobTypeRepository jobTypeRepository;
+  @Mock private MissionParticipantRepository missionParticipantRepository;
   @InjectMocks private JobTypeService jobTypeService;
 
   private static JobType missionLeadership() {

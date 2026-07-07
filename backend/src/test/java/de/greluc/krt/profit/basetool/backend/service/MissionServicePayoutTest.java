@@ -70,7 +70,8 @@ class MissionServicePayoutTest {
     assertNotNull(updatedParticipant.getStartTime(), "Start time should be set");
     // Option A: parent Mission.version must NOT be bumped by a sub-section write.
     verify(missionRepository, never()).save(any(Mission.class));
-    verify(missionParticipantRepository).save(p);
+    // #1135: check-in flushes so the slim DTO carries the committed participant @Version.
+    verify(missionParticipantRepository).saveAndFlush(p);
   }
 
   @Test
@@ -98,7 +99,8 @@ class MissionServicePayoutTest {
     assertNotNull(updatedParticipant.getEndTime(), "End time should be set");
     // Option A: parent Mission.version must NOT be bumped by a sub-section write.
     verify(missionRepository, never()).save(any(Mission.class));
-    verify(missionParticipantRepository).save(p);
+    // #1135: check-out flushes so the slim DTO carries the committed participant @Version.
+    verify(missionParticipantRepository).saveAndFlush(p);
   }
 
   @Test
