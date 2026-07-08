@@ -309,8 +309,11 @@
             clearTimeout(peerTimer);
         }
         peerTimer = setTimeout(function () {
+            // Skip the peer-driven refresh while the release/edit modal is open so an
+            // in-progress dialog is not disrupted. The modal is shown via inline
+            // display:flex (DS contract), so read that, not a hidden attribute.
             let modal = document.getElementById('mb-modal');
-            if (modal && !modal.hidden) {
+            if (modal && modal.style.display !== '' && modal.style.display !== 'none') {
                 return;
             }
             swapList();
