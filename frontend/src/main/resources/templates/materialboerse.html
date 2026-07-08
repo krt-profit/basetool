@@ -28,7 +28,6 @@
     <!-- ===================== page head + primary CTA ===================== -->
     <div class="greeting hud-box mb-head">
         <div class="mb-head-title">
-            <p class="mb-eyebrow" th:text="#{materialboerse.eyebrow}">Flotte &amp; Logistik</p>
             <h1 th:text="#{materialboerse.title}">Materialbörse</h1>
         </div>
         <button type="button" class="btn btn--cta" data-mb-open-release="new">
@@ -36,7 +35,6 @@
             <span th:text="#{materialboerse.cta.offer}">Material anbieten</span>
         </button>
     </div>
-    <p class="mb-intro" th:text="#{materialboerse.intro}">Zentraler Marktplatz für zum Tausch freigegebene Materialien.</p>
 
     <!-- ===================== board (swappable region) ===================== -->
     <div id="mb-board">
@@ -54,12 +52,6 @@
                             <span th:text="#{materialboerse.tab.mine}">Meine Angebote</span>
                             <span class="tab-count" th:text="${countMine}">0</span>
                         </button>
-                    </div>
-                    <div class="mb-search">
-                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-search"/></svg>
-                        <input type="search" data-mb-search th:value="${filterQ}"
-                               th:placeholder="#{materialboerse.filter.search.placeholder}"
-                               th:aria-label="#{materialboerse.filter.search.placeholder}"/>
                     </div>
                 </div>
                 <div class="mb-filters">
@@ -84,6 +76,12 @@
                             <option value="mat" th:selected="${filterSort == 'mat'}" th:text="#{materialboerse.sort.mat}">Material A–Z</option>
                             <option value="neu" th:selected="${filterSort == 'neu'}" th:text="#{materialboerse.sort.neu}">Neueste zuerst</option>
                         </select>
+                    </div>
+                    <div class="mb-search">
+                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-search"/></svg>
+                        <input type="search" data-mb-search th:value="${filterQ}"
+                               th:placeholder="#{materialboerse.filter.search.placeholder}"
+                               th:aria-label="#{materialboerse.filter.search.placeholder}"/>
                     </div>
                 </div>
             </div>
