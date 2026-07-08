@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Fehler behoben: In der Materialbörse ließen sich nicht alle Materialien anbieten.** Die Auswahlliste im Dialog „Material anbieten" zeigte nur die ersten 50 Lager-Posten (alphabetisch) und filterte danach im Browser, sodass Materialien weiter hinten im Alphabet (etwa Savrilium) nicht gefunden und nicht angeboten werden konnten — ohne Fehlermeldung. Die Materialsuche im Dialog läuft jetzt serverseitig, sodass jeder eigene Lager-Posten über die Suche gefunden und angeboten werden kann (REQ-MARKET-002).
+
 ## [v1.2.1](https://github.com/krt-profit/basetool/releases/tag/v1.2.1) - 2026-07-08
 
 ### Changed

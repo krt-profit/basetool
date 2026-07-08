@@ -29,6 +29,13 @@
     };
     let pickerItems = [];
     let lastFocused = null;
+    // Server-side picker search: the input debounces a fresh /releasable-items query rather than
+    // filtering a once-loaded, alphabetically-capped snapshot in the client — otherwise a material
+    // past the server's row cap (e.g. late-alphabet "Savrilium") is unreachable and the release
+    // silently no-ops. pickerSeq drops stale responses so the last-typed query always wins.
+    let pickerSeq = 0;
+    let pickerSearchTimer = null;
+    let PICKER_SEARCH_DEBOUNCE_MS = 200;
 
     function fmt(template, value) {
         return String(template || '').replace('{0}', value);
@@ -186,6 +193,7 @@
     }
 
     function loadPicker(query) {
+        let seq = ++pickerSeq;
         let url =
             '/materialboerse/releasable-items' + (query ? '?q=' + encodeURIComponent(query) : '');
         fetch(url, {
@@ -196,13 +204,29 @@
                 return r.ok ? r.json() : [];
             })
             .then(function (items) {
+                if (seq !== pickerSeq) {
+                    return; // a newer search superseded this response
+                }
                 pickerItems = Array.isArray(items) ? items : [];
                 renderPicker();
             })
             .catch(function () {
+                if (seq !== pickerSeq) {
+                    return;
+                }
                 pickerItems = [];
                 renderPicker();
             });
+    }
+
+    /** Debounces a server-side picker search so every keystroke does not fire its own request. */
+    function searchPicker(query) {
+        if (pickerSearchTimer) {
+            clearTimeout(pickerSearchTimer);
+        }
+        pickerSearchTimer = setTimeout(function () {
+            loadPicker(query);
+        }, PICKER_SEARCH_DEBOUNCE_MS);
     }
 
     function renderPicker() {
@@ -260,19 +284,6 @@
         if (list) {
             list.hidden = true;
         }
-    }
-
-    function renderPickerFiltered(query) {
-        let query2 = (query || '').toLowerCase();
-        let list = q('[data-mb-picker-list]');
-        if (!list) {
-            return;
-        }
-        list.querySelectorAll('.krt-combobox__option').forEach(function (li) {
-            let mat = (li.getAttribute('data-material') || '').toLowerCase();
-            li.style.display = mat.indexOf(query2) >= 0 ? '' : 'none';
-        });
-        list.hidden = false;
     }
 
     function submit() {
@@ -342,7 +353,7 @@
         if (e.target.matches('[data-mb-remark]')) {
             updateCharCount();
         } else if (e.target.matches('[data-mb-picker-input]')) {
-            renderPickerFiltered(e.target.value);
+            searchPicker(e.target.value);
         }
     });
 
