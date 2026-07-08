@@ -29,14 +29,6 @@
     letter-spacing: 0.14em;
     color: var(--color-gray-2);
 }
-.mb-intro {
-    margin: 12px 2px 18px;
-    font-size: 14px;
-    font-weight: 300;
-    line-height: 1.6;
-    color: var(--color-gray-1);
-    max-width: 100ch;
-}
 
 /* ---- toolbar (tabs + search + filters) ---- */
 .mb-toolbar {
