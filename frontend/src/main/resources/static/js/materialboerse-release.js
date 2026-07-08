@@ -38,6 +38,16 @@
         return modal.querySelector(sel);
     }
 
+    /**
+     * Whether the modal is currently on screen. Per the design-system contract the
+     * .krt-modal-overlay default is display:none and a modal is opened by setting an
+     * inline display:flex (styles.css), so visibility is read off the inline display,
+     * not the hidden attribute.
+     */
+    function isModalOpen() {
+        return modal.style.display !== '' && modal.style.display !== 'none';
+    }
+
     function setText(sel, text) {
         let el = q(sel);
         if (el) {
@@ -127,7 +137,10 @@
         }
 
         lastFocused = document.activeElement;
-        modal.hidden = false;
+        // .krt-modal-overlay is display:none by default; open by setting inline display:flex
+        // (the app-wide modal contract), NOT by clearing a hidden attribute — the latter left
+        // the CSS display:none in place, so the modal opened invisibly (REQ-MARKET-002/007).
+        modal.style.display = 'flex';
         let first = isNew ? q('[data-mb-picker-input]') : ta;
         if (first) {
             first.focus();
@@ -135,7 +148,7 @@
     }
 
     function hide() {
-        modal.hidden = true;
+        modal.style.display = 'none';
         if (lastFocused && typeof lastFocused.focus === 'function') {
             lastFocused.focus();
         }
@@ -306,7 +319,7 @@
     // -------- events (scoped to the modal DOM) --------
 
     document.addEventListener('click', function (e) {
-        if (modal.hidden) {
+        if (!isModalOpen()) {
             if (e.target.closest('[data-mb-picker-list] .krt-combobox__option')) {
                 return;
             }
@@ -334,7 +347,7 @@
     });
 
     document.addEventListener('keydown', function (e) {
-        if (modal.hidden) {
+        if (!isModalOpen()) {
             return;
         }
         if (e.key === 'Escape') {

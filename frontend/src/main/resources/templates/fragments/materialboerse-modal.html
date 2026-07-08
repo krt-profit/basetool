@@ -8,7 +8,11 @@
   window.materialboerseI18n (bootstrapped below, merged so a host page can add its own).
 -->
 <th:block th:fragment="releaseModal">
-    <div id="mb-modal" class="krt-modal-overlay" hidden>
+    <!-- Opened via inline display:flex from materialboerse-release.js (the app-wide
+         .krt-modal-overlay contract); the global styles.css default keeps it display:none
+         until then, so no `hidden` attribute is used (that left the CSS display:none intact
+         and the modal opened invisibly). -->
+    <div id="mb-modal" class="krt-modal-overlay">
         <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true"
              aria-labelledby="mb-modal-title" data-mb-modal>
             <div class="krt-modal-head">
