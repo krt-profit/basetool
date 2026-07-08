@@ -4,6 +4,10 @@
 
 ## [v1.2.1](https://github.com/krt-profit/basetool/releases/tag/v1.2.1) - 2026-07-08
 
+### Changed
+
+- **Fehler behoben: Der Freigabe-Dialog der Materialbörse öffnete sich unsichtbar.** Sowohl der Knopf „Material anbieten" als auch die Lager-Checkbox „Für Börse freigeben" öffneten den Dialog, der jedoch unsichtbar blieb — es ließ sich kein Material einstellen, und ein späteres Abwählen der Checkbox schlug mit „Kein aktives Angebot" fehl. Der Dialog wird jetzt korrekt angezeigt (#1174).
+
 ## [v1.2.0](https://github.com/krt-profit/basetool/releases/tag/v1.2.0) - 2026-07-07
 
 ### Added
