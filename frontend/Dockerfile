@@ -178,11 +178,15 @@ EXPOSE 18081
 #      registrations resolved, Spring Session ready, scheduled tasks armed) —
 #      not just "Tomcat is bound".
 #   2. The `readiness` health group in application.yml widens the set of indicators
-#      contributing to this endpoint (backend, keycloak, redis, diskSpace, ssl),
-#      so a backend or Keycloak outage drops readiness DOWN and any orchestrator
-#      gating on `service_healthy` will not route traffic to this instance.
-# Liveness (/actuator/health/liveness) stays unused here on purpose — a transient
-# backend/Keycloak blip should yank this instance out of the rotation, not restart it.
+#      contributing to this endpoint (backend, redis, diskSpace, ssl), so an actual
+#      backend outage drops readiness DOWN and any orchestrator gating on
+#      `service_healthy` will not route traffic to this instance. The custom
+#      KeycloakHealthIndicator is deliberately NOT in the group (ADR-0084): a
+#      transient Keycloak blip must not flip this container `unhealthy` and feed
+#      the deploy-loop thrash of the 2026-07-09 incident. Keycloak health stays
+#      observable via the root /actuator/health aggregate + WARN logs.
+# Liveness (/actuator/health/liveness) stays unused here on purpose — a failing
+# readiness probe should pull this instance out of the rotation, not restart it.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --start-interval=5s --retries=3 \
     CMD wget -q --no-check-certificate -O /dev/null https://localhost:18081/actuator/health/readiness || exit 1
 

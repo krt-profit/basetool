@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserAttributesUpdateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UserSyncResultDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.MemberEditForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
@@ -558,6 +559,34 @@ public class MemberManagementController {
       return relayBackendError("AJAX member delete failed", e);
     } catch (Exception e) {
       log.error("AJAX member delete failed", e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+          .body(Map.of("code", "INTERNAL_ERROR"));
+    }
+  }
+
+  /**
+   * AJAX handler for the "Sync now" button (ADMIN): triggers the backend's manual Keycloak user
+   * sync ({@code POST /api/v1/users/sync}) and answers with JSON so the member list re-swaps in
+   * place with the freshly reconciled roster (no full-page reload, REQ-FE-001) and a toast reports
+   * how many users were synced. A backend failure (e.g. Keycloak unreachable) is relayed with its
+   * status + {@code {code, detail}} so the client shows the reason without navigating away.
+   * ADMIN-only, like the class default; the periodic sync still runs hourly regardless.
+   *
+   * @return {@code 200} with {@code {syncedCount}} on success, or the relayed backend error status
+   */
+  @PostMapping("/sync")
+  @ResponseBody
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  public ResponseEntity<Map<String, Object>> syncMembersAjax() {
+    try {
+      UserSyncResultDto result =
+          backendApiClient.post("/api/v1/users/sync", null, UserSyncResultDto.class);
+      int syncedCount = result != null ? result.syncedCount() : 0;
+      return ResponseEntity.ok(Map.of("syncedCount", syncedCount));
+    } catch (BackendServiceException e) {
+      return relayBackendError("AJAX member sync failed", e);
+    } catch (Exception e) {
+      log.error("AJAX member sync failed", e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
           .body(Map.of("code", "INTERNAL_ERROR"));
     }

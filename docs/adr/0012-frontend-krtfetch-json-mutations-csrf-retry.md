@@ -20,7 +20,7 @@ Three forces make a cross-cutting decision necessary rather than an incremental 
   header name `X-CSRF-TOKEN` (it only works because that happens to equal Spring's default header
   name; a config change would silently break it).
 - **Stale-token 403s.** The meta-token approach 403s on a stale browser tab and after re-login,
-  because `sessionFixation(changeSessionId)` rotates the session id and `maximumSessions(2)` can
+  because `sessionFixation(changeSessionId)` rotates the session id and `maximumSessions(10)` can
   evict a session. A `CsrfFilter` 403 bypasses `GlobalExceptionHandler`, so it arrives as a bare
   403 with no `problem+json` body — every call site would need its own recovery.
 - **CSP constraint.** The app ships a strict policy: `script-src 'nonce-…' 'strict-dynamic'`, no

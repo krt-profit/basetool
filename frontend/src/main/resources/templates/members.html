@@ -40,6 +40,12 @@
             </div>
             <button type="submit" class="btn btn-ghost" th:text="#{general.search}">Suche</button>
         </form>
+        <div class="members-toolbar"
+             sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
+             style="display:flex; justify-content:flex-end; margin-bottom:1rem;">
+            <button type="button" class="btn btn-ghost" data-trigger="members-sync"
+                    th:title="#{members.sync.title}" th:text="#{members.sync.button}">Jetzt synchronisieren</button>
+        </div>
         <div id="members-results">
         <th:block th:fragment="membersTableFragment">
         <div class="table-responsive">
@@ -191,6 +197,8 @@
     const MSG_CANCEL_LABEL = "[[#{general.cancel}]]";
     const MSG_DELETE_SUCCESS = "[[#{success.user.delete}]]";
     const MSG_DELETE_ERROR = "[[#{error.user.delete}]]";
+    const MSG_SYNC_SUCCESS = "[[#{members.sync.success}]]";
+    const MSG_SYNC_ERROR = "[[#{members.sync.error}]]";
 
     // Re-render the current (filtered/paginated) member list so a deleted row drops out and the
     // pagination + SK column stay coherent. The URL already carries the active filter (kept in
@@ -221,6 +229,21 @@
         });
     }
 
+    // Admin-triggered manual Keycloak sync. POSTs to /members/sync (krtFetch handles CSRF and
+    // disables the trigger button for the round-trip), shows a toast on completion and then re-swaps
+    // the member list so the refreshed roster is visible without a full-page reload.
+    function syncMembersNow() {
+        window.krtFetch.write({
+            method: 'POST',
+            url: '/members/sync',
+            successMessage: MSG_SYNC_SUCCESS,
+            errorMessage: MSG_SYNC_ERROR,
+            onSuccess: function () {
+                refreshMembersResults();
+            }
+        });
+    }
+
     // Delegated event bindings (CSP-safe replacement for inline onclick/onchange).
     // The matching data-trigger attribute is set on the delete button above; using the
     // global event-delegation helper keeps the wiring working when Thymeleaf re-renders
@@ -228,6 +251,9 @@
     if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         window.krtEvents.on('click', 'members-delete-user', function (el) {
             deleteUser(el.getAttribute('data-user-id'));
+        });
+        window.krtEvents.on('click', 'members-sync', function () {
+            syncMembersNow();
         });
     }
 </script>

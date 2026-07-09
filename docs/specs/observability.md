@@ -318,7 +318,7 @@ transaction per pass) rather than per-scrape.
   renamed to `exported_job` — so the alerts once matched `exported_job` and one silently never fired.
   The rename splits the 180d history (old series carry `exported_job`, new ones `task`; a Grafana
   annotation marks the cutover). The last-success gauge is the source of the
-  staleness alerts — `UserSyncStale` (`user_sync`, > 15 min), `ExternalSyncStale` (the catalogue syncs,
+  staleness alerts — `UserSyncStale` (`user_sync`, > 2h20m — hourly cadence, see `app.keycloak.sync.interval`), `ExternalSyncStale` (the catalogue syncs,
 
   > 48 h), `ScheduledJobStale` (`notification_retention` / `default_blueprint_provisioning`, > 26 h),
   > `BankLedgerIntegritySweepStale` (`bank_ledger_integrity`, > 6 h, **critical** — while stale the
@@ -366,7 +366,11 @@ transaction per pass) rather than per-scrape.
 - JVM/Hikari depth (#1041 item 12, all Actuator-exported): `HikariConnectionTimeouts` (every
   `hikaricp_connections_timeout_total` increment is a request that waited ~30s for a pool slot and
   threw — can hide below `HikariPoolPending`'s window), `JvmFileDescriptorsHigh`
-  (`process_files_open_files` > 85% of max — FD leaks kill a JVM with confusing symptoms) and
+  (`process_files_open_files` > 85% of max — FD leaks kill a JVM with confusing symptoms),
+  `JvmThreadsHigh` (`jvm_threads_live_threads` > 1638 = 80% of the container's hardcoded 2048 `pids`
+  cap — at the cap the JVM throws `OutOfMemoryError: unable to create native thread` regardless of
+  heap/RAM headroom, the 2026-07-09 native-thread exhaustion root cause; the cgroup pids limit is not
+  an exported series so the cap is hardcoded) and
   `JvmGcOverheadHigh` (`rate(jvm_gc_pause_seconds_sum)` > 20% — GC thrash degrades latency before
   `JvmHeapHigh`'s 90% trips). No metaspace rule (nonheap max is often -1 → NaN). Deepened
   `03-spring-apps.json`: per-pool heap, GC pause max by action/cause, thread states, open FDs vs max,

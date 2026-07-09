@@ -31,7 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>A {@code 403} on an AJAX write means Spring Security's {@code CsrfFilter} rejected the token
  * the page started with — the usual causes are a stale browser tab, the session-id rotation that
  * {@code sessionFixation(changeSessionId)} performs on re-login, or eviction by {@code
- * maximumSessions(2)} (all configured in {@link
+ * maximumSessions(10)} (all configured in {@link
  * de.greluc.krt.profit.basetool.frontend.config.SecurityConfig}). {@code krtFetch.write} reacts by
  * calling {@code GET /csrf} once, updating the {@code _csrf} meta tags, and retrying the request,
  * so the user never sees a spurious "action failed".

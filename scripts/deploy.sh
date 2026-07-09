@@ -71,6 +71,22 @@
 #                                          on every tick. Cleared on a
 #                                          successful deploy or when a new
 #                                          digest is promoted to the tag.
+#   /var/lib/iri/health-restart.digests    backoff bookkeeping for the
+#                                          runtime-health targeted restart: when
+#                                          the running stack is already at the
+#                                          target release but a container is
+#                                          unhealthy (a runtime fault, not a
+#                                          wrong release), deploy.sh restarts
+#                                          only that service instead of rolling
+#                                          the release back. This throttles the
+#                                          restart so a container that will not
+#                                          recover is not force-recreated every
+#                                          tick. Cleared on a restart that
+#                                          restores health or a successful
+#                                          deploy. Drives the distinct
+#                                          DeployHealthRestartFailing alert (via
+#                                          deploy-health.prom), NEVER a false
+#                                          DeployRolledBack (ADR-0083).
 #   /var/lib/iri/config-stage/             scratch dir the promoted config bundle
 #                                          is extracted into before being copied
 #                                          into /var/iri/code (never applied in
@@ -149,6 +165,15 @@ FORCE=false
 BACKOFF_BASE="${IRI_BACKOFF_BASE:-600}"
 BACKOFF_MAX="${IRI_BACKOFF_MAX:-21600}"
 
+# Runtime-health-drift restart backoff. When the running stack is already at the
+# target release but a container is unhealthy (a RUNTIME fault, not a wrong
+# release), deploy.sh restarts only the affected service instead of rolling the
+# stack back. This backoff throttles that targeted restart so a container that
+# will not recover is not force-recreated every tick — shorter than the deploy
+# backoff above, because a targeted restart is cheap and recovery is urgent.
+HEALTH_RESTART_BASE="${IRI_HEALTH_RESTART_BASE:-300}"
+HEALTH_RESTART_MAX="${IRI_HEALTH_RESTART_MAX:-3600}"
+
 # --- CLI args ---------------------------------------------------------------
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -187,6 +212,9 @@ Environment overrides (all optional, sensible defaults shown):
   IRI_HEALTH_TIMEOUT=180
   IRI_BACKOFF_BASE=600     (first retry delay after a failed target, seconds)
   IRI_BACKOFF_MAX=21600    (cap for the exponential backoff, seconds)
+  IRI_HEALTH_RESTART_BASE=300   (first delay before re-restarting an unhealthy
+                                 at-target service — the runtime-health path — seconds)
+  IRI_HEALTH_RESTART_MAX=3600   (cap for the health-restart backoff, seconds)
   IRI_REGISTRY=ghcr.io
   IRI_IMAGE_NAMESPACE=krt-profit
   IRI_GHCR_USERNAME=deploy-bot
@@ -564,6 +592,11 @@ CONFIG_BLOCKED_FILE="${STATE_DIR}/config-blocked.marker"
 # rollback snapshot of it taken before a provider-JAR swap.
 KEYCLOAK_SPI_JAR="${COMPOSE_DIR}/keycloak/providers/keycloak-spi.jar"
 KEYCLOAK_SPI_PREVIOUS_JAR="${STATE_DIR}/keycloak-spi-previous.jar"
+# Backoff bookkeeping for the runtime-health targeted restart (see the
+# HEALTH_RESTART_* constants): a fixed 3-field record `marker count epoch`,
+# keyed to the target so a freshly promoted release clears it. Cleared on a
+# successful targeted restart or a successful full deploy.
+HEALTH_RESTART_FILE="${STATE_DIR}/health-restart.digests"
 
 # --- Monitoring textfile metrics (epic #936, ADR-0072) ----------------------
 # Per-outcome timestamps so the alert catalog can tell success / rollback / failure / blocked apart:
@@ -573,6 +606,11 @@ KEYCLOAK_SPI_PREVIOUS_JAR="${STATE_DIR}/keycloak-spi-previous.jar"
 # node_exporter textfile dir (already inside the systemd unit's ReadWritePaths=/var/iri).
 TEXTFILE_DIR="${IRI_MONITORING_TEXTFILE_DIR:-/var/iri/monitoring/textfile}"
 DEPLOY_METRIC_FILE="${TEXTFILE_DIR}/deploy.prom"
+# Separate textfile for the runtime-health-drift signal (a targeted restart of an
+# unhealthy at-target service). Kept out of deploy.prom so it never entangles with
+# the promotion-outcome timestamps — a runtime blip on the CURRENT release is not
+# a deploy outcome and must not read as one (that is the 2026-07-09 lesson).
+STACK_HEALTH_METRIC_FILE="${TEXTFILE_DIR}/deploy-health.prom"
 START_EPOCH="$(date +%s)"
 
 # GHCR pull token expiry (OPT-IN). A token that expires (a fine-grained PAT, which
@@ -662,6 +700,47 @@ write_deploy_metric() {
     mv -f "${tmp}" "${f}" 2>/dev/null || true
   else
     log "WARN: could not write deploy textfile metric (${TEXTFILE_DIR})"
+    rm -f "${tmp}" 2>/dev/null || true
+  fi
+}
+
+# write_stack_health_metric <healthy|restart_failed>
+# Maintains ${STACK_HEALTH_METRIC_FILE} with two gauges that drive the runtime
+# DeployHealthRestartFailing alert WITHOUT overloading the promotion-outcome
+# metrics: `healthy` stamps basetool_deploy_last_stack_healthy_timestamp (a
+# freshness heartbeat written on every healthy tick), `restart_failed` stamps
+# basetool_deploy_last_health_restart_failed_timestamp. The alert fires while the
+# failed stamp is newer than the healthy one and self-clears on the next healthy
+# tick. Each write preserves the other gauge. Best-effort; never gates a deploy.
+write_stack_health_metric() {
+  local outcome="$1" now f tmp prev_healthy prev_failed
+  now="$(date +%s)"
+  f="${STACK_HEALTH_METRIC_FILE}"
+  prev_healthy=0
+  prev_failed=0
+  if [[ -f "${f}" ]]; then
+    prev_healthy="$(awk '/^basetool_deploy_last_stack_healthy_timestamp /{print $2}' "${f}" 2>/dev/null || echo 0)"
+    prev_failed="$(awk '/^basetool_deploy_last_health_restart_failed_timestamp /{print $2}' "${f}" 2>/dev/null || echo 0)"
+  fi
+  [[ "${prev_healthy}" =~ ^[0-9]+$ ]] || prev_healthy=0
+  [[ "${prev_failed}" =~ ^[0-9]+$ ]] || prev_failed=0
+  case "${outcome}" in
+    healthy)        prev_healthy="${now}" ;;
+    restart_failed) prev_failed="${now}" ;;
+  esac
+  install -d -m 0755 "${TEXTFILE_DIR}" 2>/dev/null || true
+  tmp="${f}.$$"
+  if {
+    echo "# HELP basetool_deploy_last_stack_healthy_timestamp Unix time deploy.sh last observed the running app stack at target and healthy."
+    echo "# TYPE basetool_deploy_last_stack_healthy_timestamp gauge"
+    echo "basetool_deploy_last_stack_healthy_timestamp ${prev_healthy}"
+    echo "# HELP basetool_deploy_last_health_restart_failed_timestamp Unix time a targeted restart of an unhealthy at-target service last failed to restore health."
+    echo "# TYPE basetool_deploy_last_health_restart_failed_timestamp gauge"
+    echo "basetool_deploy_last_health_restart_failed_timestamp ${prev_failed}"
+  } > "${tmp}" 2>/dev/null; then
+    mv -f "${tmp}" "${f}" 2>/dev/null || true
+  else
+    log "WARN: could not write stack-health textfile metric (${TEXTFILE_DIR})"
     rm -f "${tmp}" 2>/dev/null || true
   fi
 }
@@ -782,7 +861,7 @@ fi
 # equals the target digest. `ps -aq` (not `-q`) so stopped/created/restarting
 # containers are judged by their state instead of being reported as absent.
 running_stack_drift() {
-  local entry svc image digest cids cid probe state img_id repo_digests
+  local entry svc image digest cids cid probe state img_id repo_digests img_ok
   for entry in \
     "backend|${BACKEND_IMAGE}|${BACKEND_DIGEST}" \
     "frontend|${FRONTEND_IMAGE}|${FRONTEND_DIGEST}" \
@@ -791,7 +870,9 @@ running_stack_drift() {
     cids="$(docker compose -f "${COMPOSE_DIR}/docker-compose.yml" \
               --profile "${PROFILE}" ps -aq "${svc}" 2>/dev/null)" || cids=""
     if [[ -z "${cids}" ]]; then
-      echo "${svc}: no container"
+      # A wholly missing service is a STRUCTURAL divergence (half-down stack),
+      # never a runtime-health blip: an `up` must (re)create the container.
+      echo "structural ${svc}: no container"
       continue
     fi
     while IFS= read -r cid; do
@@ -807,29 +888,43 @@ running_stack_drift() {
         continue
       fi
       state="${probe#*|}"
-      case "${state}" in
-        # running/starting (healthcheck still inside its start period, e.g.
-        # the restart policies bringing the stack up after a host reboot while
-        # a tick fires) counts as converged for THIS tick: `up --wait` would
-        # simply wait on it, and re-applying here could record a false backoff
-        # failure for a perfectly good target. A genuinely broken container
-        # surfaces as unhealthy/restarting on a later tick.
-        running/healthy | running/no-healthcheck | running/starting) ;;
-        *)
-          echo "${svc}: container state ${state}"
-          continue
-          ;;
-      esac
+      # Whether this container runs the TARGET image is computed for every state
+      # (not only the running-healthy ones) so an unhealthy container that IS on
+      # the target image can be told apart from one on a wrong image. The former
+      # is a runtime-health fault (targeted restart); the latter, like a missing
+      # container, is a structural mismatch the apply/rollback path must correct.
       img_id="$(docker inspect --format '{{.Image}}' "${cid}" 2>/dev/null)" || img_id=""
       repo_digests=""
       if [[ -n "${img_id}" ]]; then
         repo_digests="$(docker image inspect \
           --format '{{join .RepoDigests " "}}' "${img_id}" 2>/dev/null)" || repo_digests=""
       fi
+      img_ok=false
       case " ${repo_digests} " in
-        *" ${image}@${digest} "*) ;;
+        *" ${image}@${digest} "*) img_ok=true ;;
+      esac
+      case "${state}" in
+        # running/starting (healthcheck still inside its start period, e.g. the
+        # restart policies bringing the stack up after a host reboot while a tick
+        # fires) counts as converged for THIS tick: `up --wait` would simply wait
+        # on it, and re-applying could record a false backoff failure for a good
+        # target. Only a wrong image still drifts here (structural).
+        running/healthy | running/no-healthcheck | running/starting)
+          if [[ "${img_ok}" != "true" ]]; then
+            echo "structural ${svc}: running image [${repo_digests:-unknown}] does not match target ${digest}"
+          fi
+          ;;
         *)
-          echo "${svc}: running image [${repo_digests:-unknown}] does not match target ${digest}"
+          # Not running-healthy (unhealthy / restarting / exited / created / …).
+          # On the target image → runtime-health drift (right release, sick
+          # container) — a targeted restart, never a release rollback. On a wrong
+          # or unknown image → structural (a re-apply must correct the release
+          # before health can even be judged).
+          if [[ "${img_ok}" == "true" ]]; then
+            echo "health ${svc}: container state ${state}"
+          else
+            echo "structural ${svc}: container state ${state}, image [${repo_digests:-unknown}] not at target ${digest}"
+          fi
           ;;
       esac
     done <<< "${cids}"
@@ -839,6 +934,7 @@ running_stack_drift() {
 
 DRIFTED=false
 NOOP=false
+HEALTH_DRIFT=false
 if [[ -f "${LAST_DEPLOYED_FILE}" ]] \
    && grep -qFx "${EXPECTED_MARKER}" "${LAST_DEPLOYED_FILE}"; then
   DRIFT_REPORT="$(running_stack_drift)"
@@ -848,21 +944,40 @@ if [[ -f "${LAST_DEPLOYED_FILE}" ]] \
     # a dry-run signature check even when nothing needs applying).
     if [[ "${CHECK_ONLY}" != "true" ]]; then
       log "no change — already at target digests (running stack verified)"
+      # Freshness heartbeat for the runtime-health signal: a healthy tick pushes
+      # the last-stack-healthy timestamp past any earlier health-restart failure,
+      # so the DeployHealthRestartFailing alert self-clears the moment recovery
+      # is observed. Written on the hot no-op path so the gauge never goes stale.
+      write_stack_health_metric healthy
       exit 0
     fi
     NOOP=true
   else
-    DRIFTED=true
+    # Log every divergence (class token stripped for the human line), then split
+    # the report. A `structural` divergence (missing container / wrong image) is a
+    # real release mismatch the full apply/rollback path must reconcile. A report
+    # with ONLY `health` divergences means the deployed RELEASE is correct and
+    # only the runtime is sick (right image, unhealthy container): that takes the
+    # targeted-restart branch below — rolling the stack back to the same image
+    # cannot fix a runtime fault and would fire a false DeployRolledBack.
     while IFS= read -r drift_line; do
-      log "drift: ${drift_line}"
+      log "drift: ${drift_line#* }"
     done <<< "${DRIFT_REPORT}"
-    log "running stack does not match the last-deployed target — re-applying"
+    if grep -q '^structural ' <<< "${DRIFT_REPORT}"; then
+      DRIFTED=true
+      log "running stack does not match the last-deployed target — re-applying"
+    else
+      HEALTH_DRIFT=true
+      log "running stack is at the target release but a container is unhealthy — targeted restart (not a release rollback)"
+    fi
   fi
 fi
 
 if [[ "${CHECK_ONLY}" == "true" ]]; then
   if [[ "${NOOP}" == "true" ]]; then
     log "check-only: no change (already at target digests, running stack verified)"
+  elif [[ "${HEALTH_DRIFT}" == "true" ]]; then
+    log "check-only: would restart unhealthy at-target service(s) (runtime-health drift, not a release rollback)"
   elif [[ "${DRIFTED}" == "true" ]]; then
     log "check-only: would re-apply (running stack drifted from target digests)"
   else
@@ -888,6 +1003,74 @@ if [[ "${CHECK_ONLY}" == "true" ]]; then
     log "check-only: SIGNATURE VERIFICATION FAILED for one or more artifacts"
   fi
   exit "${co_rc}"
+fi
+
+# --- Runtime-health drift: targeted restart, NOT a release rollback ----------
+# The running stack is at the target release (right image) but one or more app
+# containers are unhealthy — a RUNTIME fault (e.g. the 2026-07-09 native-thread
+# exhaustion), not a wrong release. Rolling the stack back to the same image
+# cannot fix that and would fire a false DeployRolledBack, so restart ONLY the
+# affected service(s) (`--no-deps --force-recreate`), bounded by a short backoff
+# so a container that will not recover is not force-recreated every tick. A
+# persistent failure is recorded as a distinct health-restart signal, never a
+# deploy `rollback`, so the promotion-outcome alerts stay truthful. This path
+# deliberately does NOT re-pull or re-verify signatures: the image is already
+# present and running (it is the verified target), so there is no new supply-chain
+# surface — only the local container is recreated.
+if [[ "${HEALTH_DRIFT}" == "true" ]]; then
+  UNHEALTHY_SVCS="$(grep '^health ' <<< "${DRIFT_REPORT}" \
+    | sed -E 's/^health ([a-z]+):.*/\1/' | sort -u | tr '\n' ' ')"
+  UNHEALTHY_SVCS="${UNHEALTHY_SVCS% }"
+
+  if [[ -f "${HEALTH_RESTART_FILE}" ]]; then
+    read -r HR_MARKER HR_COUNT HR_EPOCH _ < "${HEALTH_RESTART_FILE}" || true
+    if [[ "${HR_MARKER:-}" != "${EXPECTED_MARKER}" ]] \
+       || ! [[ "${HR_COUNT:-}" =~ ^[0-9]+$ ]] || ! [[ "${HR_EPOCH:-}" =~ ^[0-9]+$ ]]; then
+      # Record belongs to a superseded target or is corrupt — drop it and restart.
+      rm -f "${HEALTH_RESTART_FILE}"
+    elif [[ "${FORCE}" == "true" ]]; then
+      log "health drift on [${UNHEALTHY_SVCS}]: ${HR_COUNT} prior restart(s) failed; --force — restarting now"
+    else
+      hr_backoff=$(( HEALTH_RESTART_BASE * (2 ** (10#${HR_COUNT} - 1)) ))
+      if (( hr_backoff > HEALTH_RESTART_MAX )); then
+        hr_backoff="${HEALTH_RESTART_MAX}"
+      fi
+      hr_elapsed=$(( $(date +%s) - 10#${HR_EPOCH} ))
+      if (( hr_elapsed < hr_backoff )); then
+        log "health drift on [${UNHEALTHY_SVCS}]: targeted restart failed ${HR_COUNT}x; in backoff (${hr_elapsed}s/${hr_backoff}s) — skipping tick (--force to retry now)"
+        exit 1
+      fi
+      log "health drift on [${UNHEALTHY_SVCS}]: restart backoff ${hr_backoff}s elapsed — retrying"
+    fi
+  fi
+
+  cd "${COMPOSE_DIR}"
+  log "health drift: restarting unhealthy service(s) [${UNHEALTHY_SVCS}] (targeted; no pull, no signature re-verify, no release rollback)"
+  HR_COMPOSE_ARGS=(-f docker-compose.yml)
+  if [[ -f "${PIN_FILE_CURRENT}" ]]; then
+    HR_COMPOSE_ARGS+=(-f "${PIN_FILE_CURRENT}")
+  fi
+  # shellcheck disable=SC2086 # UNHEALTHY_SVCS is a deliberate space-split service list
+  if docker compose "${HR_COMPOSE_ARGS[@]}" --profile "${PROFILE}" \
+       up -d --no-deps --force-recreate --no-build \
+          --wait --wait-timeout "${HEALTH_TIMEOUT}" ${UNHEALTHY_SVCS}; then
+    rm -f "${HEALTH_RESTART_FILE}"
+    log "health drift resolved — service(s) [${UNHEALTHY_SVCS}] healthy again after targeted restart"
+    write_stack_health_metric healthy
+    exit 0
+  fi
+
+  HR_COUNT=1
+  if [[ -f "${HEALTH_RESTART_FILE}" ]]; then
+    read -r PREV_HR_MARKER PREV_HR_COUNT _ < "${HEALTH_RESTART_FILE}" || true
+    if [[ "${PREV_HR_MARKER:-}" == "${EXPECTED_MARKER}" ]] && [[ "${PREV_HR_COUNT:-}" =~ ^[0-9]+$ ]]; then
+      HR_COUNT=$(( 10#${PREV_HR_COUNT} + 1 ))
+    fi
+  fi
+  printf '%s %d %d\n' "${EXPECTED_MARKER}" "${HR_COUNT}" "$(date +%s)" > "${HEALTH_RESTART_FILE}"
+  log "targeted restart of [${UNHEALTHY_SVCS}] did NOT restore health (attempt #${HR_COUNT}) — runtime fault on the deployed release; the release is left in place (no rollback)"
+  write_stack_health_metric restart_failed
+  exit 1
 fi
 
 # --- Bad-digest backoff -----------------------------------------------------
@@ -1117,9 +1300,12 @@ if docker compose \
   fi
 
   echo "${EXPECTED_MARKER}" > "${LAST_DEPLOYED_FILE}"
-  rm -f "${FAILED_FILE}" "${CONFIG_BLOCKED_FILE}"
+  rm -f "${FAILED_FILE}" "${CONFIG_BLOCKED_FILE}" "${HEALTH_RESTART_FILE}"
   log "deploy successful"
   write_deploy_metric success
+  # A fresh successful deploy is by definition a healthy stack — refresh the
+  # runtime-health heartbeat so any prior health-restart-failed signal clears.
+  write_stack_health_metric healthy
 
   # --- Non-gating monitoring apply (epic #936, ADR-0072) ---------------------
   # Reconcile the SEPARATE monitoring project AFTER the app stack is verified healthy — this NEVER

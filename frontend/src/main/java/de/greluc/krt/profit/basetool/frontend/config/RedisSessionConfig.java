@@ -326,7 +326,7 @@ public class RedisSessionConfig {
    * SpringSessionBackedSessionRegistry} instead resolves a principal's active sessions directly
    * from the Redis principal-name index, so the cap is enforced for real and survives a frontend
    * restart (the sessions live in Redis, not local heap). Consumed by {@code
-   * SecurityConfig.filterChain(...).sessionManagement().maximumSessions(2).sessionRegistry(...)}.
+   * SecurityConfig.filterChain(...).sessionManagement().maximumSessions(10).sessionRegistry(...)}.
    *
    * <p>Only present outside the {@code test} profile (this whole config is
    * {@code @Profile("!test")}); in tests {@code maximumSessions} falls back to the default

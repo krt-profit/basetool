@@ -132,23 +132,76 @@ public class TaskMetrics {
       outcome = MetricNames.OUTCOME_FAILURE;
       log.error("Scheduled job '{}' failed", job.label(), e);
     } finally {
-      long elapsedNanos = System.nanoTime() - startNanos;
+      emitJobMetrics(job, outcome, startNanos, items);
+    }
+  }
+
+  /**
+   * Rethrowing counting variant for a SYNCHRONOUS, caller-facing invocation of a job that also runs
+   * on a schedule — e.g. an admin-triggered manual user sync ({@code POST /api/v1/users/sync}). It
+   * records the identical executions counter, duration timer, last-success gauge and items counter
+   * as {@link #recordCounting}, so the manual run is indistinguishable in monitoring and refreshes
+   * the same {@code user_sync} staleness gauge; but, UNLIKE the schedule-facing overloads, it
+   * RETURNS the item count and RE-THROWS the body's failure (unchecked, wrapping a checked one) so
+   * the caller can surface it as an RFC 7807 error rather than the run being silently swallowed.
+   *
+   * <p>Use only from a request-scoped caller that owns error handling. The scheduler paths must
+   * keep using the swallowing overloads so a transient failure never tears the scheduler thread
+   * down.
+   *
+   * @param job the scheduled job being instrumented
+   * @param work the job body; its return value is the item count returned to the caller
+   * @return the item count the body reported on a clean run
+   */
+  public int recordCountingRethrow(@NotNull ScheduledJob job, @NotNull ThrowingIntSupplier work) {
+    AtomicLong lastSuccess = lastSuccessHolder(job);
+    long startNanos = System.nanoTime();
+    String outcome = MetricNames.OUTCOME_SUCCESS;
+    Integer items = null;
+    try {
+      items = work.getAsInt();
+      lastSuccess.set(Instant.now().getEpochSecond());
+      return items;
+    } catch (RuntimeException e) {
+      outcome = MetricNames.OUTCOME_FAILURE;
+      throw e;
+    } catch (Exception e) {
+      outcome = MetricNames.OUTCOME_FAILURE;
+      throw new IllegalStateException(
+          "Manual run of scheduled job '" + job.label() + "' failed", e);
+    } finally {
+      emitJobMetrics(job, outcome, startNanos, items);
+    }
+  }
+
+  /**
+   * Emits the duration timer, executions counter and (when a count was reported) items counter for
+   * a finished job run. Shared by the swallowing {@link #recordInternal} and the rethrowing {@link
+   * #recordCountingRethrow} so both paths publish byte-identical meters.
+   *
+   * @param job the scheduled job being instrumented
+   * @param outcome {@code success} or {@code failure}
+   * @param startNanos the {@link System#nanoTime()} reading taken before the body ran
+   * @param items the item count the body reported, or {@code null} when none
+   */
+  private void emitJobMetrics(
+      @NotNull ScheduledJob job, @NotNull String outcome, long startNanos, Integer items) {
+    long elapsedNanos = System.nanoTime() - startNanos;
+    registry
+        .timer(MetricNames.SCHEDULED_JOB_DURATION, MetricNames.TAG_JOB, job.label())
+        .record(elapsedNanos, TimeUnit.NANOSECONDS);
+    registry
+        .counter(
+            MetricNames.SCHEDULED_JOB_EXECUTIONS,
+            MetricNames.TAG_JOB,
+            job.label(),
+            MetricNames.TAG_OUTCOME,
+            outcome)
+        .increment();
+    if (items != null) {
       registry
-          .timer(MetricNames.SCHEDULED_JOB_DURATION, MetricNames.TAG_JOB, job.label())
-          .record(elapsedNanos, TimeUnit.NANOSECONDS);
-      registry
-          .counter(
-              MetricNames.SCHEDULED_JOB_EXECUTIONS,
-              MetricNames.TAG_JOB,
-              job.label(),
-              MetricNames.TAG_OUTCOME,
-              outcome)
-          .increment();
-      if (items != null) {
-        registry
-            .counter(MetricNames.SCHEDULED_JOB_ITEMS, MetricNames.TAG_JOB, job.label())
-            .increment(items.doubleValue());
-      }
+          .counter(MetricNames.SCHEDULED_JOB_ITEMS, MetricNames.TAG_JOB, job.label())
+          .increment(items.doubleValue());
     }
   }
 

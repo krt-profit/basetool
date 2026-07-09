@@ -161,7 +161,14 @@ app:
   keycloak:
     sync:
       enabled: true
-      interval: 1m
+      # Cadence of the periodic Keycloak->local reconciliation (UserSyncTask). Default hourly:
+      # the sync is a drift-correction safety net, not a live feed (each run makes ~1 admin call
+      # per user against Keycloak). A 1-minute cadence (the pre-2026-07 value) hammered Keycloak
+      # 60x/hour and was the accelerant behind the 2026-07-09 native-thread exhaustion incident;
+      # admins who need an immediate refresh use the "Sync now" button on the member-management
+      # page (POST /api/v1/users/sync) rather than a hot schedule. Env-parameterised (like the
+      # bank/notifications/blueprints schedulers) so the cadence is tunable without a rebuild.
+      interval: ${APP_KEYCLOAK_SYNC_INTERVAL:PT1H}
       admin-url: ${KEYCLOAK_ADMIN_URL:http://keycloak:18080}
       realm: ${KEYCLOAK_REALM:iri}
       client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:backend-service}
@@ -284,19 +291,28 @@ app:
 # guards it with fail-closed basic auth (denyAll until MONITORING_SCRAPE_USER/PASSWORD
 # are set), so exposing it here adds no unauthenticated surface.
 #
-# The `readiness` group is widened from Spring's default (just `readinessState`) to
-# also include the indicators whose `DOWN` actually means "stop sending traffic":
+# The `readiness` group is widened from Spring's default (just `readinessState`)
+# to also include the LOCAL indicators whose `DOWN` actually means "this instance
+# cannot serve":
 #   - db          — Hikari can run SELECT 1 against Postgres (auto-configured by
 #                   spring-boot-starter-data-jpa).
-#   - keycloak    — custom KeycloakHealthIndicator probes the OIDC discovery
-#                   endpoint so Keycloak outages surface in readiness even though
-#                   the Spring resource-server does not ship a built-in indicator.
 #   - diskSpace   — auto-configured; <10 MB free trips DOWN, which would otherwise
 #                   silently lose logs in prod (LogstashEncoder writes to disk).
 #   - ssl         — auto-configured when server.ssl.enabled=true; warns when the
 #                   keystore certificate is within the expiry threshold.
-# `livenessState` is deliberately NOT in this group — a failing readiness probe
-# should pull the container out of the load-balancer rotation, not restart it.
+# The custom KeycloakHealthIndicator (OIDC discovery probe) is deliberately NOT in
+# this group (ADR-0084). Because the Docker HEALTHCHECK points at this readiness
+# group, including an EXTERNAL-dependency probe here meant a transient Keycloak
+# blip — or a thread/GC stall that broke the probe itself — flipped the container
+# to `unhealthy`, which the deploy loop then thrashed against (the 2026-07-09
+# native-thread exhaustion incident). A Keycloak outage must not mark the backend's
+# OWN container unhealthy: the JVM is alive, serves health/metrics and, with cached
+# JWKS, most requests. The indicator bean stays registered, so Keycloak health
+# still contributes to the root /actuator/health aggregate and its WARN logs — it
+# just no longer gates container liveness. Startup ordering is unaffected: the
+# keycloak CONTAINER's own healthcheck (not this indicator) gates backend startup
+# via `depends_on: condition: service_healthy`.
+# `livenessState` is likewise not in this group.
 # The Docker HEALTHCHECK in backend/Dockerfile points at /actuator/health/readiness
 # so this group is what gates docker-compose `service_healthy`.
 management:
@@ -312,7 +328,7 @@ management:
         enabled: true
       group:
         readiness:
-          include: readinessState, db, keycloak, diskSpace, ssl
+          include: readinessState, db, diskSpace, ssl
   metrics:
     tags:
       # Common tag on every meter; the Grafana "Spring Boot apps" dashboard selects the

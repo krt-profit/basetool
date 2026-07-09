@@ -123,6 +123,12 @@ KC_BOOTSTRAP_ADMIN_PASSWORD=CHANGE_ME
 #   Realm "iri" -> Clients -> backend-service -> Credentials -> Regenerate.
 KEYCLOAK_ADMIN_CLIENT_SECRET=CHANGE_ME
 
+# Optional: cadence of the periodic Keycloak->local user sync (ISO-8601 duration).
+# Default PT1H (hourly) — the sync is a drift-correction safety net, not a live feed.
+# Admins can trigger an immediate sync from the member-management page's "Sync now"
+# button, so a hot cadence is unnecessary (a very short interval hammers Keycloak).
+#APP_KEYCLOAK_SYNC_INTERVAL=PT1H
+
 # PKCS12 keystore password for backend + frontend Spring SSL.
 SERVER_SSL_KEY_STORE_PASSWORD=CHANGE_ME
 

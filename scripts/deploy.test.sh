@@ -389,21 +389,122 @@ scenario_stale_image_drift() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 3: marker matches but the backend container is unhealthy (crash
-# loop). Must be treated as drift, not as "no change".
+# Scenario 3: marker matches, backend on the TARGET image but unhealthy — a
+# RUNTIME fault on the deployed release, not a wrong release (the 2026-07-09
+# native-thread incident shape). Must take the targeted-restart path (restart
+# ONLY the affected service, no re-pull, no signature re-verify) and must NOT
+# roll the release back or write a DeployRolledBack metric.
 # ---------------------------------------------------------------------------
 scenario_unhealthy_drift() {
-  echo "Scenario: marker matches, backend unhealthy (must re-apply)"
+  echo "Scenario: marker matches, backend unhealthy at target image (targeted restart, no rollback)"
   local tmp rc=0
   tmp="$(mktmp)"
   setup_host "${tmp}"
   write_marker "${MARKER}"
   mapfile -t fake < <(converged_env)
   run_deploy -- "${fake[@]}" "FAKE_STATE_backend=restarting/unhealthy" || rc=$?
-  assert_exit 0 "$rc" "unhealthy-stack re-apply succeeds"
+  assert_exit 0 "$rc" "a resolved targeted restart exits 0"
   assert_contains "drift: backend: container state restarting/unhealthy" \
     "the unhealthy state is reported as drift"
-  assert_docker " up -d" "the stack is re-applied"
+  assert_contains "targeted restart (not a release rollback)" \
+    "the run takes the runtime-health path, not a release rollback"
+  assert_docker "up -d --no-deps --force-recreate" "only the affected service is force-recreated"
+  assert_contains "health drift resolved" "the targeted restart is reported resolved"
+  assert_excludes "re-applying" "the full re-apply path is NOT taken for a health-only drift"
+  assert_excludes "rolling back" "no release rollback happens"
+  assert_no_docker "cosign verify" "a targeted restart does not re-verify signatures"
+  assert_no_docker " pull " "a targeted restart does not re-pull images"
+  if [[ ! -f "${T_STATE_DIR}/textfile/deploy.prom" ]] \
+     || ! grep -q 'basetool_deploy_last_rollback_timestamp [1-9]' \
+            "${T_STATE_DIR}/textfile/deploy.prom" 2>/dev/null; then
+    record 1 "no false DeployRolledBack metric is written for a runtime-health blip"
+  else
+    record 0 "no false DeployRolledBack metric is written for a runtime-health blip"
+  fi
+  rm -rf "${tmp}"
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 3b: the targeted restart of the unhealthy at-target service FAILS to
+# restore health. Must record a distinct health-restart-failed signal (NOT a
+# deploy rollback), feed its own backoff, and exit non-zero — the truthful
+# "runtime is broken on the deployed release" state, never a false DeployRolledBack.
+# ---------------------------------------------------------------------------
+scenario_health_drift_restart_fails() {
+  echo "Scenario: unhealthy at-target backend whose targeted restart fails (health-restart signal, not a rollback)"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_marker "${MARKER}"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" "FAKE_STATE_backend=restarting/unhealthy" "FAKE_UP_RC=1" || rc=$?
+  assert_exit 1 "$rc" "a failed targeted restart exits non-zero"
+  assert_contains "did NOT restore health (attempt #1)" "the failed restart is recorded"
+  assert_excludes "rolling back" "a runtime-health fault is never a release rollback"
+  assert_excludes "deploy successful" "it is not reported as a successful deploy"
+  if grep -q 'basetool_deploy_last_health_restart_failed_timestamp [1-9]' \
+       "${T_STATE_DIR}/textfile/deploy-health.prom" 2>/dev/null; then
+    record 1 "the health-restart-failed gauge is written"
+  else
+    record 0 "the health-restart-failed gauge is written"
+  fi
+  if [[ ! -f "${T_STATE_DIR}/textfile/deploy.prom" ]] \
+     || ! grep -q 'basetool_deploy_last_rollback_timestamp [1-9]' \
+            "${T_STATE_DIR}/textfile/deploy.prom" 2>/dev/null; then
+    record 1 "no DeployRolledBack metric is written for a runtime-health fault"
+  else
+    record 0 "no DeployRolledBack metric is written for a runtime-health fault"
+  fi
+  if grep -qF "${MARKER} 1 " "${T_STATE_DIR}/health-restart.digests" 2>/dev/null; then
+    record 1 "health-restart.digests records the target with count 1"
+  else
+    record 0 "health-restart.digests records the target with count 1"
+  fi
+  rm -rf "${tmp}"
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 3c: an unhealthy at-target service whose targeted restart already
+# failed and is inside its restart-backoff window must SKIP the tick (exit
+# non-zero) rather than force-recreate the container every 5 minutes.
+# ---------------------------------------------------------------------------
+scenario_health_drift_respects_backoff() {
+  echo "Scenario: unhealthy at-target backend, targeted restart in backoff window (must skip)"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_marker "${MARKER}"
+  printf '%s 1 %d\n' "${MARKER}" "$(date +%s)" > "${T_STATE_DIR}/health-restart.digests"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" "FAKE_STATE_backend=restarting/unhealthy" || rc=$?
+  assert_exit 1 "$rc" "a backed-off health-drift tick exits non-zero"
+  assert_contains "in backoff" "the targeted restart is throttled by its backoff"
+  assert_no_docker " up " "nothing is restarted during the health-restart backoff window"
+  rm -rf "${tmp}"
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 3d: a drift report that mixes a runtime-health divergence (backend
+# unhealthy on the target image) with a STRUCTURAL one (ingest on a stale image)
+# must take the full apply/rollback path — a structural mismatch outranks the
+# targeted-restart shortcut, since a wrong release must be corrected first.
+# ---------------------------------------------------------------------------
+scenario_mixed_drift_is_structural() {
+  echo "Scenario: health drift on one service + structural drift on another → full re-apply"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_marker "${MARKER}"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" \
+    "FAKE_STATE_backend=restarting/unhealthy" \
+    "FAKE_REPODIGESTS_ingest=ghcr.io/krt-profit/basetool-ingest@sha256:ingest-stale" || rc=$?
+  assert_exit 0 "$rc" "the mixed-drift re-apply succeeds"
+  assert_contains "re-applying" "a structural divergence forces the full re-apply path"
+  assert_contains "deploy successful" "the re-apply completes"
+  assert_docker "cosign verify" "the full re-apply verifies signatures"
+  assert_excludes "targeted restart (not a release rollback)" \
+    "the targeted-restart path is not taken when any drift is structural"
   rm -rf "${tmp}"
 }
 
@@ -792,6 +893,9 @@ scenario_config_bundle_secret_rejected() {
 scenario_converged_noop
 scenario_stale_image_drift
 scenario_unhealthy_drift
+scenario_health_drift_restart_fails
+scenario_health_drift_respects_backoff
+scenario_mixed_drift_is_structural
 scenario_missing_container_drift
 scenario_new_promotion
 scenario_check_only_drift

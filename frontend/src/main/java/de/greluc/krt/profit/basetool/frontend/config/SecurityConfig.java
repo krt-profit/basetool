@@ -401,10 +401,15 @@ public class SecurityConfig {
         //   * sessionFixation(changeSessionId) is Spring Security's default since 4.x; pinning it
         //     here makes the contract explicit so a future regression that switches to {@code
         //     none} or {@code migrateSession} is visible in code review.
-        //   * maximumSessions(2) caps a single user to two concurrent sessions (e.g. desktop +
-        //     phone); a stolen cookie used in parallel eventually pushes the legitimate session
-        //     out. maxSessionsPreventsLogin(false) keeps the UX as "most recent login wins" rather
-        //     than "new login refused" — combined with the cookie SameSite=Strict this is the right
+        //   * maximumSessions(10) caps a single user to ten concurrent sessions. The cap exists so
+        //     a stolen cookie used in parallel eventually pushes the legitimate session out, but
+        // the
+        //     30-day idle session TTL (server.servlet.session.timeout=720h) means long-lived
+        //     sessions accumulate: a low cap (was 2) evicted real multi-device/-browser users and
+        //     surfaced the "session expired (concurrent logins)" message (2026-07). 10 accommodates
+        //     realistic multi-device/-browser use while still bounding parallel cookie abuse.
+        //     maxSessionsPreventsLogin(false) keeps the UX as "most recent login wins" rather than
+        //     "new login refused" — combined with the cookie SameSite=Strict this is the right
         //     trade-off for a member-facing app.
         //   * Sessions are Redis-indexed (@EnableRedisIndexedHttpSession), so the default in-memory
         //     SessionRegistryImpl (fed by HttpSessionEventPublisher) NEVER sees them — the cap was
@@ -422,7 +427,7 @@ public class SecurityConfig {
                           org.springframework.security.config.annotation.web.configurers
                                   .SessionManagementConfigurer.SessionFixationConfigurer
                               ::changeSessionId)
-                      .maximumSessions(2)
+                      .maximumSessions(10)
                       .maxSessionsPreventsLogin(false);
               sessionRegistryProvider.ifAvailable(concurrency::sessionRegistry);
             });

@@ -25,6 +25,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
+import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
+import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -32,8 +34,10 @@ import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDt
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.UserSyncResultDto;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
+import de.greluc.krt.profit.basetool.backend.service.UserSyncService;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -67,6 +71,8 @@ class UserControllerTest {
   @Mock private UserMapper userMapper;
   @Mock private de.greluc.krt.profit.basetool.backend.service.AuthHelperService authHelperService;
   @Mock private OrgUnitMembershipService orgUnitMembershipService;
+  @Mock private UserSyncService userSyncService;
+  @Mock private TaskMetrics taskMetrics;
   @Mock private Jwt jwt;
 
   @InjectMocks private UserController controller;
@@ -103,6 +109,28 @@ class UserControllerTest {
 
     assertEquals(1, resp.totalElements());
     assertSame(dto, resp.content().getFirst());
+  }
+
+  // ── POST /sync (admin-triggered manual Keycloak user sync) ────────────────
+
+  @Test
+  void syncUsersNow_runsTheReconciliationThroughTaskMetricsAndReturnsTheCount() {
+    when(taskMetrics.recordCountingRethrow(eq(ScheduledJob.USER_SYNC), any())).thenReturn(42);
+
+    UserSyncResultDto result = controller.syncUsersNow();
+
+    assertEquals(42, result.syncedCount());
+    verify(taskMetrics).recordCountingRethrow(eq(ScheduledJob.USER_SYNC), any());
+  }
+
+  @Test
+  void syncUsersNow_propagatesASyncFailureRatherThanSwallowingIt() {
+    when(taskMetrics.recordCountingRethrow(eq(ScheduledJob.USER_SYNC), any()))
+        .thenThrow(new IllegalStateException("keycloak down"));
+
+    // The manual endpoint must surface a failure (→ RFC 7807), unlike the swallowing scheduled
+    // path.
+    assertThrows(IllegalStateException.class, () -> controller.syncUsersNow());
   }
 
   // ── GET /lookup ─────────────────────────────────────────────────────────
