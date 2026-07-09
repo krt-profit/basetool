@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.metrics;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -237,5 +238,77 @@ class TaskMetricsTest {
                 .counter()
                 .count())
         .isEqualTo(1.0d);
+  }
+
+  @Test
+  void recordCountingRethrow_returnsTheBodyCountAndRecordsTheSameMetersAsRecordCounting() {
+    int count = taskMetrics.recordCountingRethrow(ScheduledJob.USER_SYNC, () -> 5);
+
+    assertThat(count).isEqualTo(5);
+    assertThat(
+            registry
+                .get(MetricNames.SCHEDULED_JOB_ITEMS)
+                .tag(MetricNames.TAG_JOB, ScheduledJob.USER_SYNC.label())
+                .counter()
+                .count())
+        .isEqualTo(5.0d);
+    assertThat(
+            registry
+                .get(MetricNames.SCHEDULED_JOB_EXECUTIONS)
+                .tags(
+                    MetricNames.TAG_JOB,
+                    ScheduledJob.USER_SYNC.label(),
+                    MetricNames.TAG_OUTCOME,
+                    MetricNames.OUTCOME_SUCCESS)
+                .counter()
+                .count())
+        .isEqualTo(1.0d);
+    assertThat(
+            registry
+                .get(MetricNames.SCHEDULED_JOB_LAST_SUCCESS)
+                .tag(MetricNames.TAG_JOB, ScheduledJob.USER_SYNC.label())
+                .gauge()
+                .value())
+        .isGreaterThan(0.0d);
+  }
+
+  @Test
+  void recordCountingRethrow_rethrowsAnUncheckedFailureUnwrappedAndCountsIt() {
+    RuntimeException boom = new IllegalStateException("boom");
+
+    assertThatThrownBy(
+            () ->
+                taskMetrics.recordCountingRethrow(
+                    ScheduledJob.USER_SYNC,
+                    () -> {
+                      throw boom;
+                    }))
+        .isSameAs(boom);
+    assertThat(
+            registry
+                .get(MetricNames.SCHEDULED_JOB_EXECUTIONS)
+                .tags(
+                    MetricNames.TAG_JOB,
+                    ScheduledJob.USER_SYNC.label(),
+                    MetricNames.TAG_OUTCOME,
+                    MetricNames.OUTCOME_FAILURE)
+                .counter()
+                .count())
+        .isEqualTo(1.0d);
+  }
+
+  @Test
+  void recordCountingRethrow_wrapsACheckedFailureUncheckedAndCountsIt() {
+    Exception checked = new Exception("checked");
+
+    assertThatThrownBy(
+            () ->
+                taskMetrics.recordCountingRethrow(
+                    ScheduledJob.USER_SYNC,
+                    () -> {
+                      throw checked;
+                    }))
+        .isInstanceOf(IllegalStateException.class)
+        .hasCause(checked);
   }
 }

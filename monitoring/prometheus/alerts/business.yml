@@ -23,15 +23,20 @@ groups:
       # one silently never fired when it matched plain `job`. TAG_JOB was renamed to `task` to
       # sidestep the reserved name, so match on `task`. The 180d history splits at the rename (old
       # series carry `exported_job`, new ones `task`) — a Grafana annotation marks the cutover.
-      # Role drift vs. Keycloak: the user sync last succeeded > 15 min ago (it runs every 5 min).
+      # Role drift vs. Keycloak: the user sync last succeeded too long ago. The sync runs hourly
+      # (app.keycloak.sync.interval default PT1H, tightened from the pre-2026-07 1-minute cadence
+      # that fed the native-thread exhaustion incident). The threshold allows one missed hourly run
+      # plus margin (>2h20m) so a single blip does not page; a genuinely stalled sync (2+ missed
+      # runs) still fires. An admin-triggered "Sync now" (POST /api/v1/users/sync) refreshes the
+      # same last-success gauge, so a manual run also clears this alert.
       - alert: UserSyncStale
-        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{task="user_sync"}) > 900
-        for: 1m
+        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{task="user_sync"}) > 8400
+        for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "User sync stale >15 min"
-          description: "The Keycloak user sync last succeeded more than 15 minutes ago — local roles/accounts may drift from Keycloak."
+          summary: "User sync stale >2h20m"
+          description: "The Keycloak user sync last succeeded more than 2h20m ago (hourly cadence, so ~2+ consecutive runs missed) — local roles/accounts may drift from Keycloak."
 
       - alert: ExternalSyncStale
         expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{task=~"uex_sync|scwiki_sync"}) > 172800
@@ -118,21 +123,24 @@ groups:
           summary: "Business-metrics sampler stale >10min"
           description: "BusinessMetricsCollector.refresh() has not completed successfully in over 10 minutes — the approval/work-queue depth gauges are frozen and the queue-overdue alerts may be evaluating stale values. Check the backend logs for the sampler's failure."
 
-      # (#1041 item 3) Success-with-zero-work detector. user_sync runs every 5 min; a run that returns
-      # successfully but synced zero users (Keycloak returned an empty roster) leaves last_success
-      # fresh, so UserSyncStale never fires. Zero items across 30m while successful runs happened is
-      # the tell. The `and on (task)` matches the two series on the job name only.
+      # (#1041 item 3) Success-with-zero-work detector. A run that returns successfully but synced zero
+      # users (Keycloak returned an empty roster) leaves last_success fresh, so UserSyncStale never
+      # fires. Zero items while successful runs happened is the tell. The window is [3h] because the
+      # sync runs hourly (app.keycloak.sync.interval PT1H, tightened from the pre-2026-07 1-minute
+      # cadence): a 30m window would usually contain zero runs, so the `executions > 0` precondition
+      # would rarely hold and the detector would miss the empty-roster case. [3h] reliably spans 2-3
+      # runs. The `and on (task)` matches the two series on the job name only.
       - alert: UserSyncZeroItems
         expr: |
-          increase(basetool_scheduled_job_items_total{task="user_sync"}[30m]) == 0
+          increase(basetool_scheduled_job_items_total{task="user_sync"}[3h]) == 0
           and on (task)
-          increase(basetool_scheduled_job_executions_total{task="user_sync",outcome="success"}[30m]) > 0
+          increase(basetool_scheduled_job_executions_total{task="user_sync",outcome="success"}[3h]) > 0
         for: 10m
         labels:
           severity: warning
         annotations:
           summary: "User sync succeeding but syncing zero users"
-          description: "The Keycloak user sync has run successfully but processed zero users for 30 minutes — Keycloak likely returned an empty roster. Check Keycloak and the sync path before local accounts drift from the directory."
+          description: "The Keycloak user sync has run successfully but processed zero users for ~3 hours — Keycloak likely returned an empty roster. Check Keycloak and the sync path before local accounts drift from the directory."
 
       - alert: ScheduledJobFailureStreak
         expr: increase(basetool_scheduled_job_executions_total{outcome="failure"}[1h]) >= 3

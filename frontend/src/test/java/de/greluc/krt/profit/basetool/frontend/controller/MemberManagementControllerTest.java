@@ -653,6 +653,46 @@ class MemberManagementControllerTest {
       assertNotNull(response.getBody());
       assertEquals("ENTITY_IN_USE", response.getBody().get("code"));
     }
+
+    @Test
+    void syncMembersAjax_success_returns200WithSyncedCount() {
+      when(backendApiClient.post(
+              eq("/api/v1/users/sync"),
+              any(),
+              eq(de.greluc.krt.profit.basetool.frontend.model.dto.UserSyncResultDto.class)))
+          .thenReturn(new de.greluc.krt.profit.basetool.frontend.model.dto.UserSyncResultDto(7));
+
+      org.springframework.http.ResponseEntity<java.util.Map<String, Object>> response =
+          controller.syncMembersAjax();
+
+      assertEquals(200, response.getStatusCode().value());
+      assertNotNull(response.getBody());
+      assertEquals(7, response.getBody().get("syncedCount"));
+    }
+
+    @Test
+    void syncMembersAjax_backendFailure_relaysStatusAndCode() {
+      when(backendApiClient.post(
+              eq("/api/v1/users/sync"),
+              any(),
+              eq(de.greluc.krt.profit.basetool.frontend.model.dto.UserSyncResultDto.class)))
+          .thenThrow(
+              new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
+                  "down",
+                  null,
+                  503,
+                  "SERVICE_UNAVAILABLE",
+                  null,
+                  List.of(),
+                  "Keycloak unreachable"));
+
+      org.springframework.http.ResponseEntity<java.util.Map<String, Object>> response =
+          controller.syncMembersAjax();
+
+      assertEquals(503, response.getStatusCode().value());
+      assertNotNull(response.getBody());
+      assertEquals("SERVICE_UNAVAILABLE", response.getBody().get("code"));
+    }
   }
 
   // ---------------------------------------------------------------

@@ -33,6 +33,28 @@ groups:
           summary: "Deploy failed (newer than last success)"
           description: "The last deploy attempt failed and is newer than the last successful deploy (or failed with no successful deploy on record — a failing first install)."
 
+      # A container is running the CURRENT target image but is unhealthy, and
+      # deploy.sh's targeted restart could not bring it back — the runtime is
+      # broken on the deployed release. This is deliberately NOT a rollback (a
+      # wrong-release rollback fires DeployRolledBack above): rolling the stack
+      # back to the same image cannot fix a runtime fault, so deploy.sh restarts
+      # only the affected service and, when that will not stick, raises THIS
+      # signal instead of a false DeployRolledBack (ADR-0083, the 2026-07-09
+      # native-thread exhaustion incident). The heartbeat comparison self-clears
+      # the moment a tick observes the stack healthy again; the `unless` arm
+      # covers a first failure before any healthy tick was recorded. `for: 15m`
+      # rides out deploy.sh's own restart backoff so a single blip does not page.
+      - alert: DeployHealthRestartFailing
+        expr: >-
+          basetool_deploy_last_health_restart_failed_timestamp > basetool_deploy_last_stack_healthy_timestamp
+          or (basetool_deploy_last_health_restart_failed_timestamp unless basetool_deploy_last_stack_healthy_timestamp)
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Deploy-bot cannot restart an unhealthy at-target service"
+          description: "A container is running the current target image but is unhealthy, and deploy.sh's targeted restart did not restore it — the runtime is broken on the deployed release (not a rollback). Investigate the app (threads/memory/dependencies) via the container + JVM dashboards."
+
       - alert: DeployConfigBlocked
         expr: basetool_deploy_config_blocked == 1
         for: 6h

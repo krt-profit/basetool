@@ -173,8 +173,6 @@ app:
 #                   the auto-configured Resilience4j CircuitBreakerHealthIndicator
 #                   only flips DOWN once enough real traffic has tripped a breaker,
 #                   which is too late for startup-gating.
-#   - keycloak    — custom KeycloakHealthIndicator; a Keycloak outage breaks
-#                   the SSO login redirect and token refresh.
 #   - redis       — auto-configured; Spring Session persists OIDC tokens and
 #                   flash attributes in Redis, so a Redis outage logs users out
 #                   on every request.
@@ -183,8 +181,16 @@ app:
 #                   prod.
 #   - ssl         — auto-configured when server.ssl.enabled=true; warns when
 #                   the keystore certificate is within the expiry threshold.
-# `livenessState` is deliberately NOT in this group — a failing readiness probe
-# should yank the container out of the load-balancer rotation, not restart it.
+# The custom KeycloakHealthIndicator is deliberately NOT in this group (ADR-0084):
+# because this readiness group gates the Docker container health, a transient
+# Keycloak outage would otherwise flip the frontend container `unhealthy` and feed
+# the same deploy-loop thrash as the 2026-07-09 backend incident. A Keycloak blip
+# must not cycle the frontend container — the indicator bean stays registered
+# (root /actuator/health aggregate + WARN logs keep it observable), it just no
+# longer gates container liveness. The `backend` indicator stays: an actual
+# backend outage genuinely means this frontend cannot serve, and the deploy loop
+# no longer restart-storms on a merely-unhealthy container (ADR-0083).
+# `livenessState` is likewise not in this group.
 # The Docker HEALTHCHECK in frontend/Dockerfile points at /actuator/health/readiness
 # so this group is what gates docker-compose `service_healthy`.
 management:
@@ -200,7 +206,7 @@ management:
         enabled: true
       group:
         readiness:
-          include: readinessState, backend, keycloak, redis, diskSpace, ssl
+          include: readinessState, backend, redis, diskSpace, ssl
   metrics:
     tags:
       # Common tag on every meter; the Grafana "Spring Boot apps" dashboard selects the

@@ -20,15 +20,19 @@
 package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
+import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
+import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.UserSyncResultDto;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
+import de.greluc.krt.profit.basetool.backend.service.UserSyncService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import java.time.LocalDate;
@@ -42,11 +46,13 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -80,6 +86,34 @@ public class UserController {
   private final UserMapper userMapper;
   private final AuthHelperService authHelperService;
   private final OrgUnitMembershipService orgUnitMembershipService;
+  private final UserSyncService userSyncService;
+  private final TaskMetrics taskMetrics;
+
+  /**
+   * Admin-triggered manual run of the Keycloak user sync — the "Sync now" button on the
+   * member-management page. Runs the same reconciliation as the hourly {@link
+   * de.greluc.krt.profit.basetool.backend.task.UserSyncTask}, through {@link
+   * TaskMetrics#recordCountingRethrow} so it publishes the identical {@code user_sync} meters (and
+   * refreshes the {@code UserSyncStale} last-success gauge) yet still returns the synced count and
+   * surfaces a failure as an RFC 7807 problem response. The caller re-reads the member list after a
+   * 2xx to show the refreshed roster.
+   *
+   * <p>Runs {@code NOT_SUPPORTED} to opt out of the class-level {@link Transactional}: each {@code
+   * userService.syncUser} and the bank-holder reconcile must open their OWN transaction (exactly as
+   * on the scheduled path) rather than sharing one page-spanning transaction whose first failure
+   * would poison the rest.
+   *
+   * @return the number of users reconciled this run
+   */
+  @PostMapping("/sync")
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  public UserSyncResultDto syncUsersNow() {
+    int syncedCount =
+        taskMetrics.recordCountingRethrow(
+            ScheduledJob.USER_SYNC, userSyncService::syncFromKeycloak);
+    return new UserSyncResultDto(syncedCount);
+  }
 
   /**
    * Paged user list. Open to every authenticated member because the participant pickers in the

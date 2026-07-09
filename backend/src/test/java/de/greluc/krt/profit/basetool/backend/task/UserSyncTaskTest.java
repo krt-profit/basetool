@@ -19,16 +19,16 @@
 
 package de.greluc.krt.profit.basetool.backend.task;
 
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
-import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
-import de.greluc.krt.profit.basetool.backend.service.KeycloakService;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
+import de.greluc.krt.profit.basetool.backend.service.UserSyncService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import java.util.Collections;
-import java.util.List;
-import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -36,82 +36,40 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+/**
+ * Unit tests for {@link UserSyncTask} — the scheduled trigger. The reconciliation logic itself is
+ * exercised by {@code UserSyncServiceTest}; here we only pin that the scheduled entry point drives
+ * {@link UserSyncService} through the failure-swallowing {@link TaskMetrics#recordCounting}
+ * wrapper.
+ */
 @ExtendWith(MockitoExtension.class)
 class UserSyncTaskTest {
 
-  @Mock private KeycloakService keycloakService;
-
-  @Mock private UserService userService;
+  @Mock private UserSyncService userSyncService;
 
   // A real TaskMetrics (spied) so the wrapper genuinely runs the sync body; a mock would no-op it
-  // and defeat every interaction assertion below.
+  // and defeat the delegation assertion below.
   @Spy private TaskMetrics taskMetrics = new TaskMetrics(new SimpleMeterRegistry());
 
   @InjectMocks private UserSyncTask userSyncTask;
 
   @Test
-  void syncUsers_shouldFetchAndSyncUsers() {
-    KeycloakUserDto user1 =
-        new KeycloakUserDto(
-            UUID.randomUUID(),
-            "user1",
-            "u1@test.com",
-            true,
-            java.util.Collections.emptySet(),
-            null);
-    KeycloakUserDto user2 =
-        new KeycloakUserDto(
-            UUID.randomUUID(),
-            "user2",
-            "u2@test.com",
-            true,
-            java.util.Collections.emptySet(),
-            null);
-
-    when(keycloakService.fetchUsers()).thenReturn(List.of(user1, user2));
+  void syncUsers_delegatesToTheServiceThroughTaskMetrics() {
+    when(userSyncService.syncFromKeycloak()).thenReturn(3);
 
     userSyncTask.syncUsers();
 
-    verify(keycloakService).fetchUsers();
-    verify(userService).syncUser(user1);
-    verify(userService).syncUser(user2);
+    verify(taskMetrics).recordCounting(eq(ScheduledJob.USER_SYNC), any());
+    verify(userSyncService).syncFromKeycloak();
   }
 
   @Test
-  void syncUsers_shouldHandleEmptyList() {
-    when(keycloakService.fetchUsers()).thenReturn(Collections.emptyList());
+  void syncUsers_swallowsAServiceFailureSoTheSchedulerThreadSurvives() {
+    when(userSyncService.syncFromKeycloak()).thenThrow(new RuntimeException("boom"));
 
-    userSyncTask.syncUsers();
+    // recordCounting's catch-record-swallow contract must keep the scheduled trigger from throwing.
+    assertDoesNotThrow(userSyncTask::syncUsers);
 
-    verify(keycloakService).fetchUsers();
-    verifyNoInteractions(userService);
-  }
-
-  @Test
-  void syncUsers_shouldContinueOnException() {
-    KeycloakUserDto user1 =
-        new KeycloakUserDto(
-            UUID.randomUUID(),
-            "user1",
-            "u1@test.com",
-            true,
-            java.util.Collections.emptySet(),
-            null);
-    KeycloakUserDto user2 =
-        new KeycloakUserDto(
-            UUID.randomUUID(),
-            "user2",
-            "u2@test.com",
-            true,
-            java.util.Collections.emptySet(),
-            null);
-
-    when(keycloakService.fetchUsers()).thenReturn(List.of(user1, user2));
-    doThrow(new RuntimeException("Sync failed")).when(userService).syncUser(user1);
-
-    userSyncTask.syncUsers();
-
-    verify(userService).syncUser(user1);
-    verify(userService).syncUser(user2);
+    verify(userSyncService).syncFromKeycloak();
   }
 }

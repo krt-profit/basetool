@@ -161,12 +161,19 @@ EXPOSE 11261
 #   1. Spring's `readinessState` indicator only goes UP after ApplicationReadyEvent,
 #      so a 200 here guarantees the context is fully initialised (Flyway done,
 #      caches warmed, scheduled tasks armed) — not just "Tomcat is bound".
-#   2. The `readiness` health group in application.yml widens the set of indicators
-#      contributing to this endpoint (db, keycloak, diskSpace, ssl), so a Keycloak
-#      outage or a near-expiry SSL cert drops readiness DOWN and Docker Compose
-#      gates the frontend on a real end-to-end check.
-# Liveness (/actuator/health/liveness) stays unused here on purpose — a transient
-# Keycloak blip should yank the container out of `service_healthy`, not restart it.
+#      contributing to this endpoint. That group carries only LOCAL indicators
+#      (db, diskSpace, ssl) — a near-expiry SSL cert or an unreachable database
+#      drops readiness DOWN. The custom KeycloakHealthIndicator is deliberately
+#      NOT in the group (ADR-0084): an EXTERNAL-dependency probe on the endpoint
+#      that gates container health let a transient Keycloak blip (or a thread/GC
+#      stall that broke the probe) flip the container `unhealthy` and feed the
+#      deploy-loop thrash of the 2026-07-09 native-thread incident. Keycloak
+#      health stays observable via the root /actuator/health aggregate + WARN
+#      logs; it just no longer gates this container. Startup ordering is
+#      unaffected — the keycloak CONTAINER's own healthcheck gates backend
+#      startup via `depends_on`.
+# Liveness (/actuator/health/liveness) stays unused here on purpose — a failing
+# readiness probe should pull the container out of `service_healthy`, not restart it.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --start-interval=5s --retries=3 \
     CMD wget -q --no-check-certificate -O /dev/null https://localhost:11261/actuator/health/readiness || exit 1
 

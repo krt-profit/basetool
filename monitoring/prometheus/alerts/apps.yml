@@ -78,6 +78,23 @@ groups:
           summary: "JVM file descriptors >85% ({{ $labels.application }})"
           description: "{{ $labels.application }} is using more than 85% of its file-descriptor limit for 10 minutes — likely an FD leak (unclosed sockets/files). Investigate before it hits the limit and the JVM starts failing to open files/sockets."
 
+      # Native-thread exhaustion: the JVM cannot create a new OS thread once the container's cgroup
+      # `pids` cap (2048 for backend/frontend/ingest — docker-compose.yml) is reached, surfacing as
+      # `OutOfMemoryError: unable to create native thread` REGARDLESS of heap/RAM headroom. This is the
+      # leading indicator that was missing on 2026-07-09: the backend hit the pids cap (readiness +
+      # Keycloak token calls failed at ~55% memory) and the deploy loop thrashed against the resulting
+      # `unhealthy` container for ~2h. No metric exports the cgroup pids limit, so the 2048 cap is
+      # hardcoded; >80% (=1638) is the early warning and a steady climb is a thread leak. Companion to
+      # ContainerPidsHigh (infrastructure.yml), which catches non-JVM threads in the same container.
+      - alert: JvmThreadsHigh
+        expr: jvm_threads_live_threads > 1638
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "JVM live threads >80% of the pids cap ({{ $labels.application }})"
+          description: "{{ $labels.application }} holds more than 1638 live threads (>80% of the container's 2048 pids cap). At the cap the JVM throws 'unable to create native thread' and readiness/Keycloak calls fail (the 2026-07-09 native-thread exhaustion incident). A steady climb is a thread leak — investigate before it reaches 2048."
+
       # GC overhead: fraction of wall time spent in stop-the-world GC pauses. > 20% degrades latency
       # well before JvmHeapHigh's 90% trips (a JVM can thrash the collector while staying under the
       # heap ceiling). No metaspace rule — nonheap max is often -1, so a used/max ratio is NaN.
