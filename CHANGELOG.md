@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.2.4](https://github.com/krt-profit/basetool/releases/tag/v1.2.4) - 2026-07-09
+
 ### Added
 
 - **Neuer Knopf „Jetzt synchronisieren" in der Mitgliederverwaltung.** Administratoren können die Keycloak-Synchronisation manuell anstoßen, statt bis zu eine Stunde auf den nächsten automatischen Lauf zu warten; nach Abschluss erscheint eine Bestätigung und die Mitgliederliste wird direkt mit den aktualisierten Daten neu geladen.
@@ -15,8 +17,6 @@
 - **Verbesserung: Die periodische Keycloak-Synchronisation läuft jetzt stündlich statt jede Minute** und belastet Keycloak dadurch deutlich weniger. Die Frequenz ist über die Umgebungsvariable `APP_KEYCLOAK_SYNC_INTERVAL` (Standard `PT1H`) einstellbar.
 
 - **Monitoring: Frühwarnung bei Thread-Erschöpfung.** Ein neuer Alert (`JvmThreadsHigh`) warnt, sobald ein Dienst sich seiner Thread-Obergrenze nähert — die Ursache des Vorfalls vom 2026-07-09; ein nicht behebbarer Laufzeitfehler am laufenden Release meldet sich jetzt eindeutig (`DeployHealthRestartFailing`) statt als irreführendes Deploy-Rollback.
-
-### Changed
 
 - **Verbesserung: Die bearbeitende Einheit wird jetzt in der Auftragsübersicht angezeigt.** In der Auftragsverwaltung erscheint die aktuell zuständige Einheit (Staffel oder Spezialkommando) direkt unter der Auftrags-ID und -art — bisher war sie nur in der Auftragsdetailansicht sichtbar (#1188).
 
