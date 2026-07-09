@@ -745,7 +745,7 @@ expected result) are documented under [`docs/e2e-test/`](docs/e2e-test/README.md
 * **Build tool** — Gradle 9 with the Kotlin DSL, dependencies via refreshVersions
 * **Database** — PostgreSQL 18, schema owned by Flyway (Hibernate `ddl-auto=validate` everywhere)
 * **Session store** — Redis (`spring-session-data-redis`)
-* **Security** — Spring Security with OAuth2 / OIDC (Keycloak 26.6)
+* **Security** — Spring Security with OAuth2 / OIDC (Keycloak 26.7)
 * **Frontend** — Thymeleaf, Spring Security OAuth2 Client, WebClient wrapped with Resilience4j (Timeout, Retry, CircuitBreaker, Bulkhead)
 * **API documentation** — SpringDoc / OpenAPI; the committed `backend/src/main/resources/api/openapi.json` is the single documentation artifact. No Swagger UI is bundled, and `/v3/api-docs` is disabled in the `prod` profile.
 * **DTO mapping** — MapStruct (`@Mapper(componentModel = "spring")`)

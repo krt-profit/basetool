@@ -14,7 +14,7 @@ java {
   toolchain { languageVersion = JavaLanguageVersion.of(25) }
 }
 
-// CRITICAL: the Keycloak 26.6 container image runs on JDK 21. A provider JAR
+// CRITICAL: the Keycloak 26.7 container image runs on JDK 21. A provider JAR
 // compiled to Java-25 bytecode (class-file major 69) throws
 // UnsupportedClassVersionError when Keycloak's JVM (class-file major 65) tries to
 // load it. Compile with the repo-standard JDK 25 toolchain but emit Java-21

@@ -54,10 +54,10 @@ checkstyle = "13.6.0"
 googleJavaFormat = "1.35.0"
 node = "24.17.0"
 # Keycloak server SPI artifacts for the keycloak-spi provider module (Discord
-# federation + first-login gate, epic #720). Pin to the highest 26.6.x patch — the
-# floating `quay.io/keycloak/keycloak:26.6` runtime tag resolves to it; SPI APIs are
+# federation + first-login gate, epic #720). Pin to the highest 26.7.x patch — the
+# floating `quay.io/keycloak/keycloak:26.7` runtime tag resolves to it; SPI APIs are
 # stable across a minor, so an exact match avoids any load-time surprises.
-keycloak = "26.6.4"
+keycloak = "26.7.0"
 # JUnit pinned explicitly for the keycloak-spi module only — it has no Spring Boot
 # dependency-management to supply a JUnit version, unlike backend/frontend. Kept in
 # lockstep with the JUnit version Spring Boot 4.1.0 manages for those modules (6.0.3)
