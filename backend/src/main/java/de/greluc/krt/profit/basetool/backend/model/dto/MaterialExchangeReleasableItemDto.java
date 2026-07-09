@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
+import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import java.util.UUID;
 
 /**
@@ -29,14 +30,17 @@ import java.util.UUID;
  *
  * @param inventoryItemId the Lager row to release.
  * @param materialName the material's name.
+ * @param quantityType the material's quantity unit ({@code SCU} or {@code PIECE}), so the picker
+ *     and the release dialog render the amount in the material's own unit rather than always SCU.
  * @param quality the row's quality (0–1000).
- * @param amount the row's quantity in SCU.
+ * @param amount the row's quantity, expressed in the material's {@link #quantityType} unit.
  * @param locationName the row's location, shown only in the owner's own picker.
  * @param alreadyReleased whether an active offer already exists for this row.
  */
 public record MaterialExchangeReleasableItemDto(
     UUID inventoryItemId,
     String materialName,
+    QuantityType quantityType,
     Integer quality,
     Double amount,
     String locationName,
