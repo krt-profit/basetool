@@ -132,6 +132,7 @@ Complies with `docs/specs/frontend-ajax-mutations.md` (REQ-FE-001…014).
 **Acceptance**
 - [ ] Filter/tab/sort changes and writes never trigger a full-page reload.
 - [ ] The remark is server-rendered Markdown; the CTA/modal use no `confirm/alert/prompt`.
+- [ ] Master-list rows are native `<button>`s stripped of UA button chrome — no light `buttonface` fill on unselected rows and no beveled/white border around entries (#1184).
 
 **Enforced by:** `MaterialboersePageControllerMvcTest`, CI Playwright (e2e) · **Code:**
 `materialboerse.html`, `materialboerse.js`, `materialboerse-release.js`, `materialboerse.css`
