@@ -122,6 +122,13 @@
 }
 
 /* ---- master row (2-line composition inside .master-row) ---- */
+/* The rows are native <button>s, so we must strip the UA button chrome (the
+   buttonface fill and the beveled 3-sided border) that would otherwise paint a
+   light "overlay" over unselected rows and white borders around every entry —
+   the .master-row.is-active fill only masked it on the selected row (#1184).
+   Mirrors the reset on personal-inventory's .master-row buttons: keep the base
+   .master-row border-bottom hairline, reserve a transparent 3px left border so
+   the .is-active / .mb-mine accent never shifts the layout. */
 .mb-mrow {
     display: flex;
     align-items: center;
@@ -131,6 +138,11 @@
     box-sizing: border-box;
     text-align: left;
     cursor: pointer;
+    background: none;
+    border-top: none;
+    border-left: 3px solid transparent;
+    border-right: none;
+    font-family: var(--font-body);
 }
 .mb-mrow.mb-mine {
     border-left: 3px solid rgb(231 126 35 / 40%);
