@@ -27,14 +27,17 @@ import java.util.UUID;
  *
  * @param inventoryItemId the Lager row to release.
  * @param materialName the material's name.
+ * @param quantityType the material's quantity unit name ({@code SCU} / {@code PIECE}); the picker
+ *     JS renders the amount in this unit instead of always SCU.
  * @param quality the row's quality (0–1000).
- * @param amount the row's quantity in SCU.
+ * @param amount the row's quantity, expressed in the material's {@link #quantityType} unit.
  * @param locationName the row's location (shown only in the owner's own picker).
  * @param alreadyReleased whether an active offer already exists for this row.
  */
 public record MaterialExchangeReleasableItemDto(
     UUID inventoryItemId,
     String materialName,
+    @BackendEnumAsString String quantityType,
     Integer quality,
     Double amount,
     String locationName,
