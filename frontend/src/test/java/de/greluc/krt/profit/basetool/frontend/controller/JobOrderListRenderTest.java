@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.time.Instant;
 import java.util.List;
@@ -157,5 +158,54 @@ class JobOrderListRenderTest {
     assertThat(html)
         .as("the overview no longer renders the ordered items in the Materialien column")
         .doesNotContain("ZZZ Unrendered Item Name");
+  }
+
+  @Test
+  @WithMockUser
+  void viewOrders_RendersResponsibleOrgUnitUnderIdAndType() throws Exception {
+    // Given: a MATERIAL order whose responsible (processing) unit — Iridium Squadron, shorthand
+    // "IRI" — must surface under the id + kind badge in the overview's first cell (#1188). The
+    // requesting unit is left null so "IRI" uniquely identifies the responsible badge.
+    JobOrderDto order =
+        new JobOrderDto(
+            UUID.randomUUID(),
+            42,
+            new SquadronReferenceDto(UUID.randomUUID(), "Iridium Squadron", "IRI"),
+            null,
+            "Tester",
+            null,
+            1,
+            "OPEN",
+            "MATERIAL",
+            false,
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            Instant.now(),
+            1L);
+
+    when(backendApiClient.get(
+            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),
+            anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(order), 0, 1000, 1L, 1, List.of()));
+
+    // When
+    MvcResult result = mockMvc.perform(get("/orders")).andExpect(status().isOk()).andReturn();
+
+    // Then: the responsible unit's shorthand renders as its badge text, its full name as the badge
+    // title, beneath the localized caption element.
+    String html = result.getResponse().getContentAsString();
+    assertThat(html)
+        .as("the responsible unit's shorthand renders as a squadron badge in the overview")
+        .contains("IRI");
+    assertThat(html)
+        .as("the responsible unit's full name renders as the badge title")
+        .contains("Iridium Squadron");
+    assertThat(html)
+        .as("the responsible-unit caption element renders under the id + type")
+        .contains("order-responsible-label");
   }
 }

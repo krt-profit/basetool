@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Verbesserung: Die bearbeitende Einheit wird jetzt in der Auftragsübersicht angezeigt.** In der Auftragsverwaltung erscheint die aktuell zuständige Einheit (Staffel oder Spezialkommando) direkt unter der Auftrags-ID und -art — bisher war sie nur in der Auftragsdetailansicht sichtbar (#1188).
+
 ## [v1.2.3](https://github.com/krt-profit/basetool/releases/tag/v1.2.3) - 2026-07-08
 
 ## [v1.2.2](https://github.com/krt-profit/basetool/releases/tag/v1.2.2) - 2026-07-08
