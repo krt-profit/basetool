@@ -126,11 +126,13 @@ username/password login of a Discord-linked account — carries the claim.
 ### 3c. Back-fill already-linked accounts (automatic — no operator step)
 
 The backend's scheduled user sync (`app.keycloak.sync.*`, the existing `backend-service` admin
-client) now also reads each user's `GET /users/{id}/federated-identity` and persists the `discord`
-link onto `app_user.discord_user_id`. This repairs accounts that linked Discord **before** the
+client) also reads `GET /users/{id}/federated-identity` and persists the `discord` link onto
+`app_user.discord_user_id`. This repairs accounts that linked Discord **before** the
 federated-identity mapper (3b) was deployed, with no re-login — they appear with the Discord icon
-within one sync interval. No extra Keycloak config is needed beyond the admin client already used for
-user sync (it needs `view-users`).
+after the next daily sync run (05:00). The read is incremental (ADR-0085): only accounts still
+missing a local link are checked each run, so an admin who needs the icon sooner can trigger "Sync
+now" on the member-management page. No extra Keycloak config is needed beyond the admin client
+already used for user sync (it needs `view-users`).
 
 > **The approval gate (REQ-SEC-017) does NOT depend on these mappers.** Every brand-new non-admin
 > registration lands `PENDING` regardless of whether the `discord_user_id` claim is present — the

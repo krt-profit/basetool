@@ -82,9 +82,11 @@ public class CustomJwtGrantedAuthoritiesConverter
 
   /**
    * Short memoisation window for the assembled authorities (#1141). Bounds the staleness of a
-   * mid-token role / permission / approval / membership change to ~30&nbsp;s — the same order as
-   * the periodic Keycloak sync ({@code app.keycloak.sync}, ~1&nbsp;m) — while collapsing the
-   * per-request {@code syncUser} + role-lookup + membership query storm to once per token issuance.
+   * mid-token role / permission / approval / membership change to ~30&nbsp;s (after which the next
+   * request re-runs {@code syncUser}), while collapsing the per-request {@code syncUser} +
+   * role-lookup + membership query storm to once per token issuance. This login-path reconciliation
+   * is independent of — and far fresher than — the periodic drift-correction {@code
+   * app.keycloak.sync} (now daily), which only covers users who are not currently logging in.
    */
   private static final Duration AUTHORITIES_CACHE_TTL = Duration.ofSeconds(30);
 

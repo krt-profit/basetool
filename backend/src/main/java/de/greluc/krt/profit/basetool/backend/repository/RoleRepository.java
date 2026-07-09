@@ -21,11 +21,13 @@ package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import java.util.Optional;
+import java.util.Set;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 /** Spring Data repository for Role. */
@@ -60,4 +62,17 @@ public interface RoleRepository extends JpaRepository<Role, Long> {
   @NotNull
   @EntityGraph(attributePaths = {"permissions"})
   Page<Role> findAll(@NotNull Pageable pageable);
+
+  /**
+   * Returns the display {@code name} of every role in the local catalog. Backs the Keycloak user
+   * sync's role-indexed membership fetch: {@code KeycloakService.fetchUsers} queries {@code GET
+   * /roles/{name}/users} for exactly these names (the realm role name equals the local role name,
+   * the key {@code UserService.mapRoles} joins on), so ubiquitous default/technical realm roles are
+   * never walked. A lightweight scalar projection — no entity or {@code permissions} graph is
+   * loaded.
+   *
+   * @return the set of role names; never {@code null}, possibly empty.
+   */
+  @Query("SELECT r.name FROM Role r")
+  Set<String> findAllNames();
 }

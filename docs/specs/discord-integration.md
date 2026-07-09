@@ -29,8 +29,12 @@ persisting onto this column: (1) the `discord_user_id` token claim, emitted by t
 `DiscordFederatedIdentityMapper` from the federated link on **every** login (so even a pure
 credential login of a linked user carries it), persisted by `UserService.syncUser(Jwt)`; and (2) the
 scheduled Admin-API user sync, which reads `GET /users/{id}/federated-identity` and persists the
-`discord` link via `UserService.syncUser(KeycloakUserDto)` — back-filling already-linked accounts
-with no re-login. `null` for users who never linked Discord. Because the link is the recognition key
+`discord` link via `UserService.syncUser(KeycloakUserDto)` — back-filling accounts with no re-login.
+Path (2) is **incremental** (5000-account scaling, ADR-0085): the sync reads the federated-identity
+endpoint only for roster users who do **not** already carry a local link (`getKnownDiscordLinkedUserIds`
+is the skip-set), so the already-linked majority is never re-read; a *relink* to a different Discord
+account is still caught by path (1) at the linker's next login. `null` for users who never linked
+Discord. Because the link is the recognition key
 for a returning Discord user, it must be unique across users; Postgres treats `NULL` as distinct, so
 all credential-only users coexist.
 

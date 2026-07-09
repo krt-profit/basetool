@@ -155,9 +155,11 @@ issuedAt)` for a short window (~30&nbsp;s), so that work is paid once per token 
 every fragment refetch / live-sync burst / check-in. Keying on `issuedAt` makes a freshly issued token
 (re-login, refresh) a distinct key and therefore a miss, so an authority change takes effect on
 re-authentication; within one token's life a mid-token role / permission / approval / membership
-change reflects after at most the cache TTL — the same bounded-staleness order as the periodic
-`app.keycloak.sync` (~1&nbsp;min), and never longer than the token lifetime. Only successful results
-are cached; a token missing `sub`/`issuedAt` bypasses the cache and is always recomputed.
+change reflects after at most the cache TTL, and never longer than the token lifetime — the
+login-path reconciliation is independent of, and far fresher than, the periodic drift-correction
+`app.keycloak.sync` (daily 05:00), which only covers users who are not currently logging in. Only
+successful results are cached; a token missing `sub`/`issuedAt` bypasses the cache and is always
+recomputed.
 
 > **Amended by epic #692 (REQ-SEC-015 / REQ-ORG-015):** Bereich/OL leadership memberships
 > (`is_bereichsleiter`/`koordinator`/`operator`, `is_ol_member`) also mint the flat
@@ -547,16 +549,27 @@ ADR-0072.
 `UserService.markMissingUsers(currentIds)`, which flags every local user whose Keycloak id did **not**
 appear in the run as no-longer-in-Keycloak. That reconciliation is only safe if the fetched set is the
 **complete** Keycloak user list. The Admin API `GET /users` endpoint caps each response at a server-side
-maximum (~100 by default), so `KeycloakService.fetchUsers()` MUST page through `first`/`max`
-(`app.keycloak.sync.page-size`, default 100, bounded 1–1000) until a short/empty page signals the end.
+maximum (~100 by default), so `KeycloakService.fetchUsers(appRoleNames, knownDiscordLinkedIds)` MUST
+page through `first`/`max` (`app.keycloak.sync.page-size`, default 100, bounded 1–1000) until a
+short/empty page signals the end.
 
 A single unpaged call returns only the first page, so every user beyond the cap would be wrongly marked
 missing — a silent soft-delete of real members. Fetching the page is a prerequisite of the
 reconciliation, not an optimisation; the two must never diverge.
 
+**Role resolution is role-indexed, not per-user (5000-account scaling, ADR-0085).** The sync resolves
+roles by listing the members of each app-relevant realm role once (`GET /roles/{name}/users`, paged),
+driven by the local role catalog (`getMappableRoleNames`), rather than reading each user's role mapping
+individually. Both views report directly-assigned realm roles, so the reconstructed sets are equivalent
+to the old per-user path — but the Admin-API call count is bounded by the (small) number of mappable
+roles instead of the user count. The completeness invariant above is unchanged: the roster still comes
+from the paged `GET /users`; role-indexing only changes how the roster is *annotated* with roles, never
+which users are considered present.
+
 **Acceptance** (`KeycloakServiceTest`): with a page size of 2 and three users across two pages,
-`fetchUsers()` returns all three, the first request binds `first=0&max=2`, and the second advances to
-`first=2`.
+`fetchUsers` returns all three, the first request binds `first=0&max=2`, and the second advances to
+`first=2`; and with role `ADMIN` listing user A, A's DTO carries `ADMIN` resolved from
+`/roles/ADMIN/users`.
 
 **Enforced by:** `KeycloakServiceTest` · **Code:** `KeycloakService.fetchAllUsers`,
 `KeycloakSyncProperties.pageSize`, `UserSyncTask`

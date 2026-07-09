@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Verbesserung: Die periodische Keycloak-Synchronisation läuft jetzt einmal täglich um 05:00 (statt stündlich) und belastet Keycloak deutlich weniger.** Sie fragt Rollen jetzt rollen-indiziert statt einzeln pro Nutzer ab und liest Discord-Verknüpfungen nur noch für Konten ohne bestehende Verknüpfung — bei 5000 Konten sinkt die Zahl der Keycloak-Aufrufe pro Lauf von rund 10.000 auf wenige Dutzend. Für eine sofortige Aktualisierung dient der „Jetzt synchronisieren"-Knopf; einstellbar über `APP_KEYCLOAK_SYNC_CRON` / `APP_KEYCLOAK_SYNC_ZONE` (Standard `0 0 5 * * *` / `Europe/Berlin`, ersetzt `APP_KEYCLOAK_SYNC_INTERVAL`).
+- **Kapazität: Das Tool ist jetzt auf 5000 Nutzerkonten und 200 gleichzeitige Nutzer ausgelegt.** Keycloak, seine Datenbank, die Backend-Datenbank und Redis wurden auf dem 16-GB-Host entsprechend hochdimensioniert; das 30-tägige Anmeldefenster bleibt erhalten (ADR-0085).
+
 ## [v1.2.4](https://github.com/krt-profit/basetool/releases/tag/v1.2.4) - 2026-07-09
 
 ### Added

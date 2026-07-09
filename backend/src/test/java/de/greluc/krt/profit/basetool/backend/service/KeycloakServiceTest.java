@@ -88,7 +88,7 @@ class KeycloakServiceTest {
 
     KeycloakService service = new KeycloakService(properties, sslBundles);
 
-    assertTrue(service.fetchUsers().isEmpty());
+    assertTrue(service.fetchUsers(List.of(), Set.of()).isEmpty());
     verify(sslBundles).getBundle("keycloak-trust");
   }
 
@@ -119,10 +119,9 @@ class KeycloakServiceTest {
       UUID userC = UUID.fromString("00000000-0000-0000-0000-0000000000c3");
 
       // 1) client-credentials token, 2) full first page (== pageSize → keep paging),
-      // 3) short second page (< pageSize → stop), then per user a realm-role mapping followed by a
-      // federated-identity lookup (roles A, federated A, roles B, federated B, roles C, federated
-      // C)
-      // — all empty here, so this stays a pure pagination check.
+      // 3) short second page (< pageSize → stop). No role names are passed, so no /roles member
+      // page is requested; then one federated-identity lookup per roster user (A, B, C) since none
+      // is pre-known-linked — all empty here, so this stays a pure pagination check.
       server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
       server.enqueue(
           jsonResponse(
@@ -136,13 +135,10 @@ class KeycloakServiceTest {
       server.enqueue(jsonResponse("[]"));
       server.enqueue(jsonResponse("[]"));
       server.enqueue(jsonResponse("[]"));
-      server.enqueue(jsonResponse("[]"));
-      server.enqueue(jsonResponse("[]"));
-      server.enqueue(jsonResponse("[]"));
 
       KeycloakService service = new KeycloakService(properties, sslBundles);
 
-      List<KeycloakUserDto> users = service.fetchUsers();
+      List<KeycloakUserDto> users = service.fetchUsers(List.of(), Set.of());
 
       assertEquals(3, users.size(), "all three users across both pages must be returned");
       assertEquals(
@@ -185,12 +181,11 @@ class KeycloakServiceTest {
 
       UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
 
-      // token, single short page (stop), roles A (empty), federated identities A (one discord
-      // link).
+      // token, single short page (stop); no role names → no /roles member page; then federated
+      // identities A (one discord link) since A is not pre-known-linked.
       server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
       server.enqueue(
           jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
-      server.enqueue(jsonResponse("[]"));
       server.enqueue(
           jsonResponse(
               "[{\"identityProvider\":\"discord\",\"userId\":\"123456789012345678\","
@@ -198,7 +193,7 @@ class KeycloakServiceTest {
 
       KeycloakService service = new KeycloakService(properties, sslBundles);
 
-      List<KeycloakUserDto> users = service.fetchUsers();
+      List<KeycloakUserDto> users = service.fetchUsers(List.of(), Set.of());
 
       assertEquals(1, users.size());
       assertEquals("123456789012345678", users.get(0).discordUserId());
@@ -234,16 +229,111 @@ class KeycloakServiceTest {
       server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
       server.enqueue(
           jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
-      server.enqueue(jsonResponse("[]"));
       server.enqueue(
           jsonResponse("[{\"identityProvider\":\"github\",\"userId\":\"99\",\"userName\":\"a\"}]"));
 
       KeycloakService service = new KeycloakService(properties, sslBundles);
 
-      List<KeycloakUserDto> users = service.fetchUsers();
+      List<KeycloakUserDto> users = service.fetchUsers(List.of(), Set.of());
 
       assertEquals(1, users.size());
       assertNull(users.get(0).discordUserId());
+    } finally {
+      server.shutdown();
+    }
+  }
+
+  /**
+   * Role membership is resolved role-indexed: for each mappable role name, {@code fetchUsers}
+   * queries {@code GET /roles/{name}/users} once and maps the role onto every returned member,
+   * rather than reading each user's role mapping individually. With role {@code ADMIN} listing user
+   * A as a member, A's DTO must carry {@code ADMIN}, and the request path must target the role's
+   * member endpoint.
+   *
+   * @throws Exception if the mock server cannot be started or stopped.
+   */
+  @Test
+  void fetchUsers_resolvesRolesRoleIndexed() throws Exception {
+    when(sslBundles.getBundle("keycloak-trust"))
+        .thenThrow(new NoSuchSslBundleException("keycloak-trust", "no such bundle"));
+    MockWebServer server = new MockWebServer();
+    server.start();
+    try {
+      KeycloakSyncProperties properties = new KeycloakSyncProperties();
+      properties.setEnabled(true);
+      properties.setAdminUrl(server.url("/").toString().replaceAll("/+$", ""));
+      properties.setRealm("iri");
+      properties.setClientId("client");
+      properties.setClientSecret("secret");
+      properties.setPageSize(100);
+
+      UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
+
+      // token, single short roster page (stop), one ADMIN member page (A, short → stop), then
+      // federated identities A (empty, A is not pre-known-linked).
+      server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
+      server.enqueue(
+          jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
+      server.enqueue(jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\"}]"));
+      server.enqueue(jsonResponse("[]"));
+
+      KeycloakService service = new KeycloakService(properties, sslBundles);
+
+      List<KeycloakUserDto> users = service.fetchUsers(List.of("ADMIN"), Set.of());
+
+      assertEquals(1, users.size());
+      assertEquals(Set.of("ADMIN"), users.get(0).roles());
+
+      server.takeRequest(); // token
+      server.takeRequest(); // roster page
+      RecordedRequest rolePage = server.takeRequest();
+      assertTrue(
+          rolePage.getPath().contains("/roles/ADMIN/users"),
+          "role membership must be read from the role's member endpoint");
+    } finally {
+      server.shutdown();
+    }
+  }
+
+  /**
+   * Incremental Discord back-fill: a roster user whose id is already known-linked locally must NOT
+   * trigger a federated-identity read. With no role names and A pre-known-linked, only the token +
+   * roster page are requested — no third call — and A's DTO carries a {@code null} Discord id
+   * (which {@code syncUser} treats as "leave the existing link alone").
+   *
+   * @throws Exception if the mock server cannot be started or stopped.
+   */
+  @Test
+  void fetchUsers_skipsDiscordReadForAlreadyLinkedUsers() throws Exception {
+    when(sslBundles.getBundle("keycloak-trust"))
+        .thenThrow(new NoSuchSslBundleException("keycloak-trust", "no such bundle"));
+    MockWebServer server = new MockWebServer();
+    server.start();
+    try {
+      KeycloakSyncProperties properties = new KeycloakSyncProperties();
+      properties.setEnabled(true);
+      properties.setAdminUrl(server.url("/").toString().replaceAll("/+$", ""));
+      properties.setRealm("iri");
+      properties.setClientId("client");
+      properties.setClientSecret("secret");
+      properties.setPageSize(100);
+
+      UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
+
+      server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
+      server.enqueue(
+          jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
+
+      KeycloakService service = new KeycloakService(properties, sslBundles);
+
+      List<KeycloakUserDto> users = service.fetchUsers(List.of(), Set.of(userA));
+
+      assertEquals(1, users.size());
+      assertNull(users.get(0).discordUserId());
+      assertEquals(
+          2,
+          server.getRequestCount(),
+          "an already-linked user must not trigger a federated-identity read");
     } finally {
       server.shutdown();
     }

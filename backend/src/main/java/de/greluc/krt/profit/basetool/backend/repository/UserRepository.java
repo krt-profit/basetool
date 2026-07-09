@@ -390,6 +390,18 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   void markMissingUsers(@NotNull java.util.Collection<java.util.UUID> ids);
 
   /**
+   * Returns the ids of every local user that already carries a Discord account link ({@code
+   * discord_user_id} is non-null). Backs the Keycloak user sync's incremental Discord back-fill:
+   * the sync reads the (expensive, per-user) federated-identity endpoint only for roster users NOT
+   * in this set, so the already-linked majority is skipped each run. A lightweight scalar
+   * projection: no rows are materialised, so no PII (the snowflake itself) is loaded.
+   *
+   * @return the ids of users with a non-null Discord link; never {@code null}, possibly empty.
+   */
+  @Query("SELECT u.id FROM User u WHERE u.discordUserId IS NOT NULL")
+  Set<UUID> findIdsWithDiscordLink();
+
+  /**
    * Returns every user carrying the {@code ADMIN} role (case-insensitive match), ordered by
    * username.
    */

@@ -161,14 +161,19 @@ app:
   keycloak:
     sync:
       enabled: true
-      # Cadence of the periodic Keycloak->local reconciliation (UserSyncTask). Default hourly:
-      # the sync is a drift-correction safety net, not a live feed (each run makes ~1 admin call
-      # per user against Keycloak). A 1-minute cadence (the pre-2026-07 value) hammered Keycloak
-      # 60x/hour and was the accelerant behind the 2026-07-09 native-thread exhaustion incident;
-      # admins who need an immediate refresh use the "Sync now" button on the member-management
-      # page (POST /api/v1/users/sync) rather than a hot schedule. Env-parameterised (like the
-      # bank/notifications/blueprints schedulers) so the cadence is tunable without a rebuild.
-      interval: ${APP_KEYCLOAK_SYNC_INTERVAL:PT1H}
+      # Cadence of the periodic Keycloak->local reconciliation (UserSyncTask): once per day at 05:00
+      # in the configured zone (off-peak). The sync is a drift-correction safety net, not a live
+      # feed; it now resolves roles role-indexed and back-fills Discord links incrementally
+      # (KeycloakService), so a single daily run stays a bounded off-peak burst even at 5000
+      # accounts. A 1-minute cadence (the pre-2026-07 value) hammered Keycloak 60x/hour and was the
+      # accelerant behind the 2026-07-09 native-thread exhaustion incident; admins who need an
+      # immediate refresh use the "Sync now" button on the member-management page (POST
+      # /api/v1/users/sync) rather than a hot schedule. Cron (6-field sec/min/hour/dom/mon/dow) and
+      # zone are env-parameterised (like the bank/notifications/blueprints schedulers) so the
+      # cadence is tunable without a rebuild; an invalid cron fails startup rather than silently
+      # disabling the sync.
+      cron: ${APP_KEYCLOAK_SYNC_CRON:0 0 5 * * *}
+      zone: ${APP_KEYCLOAK_SYNC_ZONE:Europe/Berlin}
       admin-url: ${KEYCLOAK_ADMIN_URL:http://keycloak:18080}
       realm: ${KEYCLOAK_REALM:iri}
       client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:backend-service}
