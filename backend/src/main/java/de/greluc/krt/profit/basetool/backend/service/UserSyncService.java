@@ -38,14 +38,15 @@ import org.springframework.stereotype.Service;
  * TaskMetrics} so a manual run is indistinguishable in monitoring and refreshes the same {@code
  * user_sync} last-success gauge.
  *
- * <p>It pulls the full user list from Keycloak via {@link KeycloakService#fetchUsers()} (which
- * pages internally so the set is complete, not just the first server-side page), upserts each user
- * via {@link UserService#syncUser}, collects the Keycloak {@code id}s observed this run, and then
- * asks the service to mark every local user NOT in that set as missing — that is how deletions in
- * Keycloak get reflected locally without a hard {@code DELETE}. The completeness of the fetched set
- * is a hard prerequisite (REQ-SEC-018): a truncated list would soft-delete every real member beyond
- * the page cap, which is why {@code fetchUsers()} pages and an empty result is treated as "skip"
- * (never a wipe).
+ * <p>It pulls the full user list from Keycloak via {@link KeycloakService#fetchUsers} (which pages
+ * internally so the set is complete, not just the first server-side page, and resolves roles
+ * role-indexed with an incremental Discord back-fill), upserts each user via {@link
+ * UserService#syncUser}, collects the Keycloak {@code id}s observed this run, and then asks the
+ * service to mark every local user NOT in that set as missing — that is how deletions in Keycloak
+ * get reflected locally without a hard {@code DELETE}. The completeness of the fetched set is a
+ * hard prerequisite (REQ-SEC-018): a truncated list would soft-delete every real member beyond the
+ * page cap, which is why {@code fetchUsers()} pages and an empty result is treated as "skip" (never
+ * a wipe).
  */
 @Service
 @RequiredArgsConstructor
@@ -73,7 +74,13 @@ public class UserSyncService {
    */
   public int syncFromKeycloak() {
     log.info("Starting scheduled user sync from Keycloak...");
-    List<KeycloakUserDto> users = keycloakService.fetchUsers();
+    // Role-indexed + incremental-Discord inputs, both resolved from local state before the fetch:
+    // the mappable role names bound the role-membership queries, and the already-linked ids let the
+    // fetch skip the per-user federated-identity read for the linked majority (5000-account
+    // hardening — see KeycloakService#fetchUsers).
+    Set<String> roleNames = userService.getMappableRoleNames();
+    Set<UUID> knownDiscordLinkedIds = userService.getKnownDiscordLinkedUserIds();
+    List<KeycloakUserDto> users = keycloakService.fetchUsers(roleNames, knownDiscordLinkedIds);
     if (users.isEmpty()) {
       log.info("No users fetched from Keycloak.");
       return 0;

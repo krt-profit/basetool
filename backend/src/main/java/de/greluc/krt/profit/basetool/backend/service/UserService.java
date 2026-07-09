@@ -475,6 +475,31 @@ public class UserService {
     userRepository.markMissingUsers(currentIds);
   }
 
+  /**
+   * Returns the realm role names the scheduled Keycloak sync should index against Keycloak — the
+   * display names of every role in the local catalog. The realm role name equals the local role
+   * name (the key {@link #mapRoles(Collection)} joins on), so passing exactly these to {@code
+   * KeycloakService.fetchUsers} makes the role-indexed membership fetch query only the roles the
+   * app actually maps, never the ubiquitous default/technical realm roles. Read-only.
+   *
+   * @return the mappable realm role names; never {@code null}, possibly empty.
+   */
+  @NotNull
+  public Set<String> getMappableRoleNames() {
+    return roleRepository.findAllNames();
+  }
+
+  /**
+   * Returns the ids of local users that already carry a Discord link, so the scheduled sync can
+   * skip the per-user federated-identity read for them (incremental back-fill). Read-only.
+   *
+   * @return the ids of users with a non-null Discord link; never {@code null}, possibly empty.
+   */
+  @NotNull
+  public Set<UUID> getKnownDiscordLinkedUserIds() {
+    return userRepository.findIdsWithDiscordLink();
+  }
+
   private Set<Role> mapRoles(Collection<String> roleNames) {
     Set<Role> localRoles = new HashSet<>();
     if (roleNames != null) {

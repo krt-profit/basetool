@@ -30,12 +30,14 @@ import org.springframework.stereotype.Component;
 /**
  * Scheduled trigger for the Keycloak-&gt;local user reconciliation.
  *
- * <p>Runs {@link UserSyncService#syncFromKeycloak()} every {@code app.keycloak.sync.interval}
- * (default {@code PT1H} — hourly; the reconciliation is a drift-correction safety net, not a live
- * feed, and the pre-2026-07 1-minute cadence was the accelerant behind the native-thread exhaustion
- * incident). The reconciliation logic lives in {@link UserSyncService} so it can be shared with the
- * admin-triggered manual run ({@code POST /api/v1/users/sync}); this task is only the scheduled
- * entry point plus its instrumentation.
+ * <p>Runs {@link UserSyncService#syncFromKeycloak()} once per day on {@code app.keycloak.sync.cron}
+ * in {@code app.keycloak.sync.zone} (default {@code 0 0 5 * * *} / {@code Europe/Berlin} — 05:00
+ * local, off-peak). The reconciliation is a drift-correction safety net, not a live feed, and the
+ * pre-2026-07 1-minute cadence was the accelerant behind the native-thread exhaustion incident; a
+ * single daily off-peak burst keeps the Admin-API load bounded even at 5000 accounts. The
+ * reconciliation logic lives in {@link UserSyncService} so it can be shared with the
+ * admin-triggered manual run ({@code POST /api/v1/users/sync}) — the on-demand refresh path now
+ * that the schedule is daily; this task is only the scheduled entry point plus its instrumentation.
  */
 @Component
 @RequiredArgsConstructor
@@ -52,7 +54,9 @@ public class UserSyncTask {
    * the wrapper so the scheduler thread survives; the admin-triggered manual run uses {@link
    * TaskMetrics#recordCountingRethrow} instead so the failure surfaces to the caller.
    */
-  @Scheduled(fixedDelayString = "${app.keycloak.sync.interval:PT1H}")
+  @Scheduled(
+      cron = "${app.keycloak.sync.cron:0 0 5 * * *}",
+      zone = "${app.keycloak.sync.zone:Europe/Berlin}")
   public void syncUsers() {
     taskMetrics.recordCounting(ScheduledJob.USER_SYNC, userSyncService::syncFromKeycloak);
   }

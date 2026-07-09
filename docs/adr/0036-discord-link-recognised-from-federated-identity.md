@@ -48,12 +48,14 @@ mapper sync mode. Three layers, defence-in-depth:
    It replaces the `oidc-usermodel-attribute-mapper` as the `basetool-frontend` claim source; the
    claim name (`discord_user_id`) and the backend's persist-on-login are unchanged.
 
-2. **Backfill — Admin-API federated-identity sync (`KeycloakService`).** The scheduled user sync now
-   also reads each user's `GET /users/{id}/federated-identity`, picks the `discord` entry, and
-   persists its id onto `app_user.discord_user_id` via `syncUser(KeycloakUserDto)`. This repairs
-   **already-linked existing accounts with no re-login of any kind**, on the sync cadence. It only
-   *sets* the link, never clears it (the fetch is best-effort and returns `null` on any failure, so
-   clearing on `null` could wrongly wipe a real link).
+2. **Backfill — Admin-API federated-identity sync (`KeycloakService`).** The scheduled user sync also
+   reads `GET /users/{id}/federated-identity`, picks the `discord` entry, and persists its id onto
+   `app_user.discord_user_id` via `syncUser(KeycloakUserDto)`. This repairs **already-linked existing
+   accounts with no re-login of any kind**, on the sync cadence. It only *sets* the link, never clears
+   it (the fetch is best-effort and returns `null` on any failure, so clearing on `null` could wrongly
+   wipe a real link). Since ADR-0085 (5000-account scaling) this read is **incremental**: it runs only
+   for roster users without a local link yet — the already-linked population is skipped each run, and a
+   *relink* to a different account is caught by layer 1 at the linker's next login.
 
 3. **Defence-in-depth — attribute importer Sync Mode = `FORCE`.** The `DiscordUserAttributeMapper`
    keeps the Keycloak **user attribute** populated (useful for admin-console visibility and as a
@@ -74,8 +76,10 @@ mapper sync mode. Three layers, defence-in-depth:
   first-broker-login gate. The indicator is purely informational, admin-only, and never grants
   anything; surfacing it for account-console-linked members is more accurate, not a privilege change.
   The membership gate remains the boundary for *new Discord logins* and is untouched.
-- **One extra Admin-API call per user per sync** (`/federated-identity`), best-effort and swallowed —
-  a transient failure yields `null` and never wipes a link or aborts the run.
+- **One `/federated-identity` Admin-API call per *unlinked* user per sync**, best-effort and swallowed
+  — a transient failure yields `null` and never wipes a link or aborts the run. Since ADR-0085 the
+  linked majority is skipped (incremental back-fill), so the per-run cost is bounded by the unlinked
+  population, not the full roster.
 - **A realm-config change is required at deploy:** swap the `basetool-frontend` `discord_user_id`
   protocol mapper to `discord-federated-identity-mapper` and set the importer mapper to `FORCE` (see
   the runbook). The new SPI mapper ships in the same provider JAR as ADR-0030's providers.

@@ -23,13 +23,15 @@ import de.greluc.krt.profit.basetool.backend.config.KeycloakSyncProperties;
 import de.greluc.krt.profit.basetool.backend.config.KeycloakTrustSupport;
 import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.boot.ssl.SslBundles;
@@ -48,9 +50,17 @@ import org.springframework.web.client.RestClientResponseException;
  *
  * <p>Obtains an admin access token via the {@code client_credentials} grant against the realm's
  * {@code openid-connect/token} endpoint, then pages through {@code /admin/realms/{realm}/users} and
- * joins each user record with the user's realm role mappings. Failures are swallowed at the top
- * level: the scheduler treats an empty list as "skip this run" and never wipes local users based on
- * it (see {@link UserService#markMissingUsers}).
+ * joins each user record with the roles the app cares about. Role membership is resolved
+ * <em>role-indexed</em> — one paged {@code GET /roles/{name}/users} per app-relevant realm role
+ * (see {@link #fetchRoleMemberships}) — rather than one {@code /role-mappings} call per user, so
+ * the per-run Admin-API call count is bounded by the (small) number of mappable roles instead of
+ * the user count. That N&#8594;#roles collapse is the primary 5000-account scaling fix: the old
+ * per-user fan-out issued ~2 admin calls per user (one roles, one federated-identity), which at
+ * thousands of accounts was a multi-minute Keycloak-hammering burst. The Discord federated-identity
+ * back-fill is likewise made <em>incremental</em> — read only for users who do not already carry a
+ * local Discord link (see the {@code knownDiscordLinkedIds} argument of {@link #fetchUsers}).
+ * Failures are swallowed at the top level: the scheduler treats an empty list as "skip this run"
+ * and never wipes local users based on it (see {@link UserService#markMissingUsers}).
  *
  * <p>The {@link #BEARER_PREFIX} constant exists so the literal {@code "Bearer "} never gets typed
  * by hand at a new call site — open-coding the prefix in a future log statement is the canonical
@@ -151,7 +161,8 @@ public class KeycloakService {
   }
 
   /**
-   * Fetches the entire realm user catalog plus role mappings.
+   * Fetches the entire realm user catalog plus the app-relevant role memberships, joining an
+   * incremental Discord federated-identity back-fill.
    *
    * <p>Short-circuits to an empty list when sync is disabled or the admin URL is unconfigured — a
    * missing setting must NOT trigger an exception that would leak the configuration shape to the
@@ -159,9 +170,24 @@ public class KeycloakService {
    * returns an empty list; the scheduler then treats the run as "skip" rather than marking every
    * local user as missing.
    *
-   * @return list of Keycloak users with their resolved realm role names, or empty on any failure
+   * <p>Scaling shape (5000-account hardening): roles are resolved <em>once per role</em> via {@link
+   * #fetchRoleMemberships(Collection, String)} rather than once per user, and the Discord link is
+   * read only for users NOT in {@code knownDiscordLinkedIds}. On a steady-state run that means a
+   * handful of role-listing calls plus a Discord read only for accounts still missing a local link
+   * (new members, or ones that never linked) — the linked majority is skipped entirely.
+   *
+   * @param appRoleNames the realm role names the app maps locally (from the local role catalog);
+   *     only these are indexed against Keycloak, so default/technical realm roles never trigger a
+   *     wasteful full-membership page. A role that exists locally but not in Keycloak (e.g. the
+   *     local-only {@code Guest} fallback) simply contributes no memberships. Never {@code null}.
+   * @param knownDiscordLinkedIds ids of users who already carry a local Discord link and therefore
+   *     do NOT need their federated identity re-read this run; every other roster user (including
+   *     brand-new ones absent locally) gets the read. Never {@code null}.
+   * @return list of Keycloak users with their resolved realm role names and (for the non-skipped
+   *     subset) Discord link, or empty on any failure
    */
-  public List<KeycloakUserDto> fetchUsers() {
+  public List<KeycloakUserDto> fetchUsers(
+      Collection<String> appRoleNames, Set<UUID> knownDiscordLinkedIds) {
     if (!properties.isEnabled() || properties.getAdminUrl() == null) {
       log.debug("Keycloak sync disabled or admin URL missing");
       return Collections.emptyList();
@@ -169,16 +195,26 @@ public class KeycloakService {
 
     try {
       String token = getAccessToken();
+      List<KeycloakUserDto> roster = fetchAllUsers(token);
+      Map<UUID, Set<String>> rolesByUser = fetchRoleMemberships(appRoleNames, token);
 
-      return fetchAllUsers(token).stream()
-          .map(
-              u -> {
-                Set<String> roles = fetchUserRoles(u.id(), token);
-                String discordUserId = fetchDiscordFederatedId(u.id(), token);
-                return new KeycloakUserDto(
-                    u.id(), u.username(), u.email(), u.enabled(), roles, discordUserId);
-              })
-          .toList();
+      List<KeycloakUserDto> result = new ArrayList<>(roster.size());
+      for (KeycloakUserDto u : roster) {
+        Set<String> roles = rolesByUser.getOrDefault(u.id(), Collections.emptySet());
+        // Incremental Discord back-fill: skip the per-user federated-identity read for accounts
+        // that already carry a local link. syncUser treats the resulting null as "leave the
+        // existing link alone", so skipping is safe and cannot wipe a real link. A relink to a
+        // different Discord account is still caught at the linker's next login (the JWT claim
+        // path), which is why the daily sync only needs to cover accounts with no local link yet.
+        String discordUserId =
+            (u.id() != null && !knownDiscordLinkedIds.contains(u.id()))
+                ? fetchDiscordFederatedId(u.id(), token)
+                : null;
+        result.add(
+            new KeycloakUserDto(
+                u.id(), u.username(), u.email(), u.enabled(), roles, discordUserId));
+      }
+      return result;
 
     } catch (Exception e) {
       log.error("Failed to fetch users from Keycloak", e);
@@ -230,29 +266,89 @@ public class KeycloakService {
     return all;
   }
 
-  private Set<String> fetchUserRoles(UUID userId, String token) {
-    try {
-      List<Map<String, Object>> roles =
-          adminClient()
-              .get()
-              .uri(
-                  "/admin/realms/{realm}/users/{id}/role-mappings/realm",
-                  properties.getRealm(),
-                  userId)
-              .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
-              .retrieve()
-              .body(new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+  /**
+   * Builds the {@code userId -> realm role names} index by listing the members of each app-relevant
+   * realm role once, rather than reading every user's role mappings individually.
+   *
+   * <p>This is the role-indexed inverse of the old per-user {@code GET
+   * /users/{id}/role-mappings/realm} fan-out (which cost one Admin-API call per user). Both views
+   * report <em>directly-assigned</em> realm roles, so the reconstructed sets are equivalent to what
+   * the per-user path returned — only far cheaper: the call count is bounded by the number of
+   * mappable roles (a handful) times their page count, not by the user count. Only the roles the
+   * local catalog maps are queried, so ubiquitous default/technical realm roles ({@code
+   * default-roles-*}, {@code offline_access}, {@code uma_authorization}) never trigger a
+   * full-membership page walk.
+   *
+   * @param appRoleNames the realm role names to index; never {@code null}.
+   * @param token a valid admin access token.
+   * @return a mutable map of user id to the subset of {@code appRoleNames} each user holds; users
+   *     with none simply do not appear (the caller defaults them to the empty set, which {@link
+   *     UserService#syncUser(KeycloakUserDto)} maps to the {@code Guest} fallback).
+   */
+  private Map<UUID, Set<String>> fetchRoleMemberships(
+      Collection<String> appRoleNames, String token) {
+    Map<UUID, Set<String>> byUser = new HashMap<>();
+    for (String roleName : appRoleNames) {
+      accumulateRoleMembers(roleName, token, byUser);
+    }
+    return byUser;
+  }
 
-      if (roles == null) {
-        return Collections.emptySet();
+  /**
+   * Pages through {@code GET /roles/{roleName}/users} and records the role against every member id
+   * in {@code byUser}. The endpoint caps each response at a server-side maximum, so this loops
+   * {@code first}/{@code max} (page size from {@link KeycloakSyncProperties#getPageSize()}) until a
+   * short or empty page signals the end — mirroring {@link #fetchAllUsers(String)}.
+   *
+   * <p>Best-effort per role: any failure is logged (role name only — never PII) and the role simply
+   * contributes no memberships this run, exactly the degradation the per-user path had. A {@code
+   * 404} for a realm role that exists locally but not in Keycloak (the local-only {@code Guest}
+   * fallback) is the common, harmless case.
+   *
+   * @param roleName the realm role whose members to enumerate.
+   * @param token a valid admin access token.
+   * @param byUser the accumulator to populate (user id &#8594; role names).
+   */
+  private void accumulateRoleMembers(String roleName, String token, Map<UUID, Set<String>> byUser) {
+    int pageSize = properties.getPageSize();
+    int first = 0;
+    try {
+      while (true) {
+        final int currentFirst = first;
+        List<Map<String, Object>> page =
+            adminClient()
+                .get()
+                .uri(
+                    uriBuilder ->
+                        uriBuilder
+                            .path("/admin/realms/{realm}/roles/{roleName}/users")
+                            .queryParam("first", currentFirst)
+                            .queryParam("max", pageSize)
+                            .build(properties.getRealm(), roleName))
+                .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
+                .retrieve()
+                .body(new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+
+        if (page == null || page.isEmpty()) {
+          break;
+        }
+        for (Map<String, Object> member : page) {
+          if (member.get("id") instanceof String idText) {
+            try {
+              byUser.computeIfAbsent(UUID.fromString(idText), k -> new HashSet<>()).add(roleName);
+            } catch (IllegalArgumentException ignored) {
+              // A non-UUID member id is a Keycloak configuration deviation; skip it rather than
+              // aborting the whole role page (matches the fail-closed id handling elsewhere).
+            }
+          }
+        }
+        if (page.size() < pageSize) {
+          break;
+        }
+        first += pageSize;
       }
-      return roles.stream()
-          .map(r -> (String) r.get("name"))
-          .filter(Objects::nonNull)
-          .collect(Collectors.toSet());
     } catch (Exception e) {
-      log.warn("Failed to fetch roles for user {}", userId, e);
-      return Collections.emptySet();
+      log.warn("Failed to fetch members for realm role '{}'", roleName, e);
     }
   }
 
