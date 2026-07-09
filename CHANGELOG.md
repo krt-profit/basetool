@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.2.5](https://github.com/krt-profit/basetool/releases/tag/v1.2.5) - 2026-07-09
+
 ### Changed
 
 - **Keycloak auf 26.7.0 angehoben (Sicherheits- und Wartungsupdate).** Der Anmeldedienst (Keycloak) wird von 26.6.4 auf das Minor-Release 26.7.0 aktualisiert — mit mehreren Sicherheitskorrekturen (u. a. HTTP-Parameter-Pollution im OIDC-Endpunkt, Umgehung der CIBA-Brute-Force-Sperre, TOCTOU beim Umbenennen von Admin-Rollen und eine Rechte-Eskalation in der alten feingranularen Rechteverwaltung). Keine Funktions- oder Konfigurationsänderung: Anmeldung, Realm-Import und der `keycloak-spi`-Provider (Discord-Föderation + Mitgliedschafts-Gate) laufen unverändert weiter. Das gepinnte Container-Image (`quay.io/keycloak/keycloak:26.7`-Digest, weiterhin JDK 21) und die SPI-Artefakte des `keycloak-spi`-Moduls ziehen mit. **Deploy-Hinweis:** Beim nächsten Deploy lädt Compose das neue Image-Digest; der Keycloak-Container muss dafür neu gestartet werden.
