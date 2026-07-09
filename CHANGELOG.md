@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.2.6](https://github.com/krt-profit/basetool/releases/tag/v1.2.6) - 2026-07-09
+
 ### Added
 
 - **Benachrichtigung, wenn jemand Interesse an einem Materialbörse-Angebot anmeldet.** Anbieter erhalten jetzt eine In-App-Benachrichtigung, sobald ein Mitglied Interesse an einem ihrer Angebote anmeldet, und müssen die Börse dafür nicht mehr selbst im Blick behalten (#1187).
