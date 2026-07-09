@@ -487,6 +487,7 @@ public class MaterialExchangeService {
                 new MaterialExchangeReleasableItemDto(
                     item.getId(),
                     item.getMaterial().getName(),
+                    item.getMaterial().getQuantityType(),
                     item.getQuality(),
                     item.getAmount(),
                     item.getLocation() == null ? null : item.getLocation().getName(),

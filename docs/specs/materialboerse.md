@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-07.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-09.
 > **Owner area:** MARKET · **Related ADRs:** ADR-0082
 
 # Materialbörse — material-exchange trade board
@@ -20,12 +20,17 @@ decisions are recorded in ADR-0082.
 
 Every `ACTIVE` offer is visible to every real member (`KRT_MEMBER`) regardless of the offer's owning
 org unit — the board is a single org-wide marketplace, not staffel-scoped. Authenticated-but-roleless
-guests do **not** see the board. The board shows per offer: material, quality (0–1000), quantity
-(SCU), the anbieter (username) + squadron badge, when it was released, and the interessenten count.
+guests do **not** see the board. The board shows per offer: material, quality (0–1000), quantity in
+the material's own unit (SCU for bulk materials, Stück/piece for `PIECE` materials — never a
+hardcoded SCU), the anbieter (username) + squadron badge, when it was released, and the interessenten
+count.
 
 **Acceptance**
 - [ ] A `KRT_MEMBER` sees offers from every squadron; a `GUEST` gets 403 on `/materialboerse`.
 - [ ] The board read applies no OrgUnit scope filter.
+- [ ] A `PIECE` material's quantity renders as an integer count in the piece unit, an SCU material's
+with the SCU unit — the amount unit follows `Material.quantityType`, matching the Lager
+(#1182).
 
 **Enforced by:** `MaterialExchangeServiceTest`, `MaterialboersePageControllerMvcTest` · **Code:**
 `MaterialExchangeService#board`, `MaterialExchangeController`, `MaterialboersePageController`
@@ -34,8 +39,9 @@ guests do **not** see the board. The board shows per offer: material, quality (0
 
 A member releases one of **their own** Lager rows via the "Für Börse freigeben" checkbox on Mein
 Lager or the "Material anbieten" CTA on the board. Release opens the remark dialog: a read-only fact
-strip (material · quality as a plain number · quantity SCU) + a Markdown textarea (≤ 20 000
-characters, live counter). Material, quality and amount are read **live** from the linked
+strip (material · quality as a plain number · quantity in the material's own unit — SCU or
+Stück/piece) + a Markdown textarea (≤ 20 000 characters, live counter). Material, quality and amount
+are read **live** from the linked
 `InventoryItem` (single source of truth); the client never sets them. Releasing an item that already
 has an active offer re-activates/updates it rather than duplicating (one active offer per item).
 

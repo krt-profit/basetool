@@ -58899,6 +58899,10 @@
           "materialName" : {
             "type" : "string"
           },
+          "quantityType" : {
+            "type" : "string",
+            "enum" : [ "SCU", "PIECE" ]
+          },
           "quality" : {
             "type" : "integer",
             "format" : "int32"

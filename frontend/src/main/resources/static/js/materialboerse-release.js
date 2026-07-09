@@ -75,21 +75,39 @@
         });
     }
 
-    function formatScu(amount) {
+    /**
+     * Formats an amount in the material's own unit: an integer count + the piece unit for a PIECE
+     * material, otherwise the up-to-3-decimal SCU rendering. Fixes issue #1182, where every offer
+     * was shown as SCU regardless of the material's quantity type. The unit labels come from
+     * window.materialboerseI18n (localized), with ASCII fallbacks only if the bootstrap is absent.
+     */
+    function formatAmount(amount, quantityType) {
         let n = Number(amount);
         if (isNaN(n)) {
             return String(amount);
         }
-        return n.toLocaleString('de-DE', { maximumFractionDigits: 3 }) + ' SCU';
+        if (quantityType === 'PIECE') {
+            return (
+                n.toLocaleString('de-DE', { maximumFractionDigits: 0 }) +
+                ' ' +
+                (i18n.unitPiece || 'Stk')
+            );
+        }
+        return (
+            n.toLocaleString('de-DE', { maximumFractionDigits: 3 }) + ' ' + (i18n.unitScu || 'SCU')
+        );
     }
 
-    function setFacts(material, quality, amount) {
+    function setFacts(material, quality, amount, quantityType) {
         setText('[data-mb-fact-material]', material || '—');
         setText(
             '[data-mb-fact-quality]',
             quality != null && quality !== '' ? String(quality) : '—',
         );
-        setText('[data-mb-fact-amount]', amount != null && amount !== '' ? formatScu(amount) : '—');
+        setText(
+            '[data-mb-fact-amount]',
+            amount != null && amount !== '' ? formatAmount(amount, quantityType) : '—',
+        );
     }
 
     function updateCharCount() {
@@ -106,7 +124,7 @@
     /**
      * Opens the modal.
      * @param mode 'new' | 'lager' | 'edit'
-     * @param ctx {itemId?, material?, quality?, amount?, offerId?, version?, remark?}
+     * @param ctx {itemId?, material?, quantityType?, quality?, amount?, offerId?, version?, remark?}
      * @param doneOrOpts either an onDone callback(body), or {onDone, onCancel} — onCancel fires when
      *        the dialog is dismissed without submitting (e.g. to revert a Lager checkbox).
      */
@@ -133,7 +151,7 @@
         setText('[data-mb-modal-title]', isEdit ? i18n.editTitle : i18n.releaseTitle);
         setText('[data-mb-submit-label]', isEdit ? i18n.submitSave : i18n.submitRelease);
         toggle('[data-mb-picker]', isNew);
-        setFacts(ctx.material, ctx.quality, ctx.amount);
+        setFacts(ctx.material, ctx.quality, ctx.amount, ctx.quantityType);
 
         let ta = q('[data-mb-remark]');
         ta.value = ctx.remark || '';
@@ -246,7 +264,7 @@
                     'Q ' +
                     it.quality +
                     ' · ' +
-                    formatScu(it.amount) +
+                    formatAmount(it.amount, it.quantityType) +
                     (it.locationName ? ' · ' + escapeHtml(it.locationName) : '') +
                     (it.alreadyReleased ? ' · ' + escapeHtml(i18n.pickerAlready || '') : '');
                 return (
@@ -254,6 +272,8 @@
                     it.inventoryItemId +
                     '" data-material="' +
                     escapeHtml(it.materialName) +
+                    '" data-quantity-type="' +
+                    escapeHtml(it.quantityType) +
                     '" data-quality="' +
                     it.quality +
                     '" data-amount="' +
@@ -275,6 +295,7 @@
             li.getAttribute('data-material'),
             li.getAttribute('data-quality'),
             li.getAttribute('data-amount'),
+            li.getAttribute('data-quantity-type'),
         );
         let input = q('[data-mb-picker-input]');
         if (input) {

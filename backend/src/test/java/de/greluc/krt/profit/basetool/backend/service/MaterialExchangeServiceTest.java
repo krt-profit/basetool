@@ -36,8 +36,10 @@ import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeInterest;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOffer;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus;
+import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeOfferDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleasableItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleaseRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeRemarkUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
@@ -48,6 +50,7 @@ import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -246,6 +249,27 @@ class MaterialExchangeServiceTest {
     when(offerRepository.findWithDetailById(offerId)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.detail(offerId)).isInstanceOf(NotFoundException.class);
+  }
+
+  /**
+   * The "Material anbieten" picker carries each item's material quantity type, so the release
+   * dialog renders the amount in the material's own unit (Stück for PIECE) instead of always SCU
+   * (#1182).
+   */
+  @Test
+  void myReleasableItems_carriesMaterialQuantityType() {
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    Material piece = material("Ballistic Gatling");
+    piece.setQuantityType(QuantityType.PIECE);
+    InventoryItem item = item(owner, piece, 500, 12.0);
+    when(inventoryItemRepository.findReleasableForUser(any(), any(), any()))
+        .thenReturn(List.of(item));
+    when(offerRepository.findInventoryItemIdsWithStatus(any(), any())).thenReturn(Set.of());
+
+    List<MaterialExchangeReleasableItemDto> items = service.myReleasableItems(null);
+
+    assertThat(items).hasSize(1);
+    assertThat(items.get(0).quantityType()).isEqualTo(QuantityType.PIECE);
   }
 
   private static User user(UUID id, String name) {
