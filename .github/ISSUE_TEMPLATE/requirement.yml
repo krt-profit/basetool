@@ -39,21 +39,30 @@ body:
       label: Area (REQ-ID prefix)
       description: Drives the `REQ-<AREA>-NNN` id when this lands in docs/specs.
       options:
-        - AUTH (auth / roles / OIDC)
-        - ORG (org-unit / tenancy / scope)
-        - ORDERS (job orders)
-        - INV (inventory / stock)
-        - MISSION (missions / operations)
-        - REFINERY
-        - HANGAR
-        - PROMO (promotion system)
         - BANK (Kartell bank)
-        - ADMIN
-        - UEX integration
-        - UI / design
-        - I18N
-        - DB / migration
-        - OPS / deployment
+        - MISSION (missions / operations)
+        - ORDERS (job orders)
+        - REFINERY (refinery)
+        - INV (inventory / stock)
+        - HANGAR (hangar)
+        - MARKET (material-exchange board)
+        - PROMO (promotion system)
+        - NOTIF (notifications)
+        - INGEST (desktop ingest)
+        - UEX (UEX integration)
+        - ORG (org-unit / tenancy / scope)
+        - ROLE (roles / memberships / ranks)
+        - AUTH (auth / OIDC / Keycloak identity)
+        - SEC (access control / PII security)
+        - AUDIT (audit logs)
+        - ADMIN (admin area)
+        - API (API conventions)
+        - FE (frontend / krtFetch)
+        - DB (data / persistence / migration)
+        - UI (UI / design system)
+        - I18N (i18n / messages)
+        - OBS (observability / monitoring)
+        - OPS (deployment / operations)
         - Other
     validations:
       required: true
