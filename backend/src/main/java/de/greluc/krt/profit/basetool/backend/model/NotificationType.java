@@ -80,5 +80,15 @@ public enum NotificationType {
    * default rule notifies every admin; the frontend renders it under {@code
    * notifications.type.DISCORD_REGISTRATION_PENDING} with the {@code username} render parameter.
    */
-  DISCORD_REGISTRATION_PENDING
+  DISCORD_REGISTRATION_PENDING,
+
+  /**
+   * A member registered interest in a Materialbörse offer (#1187, REQ-MARKET-011). The seeded
+   * default rule notifies the offer's owner (the Anbieter); the frontend renders it under {@code
+   * notifications.type.MATERIAL_EXCHANGE_INTEREST_REGISTERED} with the {@code interessent} and
+   * {@code material} render parameters. Disclosing the interessent's name to the owner is permitted
+   * because the notification is delivered only to the owner (REQ-MARKET-006 anonymity is
+   * owner-only).
+   */
+  MATERIAL_EXCHANGE_INTEREST_REGISTERED
 }

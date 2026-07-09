@@ -56,5 +56,11 @@ public enum NotificationEventType {
    * A new Discord user registered and is awaiting admin approval (epic #720, Track 1,
    * REQ-NOTIF-012). The default rule notifies every admin.
    */
-  DISCORD_REGISTRATION_PENDING
+  DISCORD_REGISTRATION_PENDING,
+
+  /**
+   * A member registered interest in a Materialbörse offer (#1187, REQ-MARKET-011). The default rule
+   * notifies the offer's owner (the Anbieter) via the {@code EVENT_RECIPIENT} selector.
+   */
+  MATERIAL_EXCHANGE_INTEREST_REGISTERED
 }
