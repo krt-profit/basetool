@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-21.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-09.
 > **Owner area:** ORDERS · **Related ADRs:** none
 
 # Order-overview Materialien column
@@ -148,6 +148,35 @@ fragment so a filter change re-renders them.
 **Enforced by:** `JobOrderPaginationMvcTest`, `JobOrderPageCookieTest` (fetch URL) · **Code:**
 `JobOrderPageController.viewOrders` / `buildPaginationBaseUrl`, `templates/orders-index.html`,
 `templates/fragments/pagination.html` · **Issues:** #2 (performance audit)
+
+### REQ-ORDERS-022 — Overview surfaces the responsible (processing) org unit
+
+The order-overview list's first cell (the one carrying the order id and the `MATERIAL`/`ITEM`
+kind badge) MUST also render the order's **responsible org unit** — the *processing* unit
+("Bearbeitende Einheit", `JobOrderDto.responsibleOrgUnit`, the squadron or Spezialkommando
+handling the job per REQ-ORG-003) — under the id and type, so the handling unit is visible at a
+glance from the overview and not only on the detail page. It is rendered as a `squadron-badge`
+(shorthand as text, full name as `title`) beneath a small caption label (`orders.index.responsible`,
+DE "Bearbeitende Einheit" / EN "Responsible unit"), with the muted `squadron-badge-muted` em-dash
+fallback when the unit is absent — the same badge idiom the **Auftraggeber** cell uses for
+`requestingOrgUnit`. This is **not** a new table column; it stacks inside the existing first cell.
+It stays distinct from the **Auftraggeber** (`requestingOrgUnit`, the *customer*) column, which is
+unchanged. The data is already carried on every list row's `JobOrderDto`, so no controller/DTO or
+backend change is needed and the order-list endpoint gains no query; the badge rides the
+`ordersResults` AJAX-swap fragment, so it re-renders on filter/scope changes and drag-reorder too.
+
+**Acceptance**
+
+- [ ] Every overview row shows its responsible unit's shorthand (title = full name) under the id
+  and kind badge; an order without a responsible unit shows the muted em-dash fallback.
+- [ ] The caption uses the `orders.index.responsible` key (DE + EN + neutral fallback); no
+  hard-coded label.
+- [ ] The requesting-unit (Auftraggeber) column is unchanged and the two org units stay visually
+  distinct.
+
+**Enforced by:** `JobOrderListRenderTest` (frontend render — responsible-badge assertion) ·
+**Code:** `templates/orders-index.html`, `JobOrderDto.responsibleOrgUnit`,
+`.order-responsible-label` (`styles.css`), `orders.index.responsible` (i18n) · **Issues:** #1188
 
 ## Out of scope
 

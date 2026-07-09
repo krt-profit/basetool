@@ -102,6 +102,16 @@
                         <span th:case="'ITEM'" class="order-kind-badge order-kind-item" th:text="#{orders.kind.item}">Item</span>
                         <span th:case="*" class="order-kind-badge order-kind-material" th:text="#{orders.kind.material}">Material</span>
                     </span>
+                    <!-- Processing unit (Bearbeitende Einheit) surfaced under the ID + type so the
+                         handling squadron/SK is visible at a glance in the overview, not only in the
+                         detail view (#1188). Mirrors the Auftraggeber badge markup: shorthand as text,
+                         full name as title, muted em-dash fallback. -->
+                    <span class="order-responsible-label" th:text="#{orders.index.responsible}">Bearbeitende Einheit</span>
+                    <span th:if="${order.responsibleOrgUnit != null}" class="squadron-badge"
+                          th:title="${order.responsibleOrgUnit.name()}"
+                          th:text="${order.responsibleOrgUnit.shorthand()}">IRI</span>
+                    <span th:if="${order.responsibleOrgUnit == null}" class="squadron-badge squadron-badge-muted"
+                          th:title="#{orders.index.responsible}">—</span>
                 </td>
                 <td class="nowrap">
                     <span sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)" th:if="${order.priority != null}" style="cursor: grab; margin-right: 0.5rem; color: var(--color-primary);" title="Drag & Drop zum Ändern der Priorität">☰</span>

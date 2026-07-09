@@ -3019,6 +3019,18 @@ input[type='radio']:focus {
     color: var(--color-info);
 }
 
+/* Caption for the processing unit (Bearbeitende Einheit) shown under the ID +
+   type badge in the order-overview first column (#1188). Small, muted, bold so
+   it reads as a sub-label for the squadron badge beneath it without competing
+   with the order id. On its own line via display:block. */
+.order-responsible-label {
+    display: block;
+    margin-top: var(--space-1);
+    color: var(--color-gray-1);
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-bold);
+}
+
 /* Quality chip for an item order's aggregated-materials panel — one row per
    (material, quality). GOOD (700+) reads as the Profit green; NONE ("Keine")
    takes the muted grey so "no quality floor" never competes for attention. */
