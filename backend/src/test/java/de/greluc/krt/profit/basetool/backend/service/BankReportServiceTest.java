@@ -136,9 +136,12 @@ class BankReportServiceTest {
     String secondHalf =
         extractText(statementService.generateStatement(account.getId(), mid, end, null));
 
-    // Then: first half sees only the deposit (opening 0 -> closing 500)
+    // Then: first half sees only the deposit (opening 0 -> closing 500). Assert the withdrawal's
+    // absence via its type label, not the amount: the leg renders as "-201" (gross = 200 + 1 fee,
+    // ADR-0052) and a bare "-200" substring would flakily collide with the random "rh-<hex>" holder
+    // handle rendered on the deposit row (e.g. "rh-200...").
     assertTrue(firstHalf.contains("+500"), "deposit inside first period");
-    assertFalse(firstHalf.contains("-200"), "withdrawal outside first period");
+    assertFalse(firstHalf.contains("Auszahlung"), "withdrawal outside first period");
     assertTrue(firstHalf.contains("500 aUEC"), "closing 500 in first period");
     // ... and the second half only the withdrawal on an opening of 500
     assertFalse(secondHalf.contains("+500"), "deposit outside second period");
