@@ -9,9 +9,16 @@
 ### Changed
 
 - **Verbesserung: Deutlich seltener „Sitzung abgelaufen (gleichzeitige Anmeldungen)".** Die Obergrenze gleichzeitiger Anmeldungen pro Nutzer wurde von 2 auf 10 angehoben. In Kombination mit dem 30-tägigen Sitzungsfenster verdrängte die niedrige Grenze bisher echte Sitzungen von Nutzern, die sich von mehreren Geräten/Browsern anmelden, und zeigte ihnen die Meldung „This session has been expired". Die neueste Anmeldung gewinnt weiterhin, und niemand wird ausgesperrt.
+
 - **Verbesserung: Ein vorübergehender Laufzeitfehler eines Dienstes löst keinen stundenlangen Neustart-/Rollback-Sturm mehr aus.** In der Nacht zum 2026-07-09 erschöpfte das Backend seine Thread-Obergrenze, wodurch sein Health-Check kippte und die automatische Bereitstellung das unveränderte Release wiederholt (fälschlich) „zurückrollte". Der Deploy-Automatismus unterscheidet jetzt einen echten Fehl-Release von einem reinen Laufzeitproblem am bereits laufenden Release und startet in letzterem Fall nur den betroffenen Dienst gezielt neu, statt die Version zurückzurollen. Ein kurzer Keycloak-Ausfall nimmt zudem die App-Container nicht mehr aus dem Health-Zustand (ADR-0083/0084).
+
 - **Verbesserung: Die periodische Keycloak-Synchronisation läuft jetzt stündlich statt jede Minute** und belastet Keycloak dadurch deutlich weniger. Die Frequenz ist über die Umgebungsvariable `APP_KEYCLOAK_SYNC_INTERVAL` (Standard `PT1H`) einstellbar.
+
 - **Monitoring: Frühwarnung bei Thread-Erschöpfung.** Ein neuer Alert (`JvmThreadsHigh`) warnt, sobald ein Dienst sich seiner Thread-Obergrenze nähert — die Ursache des Vorfalls vom 2026-07-09; ein nicht behebbarer Laufzeitfehler am laufenden Release meldet sich jetzt eindeutig (`DeployHealthRestartFailing`) statt als irreführendes Deploy-Rollback.
+
+### Changed
+
+- **Verbesserung: Die bearbeitende Einheit wird jetzt in der Auftragsübersicht angezeigt.** In der Auftragsverwaltung erscheint die aktuell zuständige Einheit (Staffel oder Spezialkommando) direkt unter der Auftrags-ID und -art — bisher war sie nur in der Auftragsdetailansicht sichtbar (#1188).
 
 ## [v1.2.3](https://github.com/krt-profit/basetool/releases/tag/v1.2.3) - 2026-07-08
 
