@@ -40,17 +40,31 @@ body:
       label: Affected Area
       multiple: true
       options:
-        - Backend (REST API / Service / Repository)
-        - Frontend (Thymeleaf / Controller / JS)
-        - Database / Flyway migration
-        - Security / OIDC / Keycloak / Roles
-        - UEX integration
-        - Hangar / Inventory / Refinery
-        - Mission Planning / Operations
-        - Inventory / Stock
-        - i18n / UI strings / Styleguide
-        - Build / Gradle / CI
-        - Docker / Compose / Stack
+        - BANK (Kartell bank)
+        - MISSION (missions / operations)
+        - ORDERS (job orders)
+        - REFINERY (refinery)
+        - INV (inventory / Lager / stock)
+        - HANGAR (hangar)
+        - MARKET (material-exchange board)
+        - PROMO (promotion system)
+        - NOTIF (notifications)
+        - INGEST (desktop ingest)
+        - UEX (UEX integration)
+        - ORG (org-unit / tenancy / scope)
+        - ROLE (roles / memberships / ranks)
+        - AUTH (auth / OIDC / Keycloak identity)
+        - SEC (access control / PII security)
+        - AUDIT (audit logs)
+        - ADMIN (admin area)
+        - API (API conventions)
+        - BE (backend / REST API)
+        - FE (frontend / krtFetch)
+        - DATA (database / persistence / migration)
+        - UI (UI / design system)
+        - I18N (i18n / messages)
+        - OBS (observability / monitoring)
+        - OPS (deployment / Docker / CI / build)
         - Other
     validations:
       required: true

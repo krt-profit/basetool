@@ -101,8 +101,9 @@ REQ-<AREA>-<NNN>     e.g. REQ-ORDERS-012, REQ-AUTH-003
 ```
 
 `<AREA>` is drawn from the same vocabulary as the issue "Affected Area" and the labels:
-`AUTH`, `ORG`, `ORDERS`, `INV`, `MISSION`, `REFINERY`, `HANGAR`, `PROMO`, `BANK`,
-`ADMIN`, `UEX`, `UI`, `I18N`, `DB`, `OPS`, `NOTIF`, `INGEST`, `AUDIT`, `ROLE`, `MARKET`. Numbers are never reused, even
+`AUTH`, `SEC`, `ORG`, `ORDERS`, `INV`, `MISSION`, `REFINERY`, `HANGAR`, `PROMO`, `BANK`,
+`ADMIN`, `UEX`, `UI`, `BE`, `FE`, `I18N`, `DATA`, `OPS`, `OBS`, `API`, `NOTIF`, `INGEST`,
+`AUDIT`, `ROLE`, `MARKET`. Numbers are never reused, even
 after a requirement is removed (mark it superseded instead).
 
 In a test, name the requirement it pins down:
