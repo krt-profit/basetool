@@ -350,6 +350,34 @@ logged** (REQ-OBS).
 `service/SmtpMailService`, `config/MailProperties`, `config/AsyncConfig#MAIL_EXECUTOR`,
 `application.yml` (`spring.mail.*` / `app.mail.*`) · **Decision:** ADR-0064 · **Issues:** #720
 
+### REQ-NOTIF-016 — UC4: notify the Materialbörse offer owner on an interest registration
+
+When a member registers interest in a Materialbörse offer, the offer owner (the Anbieter) is notified
+through the engine (#1187). A `MATERIAL_EXCHANGE_INTEREST_REGISTERED` event carries the **directed
+recipient** (`NotificationEvent.contextRecipientSub()` = the offer owner) and is mapped by a seeded
+default rule (V211) to a same-named notification with a single `EVENT_RECIPIENT` selector — the same
+directed-recipient mechanism as the bank decision notifications (REQ-NOTIF-011, UC3). The registering
+member is excluded (`exclude_actor = TRUE`; moot because a member can never register interest in their
+own offer). The primary requirement, its anonymity reasoning, and the "new registration only /
+after-commit" semantics live in [`materialboerse.md`](materialboerse.md) (REQ-MARKET-011); this entry
+records the notification-engine consumer.
+
+**Acceptance**
+
+- [x] Registering interest (after commit) notifies the offer owner via the `EVENT_RECIPIENT` selector,
+  excluding the registering member (`MaterialExchangeServiceTest`, `RuleEvaluationServiceTest`).
+- [x] Adding the `MATERIAL_EXCHANGE_INTEREST_REGISTERED` event/notification types needs no schema
+  migration (open enums; the seed rule is V211 data).
+- [x] The notification renders via `notifications.type.MATERIAL_EXCHANGE_INTEREST_REGISTERED` (DE + EN
+  + base bundles, named placeholders `{interessent}`/`{material}`).
+
+**Enforced by:** `MaterialExchangeServiceTest`, `RuleEvaluationServiceTest`,
+`MessageBundleConsistencyTest` · **Code:**
+`event/MaterialExchangeInterestRegisteredEvent`,
+`service/MaterialExchangeService#registerInterestInNewTransaction`, `model/NotificationEventType`,
+`model/NotificationType`,
+`db/migration/V211__seed_material_exchange_interest_notification_rule.sql` · **Issues:** #1187
+
 ## Out of scope (v1)
 
 - Per-notification e-mail routing (generic fan-out of in-app notification types to e-mail), user

@@ -27,6 +27,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.event.MaterialExchangeInterestRegisteredEvent;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
@@ -54,10 +55,12 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
@@ -78,6 +81,7 @@ class MaterialExchangeServiceTest {
   @Mock private AuditService auditService;
   @Mock private UserMapper userMapper;
   @Mock private SquadronMapper squadronMapper;
+  @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private ObjectProvider<MaterialExchangeService> selfProvider;
 
   @InjectMocks private MaterialExchangeService service;
@@ -152,7 +156,7 @@ class MaterialExchangeServiceTest {
     verify(auditService, never()).record(any(), any(), any(), any(), any());
   }
 
-  /** A member cannot register interest in their own offer. */
+  /** A member cannot register interest in their own offer — and no notification is emitted. */
   @Test
   void registerInterest_ownOffer_forbidden() {
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
@@ -162,6 +166,53 @@ class MaterialExchangeServiceTest {
     assertThatThrownBy(() -> service.registerInterest(offerId))
         .isInstanceOf(AccessDeniedException.class);
     verify(interestRepository, never()).save(any());
+    verify(eventPublisher, never()).publishEvent(any());
+  }
+
+  /**
+   * A genuinely new interest registration publishes a {@link
+   * MaterialExchangeInterestRegisteredEvent} directed at the offer owner, carrying the interessent
+   * and material render params (#1187, REQ-MARKET-011).
+   */
+  @Test
+  void registerInterest_newRegistration_publishesOwnerNotification() {
+    User interested = user(otherId, "Mara");
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
+    when(selfProvider.getObject()).thenReturn(service);
+    when(offerRepository.findById(offerId)).thenReturn(Optional.of(offer));
+    when(interestRepository.existsByOfferIdAndInterestedUserId(offerId, otherId)).thenReturn(false);
+    when(userRepository.findById(otherId)).thenReturn(Optional.of(interested));
+    when(offerRepository.findWithDetailById(offerId)).thenReturn(Optional.of(offer));
+    when(interestRepository.countByOfferId(offerId)).thenReturn(1L);
+
+    service.registerInterest(offerId);
+
+    ArgumentCaptor<MaterialExchangeInterestRegisteredEvent> captor = ArgumentCaptor.captor();
+    verify(eventPublisher).publishEvent(captor.capture());
+    MaterialExchangeInterestRegisteredEvent event = captor.getValue();
+    assertThat(event.contextRecipientSub()).as("recipient is the owner").isEqualTo(ownerId);
+    assertThat(event.actorSub()).as("actor is the interessent").isEqualTo(otherId);
+    assertThat(event.entityId()).isEqualTo(offerId);
+    assertThat(event.entityType()).isEqualTo("MATERIAL_EXCHANGE_OFFER");
+    assertThat(event.renderParams())
+        .containsEntry("interessent", "Mara")
+        .containsEntry("material", "Agricium");
+  }
+
+  /** A duplicate (idempotent) interest registration saves nothing and emits no notification. */
+  @Test
+  void registerInterest_alreadyRegistered_noEventNoSave() {
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
+    when(selfProvider.getObject()).thenReturn(service);
+    when(offerRepository.findById(offerId)).thenReturn(Optional.of(offer));
+    when(interestRepository.existsByOfferIdAndInterestedUserId(offerId, otherId)).thenReturn(true);
+    when(offerRepository.findWithDetailById(offerId)).thenReturn(Optional.of(offer));
+    when(interestRepository.countByOfferId(offerId)).thenReturn(1L);
+
+    service.registerInterest(offerId);
+
+    verify(interestRepository, never()).save(any());
+    verify(eventPublisher, never()).publishEvent(any());
   }
 
   /** A stale version on a remark edit raises an optimistic-lock conflict (→ 409). */
