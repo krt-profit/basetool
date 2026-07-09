@@ -123,11 +123,13 @@ KC_BOOTSTRAP_ADMIN_PASSWORD=CHANGE_ME
 #   Realm "iri" -> Clients -> backend-service -> Credentials -> Regenerate.
 KEYCLOAK_ADMIN_CLIENT_SECRET=CHANGE_ME
 
-# Optional: cadence of the periodic Keycloak->local user sync (ISO-8601 duration).
-# Default PT1H (hourly) — the sync is a drift-correction safety net, not a live feed.
-# Admins can trigger an immediate sync from the member-management page's "Sync now"
-# button, so a hot cadence is unnecessary (a very short interval hammers Keycloak).
-#APP_KEYCLOAK_SYNC_INTERVAL=PT1H
+# Optional: cadence of the periodic Keycloak->local user sync. Spring 6-field cron
+# (sec min hour dom mon dow) evaluated in APP_KEYCLOAK_SYNC_ZONE. Default: once per day
+# at 05:00 Europe/Berlin (off-peak) — the sync is a drift-correction safety net, not a
+# live feed. Admins can trigger an immediate sync from the member-management page's
+# "Sync now" button, so a hot cadence is unnecessary. An invalid cron fails startup.
+#APP_KEYCLOAK_SYNC_CRON=0 0 5 * * *
+#APP_KEYCLOAK_SYNC_ZONE=Europe/Berlin
 
 # PKCS12 keystore password for backend + frontend Spring SSL.
 SERVER_SSL_KEY_STORE_PASSWORD=CHANGE_ME

@@ -20,8 +20,11 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -56,7 +59,7 @@ class UserSyncServiceTest {
   void syncFromKeycloak_fetchesUpsertsReconcilesAndReturnsTheSyncedCount() {
     KeycloakUserDto user1 = user("user1");
     KeycloakUserDto user2 = user("user2");
-    when(keycloakService.fetchUsers()).thenReturn(List.of(user1, user2));
+    when(keycloakService.fetchUsers(anyCollection(), anySet())).thenReturn(List.of(user1, user2));
 
     int count = userSyncService.syncFromKeycloak();
 
@@ -69,13 +72,16 @@ class UserSyncServiceTest {
 
   @Test
   void syncFromKeycloak_onEmptyRoster_skipsWithoutTouchingLocalState() {
-    when(keycloakService.fetchUsers()).thenReturn(Collections.emptyList());
+    when(keycloakService.fetchUsers(anyCollection(), anySet())).thenReturn(Collections.emptyList());
 
     int count = userSyncService.syncFromKeycloak();
 
     assertEquals(0, count);
-    verify(keycloakService).fetchUsers();
-    verifyNoInteractions(userService);
+    verify(keycloakService).fetchUsers(anyCollection(), anySet());
+    // The role-name + already-linked reads happen before the fetch (to parameterise it), but an
+    // empty roster must touch no write path and never reconcile the bank holders.
+    verify(userService, never()).syncUser(any(KeycloakUserDto.class));
+    verify(userService, never()).markMissingUsers(anySet());
     verifyNoInteractions(bankHolderReconciliationService);
   }
 
@@ -83,7 +89,7 @@ class UserSyncServiceTest {
   void syncFromKeycloak_continuesAndCountsOnlyTheUsersThatSucceeded() {
     KeycloakUserDto user1 = user("user1");
     KeycloakUserDto user2 = user("user2");
-    when(keycloakService.fetchUsers()).thenReturn(List.of(user1, user2));
+    when(keycloakService.fetchUsers(anyCollection(), anySet())).thenReturn(List.of(user1, user2));
     doThrow(new RuntimeException("sync failed")).when(userService).syncUser(user1);
 
     int count = userSyncService.syncFromKeycloak();
@@ -100,7 +106,7 @@ class UserSyncServiceTest {
   @Test
   void syncFromKeycloak_swallowsABankReconcileFailureAfterASuccessfulRosterSync() {
     KeycloakUserDto user1 = user("user1");
-    when(keycloakService.fetchUsers()).thenReturn(List.of(user1));
+    when(keycloakService.fetchUsers(anyCollection(), anySet())).thenReturn(List.of(user1));
     doThrow(new RuntimeException("bank hiccup"))
         .when(bankHolderReconciliationService)
         .reconcileAll();

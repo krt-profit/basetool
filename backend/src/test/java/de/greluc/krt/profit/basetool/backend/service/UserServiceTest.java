@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -38,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -124,6 +126,32 @@ class UserServiceTest {
 
     verify(userRepository).saveAndFlush(user);
     verify(userRepository, never()).save(user);
+  }
+
+  /**
+   * Pins that {@code getMappableRoleNames} (the input that bounds the sync's role-indexed
+   * membership fetch) returns exactly the local role catalog's names via {@code
+   * RoleRepository.findAllNames}.
+   */
+  @Test
+  void getMappableRoleNames_returnsTheLocalRoleCatalogNames() {
+    when(roleRepository.findAllNames()).thenReturn(Set.of("ADMIN", "OFFICER", "Guest"));
+
+    assertEquals(Set.of("ADMIN", "OFFICER", "Guest"), userService.getMappableRoleNames());
+    verify(roleRepository).findAllNames();
+  }
+
+  /**
+   * Pins that {@code getKnownDiscordLinkedUserIds} (the skip-set for the incremental Discord
+   * back-fill) delegates to {@code UserRepository.findIdsWithDiscordLink}.
+   */
+  @Test
+  void getKnownDiscordLinkedUserIds_returnsAlreadyLinkedIds() {
+    UUID linked = UUID.randomUUID();
+    when(userRepository.findIdsWithDiscordLink()).thenReturn(Set.of(linked));
+
+    assertEquals(Set.of(linked), userService.getKnownDiscordLinkedUserIds());
+    verify(userRepository).findIdsWithDiscordLink();
   }
 
   /**

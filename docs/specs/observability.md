@@ -318,7 +318,7 @@ transaction per pass) rather than per-scrape.
   renamed to `exported_job` — so the alerts once matched `exported_job` and one silently never fired.
   The rename splits the 180d history (old series carry `exported_job`, new ones `task`; a Grafana
   annotation marks the cutover). The last-success gauge is the source of the
-  staleness alerts — `UserSyncStale` (`user_sync`, > 2h20m — hourly cadence, see `app.keycloak.sync.interval`), `ExternalSyncStale` (the catalogue syncs,
+  staleness alerts — `UserSyncStale` (`user_sync`, > 26h — daily 05:00 cadence, see `app.keycloak.sync.cron`), `ExternalSyncStale` (the catalogue syncs,
 
   > 48 h), `ScheduledJobStale` (`notification_retention` / `default_blueprint_provisioning`, > 26 h),
   > `BankLedgerIntegritySweepStale` (`bank_ledger_integrity`, > 6 h, **critical** — while stale the
