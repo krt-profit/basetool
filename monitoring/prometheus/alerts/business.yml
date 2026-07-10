@@ -329,7 +329,7 @@ groups:
           summary: "Notification SSE relay pool near saturation"
           description: "The frontend has held more than 800 of its 1000 SSE relay slots for 10 minutes — past 1000 the next live viewer's push is silently dropped. Check the concurrent viewer count and per-user stream multiplication; consider raising frontend-sse-pool maxConnections or capping streams per user."
 
-      # (#1188 / REQ-SEC-025) Runaway session store. basetool_active_sessions counts live Spring
+      # (REQ-SEC-025) Runaway session store. basetool_active_sessions counts live Spring
       # Session sessions in Redis. Un-authenticated requests mint throwaway sessions (a CSRF-token
       # render on a permit-all page, pre-login OAuth2 state); before the two-tier-TTL fix these
       # inherited the 30-day authenticated window and accreted to >16000 orphan CSRF-only sessions

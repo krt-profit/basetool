@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-07-10
 - **Deciders:** @greluc
-- **Related:** `RedisSessionConfig` · `SessionLifetimeUpgradeSuccessHandler` · `SecurityConfig#oauth2LoginSuccessHandler` · `ActiveSessionsTracker` / `SessionMetricsConfig` (`basetool_active_sessions`) · `application.yml` (`app.session.*`, `server.servlet.session`) · REQ-SEC-025 · REQ-SEC-010 · REQ-OBS-011 · ADR-0085 · #1188
+- **Related:** `RedisSessionConfig` · `SessionLifetimeUpgradeSuccessHandler` · `SecurityConfig#oauth2LoginSuccessHandler` · `ActiveSessionsTracker` / `SessionMetricsConfig` (`basetool_active_sessions`) · `application.yml` (`app.session.*`, `server.servlet.session`) · REQ-SEC-025 · REQ-SEC-010 · REQ-OBS-011 · ADR-0085
 
 ## Context
 

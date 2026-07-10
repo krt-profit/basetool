@@ -462,7 +462,7 @@ before alerting). All labels are fixed literals, pure counts. The `frontend-sse-
 (`.metrics(true)`, #1127); `basetool_notification_relay_connections` backs the
 `SseRelayPoolNearSaturation` alert (> 0.8 of the 1000-slot SSE pool for 10m) — the early warning
 before the pool starts silently dropping the 1001st live viewer. `basetool_active_sessions`
-additionally backs the `ActiveSessionsRunaway` alert (> 2000 for 1h, #1188): the frontend session
+additionally backs the `ActiveSessionsRunaway` alert (> 2000 for 1h): the frontend session
 idle timeout is two-tier (REQ-SEC-025 / ADR-0088) — un-authenticated sessions get a short window
 (`app.session.anonymous-timeout`) so the throwaway CSRF-token / pre-login-OAuth2 sessions minted for
 anonymous traffic cannot accrete, and only a successful login promotes the session to the 30-day

@@ -820,7 +820,7 @@ sessions and the long "stay logged in" window **only after a successful login**.
 mints for anonymous traffic — chiefly the CSRF-token session created when an anonymous client renders
 a form-bearing permit-all page, plus pre-login OAuth2 `authorizationRequest` state — live for 30
 days. Anonymous probe / crawler traffic thereby accreted **>16 000 orphan CSRF-only sessions against
-~30 real principals** (the `basetool_active_sessions` runaway, #1188), on a collision course with the
+~30 real principals** (the `basetool_active_sessions` runaway), on a collision course with the
 Redis `maxmemory noeviction` ceiling, where login / token-refresh writes start failing.
 
 `RedisSessionConfig`'s `SessionRepositoryCustomizer` applies `app.session.anonymous-timeout` (default
@@ -849,8 +849,7 @@ ADR-0088). Runaway regression is caught by `ActiveSessionsRunaway`
 `SessionLifetimeUpgradeSuccessHandlerTest` (login promotes to the authenticated window; no session
 minted when absent) · **Code:** `RedisSessionConfig#sessionRepositoryCustomizer`,
 `SessionLifetimeUpgradeSuccessHandler`, `SecurityConfig#oauth2LoginSuccessHandler` · **Monitoring:**
-`ActiveSessionsRunaway` · **ADR:** [ADR-0088](../adr/0088-two-tier-session-idle-timeout.md) ·
-**Issues:** #1188
+`ActiveSessionsRunaway` · **ADR:** [ADR-0088](../adr/0088-two-tier-session-idle-timeout.md)
 
 ## Out of scope
 
