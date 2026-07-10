@@ -634,7 +634,8 @@ public class SecurityConfig {
         // authorities are already assembled. Emits an RFC-7807 problem+json body with a minted
         // correlationId (it runs before CorrelationIdFilter) — RFC-7807 hardening.
         .addFilterAfter(
-            new PendingApprovalAccessFilter(messageSource, appProblemProperties, objectMapper),
+            new PendingApprovalAccessFilter(
+                messageSource, appProblemProperties, objectMapper, meterRegistry),
             org.springframework.security.oauth2.server.resource.web.authentication
                 .BearerTokenAuthenticationFilter.class)
         // REQ-SEC-024: catch an identity-provider-unreachable failure (JWKS fetch timeout / 5xx /

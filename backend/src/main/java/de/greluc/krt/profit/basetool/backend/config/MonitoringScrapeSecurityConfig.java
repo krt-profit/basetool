@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.config;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -60,6 +61,7 @@ import org.springframework.security.web.SecurityFilterChain;
  * </ul>
  */
 @Configuration
+@Slf4j
 @RequiredArgsConstructor
 public class MonitoringScrapeSecurityConfig {
 
@@ -104,10 +106,20 @@ public class MonitoringScrapeSecurityConfig {
       http.userDetailsService(new InMemoryUserDetailsManager(scrapeUser))
           .httpBasic(Customizer.withDefaults())
           .authorizeHttpRequests(auth -> auth.anyRequest().hasRole(MONITORING_ROLE));
+      // One line per boot so the chosen posture is discoverable. Log the fixed role literal, never
+      // the scrape username or password (REQ-OBS-004).
+      log.info(
+          "Prometheus scrape endpoint secured with HTTP basic auth (role {}).", MONITORING_ROLE);
     } else {
       // Fail-closed: no credentials configured -> nobody reaches the metrics payload. The
       // default Http403ForbiddenEntryPoint answers every request with 403.
       http.authorizeHttpRequests(auth -> auth.anyRequest().denyAll());
+      // Discoverable startup breadcrumb: legitimate in dev/test/e2e or a prod host without the
+      // monitoring stack, but also the signature of an accidentally-unset MONITORING_SCRAPE_* pair
+      // in prod (Grafana dashboards then go blank). The config cannot tell the two apart, so INFO.
+      log.info(
+          "Prometheus scrape endpoint is DENY-ALL: MONITORING_SCRAPE_USER/PASSWORD not configured"
+              + " — /actuator/prometheus returns 403 to every caller.");
     }
     return http.build();
   }

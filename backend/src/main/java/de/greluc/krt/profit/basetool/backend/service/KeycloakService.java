@@ -21,7 +21,9 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.KeycloakSyncProperties;
 import de.greluc.krt.profit.basetool.backend.config.KeycloakTrustSupport;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -98,6 +100,9 @@ public class KeycloakService {
 
   private final KeycloakSyncProperties properties;
 
+  /** Micrometer registry for the {@code basetool_keycloak_sync_fetch_failures_total} counter. */
+  private final MeterRegistry meterRegistry;
+
   /**
    * Pre-built request factory pinned (via {@link KeycloakTrustSupport}) to trust only the {@link
    * #KEYCLOAK_TRUST_BUNDLE} truststore, or {@code null} when that bundle is not configured for the
@@ -114,10 +119,14 @@ public class KeycloakService {
    * @param properties the {@code app.keycloak.sync.*} configuration (admin URL, realm, credentials)
    * @param sslBundles the registered Spring SSL bundles; consulted for {@link
    *     #KEYCLOAK_TRUST_BUNDLE} to pin the self-signed Keycloak certificate in production
+   * @param meterRegistry the Micrometer registry for the {@code
+   *     basetool_keycloak_sync_fetch_failures_total} counter
    */
-  public KeycloakService(KeycloakSyncProperties properties, SslBundles sslBundles) {
+  public KeycloakService(
+      KeycloakSyncProperties properties, SslBundles sslBundles, MeterRegistry meterRegistry) {
     this.properties = properties;
     this.trustedRequestFactory = buildTrustedRequestFactory(sslBundles);
+    this.meterRegistry = meterRegistry;
   }
 
   /**
@@ -218,6 +227,11 @@ public class KeycloakService {
 
     } catch (Exception e) {
       log.error("Failed to fetch users from Keycloak", e);
+      // REQ-OBS-011: the swallow returns an empty roster and the sync still records success, so
+      // without this counter a Keycloak Admin-API outage is indistinguishable from a legitimately
+      // empty roster (departed users would keep their local roles). KeycloakSyncFetchFailing
+      // alerts.
+      meterRegistry.counter(MetricNames.KEYCLOAK_SYNC_FETCH_FAILURES).increment();
       return Collections.emptyList();
     }
   }
