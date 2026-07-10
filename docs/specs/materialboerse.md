@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-09.
-> **Owner area:** MARKET · **Related ADRs:** ADR-0082
+> **Owner area:** MARKET · **Related ADRs:** ADR-0082, ADR-0086
 
 # Materialbörse — material-exchange trade board
 
@@ -8,9 +8,10 @@
 The Materialbörse (Flotte & Logistik, `/materialboerse`) is a central, org-wide-visible marketplace
 for materials a player releases for trade. It shows **only** which player offers which material, in
 which quality and quantity; negotiation and handover happen off-tool between the players. It builds
-on the existing Lager (`InventoryItem`): a member releases one of their own stock rows with a
-free-form Markdown remark ("was suchst du im Gegenzug?"), other members register interest, and the
-anbieter takes the negotiation from there. The design is fixed by the DAS KARTELL design proposal
+on the existing Lager (`InventoryItem`): a member releases one of their own stock rows — offering
+the whole row or only a **part** of its stock (ADR-0086) — with a free-form Markdown remark ("was
+suchst du im Gegenzug?"), other members register interest, and the anbieter takes the negotiation
+from there. The design is fixed by the DAS KARTELL design proposal
 `proposals/materialboerse-final.html` (locked master-detail layout). Data model + visibility
 decisions are recorded in ADR-0082.
 
@@ -35,23 +36,36 @@ with the SCU unit — the amount unit follows `Material.quantityType`, matching 
 **Enforced by:** `MaterialExchangeServiceTest`, `MaterialboersePageControllerMvcTest` · **Code:**
 `MaterialExchangeService#board`, `MaterialExchangeController`, `MaterialboersePageController`
 
-### REQ-MARKET-002 — Release a Lager row (with a Markdown remark)
+### REQ-MARKET-002 — Release a Lager row (whole or partial, with a Markdown remark)
 
 A member releases one of **their own** Lager rows via the "Für Börse freigeben" checkbox on Mein
-Lager or the "Material anbieten" CTA on the board. Release opens the remark dialog: a read-only fact
-strip (material · quality as a plain number · quantity in the material's own unit — SCU or
-Stück/piece) + a Markdown textarea (≤ 20 000 characters, live counter). Material, quality and amount
-are read **live** from the linked
-`InventoryItem` (single source of truth); the client never sets them. Releasing an item that already
-has an active offer re-activates/updates it rather than duplicating (one active offer per item).
+Lager or the "Material anbieten" CTA on the board. Release opens the offer dialog: a read-only fact
+strip (material · quality as a plain number), an **editable offered-quantity field** ("Menge
+anbieten" in the material's own unit — SCU or Stück/piece, #1182 — defaulting to the row's full stock
+with an "Alles" shortcut) + a Markdown textarea (≤ 20 000 characters, live counter). Material and
+quality are read **live** from the linked `InventoryItem`; the **offered quantity is the owner's
+choice** — the whole row or only a part of it (ADR-0086), validated server-side to be **positive and
+at most the item's current amount** (the client never sets material/quality). Releasing an item that
+already has an active offer re-activates/updates its offered amount and remark rather than duplicating
+(one active offer per item). The board **never advertises more than is in stock**: the effective
+quantity shown, filtered and sorted is `min(offeredAmount, current stock)`, so the offer shrinks as
+the row is partially booked out (ADR-0086, clamp-on-read). A **fully** booked-out row is deleted by
+the inventory book-out paths (delete-on-depletion), which cascade-deletes the offer (V210 `ON DELETE
+CASCADE`) — so a dead, zero-stock offer never lingers; no separate "hide depleted" pass is needed.
 
 **Acceptance**
 - [ ] Releasing another member's item is rejected (403).
-- [ ] The offer's quality/amount always equal the item's current quality/amount.
+- [ ] The offer's quality always equals the item's current quality.
+- [ ] Offering a part of the row stores that part; offering more than the item's current stock is
+rejected (400).
+- [ ] The board never shows more than the item's current stock: after part of the row is booked out,
+the offer's shown/filtered/sorted amount drops to the remaining stock; when the row is fully booked
+out it is deleted and its offer cascade-removed (no lingering zero-stock offer).
 - [ ] A remark over 20 000 characters is rejected (400).
 
 **Enforced by:** `MaterialExchangeServiceTest`, `MaterialExchangeRepositoryDataTest` · **Code:**
-`MaterialExchangeService#release`, `MaterialExchangeReleaseRequest`, `V210` partial-unique index
+`MaterialExchangeService#release/updateOffer`, `MaterialExchangeReleaseRequest`,
+`MaterialExchangeOfferUpdateRequest`, `V212` offered-amount column, `V210` partial-unique index
 
 ### REQ-MARKET-003 — Signal-only
 
@@ -101,21 +115,24 @@ negotiation; a member cannot register interest in their own offer. Registration 
 
 ### REQ-MARKET-007 — Offer lifecycle (edit / deactivate), owner-only, optimistic-locked
 
-Only the owner may edit an offer's remark (version-guarded via `support.OptimisticLock`, 409 on
-mismatch) or deactivate it (from the board detail or by un-checking the Lager checkbox). A
-deactivated offer is retained for the audit trail but never listed.
+Only the owner may edit an offer's **offered amount and remark** ("Angebot bearbeiten",
+version-guarded via `support.OptimisticLock`, 409 on mismatch; a raised amount is re-validated
+against the item's current stock, 400 if it exceeds it) or deactivate it (from the board detail or
+by un-checking the Lager checkbox). A deactivated offer is retained for the audit trail but never
+listed.
 
 **Acceptance**
-- [ ] A non-owner edit/deactivate is rejected (403); a stale-version remark edit is a 409.
+- [ ] A non-owner edit/deactivate is rejected (403); a stale-version edit is a 409.
+- [ ] Editing the offered amount above the item's current stock is rejected (400).
 
 **Enforced by:** `MaterialExchangeServiceTest` · **Code:** `MaterialExchangeService`
 
 ### REQ-MARKET-008 — Audited area
 
-Every state-mutating Materialbörse activity (offer release, offer deactivate, remark edit, interest
+Every state-mutating Materialbörse activity (offer release, offer edit, offer deactivate, interest
 register, interest withdraw) writes exactly one `audit_event` row under `AuditDomain.MARKET`, in the
-business transaction, with a PII-free `key=value` details payload (ids/quality/amount/remark **length**
-only — never the remark body, never usernames). The unified audit viewer gains a Materialbörse tab.
+business transaction, with a PII-free `key=value` details payload (ids/quality/offered amount/stock/remark
+**length** only — never the remark body, never usernames). The unified audit viewer gains a Materialbörse tab.
 See `docs/specs/audit.md` (REQ-AUDIT-001/002).
 
 **Acceptance**
@@ -129,10 +146,14 @@ See `docs/specs/audit.md` (REQ-AUDIT-001/002).
 `/materialboerse` renders the locked master-detail layout of the design proposal (lean list left,
 full offer right) using only design-system classes/tokens; `materialboerse.css` is page composition
 only. Tabs "Alle Angebote" / "Meine Angebote" carry counts (board totals, filter-independent). Filters:
-search (material or player), min. quality, min. quantity, sort (Qualität ↓ · Menge ↓ · Material A–Z ·
-Neueste zuerst — no "nur ohne Interessenten"). Every interaction updates the DOM in place through
-`krtFetch` (no full-page reload on success), the remark renders server-side via the `@markdown` bean
-into `.markdown-content`, and there are no native dialogs (KRT modal + `showKrtConfirm` + toasts).
+search (material or player), min. quality, min. quantity (on the **effective** amount = offered,
+capped at current stock), sort (Qualität ↓ · Menge ↓ · Material A–Z · Neueste zuerst — no "nur ohne
+Interessenten"). The release/edit modal
+carries the editable "Menge anbieten" field (default = full stock, "Alles" shortcut, client-bounded
+by the item's amount and server-validated) so a member can offer only a part of a row. Every
+interaction updates the DOM in place through `krtFetch` (no full-page reload on success), the remark
+renders server-side via the `@markdown` bean into `.markdown-content`, and there are no native
+dialogs (KRT modal + `showKrtConfirm` + toasts).
 Complies with `docs/specs/frontend-ajax-mutations.md` (REQ-FE-001…014).
 
 **Acceptance**

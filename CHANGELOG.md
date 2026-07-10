@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Materialbörse: Teilmengen anbieten.** Beim Freigeben eines Lager-Postens lässt sich jetzt wählen, wie viel davon angeboten wird — die ganze Menge (Schaltfläche „Alles") oder nur ein Teil. Die angebotene Menge kann später über „Angebot bearbeiten" angepasst werden und darf den aktuellen Lagerbestand nie überschreiten: Wird ein Teil des Postens ausgebucht, sinkt die angezeigte Angebotsmenge automatisch mit; wird der Posten vollständig ausgebucht, wird er gelöscht und das Angebot damit automatisch von der Börse entfernt. Filter und Sortierung „Menge" beziehen sich auf diese effektive Menge (#1183).
+
 ### Changed
 
 - **Weniger Log-Rauschen, wenn das Backend kurz nicht erreichbar ist (z. B. bei einem Neustart/Deploy).** Ein durch den offenen Circuit-Breaker kurzgeschlossener Aufruf wurde bisher dreifach als `WARN` protokolliert und flutete bei jedem Backend-Neustart das Log, sodass ein erwarteter, sich selbst behebender Aussetzer kaum von einem echten Vorfall zu unterscheiden war. Solche kurzgeschlossenen Aufrufe werden jetzt auf `DEBUG` gestuft; das einmalige Öffnen des Breakers, die Metrik und der Alert bleiben als Signal erhalten (#1203).
