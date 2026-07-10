@@ -1621,10 +1621,12 @@ public class JobOrderWriteController {
 
     Collection<? extends GrantedAuthority> reachableAuthorities =
         roleHierarchy.getReachableGrantedAuthorities(authorities);
+    // REQ-OBS-004: log a stable short pseudonym, never principal.getName() (the Keycloak
+    // preferred_username handle, which PiiMasker does not scrub).
     log.debug(
-        "JobOrder: Checking logistician status for user {}. Original authorities: {}."
+        "JobOrder: Checking logistician status for user u-{}. Original authorities: {}."
             + " Reachable authorities: {}",
-        principal.getName(),
+        Integer.toHexString(java.util.Objects.hashCode(principal.getName())),
         authorities,
         reachableAuthorities);
     boolean result =

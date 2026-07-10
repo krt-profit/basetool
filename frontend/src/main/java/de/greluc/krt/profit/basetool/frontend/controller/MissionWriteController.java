@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.dto.CreateMissionRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationDto;
@@ -30,6 +31,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.CrewForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.MissionForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ParticipantForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.validation.Valid;
@@ -305,7 +307,7 @@ public class MissionWriteController {
       log.debug("Set party lead (AJAX) failed: status={}", e.getStatusCode());
       return MissionPageController.propagateBackendError(e);
     } catch (Exception e) {
-      log.debug("UNEXPECTED ERROR in setPartyLeadAjax for mission {}", id, e);
+      log.error("UNEXPECTED ERROR in setPartyLeadAjax for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
     }
   }
@@ -329,6 +331,9 @@ public class MissionWriteController {
           Void.class,
           isPublic);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
+    } catch (BackendServiceException e) {
+      BackendErrorLogging.warn(log, "checkInParticipant", participantId, e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.mission.participant.update");
     } catch (Exception e) {
       log.error("Check-in participant failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.mission.participant.update");
@@ -355,6 +360,9 @@ public class MissionWriteController {
           Void.class,
           isPublic);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
+    } catch (BackendServiceException e) {
+      BackendErrorLogging.warn(log, "checkOutParticipant", participantId, e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.mission.participant.update");
     } catch (Exception e) {
       log.error("Check-out participant failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.mission.participant.update");
@@ -484,6 +492,9 @@ public class MissionWriteController {
       backendApiClient.delete(
           "/api/v1/missions/" + id + "/participants/" + participantId, Void.class, isPublic);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
+    } catch (BackendServiceException e) {
+      BackendErrorLogging.warn(log, "deleteParticipant", participantId, e);
+      return "redirect:/missions/" + id + "?error=error.mission.participant.delete";
     } catch (Exception e) {
       log.error("Delete participant failed", e);
       return "redirect:/missions/" + id + "?error=error.mission.participant.delete";
@@ -1498,7 +1509,7 @@ public class MissionWriteController {
       log.debug("Add unit (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return MissionPageController.propagateBackendError(e);
     } catch (Exception e) {
-      log.debug("UNEXPECTED ERROR in addUnitAjax for mission {}", id, e);
+      log.error("UNEXPECTED ERROR in addUnitAjax for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
     }
   }
@@ -1579,7 +1590,7 @@ public class MissionWriteController {
       log.debug("Add step (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return MissionPageController.propagateBackendError(e);
     } catch (Exception e) {
-      log.debug("UNEXPECTED ERROR in addStepAjax for mission {}", id, e);
+      log.error("UNEXPECTED ERROR in addStepAjax for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
     }
   }
@@ -1741,7 +1752,7 @@ public class MissionWriteController {
           "Add objective (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return MissionPageController.propagateBackendError(e);
     } catch (Exception e) {
-      log.debug("UNEXPECTED ERROR in addObjectiveAjax for mission {}", id, e);
+      log.error("UNEXPECTED ERROR in addObjectiveAjax for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
     }
   }
@@ -1890,7 +1901,7 @@ public class MissionWriteController {
           "Add participant (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return MissionPageController.propagateBackendError(e);
     } catch (Exception e) {
-      log.debug("UNEXPECTED ERROR in addParticipantAjax for mission {}", id, e);
+      log.error("UNEXPECTED ERROR in addParticipantAjax for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
     }
   }
@@ -2067,7 +2078,7 @@ public class MissionWriteController {
       log.debug("Add crew (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return MissionPageController.propagateBackendError(e);
     } catch (Exception e) {
-      log.debug("UNEXPECTED ERROR in addCrewAjax for mission {} unit {}", id, unitId, e);
+      log.error("UNEXPECTED ERROR in addCrewAjax for mission {} unit {}", id, unitId, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
     }
   }

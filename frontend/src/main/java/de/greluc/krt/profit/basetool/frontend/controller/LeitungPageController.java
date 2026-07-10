@@ -95,6 +95,9 @@ public class LeitungPageController {
     try {
       model.addAttribute(
           "leitung", backendApiClient.get("/api/v1/leitung/view", LeitungViewDto.class));
+    } catch (BackendServiceException e) {
+      log.debug("Failed to load Leitung view", e);
+      model.addAttribute("error", "leitung.error.load");
     } catch (Exception e) {
       log.error("Failed to load Leitung view", e);
       model.addAttribute("error", "leitung.error.load");

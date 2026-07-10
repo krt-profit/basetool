@@ -39,6 +39,8 @@
 
 - **Fehler behoben: Die RED-Panels im Tracing-Dashboard zeigten „No data" mit Fehlerhinweis.** Die drei Panels (Request-Rate, p95-Latenz, Fehlerrate) liefen als TraceQL-Metrics-Abfragen gegen Tempo, was den nicht aktivierten `local-blocks`-Prozessor voraussetzt. Sie beziehen ihre Werte jetzt — nach Route gruppiert — aus den vorhandenen `http_server_requests`-Histogrammen (Prometheus), denselben Serien wie die Latenz-/5xx-Alarme. Kein zusätzlicher Speicher-, Tempo-Neustart- oder Reihen-Aufwand; die Trace-Tabellen „Slow traces"/„Error traces" bleiben unverändert an Tempo (ADR-0076).
 
+- **Weniger fälschliche ERROR-Logs im Frontend bei Backend-Aussetzern.** Zahlreiche Seiten- und Schreib-Handler protokollierten einen bereits an der Backend-Grenze einmalig geloggten Fehler (erwartete 4xx wie Validierung/Konflikt oder einen kurzgeschlossenen Circuit-Breaker) ein zweites Mal als ERROR und konnten so bei einem Backend-Neustart schon beim Öffnen der Startseite oder einer Admin-Seite den `LogbackErrorSpike`-Alarm fälschlich auslösen; solche Fälle werden jetzt einheitlich als DEBUG (Grenze hat bereits geloggt) bzw. WARN geführt, während unerwartete Fehler weiter als ERROR sichtbar bleiben und genuine 500er in AJAX-Handlern nun korrekt als ERROR statt DEBUG erscheinen. Zusätzlich wird der Keycloak-Callsign-Handle nicht mehr ins Log geschrieben und ein abgebrochener Benachrichtigungs-Stream erzeugt keine überflüssige ERROR-Zeile mehr (REQ-OBS-001/-004).
+
 ## [v1.2.6](https://github.com/krt-profit/basetool/releases/tag/v1.2.6) - 2026-07-09
 
 ### Added

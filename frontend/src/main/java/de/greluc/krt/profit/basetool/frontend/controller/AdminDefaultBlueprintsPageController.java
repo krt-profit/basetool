@@ -194,6 +194,9 @@ public class AdminDefaultBlueprintsPageController {
       List<DefaultBlueprintDto> result =
           backendApiClient.get("/api/v1/admin/default-blueprints", DEFAULT_BLUEPRINT_LIST_TYPE);
       return result == null ? Collections.emptyList() : result;
+    } catch (BackendServiceException e) {
+      log.debug("Failed to fetch default blueprints", e);
+      return Collections.emptyList();
     } catch (Exception e) {
       log.error("Failed to fetch default blueprints", e);
       return Collections.emptyList();

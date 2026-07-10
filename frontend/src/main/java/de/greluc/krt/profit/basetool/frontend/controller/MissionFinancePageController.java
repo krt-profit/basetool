@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.form.MissionFinanceEntryForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
@@ -103,6 +104,9 @@ public class MissionFinancePageController {
 
       backendApiClient.post("/api/v1/finance-entries", body, Void.class, authHelper.isAnonymous());
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
+    } catch (BackendServiceException e) {
+      BackendErrorLogging.warn(log, "addFinanceEntry", id, e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.finance.add");
     } catch (Exception e) {
       log.error("Add finance entry failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.finance.add");
@@ -148,6 +152,9 @@ public class MissionFinancePageController {
 
       backendApiClient.put("/api/v1/finance-entries/" + entryId, body, Void.class, false);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
+    } catch (BackendServiceException e) {
+      BackendErrorLogging.warn(log, "updateFinanceEntry", entryId, e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.finance.update");
     } catch (Exception e) {
       log.error("Update finance entry failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.finance.update");
@@ -174,6 +181,9 @@ public class MissionFinancePageController {
     try {
       backendApiClient.delete("/api/v1/finance-entries/" + entryId, Void.class, false);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
+    } catch (BackendServiceException e) {
+      BackendErrorLogging.warn(log, "deleteFinanceEntry", entryId, e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.finance.delete");
     } catch (Exception e) {
       log.error("Delete finance entry failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.finance.delete");
@@ -210,7 +220,7 @@ public class MissionFinancePageController {
       log.debug("Add finance entry (AJAX) failed: status={}", e.getStatusCode());
       return MissionPageController.propagateBackendError(e);
     } catch (Exception e) {
-      log.debug("UNEXPECTED ERROR in addFinanceEntryAjax for mission {}", id, e);
+      log.error("UNEXPECTED ERROR in addFinanceEntryAjax for mission {}", id, e);
       return ResponseEntity.internalServerError().build();
     }
   }
@@ -239,7 +249,7 @@ public class MissionFinancePageController {
       log.debug("Update finance entry (AJAX) failed: status={}", e.getStatusCode());
       return MissionPageController.propagateBackendError(e);
     } catch (Exception e) {
-      log.debug(
+      log.error(
           "UNEXPECTED ERROR in updateFinanceEntryAjax for mission {} entry {}", id, entryId, e);
       return ResponseEntity.internalServerError().build();
     }
@@ -265,7 +275,7 @@ public class MissionFinancePageController {
       log.debug("Delete finance entry (AJAX) failed: status={}", e.getStatusCode());
       return MissionPageController.propagateBackendError(e);
     } catch (Exception e) {
-      log.debug(
+      log.error(
           "UNEXPECTED ERROR in deleteFinanceEntryAjax for mission {} entry {}", id, entryId, e);
       return ResponseEntity.internalServerError().build();
     }

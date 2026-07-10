@@ -316,6 +316,9 @@ public class MaterialboersePageController {
       PageResponse<MaterialExchangeOfferDto> page =
           backendApiClient.get(uri.toUriString(), OFFERS_PAGE);
       return page == null ? List.of() : page.content();
+    } catch (BackendServiceException e) {
+      log.debug("Failed to load Materialbörse board", e);
+      return List.of();
     } catch (Exception e) {
       log.error("Failed to load Materialbörse board", e);
       return List.of();
@@ -336,6 +339,9 @@ public class MaterialboersePageController {
     try {
       return backendApiClient.get(
           "/api/v1/material-exchange/offers/" + offerId, MaterialExchangeOfferDto.class);
+    } catch (BackendServiceException e) {
+      log.debug("Failed to load Materialbörse offer {}", offerId, e);
+      return null;
     } catch (Exception e) {
       log.error("Failed to load Materialbörse offer {}", offerId, e);
       return null;
@@ -351,6 +357,9 @@ public class MaterialboersePageController {
     try {
       return backendApiClient.get(
           "/api/v1/material-exchange/counts", MaterialExchangeCountsDto.class);
+    } catch (BackendServiceException e) {
+      log.debug("Failed to load Materialbörse counts", e);
+      return new MaterialExchangeCountsDto(0, 0);
     } catch (Exception e) {
       log.error("Failed to load Materialbörse counts", e);
       return new MaterialExchangeCountsDto(0, 0);

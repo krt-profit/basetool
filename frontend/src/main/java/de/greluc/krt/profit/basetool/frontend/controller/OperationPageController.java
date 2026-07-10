@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
+import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionListDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationDto;
@@ -474,7 +475,7 @@ public class OperationPageController {
         log.warn("Optimistic locking failure updating operation: {}", id);
         redirectAttributes.addFlashAttribute("errorMessage", "error.optimistic.locking");
       } else {
-        log.error("Error updating operation {}: status {}", id, e.getStatusCode(), e);
+        BackendErrorLogging.warn(log, "updateOperation", id, e);
         redirectAttributes.addFlashAttribute("errorMessage", "operation.update.error");
       }
     } catch (Exception e) {

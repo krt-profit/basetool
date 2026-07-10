@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MembershipDeltaRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MembershipDeltaResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitKind;
@@ -342,6 +343,13 @@ public class MemberManagementController {
       if ("profile".equals(form.source())) {
         return "redirect:/profile";
       }
+    } catch (BackendServiceException e) {
+      BackendErrorLogging.warn(log, "updateMember", id, e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.member.update.failed");
+      return "redirect:/members/"
+          + id
+          + "/edit"
+          + (form.source() != null ? "?source=" + form.source() : "");
     } catch (Exception e) {
       log.error("Update failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.member.update.failed");
@@ -530,6 +538,9 @@ public class MemberManagementController {
     try {
       backendApiClient.delete("/api/v1/users/" + id, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "success.user.delete");
+    } catch (BackendServiceException e) {
+      BackendErrorLogging.warn(log, "deleteMember", id, e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.user.delete");
     } catch (Exception e) {
       log.error("Delete failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.user.delete");

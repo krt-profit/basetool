@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderStoreDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderStoreItemDto;
@@ -27,6 +28,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.RefineryOrderForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.RefineryOrderStoreForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.RefineryOrderStoreItemForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.List;
@@ -129,12 +131,18 @@ public class RefineryOrderWriteController {
             + (form.getSource() != null ? "?source=" + form.getSource() : "");
       }
 
-      log.info("Sending refinery order DTO: {}", orderDto);
+      log.debug("Sending refinery order DTO: {}", orderDto);
 
       backendApiClient.post("/api/v1/refinery-orders", orderDto, RefineryOrderDto.class);
       redirectAttributes.addFlashAttribute("successToast", "success.refineryorder.create");
 
       return "redirect:/refinery-orders";
+    } catch (BackendServiceException e) {
+      BackendErrorLogging.warn(log, "POST /api/v1/refinery-orders", e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.create.failed");
+      redirectAttributes.addFlashAttribute("refineryOrderForm", form);
+      return "redirect:/refinery-orders/create"
+          + (form.getSource() != null ? "?source=" + form.getSource() : "");
     } catch (Exception e) {
       log.error("Failed to create refinery order", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.create.failed");
@@ -176,6 +184,11 @@ public class RefineryOrderWriteController {
       }
       backendApiClient.put("/api/v1/refinery-orders/" + id, orderDto, RefineryOrderDto.class);
       redirectAttributes.addFlashAttribute("successToast", "success.refineryorder.update");
+    } catch (BackendServiceException e) {
+      BackendErrorLogging.warn(log, "PUT /api/v1/refinery-orders/{id}", id, e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.update.failed");
+      redirectAttributes.addFlashAttribute("refineryOrderForm", form);
+      return "redirect:/refinery-orders/" + id;
     } catch (Exception e) {
       log.error("Failed to update refinery order", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.update.failed");
@@ -199,6 +212,9 @@ public class RefineryOrderWriteController {
     try {
       backendApiClient.delete("/api/v1/refinery-orders/" + id, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "success.refineryorder.cancel");
+    } catch (BackendServiceException e) {
+      BackendErrorLogging.warn(log, "DELETE /api/v1/refinery-orders/{id}", id, e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.cancel.failed");
     } catch (Exception e) {
       log.error("Failed to cancel refinery order", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.cancel.failed");
@@ -236,6 +252,12 @@ public class RefineryOrderWriteController {
       RefineryOrderStoreDto dto = buildStoreDto(form);
       backendApiClient.post("/api/v1/refinery-orders/" + id + "/store", dto, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "success.refineryorder.store");
+    } catch (BackendServiceException e) {
+      BackendErrorLogging.warn(log, "POST /api/v1/refinery-orders/{id}/store", id, e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.store.failed");
+      redirectAttributes.addFlashAttribute("storeForm", form);
+      redirectAttributes.addFlashAttribute("showStoreModal", true);
+      return "redirect:/refinery-orders/" + id;
     } catch (Exception e) {
       log.error("Failed to store refinery order", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.store.failed");
