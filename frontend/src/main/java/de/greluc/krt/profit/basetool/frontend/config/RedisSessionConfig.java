@@ -61,12 +61,18 @@ import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
  * <p>Uses {@code @EnableRedisIndexedHttpSession} to enable Redis-backed HTTP sessions with index
  * support for session lookup by principal name and session ID.
  *
- * <p><b>Session Timeout:</b> {@code @EnableRedisIndexedHttpSession} disables Spring Boot's
- * auto-configuration bridge that would normally apply {@code server.servlet.session.timeout} to the
- * {@link RedisIndexedSessionRepository}. Without explicit configuration, the default of 1800
- * seconds (30 minutes) is used. A {@link SessionRepositoryCustomizer} bean re-applies the
- * configured timeout value so that Redis sessions honour the same TTL as configured in {@code
- * application.yml}.
+ * <p><b>Two-tier session timeout (REQ-SEC-025, ADR-0088):</b>
+ * {@code @EnableRedisIndexedHttpSession} disables Spring Boot's auto-configuration bridge that
+ * would normally apply {@code server.servlet.session.timeout} to the {@link
+ * RedisIndexedSessionRepository}; without it the repository default of 1800 s (30 min) applies. A
+ * {@link SessionRepositoryCustomizer} bean instead applies the <em>anonymous</em> window ({@code
+ * app.session.anonymous-timeout}, default 30m) as the repository default, so throwaway sessions
+ * minted for un-authenticated traffic (CSRF-token / pre-login OAuth2 state) expire in minutes. A
+ * successful login promotes its session to the long <em>authenticated</em> window ({@code
+ * app.session.authenticated-timeout}, default 720h) in {@code
+ * SessionLifetimeUpgradeSuccessHandler}. The split stopped the {@code basetool_active_sessions}
+ * runaway (&gt;16 000 orphan CSRF-only sessions against ~30 real principals) without shortening the
+ * 30-day "stay logged in" window members rely on.
  *
  * <p>This configuration is excluded from the {@code test} profile to prevent Redis connection
  * attempts during unit and integration tests.
@@ -78,16 +84,26 @@ import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 public class RedisSessionConfig {
 
   /**
-   * Session timeout read from {@code server.servlet.session.timeout} (default: 240h).
+   * <em>Anonymous</em> session idle timeout read from {@code app.session.anonymous-timeout}
+   * (default 30m), applied as the repository's default {@code maxInactiveInterval} (REQ-SEC-025,
+   * ADR-0088).
    *
-   * <p>{@code @EnableRedisIndexedHttpSession} disables Spring Boot's auto-configuration for Spring
-   * Session, so {@code server.servlet.session.timeout} is NOT automatically applied to the {@link
-   * RedisIndexedSessionRepository}. Without explicit configuration the default of 1800 seconds (30
-   * minutes) is used — sessions expire far too quickly. This field is injected here and applied via
-   * {@link #sessionRepositoryCustomizer()}.
+   * <p>Deliberately short: every NEW session starts with this window, including the throwaway
+   * sessions Spring Security mints for un-authenticated traffic — the CSRF-token session created
+   * when an anonymous client renders a form-bearing permit-all page, and pre-login OAuth2 {@code
+   * authorizationRequest} state. Those orphans must expire in minutes; leaving them at the 30-day
+   * "stay logged in" window let anonymous probe/crawler traffic accrete &gt;16 000 orphan CSRF-only
+   * sessions in Redis against ~30 real principals (the {@code basetool_active_sessions} runaway),
+   * on a collision course with the {@code maxmemory noeviction} ceiling. A real login promotes its
+   * session to the long {@code app.session.authenticated-timeout} window in {@code
+   * SessionLifetimeUpgradeSuccessHandler}, so members keep the 30-day window unchanged.
+   *
+   * <p>{@code @EnableRedisIndexedHttpSession} disables Spring Boot's auto-configuration bridge, so
+   * this value is NOT applied automatically; without it the repository default of 1800 s (30 min)
+   * would apply. Injected here and applied via {@link #sessionRepositoryCustomizer()}.
    */
-  @Value("${server.servlet.session.timeout:240h}")
-  private Duration sessionTimeout;
+  @Value("${app.session.anonymous-timeout:30m}")
+  private Duration anonymousSessionTimeout;
 
   /**
    * Redis key namespace read from {@code spring.session.redis.namespace} (default: {@code
@@ -245,8 +261,8 @@ public class RedisSessionConfig {
    * is bypassed and none of the following properties are applied automatically:
    *
    * <ul>
-   *   <li>{@code server.servlet.session.timeout} → default 1800s (30 min) instead of configured
-   *       240h
+   *   <li>{@code app.session.anonymous-timeout} → default 1800s (30 min) instead of the configured
+   *       anonymous window (REQ-SEC-025)
    *   <li>{@code spring.session.redis.namespace} → default {@code spring:session} instead of
    *       configured {@code basetool:session}; causes {@code keys "basetool:session:*"} to return
    *       empty even when sessions are correctly persisted
@@ -264,7 +280,7 @@ public class RedisSessionConfig {
   @Bean
   public SessionRepositoryCustomizer<RedisIndexedSessionRepository> sessionRepositoryCustomizer() {
     return repository -> {
-      repository.setDefaultMaxInactiveInterval(sessionTimeout);
+      repository.setDefaultMaxInactiveInterval(anonymousSessionTimeout);
       repository.setRedisKeyNamespace(redisNamespace);
       repository.setFlushMode(resolveFlushMode());
     };

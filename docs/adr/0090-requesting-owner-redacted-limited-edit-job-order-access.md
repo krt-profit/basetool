@@ -1,9 +1,9 @@
-# ADR-0087 — Requesting-owner redacted view + limited edit of job orders
+# ADR-0090 — Requesting-owner redacted view + limited edit of job orders
 
 - **Status:** Accepted
 - **Date:** 2026-07-10
 - **Deciders:** @greluc
-- **Related:** `AccessGateService.canSeeJobOrderAsRequester` / `canEditJobOrderAsRequester` · `RequestScopeResolver.isOrderRequester` / `currentDirectMembershipOrgUnitIds` / `canViewOwnJobOrders` · `JobOrderService.updateJobOrderAsRequester` / `updateItemJobOrderAsRequester` / `getRequestedJobOrders` / `replaceMaterialsWithinTransaction` · `JobOrderController` (`GET /requested`, `PUT /{id}/requested`, `PUT /{id}/items/requested`, `cleanupJobOrderForRequester`) · `JobOrderUpdatedByRequesterEvent` · V213 · REQ-ORDERS-023 · REQ-NOTIF-017 · REQ-ORG-003 · REQ-SEC-009 · ADR-0029 · #1186
+- **Related:** `AccessGateService.canSeeJobOrderAsRequester` / `canEditJobOrderAsRequester` · `RequestScopeResolver.isOrderRequester` / `currentDirectMembershipOrgUnitIds` / `canViewOwnJobOrders` · `JobOrderService.updateJobOrderAsRequester` / `updateItemJobOrderAsRequester` / `getRequestedJobOrders` / `replaceMaterialsWithinTransaction` · `JobOrderController` (`GET /requested`, `PUT /{id}/requested`, `PUT /{id}/items/requested`, `cleanupJobOrderForRequester`) · `JobOrderUpdatedByRequesterEvent` · V214 · REQ-ORDERS-023 · REQ-NOTIF-017 · REQ-ORG-003 · REQ-SEC-009 · ADR-0029 · #1186
 
 ## Context
 
@@ -53,7 +53,7 @@ gate and the LOGISTICIAN full-edit path:
 - Requester edits reuse the existing audit events (`JOB_ORDER_UPDATED` / `_ITEM_UPDATED` /
   `_MATERIAL_UNLINKED`) with a bounded `byRequester=true` details flag (no new `AuditEventType`), and
   publish a new `JobOrderUpdatedByRequesterEvent` notifying the responsible unit's officers + leads
-  (seeded rule V213, `NotificationType.JOB_ORDER_UPDATED_BY_REQUESTER`).
+  (seeded rule V214, `NotificationType.JOB_ORDER_UPDATED_BY_REQUESTER`).
 
 The shared material full-replace was hardened to the canonical `createHandover` unlink ordering
 (mutate + `saveAndFlush` first, then the `clearAutomatically` inventory unlinks, then re-fetch) and

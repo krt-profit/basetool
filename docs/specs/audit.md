@@ -89,12 +89,14 @@ Coverage is **complete**, including the cross-area writers and the system/automa
 - **Materialbörse** (`MaterialExchangeOffer` / `MaterialExchangeInterest`, `AuditDomain.MARKET`,
   REQ-MARKET-008) — every trade-board mutation: offer release (`MARKET_OFFER_RELEASED`), offer
   edit — offered amount + remark (`MARKET_REMARK_UPDATED`), offer deactivate
-  (`MARKET_OFFER_DEACTIVATED`), interest register (`MARKET_INTEREST_REGISTERED`) and interest
-  withdraw (`MARKET_INTEREST_WITHDRAWN`). The subject is the offer, labelled by the **material name**
-  (a non-personal value); the anbieter is the target reference. The details payload carries only
-  bounded facts — the item id, quality, the **offered amount** (plus the item's current stock on
-  release), the remark **length**, and a re-release flag — **never** the remark body, the
-  anbieter/interessent handle, or the item's location.
+  (`MARKET_OFFER_DEACTIVATED`), interest register (`MARKET_INTEREST_REGISTERED`) and interest withdraw
+  (`MARKET_INTEREST_WITHDRAWN`). Both offer **kinds** reuse these five events (REQ-MARKET-012). The
+  subject is the offer, labelled by the **material name** for a material offer or the **item name** for
+  an item offer (both non-personal game-asset values); the anbieter is the target reference. The
+  details payload carries only bounded facts — the offer `kind`, plus for a material offer the item id
+  / quality / **offered amount** (and the item's current stock on release) / re-release flag and for an
+  item offer the blueprint `product` key / `qty`, and always the remark **length** — **never** the
+  remark body, the anbieter/interessent handle, or the item's location.
 
 The audit table is **business data, not logging** — the [`observability.md`](observability.md) rule
 (never write names, emails or tokens to the **log stream**) is unaffected and still applies. User

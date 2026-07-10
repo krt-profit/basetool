@@ -718,16 +718,19 @@ target, a picker that preloads the full (or admin-"all-squadrons") roster ships 
 the marker value**: `data-krt-combobox="remote-users"` searches the squadron/admin-scoped
 `/users/search`, and `data-krt-combobox="remote-bank-users"` searches the bank-audience
 `/users/search-bank` (ADR-0089 — same query/scope, role gate widened to bank staff; backs the
-register-holder / grant-Bank-Employee / approval-limit pickers). The enhancer looks the marker up in
+register-holder / grant-Bank-Employee / approval-limit **and the deposit/withdrawal counterparty**
+pickers). The enhancer looks the marker up in
 the shared `window.krtComboboxRemoteSources` registry (`krt-user-search.js`), so no per-page JS is
 needed; the roster is fetched on demand (debounced, paginated), not preloaded. **Edit-mode seeding**
 is preserved: a picker with a current value renders exactly one seeded `<option>` for it (its display
 name sourced from the aggregate the page already loads, or a single `/users/{id}` lookup) so the box
-shows the name, not a raw id — the no-JS `<select>` fallback still submits it. Pickers bounded to a
+shows the name, not a raw id — the no-JS `<select>` fallback still submits it. The **counterparty**
+picker is add-only (no edit-mode seed) and keeps its intertwined enable/disable JS — the "kein
+Tool-Account" external toggle and the dependent org-unit loader drive the combobox's hidden value
+input, and the enable/disable/clear routes through the shared combobox-aware helper so the visible
+textbox mirrors the state (bank.js). Pickers bounded to a
 **small scoped** set (a single mission's `${participants}`) stay in local-filter mode; the carve-outs
-below are unchanged. *(Known remaining preload: the bank deposit/withdrawal **counterparty** picker is
-a plain `<select>` with intertwined enable/disable JS; its conversion is tracked as a #1193
-follow-up.)*
+below are unchanged.
 
 The combobox preserves the original control's `name`, `id` and generic `data-*` (incl. `data-role` /
 `data-trigger`) onto its hidden input, so existing `getElementById` lookups, form submission and

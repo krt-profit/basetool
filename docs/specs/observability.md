@@ -402,8 +402,10 @@ transaction per pass) rather than per-scrape.
   `PROMOTION` / `PERSONAL_INVENTORY` / `MARKET` are excluded as legitimately-quiet and reviewed on
   the operations dashboard's per-domain table instead).
 - `basetool_material_exchange_active_count{status="ACTIVE"}` gauge sampled by
-  `BusinessMetricsCollector` — the number of active Materialbörse offers on the board (REQ-MARKET-*,
-  REQ-OBS-011). Counts only; the board never emits a per-offer, per-user or location label.
+  `BusinessMetricsCollector` — the number of active Materialbörse offers on the board, spanning
+  **both** offer kinds (material and item, REQ-MARKET-012), via `countByStatus(ACTIVE)`
+  (REQ-MARKET-*, REQ-OBS-011). Counts only; the board never emits a per-offer, per-user, per-kind or
+  location label.
 - `basetool_bank_audit_events_total{event_type}` counter at the single `BankAuditService.record`
   choke point (`event_type` = the bounded `BankAuditEventType` enum). The bank keeps a physically
   separate `bank_audit_event` table excluded from `AuditDomain`, so before #1041 item 10 the most
@@ -472,7 +474,15 @@ before alerting). All labels are fixed literals, pure counts. The `frontend-sse-
 `frontend-pool` Reactor-Netty connection pools additionally export `reactor.netty.connection.provider.*`
 (`.metrics(true)`, #1127); `basetool_notification_relay_connections` backs the
 `SseRelayPoolNearSaturation` alert (> 0.8 of the 1000-slot SSE pool for 10m) — the early warning
-before the pool starts silently dropping the 1001st live viewer.
+before the pool starts silently dropping the 1001st live viewer. `basetool_active_sessions`
+additionally backs the `ActiveSessionsRunaway` alert (> 2000 for 1h): the frontend session
+idle timeout is two-tier (REQ-SEC-025 / ADR-0088) — un-authenticated sessions get a short window
+(`app.session.anonymous-timeout`) so the throwaway CSRF-token / pre-login-OAuth2 sessions minted for
+anonymous traffic cannot accrete, and only a successful login promotes the session to the 30-day
+`app.session.authenticated-timeout`. A sustained climb past a few hundred means that split regressed
+(orphan sessions accreting again, as they did to >16000 against ~30 real principals) and the Redis
+session store is heading for its `maxmemory noeviction` ceiling where login/token-refresh writes
+fail.
 
 The auth surfaces (#1041 item 18) add `basetool_login_total{outcome,reason}` (`SecurityConfig`'s
 OAuth2 success/failure handlers: `outcome` = `success` / `failure`; on failure `reason` =

@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-10.
-> **Owner area:** ORDERS · **Related ADRs:** ADR-0087
+> **Owner area:** ORDERS · **Related ADRs:** ADR-0090
 
 # Requesting-owner (Auftraggeber) job-order access
 
@@ -17,7 +17,7 @@ This spec adds a **requester escape**: a member of an order's requesting org uni
 and, while it is still fully undelivered, edit it within limits — independent of the profit gate and
 independent of the LOGISTICIAN full-edit path used by the processing side. Ownership is defined at the
 **org-unit level** (membership in the requesting org unit), because a job order carries no per-user
-creator column and may be created anonymously; there is no schema change (ADR-0087).
+creator column and may be created anonymously; there is no schema change (ADR-0090).
 
 ## Requirements
 
@@ -70,7 +70,7 @@ processing unit's officers/leads are notified (REQ-NOTIF-017).
 ## Out of scope
 
 - Per-user ("only the person who created it") ownership — ownership is org-unit-level by design
-  (ADR-0087); a job order has no `created_by` column and may be created anonymously.
+  (ADR-0090); a job order has no `created_by` column and may be created anonymously.
 - Changing the responsible org unit, status, priority or handle from the requester side — those stay
   processing-side concerns (the reassignment endpoint owns the responsible unit).
 - The item-order requester **edit UI** ships in a later increment; the backend endpoint

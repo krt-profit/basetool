@@ -60,10 +60,14 @@ server:
     mime-types: text/html,text/plain,text/css,application/javascript,application/json,image/svg+xml
   servlet:
     session:
-      # 30-day rolling idle window (was 240h / 10 days). RedisSessionConfig's
-      # SessionRepositoryCustomizer applies this as the repository's
-      # defaultMaxInactiveInterval (sliding, refreshed on every request), so a
-      # user who visits at least once every 30 days never expires server-side.
+      # Servlet-container default only. With @EnableRedisIndexedHttpSession the
+      # Redis repository — not the container — owns the session TTL, and the idle
+      # window is now TWO-TIER (REQ-SEC-025, ADR-0088): the repository default is
+      # the short `app.session.anonymous-timeout` (throwaway un-authenticated
+      # sessions), promoted to `app.session.authenticated-timeout` (720h, the
+      # 30-day "stay logged in" window) on a successful login. Kept at 720h so it
+      # never contradicts the authenticated window; it is not what expires an
+      # authenticated user's Redis session.
       timeout: 720h
       cookie:
         secure: true
@@ -138,6 +142,19 @@ app:
     response-timeout: 5s
     read-timeout: 3s
     write-timeout: 3s
+  session:
+    # Two-tier session idle timeout (REQ-SEC-025, ADR-0088). Every NEW session starts with the short
+    # ANONYMOUS window; a successful login promotes it to the long AUTHENTICATED window (in
+    # SessionLifetimeUpgradeSuccessHandler). This stops the throwaway sessions Spring Security mints
+    # for un-authenticated traffic — chiefly the CSRF-token session created when an anonymous client
+    # renders a form-bearing permit-all page, plus pre-login OAuth2 authorizationRequest state — from
+    # lingering the full login window: those orphans previously accreted >16k 30-day Redis sessions
+    # against ~30 real principals (basetool_active_sessions runaway) on a collision course with the
+    # Redis `maxmemory noeviction` ceiling. Real members keep the unchanged 30-day "stay logged in"
+    # window. Applied by RedisSessionConfig (anonymous = repository default) and the login success
+    # handler (authenticated = post-login bump).
+    anonymous-timeout: ${APP_SESSION_ANONYMOUS_TIMEOUT:30m}
+    authenticated-timeout: ${APP_SESSION_AUTHENTICATED_TIMEOUT:720h}
   ui:
     notification-duration: 5000
   logging:

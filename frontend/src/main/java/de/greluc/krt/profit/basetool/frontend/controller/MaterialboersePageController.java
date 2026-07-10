@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintProductDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeCountsDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeOfferDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeReleasableItemDto;
@@ -75,8 +76,15 @@ public class MaterialboersePageController {
   private static final ParameterizedTypeReference<List<MaterialExchangeReleasableItemDto>>
       RELEASABLE_LIST = new ParameterizedTypeReference<>() {};
 
+  /** Captured generic type for the offerable blueprint-products picker response. */
+  private static final ParameterizedTypeReference<List<BlueprintProductDto>> PRODUCT_LIST =
+      new ParameterizedTypeReference<>() {};
+
   /** The board request size — large enough to show the whole board in one scrollable list. */
   private static final int BOARD_SIZE = 200;
+
+  /** Cap on the number of blueprint-products the item-offer type-ahead requests. */
+  private static final int PRODUCT_PICKER_LIMIT = 25;
 
   private final BackendApiClient backendApiClient;
 
@@ -146,6 +154,40 @@ public class MaterialboersePageController {
     return proxy(
         "Release Materialbörse offer failed",
         () -> backendApiClient.post("/api/v1/material-exchange/offers", body, Object.class));
+  }
+
+  /**
+   * Lists a craftable item on the board ("Item anbieten", #1185).
+   *
+   * @param body the {@code {productKey, quantity, remark}} payload.
+   * @return the backend result, or its error status + body.
+   */
+  @PostMapping("/item-offers/ajax")
+  @ResponseBody
+  public ResponseEntity<Object> releaseItem(@RequestBody Map<String, Object> body) {
+    return proxy(
+        "List Materialbörse item offer failed",
+        () -> backendApiClient.post("/api/v1/material-exchange/item-offers", body, Object.class));
+  }
+
+  /**
+   * Returns craftable items (blueprint products) matching a name fragment, for the "Item anbieten"
+   * type-ahead — a member-gated proxy over the backend blueprint-product search (only items an
+   * active blueprint produces, #1185).
+   *
+   * @param q a product-name fragment, or {@code null} for the first products.
+   * @return the matching products, or the backend error status + body.
+   */
+  @GetMapping("/offerable-products")
+  @ResponseBody
+  public ResponseEntity<Object> offerableProducts(@RequestParam(required = false) String q) {
+    UriComponentsBuilder uri =
+        UriComponentsBuilder.fromPath("/api/v1/blueprints/products/search")
+            .queryParam("limit", PRODUCT_PICKER_LIMIT);
+    appendIfPresent(uri, "q", q);
+    return proxy(
+        "Load Materialbörse offerable products failed",
+        () -> backendApiClient.get(uri.toUriString(), PRODUCT_LIST));
   }
 
   /**
