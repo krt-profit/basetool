@@ -94,6 +94,38 @@ class LiveSyncTopicTest {
   }
 
   @Test
+  void parse_distinguishesTheSharedBankPrefixByScope() {
+    UUID id = UUID.randomUUID();
+
+    // `bank:{id}` is the per-account room; the bare `bank` is the staff room — the SAME prefix,
+    // split by the presence of the id segment (the scope-aware classForPrefix fix).
+    LiveSyncTopic account = LiveSyncTopic.parse("bank:" + id);
+    assertThat(account).isNotNull();
+    assertThat(account.topicClass()).isEqualTo(LiveSyncTopicClass.BANK_ACCOUNT);
+    assertThat(account.resourceId()).isEqualTo(id);
+    assertThat(account.canonical()).isEqualTo("bank:" + id);
+
+    LiveSyncTopic staff = LiveSyncTopic.parse("bank");
+    assertThat(staff).isNotNull();
+    assertThat(staff.topicClass()).isEqualTo(LiveSyncTopicClass.BANK_STAFF);
+    assertThat(staff.resourceId()).isNull();
+    assertThat(staff.canonical()).isEqualTo("bank");
+
+    // `bank:` with an empty id is a malformed scoped topic, not a fallback to the staff room.
+    assertThat(LiveSyncTopic.parse("bank:")).isNull();
+  }
+
+  @Test
+  void parse_acceptsGlobalOrgUnitBankTopic_andRejectsAnIdOnIt() {
+    LiveSyncTopic topic = LiveSyncTopic.parse("orgunit-bank");
+    assertThat(topic).isNotNull();
+    assertThat(topic.topicClass()).isEqualTo(LiveSyncTopicClass.ORGUNIT_BANK);
+    assertThat(topic.resourceId()).isNull();
+    // A global room; a prefixed id violates its scope.
+    assertThat(LiveSyncTopic.parse("orgunit-bank:" + UUID.randomUUID())).isNull();
+  }
+
+  @Test
   void everyScopedClassExposesAnAuthProbePathWithAnIdPlaceholder() {
     for (LiveSyncTopicClass topicClass : LiveSyncTopicClass.values()) {
       if (topicClass.scoped()) {

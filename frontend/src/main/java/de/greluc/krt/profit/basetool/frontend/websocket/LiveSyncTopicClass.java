@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.websocket;
 
+import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.Set;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -132,7 +133,69 @@ public enum LiveSyncTopicClass {
       false,
       "orders",
       "/api/v1/me/capabilities",
-      "canViewJobOrders");
+      "canViewJobOrders"),
+
+  /**
+   * Per-account bank room: a Kartellbank account detail page — the staff {@code
+   * /bank/accounts/{id}} and the org-unit {@code /org-unit-bank/accounts/{id}} views (#556, #666).
+   * No editor-presence dots. A subscribe is authorized by a <b>dual</b> per-account read: first the
+   * staff read {@code GET /api/v1/bank/accounts/{id}}, and on an explicit 403/404 the org-unit read
+   * {@code GET /api/v1/org-units/bank/accounts/{id}} ({@link #fallbackProbePath}) — a member may
+   * see an account they own via the org-unit view even without bank-staff rights. The subscribe is
+   * denied only when <b>both</b> reads explicitly refuse; any transient failure fails open. Shares
+   * the {@code bank} prefix with {@link #BANK_STAFF} (disambiguated by the id segment).
+   */
+  BANK_ACCOUNT(
+      "bank",
+      true,
+      Set.of("account", "bookings", "chart"),
+      false,
+      "bank_account",
+      "/api/v1/bank/accounts/{id}",
+      null,
+      "/api/v1/org-units/bank/accounts/{id}",
+      null),
+
+  /**
+   * Global bank-staff room: the staff dashboard grid, the confirmation queue, the management tab
+   * and the grants matrix ({@code /bank}, {@code /bank/requests}, {@code /bank/manage}, {@code
+   * /bank/grants}). No editor-presence dots. A subscribe is authorized by a <b>local</b> role check
+   * against the authorities captured at handshake — a caller holding {@code ROLE_BANK_EMPLOYEE} or
+   * {@code ROLE_BANK_MANAGEMENT} — with no backend call ({@link #requiredAnyRole}); a caller with
+   * neither is denied. The management-only {@code grants} section stays protected per-fragment (a
+   * bank employee without management is refused the grants fragment GET), so admitting either bank
+   * role to the room is safe. Shares the {@code bank} prefix with {@link #BANK_ACCOUNT} (the bare
+   * prefix, no id, resolves here).
+   */
+  BANK_STAFF(
+      "bank",
+      false,
+      Set.of("grid", "requestQueue", "manage", "grants"),
+      false,
+      "bank_staff",
+      null,
+      null,
+      null,
+      Set.of(Roles.authority(Roles.BANK_EMPLOYEE), Roles.authority(Roles.BANK_MANAGEMENT))),
+
+  /**
+   * Global org-unit bank room: the org-unit officer/lead overview and account-detail settings
+   * ({@code /org-unit-bank}, {@code /org-unit-bank/accounts/{id}} — the settings region; the
+   * per-account balance/bookings/chart there ride the {@link #BANK_ACCOUNT} room). No
+   * editor-presence dots. A subscribe is authorized by a <b>local</b> member-or-above role check
+   * ({@link Roles#MEMBER_AUTHORITIES}) against the captured authorities — the same gate the {@code
+   * /org-unit-bank} page carries — with no backend call.
+   */
+  ORGUNIT_BANK(
+      "orgunit-bank",
+      false,
+      Set.of("orgUnitBank", "orgUnitBankSettings"),
+      false,
+      "orgunit_bank",
+      null,
+      null,
+      null,
+      Roles.MEMBER_AUTHORITIES);
 
   private final String prefix;
   private final boolean scoped;
@@ -141,6 +204,8 @@ public enum LiveSyncTopicClass {
   private final String metricLabel;
   private final String authProbePath;
   private final String capabilityField;
+  private final String fallbackProbePath;
+  private final Set<String> requiredAnyRole;
 
   /**
    * Defines one topic class.
@@ -166,6 +231,50 @@ public enum LiveSyncTopicClass {
       @NotNull String metricLabel,
       @Nullable String authProbePath,
       @Nullable String capabilityField) {
+    this(
+        prefix,
+        scoped,
+        allowedSections,
+        presenceEnabled,
+        metricLabel,
+        authProbePath,
+        capabilityField,
+        null,
+        null);
+  }
+
+  /**
+   * Defines one topic class, including the two bank-specific authorization extensions.
+   *
+   * @param prefix the wire prefix identifying the class
+   * @param scoped {@code true} if a concrete topic carries a resource UUID, {@code false} for a
+   *     bare-prefix global room
+   * @param allowedSections the section-key whitelist the relay forwards for this class
+   * @param presenceEnabled whether this class carries editor-presence dots
+   * @param metricLabel the bounded {@code topic_class} metric label value
+   * @param authProbePath the authenticated backend read that authorizes a subscribe, or {@code
+   *     null} when the socket authentication (or a {@link #requiredAnyRole} local check) authorizes
+   *     it
+   * @param capabilityField for a global class authorized by a capability, the boolean field of the
+   *     {@link #authProbePath} response that must be {@code true}; {@code null} otherwise
+   * @param fallbackProbePath a second per-resource read tried when the {@link #authProbePath}
+   *     explicitly refuses (403/404), so a subscribe is denied only when both refuse; {@code null}
+   *     when the class has no fallback read
+   * @param requiredAnyRole for a global class authorized by a <b>local</b> role check, the set of
+   *     authorities of which the caller must hold at least one (matched against the authorities
+   *     captured at handshake, no backend call); {@code null} when the class is not locally
+   *     role-gated
+   */
+  LiveSyncTopicClass(
+      @NotNull String prefix,
+      boolean scoped,
+      @NotNull Set<String> allowedSections,
+      boolean presenceEnabled,
+      @NotNull String metricLabel,
+      @Nullable String authProbePath,
+      @Nullable String capabilityField,
+      @Nullable String fallbackProbePath,
+      @Nullable Set<String> requiredAnyRole) {
     this.prefix = prefix;
     this.scoped = scoped;
     this.allowedSections = allowedSections;
@@ -173,6 +282,8 @@ public enum LiveSyncTopicClass {
     this.metricLabel = metricLabel;
     this.authProbePath = authProbePath;
     this.capabilityField = capabilityField;
+    this.fallbackProbePath = fallbackProbePath;
+    this.requiredAnyRole = requiredAnyRole;
   }
 
   /**
@@ -246,5 +357,31 @@ public enum LiveSyncTopicClass {
   @Nullable
   public String capabilityField() {
     return capabilityField;
+  }
+
+  /**
+   * Returns a second per-resource authorization read tried only when the {@link #authProbePath}
+   * explicitly refuses (403/404) — the subscribe is denied only when both reads refuse. Used by the
+   * {@link #BANK_ACCOUNT} room so an org-unit owner who may see the account through the org-unit
+   * view but not as bank staff is still allowed.
+   *
+   * @return the fallback probe path template, or {@code null} when the class has no fallback read
+   */
+  @Nullable
+  public String fallbackProbePath() {
+    return fallbackProbePath;
+  }
+
+  /**
+   * Returns the authorities of which the caller must hold at least one for a <b>local</b>,
+   * backend-free subscribe authorization (matched against the authorities captured at handshake),
+   * or {@code null} when the class is not locally role-gated. Used by the global {@link
+   * #BANK_STAFF} and {@link #ORGUNIT_BANK} rooms.
+   *
+   * @return the any-of required authority set, or {@code null}
+   */
+  @Nullable
+  public Set<String> requiredAnyRole() {
+    return requiredAnyRole;
   }
 }

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.websocket;
 import de.greluc.krt.profit.basetool.frontend.logging.ActiveSquadronRelayFilter;
 import java.time.Duration;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -106,6 +107,48 @@ public class LiveSyncSubscriptionAuthorizer {
   @NotNull
   public Decision authorize(
       @NotNull LiveSyncTopic topic, @Nullable String accessToken, @Nullable UUID activeOrgUnitId) {
+    return authorize(topic, accessToken, activeOrgUnitId, null);
+  }
+
+  /**
+   * Decides whether a subscribe to {@code topic} is authorized, additionally consulting the
+   * authorities captured at handshake for a locally role-gated global room (the {@code bank} staff
+   * and {@code orgunit-bank} rooms).
+   *
+   * @param topic the parsed topic being subscribed to
+   * @param accessToken the OAuth2 access token captured at handshake, or {@code null}
+   * @param activeOrgUnitId the active-org-unit pin captured at handshake, or {@code null}
+   * @param authorities the authorities captured at handshake for a local role check, or {@code
+   *     null} when none were captured (then a locally role-gated room fails open)
+   * @return {@link Decision#ALLOW} to accept the subscribe (including every fail-open case), or
+   *     {@link Decision#DENY} on an explicit backend refusal (resource/dual-resource topic), a
+   *     withheld capability (capability topic), or a missing required role (local topic)
+   */
+  @NotNull
+  public Decision authorize(
+      @NotNull LiveSyncTopic topic,
+      @Nullable String accessToken,
+      @Nullable UUID activeOrgUnitId,
+      @Nullable Set<String> authorities) {
+    Set<String> requiredAnyRole = topic.topicClass().requiredAnyRole();
+    if (requiredAnyRole != null) {
+      // Local, backend-free role check against the handshake-captured authorities (bank staff /
+      // orgunit-bank). A missing capture fails open (opaque keys only; each fragment re-pull
+      // re-authorizes per viewer through the servlet path).
+      if (authorities == null) {
+        return Decision.ALLOW;
+      }
+      for (String role : requiredAnyRole) {
+        if (authorities.contains(role)) {
+          return Decision.ALLOW;
+        }
+      }
+      log.debug(
+          "Live-sync subscribe denied for local-role topic {} (none of {} held)",
+          topic.canonical(),
+          requiredAnyRole);
+      return Decision.DENY;
+    }
     String probePath = topic.topicClass().authProbePath();
     if (probePath == null) {
       // Authenticated-only global room: nothing to probe.
@@ -117,11 +160,12 @@ public class LiveSyncSubscriptionAuthorizer {
       return Decision.ALLOW;
     }
     if (topic.resourceId() != null) {
+      String resource = topic.resourceId().toString();
+      String fallbackTemplate = topic.topicClass().fallbackProbePath();
+      String fallbackUri =
+          fallbackTemplate == null ? null : fallbackTemplate.replace("{id}", resource);
       return probeResource(
-          topic,
-          probePath.replace("{id}", topic.resourceId().toString()),
-          accessToken,
-          activeOrgUnitId);
+          topic, probePath.replace("{id}", resource), fallbackUri, accessToken, activeOrgUnitId);
     }
     String capabilityField = topic.topicClass().capabilityField();
     if (capabilityField != null) {
@@ -134,8 +178,38 @@ public class LiveSyncSubscriptionAuthorizer {
   }
 
   /**
-   * Runs a per-resource authorization read (a scoped class): a 2xx allows, an explicit 403/404
-   * denies, anything else (401/5xx/timeout/transport) fails open.
+   * Runs a per-resource authorization read, with a fallback: the primary read decides unless it
+   * <b>explicitly</b> refuses (403/404), in which case the {@code fallbackUri} (when present)
+   * decides — so a dual-read class ({@link LiveSyncTopicClass#BANK_ACCOUNT}) is denied only when
+   * both reads explicitly refuse. A primary 2xx or a primary transient failure (fail-open) short-
+   * circuits without touching the fallback.
+   *
+   * @param topic the topic (for logging)
+   * @param primaryUri the resolved primary resource read URI
+   * @param fallbackUri the resolved fallback read URI, or {@code null} when the class has none
+   * @param accessToken the captured bearer
+   * @param activeOrgUnitId the captured pin, or {@code null}
+   * @return the verdict
+   */
+  private Decision probeResource(
+      LiveSyncTopic topic,
+      String primaryUri,
+      @Nullable String fallbackUri,
+      String accessToken,
+      UUID activeOrgUnitId) {
+    Decision primary = probeOne(topic, primaryUri, accessToken, activeOrgUnitId);
+    if (primary != Decision.DENY || fallbackUri == null) {
+      // ALLOW (2xx or a transient fail-open) is final; an explicit DENY with no fallback is final.
+      return primary;
+    }
+    // The primary explicitly refused (403/404); the org-unit fallback read decides — a 2xx there
+    // allows, a second explicit refusal denies, a transient failure fails open.
+    return probeOne(topic, fallbackUri, accessToken, activeOrgUnitId);
+  }
+
+  /**
+   * Runs a single per-resource authorization read: a 2xx allows, an explicit 403/404 denies,
+   * anything else (401/5xx/timeout/transport) fails open.
    *
    * @param topic the topic (for logging)
    * @param uri the resolved resource read URI
@@ -143,7 +217,7 @@ public class LiveSyncSubscriptionAuthorizer {
    * @param activeOrgUnitId the captured pin, or {@code null}
    * @return the verdict
    */
-  private Decision probeResource(
+  private Decision probeOne(
       LiveSyncTopic topic, String uri, String accessToken, UUID activeOrgUnitId) {
     try {
       liveSyncAuthWebClient

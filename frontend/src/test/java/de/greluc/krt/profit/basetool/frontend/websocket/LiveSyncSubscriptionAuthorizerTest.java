@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.frontend.logging.ActiveSquadronRelayFilter;
 import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncSubscriptionAuthorizer.Decision;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import okhttp3.mockwebserver.MockResponse;
@@ -203,6 +204,91 @@ class LiveSyncSubscriptionAuthorizerTest {
 
     assertThat(authorizer.authorize(orders, null, PIN)).isEqualTo(Decision.ALLOW);
     assertThat(server.getRequestCount()).isZero();
+  }
+
+  // ── Bank account dual resource probe (staff read, org-unit fallback) ─────────────────────────
+
+  @Test
+  void authorize_bankAccountPrimary2xx_allows_withoutTouchingTheFallback() throws Exception {
+    LiveSyncTopic bank = LiveSyncTopic.parse("bank:" + UUID.randomUUID());
+    server.enqueue(new MockResponse().setResponseCode(200).setBody("{}"));
+
+    assertThat(authorizer.authorize(bank, TOKEN, PIN)).isEqualTo(Decision.ALLOW);
+    RecordedRequest request = server.takeRequest(2, TimeUnit.SECONDS);
+    assertThat(request).isNotNull();
+    assertThat(request.getPath()).isEqualTo("/api/v1/bank/accounts/" + bank.resourceId());
+    // A 2xx staff read is final — the org-unit fallback is never issued.
+    assertThat(server.getRequestCount()).isEqualTo(1);
+  }
+
+  @Test
+  void authorize_bankAccountPrimaryDeniesButFallbackAllows() throws Exception {
+    LiveSyncTopic bank = LiveSyncTopic.parse("bank:" + UUID.randomUUID());
+    server.enqueue(new MockResponse().setResponseCode(403)); // not bank staff
+    server.enqueue(new MockResponse().setResponseCode(200).setBody("{}")); // but an org-unit owner
+
+    assertThat(authorizer.authorize(bank, TOKEN, PIN)).isEqualTo(Decision.ALLOW);
+    RecordedRequest primary = server.takeRequest(2, TimeUnit.SECONDS);
+    assertThat(primary.getPath()).isEqualTo("/api/v1/bank/accounts/" + bank.resourceId());
+    RecordedRequest fallback = server.takeRequest(2, TimeUnit.SECONDS);
+    assertThat(fallback.getPath())
+        .isEqualTo("/api/v1/org-units/bank/accounts/" + bank.resourceId());
+  }
+
+  @Test
+  void authorize_bankAccountBothReadsRefuse_denies() {
+    LiveSyncTopic bank = LiveSyncTopic.parse("bank:" + UUID.randomUUID());
+    server.enqueue(new MockResponse().setResponseCode(404));
+    server.enqueue(new MockResponse().setResponseCode(403));
+
+    assertThat(authorizer.authorize(bank, TOKEN, PIN)).isEqualTo(Decision.DENY);
+  }
+
+  // ── Local role-gated global rooms (bank staff / orgunit-bank) — no backend call ──────────────
+
+  @Test
+  void authorize_bankStaffWithBankEmployeeRole_allows_withoutProbing() {
+    LiveSyncTopic staff = LiveSyncTopic.parse("bank");
+    assertThat(authorizer.authorize(staff, TOKEN, PIN, Set.of("ROLE_BANK_EMPLOYEE")))
+        .isEqualTo(Decision.ALLOW);
+    assertThat(server.getRequestCount()).isZero();
+  }
+
+  @Test
+  void authorize_bankStaffWithManagementRoleOnly_allows() {
+    LiveSyncTopic staff = LiveSyncTopic.parse("bank");
+    assertThat(authorizer.authorize(staff, TOKEN, PIN, Set.of("ROLE_BANK_MANAGEMENT")))
+        .isEqualTo(Decision.ALLOW);
+  }
+
+  @Test
+  void authorize_bankStaffWithoutABankRole_denies_withoutProbing() {
+    LiveSyncTopic staff = LiveSyncTopic.parse("bank");
+    assertThat(authorizer.authorize(staff, TOKEN, PIN, Set.of("ROLE_KRT_MEMBER")))
+        .isEqualTo(Decision.DENY);
+    assertThat(server.getRequestCount()).isZero();
+  }
+
+  @Test
+  void authorize_bankStaffNullAuthorities_failsOpen() {
+    // A capture miss fails open (opaque keys only; the fragment GET re-authorizes per viewer).
+    LiveSyncTopic staff = LiveSyncTopic.parse("bank");
+    assertThat(authorizer.authorize(staff, TOKEN, PIN, null)).isEqualTo(Decision.ALLOW);
+  }
+
+  @Test
+  void authorize_orgUnitBankWithMemberRole_allows() {
+    LiveSyncTopic orgUnit = LiveSyncTopic.parse("orgunit-bank");
+    assertThat(authorizer.authorize(orgUnit, TOKEN, PIN, Set.of("ROLE_KRT_MEMBER")))
+        .isEqualTo(Decision.ALLOW);
+    assertThat(server.getRequestCount()).isZero();
+  }
+
+  @Test
+  void authorize_orgUnitBankWithOnlyGuestRole_denies() {
+    LiveSyncTopic orgUnit = LiveSyncTopic.parse("orgunit-bank");
+    assertThat(authorizer.authorize(orgUnit, TOKEN, PIN, Set.of("ROLE_GUEST")))
+        .isEqualTo(Decision.DENY);
   }
 
   private static MockResponse jsonResponse(String body) {

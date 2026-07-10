@@ -63,7 +63,7 @@ public record LiveSyncTopic(
     int colon = raw.indexOf(':');
     String prefix = (colon < 0) ? raw : raw.substring(0, colon);
     String idPart = (colon < 0) ? null : raw.substring(colon + 1);
-    LiveSyncTopicClass topicClass = classForPrefix(prefix);
+    LiveSyncTopicClass topicClass = classForPrefix(prefix, idPart != null);
     if (topicClass == null) {
       return null;
     }
@@ -86,21 +86,31 @@ public record LiveSyncTopic(
   }
 
   /**
-   * Resolves the topic class whose {@link LiveSyncTopicClass#prefix()} equals {@code prefix}. When
-   * a prefix is shared between a global and a scoped class ({@code bank}), the caller's id segment
-   * decides which — so this returns the class matching the requested scope: the scoped class if an
-   * id is present, otherwise the global one. Returns {@code null} for an unknown prefix.
+   * Resolves the topic class whose {@link LiveSyncTopicClass#prefix()} equals {@code prefix} and
+   * whose scope matches the request. When a prefix is shared between a global and a scoped class
+   * ({@code bank} → {@link LiveSyncTopicClass#BANK_STAFF} global vs {@link
+   * LiveSyncTopicClass#BANK_ACCOUNT} scoped), the caller's id segment decides which: the scoped
+   * class when an id segment is present, the global one otherwise. Returns {@code null} for an
+   * unknown prefix or when no class of the requested scope uses it (e.g. {@code orders:{id}} — a
+   * scoped request on a prefix that only has a global class).
    *
    * @param prefix the wire prefix (never {@code null})
-   * @return the matching class, or {@code null} if no class uses that prefix
+   * @param hasIdSegment whether the raw topic carried a {@code :id} segment
+   * @return the matching class, or {@code null} if no class of the requested scope uses that prefix
    */
   @Nullable
-  private static LiveSyncTopicClass classForPrefix(@NotNull String prefix) {
+  private static LiveSyncTopicClass classForPrefix(@NotNull String prefix, boolean hasIdSegment) {
+    LiveSyncTopicClass scopedMatch = null;
+    LiveSyncTopicClass globalMatch = null;
     for (LiveSyncTopicClass candidate : LiveSyncTopicClass.values()) {
       if (candidate.prefix().equals(prefix)) {
-        return candidate;
+        if (candidate.scoped()) {
+          scopedMatch = candidate;
+        } else {
+          globalMatch = candidate;
+        }
       }
     }
-    return null;
+    return hasIdSegment ? scopedMatch : globalMatch;
   }
 }

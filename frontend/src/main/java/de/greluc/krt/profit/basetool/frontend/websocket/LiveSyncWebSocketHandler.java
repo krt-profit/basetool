@@ -42,8 +42,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.web.socket.CloseStatus;
@@ -158,6 +160,14 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    * interceptor can populate it.
    */
   public static final String ATTR_ACTIVE_ORG_UNIT = "livesync.activeOrgUnit";
+
+  /**
+   * Session-attribute key ({@code Set<String>}) holding the caller's authorities captured at
+   * handshake, used to authorize a subscribe to a locally role-gated global room (the {@code bank}
+   * staff and {@code orgunit-bank} rooms) without a backend call. Public so the interceptor can
+   * populate it.
+   */
+  public static final String ATTR_AUTHORITIES = "livesync.authorities";
 
   /**
    * Session-attribute key holding a multiplexed socket's set of subscribed canonical topics (a
@@ -599,8 +609,9 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     subs.add(topic.canonical());
     String token = (String) session.getAttributes().get(ATTR_ACCESS_TOKEN);
     UUID pin = session.getAttributes().get(ATTR_ACTIVE_ORG_UNIT) instanceof UUID u ? u : null;
+    Set<String> authorities = capturedAuthorities(session);
     try {
-      authExecutor.execute(() -> authorizeAndRegister(session, topic, token, pin));
+      authExecutor.execute(() -> authorizeAndRegister(session, topic, token, pin, authorities));
     } catch (RejectedExecutionException e) {
       // Auth executor saturated: fail open (opaque keys only; each fragment re-pull re-authorizes).
       droppedCounter(topic, MetricNames.DROPPED_AUTHORIZE_SATURATED).increment();
@@ -617,12 +628,17 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    * @param topic the topic being authorized
    * @param token the captured OAuth2 access token (may be {@code null})
    * @param pin the captured active-org-unit pin (may be {@code null})
+   * @param authorities the captured authorities for a local role check (may be {@code null})
    */
   private void authorizeAndRegister(
-      @NotNull WebSocketSession session, @NotNull LiveSyncTopic topic, String token, UUID pin) {
+      @NotNull WebSocketSession session,
+      @NotNull LiveSyncTopic topic,
+      String token,
+      UUID pin,
+      Set<String> authorities) {
     LiveSyncSubscriptionAuthorizer.Decision decision;
     try {
-      decision = authorizer.authorize(topic, token, pin);
+      decision = authorizer.authorize(topic, token, pin, authorities);
     } catch (RuntimeException e) {
       log.debug(
           "Live-sync subscribe authorization threw for {}; failing open", topic.canonical(), e);
@@ -850,6 +866,27 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     // ATTR_SUBSCRIPTIONS is only ever written as a ConcurrentHashMap keySet of topic strings.
     Object value = session.getAttributes().get(ATTR_SUBSCRIPTIONS);
     return value instanceof Set ? (Set<String>) value : null;
+  }
+
+  /**
+   * Resolves the authorities captured at handshake ({@link #ATTR_AUTHORITIES}) as a {@code
+   * Set<String>}, or {@code null} when none were captured — then a locally role-gated subscribe
+   * fails open. Rebuilt (rather than cast) so no unchecked cast is needed reading the untyped
+   * attribute map.
+   *
+   * @param session the session
+   * @return the captured authority names, or {@code null}
+   */
+  @Nullable
+  private static Set<String> capturedAuthorities(@NotNull WebSocketSession session) {
+    Object value = session.getAttributes().get(ATTR_AUTHORITIES);
+    if (!(value instanceof Set<?> raw)) {
+      return null;
+    }
+    return raw.stream()
+        .filter(String.class::isInstance)
+        .map(String.class::cast)
+        .collect(Collectors.toUnmodifiableSet());
   }
 
   /**

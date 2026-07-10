@@ -21,7 +21,9 @@ package de.greluc.krt.profit.basetool.frontend.websocket;
 
 import de.greluc.krt.profit.basetool.frontend.logging.ActiveSquadronContext;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -29,6 +31,7 @@ import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.http.server.ServletServerHttpRequest;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
@@ -51,7 +54,10 @@ import org.springframework.web.socket.server.HandshakeInterceptor;
  *       like {@code NotificationPageController.stream} — never triggering a refresh that Keycloak's
  *       reuse-detection would punish, REQ-SEC-012); and
  *   <li>the active-org-unit pin ({@link ActiveSquadronContext}), so a probe scopes exactly like the
- *       page's own reads.
+ *       page's own reads; and
+ *   <li>the caller's authorities, so a subscribe to a locally role-gated global room (the {@code
+ *       bank} staff and {@code orgunit-bank} rooms) can be authorized without a backend call on a
+ *       message thread that has no {@code SecurityContext}.
  * </ul>
  *
  * <p>Both are stashed in the future session's attributes for {@code LiveSyncSubscriptionAuthorizer}
@@ -96,6 +102,17 @@ public class LiveSyncSyncHandshakeInterceptor implements HandshakeInterceptor {
     }
     try {
       Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+      if (authentication != null) {
+        // Capture the caller's authorities verbatim (the frontend does a literal authority match —
+        // no role hierarchy) so a later subscribe to a locally role-gated global room (the bank
+        // staff / orgunit-bank rooms) can be authorized on a WebSocket message thread that has no
+        // SecurityContext. Never logged.
+        Set<String> authorities =
+            authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toUnmodifiableSet());
+        attributes.put(LiveSyncWebSocketHandler.ATTR_AUTHORITIES, authorities);
+      }
       if (authentication != null && request instanceof ServletServerHttpRequest servletRequest) {
         OAuth2AuthorizedClient client =
             authorizedClientRepository.loadAuthorizedClient(

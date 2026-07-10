@@ -28,7 +28,9 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.frontend.logging.ActiveSquadronContext;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,6 +42,7 @@ import org.springframework.http.server.ServletServerHttpResponse;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
@@ -103,6 +106,26 @@ class LiveSyncSyncHandshakeInterceptorTest {
     interceptor.beforeHandshake(request, response, wsHandler, attributes);
 
     assertThat(attributes.get(LiveSyncWebSocketHandler.ATTR_ACCESS_TOKEN)).isEqualTo("tok-123");
+  }
+
+  @Test
+  void capturesAuthoritiesVerbatim() {
+    SecurityContextHolder.getContext()
+        .setAuthentication(
+            new UsernamePasswordAuthenticationToken(
+                "user",
+                "n/a",
+                List.of(
+                    new SimpleGrantedAuthority("ROLE_BANK_EMPLOYEE"),
+                    new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))));
+
+    interceptor.beforeHandshake(request, response, wsHandler, attributes);
+
+    Object captured = attributes.get(LiveSyncWebSocketHandler.ATTR_AUTHORITIES);
+    assertThat(captured).isInstanceOf(Set.class);
+    assertThat((Set<?>) captured)
+        .extracting(Object::toString)
+        .containsExactlyInAnyOrder("ROLE_BANK_EMPLOYEE", "ROLE_KRT_MEMBER");
   }
 
   @Test

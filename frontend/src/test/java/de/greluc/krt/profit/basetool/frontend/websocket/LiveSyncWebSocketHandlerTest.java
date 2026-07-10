@@ -86,7 +86,7 @@ class LiveSyncWebSocketHandlerTest {
     // Default: authorize any subscribe. Individual tests override to DENY where they need it. The
     // executor is direct (Runnable::run) so an async subscribe-authorize completes synchronously in
     // the test thread — the saturation path uses a throwing executor instead.
-    when(authorizer.authorize(any(), any(), any()))
+    when(authorizer.authorize(any(), any(), any(), any()))
         .thenReturn(LiveSyncSubscriptionAuthorizer.Decision.ALLOW);
     handler =
         new LiveSyncWebSocketHandler(
@@ -448,7 +448,7 @@ class LiveSyncWebSocketHandlerTest {
 
   @Test
   void multiplexedSubscribe_denied_refusesAndCounts() throws Exception {
-    when(authorizer.authorize(any(), any(), any()))
+    when(authorizer.authorize(any(), any(), any(), any()))
         .thenReturn(LiveSyncSubscriptionAuthorizer.Decision.DENY);
     FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
     subscribe(bob, operationTopic());
@@ -533,7 +533,7 @@ class LiveSyncWebSocketHandlerTest {
     SimpleMeterRegistry reg2 = new SimpleMeterRegistry();
     LiveSyncPresenceService svc2 = new LiveSyncPresenceService(reg2);
     LiveSyncSubscriptionAuthorizer denyAll = mock(LiveSyncSubscriptionAuthorizer.class);
-    when(denyAll.authorize(any(), any(), any()))
+    when(denyAll.authorize(any(), any(), any(), any()))
         .thenReturn(LiveSyncSubscriptionAuthorizer.Decision.DENY);
     LiveSyncWebSocketHandler saturated =
         new LiveSyncWebSocketHandler(
