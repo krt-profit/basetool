@@ -712,13 +712,16 @@
     }
 
     /**
-     * Resolves a bank live-sync account placeholder to a concrete account id: `account` from the
-     * form's dedicated publish-only `data-livesync-account` (or, on the movement modal, its
-     * submitted `data-account-id`), `destination` from an enabled non-empty `destinationAccountId`
-     * (a transfer target). Returns null when the form has no such account (e.g. a deposit has no
-     * transfer destination) so the entry is skipped. `data-livesync-account` is read only here and
-     * never enters the submit body (submitBankForm reads `data-account-id`), so tagging a form for
-     * publishing never changes its money write.
+     * Resolves a bank live-sync account placeholder to a concrete account id. `account`: the form's
+     * dedicated publish-only `data-livesync-account`, else its submitted `data-account-id` (the
+     * movement modal), else a primed `_livesyncAccount` field (the confirm modal, filled per-row by
+     * primeModal). `destination`: an enabled non-empty submitted `destinationAccountId` (a movement
+     * transfer target), else a primed `_livesyncDestination` field (a confirm of a transfer
+     * request). Returns null when the form has no such account (e.g. a deposit / a non-transfer
+     * confirm has no destination) so the entry is skipped. None of these are read into the submit
+     * body (`data-livesync-account` is an attribute; the `_livesync*` fields are `_`-prefixed, so
+     * submitBankForm treats them as unused endpoint placeholders), so tagging a form for publishing
+     * never changes its money write.
      *
      * @param {HTMLFormElement} form the form whose write just succeeded
      * @param {string} ref the placeholder name (`account` or `destination`)
@@ -726,14 +729,17 @@
      */
     function resolveBankLiveSyncAccount(form, ref) {
         if (ref === 'account') {
+            const primed = form.querySelector('[name="_livesyncAccount"]');
             return (
                 form.getAttribute('data-livesync-account') ||
                 form.getAttribute('data-account-id') ||
-                null
+                (primed && primed.value ? primed.value : null)
             );
         }
         if (ref === 'destination') {
-            const el = form.querySelector('[name="destinationAccountId"]');
+            const el =
+                form.querySelector('[name="destinationAccountId"]') ||
+                form.querySelector('[name="_livesyncDestination"]');
             return el && !el.disabled && el.value ? el.value : null;
         }
         return null;

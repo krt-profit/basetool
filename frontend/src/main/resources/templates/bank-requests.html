@@ -145,7 +145,7 @@
                             <button type="button" class="btn btn--cta btn-sm"
                                     data-trigger="open-modal-display" data-modal-id="bank-confirm-request-modal"
                                     data-testid="bank-request-confirm-btn"
-                                    th:attr="data-field-_id=${r.id()},data-field-version=${r.version()},data-field-reqlabel=${r.accountNo()},data-field-reqtype=${r.type()},data-field-reqamount=${r.amount()},data-field-requiresownerapproval=${r.requiresOwnerApproval()},data-field-ownerapprovalgranted=${r.ownerApprovalGranted()},data-field-splitenabled=${r.splitEnabled()},data-field-splitpercent=${r.splitPercent()},data-field-justification=${r.justification()}"
+                                    th:attr="data-field-_id=${r.id()},data-field-version=${r.version()},data-field-reqlabel=${r.accountNo()},data-field-reqtype=${r.type()},data-field-reqamount=${r.amount()},data-field-requiresownerapproval=${r.requiresOwnerApproval()},data-field-ownerapprovalgranted=${r.ownerApprovalGranted()},data-field-splitenabled=${r.splitEnabled()},data-field-splitpercent=${r.splitPercent()},data-field-justification=${r.justification()},data-field-_livesyncaccount=${r.accountId()},data-field-_livesyncdestination=${r.targetAccountId() != null ? r.targetAccountId() : ''}"
                                     th:text="#{bank.request.action.confirm}">Best&auml;tigen</button>
                             <button type="button" class="btn btn-ghost btn-sm"
                                     data-trigger="open-modal-display" data-modal-id="bank-reject-request-modal"
@@ -190,11 +190,17 @@
                         data-modal-id="bank-confirm-request-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
             </div>
             <form class="bank-ajax-form no-track" data-refresh="requestQueue"
-                  data-livesync="bank/requestQueue,grid orgunit-bank/orgUnitBank"
+                  data-livesync="bank/requestQueue,grid orgunit-bank/orgUnitBank bank:@account/account,bookings,chart bank:@destination/account,bookings,chart"
                   data-endpoint="/api/proxy/bank/requests/{id}/confirm" data-method="POST">
                 <div class="krt-modal-body">
                     <input type="hidden" name="_id">
                     <input type="hidden" name="version">
+                    <!-- Publish-only account ids (REQ-FE-015): primed per-row by primeModal from the
+                         confirm trigger so a confirmed booking also re-renders the affected account's
+                         detail room for its viewers. `_`-prefixed, so submitBankForm never sends them
+                         in the confirm body; _livesyncDestination stays empty for a non-transfer. -->
+                    <input type="hidden" name="_livesyncAccount">
+                    <input type="hidden" name="_livesyncDestination">
                     <p class="text-muted"><span data-bank-label="reqlabel">KB-0001 &middot; Einzahlung 5.000</span></p>
 
                     <!-- Split deposit notice (REQ-BANK-043): shown when the request distributes a
