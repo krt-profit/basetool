@@ -164,6 +164,19 @@ class UserControllerTest {
   }
 
   @Test
+  void searchUsers_nullQuery_matchesAllViaEmptyFilter() {
+    // The remoteSource picker fires an empty ?query= on a browse-mode open, which the emptyAsNull
+    // string binder collapses to null; the controller must normalise it to the match-all empty
+    // filter rather than reject it as a missing required param (#1193).
+    when(userService.searchByUsername(eq(""), any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of()));
+
+    controller.searchUsers(null, null, null, null);
+
+    verify(userService).searchByUsername(eq(""), any(Pageable.class));
+  }
+
+  @Test
   void searchUsers_wrapsServicePageIntoPageResponse() {
     User entity = new User();
     UserDto dto = mockDto(UUID.randomUUID());
