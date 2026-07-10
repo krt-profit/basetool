@@ -235,6 +235,7 @@
                     quality: el.getAttribute('data-quality'),
                     amount: el.getAttribute('data-amount'),
                     available: el.getAttribute('data-available'),
+                    quantityType: el.getAttribute('data-quantity-type'),
                     remark: el.getAttribute('data-remark'),
                 },
                 swapBoard,

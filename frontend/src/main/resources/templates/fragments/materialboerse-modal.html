@@ -41,7 +41,7 @@
                     <div class="mb-modal-amount-row">
                         <input id="mb-amount" data-mb-amount type="number" min="0" step="0.001"
                                inputmode="decimal" th:aria-label="#{materialboerse.modal.offeredAmount.label}"/>
-                        <span class="mb-modal-amount-unit" th:text="#{materialboerse.unit.scu}">SCU</span>
+                        <span class="mb-modal-amount-unit" data-mb-amount-unit th:text="#{material.quantity.scu}">SCU</span>
                         <button type="button" class="btn btn-ghost btn-xs" data-mb-amount-max
                                 th:text="#{materialboerse.modal.offeredAmount.all}">Alles</button>
                     </div>
@@ -85,6 +85,8 @@
             charCounter: /*[[#{materialboerse.modal.remark.counter}]]*/ '{0} / 20.000',
             pickerEmpty: /*[[#{materialboerse.modal.material.empty}]]*/ 'Keine freigebbaren Lager-Posten gefunden.',
             pickerAlready: /*[[#{materialboerse.modal.material.already}]]*/ 'bereits auf der Börse',
+            unitScu: /*[[#{material.quantity.scu}]]*/ 'SCU',
+            unitPiece: /*[[#{material.quantity.piece}]]*/ 'Stück',
             conflict: window.materialboerseI18n && window.materialboerseI18n.conflict ? window.materialboerseI18n.conflict : {
                 title: /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt',
                 reloadDetailFallback: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Neu laden.',

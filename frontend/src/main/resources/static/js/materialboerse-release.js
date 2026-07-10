@@ -26,6 +26,7 @@
         offerId: null,
         version: null,
         available: null,
+        quantityType: null,
         onDone: null,
         onCancel: null,
     };
@@ -77,12 +78,27 @@
         });
     }
 
-    function formatScu(amount) {
+    /**
+     * Formats an amount in the material's own unit: an integer count + the piece unit for a PIECE
+     * material, otherwise the up-to-3-decimal SCU rendering. Fixes issue #1182, where every offer
+     * was shown as SCU regardless of the material's quantity type. The unit labels come from
+     * window.materialboerseI18n (localized), with ASCII fallbacks only if the bootstrap is absent.
+     */
+    function formatAmount(amount, quantityType) {
         let n = Number(amount);
         if (isNaN(n)) {
             return String(amount);
         }
-        return n.toLocaleString('de-DE', { maximumFractionDigits: 3 }) + ' SCU';
+        if (quantityType === 'PIECE') {
+            return (
+                n.toLocaleString('de-DE', { maximumFractionDigits: 0 }) +
+                ' ' +
+                (i18n.unitPiece || 'Stk')
+            );
+        }
+        return (
+            n.toLocaleString('de-DE', { maximumFractionDigits: 3 }) + ' ' + (i18n.unitScu || 'SCU')
+        );
     }
 
     function setFacts(material, quality) {
@@ -95,17 +111,24 @@
 
     /**
      * Sets the editable offered-amount field: its current value, the max the owner may offer (the
-     * item's current stock, kept in state.available for validation), and the "max. X verfügbar"
-     * hint. A null max disables the input (release-new mode before an item is picked).
+     * item's current stock, kept in state.available for validation), the unit label + step for the
+     * material's quantity type (SCU vs PIECE, #1199/#1182), and the "max. X verfügbar" hint. A null
+     * max disables the input (release-new mode before an item is picked).
      * @param value the initial offered amount, or '' / null for empty.
      * @param max the item's current stock as the ceiling, or null for "unknown / disabled".
      */
     function setAmountField(value, max) {
         let input = q('[data-mb-amount]');
         let hint = q('[data-mb-amount-hint]');
+        let unit = q('[data-mb-amount-unit]');
+        let isPiece = state.quantityType === 'PIECE';
         let maxNum = max == null || max === '' ? NaN : Number(max);
         state.available = isNaN(maxNum) ? null : maxNum;
+        if (unit) {
+            unit.textContent = isPiece ? i18n.unitPiece || 'Stück' : i18n.unitScu || 'SCU';
+        }
         if (input) {
+            input.step = isPiece ? '1' : '0.001';
             if (state.available != null) {
                 input.max = String(state.available);
                 input.disabled = false;
@@ -119,7 +142,10 @@
         if (hint) {
             hint.textContent =
                 state.available != null
-                    ? fmt(i18n.amountMax || 'max. {0} verfügbar', formatScu(state.available))
+                    ? fmt(
+                          i18n.amountMax || 'max. {0} verfügbar',
+                          formatAmount(state.available, state.quantityType),
+                      )
                     : '';
         }
     }
@@ -169,9 +195,10 @@
     /**
      * Opens the modal.
      * @param mode 'new' | 'lager' | 'edit'
-     * @param ctx {itemId?, material?, quality?, amount?, available?, offerId?, version?, remark?} —
-     *        for 'edit', amount is the current offered quantity and available is the item's total
-     *        stock (the ceiling); for 'lager'/'new' amount is the item's stock (the default + max).
+     * @param ctx {itemId?, material?, quantityType?, quality?, amount?, available?, offerId?,
+     *        version?, remark?} — quantityType drives the SCU/PIECE unit; for 'edit', amount is the
+     *        current offered quantity and available is the item's total stock (the ceiling); for
+     *        'lager'/'new' amount is the item's stock (the default + max).
      * @param doneOrOpts either an onDone callback(body), or {onDone, onCancel} — onCancel fires when
      *        the dialog is dismissed without submitting (e.g. to revert a Lager checkbox).
      */
@@ -191,6 +218,7 @@
             offerId: ctx.offerId || null,
             version: ctx.version || null,
             available: null,
+            quantityType: ctx.quantityType || null,
             onDone: onDone,
             onCancel: onCancel,
         };
@@ -263,6 +291,7 @@
             offerId: null,
             version: null,
             available: null,
+            quantityType: null,
             onDone: null,
             onCancel: null,
         };
@@ -322,7 +351,7 @@
                     'Q ' +
                     it.quality +
                     ' · ' +
-                    formatScu(it.amount) +
+                    formatAmount(it.amount, it.quantityType) +
                     (it.locationName ? ' · ' + escapeHtml(it.locationName) : '') +
                     (it.alreadyReleased ? ' · ' + escapeHtml(i18n.pickerAlready || '') : '');
                 return (
@@ -330,6 +359,8 @@
                     it.inventoryItemId +
                     '" data-material="' +
                     escapeHtml(it.materialName) +
+                    '" data-quantity-type="' +
+                    escapeHtml(it.quantityType) +
                     '" data-quality="' +
                     it.quality +
                     '" data-amount="' +
@@ -347,9 +378,11 @@
 
     function pickItem(li) {
         state.itemId = li.getAttribute('data-item-id');
+        state.quantityType = li.getAttribute('data-quantity-type');
         let amount = li.getAttribute('data-amount');
         setFacts(li.getAttribute('data-material'), li.getAttribute('data-quality'));
-        // Offer the whole picked row by default; its stock is the ceiling.
+        // Offer the whole picked row by default; its stock is the ceiling. setAmountField reads
+        // state.quantityType (just set) to render the SCU/PIECE unit + step.
         setAmountField(amount, amount);
         let input = q('[data-mb-picker-input]');
         if (input) {

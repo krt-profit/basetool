@@ -112,7 +112,10 @@
                             <span class="mb-mrow-meta">
                                 <span th:text="'Q ' + ${offer.quality()}">Q 0</span>
                                 <span class="mb-dot">·</span>
-                                <span th:text="${#numbers.formatDecimal(offer.amount(), 1, 'POINT', 3, 'DEFAULT')} + ' ' + #{materialboerse.unit.scu}">0 SCU</span>
+                                <span th:switch="${offer.material().quantityType()}">
+                                    <span th:case="'PIECE'" th:text="${#numbers.formatInteger(offer.amount(), 1)} + ' ' + #{material.quantity.piece}">0 Stück</span>
+                                    <span th:case="*" th:text="${#numbers.formatDecimal(offer.amount(), 1, 'POINT', 3, 'DEFAULT')} + ' ' + #{material.quantity.scu}">0 SCU</span>
+                                </span>
                                 <span class="mb-dot">·</span>
                                 <span data-mb-ago th:data-ts="${offer.releasedAt()}" th:text="${offer.releasedAt()}">vor …</span>
                             </span>
@@ -155,7 +158,7 @@
 
                             <div class="facts-bar mb-dp-facts">
                                 <span><span class="fact-k" th:text="#{materialboerse.facts.quality}">Qualität</span><span class="fact-v" th:text="${offer.quality()}">0</span></span>
-                                <span><span class="fact-k" th:text="#{materialboerse.facts.amount}">Menge</span><span class="fact-v" th:text="${#numbers.formatDecimal(offer.amount(), 1, 'POINT', 3, 'DEFAULT')} + ' ' + #{materialboerse.unit.scu}">0 SCU</span></span>
+                                <span><span class="fact-k" th:text="#{materialboerse.facts.amount}">Menge</span><span class="fact-v" th:switch="${offer.material().quantityType()}"><span th:case="'PIECE'" th:text="${#numbers.formatInteger(offer.amount(), 1)} + ' ' + #{material.quantity.piece}">0 Stück</span><span th:case="*" th:text="${#numbers.formatDecimal(offer.amount(), 1, 'POINT', 3, 'DEFAULT')} + ' ' + #{material.quantity.scu}">0 SCU</span></span></span>
                                 <span><span class="fact-k" th:text="#{materialboerse.facts.released}">Freigegeben</span><span class="fact-v" data-mb-ago th:data-ts="${offer.releasedAt()}" th:text="${offer.releasedAt()}">vor …</span></span>
                             </div>
 
@@ -201,6 +204,7 @@
                                                     th:data-offer-id="${offer.id()}" th:data-version="${offer.version()}"
                                                     th:data-material="${offer.material().name()}" th:data-quality="${offer.quality()}"
                                                     th:data-amount="${offer.amount()}" th:data-available="${offer.availableAmount()}"
+                                                    th:data-quantity-type="${offer.material().quantityType()}"
                                                     th:data-remark="${offer.remark()}">
                                                 <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg>
                                                 <span th:text="#{materialboerse.action.editRemark}">Angebot bearbeiten</span>

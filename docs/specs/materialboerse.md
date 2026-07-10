@@ -21,12 +21,17 @@ decisions are recorded in ADR-0082.
 
 Every `ACTIVE` offer is visible to every real member (`KRT_MEMBER`) regardless of the offer's owning
 org unit — the board is a single org-wide marketplace, not staffel-scoped. Authenticated-but-roleless
-guests do **not** see the board. The board shows per offer: material, quality (0–1000), quantity
-(SCU), the anbieter (username) + squadron badge, when it was released, and the interessenten count.
+guests do **not** see the board. The board shows per offer: material, quality (0–1000), quantity in
+the material's own unit (SCU for bulk materials, Stück/piece for `PIECE` materials — never a
+hardcoded SCU), the anbieter (username) + squadron badge, when it was released, and the interessenten
+count.
 
 **Acceptance**
 - [ ] A `KRT_MEMBER` sees offers from every squadron; a `GUEST` gets 403 on `/materialboerse`.
 - [ ] The board read applies no OrgUnit scope filter.
+- [ ] A `PIECE` material's quantity renders as an integer count in the piece unit, an SCU material's
+with the SCU unit — the amount unit follows `Material.quantityType`, matching the Lager
+(#1182).
 
 **Enforced by:** `MaterialExchangeServiceTest`, `MaterialboersePageControllerMvcTest` · **Code:**
 `MaterialExchangeService#board`, `MaterialExchangeController`, `MaterialboersePageController`
@@ -36,17 +41,17 @@ guests do **not** see the board. The board shows per offer: material, quality (0
 A member releases one of **their own** Lager rows via the "Für Börse freigeben" checkbox on Mein
 Lager or the "Material anbieten" CTA on the board. Release opens the offer dialog: a read-only fact
 strip (material · quality as a plain number), an **editable offered-quantity field** ("Menge
-anbieten" in SCU, defaulting to the row's full stock with an "Alles" shortcut) + a Markdown textarea
-(≤ 20 000 characters, live counter). Material and quality are read **live** from the linked
-`InventoryItem`; the **offered quantity is the owner's choice** — the whole row or only a part of it
-(ADR-0086), validated server-side to be **positive and at most the item's current amount** (the
-client never sets material/quality). Releasing an item that already has an active offer
-re-activates/updates its offered amount and remark rather than duplicating (one active offer per
-item). The board **never advertises more than is in stock**: the effective quantity shown, filtered
-and sorted is `min(offeredAmount, current stock)`, so the offer shrinks as the row is partially
-booked out (ADR-0086, clamp-on-read). A **fully** booked-out row is deleted by the inventory book-out
-paths (delete-on-depletion), which cascade-deletes the offer (V210 `ON DELETE CASCADE`) — so a dead,
-zero-stock offer never lingers; no separate "hide depleted" pass is needed.
+anbieten" in the material's own unit — SCU or Stück/piece, #1182 — defaulting to the row's full stock
+with an "Alles" shortcut) + a Markdown textarea (≤ 20 000 characters, live counter). Material and
+quality are read **live** from the linked `InventoryItem`; the **offered quantity is the owner's
+choice** — the whole row or only a part of it (ADR-0086), validated server-side to be **positive and
+at most the item's current amount** (the client never sets material/quality). Releasing an item that
+already has an active offer re-activates/updates its offered amount and remark rather than duplicating
+(one active offer per item). The board **never advertises more than is in stock**: the effective
+quantity shown, filtered and sorted is `min(offeredAmount, current stock)`, so the offer shrinks as
+the row is partially booked out (ADR-0086, clamp-on-read). A **fully** booked-out row is deleted by
+the inventory book-out paths (delete-on-depletion), which cascade-deletes the offer (V210 `ON DELETE
+CASCADE`) — so a dead, zero-stock offer never lingers; no separate "hide depleted" pass is needed.
 
 **Acceptance**
 - [ ] Releasing another member's item is rejected (403).
@@ -173,6 +178,38 @@ with no location or interessent identity crossing the socket.
 
 **Enforced by:** code review, CI Playwright (e2e) · **Code:** the Materialbörse presence relay +
 `materialboerse.js` receiver
+
+### REQ-MARKET-011 — Notify the owner when a member registers interest
+
+When a member registers interest in an offer (REQ-MARKET-006), the offer's owner (the Anbieter)
+receives an in-app notification so they learn about the interested party without polling the board
+(#1187). This reuses the data-driven notification engine (REQ-NOTIF-007, ADR-0015) exactly like the
+bank booking-request decision (REQ-NOTIF-011): the release path publishes a
+`MaterialExchangeInterestRegisteredEvent` carrying the owner as the directed recipient
+(`contextRecipientSub`), and a seeded default rule (V211) resolves it through a single
+`EVENT_RECIPIENT` selector with `exclude_actor = TRUE`. The notification is emitted **only** on a
+genuinely new registration — a duplicate/idempotent registration (REQ-MARKET-006) emits nothing — and
+after the registration transaction commits (REQ-NOTIF-002), so a rolled-back registration produces no
+phantom notification. The interessent's name is carried as a render parameter: this is a permitted
+disclosure because the notification reaches **only** the owner, consistent with REQ-MARKET-006's
+owner-only interessenten anonymity, and no location or interessent identity crosses the board
+live-sync socket (REQ-MARKET-010). The rule stays admin-editable/-deletable at runtime; adding the
+`MATERIAL_EXCHANGE_INTEREST_REGISTERED` event/notification types needs no schema migration (open
+enums, REQ-NOTIF-003).
+
+**Acceptance**
+- [ ] Registering interest in an active offer notifies the offer owner (after commit), excluding the
+registering member.
+- [ ] A duplicate registration emits no second notification; withdrawing and re-registering emits a
+fresh one.
+- [ ] The notification renders via `notifications.type.MATERIAL_EXCHANGE_INTEREST_REGISTERED` (DE +
+EN + base bundles, `{interessent}`/`{material}` placeholders).
+
+**Enforced by:** `MaterialExchangeServiceTest`, `RuleEvaluationServiceTest`,
+`MessageBundleConsistencyTest` · **Code:**
+`MaterialExchangeService#registerInterestInNewTransaction`,
+`event/MaterialExchangeInterestRegisteredEvent`, `model/NotificationEventType`,
+`model/NotificationType`, `db/migration/V211__seed_material_exchange_interest_notification_rule.sql`
 
 ## Out of scope
 

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.event.MaterialExchangeInterestRegisteredEvent;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
@@ -57,6 +58,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -109,6 +111,14 @@ public class MaterialExchangeService {
   private final AuditService auditService;
   private final UserMapper userMapper;
   private final SquadronMapper squadronMapper;
+
+  /**
+   * Publishes the {@link MaterialExchangeInterestRegisteredEvent} that drives the owner's
+   * interest-registered notification (#1187, REQ-MARKET-011). The after-commit notification
+   * listener consumes it, so the publish stays a side-effect-free scalar hand-off inside the
+   * registration transaction (REQ-NOTIF-002).
+   */
+  private final ApplicationEventPublisher eventPublisher;
 
   /**
    * Self-reference used only to run {@link #registerInterestInNewTransaction(UUID, UUID)} in a
@@ -375,7 +385,10 @@ public class MaterialExchangeService {
   /**
    * The transactional insert behind {@link #registerInterest(UUID)}, run in a fresh transaction so
    * a unique-constraint violation aborts only this transaction (the orchestrator catches it).
-   * Public so the Spring proxy applies the {@code REQUIRES_NEW} propagation.
+   * Public so the Spring proxy applies the {@code REQUIRES_NEW} propagation. On a genuinely new
+   * registration it publishes a {@link MaterialExchangeInterestRegisteredEvent} so the after-commit
+   * notification listener alerts the offer's owner (#1187, REQ-MARKET-011); a duplicate
+   * registration returns early and publishes nothing.
    *
    * @param offerId the offer to register interest in.
    * @param viewerId the registering member.
@@ -411,6 +424,18 @@ public class MaterialExchangeService {
         materialLabel(offer.getInventoryItem()),
         offer.getOwner() == null ? null : offer.getOwner().getId(),
         AuditDetails.of("offer", offerId));
+    // Notify the owner about the new interested party (#1187, REQ-MARKET-011). Published only on a
+    // genuinely new registration (the idempotent-duplicate return above skips it), inside this
+    // transaction so the after-commit listener never fires for a rolled-back registration.
+    if (offer.getOwner() != null) {
+      eventPublisher.publishEvent(
+          new MaterialExchangeInterestRegisteredEvent(
+              offerId,
+              materialLabel(offer.getInventoryItem()),
+              viewer.getEffectiveName(),
+              offer.getOwner().getId(),
+              viewerId));
+    }
   }
 
   /**
@@ -478,6 +503,7 @@ public class MaterialExchangeService {
                 new MaterialExchangeReleasableItemDto(
                     item.getId(),
                     item.getMaterial().getName(),
+                    item.getMaterial().getQuantityType(),
                     item.getQuality(),
                     item.getAmount(),
                     item.getLocation() == null ? null : item.getLocation().getName(),

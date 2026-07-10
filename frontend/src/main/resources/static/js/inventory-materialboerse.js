@@ -38,6 +38,7 @@
                     material: el.getAttribute('data-material'),
                     quality: el.getAttribute('data-quality'),
                     amount: el.getAttribute('data-amount'),
+                    quantityType: el.getAttribute('data-quantity-type'),
                 },
                 {
                     onDone: function () {
