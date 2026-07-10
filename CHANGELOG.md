@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Fehler behoben: Wiederkehrende WARN-Meldung im Frontend-Log entfernt.** Spring Data warnte bei jedem Seitenaufruf, ein `@ModelAttribute`-Parameter des Staffel-Kontexts sei „nicht mit @ProjectedPayload annotiert" — ein Fehlalarm, da es sich um normale Listen und nicht um Projektionen handelt. Die im Frontend ohnehin ungenutzte Spring-Data-Web-Unterstützung wird jetzt nicht mehr geladen, wodurch die Fehlmeldung an der Wurzel entfällt (statt nur den Logger stummzuschalten) (#1202).
+
 ## [v1.2.6](https://github.com/krt-profit/basetool/releases/tag/v1.2.6) - 2026-07-09
 
 ### Added
