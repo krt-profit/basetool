@@ -45,8 +45,9 @@ import org.springframework.stereotype.Service;
  * service to mark every local user NOT in that set as missing — that is how deletions in Keycloak
  * get reflected locally without a hard {@code DELETE}. The completeness of the fetched set is a
  * hard prerequisite (REQ-SEC-018): a truncated list would soft-delete every real member beyond the
- * page cap, which is why {@code fetchUsers()} pages and an empty result is treated as "skip" (never
- * a wipe).
+ * page cap, which is why {@code fetchUsers} pages and an empty result is treated as "skip" (never a
+ * wipe) — including when a role-membership read fails transiently, so a degraded, role-stripped set
+ * is never persisted as a successful run.
  */
 @Service
 @RequiredArgsConstructor

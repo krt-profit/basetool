@@ -576,12 +576,31 @@ roles instead of the user count. The completeness invariant above is unchanged: 
 from the paged `GET /users`; role-indexing only changes how the roster is *annotated* with roles, never
 which users are considered present.
 
+**The local catalog is matched case-insensitively against the realm's actual role names.** Keycloak's
+`GET /roles/{name}/users` lookup is case-sensitive, so the sync first lists the realm's real role names
+(paged `GET /roles`) and matches the local mappable names against them ignoring case (mirroring the
+interactive JWT path's `findByNameIgnoreCase`), then queries members under Keycloak's own casing. This
+removes a scheduled-vs-interactive casing asymmetry: a role whose Keycloak name differs only in case
+from the local name is still resolved, not silently dropped.
+
+**A role-membership read failure is fail-safe: it skips the run, never degrades the write.** Because a
+role-stripped set would misclassify holders — mapping a brand-new admin to the `Guest` fallback and
+creating it `PENDING` instead of `ACTIVE`, or mass-downgrading existing admins — a transient failure of
+any role read (5xx, 401/403, timeout, malformed body) propagates to `fetchUsers`' top-level catch and
+skips the whole run (empty roster → "skip", never a wipe, never a degraded persist), exactly like a
+roster-page failure. Only a clean `404` on a single role's member read (a benign TOCTOU: the role
+vanished after the `GET /roles` listing named it) is swallowed — that role contributes no members and
+the run continues.
+
 **Acceptance** (`KeycloakServiceTest`): with a page size of 2 and three users across two pages,
 `fetchUsers` returns all three, the first request binds `first=0&max=2`, and the second advances to
-`first=2`; and with role `ADMIN` listing user A, A's DTO carries `ADMIN` resolved from
-`/roles/ADMIN/users`.
+`first=2`; with realm role `ADMIN` listing user A, A's DTO carries `ADMIN` resolved from
+`/roles/ADMIN/users`; a realm role spelled `admin` still resolves the app's `ADMIN` (case-insensitive);
+a 5xx on a role's member read yields an empty result (run skipped, no degraded roles); and a clean 404
+on a role's member read keeps the roster with that role simply absent.
 
 **Enforced by:** `KeycloakServiceTest` · **Code:** `KeycloakService.fetchAllUsers`,
+`KeycloakService.fetchRealmRoleNames`, `KeycloakService.fetchRoleMemberships`,
 `KeycloakSyncProperties.pageSize`, `UserSyncTask`
 
 ### REQ-SEC-015 — Bereich/OL leadership grants officer-equivalent reach, never admin rights

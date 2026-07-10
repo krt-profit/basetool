@@ -39,6 +39,8 @@
 
 - **Fehler behoben: Die RED-Panels im Tracing-Dashboard zeigten „No data" mit Fehlerhinweis.** Die drei Panels (Request-Rate, p95-Latenz, Fehlerrate) liefen als TraceQL-Metrics-Abfragen gegen Tempo, was den nicht aktivierten `local-blocks`-Prozessor voraussetzt. Sie beziehen ihre Werte jetzt — nach Route gruppiert — aus den vorhandenen `http_server_requests`-Histogrammen (Prometheus), denselben Serien wie die Latenz-/5xx-Alarme. Kein zusätzlicher Speicher-, Tempo-Neustart- oder Reihen-Aufwand; die Trace-Tabellen „Slow traces"/„Error traces" bleiben unverändert an Tempo (ADR-0076).
 
+- **Fehler behoben: Ein vorübergehender Keycloak-Fehler während der täglichen Nutzer-Synchronisation stuft keine Konten mehr falsch ein.** Schlug beim rollenindizierten Sync das Auslesen der Mitglieder einer Rolle vorübergehend fehl (Timeout/5xx), wurde diese Rolle bisher stillschweigend allen Inhabern entzogen — ein neu angelegtes Admin-Konto konnte so als „ausstehend" in der Freigabe-Warteschlange landen und bestehende Admins wurden kurzzeitig herabgestuft. Ein solcher Fehler überspringt jetzt den ganzen Lauf (kein degradiertes Schreiben), und die Rollenzuordnung ist gegen Groß-/Kleinschreibungs-Unterschiede zwischen lokalem Katalog und Keycloak abgesichert (REQ-SEC-018).
+
 ## [v1.2.6](https://github.com/krt-profit/basetool/releases/tag/v1.2.6) - 2026-07-09
 
 ### Added

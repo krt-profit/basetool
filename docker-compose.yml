@@ -211,7 +211,7 @@ x-keycloak: &keycloak-template
     # SPI to capture each member's per-guild server nickname for the admin approval queue. The `:-`
     # default makes it optional — when unset the SPI skips nickname capture (fail-open); it never
     # affects the login. Put the value in .env (it is not a secret). The two Keycloak mappers that
-    # surface it are operator steps in docs/keycloak/DISCORD_KEYCLOAK_SETUP.md §3c.
+    # surface it are operator steps in docs/keycloak/DISCORD_KEYCLOAK_SETUP.md §3d.
     DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
     # Optional (REQ-SEC-022, ADR-0051): the Discord first-login account-existence precheck. When the
     # URL + shared secret are set, the SPI asks the backend over HTTPS whether a Basetool account
