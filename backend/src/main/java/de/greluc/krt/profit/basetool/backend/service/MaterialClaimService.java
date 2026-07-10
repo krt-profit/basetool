@@ -72,7 +72,10 @@ import org.springframework.transaction.annotation.Transactional;
  * by {@code minQuality}, an {@code ITEM} order sums {@link JobOrderItemMaterial} per quality). The
  * service enforces every invariant the data layer cannot: claims live only on SK orders, the sum
  * across squadrons never exceeds the bucket's required amount (no overclaim), and a squadron holds
- * at most one claim per bucket (a repeat post updates rather than duplicates).
+ * at most one claim per bucket (a repeat post updates rather than duplicates). The no-overclaim
+ * invariant is a cross-row aggregate, so it is made concurrency-safe with a pessimistic lock on the
+ * order (the claims' aggregate root) taken before the already-claimed sum is read — see {@link
+ * #upsertClaim} (REQ-ORDERS-024, ADR-0092).
  *
  * <p>Claims are an independent aggregate — there is no mapped collection on {@link JobOrder}, so
  * the reconciliation hooks ({@link #withdrawAllForOrderWithinTransaction} on SK→Squadron
@@ -239,6 +242,17 @@ public class MaterialClaimService {
    * squadron must itself be profit-eligible (only Profit-side squadrons take part in the order
    * workflow).
    *
+   * <p><b>No cross-squadron overclaim under concurrency.</b> The no-overclaim guard sums the
+   * bucket's claims across <em>all</em> squadrons — a cross-row aggregate the unique index cannot
+   * protect. Two DIFFERENT squadrons racing their first claim on one bucket would each read a zero
+   * already-claimed sum under {@code READ COMMITTED} (the other's uncommitted INSERT is invisible)
+   * and both commit past the required amount, and because {@code uq_material_claim_bucket_org_unit}
+   * keys per claiming squadron the two rows never collide. {@link #upsertClaimWithinTransaction}
+   * therefore takes a {@code PESSIMISTIC_WRITE} row lock on the order — the claims' aggregate root,
+   * via {@code JobOrderRepository.lockForClaimUpsert} — before reading that sum: claimants of one
+   * order serialise, so the loser reads the winner's committed claim and its guard rejects the
+   * overclaim (REQ-ORDERS-024, ADR-0092).
+   *
    * <p><b>Last-writer-wins under concurrency, for real.</b> The {@code material_claim} row carries
    * a JPA {@code @Version} (via {@code AbstractEntity}) <em>and</em> a unique index {@code
    * uq_material_claim_bucket_org_unit} on {@code (job_order_id, material_id, quality_requirement,
@@ -253,7 +267,10 @@ public class MaterialClaimService {
    * boolean toggle the {@code @Version} is kept and echoed to the client through {@link ClaimDto} —
    * a genuine concurrent same-squadron edit that outlasts the retry bound still surfaces a truthful
    * 409, never a 500 (found in the optimistic-lock audit for #1186, pre-existing on the claim
-   * sign-up path).
+   * sign-up path). Now that the pessimistic order lock above serialises an order's claim writers,
+   * this retry is a defense-in-depth backstop rather than the primary guard — it still covers a
+   * same-row race the order lock does not serialise, e.g. an upsert whose row is deleted by a
+   * concurrent {@link #withdrawClaim} between the find-or-create and the save.
    *
    * @param jobOrderId the order.
    * @param dto the claim payload.
@@ -327,6 +344,15 @@ public class MaterialClaimService {
               + " quality="
               + dto.qualityRequirement());
     }
+
+    // Serialise every claim upsert on this order on its aggregate-root (job_order) row BEFORE
+    // summing the bucket's existing claims (REQ-ORDERS-024, ADR-0092). Two DIFFERENT squadrons
+    // racing their first claim on the same bucket would otherwise each read a zero already-claimed
+    // sum under READ COMMITTED (the other's uncommitted INSERT is invisible), both pass the guard
+    // below and both commit — and because uq_material_claim_bucket_org_unit keys per claiming
+    // squadron it never collides across squadrons, so the REQUIRES_NEW retry cannot catch that
+    // cross-squadron overclaim. The row lock releases at this attempt's commit/rollback.
+    jobOrderRepository.lockForClaimUpsert(jobOrderId);
 
     double amount = dto.amount();
     double claimedByOthers =
