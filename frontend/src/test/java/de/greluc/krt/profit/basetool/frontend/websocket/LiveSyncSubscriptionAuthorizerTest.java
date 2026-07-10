@@ -129,6 +129,32 @@ class LiveSyncSubscriptionAuthorizerTest {
     assertThat(request.getHeader("Authorization")).isEqualTo("Bearer " + TOKEN);
   }
 
+  @Test
+  void authorize_orderResourceProbe_allows2xx_andTargetsThePerOrderRead() throws Exception {
+    // The `order:{id}` detail room authorizes via GET /api/v1/orders/{id}. A requesting owner who
+    // reaches their own order through the requester escape (REQ-ORDERS-023) gets a redacted 2xx and
+    // is allowed (a foreign order would 403/404 and deny). The probe targets the per-order read,
+    // exactly like the page's own load — distinct from the global `orders` queue's capability
+    // probe.
+    LiveSyncTopic order = LiveSyncTopic.parse("order:" + UUID.randomUUID());
+    server.enqueue(new MockResponse().setResponseCode(200).setBody("{}"));
+
+    assertThat(authorizer.authorize(order, TOKEN, PIN)).isEqualTo(Decision.ALLOW);
+    RecordedRequest request = server.takeRequest(2, TimeUnit.SECONDS);
+    assertThat(request).isNotNull();
+    assertThat(request.getPath()).isEqualTo("/api/v1/orders/" + order.resourceId());
+    assertThat(request.getHeader("Authorization")).isEqualTo("Bearer " + TOKEN);
+  }
+
+  @Test
+  void authorize_orderResourceProbe_403_denies() {
+    // A foreign order the caller may not read denies the subscribe.
+    LiveSyncTopic order = LiveSyncTopic.parse("order:" + UUID.randomUUID());
+    server.enqueue(new MockResponse().setResponseCode(403));
+
+    assertThat(authorizer.authorize(order, TOKEN, PIN)).isEqualTo(Decision.DENY);
+  }
+
   // ── Global-room capability probe (the `orders` queue: canViewJobOrders) ──────────────────────
 
   @Test

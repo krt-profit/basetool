@@ -492,6 +492,31 @@ class JobOrderPageControllerNoReloadMvcTest {
   }
 
   @Test
+  void viewOrderDetail_AssigneesFragment_RendersTheAssigneesSection() throws Exception {
+    // The order:{id} live-sync receiver refreshes the `assignees` section via GET
+    // /orders/{id}?fragment=assignees (REQ-FE-015). The fragment switch must map it to the
+    // assigneesSection fragment (HTTP 200, section-sized, no page chrome), not fall through to the
+    // whole page — the new case added alongside the ORDER topic class.
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+        .thenReturn(materialOrder(orderId, 1L));
+
+    var result =
+        mockMvc
+            .perform(
+                get("/orders/" + orderId)
+                    .param("fragment", "assignees")
+                    .with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn();
+
+    String html = result.getResponse().getContentAsString();
+    assertThat(html).as("assignees section fragment root").contains("id=\"assignees-section\"");
+    assertThat(html).as("no page chrome in the section fragment").doesNotContain("<main");
+  }
+
+  @Test
   void viewOrderDetail_FragmentBackendError_ReturnsNonRedirectErrorFragment() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();

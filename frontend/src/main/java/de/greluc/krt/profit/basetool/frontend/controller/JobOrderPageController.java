@@ -587,6 +587,7 @@ public class JobOrderPageController {
         case "item-handovers" -> "orders-detail :: itemHandoverSection";
         case "item-handover-lines" -> "orders-detail :: itemHandoverLines";
         case "blueprint-owners" -> "orders-detail :: blueprintOwnersSection";
+        case "assignees" -> "orders-detail :: assigneesSection";
         default -> "orders-detail";
       };
     }

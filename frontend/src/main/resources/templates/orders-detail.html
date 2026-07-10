@@ -474,6 +474,12 @@
              section's outerHTML is replaced. -->
         <!-- The wrapper makes the heading a :first-child, which zeroes .section-title's 2rem top
              margin — restore it here so the section keeps the same gap as its unwrapped siblings. -->
+        <!-- #order-assignees-results is the live-sync swap container (REQ-FE-015): the order:{id}
+             receiver re-renders `assignees` into it via GET /orders/{id}?fragment=assignees, while
+             the actor's own oaSend keeps its bespoke outerHTML swap of the inner #assignees-section
+             (the fragment root). The wrapper carries the requesterView gate so the container is
+             absent — and the peer refresh skips it — for a redacted requester view. -->
+        <div id="order-assignees-results" th:unless="${requesterView}">
         <div id="assignees-section" th:fragment="assigneesSection" th:data-order-id="${order.id}" style="margin-top: 2rem;" th:unless="${requesterView}">
         <h3 class="section-title" th:text="#{orders.detail.assignees.title}">Bearbeiter</h3>
         <div class="flex-col-gap">
@@ -537,6 +543,7 @@
                     <button type="button" class="btn btn-ghost" data-trigger="oa-add-user" th:text="#{orders.detail.assignees.addUser}">Hinzufügen</button>
                 </div>
             </div>
+        </div>
         </div>
         </div>
 
@@ -1144,6 +1151,13 @@
     const I18N_NOTE_CONFLICT = /*[[#{orders.detail.assignees.note.conflict}]]*/ 'Der Eintrag wurde zwischenzeitlich ge\u00e4ndert. Bitte lade die Seite neu.';
     const I18N_NOTE_FORBIDDEN = /*[[#{orders.detail.assignees.note.forbidden}]]*/ 'Du darfst diesen Eintrag nicht bearbeiten.';
     const I18N_NOTE_FOR = /*[[#{orders.detail.assignees.note.for}]]*/ 'Notiz f\u00fcr {0}';
+
+    // Live multi-user sync (REQ-FE-010 / REQ-FE-015, ADR-0092): window.orderId keys the order:{id}
+    // room the detail page subscribes to; the two strings feed the deferred-refresh pill and the
+    // section-refresh error toast consumed by the order seam in orders-detail.js.
+    window.orderId = /*[[${order.id}]]*/ null;
+    const KRT_ORDER_LIVESYNC_UPDATES = /*[[#{livesync.updates_available}]]*/ 'Aktualisierungen verf\u00fcgbar';
+    const KRT_ORDER_SECTION_REFRESH_ERROR = /*[[#{orders.section.refresh.error}]]*/ 'Der Abschnitt konnte nicht aktualisiert werden. Bitte Seite neu laden.';
 </script>
 <script th:src="@{/js/orders-detail.js}" th:attr="nonce=${cspNonce}"></script>
 </body>

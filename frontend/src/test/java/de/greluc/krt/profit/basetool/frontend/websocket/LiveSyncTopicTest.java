@@ -56,6 +56,28 @@ class LiveSyncTopicTest {
   }
 
   @Test
+  void parse_acceptsScopedOrderTopic_andDistinguishesItFromTheOrdersQueue() {
+    UUID id = UUID.randomUUID();
+
+    LiveSyncTopic order = LiveSyncTopic.parse("order:" + id);
+    assertThat(order).isNotNull();
+    assertThat(order.topicClass()).isEqualTo(LiveSyncTopicClass.ORDER);
+    assertThat(order.resourceId()).isEqualTo(id);
+    assertThat(order.canonical()).isEqualTo("order:" + id);
+
+    // The near-identical `order`/`orders` stem must NOT collide: a scoped `order:{id}` is the
+    // detail
+    // room, while the bare `orders` is the global staff-queue room — distinct classes, keyed apart
+    // by
+    // prefix and the presence of the id segment.
+    LiveSyncTopic queue = LiveSyncTopic.parse("orders");
+    assertThat(queue).isNotNull();
+    assertThat(queue.topicClass()).isEqualTo(LiveSyncTopicClass.ORDERS_QUEUE);
+    // The `order` detail room is scoped, so the bare prefix (no id) is rejected.
+    assertThat(LiveSyncTopic.parse("order")).isNull();
+  }
+
+  @Test
   void parse_acceptsGlobalOrdersQueueTopic() {
     LiveSyncTopic topic = LiveSyncTopic.parse("orders");
 

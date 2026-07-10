@@ -93,6 +93,33 @@ public enum LiveSyncTopicClass {
       null),
 
   /**
+   * Per-order room: the job-order detail page (#1102). No editor-presence dots; a subscribe is
+   * authorized by the same authenticated {@code GET /api/v1/orders/{id}} the page performs — a
+   * requesting owner who reaches the order through the requester escape (REQ-ORDERS-023) gets a
+   * redacted 2xx and is allowed, while a foreign order answers 403/404 and is denied. Distinct from
+   * the {@link #ORDERS_QUEUE} global room despite the shared {@code order}/{@code orders} stem:
+   * {@link LiveSyncTopic#parse(String)} keys them apart by prefix and the presence of the id
+   * segment.
+   */
+  ORDER(
+      "order",
+      true,
+      Set.of(
+          "header",
+          "materials",
+          "aggregated",
+          "items",
+          "handovers",
+          "item-handovers",
+          "item-handover-lines",
+          "blueprint-owners",
+          "assignees"),
+      false,
+      "order",
+      "/api/v1/orders/{id}",
+      null),
+
+  /**
    * Global job-order queue room: the {@code /orders} list (#1102). A subscribe is authorized by the
    * caller's {@code canViewJobOrders} capability (a non-profit requester / guest who only sees
    * their own orders is refused), so the {@link #authProbePath} is the capabilities endpoint and
