@@ -39,4 +39,4 @@ import java.util.List;
 public record JobOrderItemHandoverCreateDto(
     @NotNull Instant handoverTime,
     @NotBlank @Size(max = 255) String recipientHandle,
-    @NotEmpty @Valid List<JobOrderItemHandoverEntryCreateDto> entries) {}
+    @NotEmpty List<@Valid JobOrderItemHandoverEntryCreateDto> entries) {}

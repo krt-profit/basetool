@@ -28,5 +28,5 @@ import lombok.Data;
 /** Form-binding object for Refinery Order Store input. */
 @Data
 public class RefineryOrderStoreForm {
-  @NotEmpty @Valid private List<RefineryOrderStoreItemForm> items = new ArrayList<>();
+  @NotEmpty private List<@Valid RefineryOrderStoreItemForm> items = new ArrayList<>();
 }

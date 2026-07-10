@@ -74,7 +74,7 @@ public class RefineryOrderForm {
    */
   private UUID owningOrgUnitId;
 
-  @Valid private List<RefineryGoodForm> goods = new ArrayList<>();
+  private List<@Valid RefineryGoodForm> goods = new ArrayList<>();
 
   /** Seeds the form with one empty good row so the "add good" UI starts non-empty. */
   public RefineryOrderForm() {

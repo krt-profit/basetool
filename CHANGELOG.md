@@ -8,6 +8,8 @@
 
 - **Fehler behoben: Ein langsamer, aber erfolgreicher Backend-Aufruf wird nicht mehr als WARN protokolliert.** Erfolgreiche Aufrufe (z. B. `POST /api/v1/users/sync` mit Status 200), die nur die Langsam-Schwelle überschritten, erschienen im Log fälschlich als WARN. Sie werden jetzt als INFO mit dem Marker „Slow backend call" geführt; WARN bleibt echten Serverfehlern (5xx) und Netzwerkfehlern vorbehalten. Die Latenzüberwachung erfolgt weiterhin über das `http.client.requests`-p95-Histogramm (#1204).
 
+- **Fehler behoben: Hibernate-Warnungen aus dem Backend-Log entfernt.** Die überflüssige explizite `hibernate.dialect`-Angabe (PostgreSQL wird automatisch erkannt) wurde entfernt und die veralteten `@Valid`-Container-Annotationen auf die Typargument-Form (`List<@Valid X>`) umgestellt. Die Validierung bleibt unverändert; das Backend-Log startet nun ohne diese Warnungen (#1206).
+
 ## [v1.2.6](https://github.com/krt-profit/basetool/releases/tag/v1.2.6) - 2026-07-09
 
 ### Added
