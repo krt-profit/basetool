@@ -85,32 +85,6 @@ services:
       # This stack therefore creates new non-admins ACTIVE; the approval lifecycle itself is covered
       # by backend unit tests (UserServiceDiscordSyncTest / UserServiceApprovalTest), not e2e.
       APP_REGISTRATION_REQUIRE_APPROVAL: "false"
-      # Serve HTTP/1.1 (not HTTP/2) on the backend for the throwaway E2E stack — the same fix
-      # frontend-dev applies below (see its comment), extended to the backend server because the
-      # backend also negotiates h2 with its two clients: the frontend's server-side WebClient AND
-      # BackendSeeder's java.net.http.HttpClient (which defaults to HTTP_2 and reaches
-      # https://localhost:11261 over ALPN). Under CI load the h2 layer intermittently mangles a
-      # body-carrying write (POST/PUT/PATCH — the "Client reset the stream before the request was
-      # fully read" class): for the admin membership seed (PATCH /api/v1/users/{id}/memberships) the
-      # request reaches the resource server WITHOUT its Authorization header and is processed as
-      # `anonymous`, so the ADMIN gate 403s it — BankBookingE2eTest (and any @BeforeAll that seeds
-      # admin membership first) then fails with "Membership seeding PATCH failed: HTTP 403" while the
-      # bodyless GET /users/me on the same token authenticates fine milliseconds before and after.
-      # HTTP/1.1 has no HPACK/stream-multiplexing state to corrupt, removing the class at the source
-      # for every backend client. Transport-only: it changes neither the app nor any assertion, and
-      # prod (which keeps h2) is untouched. An env var (highest Spring property precedence) overrides
-      # application.yml's server.http2.enabled=true.
-      SERVER_HTTP2_ENABLED: "false"
-      # TEMPORARY DIAGNOSTIC (remove once the anonymous-403 seed flake is root-caused): raise the
-      # Spring Security web + resource-server loggers to DEBUG so the backend.log records WHY the
-      # admin membership PATCH resolves to `anonymous`. The distinguishing lines: "Set
-      # SecurityContextHolder to anonymous" (no bearer token reached the resolver -> a
-      # transport/header problem) vs an "Invalid bearer token"/JWT-decode failure (the token WAS
-      # present but rejected -> a JWKS/validation problem). DEBUG on these packages logs filter
-      # decisions and the authenticated principal (sub, already in our MDC) but NOT the raw token, so
-      # no new secret enters the uploaded artifacts.
-      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY_WEB: "DEBUG"
-      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY_OAUTH2_SERVER_RESOURCE: "DEBUG"
     # Drop the test stack's host.docker.internal -> host-gateway mapping so the Keycloak network
     # alias (above) resolves instead — the host-gateway route can't reach KC's 127.0.0.1-bound
     # published port on a Linux runner.

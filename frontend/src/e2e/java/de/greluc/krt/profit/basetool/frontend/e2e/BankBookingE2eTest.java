@@ -55,6 +55,9 @@ class BankBookingE2eTest {
   private static final String MGMT_PASSWORD = "test-bank-management-pw";
   private static final String EMPLOYEE_USER = "test-bank-employee";
   private static final String EMPLOYEE_PASSWORD = "test-bank-employee-pw";
+  private static final String ADMIN_USER = System.getProperty("e2e.username", "test-admin");
+  private static final String ADMIN_PASSWORD = System.getProperty("e2e.password", "test-admin-pw");
+  private static final String IRIDIUM_ID = "00000000-0000-0000-0000-000000000001";
 
   private static Playwright playwright;
   private static Browser browser;
@@ -80,8 +83,12 @@ class BankBookingE2eTest {
     String mgmtId = seeder.getUserId(MGMT_USER, MGMT_PASSWORD);
     // Give the employee a single org-unit (IRIDIUM) membership so the counterparty picker's
     // dependent Einheit select has a membership to resolve and auto-select (REQ-BANK-044, #1193
-    // follow-up: the counterparty-picker E2E below). Idempotent + harmless to the booking flows.
-    seeder.ensureIridiumMembership(EMPLOYEE_USER, EMPLOYEE_PASSWORD);
+    // follow-up: the counterparty-picker E2E below). Assigned via an ADMIN token: the membership
+    // endpoint (PATCH /users/{id}/memberships) is ADMIN-gated, so the bank employee cannot
+    // self-assign — `ensureIridiumMembership(EMPLOYEE...)` would PATCH with the employee's own
+    // non-admin token and 403. Idempotent + harmless to the booking flows.
+    seeder.assignStaffelMembership(
+        ADMIN_USER, ADMIN_PASSWORD, employeeId, IRIDIUM_ID, false, false);
 
     accountId =
         seeder.createBankAccount(MGMT_USER, MGMT_PASSWORD, "E2E Booking Account", "SPECIAL");
