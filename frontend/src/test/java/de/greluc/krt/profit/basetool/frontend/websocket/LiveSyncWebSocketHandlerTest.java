@@ -634,6 +634,37 @@ class LiveSyncWebSocketHandlerTest {
     assertThat(service.get(topic, "crew", "user-1")).isNull();
   }
 
+  @Test
+  void publishFromServer_relaysToLocalRoom_andFansOut() throws Exception {
+    // The server-side publish path (anonymous guest order create — no socket to publish from).
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    subscribe(bob, "orders");
+    bob.sent.clear();
+
+    handler.publishFromServer("orders", List.of("queue"));
+
+    assertThat(sectionsOf(lastBroadcast(bob))).containsExactly("queue");
+    assertThat(fanout.publishedTopics).containsExactly("orders");
+  }
+
+  @Test
+  void publishFromServer_dropsSectionsOutsideWhitelist() throws Exception {
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    subscribe(bob, "orders");
+    bob.sent.clear();
+
+    handler.publishFromServer("orders", List.of("bogus"));
+
+    assertThat(bob.sent).isEmpty();
+    assertThat(fanout.publishedTopics).isEmpty();
+  }
+
+  @Test
+  void publishFromServer_ignoresUnknownTopic() {
+    handler.publishFromServer("nope:not-a-topic", List.of("queue"));
+    assertThat(fanout.publishedTopics).isEmpty();
+  }
+
   // ── helpers ────────────────────────────────────────────────────────────────────────────────
 
   private static String missionTopic() {

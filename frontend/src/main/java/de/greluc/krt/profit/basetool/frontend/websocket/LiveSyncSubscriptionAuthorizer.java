@@ -21,11 +21,14 @@ package de.greluc.krt.profit.basetool.frontend.websocket;
 
 import de.greluc.krt.profit.basetool.frontend.logging.ActiveSquadronRelayFilter;
 import java.time.Duration;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
@@ -53,7 +56,10 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  * opaque section keys, and every fragment it then re-pulls is independently authorized per viewer
  * through the servlet path (with a fresh token and pin), so a stale-token or backend-blip false
  * allow leaks at most "some section of resource X changed", never its contents. A global-room class
- * ({@code authProbePath == null}) is authorized by the socket's authentication alone.
+ * either requires a capability (a capabilities read whose {@link
+ * LiveSyncTopicClass#capabilityField} must be {@code true} — a withheld flag, e.g. a non-profit
+ * requester lacking {@code canViewJobOrders}, denies; a failed read fails open) or, with no probe
+ * path at all, is authorized by the socket's authentication alone.
  */
 @Slf4j
 @Component
@@ -75,11 +81,18 @@ public class LiveSyncSubscriptionAuthorizer {
    */
   private static final Duration PROBE_TIMEOUT = Duration.ofSeconds(3);
 
+  /** Response type for a capabilities probe — a flat map of boolean capability flags. */
+  private static final ParameterizedTypeReference<Map<String, Object>> CAPABILITIES_TYPE =
+      new ParameterizedTypeReference<>() {};
+
   private final WebClient liveSyncAuthWebClient;
 
   /**
    * Decides whether a subscribe to {@code topic} is authorized for the socket owner, replaying the
-   * captured OAuth2 token and active-org-unit pin as explicit headers.
+   * captured OAuth2 token and active-org-unit pin as explicit headers. Dispatches by class: a
+   * resource-scoped topic runs a per-resource read; a global topic with a {@link
+   * LiveSyncTopicClass#capabilityField()} runs a capabilities read and requires that flag; any
+   * other global topic (no probe path) is authorized by the socket authentication alone.
    *
    * @param topic the parsed topic being subscribed to
    * @param accessToken the OAuth2 access token captured at handshake, or {@code null} if none was
@@ -87,15 +100,15 @@ public class LiveSyncSubscriptionAuthorizer {
    * @param activeOrgUnitId the active-org-unit pin captured at handshake, relayed as {@code
    *     X-Active-Org-Unit-Id} so the probe scopes exactly like the page's own read, or {@code null}
    * @return {@link Decision#ALLOW} to accept the subscribe (including every fail-open case), or
-   *     {@link Decision#DENY} on an explicit backend 403/404
+   *     {@link Decision#DENY} on an explicit backend 403/404 (resource topic) or a withheld
+   *     capability (global topic)
    */
   @NotNull
   public Decision authorize(
       @NotNull LiveSyncTopic topic, @Nullable String accessToken, @Nullable UUID activeOrgUnitId) {
     String probePath = topic.topicClass().authProbePath();
-    if (probePath == null || topic.resourceId() == null) {
-      // Global room: the socket is already authenticated; a per-role local check is layered on when
-      // such a class ships (bank staff, org-unit bank). Nothing to probe here.
+    if (probePath == null) {
+      // Authenticated-only global room: nothing to probe.
       return Decision.ALLOW;
     }
     if (accessToken == null || accessToken.isBlank()) {
@@ -103,19 +116,40 @@ public class LiveSyncSubscriptionAuthorizer {
       // subscriber still only ever receives opaque keys; each fragment re-pull re-authorizes.
       return Decision.ALLOW;
     }
-    String uri = probePath.replace("{id}", topic.resourceId().toString());
+    if (topic.resourceId() != null) {
+      return probeResource(
+          topic,
+          probePath.replace("{id}", topic.resourceId().toString()),
+          accessToken,
+          activeOrgUnitId);
+    }
+    String capabilityField = topic.topicClass().capabilityField();
+    if (capabilityField != null) {
+      return probeCapability(topic, probePath, capabilityField, accessToken, activeOrgUnitId);
+    }
+    // A global class with a probe path but neither an id nor a capability field is a
+    // misconfiguration
+    // rather than a runtime state; authenticated access suffices.
+    return Decision.ALLOW;
+  }
+
+  /**
+   * Runs a per-resource authorization read (a scoped class): a 2xx allows, an explicit 403/404
+   * denies, anything else (401/5xx/timeout/transport) fails open.
+   *
+   * @param topic the topic (for logging)
+   * @param uri the resolved resource read URI
+   * @param accessToken the captured bearer
+   * @param activeOrgUnitId the captured pin, or {@code null}
+   * @return the verdict
+   */
+  private Decision probeResource(
+      LiveSyncTopic topic, String uri, String accessToken, UUID activeOrgUnitId) {
     try {
       liveSyncAuthWebClient
           .get()
           .uri(uri)
-          .headers(
-              headers -> {
-                headers.setBearerAuth(accessToken);
-                if (activeOrgUnitId != null) {
-                  headers.set(
-                      ActiveSquadronRelayFilter.ACTIVE_ORG_UNIT_HEADER, activeOrgUnitId.toString());
-                }
-              })
+          .headers(headers -> applyAuth(headers, accessToken, activeOrgUnitId))
           .retrieve()
           .toBodilessEntity()
           .block(PROBE_TIMEOUT);
@@ -138,6 +172,65 @@ public class LiveSyncSubscriptionAuthorizer {
           topic.canonical(),
           e);
       return Decision.ALLOW;
+    }
+  }
+
+  /**
+   * Runs a capability authorization read (a global class): reads the capabilities response and
+   * requires {@code field} to be {@code true}. A withheld capability is an explicit DENY; any
+   * failure to read the capabilities (401/5xx/timeout/transport) fails open — the DENY signal is
+   * the flag being {@code false}, not the HTTP status, and the queue fragment re-authorizes per
+   * viewer anyway.
+   *
+   * @param topic the topic (for logging)
+   * @param path the capabilities endpoint
+   * @param field the boolean capability field that must be {@code true}
+   * @param accessToken the captured bearer
+   * @param activeOrgUnitId the captured pin, or {@code null}
+   * @return the verdict
+   */
+  private Decision probeCapability(
+      LiveSyncTopic topic, String path, String field, String accessToken, UUID activeOrgUnitId) {
+    try {
+      Map<String, Object> capabilities =
+          liveSyncAuthWebClient
+              .get()
+              .uri(path)
+              .headers(headers -> applyAuth(headers, accessToken, activeOrgUnitId))
+              .retrieve()
+              .bodyToMono(CAPABILITIES_TYPE)
+              .block(PROBE_TIMEOUT);
+      boolean granted = capabilities != null && Boolean.TRUE.equals(capabilities.get(field));
+      if (!granted) {
+        log.debug(
+            "Live-sync subscribe denied for global topic {} (capability {} not granted)",
+            topic.canonical(),
+            field);
+        return Decision.DENY;
+      }
+      return Decision.ALLOW;
+    } catch (RuntimeException e) {
+      log.debug(
+          "Live-sync capability probe failed for topic {}; allowing (fail-open)",
+          topic.canonical(),
+          e);
+      return Decision.ALLOW;
+    }
+  }
+
+  /**
+   * Sets the captured bearer and (when present) the active-org-unit pin header on an outbound
+   * probe.
+   *
+   * @param headers the request headers to mutate
+   * @param accessToken the captured bearer
+   * @param activeOrgUnitId the captured pin, or {@code null}
+   */
+  private static void applyAuth(
+      HttpHeaders headers, String accessToken, @Nullable UUID activeOrgUnitId) {
+    headers.setBearerAuth(accessToken);
+    if (activeOrgUnitId != null) {
+      headers.set(ActiveSquadronRelayFilter.ACTIVE_ORG_UNIT_HEADER, activeOrgUnitId.toString());
     }
   }
 }

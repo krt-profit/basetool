@@ -56,6 +56,22 @@ class LiveSyncTopicTest {
   }
 
   @Test
+  void parse_acceptsGlobalOrdersQueueTopic() {
+    LiveSyncTopic topic = LiveSyncTopic.parse("orders");
+
+    assertThat(topic).isNotNull();
+    assertThat(topic.topicClass()).isEqualTo(LiveSyncTopicClass.ORDERS_QUEUE);
+    assertThat(topic.resourceId()).isNull();
+    assertThat(topic.canonical()).isEqualTo("orders");
+  }
+
+  @Test
+  void parse_rejectsGlobalOrdersQueueTopicCarryingAnId() {
+    // `orders` is a global room; a prefixed id violates its scope.
+    assertThat(LiveSyncTopic.parse("orders:" + UUID.randomUUID())).isNull();
+  }
+
+  @Test
   void everyScopedClassExposesAnAuthProbePathWithAnIdPlaceholder() {
     for (LiveSyncTopicClass topicClass : LiveSyncTopicClass.values()) {
       if (topicClass.scoped()) {

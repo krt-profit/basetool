@@ -128,4 +128,61 @@ class LiveSyncSubscriptionAuthorizerTest {
     assertThat(request.getHeader(ActiveSquadronRelayFilter.ACTIVE_ORG_UNIT_HEADER)).isNull();
     assertThat(request.getHeader("Authorization")).isEqualTo("Bearer " + TOKEN);
   }
+
+  // ── Global-room capability probe (the `orders` queue: canViewJobOrders) ──────────────────────
+
+  @Test
+  void authorize_globalCapabilityGranted_allows_viaCapabilitiesEndpoint() throws Exception {
+    LiveSyncTopic orders = LiveSyncTopic.parse("orders");
+    server.enqueue(jsonResponse("{\"canViewJobOrders\":true}"));
+
+    assertThat(authorizer.authorize(orders, TOKEN, PIN)).isEqualTo(Decision.ALLOW);
+    RecordedRequest request = server.takeRequest(2, TimeUnit.SECONDS);
+    assertThat(request).isNotNull();
+    assertThat(request.getPath()).isEqualTo("/api/v1/me/capabilities");
+    assertThat(request.getHeader("Authorization")).isEqualTo("Bearer " + TOKEN);
+    assertThat(request.getHeader(ActiveSquadronRelayFilter.ACTIVE_ORG_UNIT_HEADER))
+        .isEqualTo(PIN.toString());
+  }
+
+  @Test
+  void authorize_globalCapabilityWithheld_denies() {
+    LiveSyncTopic orders = LiveSyncTopic.parse("orders");
+    // A non-profit requester / guest lacks canViewJobOrders — refused from the staff queue room.
+    server.enqueue(jsonResponse("{\"canViewJobOrders\":false}"));
+
+    assertThat(authorizer.authorize(orders, TOKEN, PIN)).isEqualTo(Decision.DENY);
+  }
+
+  @Test
+  void authorize_globalCapabilityAbsent_denies() {
+    LiveSyncTopic orders = LiveSyncTopic.parse("orders");
+    server.enqueue(jsonResponse("{}"));
+
+    assertThat(authorizer.authorize(orders, TOKEN, PIN)).isEqualTo(Decision.DENY);
+  }
+
+  @Test
+  void authorize_globalCapabilityProbeFails_failsOpen() {
+    LiveSyncTopic orders = LiveSyncTopic.parse("orders");
+    // The DENY signal is the flag being false, not an HTTP error — a failed read fails open.
+    server.enqueue(new MockResponse().setResponseCode(503));
+
+    assertThat(authorizer.authorize(orders, TOKEN, PIN)).isEqualTo(Decision.ALLOW);
+  }
+
+  @Test
+  void authorize_globalCapabilityNullToken_allowsWithoutProbing() {
+    LiveSyncTopic orders = LiveSyncTopic.parse("orders");
+
+    assertThat(authorizer.authorize(orders, null, PIN)).isEqualTo(Decision.ALLOW);
+    assertThat(server.getRequestCount()).isZero();
+  }
+
+  private static MockResponse jsonResponse(String body) {
+    return new MockResponse()
+        .setResponseCode(200)
+        .setHeader("Content-Type", "application/json")
+        .setBody(body);
+  }
 }

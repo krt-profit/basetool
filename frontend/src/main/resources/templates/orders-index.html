@@ -221,6 +221,8 @@
     // the orders-index.js page module loaded immediately after this bootstrap (ADR-0069).
     const KRT_ORDERS_AGE_YELLOW = /*[[${ageYellowDays}]]*/ 30;
     const KRT_ORDERS_AGE_RED = /*[[${ageRedDays}]]*/ 90;
+    const KRT_ORDERS_LIVESYNC_UPDATES = /*[[#{livesync.updates_available}]]*/ 'Aktualisierungen verfuegbar';
+    const KRT_ORDERS_SECTION_REFRESH_ERROR = /*[[#{orders.section.refresh.error}]]*/ 'Die Liste konnte nicht aktualisiert werden. Bitte Seite neu laden.';
 </script>
 <script th:src="@{/js/orders-index.js}" th:attr="nonce=${cspNonce}"></script>
 <script sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)" th:inline="javascript" th:attr="nonce=${cspNonce}">

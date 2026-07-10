@@ -43,11 +43,15 @@ import org.jetbrains.annotations.Nullable;
  *   <li>{@link #presenceEnabled} — whether this class carries editor-presence (focus/blur/heartbeat
  *       dots). Only the mission surface does today;
  *   <li>{@link #metricLabel} — the bounded {@code topic_class} metric label value (REQ-OBS-011);
- *   <li>{@link #authProbePath} — for a resource-scoped class, the authenticated backend read whose
- *       success authorizes a {@code /ws/sync} <em>subscribe</em> to a concrete topic of this class
- *       (the {@code {id}} placeholder is replaced with the topic's resource UUID). {@code null} for
- *       a global room, which is authorized by the socket's authentication alone (a per-role local
- *       check is layered on when such a class ships). See {@code LiveSyncSubscriptionAuthorizer}.
+ *   <li>{@link #authProbePath} — the authenticated backend read that authorizes a {@code /ws/sync}
+ *       <em>subscribe</em>: for a resource-scoped class the per-resource read (the {@code {id}}
+ *       placeholder is replaced with the topic's resource UUID), for a global class authorized by a
+ *       capability the capabilities endpoint whose {@link #capabilityField} is required. {@code
+ *       null} when the socket's authentication alone authorizes the subscribe. See {@code
+ *       LiveSyncSubscriptionAuthorizer};
+ *   <li>{@link #capabilityField} — for a global class authorized by a capability, the boolean flag
+ *       of the {@link #authProbePath} response that must be {@code true} (e.g. {@code
+ *       canViewJobOrders} for the {@code orders} queue); {@code null} otherwise.
  * </ul>
  *
  * <p>Note that {@code bank} and {@code bank:{accountId}} deliberately share the {@link #prefix}
@@ -72,7 +76,8 @@ public enum LiveSyncTopicClass {
           "organisation"),
       true,
       "mission",
-      "/api/v1/missions/{id}"),
+      "/api/v1/missions/{id}",
+      null),
 
   /**
    * Per-operation room: the operation detail page (#1115). No editor-presence dots; a subscribe is
@@ -84,7 +89,23 @@ public enum LiveSyncTopicClass {
       Set.of("overview", "missions", "payout", "finance"),
       false,
       "operation",
-      "/api/v1/operations/{id}");
+      "/api/v1/operations/{id}",
+      null),
+
+  /**
+   * Global job-order queue room: the {@code /orders} list (#1102). A subscribe is authorized by the
+   * caller's {@code canViewJobOrders} capability (a non-profit requester / guest who only sees
+   * their own orders is refused), so the {@link #authProbePath} is the capabilities endpoint and
+   * {@link #capabilityField} the boolean to require rather than a per-resource read.
+   */
+  ORDERS_QUEUE(
+      "orders",
+      false,
+      Set.of("queue"),
+      false,
+      "orders",
+      "/api/v1/me/capabilities",
+      "canViewJobOrders");
 
   private final String prefix;
   private final boolean scoped;
@@ -92,6 +113,7 @@ public enum LiveSyncTopicClass {
   private final boolean presenceEnabled;
   private final String metricLabel;
   private final String authProbePath;
+  private final String capabilityField;
 
   /**
    * Defines one topic class.
@@ -102,8 +124,12 @@ public enum LiveSyncTopicClass {
    * @param allowedSections the section-key whitelist the relay forwards for this class
    * @param presenceEnabled whether this class carries editor-presence dots
    * @param metricLabel the bounded {@code topic_class} metric label value
-   * @param authProbePath the authenticated backend read that authorizes a subscribe to a concrete
-   *     topic of this class ({@code {id}} → resource UUID), or {@code null} for a global room
+   * @param authProbePath the authenticated backend read that authorizes a subscribe — for a scoped
+   *     class a per-resource read with an {@code {id}} placeholder, for a global class the
+   *     capabilities endpoint whose {@link #capabilityField} is checked — or {@code null} when the
+   *     socket authentication alone authorizes the subscribe
+   * @param capabilityField for a global class authorized by a capability, the boolean field of the
+   *     {@link #authProbePath} response that must be {@code true}; {@code null} otherwise
    */
   LiveSyncTopicClass(
       @NotNull String prefix,
@@ -111,13 +137,15 @@ public enum LiveSyncTopicClass {
       @NotNull Set<String> allowedSections,
       boolean presenceEnabled,
       @NotNull String metricLabel,
-      @Nullable String authProbePath) {
+      @Nullable String authProbePath,
+      @Nullable String capabilityField) {
     this.prefix = prefix;
     this.scoped = scoped;
     this.allowedSections = allowedSections;
     this.presenceEnabled = presenceEnabled;
     this.metricLabel = metricLabel;
     this.authProbePath = authProbePath;
+    this.capabilityField = capabilityField;
   }
 
   /**
@@ -179,5 +207,17 @@ public enum LiveSyncTopicClass {
   @Nullable
   public String authProbePath() {
     return authProbePath;
+  }
+
+  /**
+   * For a global class authorized by a capability, the boolean field of the {@link #authProbePath}
+   * response that must be {@code true} for a subscribe to be allowed; {@code null} for a scoped
+   * class or a global class authorized by authentication alone.
+   *
+   * @return the required capability field name, or {@code null}
+   */
+  @Nullable
+  public String capabilityField() {
+    return capabilityField;
   }
 }

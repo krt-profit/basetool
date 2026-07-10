@@ -886,6 +886,54 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
+   * Publishes a <em>server-originated</em> {@code changed} signal (REQ-FE-015, ADR-0092): relays it
+   * to this instance's local room (no origin to exclude — there is no acting socket) and hands it
+   * to the cross-replica fan-out. This is the seam a controller uses when the mutating actor has no
+   * socket to publish from — chiefly an <b>anonymous guest order create</b>, which must still poke
+   * the staff {@code orders} queue every logged-in viewer is subscribed to. The sections are
+   * validated against the topic class's whitelist just like a client frame.
+   *
+   * @param canonicalTopic the canonical topic string (unknown topics are ignored)
+   * @param sections the section keys to relay (filtered to the class whitelist)
+   */
+  public void publishFromServer(@NotNull String canonicalTopic, @NotNull List<String> sections) {
+    LiveSyncTopic topic = LiveSyncTopic.parse(canonicalTopic);
+    if (topic == null) {
+      return;
+    }
+    List<String> allowed = retainAllowed(sections, topic.topicClass());
+    if (allowed.isEmpty()) {
+      return;
+    }
+    relayLocal(topic, allowed, null);
+    fanout.publish(topic.canonical(), allowed);
+  }
+
+  /**
+   * Keeps only the section keys that belong to a class's whitelist, de-duplicated and capped — the
+   * {@link List}-input counterpart of {@link #sanitiseSections(JsonNode, LiveSyncTopicClass)} for a
+   * server-originated publish.
+   *
+   * @param sections the raw section keys
+   * @param topicClass the class whose whitelist applies
+   * @return the accepted, de-duplicated, capped keys
+   */
+  private static List<String> retainAllowed(
+      @NotNull List<String> sections, @NotNull LiveSyncTopicClass topicClass) {
+    Set<String> allowed = topicClass.allowedSections();
+    List<String> result = new ArrayList<>();
+    for (String section : sections) {
+      if (result.size() >= MAX_CHANGED_SECTIONS) {
+        break;
+      }
+      if (section != null && allowed.contains(section) && !result.contains(section)) {
+        result.add(section);
+      }
+    }
+    return result;
+  }
+
+  /**
    * Reaper tick — drops expired presence entries from every tracked topic and broadcasts the
    * resulting snapshot to rooms that lost at least one entry. Runs on a single daemon thread; any
    * thrown exception is logged and swallowed so a transient failure does not kill the reaper.
