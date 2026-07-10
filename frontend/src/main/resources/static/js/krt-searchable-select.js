@@ -667,17 +667,27 @@
     // Builds the config for an auto-initialised combobox: shared i18n defaults from
     // `window.krtComboboxI18n`, each overridable per-control by a `data-combobox-*` attribute. Keeps
     // the shared user-picker strings in ONE place (head.html) while still letting a single control
-    // customise its wording. (Backend-backed pickers pass an explicit `remoteSource` via the direct
-    // krtSearchableSelect API instead — e.g. the orders item search.)
+    // customise its wording.
+    //
+    // A backend-backed picker opts in declaratively via the MARKER VALUE: `data-krt-combobox` set to
+    // a key registered in `window.krtComboboxRemoteSources` (e.g. `remote-users` /
+    // `remote-bank-users`, defined in krt-user-search.js) makes the picker fetch its options on
+    // demand from that source instead of filtering a preloaded list (REQ-FE-011, ADR-0053/0089,
+    // #1193). Keeps this module generic — the search URLs live in the registry, not here. (A page
+    // may still pass an explicit `remoteSource` via the direct krtSearchableSelect API — e.g. the
+    // orders item search.)
     function autoConfig(select) {
         const i18n = window.krtComboboxI18n || {};
         const d = select.dataset;
+        const remoteSources = window.krtComboboxRemoteSources || {};
+        const remoteSource = remoteSources[d.krtCombobox];
         return {
             placeholder: d.comboboxPlaceholder || i18n.placeholder,
             noResultsText: d.comboboxNoResults || i18n.noResults,
             hintText: d.comboboxHint || i18n.hint,
             invalidText: d.comboboxInvalid || i18n.invalid,
             loadingText: d.comboboxLoading || i18n.loading,
+            remoteSource: typeof remoteSource === 'function' ? remoteSource : undefined,
         };
     }
 

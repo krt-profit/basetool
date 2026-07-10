@@ -171,10 +171,13 @@
                 <div class="material-row mt-1-5">
                     <div class="form-group flex-2 mb-0">
                         <label for="ownerId" th:text="#{refineryorder.form.owner}">Besitzer</label>
+                        <!-- Server-side searchable combobox (remote-users, #1193): seed only the
+                             current owner; the roster is searched on demand. Non-logisticians keep
+                             the disabled plain select. -->
                         <select id="ownerId" th:field="*{ownerId}" required th:disabled="${!isLogistician}"
-                                th:attr="data-krt-combobox=${isLogistician ? '' : null}">
+                                th:attr="data-krt-combobox=${isLogistician ? 'remote-users' : null}">
                             <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
-                            <option th:each="user : ${users}" th:value="${user.id}" th:attr="data-search=${user.username}" th:text="${user.effectiveName}"></option>
+                            <option th:if="${refineryOrderForm.ownerId != null}" th:value="${refineryOrderForm.ownerId}" th:text="${seedUserNames.get(refineryOrderForm.ownerId)}"></option>
                         </select>
                         <input type="hidden" th:field="*{ownerId}" th:if="${!isLogistician}" />
                     </div>
@@ -420,8 +423,11 @@
                             </div>
                             <div class="form-group flex-1 mb-0">
                                 <label th:for="'storeUser_' + ${stat.index}" th:text="#{refineryorder.store.user}">Mitglied</label>
-                                <select th:id="'storeUser_' + ${stat.index}" th:field="*{items[__${stat.index}__].userId}" required data-krt-combobox>
-                                    <option th:each="u : ${users}" th:value="${u.id}" th:attr="data-search=${u.username}" th:text="${u.effectiveName}"></option>
+                                <!-- Server-side searchable combobox (remote-users, #1193): seed only
+                                     the current receiver (defaults to the caller); the roster is
+                                     searched on demand. -->
+                                <select th:id="'storeUser_' + ${stat.index}" th:field="*{items[__${stat.index}__].userId}" required data-krt-combobox="remote-users">
+                                    <option th:if="${item.userId != null}" th:value="${item.userId}" th:text="${seedUserNames.get(item.userId)}"></option>
                                 </select>
                             </div>
                         </div>
@@ -459,9 +465,9 @@
          with a fresh <select data-krt-combobox> from here (id/name stamped per index in JS) and
          re-enhances it via window.krtEnhanceComboboxes. -->
     <template id="store-user-select-tpl">
-        <select data-krt-combobox required>
-            <option th:each="u : ${users}" th:value="${u.id}" th:attr="data-search=${u.username}" th:text="${u.effectiveName}"></option>
-        </select>
+        <!-- Fresh (un-enhanced) receiver picker for a split row (#1193): no preloaded options — the
+             combobox searches /users/search on demand once krtEnhanceComboboxes upgrades it. -->
+        <select data-krt-combobox="remote-users" required></select>
     </template>
 </main>
 

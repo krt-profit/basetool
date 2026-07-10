@@ -23,7 +23,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
@@ -66,22 +65,20 @@ public class BankManagePageController {
   private static final ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>
       ORG_UNIT_OPTION_LIST_TYPE = new ParameterizedTypeReference<>() {};
 
-  /** Response type for the {@code /users/lookup} user-reference list. */
-  private static final ParameterizedTypeReference<List<UserReferenceDto>> USER_REFERENCE_LIST_TYPE =
-      new ParameterizedTypeReference<>() {};
-
   private final BackendApiClient backendApiClient;
 
   /**
    * Renders the management page with both tabs' data: all accounts (incl. balances — the
    * zero-balance rule disables the close button server-knowledge-first) and the holder registry
-   * with custody totals. The org-unit list and the user lookup feed the two creation modals.
+   * with custody totals. The org-unit list feeds the account-creation modal; the
+   * holder-registration modal's user picker is a server-side search combobox (#1193), so no user
+   * roster is preloaded.
    *
    * @param tab the active tab ({@code halter} default/first, {@code konten})
    * @param fragment when {@code "manageBody"} only the tab-nav + active panel are re-rendered after
    *     an account/holder lifecycle write (REQ-FE-005), refreshing the row plus the tab-count
-   *     aggregates in place; the creation-modal lookups (org-units, users) are then skipped because
-   *     the modals live outside the swapped region
+   *     aggregates in place; the creation-modal lookups (org-units) are then skipped because the
+   *     modals live outside the swapped region
    * @param authentication the caller's authentication, used to detect the management perspective
    * @param principal the authenticated OIDC user, used to read the caller's {@code sub} (Keycloak
    *     UUID) so the holder tab can link the caller's own holder row; {@code null} for a non-OIDC
@@ -142,22 +139,19 @@ public class BankManagePageController {
       return "bank-manage :: manageBody";
     }
 
-    // The org-unit/user lookups feed management-only modals (non-special account creation links a
-    // Bereich/OL; manual holder registration picks a user). An employee may only create SPECIAL
-    // accounts (no org unit) and cannot register holders, so those backend reads — themselves
-    // management-gated — are skipped for a plain employee (REQ-BANK-030).
+    // The org-unit lookup feeds the management-only non-special account-creation modal (it links a
+    // Bereich/OL). An employee may only create SPECIAL accounts (no org unit), so that
+    // management-gated backend read is skipped for a plain employee (REQ-BANK-030). The
+    // holder-registration modal's user picker is now a server-side search combobox (#1193,
+    // data-krt-combobox="remote-bank-users"), so no full user roster is loaded here.
     if (management) {
       List<OrgUnitMembershipOptionDto> orgUnits =
           backendApiClient.getCached(
               CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS, ORG_UNIT_OPTION_LIST_TYPE);
-      List<UserReferenceDto> users =
-          backendApiClient.get("/api/v1/users/lookup", USER_REFERENCE_LIST_TYPE);
       model.addAttribute(
           "orgUnits", orgUnits == null ? List.<OrgUnitMembershipOptionDto>of() : orgUnits);
-      model.addAttribute("users", users == null ? List.<UserReferenceDto>of() : users);
     } else {
       model.addAttribute("orgUnits", List.<OrgUnitMembershipOptionDto>of());
-      model.addAttribute("users", List.<UserReferenceDto>of());
     }
     // No transfer-fee rate is fetched here: the only booking modal on this page is the
     // holder→holder

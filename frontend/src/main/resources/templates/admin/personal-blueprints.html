@@ -32,13 +32,15 @@
     <div class="hud-box krt-personal-inventory mt-2">
         <form th:action="@{/admin/personal-blueprints}" method="get" class="krt-pi-userform no-track">
             <label for="krt-bp-user-select" th:text="#{admin.personalInventory.userSelect.label}">Mitglied</label>
-            <select id="krt-bp-user-select" name="userSub" data-trigger="submit-form" data-krt-combobox>
+            <!-- Server-side searchable combobox (remote-users, #1193): the roster is no longer
+                 preloaded; only the currently-selected member is seeded so edit mode shows their
+                 name. Typing queries /users/search on demand. -->
+            <select id="krt-bp-user-select" name="userSub" data-trigger="submit-form" data-krt-combobox="remote-users">
                 <option value="" th:text="#{admin.personalInventory.userSelect.placeholder}">-- bitte waehlen --</option>
-                <option th:each="u : ${users}"
-                        th:value="${u.id}"
-                        th:attr="data-search=${u.username}"
-                        th:selected="${selectedUserSub != null and selectedUserSub == u.id?.toString()}"
-                        th:text="${u.effectiveName != null ? u.effectiveName : u.username}">User</option>
+                <option th:if="${selectedUser != null}"
+                        th:value="${selectedUser.id}"
+                        th:selected="true"
+                        th:text="${selectedUser.effectiveName != null ? selectedUser.effectiveName : selectedUser.username}">User</option>
             </select>
         </form>
 

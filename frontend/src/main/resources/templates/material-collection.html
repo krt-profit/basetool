@@ -49,15 +49,16 @@
                     th:data-version="${entry.version}"
                     th:data-amount="${entry.quantity}">
                     <td>
+                        <!-- Server-side searchable combobox (remote-users, #1193): seed only this
+                             entry's current owner; the roster is searched on demand. -->
                         <select class="owner-select krt-select"
-                                data-role="owner-select" data-krt-combobox
+                                data-role="owner-select" data-krt-combobox="remote-users"
                                 th:data-inventory-id="${entry.inventoryEntryId}"
                                 style="min-height: 44px; width: 100%; min-width: 140px; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); padding: 0.4rem 0.5rem;">
-                            <option th:each="u : ${users}"
-                                    th:value="${u.id}"
-                                    th:attr="data-search=${u.username}"
-                                    th:text="${u.effectiveName}"
-                                    th:selected="${u.id == entry.ownerId}"></option>
+                            <option th:if="${entry.ownerId != null}"
+                                    th:value="${entry.ownerId}"
+                                    th:selected="true"
+                                    th:text="${entry.ownerName}"></option>
                         </select>
                     </td>
                     <td>

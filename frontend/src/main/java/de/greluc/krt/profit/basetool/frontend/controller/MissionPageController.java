@@ -36,7 +36,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderListDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ShipDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ShipTypeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.CrewForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.MissionForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ParticipantForm;
@@ -103,10 +102,6 @@ public class MissionPageController {
   /** Response type for the single-mission {@code /api/v1/missions/{id}} read. */
   private static final ParameterizedTypeReference<MissionDto> MISSION =
       new ParameterizedTypeReference<MissionDto>() {};
-
-  /** Response type for the {@code /api/v1/users/lookup} manager-picker reference-list read. */
-  private static final ParameterizedTypeReference<List<UserReferenceDto>> USER_REFERENCE_LIST =
-      new ParameterizedTypeReference<List<UserReferenceDto>>() {};
 
   /**
    * Response type for the paged job-type / squadron / frequency-type catalog reads, whose rows are
@@ -384,7 +379,7 @@ public class MissionPageController {
       // tripped the shared circuit breaker into a fleet-wide outage. `fullRender` (the top-level
       // page load) keeps fetching everything; a fragment fetches only its slice. The attribute->
       // fragment mapping is verified against mission-detail.html (finance attrs -> financeSection,
-      // allUsers/ownerOptions -> mgmtPanels, unitShipOptions -> unit modals) so a skipped read is
+      // ownerOptions -> mgmtPanels, unitShipOptions -> unit modals) so a skipped read is
       // never dereferenced by the fragment actually rendered.
       final boolean fullRender = fragment == null;
       final String frag = fullRender ? null : fragment.toLowerCase(java.util.Locale.ROOT);
@@ -576,23 +571,17 @@ public class MissionPageController {
       model.addAttribute("frequencyByTypeId", frequencyByTypeId);
       model.addAttribute("customFrequencies", customFrequencies);
 
-      // Fetch users + owner picker for the Verwaltung (mgmt) panel ONLY — the manager/owner selects
-      // live in the mgmtPanels fragment, so a crew/finance/overview/steps/... refetch does not need
-      // them (fragment-gating, see fullRender note above). Default to empty lists when skipped so a
-      // stray reference never NPEs.
+      // Fetch the owner/manager org-unit options for the Verwaltung (mgmt) panel ONLY — the
+      // owning-org-unit select lives in the mgmtPanels fragment, so a crew/finance/overview/...
+      // refetch does not need it (fragment-gating, see fullRender note above). Default to an empty
+      // list when skipped so a stray reference never NPEs. The owner/manager USER pickers are now
+      // server-side searchable comboboxes (remote-users, #1193) that fetch matches from
+      // /users/search on demand, so the full roster is no longer preloaded here.
       if (!authHelperService.isAnonymous() && needMgmt) {
-        try {
-          List<UserReferenceDto> allUsers =
-              backendApiClient.get("/api/v1/users/lookup", USER_REFERENCE_LIST, false);
-          model.addAttribute("allUsers", allUsers);
-        } catch (Exception e) {
-          log.warn("Could not load users for manager selection", e);
-        }
         // Owning-org-unit reassignment picker (REQ-ORG-018): the caller's assignable org units feed
         // the Verwaltung "Verantwortliche Einheit" control, mirroring the create-form owner-picker.
         model.addAttribute("ownerOptions", fetchCallerMembershipOptions(principal));
       } else {
-        model.addAttribute("allUsers", List.of());
         model.addAttribute("ownerOptions", List.of());
       }
 

@@ -89,7 +89,6 @@ class BankGrantsPageControllerTest {
     when(backendApiClient.get(eq("/api/v1/bank/grants"), anyTypeRef())).thenReturn(allGrants);
     when(backendApiClient.get(eq("/api/v1/bank/accounts?size=500"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 500, 0, 0, Collections.emptyList()));
-    when(backendApiClient.get(eq("/api/v1/users/lookup"), anyTypeRef())).thenReturn(List.of());
 
     // When
     controller.grants("employee", null, userId, null, model);
@@ -106,8 +105,8 @@ class BankGrantsPageControllerTest {
 
   // covers REQ-FE-005 (#579) — an in-place re-render (fragment=grantsMatrix) returns only the
   // matrix
-  // fragment honouring the active filter, and skips the all-grants / accounts / users lookups that
-  // feed the filter selectors and the create modal (all outside the swapped region).
+  // fragment honouring the active filter, and skips the all-grants / accounts lookups that feed the
+  // filter selectors and the create modal (all outside the swapped region).
   @Test
   void grants_fragmentGrantsMatrix_rendersOnlyMatrixFragment_andSkipsFilterAndModalLookups() {
     // Given
@@ -129,6 +128,5 @@ class BankGrantsPageControllerTest {
     assertEquals(1, grants.size());
     // The fragment path must not load the filter selectors / create-modal lookups.
     verify(backendApiClient, never()).get(eq("/api/v1/bank/accounts?size=500"), anyTypeRef());
-    verify(backendApiClient, never()).get(eq("/api/v1/users/lookup"), anyTypeRef());
   }
 }

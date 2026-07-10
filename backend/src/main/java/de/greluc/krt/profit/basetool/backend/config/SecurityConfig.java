@@ -501,6 +501,21 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/api/v1/users/search")
                     .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER)
+                    // Bank-audience search twin (ADR-0089, the #1193 remoteSource switch): the bank
+                    // pickers (register holder, grant Bank-Employee role, approval limits) resolve
+                    // candidates across the whole user base and must stay reachable for a bank
+                    // employee/manager who holds no org-role (REQ-BANK-008/009/044) — same widening
+                    // as /lookup, and the same squadron scope. Kept off /search so the ordinary
+                    // picker's gate is unchanged. BANK_EMPLOYEE covers BANK_MANAGEMENT via the role
+                    // hierarchy; both are listed so the URL gate does not depend on hierarchy
+                    // evaluation at the filter layer.
+                    .requestMatchers("/api/v1/users/search-bank")
+                    .hasAnyRole(
+                        Roles.ADMIN,
+                        Roles.OFFICER,
+                        Roles.KRT_MEMBER,
+                        Roles.BANK_MANAGEMENT,
+                        Roles.BANK_EMPLOYEE)
                     // Bank widening (REQ-BANK-009 grants, REQ-BANK-044 deposit/withdrawal
                     // counterparty): bank staff resolve grantees and the Einzahler/Empfänger via
                     // the

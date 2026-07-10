@@ -137,6 +137,13 @@
         };
     </script>
     <!--
+      Shared server-side user-search sources for the combobox (REQ-FE-011, ADR-0053/0089, #1193).
+      Registers the `remote-users` / `remote-bank-users` remoteSource functions on
+      window.krtComboboxRemoteSources; must load BEFORE the enhancer below so the registry exists
+      when a `data-krt-combobox="remote-*"` picker is upgraded. No `defer` for the same reason.
+    -->
+    <script th:src="@{/js/krt-user-search.js}" th:attr="nonce=${cspNonce}"></script>
+    <!--
       Searchable combobox enhancer (REQ-FE-011). Loaded globally and synchronously (no `defer`) so
       `window.krtSearchableSelect` exists before any inline page `<script>` that calls it (e.g. the
       orders item-search), and so its DOMContentLoaded / `krt:swapped` auto-initialiser upgrades
