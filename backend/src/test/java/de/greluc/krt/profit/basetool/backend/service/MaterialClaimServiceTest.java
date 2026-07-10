@@ -22,7 +22,10 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -43,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.ClaimDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateClaimDto;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialClaimRepository;
@@ -60,6 +64,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
  * Mockito unit tests for {@link MaterialClaimService}: open-remaining math for both order kinds,
@@ -79,6 +86,15 @@ class MaterialClaimServiceTest {
   @Mock private SquadronMapper squadronMapper;
 
   @Mock private AuditService auditService;
+
+  /**
+   * Deferred self-reference the {@link MaterialClaimService#upsertClaim} orchestrator uses to open
+   * a fresh {@code REQUIRES_NEW} transaction per attempt. In-process there is no Spring proxy, so
+   * tests point {@code self.getObject()} at the service under test (or a spy) so the orchestrator
+   * invokes the real within-transaction body.
+   */
+  @Mock private ObjectProvider<MaterialClaimService> self;
+
   @InjectMocks private MaterialClaimService service;
 
   private static final UUID ORDER_ID = UUID.randomUUID();
@@ -181,6 +197,14 @@ class MaterialClaimServiceTest {
 
   @Nested
   class UpsertGuardTests {
+
+    @BeforeEach
+    void delegateSelfToRealService() {
+      // upsertClaim now runs each attempt through self.getObject() so the retry gets a fresh
+      // REQUIRES_NEW transaction. In-process there is no proxy, so point self at the service under
+      // test — the orchestrator then invokes the real within-transaction body.
+      when(self.getObject()).thenReturn(service);
+    }
 
     @Test
     void nonSkOrder_rejected() {
@@ -286,6 +310,11 @@ class MaterialClaimServiceTest {
   @Nested
   class UpsertInsertUpdateTests {
 
+    @BeforeEach
+    void delegateSelfToRealService() {
+      when(self.getObject()).thenReturn(service);
+    }
+
     @Test
     void noExistingClaim_inserts() {
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
@@ -340,6 +369,11 @@ class MaterialClaimServiceTest {
 
   @Nested
   class PermissionTests {
+
+    @BeforeEach
+    void delegateSelfToRealService() {
+      when(self.getObject()).thenReturn(service);
+    }
 
     @Test
     void neitherOwnSquadronNorSkAuthority_forbidden() {
@@ -404,6 +438,79 @@ class MaterialClaimServiceTest {
       service.upsertClaim(ORDER_ID, dto(SQUADRON_A, 4.0));
 
       verify(materialClaimRepository).save(any(MaterialClaim.class));
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // concurrency: find-or-create race retry (last-writer-wins)
+  // ---------------------------------------------------------------
+
+  /**
+   * Pins the concurrency contract of the claim upsert: two logisticians of the same squadron
+   * lodging the first claim on one bucket race on the unique index / {@code @Version}, and the
+   * loser must retry in a fresh transaction rather than surface a 500 — so last-writer-wins
+   * actually holds. Drives the orchestrator ({@link MaterialClaimService#upsertClaim}) with a spied
+   * within-transaction body to simulate the race deterministically (a real-Postgres reproduction
+   * lives in {@code MaterialClaimConcurrencyTest}).
+   */
+  @Nested
+  class UpsertClaimConcurrencyTests {
+
+    private final CreateClaimDto payload = dto(SQUADRON_A, 4.0);
+
+    @Test
+    void retriesInAFreshTransaction_whenTheInsertRaceLoses() {
+      MaterialClaimService spied = spy(service);
+      when(self.getObject()).thenReturn(spied);
+      ClaimDto expected = sampleClaimDto();
+      // First attempt loses the INSERT race (unique index), retry finds the winner's row and wins.
+      doThrow(new DataIntegrityViolationException("uq_material_claim_bucket_org_unit"))
+          .doReturn(expected)
+          .when(spied)
+          .upsertClaimWithinTransaction(ORDER_ID, payload);
+
+      ClaimDto result = service.upsertClaim(ORDER_ID, payload);
+
+      assertEquals(expected, result, "the winning retry's claim must be returned");
+      verify(spied, times(2)).upsertClaimWithinTransaction(ORDER_ID, payload);
+    }
+
+    @Test
+    void retriesInAFreshTransaction_whenTheUpdateRaceLoses() {
+      MaterialClaimService spied = spy(service);
+      when(self.getObject()).thenReturn(spied);
+      ClaimDto expected = sampleClaimDto();
+      // First attempt loses the @Version race on the existing row, retry reloads and wins.
+      doThrow(new ObjectOptimisticLockingFailureException(MaterialClaim.class, null))
+          .doReturn(expected)
+          .when(spied)
+          .upsertClaimWithinTransaction(ORDER_ID, payload);
+
+      ClaimDto result = service.upsertClaim(ORDER_ID, payload);
+
+      assertEquals(expected, result);
+      verify(spied, times(2)).upsertClaimWithinTransaction(ORDER_ID, payload);
+    }
+
+    @Test
+    void propagatesConflict_whenEveryAttemptLosesTheRace() {
+      MaterialClaimService spied = spy(service);
+      when(self.getObject()).thenReturn(spied);
+      // A pathological, never-winning race: the bounded retry gives up and surfaces the conflict so
+      // the exception maps to a truthful 409, never a 500.
+      doThrow(new ObjectOptimisticLockingFailureException(MaterialClaim.class, null))
+          .when(spied)
+          .upsertClaimWithinTransaction(ORDER_ID, payload);
+
+      assertThrows(
+          ObjectOptimisticLockingFailureException.class,
+          () -> service.upsertClaim(ORDER_ID, payload));
+      // Exactly MAX_UPSERT_ATTEMPTS attempts (four swallowed + one propagating).
+      verify(spied, times(5)).upsertClaimWithinTransaction(ORDER_ID, payload);
+    }
+
+    private ClaimDto sampleClaimDto() {
+      return new ClaimDto(UUID.randomUUID(), null, 4.0, null, null, 0L);
     }
   }
 

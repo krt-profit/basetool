@@ -23,6 +23,8 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -207,8 +209,14 @@ class BankInPlaceFragmentMvcTest {
                             "data-counterparty-user",
                             "data-role=\"bank-cp-external-toggle\"",
                             "data-counterparty-orgunit"))))
+        // #1193 follow-up: the counterparty user picker is a server-side searchable combobox
+        // (remote-bank-users), so it carries the marker and preloads no user roster.
+        .andExpect(
+            content().string(Matchers.containsString("data-krt-combobox=\"remote-bank-users\"")))
         .andExpect(
             content().string(Matchers.not(Matchers.containsString("id=\"bank-deposit-modal\""))));
+    // The roster is fetched on demand, so the accountBody render issues no all-users lookup.
+    verify(backendApiClient, never()).get(eq("/api/v1/users/lookup"), anyTypeRef());
   }
 
   private static BankAccountDto account(UUID id, String no, String status, String balance) {

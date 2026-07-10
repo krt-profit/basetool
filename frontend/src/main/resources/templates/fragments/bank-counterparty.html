@@ -31,10 +31,17 @@
             <span th:text="#{__${labelKey}__}">Einzahler</span>
             <th:block th:replace="~{fragments/scu-hint :: fieldHint(${hintKey})}"></th:block>
         </label>
+        <!-- Server-side searchable combobox (remote-bank-users, #1193 follow-up, REQ-FE-011): the
+             roster is no longer preloaded. Typing queries /users/search-bank on demand (the
+             bank-widened audience, so role-less bank staff can search); an add-only picker, so only
+             the placeholder is seeded (no edit-mode value). The enhancer carries data-counterparty-user
+             + data-orgunit-target onto its hidden input and re-dispatches a bubbling `change` on it, so
+             bank.js's change-delegated membership loader (fillCounterpartyOrgUnits) and the "kein
+             Tool-Account" external toggle keep driving the dependent Einheit picker unchanged. -->
         <select th:id="${prefix} + '-user'" name="counterpartyUserId"
-                data-counterparty-user th:attr="data-orgunit-target=${prefix} + '-ou',data-testid=${prefix} + '-user'">
+                data-counterparty-user data-krt-combobox="remote-bank-users"
+                th:attr="data-orgunit-target=${prefix} + '-ou',data-testid=${prefix} + '-user'">
             <option value="" th:text="#{bank.field.counterparty.placeholder}">Person w&auml;hlen &hellip;</option>
-            <option th:each="u : ${users}" th:value="${u.id()}" th:text="${u.effectiveName()}">carol</option>
         </select>
         <span class="bank-field-error" data-error-for="counterpartyUserId"></span>
     </div>

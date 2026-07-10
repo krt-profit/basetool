@@ -23,6 +23,7 @@
     let state = {
         mode: null,
         itemId: null,
+        productKey: null,
         offerId: null,
         version: null,
         available: null,
@@ -31,13 +32,17 @@
         onCancel: null,
     };
     let pickerItems = [];
+    let productItems = [];
     let lastFocused = null;
     // Server-side picker search: the input debounces a fresh /releasable-items query rather than
     // filtering a once-loaded, alphabetically-capped snapshot in the client — otherwise a material
     // past the server's row cap (e.g. late-alphabet "Savrilium") is unreachable and the release
-    // silently no-ops. pickerSeq drops stale responses so the last-typed query always wins.
+    // silently no-ops. pickerSeq drops stale responses so the last-typed query always wins. The item
+    // (blueprint-product) picker has its own sequence/timer for the same reason (REQ-MARKET-012).
     let pickerSeq = 0;
     let pickerSearchTimer = null;
+    let itemPickerSeq = 0;
+    let itemPickerSearchTimer = null;
     let PICKER_SEARCH_DEBOUNCE_MS = 200;
 
     function fmt(template, value) {
@@ -215,6 +220,7 @@
         state = {
             mode: mode,
             itemId: ctx.itemId || null,
+            productKey: null,
             offerId: ctx.offerId || null,
             version: ctx.version || null,
             available: null,
@@ -224,18 +230,36 @@
         };
         let isNew = mode === 'new';
         let isEdit = mode === 'edit';
-        setText('[data-mb-modal-title]', isEdit ? i18n.editTitle : i18n.releaseTitle);
+        let isItem = mode === 'item';
+        setText(
+            '[data-mb-modal-title]',
+            isEdit ? i18n.editTitle : isItem ? i18n.itemTitle : i18n.releaseTitle,
+        );
         setText('[data-mb-submit-label]', isEdit ? i18n.submitSave : i18n.submitRelease);
         toggle('[data-mb-picker]', isNew);
-        setFacts(ctx.material, ctx.quality);
-        if (isNew) {
-            // No item picked yet: disable the amount field until the picker selection sets its max.
-            setAmountField('', null);
-        } else {
-            // 'edit': value = current offered amount, ceiling = item's total stock (ctx.available).
-            // 'lager': value = ceiling = the item's stock (offer the whole row by default).
-            let max = isEdit ? ctx.available : ctx.amount;
-            setAmountField(ctx.amount, max);
+        // Item mode (REQ-MARKET-012): show the blueprint-product picker + quantity input, hide the
+        // material facts strip + offered-amount block (a craftable item has no live stock, so the
+        // picker input alone carries the chosen item's name).
+        toggle('[data-mb-item-picker]', isItem);
+        toggle('[data-mb-facts]', !isItem);
+        toggle('[data-mb-amount-block]', !isItem);
+        toggle('[data-mb-qty-block]', isItem);
+        toggle('[data-mb-qty-error]', false);
+        let qtyInput = q('[data-mb-item-qty]');
+        if (qtyInput) {
+            qtyInput.value = '';
+        }
+        if (!isItem) {
+            setFacts(ctx.material, ctx.quality);
+            if (isNew) {
+                // No item picked yet: disable the amount field until the picker selection sets its max.
+                setAmountField('', null);
+            } else {
+                // 'edit': value = current offered amount, ceiling = item's total stock (ctx.available).
+                // 'lager': value = ceiling = the item's stock (offer the whole row by default).
+                let max = isEdit ? ctx.available : ctx.amount;
+                setAmountField(ctx.amount, max);
+            }
         }
 
         let ta = q('[data-mb-remark]');
@@ -244,6 +268,12 @@
 
         if (isNew) {
             loadPicker('');
+        } else if (isItem) {
+            let itemInput = q('[data-mb-item-picker-input]');
+            if (itemInput) {
+                itemInput.value = '';
+            }
+            loadItemPicker('');
         }
 
         lastFocused = document.activeElement;
@@ -251,7 +281,11 @@
         // (the app-wide modal contract), NOT by clearing a hidden attribute — the latter left
         // the CSS display:none in place, so the modal opened invisibly (REQ-MARKET-002/007).
         modal.style.display = 'flex';
-        let first = isNew ? q('[data-mb-picker-input]') : ta;
+        let first = isNew
+            ? q('[data-mb-picker-input]')
+            : isItem
+              ? q('[data-mb-item-picker-input]')
+              : ta;
         if (first) {
             first.focus();
         }
@@ -288,6 +322,7 @@
         state = {
             mode: null,
             itemId: null,
+            productKey: null,
             offerId: null,
             version: null,
             available: null,
@@ -394,6 +429,89 @@
         }
     }
 
+    // -------- item (blueprint-product) picker (item offers, REQ-MARKET-012) --------
+
+    function loadItemPicker(query) {
+        let seq = ++itemPickerSeq;
+        let url =
+            '/materialboerse/offerable-products' + (query ? '?q=' + encodeURIComponent(query) : '');
+        fetch(url, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin',
+        })
+            .then(function (r) {
+                return r.ok ? r.json() : [];
+            })
+            .then(function (items) {
+                if (seq !== itemPickerSeq) {
+                    return; // a newer search superseded this response
+                }
+                productItems = Array.isArray(items) ? items : [];
+                renderItemPicker();
+            })
+            .catch(function () {
+                if (seq !== itemPickerSeq) {
+                    return;
+                }
+                productItems = [];
+                renderItemPicker();
+            });
+    }
+
+    /** Debounces a server-side blueprint-product search so every keystroke does not fire a request. */
+    function searchItemPicker(query) {
+        if (itemPickerSearchTimer) {
+            clearTimeout(itemPickerSearchTimer);
+        }
+        itemPickerSearchTimer = setTimeout(function () {
+            loadItemPicker(query);
+        }, PICKER_SEARCH_DEBOUNCE_MS);
+    }
+
+    function renderItemPicker() {
+        let list = q('[data-mb-item-picker-list]');
+        if (!list) {
+            return;
+        }
+        if (!productItems.length) {
+            list.innerHTML =
+                '<li class="krt-combobox__notice">' +
+                escapeHtml(i18n.itemPickerEmpty || '') +
+                '</li>';
+            list.hidden = false;
+            return;
+        }
+        list.innerHTML = productItems
+            .map(function (it) {
+                let meta = it.manufacturerName ? escapeHtml(it.manufacturerName) : '';
+                return (
+                    '<li class="krt-combobox__option" role="option" data-product-key="' +
+                    escapeHtml(it.productKey) +
+                    '" data-name="' +
+                    escapeHtml(it.name) +
+                    '"><strong>' +
+                    escapeHtml(it.name) +
+                    '</strong>' +
+                    (meta ? ' <small>' + meta + '</small>' : '') +
+                    '</li>'
+                );
+            })
+            .join('');
+        list.hidden = false;
+    }
+
+    function pickProduct(li) {
+        state.productKey = li.getAttribute('data-product-key');
+        let input = q('[data-mb-item-picker-input]');
+        if (input) {
+            input.value = li.getAttribute('data-name');
+        }
+        let list = q('[data-mb-item-picker-list]');
+        if (list) {
+            list.hidden = true;
+        }
+    }
+
     function submit() {
         let remark = q('[data-mb-remark]').value;
         if (state.mode === 'edit') {
@@ -418,6 +536,10 @@
                     return finish(body);
                 },
             });
+            return;
+        }
+        if (state.mode === 'item') {
+            submitItem(remark);
             return;
         }
         // 'new' / 'lager': an item must be chosen first (the amount field stays disabled until then).
@@ -446,6 +568,39 @@
         });
     }
 
+    /**
+     * Submits an item offer (#1185): requires a picked blueprint product and a whole quantity ≥ 1
+     * (validated client-side; the backend re-validates the product and the quantity). POSTs to the
+     * item-offer proxy and, on success, notifies peers and closes the modal like a material release.
+     */
+    function submitItem(remark) {
+        if (!state.productKey) {
+            return;
+        }
+        let qtyInput = q('[data-mb-item-qty]');
+        let quantity = qtyInput ? parseInt(qtyInput.value, 10) : NaN;
+        if (isNaN(quantity) || quantity < 1) {
+            toggle('[data-mb-qty-error]', true);
+            if (qtyInput) {
+                qtyInput.focus();
+            }
+            return;
+        }
+        toggle('[data-mb-qty-error]', false);
+        window.krtFetch.write({
+            method: 'POST',
+            url: '/materialboerse/item-offers/ajax',
+            payload: { productKey: state.productKey, quantity: quantity, remark: remark },
+            successMessage: i18n.itemReleased || i18n.released,
+            errorMessage: i18n.error,
+            serialize: SERIALIZE_KEY,
+            onSuccess: function (body) {
+                notifyPeers();
+                return finish(body);
+            },
+        });
+    }
+
     function notifyPeers() {
         if (window.krtMaterialboardPresence) {
             window.krtMaterialboardPresence.sendChanged(['board']);
@@ -456,7 +611,10 @@
 
     document.addEventListener('click', function (e) {
         if (!isModalOpen()) {
-            if (e.target.closest('[data-mb-picker-list] .krt-combobox__option')) {
+            if (
+                e.target.closest('[data-mb-picker-list] .krt-combobox__option') ||
+                e.target.closest('[data-mb-item-picker-list] .krt-combobox__option')
+            ) {
                 return;
             }
         }
@@ -481,6 +639,11 @@
         let li = e.target.closest('[data-mb-picker-list] .krt-combobox__option');
         if (li) {
             pickItem(li);
+            return;
+        }
+        let pli = e.target.closest('[data-mb-item-picker-list] .krt-combobox__option');
+        if (pli) {
+            pickProduct(pli);
         }
     });
 
@@ -489,6 +652,10 @@
             updateCharCount();
         } else if (e.target.matches('[data-mb-picker-input]')) {
             searchPicker(e.target.value);
+        } else if (e.target.matches('[data-mb-item-picker-input]')) {
+            searchItemPicker(e.target.value);
+        } else if (e.target.matches('[data-mb-item-qty]')) {
+            toggle('[data-mb-qty-error]', false);
         }
     });
 

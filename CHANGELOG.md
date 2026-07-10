@@ -4,13 +4,18 @@
 
 ### Added
 
+- **Items auf der Materialbörse anbieten.** Neben „Material anbieten" gibt es jetzt „Item anbieten": craftbare Items (also solche, für die ein Blueprint existiert) lassen sich mit selbst angegebener Menge auf der Börse anbieten. Item-Angebote haben keine Qualität und keinen Standort; ein Mitglied kann dasselbe Item auch mehrfach anbieten (#1185).
 - **Materialbörse: Teilmengen anbieten.** Beim Freigeben eines Lager-Postens lässt sich jetzt wählen, wie viel davon angeboten wird — die ganze Menge (Schaltfläche „Alles") oder nur ein Teil. Die angebotene Menge kann später über „Angebot bearbeiten" angepasst werden und darf den aktuellen Lagerbestand nie überschreiten: Wird ein Teil des Postens ausgebucht, sinkt die angezeigte Angebotsmenge automatisch mit; wird der Posten vollständig ausgebucht, wird er gelöscht und das Angebot damit automatisch von der Börse entfernt. Filter und Sortierung „Menge" beziehen sich auf diese effektive Menge (#1183).
 
 ### Changed
 
 - **Fehler behoben: Anmelde-Sitzungen häufen sich nicht mehr unbegrenzt im Sitzungsspeicher an.** Anonyme Seitenaufrufe (etwa durch Uptime- oder Suchmaschinen-Bots) legten bisher jeweils eine 30 Tage gültige Sitzung in Redis an; so liefen über 16.000 verwaiste Sitzungen auf, die den Speicher langfristig gefüllt und irgendwann Anmeldungen blockiert hätten. Nicht angemeldete Sitzungen laufen jetzt nach kurzer Zeit ab, während das 30-Tage-Fenster „Angemeldet bleiben" erst nach erfolgreicher Anmeldung greift und für Mitglieder unverändert bleibt. Ein neuer Alarm (`ActiveSessionsRunaway`) warnt, falls sich so etwas wiederholt (REQ-SEC-025, ADR-0088).
 
+- **Fehler behoben: Kein Serverfehler mehr, wenn zwei Logistiker derselben Squadron gleichzeitig die erste Eintragung auf denselben Materialposten eines Spezialkommando-Auftrags vornehmen.** Bisher konnte der Verlierer dieses seltenen Wettlaufs einen internen Serverfehler (500) statt einer gespeicherten Eintragung erhalten. Die Eintragung wird jetzt automatisch in einer frischen Transaktion erneut versucht (der zuletzt Speichernde gewinnt); nur ein tatsächlich anhaltender Konflikt meldet weiterhin sauber „Konflikt" (409) statt eines Serverfehlers.
+
 - **Verbesserung: Nutzer-Auswahlfelder suchen jetzt serverseitig statt die ganze Mitgliederliste vorzuladen.** Die Auswahlfelder, die bisher alle Mitglieder komplett vorluden (u. a. in Lager, Raffinerie, Aufträgen, Missionen, Rollen-/Leitungsverwaltung und der Kartellbank), durchsuchen die Mitglieder jetzt erst bei der Eingabe über den Server — schneller und skalierbar für tausende Konten. Gäste-Felder und die Halter-Auswahl bleiben unverändert (#1193).
+
+- **Verbesserung: Auch die Einzahler-/Empfänger-Auswahl im Kontobewegungs-Dialog sucht jetzt serverseitig.** Das Gegenpartei-Auswahlfeld der Ein-/Auszahlung lud als letztes Bank-Auswahlfeld noch die gesamte Nutzerliste vor; es durchsucht die Mitglieder jetzt erst bei der Eingabe über den Server. Der „Kein Tool-Account"-Umschalter und die abhängige Einheiten-Auswahl funktionieren unverändert (Folgeänderung zu #1193).
 
 - **Weniger Log-Rauschen, wenn das Backend kurz nicht erreichbar ist (z. B. bei einem Neustart/Deploy).** Ein durch den offenen Circuit-Breaker kurzgeschlossener Aufruf wurde bisher dreifach als `WARN` protokolliert und flutete bei jedem Backend-Neustart das Log, sodass ein erwarteter, sich selbst behebender Aussetzer kaum von einem echten Vorfall zu unterscheiden war. Solche kurzgeschlossenen Aufrufe werden jetzt auf `DEBUG` gestuft; das einmalige Öffnen des Breakers, die Metrik und der Alert bleiben als Signal erhalten (#1203).
 

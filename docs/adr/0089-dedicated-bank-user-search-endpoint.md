@@ -19,10 +19,13 @@ on demand as the user types, so no converted picker ships thousands of `<option>
 Most converted pickers sit on pages that require an org role, so the existing squadron-scope-aware
 `/api/v1/users/search` (`@PreAuthorize` ADMIN/OFFICER/KRT_MEMBER) covers them unchanged. The
 exception is the **bank** pickers — register a holder, grant the Bank-Employee role, set an approval
-limit — which today resolve candidates through `/api/v1/users/lookup`. That lookup is deliberately
+limit, resolve the deposit/withdrawal **counterparty** (Einzahler / Empfänger) — which today resolve
+candidates through `/api/v1/users/lookup`. That lookup is deliberately
 widened to bank staff (`BANK_EMPLOYEE`, which covers `BANK_MANAGEMENT` via the role hierarchy) because
 a bank manager/employee **need not hold any org role** (REQ-BANK-008/009/044). The regular `/search`
-would 403 such a caller.
+would 403 such a caller. (The counterparty picker's conversion — deferred at #1193 because of its
+intertwined external-toggle/org-unit JS — lands as the immediate #1193 follow-up; it reuses this same
+`remote-bank-users` source with no endpoint change.)
 
 Crucially, `/search` and `/lookup` already resolve the **identical** scope:
 `UserService.searchByUsername(...)` and `findAllReference()` both go through
