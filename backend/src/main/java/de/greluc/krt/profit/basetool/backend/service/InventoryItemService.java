@@ -644,9 +644,11 @@ public class InventoryItemService {
    * Consumes or transfers an inventory item — delegates to {@link
    * InventoryCheckoutService#bookOutInventoryItem}.
    *
-   * <p>The {@code type} discriminator selects CONSUME (just decrement), TRANSFER (append-only move
+   * <p>The {@code type} discriminator selects DISCARD (just decrement), TRANSFER (append-only move
    * to the target location/owner) or SELL (decrement plus a mission finance entry). When the
-   * post-decrement quantity is floating-point-zero the row is removed entirely.
+   * post-decrement quantity is floating-point-zero the row is removed entirely. An explicit {@code
+   * TRANSFER} carrying neither a target user nor a target location is rejected up front
+   * (REQ-INV-025).
    *
    * @param id the source inventory row id
    * @param dto the book-out payload (type, amount, version, transfer/sell fields)
@@ -655,7 +657,8 @@ public class InventoryItemService {
    * @return the reduced source (or new target) row DTO, or {@code null} when the row is depleted
    * @throws NotFoundException when the item is unknown
    * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the requested
-   *     amount exceeds the available quantity
+   *     amount exceeds the available quantity, when a SELL is missing its terminal or a valid sell
+   *     amount, or when a {@code TRANSFER} carries neither a target user nor a target location
    */
   @Transactional
   public InventoryItemDto bookOutInventoryItem(

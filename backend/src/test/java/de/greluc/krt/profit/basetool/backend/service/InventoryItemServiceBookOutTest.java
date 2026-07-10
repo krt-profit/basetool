@@ -436,6 +436,36 @@ class InventoryItemServiceBookOutTest {
     }
 
     @Test
+    void explicitTransferWithoutTargets_throwsBadRequestAndDestroysNothing() {
+      // REQ-INV-025: an explicit type=TRANSFER carrying neither a target user nor a target location
+      // has nowhere to move the stock to. It must be rejected with 400 up front — it must NOT fall
+      // through to the consume tail, which would silently decrement/delete the source and mislog it
+      // as INVENTORY_ITEM_CONSUMED with type=TRANSFER (the destructive fall-through this pins
+      // shut).
+      InventoryItem item = newItem(10.0, 1L);
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+
+      BadRequestException ex =
+          assertThrows(
+              BadRequestException.class,
+              () ->
+                  service.bookOutInventoryItem(
+                      ITEM_ID,
+                      newDto(4.0, null, null, CheckoutType.TRANSFER, null, null, 1L),
+                      OWNER_ID,
+                      false));
+      assert ex.getMessage().toLowerCase().contains("target");
+
+      // Nothing is written: the source keeps its full amount, no row is inserted or deleted.
+      assertEquals(10.0, item.getAmount(), "source amount must be unchanged");
+      verify(inventoryItemRepository, never()).save(any());
+      verify(inventoryItemRepository, never()).saveAndFlush(any());
+      verify(inventoryItemRepository, never()).delete(any());
+      // And no audit event — a rejected request records nothing (no spurious CONSUMED event).
+      verify(auditService, never()).record(any(), any(), any(), any(), any());
+    }
+
+    @Test
     void transferPartial_keepsSourceWithRemainingAmount() {
       // amount=3 out of 10 -> source keeps 7, new item gets 3.
       UUID targetUserId = UUID.randomUUID();
@@ -627,34 +657,6 @@ class InventoryItemServiceBookOutTest {
       assertSame(
           targetUser, saveCaptor.getValue().getUser(), "the saved row is the new target row");
       verify(inventoryItemRepository, never()).delete(any());
-    }
-
-    @Test
-    void explicitTransferWithoutTargets_fallsThroughToDiscard() {
-      // Gap 5: an explicit type=TRANSFER with NEITHER a target user NOR a target location fails the
-      // guard `checkoutType == TRANSFER && (targetUserId != null || targetLocationId != null)`, so
-      // the transfer branch is skipped and control falls through to the DISCARD/consume tail. This
-      // pins the CURRENT contract: the request is NOT rejected — the source stock is simply
-      // decremented as a discard and NO new target row is inserted (never save()). (See the
-      // book-out spec note on this unguarded target-less TRANSFER stock loss.)
-      InventoryItem item = newItem(10.0, 1L);
-      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
-      when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
-
-      service.bookOutInventoryItem(
-          ITEM_ID, newDto(4.0, null, null, CheckoutType.TRANSFER, null, null, 1L), OWNER_ID, false);
-
-      // Discard fall-through: source decremented in place, NO new target row inserted.
-      assertEquals(6.0, item.getAmount(), "source is decremented as a discard, not transferred");
-      verify(inventoryItemRepository).saveAndFlush(item);
-      verify(inventoryItemRepository, never()).save(any());
-      verify(inventoryItemRepository, never()).delete(any());
-      // The tail records a CONSUMED (discard) event, not a TRANSFERRED event.
-      verify(auditService)
-          .record(
-              eq(AuditEventType.INVENTORY_ITEM_CONSUMED), eq(ITEM_ID), any(), eq(OWNER_ID), any());
-      verify(auditService, never())
-          .record(eq(AuditEventType.INVENTORY_ITEM_TRANSFERRED), any(), any(), any(), any());
     }
   }
 

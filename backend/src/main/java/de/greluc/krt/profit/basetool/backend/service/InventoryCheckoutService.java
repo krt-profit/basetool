@@ -105,15 +105,19 @@ public class InventoryCheckoutService {
   /**
    * Consumes or transfers an inventory item.
    *
-   * <p>The {@code type} discriminator selects: CONSUME (just decrement), TRANSFER (decrement here,
+   * <p>The {@code type} discriminator selects: DISCARD (just decrement), TRANSFER (decrement here,
    * then insert a new row for the moved quantity at the target location/owner — inventory is
    * append-only, so the moved stock is never folded into an existing target stack), SELL (decrement
-   * here, create a finance entry for the participant). When the post-decrement quantity is below
-   * {@link #QUANTITY_EPSILON} the row is removed entirely.
+   * here, create a finance entry for the participant). When {@code type} is {@code null} it is
+   * inferred from the presence of a target (TRANSFER when a target user/location is given, else
+   * DISCARD); an <em>explicit</em> {@code TRANSFER} carrying neither target is rejected up front so
+   * it can never fall through and silently consume the source stock (REQ-INV-025). When the
+   * post-decrement quantity is below {@link #QUANTITY_EPSILON} the row is removed entirely.
    *
    * @throws NotFoundException when the item is unknown
    * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the requested
-   *     amount exceeds the available quantity
+   *     amount exceeds the available quantity, when a SELL is missing its terminal or a valid sell
+   *     amount, or when a {@code TRANSFER} carries neither a target user nor a target location
    */
   @Transactional
   public InventoryItemDto bookOutInventoryItem(
@@ -150,6 +154,16 @@ public class InventoryCheckoutService {
       }
     }
 
+    // A TRANSFER with neither a target user nor a target location has nowhere to move the stock to.
+    // Reject it up front (400) — an explicit type=TRANSFER survives the null-inference above, so
+    // without this guard it would fall through to the consume tail below, silently destroying the
+    // source stock and mislogging it as INVENTORY_ITEM_CONSUMED with type=TRANSFER (REQ-INV-025).
+    if (checkoutType == CheckoutType.TRANSFER
+        && dto.targetUserId() == null
+        && dto.targetLocationId() == null) {
+      throw new BadRequestException("Transfer requires a target user or location");
+    }
+
     double remainingAmount = roundAmount(item.getAmount() - dto.amount());
 
     // Snapshot the source row's scalar identity BEFORE any decrement/delete so the audit row stays
@@ -161,8 +175,9 @@ public class InventoryCheckoutService {
     final boolean depleted = remainingAmount <= QUANTITY_EPSILON;
     UUID financeEntryId = null;
 
-    if (checkoutType == CheckoutType.TRANSFER
-        && (dto.targetUserId() != null || dto.targetLocationId() != null)) {
+    if (checkoutType == CheckoutType.TRANSFER) {
+      // A TRANSFER is guaranteed to carry at least one target here (the up-front guard rejects the
+      // target-less case), so the branch is unconditional on the type.
       return bookOutTransfer(
           item, dto, remainingAmount, sourceId, sourceLabel, materialName, depleted);
     } else if (checkoutType == CheckoutType.SELL && item.getMission() != null) {
