@@ -76,6 +76,20 @@ same UUID space and is not PII).
 All three modules expose Micrometer metrics at `GET /actuator/prometheus` for the monitoring
 scrape (epic #936, ADR-0072). The endpoint is **never public**:
 
+> **Amended by ADR-0090 (frontend + ingest, prod):** the two internet-facing modules now serve
+> **all** of `/actuator/**` (health + prometheus) on a dedicated **internal-only management port**
+> (frontend `18091`, ingest `11272`; `management.server.port` in `application-prod.yml`, HTTPS via the
+> shared keystore). That port is reachable only on `net-monitoring-scrape` (Prometheus) and
+> `localhost` (the Docker `HEALTHCHECK`) — never host-published and never on an NPM proxy network —
+> so `/actuator/**` is off the public connector entirely (a public probe gets 404 at the app level,
+> independent of the NPM edge deny). On that internal-only port Actuator is **unauthenticated** (a
+> per-module `ManagementPortSecurityConfig` permit-all chain, gated by `@ConditionalOnProperty`), the
+> Keycloak port-9000 posture: the fail-closed basic-auth **compensating control below is superseded
+> by port isolation** for frontend/ingest and their scrape jobs drop `basic_auth`. The bullets below
+> therefore describe **backend** (unchanged — app-port scrape, basic-auth) and **dev/test/e2e** (no
+> management port set → Actuator stays on the app port, `MonitoringScrapeSecurityConfig` fail-closes
+> it). REQ-OBS-012's edge assertions remain as belt-and-braces drift detection.
+
 - Each module guards exactly this path with a **dedicated `SecurityFilterChain`**
   (`MonitoringScrapeSecurityConfig`, ordered before the main chain) using HTTP basic auth
   against a single in-memory scrape identity fed by the `MONITORING_SCRAPE_USER` /
@@ -87,12 +101,15 @@ scrape (epic #936, ADR-0072). The endpoint is **never public**:
   browser session (frontend) must **not** grant access to the metrics payload.
 - The scrape chain is stateless (no session, no CSRF token, no request cache) so a 30-second
   scrape interval creates no session state; a scrape response never carries `Set-Cookie`.
-- `/actuator/health` remains public for the Docker `HEALTHCHECK` — unchanged by this
-  requirement. The frontend `BotProtectionFilter` whitelists `/actuator/health` (incl. its
-  liveness/readiness sub-paths, case-insensitively — pre-existing behaviour) and
-  `/actuator/prometheus` as an **exact, case-sensitive match only**, mirroring the scrape
-  chain's `securityMatcher`; prometheus sub-paths/case variants and every other
-  `/actuator/**` path stay blocked with 404 before the security chains run.
+- `/actuator/health` is **unauthenticated at the app** (`permitAll`) so the Docker `HEALTHCHECK`
+  can reach it over `localhost` inside the container — but it is **not internet-reachable**: the
+  same `location /actuator` NPM edge deny that hides `/actuator/prometheus` also hides
+  `/actuator/health`, and `blackbox-edge-deny` now asserts the 404 for **both** paths on both public
+  hosts (REQ-OBS-012). "Public" here means unauthenticated-at-the-app, not edge-exposed. The
+  frontend/ingest `BotProtectionFilter` whitelists `/actuator/health` (incl. its liveness/readiness
+  sub-paths, case-insensitively) and `/actuator/prometheus` as an **exact, case-sensitive match
+  only**, mirroring the scrape chain's `securityMatcher`; prometheus sub-paths/case variants and
+  every other `/actuator/**` path stay blocked with 404 before the security chains run.
 - **Prod precondition for setting the credentials:** the NPM `/actuator` deny rules on both
   public hosts (`profit-base.online`, `ingest.profit-base.online`) are applied **before**
   `MONITORING_SCRAPE_*` is deployed (Phase-2 runbook), so the credentialed endpoint is only
@@ -499,7 +516,10 @@ otherwise masks as intermittent failed writes). The pre-auth `BotProtectionFilte
 `basetool_bot_blocked_total{rule}` (#1041 item 19; `rule` = `method` / `path_prefix` /
 `file_extension`) at its three reject branches, which were otherwise `log.debug`-only and
 prod-invisible — the counter also surfaces a self-inflicted false positive when a new legit route
-matches a blocked prefix. Panels only, all labels fixed literals.
+matches a blocked prefix. The **ingest gateway** carries the same filter (`REQ-INGEST-009`) and emits
+the same `basetool_bot_blocked_total{rule}` series, distinguished by the `application` common tag
+(`basetool-ingest` vs `basetool-frontend`); the "Bot-blocked/hour by rule" panel groups by
+`application` + `rule` so both modules are visible. Panels only, all labels fixed literals.
 
 **Ingest.** `basetool_ingest_handoff_total{kind}` (accepted+staged handoffs per `HandoffKind`),
 `basetool_ingest_handoff_errors_total{reason}` (relay failures: `backend_reject` /
@@ -536,11 +556,18 @@ Advanced snippets under `/var/iri/npm/data`), not in git — a UI misclick or a 
 could silently undo it. The monitoring plane therefore **asserts** that posture continuously
 instead of trusting the one-time rollout verification:
 
-- **`/actuator` edge deny** — the `blackbox-edge-deny` job probes `/actuator/prometheus` on both
-  public app hosts with the `http_deny_404` module: probe success means the edge answers exactly
-  404 (the live deny). If the block drifts, the request reaches the fail-closed app endpoint
-  (401) and `EdgeActuatorDenyBroken` (critical) fires — the continuous version of the ADR-0072
-  compensating control.
+- **`/actuator` edge deny** — the `blackbox-edge-deny` job probes **both** `/actuator/prometheus`
+  **and** `/actuator/health` on **both** public app hosts (`profit-base.online`,
+  `ingest.profit-base.online`) with the `http_deny_404` module: probe success means the edge answers
+  exactly 404 (the live deny). The whole `/actuator` prefix is denied (`location /actuator` on the
+  NPM host), so neither the metrics surface nor the health/liveness/readiness/build-info surface is
+  internet-reachable — Prometheus reaches metrics over `net-monitoring-scrape` and the Docker
+  `HEALTHCHECK` reaches health over `localhost`, so neither needs any edge exposure. Health is
+  asserted explicitly (not only metrics) so a deny narrowed to just `/actuator/prometheus` cannot
+  silently re-expose the health surface. If any of the four probes drifts, the request reaches the
+  app endpoint (metrics → fail-closed 401; health → 200) and `EdgeActuatorDenyBroken` (critical)
+  fires — the continuous version of the ADR-0072 compensating control. The daily external
+  `edge-deny-probe.yml` re-asserts the same four URLs from a GitHub runner.
 - **Force-SSL redirect** — the `blackbox-force-ssl` job probes plain-HTTP port 80 of all four
   public vhosts with `http_force_ssl_redirect` (301/308 + `Location: https://…`, redirects not
   followed); `EdgeForceSslRedirectBroken` (warning) fires on drift.

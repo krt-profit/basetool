@@ -1677,9 +1677,9 @@
       },
       "targets": [
         {
-          "expr": "sum by (rule) (rate(basetool_bot_blocked_total[1h])) * 3600",
+          "expr": "sum by (application, rule) (rate(basetool_bot_blocked_total[1h])) * 3600",
           "refId": "A",
-          "legendFormat": "{{rule}}",
+          "legendFormat": "{{application}} {{rule}}",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
