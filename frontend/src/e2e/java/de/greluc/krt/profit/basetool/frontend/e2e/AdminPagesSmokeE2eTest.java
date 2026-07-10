@@ -20,11 +20,13 @@
 package de.greluc.krt.profit.basetool.frontend.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.Response;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -34,23 +36,23 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
- * Non-destructive smoke subset: log in once and confirm each core page renders the authenticated
- * app shell. Unlike the {@code @Tag("e2e")} flows, this suite is target-agnostic and read-only — it
- * creates and mutates nothing, so it is safe to run against a shared staging deployment.
+ * Non-destructive page-load smoke for the ADMIN-only management pages that had no end-to-end
+ * coverage at all — several admin data-management screens plus the members list and the
+ * organisation-leadership view. It guards against a page rendering a 500 (a stale template, a
+ * broken controller binding, a missing model attribute) the way {@code CorePagesSmokeE2eTest}
+ * guards the member-facing core pages.
  *
- * <p>Tagged {@code @Tag("smoke")}: the {@code smokeTest} Gradle task selects it, and it runs
- * against whatever {@link E2eStackExtension} resolves as the base URL — the ephemeral local stack
- * by default, or an external {@code E2E_BASE_URL} (staging) when set, with the user supplied via
- * {@code -Pe2e.username} / {@code -Pe2e.password} (CI secrets).
- *
- * <p>The assertion targets {@code nav-logout}, the authenticated-only sidebar logout control, so
- * its visibility proves the session is authenticated and the page neither errored nor bounced to
- * the identity provider. It replaced {@code nav-orders}: the nav links now live inside collapsed
- * {@code <details>} sections ({@code display:none} until expanded), whereas the logout control is
- * always rendered for a logged-in user.
+ * <p>Unlike {@code CorePagesSmokeE2eTest} (tagged {@code smoke}, target-agnostic, possibly a
+ * non-admin staging user), these pages are {@code ADMIN}-gated, so this class logs in explicitly as
+ * {@code test-admin} and is tagged {@code @Tag("e2e")} to run against the ephemeral stack where
+ * that seeded admin exists. It mutates nothing — every check is a GET — asserting both an HTTP 200
+ * and the authenticated shell ({@code nav-logout}), so a page that bounced to the IdP or errored
+ * fails loudly. Pages already covered by a dedicated flow ({@code /admin/settings}, {@code
+ * /admin/materials}, {@code /admin/special-commands}, {@code /admin/default-blueprints}, {@code
+ * /admin/bank}, {@code /admin/audit-log}, {@code /admin/mission-data}) are intentionally omitted.
  */
-@Tag("smoke")
-class CorePagesSmokeE2eTest {
+@Tag("e2e")
+class AdminPagesSmokeE2eTest {
 
   /** Provisions (or, in staging mode, targets) the stack for the whole run. */
   @RegisterExtension static final E2eStackExtension STACK = new E2eStackExtension();
@@ -62,11 +64,17 @@ class CorePagesSmokeE2eTest {
   private static Browser browser;
   private static Path storageState;
 
-  /** Launches the browser and captures one authenticated session reused across all page checks. */
+  /**
+   * Launches the browser and, for the ephemeral stack, ensures the admin's own {@code app_user} row
+   * exists, then captures one authenticated admin session reused across all page checks.
+   */
   @BeforeAll
   static void setUp() {
     playwright = Playwright.create();
     browser = E2eSupport.launchBrowser(playwright, STACK.managesStack());
+    if (STACK.managesStack()) {
+      new BackendSeeder().ensureIridiumMembership(USERNAME, PASSWORD);
+    }
     storageState =
         E2eSupport.authenticatedStorageState(browser, STACK.baseUrl(), USERNAME, PASSWORD);
   }
@@ -83,31 +91,30 @@ class CorePagesSmokeE2eTest {
   }
 
   /**
-   * Navigates to a core page with the authenticated session and asserts the authenticated sidebar
-   * renders, proving the page loads for a logged-in user without touching any data.
+   * Navigates to an ADMIN-only page with the authenticated admin session and asserts it renders
+   * (HTTP 200 and the authenticated sidebar), proving the page loads without touching any data.
    *
-   * @param path the app-relative path of the core page to load
+   * @param path the app-relative path of the admin page to load
    */
-  @ParameterizedTest(name = "core page {0} loads")
+  @ParameterizedTest(name = "admin page {0} loads")
   @ValueSource(
       strings = {
-        "/",
-        "/missions",
-        "/orders",
-        "/refinery-orders",
-        "/hangar",
-        "/operations",
-        "/materials",
-        "/materials/overview",
-        "/materials/profit-calculation",
-        "/ship-data",
-        "/blueprint-overview",
-        "/org-chart",
-        "/notifications",
-        "/personal-inventory",
-        "/personal-inventory/blueprints"
+        "/members",
+        "/organisation/leitung",
+        "/admin/locations",
+        "/admin/material-aliases",
+        "/admin/uex-data",
+        "/admin/discord-registrations",
+        "/admin/sync-reports",
+        "/admin/p4k-import",
+        "/admin/announcement",
+        "/admin/notification-rules",
+        "/admin/org-structure",
+        "/admin/blueprints",
+        "/admin/personal-inventory",
+        "/admin/personal-blueprints"
       })
-  void corePageLoads(String path) {
+  void adminPageLoads(String path) {
     String baseUrl = STACK.baseUrl();
     try (BrowserContext context =
         browser.newContext(
@@ -116,11 +123,12 @@ class CorePagesSmokeE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        E2eSupport.navigate(page, baseUrl + path);
+        Response response = E2eSupport.navigate(page, baseUrl + path);
+        assertEquals(200, response.status(), "admin page " + path + " must render HTTP 200");
         assertThat(page.getByTestId("nav-logout")).isVisible();
       } catch (RuntimeException | AssertionError failure) {
-        String slug = path.equals("/") ? "home" : path.substring(1).replace('/', '-');
-        E2eSupport.dump(page, "smoke-" + slug);
+        String slug = path.substring(1).replace('/', '-');
+        E2eSupport.dump(page, "admin-smoke-" + slug);
         throw failure;
       }
     }
