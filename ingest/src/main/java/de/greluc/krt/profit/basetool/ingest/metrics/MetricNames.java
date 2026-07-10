@@ -37,6 +37,15 @@ public final class MetricNames {
   public static final String INGEST_HANDOFF_ERRORS = "basetool.ingest.handoff.errors";
 
   /**
+   * Counter {@code basetool_ingest_payload_rejected_total} (untagged). Bumped by {@link
+   * de.greluc.krt.profit.basetool.ingest.filter.PayloadSizeLimitFilter} when a request body exceeds
+   * the cap and is refused with 413. The DoS guard was otherwise silent (no log, no metric), unlike
+   * its sibling bot / rate-limit reject filters, so a flood of oversized-body probes against the
+   * only internet-facing surface was undetectable (REQ-OBS-011, REQ-INGEST-005).
+   */
+  public static final String INGEST_PAYLOAD_REJECTED = "basetool.ingest.payload.rejected";
+
+  /**
    * Counter {@code basetool_ratelimit_rejections_total} — tag {@code bucket} ({@code ip}/{@code
    * subject}). Shares its name with the backend rate-limit counter; the {@code application} common
    * tag distinguishes the module.

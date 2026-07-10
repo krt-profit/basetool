@@ -78,6 +78,8 @@ public class AdminAnnouncementPageController {
       Map<String, Object> adminAnnouncement =
           backendApiClient.get("/api/v1/announcement/admin", STRING_OBJECT_MAP_TYPE);
       model.addAttribute("adminAnnouncement", adminAnnouncement);
+    } catch (BackendServiceException e) {
+      log.debug("Could not fetch admin announcement", e);
     } catch (Exception e) {
       log.error("Could not fetch admin announcement", e);
     }

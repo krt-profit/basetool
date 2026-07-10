@@ -421,7 +421,7 @@ public class UexClient {
         .timeout(CALL_TIMEOUT)
         .onErrorResume(
             e -> {
-              log.error("Failed to fetch {} from UEX API", resourceLabel, e);
+              log.warn("Failed to fetch {} from UEX API", resourceLabel, e);
               meterRegistry
                   .counter(
                       MetricNames.EXTERNAL_FETCH_ERRORS,

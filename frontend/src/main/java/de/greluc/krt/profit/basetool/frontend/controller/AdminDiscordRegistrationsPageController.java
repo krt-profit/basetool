@@ -86,6 +86,10 @@ public class AdminDiscordRegistrationsPageController {
       List<PendingRegistrationDto> registrations =
           backendApiClient.get(BACKEND_BASE, PENDING_REGISTRATION_LIST_TYPE);
       model.addAttribute("registrations", registrations == null ? List.of() : registrations);
+    } catch (BackendServiceException e) {
+      log.debug("Failed to load the Discord registration queue", e);
+      model.addAttribute("error", "error.admin.discordRegistrations.load");
+      model.addAttribute("registrations", List.of());
     } catch (Exception e) {
       log.error("Failed to load the Discord registration queue", e);
       model.addAttribute("error", "error.admin.discordRegistrations.load");

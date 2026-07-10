@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitBankAccountSettin
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitBankBalanceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.math.BigDecimal;
@@ -225,8 +226,10 @@ public class OrgUnitBankPageController {
       if (balances != null) {
         return balances;
       }
+    } catch (BackendServiceException e) {
+      log.debug("Failed to fetch org-unit bank balances", e);
     } catch (RuntimeException e) {
-      log.warn("Failed to fetch org-unit bank balances");
+      log.warn("Failed to fetch org-unit bank balances", e);
     }
     return List.of();
   }
@@ -243,8 +246,10 @@ public class OrgUnitBankPageController {
       if (requests != null) {
         return requests;
       }
+    } catch (BackendServiceException e) {
+      log.debug("Failed to fetch org-unit bank own requests", e);
     } catch (RuntimeException e) {
-      log.warn("Failed to fetch org-unit bank own requests");
+      log.warn("Failed to fetch org-unit bank own requests", e);
     }
     return List.of();
   }
@@ -262,8 +267,10 @@ public class OrgUnitBankPageController {
       if (requests != null) {
         return requests;
       }
+    } catch (BackendServiceException e) {
+      log.debug("Failed to fetch org-unit bank foreign requests", e);
     } catch (RuntimeException e) {
-      log.warn("Failed to fetch org-unit bank foreign requests");
+      log.warn("Failed to fetch org-unit bank foreign requests", e);
     }
     return List.of();
   }
@@ -280,8 +287,10 @@ public class OrgUnitBankPageController {
       if (targets != null) {
         return targets;
       }
+    } catch (BackendServiceException e) {
+      log.debug("Failed to fetch org-unit bank transfer targets", e);
     } catch (RuntimeException e) {
-      log.warn("Failed to fetch org-unit bank transfer targets");
+      log.warn("Failed to fetch org-unit bank transfer targets", e);
     }
     return List.of();
   }

@@ -129,8 +129,10 @@ public class AdminSettingsPageController {
               "/api/v1/settings/job_order.age_yellow_days", SystemSettingDto.class);
       yellowDays = Integer.parseInt(yellowSetting.value());
       yellowVersion = yellowSetting.version();
+    } catch (BackendServiceException e) {
+      log.debug("Could not fetch yellow days setting", e);
     } catch (Exception e) {
-      log.warn("Could not fetch yellow days setting");
+      log.warn("Could not fetch yellow days setting", e);
     }
 
     try {
@@ -138,8 +140,10 @@ public class AdminSettingsPageController {
           backendApiClient.get("/api/v1/settings/job_order.age_red_days", SystemSettingDto.class);
       redDays = Integer.parseInt(redSetting.value());
       redVersion = redSetting.version();
+    } catch (BackendServiceException e) {
+      log.debug("Could not fetch red days setting", e);
     } catch (Exception e) {
-      log.warn("Could not fetch red days setting");
+      log.warn("Could not fetch red days setting", e);
     }
 
     try {
@@ -147,8 +151,10 @@ public class AdminSettingsPageController {
           backendApiClient.get("/api/v1/settings/refinery.rounding.mode", SystemSettingDto.class);
       refineryRoundingMode = roundingSetting.value();
       refineryRoundingVersion = roundingSetting.version();
+    } catch (BackendServiceException e) {
+      log.debug("Could not fetch refinery rounding mode setting", e);
     } catch (Exception e) {
-      log.warn("Could not fetch refinery rounding mode setting");
+      log.warn("Could not fetch refinery rounding mode setting", e);
     }
 
     BigDecimal transferFeePercent = DEFAULT_TRANSFER_FEE_PERCENT;
@@ -165,8 +171,10 @@ public class AdminSettingsPageController {
         transferFeePercent = transferFeePercent.setScale(0, RoundingMode.UNNECESSARY);
       }
       transferFeeVersion = feeSetting.version();
+    } catch (BackendServiceException e) {
+      log.debug("Could not fetch operation transfer fee rate setting", e);
     } catch (Exception e) {
-      log.warn("Could not fetch operation transfer fee rate setting");
+      log.warn("Could not fetch operation transfer fee rate setting", e);
     }
 
     model.addAttribute("ageYellowDays", yellowDays);
@@ -186,8 +194,10 @@ public class AdminSettingsPageController {
           backendApiClient.get("/api/v1/settings/" + INTAKE_SK_SETTING_KEY, SystemSettingDto.class);
       intakeSpecialCommandId = intakeSetting.value() == null ? "" : intakeSetting.value();
       intakeSpecialCommandVersion = intakeSetting.version();
+    } catch (BackendServiceException e) {
+      log.debug("Could not fetch job-order intake special-command setting", e);
     } catch (Exception e) {
-      log.warn("Could not fetch job-order intake special-command setting");
+      log.warn("Could not fetch job-order intake special-command setting", e);
     }
     model.addAttribute("intakeSpecialCommandId", intakeSpecialCommandId);
     model.addAttribute("intakeSpecialCommandVersion", intakeSpecialCommandVersion);

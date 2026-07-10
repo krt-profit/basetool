@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -104,6 +105,10 @@ public class AdminBlueprintsPageController {
       } else {
         populateEmpty(model);
       }
+    } catch (BackendServiceException e) {
+      log.debug("Error loading blueprints data (search={})", trimmed, e);
+      model.addAttribute("error", "error.admin.blueprints.load");
+      populateEmpty(model);
     } catch (Exception e) {
       log.error("Error loading blueprints data (search={})", trimmed, e);
       model.addAttribute("error", "error.admin.blueprints.load");

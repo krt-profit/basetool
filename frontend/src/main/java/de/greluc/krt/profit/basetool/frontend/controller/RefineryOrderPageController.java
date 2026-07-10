@@ -1018,9 +1018,12 @@ public class RefineryOrderPageController {
     Collection<? extends GrantedAuthority> authorities =
         (auth != null) ? auth.getAuthorities() : principal.getAuthorities();
 
+    // REQ-OBS-004: never log principal.getName() (the Keycloak preferred_username handle — PII the
+    // appender PiiMasker does not scrub). Log the same stable short pseudonym used for the
+    // backend-flag grant below (BackendRoleSyncFilter.maskPrincipal shape).
     log.debug(
-        "Checking logistician status for user: {}, authorities: {}",
-        principal.getName(),
+        "Checking logistician status for user u-{}, authorities: {}",
+        Integer.toHexString(java.util.Objects.hashCode(principal.getName())),
         authorities);
     Collection<? extends GrantedAuthority> reachableAuthorities =
         roleHierarchy.getReachableGrantedAuthorities(authorities);
@@ -1045,7 +1048,7 @@ public class RefineryOrderPageController {
           // a few lines down does not carry the principal at all.
           log.info(
               "Granting logistician by backend flag for user: u-{}",
-              Integer.toHexString(principal.getName().hashCode()));
+              Integer.toHexString(java.util.Objects.hashCode(principal.getName())));
           result = true;
         }
       } catch (Exception e) {

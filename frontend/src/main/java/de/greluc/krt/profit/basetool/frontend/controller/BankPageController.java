@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.BankTransferFeeRateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -480,6 +481,9 @@ public class BankPageController {
     PageResponse<BankBookingDto> bookings;
     try {
       bookings = fetchBookings(id, effectivePage, size, period.fromInstant(), period.toInstant());
+    } catch (BackendServiceException e) {
+      log.debug("Error loading bookings for account {}", id, e);
+      bookings = null;
     } catch (RuntimeException e) {
       log.error("Error loading bookings for account {}", id, e);
       bookings = null;
@@ -622,6 +626,9 @@ public class BankPageController {
     PageResponse<BankHolderBookingDto> bookings;
     try {
       bookings = fetchHolderBookings(id, effectivePage);
+    } catch (BackendServiceException e) {
+      log.debug("Error loading holder bookings fragment for holder {}", id, e);
+      bookings = null;
     } catch (Exception e) {
       log.error("Error loading holder bookings fragment for holder {}", id, e);
       bookings = null;

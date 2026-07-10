@@ -130,6 +130,10 @@ public class AdminSpecialCommandsPageController {
 
     try {
       model.addAttribute("specialCommands", fetchSpecialCommands(includeInactive));
+    } catch (BackendServiceException e) {
+      log.debug("Error loading SpecialCommands", e);
+      model.addAttribute("specialCommands", List.of());
+      model.addAttribute("error", "error.admin.specialcommands.load");
     } catch (Exception e) {
       log.error("Error loading SpecialCommands", e);
       model.addAttribute("specialCommands", List.of());
@@ -350,6 +354,9 @@ public class AdminSpecialCommandsPageController {
       }
       model.addAttribute("specialCommand", sc);
       model.addAttribute("members", fetchMembers(id));
+    } catch (BackendServiceException e) {
+      log.debug("Load SpecialCommand detail failed", e);
+      return "redirect:/admin/special-commands?error=LoadSpecialCommandDetailFailed";
     } catch (Exception e) {
       log.error("Load SpecialCommand detail failed", e);
       return "redirect:/admin/special-commands?error=LoadSpecialCommandDetailFailed";

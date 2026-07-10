@@ -191,14 +191,45 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   }
 
   /**
-   * Transport failure reaching the backend (connection refused, timeout) or an open circuit → 502.
+   * A genuine transport failure reaching the backend (connection refused, timeout) → 502. This is
+   * the signal the backend is down and is what opens the circuit breaker, so it is logged at WARN.
    *
-   * @param ex the request/circuit exception
+   * @param ex the request exception
    * @return a 502 problem
    */
-  @ExceptionHandler({WebClientRequestException.class, CallNotPermittedException.class})
-  public @NotNull ProblemDetail handleBackendUnreachable(@NotNull Exception ex) {
+  @ExceptionHandler(WebClientRequestException.class)
+  public @NotNull ProblemDetail handleBackendTransportFailure(
+      @NotNull WebClientRequestException ex) {
     log.warn("Backend relay failed: {}", ex.getClass().getSimpleName());
+    return backendUnavailable();
+  }
+
+  /**
+   * A call short-circuited by the already-open {@code backend} circuit breaker → 502. Logged at
+   * DEBUG, not WARN (REQ-OBS-001): the open breaker rejects every {@code /v1} call for its whole
+   * wait-duration-in-open-state window, so at WARN a routine backend restart would flood the log
+   * (the ingest analogue of issue #1203). The one-time state-transition WARN (the {@code
+   * BackendImportClient} listener) plus the {@code resilience4j_circuitbreaker_state} gauge are the
+   * health signal; nothing depends on this per-call line.
+   *
+   * @param ex the circuit-open exception
+   * @return a 502 problem
+   */
+  @ExceptionHandler(CallNotPermittedException.class)
+  public @NotNull ProblemDetail handleBackendCircuitOpen(@NotNull CallNotPermittedException ex) {
+    // Reference the exception (class name only — no stack trace at DEBUG for a routine
+    // short-circuit).
+    log.debug("Backend circuit open ({}); rejecting relay", ex.getClass().getSimpleName());
+    return backendUnavailable();
+  }
+
+  /**
+   * Shared 502 body + {@code backend_unavailable} handoff-error count for both the
+   * transport-failure and open-circuit branches.
+   *
+   * @return the 502 problem
+   */
+  private @NotNull ProblemDetail backendUnavailable() {
     countHandoffError(MetricNames.REASON_BACKEND_UNAVAILABLE);
     return problem(
         HttpStatus.BAD_GATEWAY,
@@ -277,7 +308,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             : message.substring(0, MAX_RELAYED_DETAIL);
       }
     } catch (JacksonException e) {
-      log.debug("Could not parse backend problem+json body; using a generic detail.");
+      log.debug("Could not parse backend problem+json body; using a generic detail.", e);
     }
     return GENERIC_BACKEND_REJECT;
   }

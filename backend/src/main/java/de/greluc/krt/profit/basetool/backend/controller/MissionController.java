@@ -1411,7 +1411,7 @@ public class MissionController {
       log.info("Manager {} removed from mission {} successfully", userId, id);
       return missionMapper.toDto(mission);
     } catch (Exception e) {
-      log.error("Failed to remove manager {} from mission {}: {}", userId, id, e.getMessage(), e);
+      log.debug("Failed to remove manager {} from mission {}: {}", userId, id, e.getMessage(), e);
       throw e;
     }
   }
