@@ -116,11 +116,15 @@ class RedisSessionConfigTest {
     verify(repository).setFlushMode(expected);
   }
 
-  /** The customizer also re-applies the configured session timeout and Redis key namespace. */
+  /**
+   * The customizer applies the short <em>anonymous</em> idle window (REQ-SEC-025, ADR-0088) as the
+   * repository default — a real login later promotes its session to the long authenticated window
+   * in {@code SessionLifetimeUpgradeSuccessHandler} — plus the Redis key namespace.
+   */
   @Test
-  void customizerAppliesTimeoutAndNamespace() {
+  void customizerAppliesAnonymousTimeoutAndNamespace() {
     RedisIndexedSessionRepository repository = applyCustomizer("IMMEDIATE");
-    verify(repository).setDefaultMaxInactiveInterval(Duration.ofHours(240));
+    verify(repository).setDefaultMaxInactiveInterval(Duration.ofMinutes(30));
     verify(repository).setRedisKeyNamespace("basetool:session");
   }
 
@@ -153,7 +157,7 @@ class RedisSessionConfigTest {
    */
   private static RedisIndexedSessionRepository applyCustomizer(String flushModeValue) {
     RedisSessionConfig config = new RedisSessionConfig();
-    ReflectionTestUtils.setField(config, "sessionTimeout", Duration.ofHours(240));
+    ReflectionTestUtils.setField(config, "anonymousSessionTimeout", Duration.ofMinutes(30));
     ReflectionTestUtils.setField(config, "redisNamespace", "basetool:session");
     ReflectionTestUtils.setField(config, "flushModeValue", flushModeValue);
     SessionRepositoryCustomizer<RedisIndexedSessionRepository> customizer =

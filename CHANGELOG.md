@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Fehler behoben: Anmelde-Sitzungen häufen sich nicht mehr unbegrenzt im Sitzungsspeicher an.** Anonyme Seitenaufrufe (etwa durch Uptime- oder Suchmaschinen-Bots) legten bisher jeweils eine 30 Tage gültige Sitzung in Redis an; so liefen über 16.000 verwaiste Sitzungen auf, die den Speicher langfristig gefüllt und irgendwann Anmeldungen blockiert hätten. Nicht angemeldete Sitzungen laufen jetzt nach kurzer Zeit ab, während das 30-Tage-Fenster „Angemeldet bleiben" erst nach erfolgreicher Anmeldung greift und für Mitglieder unverändert bleibt. Ein neuer Alarm (`ActiveSessionsRunaway`) warnt, falls sich so etwas wiederholt (REQ-SEC-025, ADR-0088, #1188).
+
 ## [v1.2.6](https://github.com/krt-profit/basetool/releases/tag/v1.2.6) - 2026-07-09
 
 ### Added

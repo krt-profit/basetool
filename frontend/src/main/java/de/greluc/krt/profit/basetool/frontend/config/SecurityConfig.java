@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.config;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
@@ -214,7 +215,8 @@ public class SecurityConfig {
           String keycloakIssuerUri,
       org.springframework.beans.factory.ObjectProvider<
               org.springframework.security.core.session.SessionRegistry>
-          sessionRegistryProvider)
+          sessionRegistryProvider,
+      AuthenticationSuccessHandler oauth2LoginSuccessHandler)
       throws Exception {
     SmartOidcLogoutSuccessHandler oidcLogoutSuccessHandler =
         new SmartOidcLogoutSuccessHandler(clientRegistrationRepository, "{baseUrl}");
@@ -369,7 +371,7 @@ public class SecurityConfig {
                     // code-to-token / JWKS / state failure breaks all logins with no other frontend
                     // signal — KeycloakLoginErrorSpike's event regex misses code-to-token errors.
                     .failureHandler(new LoginFailureMetricsHandler(meterRegistry, "/?error"))
-                    .successHandler(oauth2LoginSuccessHandler())
+                    .successHandler(oauth2LoginSuccessHandler)
                     .authorizationEndpoint(
                         auth ->
                             auth.authorizationRequestResolver(
@@ -455,21 +457,34 @@ public class SecurityConfig {
   }
 
   /**
-   * Builds the post-OAuth2-login success handler. Wraps the default {@link
+   * Builds the post-OAuth2-login success handler chain. Innermost is the {@link
+   * AssetAwareAuthenticationSuccessHandler}, which wraps the default {@link
    * org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler}
    * so that saved requests pointing to static-asset URLs (background sourcemap lookups,
    * favicon/font/CSS probes from DevTools and browser extensions) are dropped and the user is sent
-   * to the context root instead of a 404 asset path. See {@link
-   * AssetAwareAuthenticationSuccessHandler} for the full rationale and the matched-path list.
+   * to the context root instead of a 404 asset path. That is wrapped by {@link
+   * SessionLifetimeUpgradeSuccessHandler}, which promotes the session from the short anonymous idle
+   * window to the long authenticated window (REQ-SEC-025, ADR-0088), and finally by {@link
+   * LoginSuccessMetricsHandler}, which counts the successful login.
    *
+   * @param authenticatedSessionTimeout the idle window an authenticated session should carry
+   *     ({@code app.session.authenticated-timeout}, default the 30-day "stay logged in" window); a
+   *     login promotes its short anonymous session to this window
    * @return the success handler wired into {@code .oauth2Login().successHandler(...)}
    */
   @Bean
-  public AuthenticationSuccessHandler oauth2LoginSuccessHandler() {
-    // #1041 item 18: wrap the asset-aware handler so a successful login is counted into
+  public AuthenticationSuccessHandler oauth2LoginSuccessHandler(
+      @Value("${app.session.authenticated-timeout:720h}") Duration authenticatedSessionTimeout) {
+    // #1041 item 18: the outer metrics handler counts a success into
     // basetool_login_total{outcome="success"} — the denominator FrontendLoginBroken checks against.
+    // REQ-SEC-025: the middle handler upgrades the just-authenticated session's idle window from
+    // the
+    // short anonymous default (which keeps orphan CSRF sessions from accreting) to the long login
+    // window, so real members keep the 30-day "stay logged in" behaviour.
     return new LoginSuccessMetricsHandler(
-        meterRegistry, new AssetAwareAuthenticationSuccessHandler());
+        meterRegistry,
+        new SessionLifetimeUpgradeSuccessHandler(
+            authenticatedSessionTimeout, new AssetAwareAuthenticationSuccessHandler()));
   }
 
   private OAuth2AuthorizationRequestResolver authorizationRequestResolver(
