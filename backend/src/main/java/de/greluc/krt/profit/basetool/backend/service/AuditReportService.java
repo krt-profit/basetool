@@ -156,7 +156,7 @@ public class AuditReportService {
    */
   private void ensureWithinExportCap(long count, @NotNull String label) {
     if (count > MAX_EXPORT_ROWS) {
-      log.warn(
+      log.debug(
           "Audit export for {} would load {} rows (> cap {}); rejecting",
           label,
           count,

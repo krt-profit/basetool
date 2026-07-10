@@ -104,6 +104,7 @@ public class UexUniverseSyncService {
     log.info("Starting sync for Citys...");
     List<UexCityDto> dtos = uexClient.getCities();
     if (dtos.isEmpty()) {
+      log.warn("No cities received from UEX API. Aborting city synchronization.");
       return;
     }
     for (UexCityDto dto : dtos) {
@@ -201,6 +202,7 @@ public class UexUniverseSyncService {
     log.info("Starting sync for Factions...");
     List<UexFactionDto> dtos = uexClient.getFactions();
     if (dtos.isEmpty()) {
+      log.warn("No factions received from UEX API. Aborting faction synchronization.");
       return;
     }
     for (UexFactionDto dto : dtos) {
@@ -247,6 +249,7 @@ public class UexUniverseSyncService {
     log.info("Starting sync for Jurisdictions...");
     List<UexJurisdictionDto> dtos = uexClient.getJurisdictions();
     if (dtos.isEmpty()) {
+      log.warn("No jurisdictions received from UEX API. Aborting jurisdiction synchronization.");
       return;
     }
     for (UexJurisdictionDto dto : dtos) {
@@ -290,6 +293,7 @@ public class UexUniverseSyncService {
     log.info("Starting sync for Moons...");
     List<UexMoonDto> dtos = uexClient.getMoons();
     if (dtos.isEmpty()) {
+      log.warn("No moons received from UEX API. Aborting moon synchronization.");
       return;
     }
     for (UexMoonDto dto : dtos) {
@@ -337,6 +341,7 @@ public class UexUniverseSyncService {
     log.info("Starting sync for Orbits...");
     List<UexOrbitDto> dtos = uexClient.getOrbits();
     if (dtos.isEmpty()) {
+      log.warn("No orbits received from UEX API. Aborting orbit synchronization.");
       return;
     }
     for (UexOrbitDto dto : dtos) {
@@ -383,6 +388,7 @@ public class UexUniverseSyncService {
     log.info("Starting sync for Outposts...");
     List<UexOutpostDto> dtos = uexClient.getOutposts();
     if (dtos.isEmpty()) {
+      log.warn("No outposts received from UEX API. Aborting outpost synchronization.");
       return;
     }
     for (UexOutpostDto dto : dtos) {
@@ -457,6 +463,7 @@ public class UexUniverseSyncService {
     log.info("Starting sync for Planets...");
     List<UexPlanetDto> dtos = uexClient.getPlanets();
     if (dtos.isEmpty()) {
+      log.warn("No planets received from UEX API. Aborting planet synchronization.");
       return;
     }
     for (UexPlanetDto dto : dtos) {
@@ -505,6 +512,7 @@ public class UexUniverseSyncService {
     log.info("Starting sync for Pois...");
     List<UexPoiDto> dtos = uexClient.getPoi();
     if (dtos.isEmpty()) {
+      log.warn("No points of interest received from UEX API. Aborting POI synchronization.");
       return;
     }
     for (UexPoiDto dto : dtos) {
@@ -582,6 +590,7 @@ public class UexUniverseSyncService {
     log.info("Starting sync for SpaceStations...");
     List<UexSpaceStationDto> dtos = uexClient.getSpaceStations();
     if (dtos.isEmpty()) {
+      log.warn("No space stations received from UEX API. Aborting space station synchronization.");
       return;
     }
     for (UexSpaceStationDto dto : dtos) {
@@ -685,6 +694,7 @@ public class UexUniverseSyncService {
     log.info("Starting sync for Terminals...");
     List<UexTerminalDto> dtos = uexClient.getTerminals();
     if (dtos.isEmpty()) {
+      log.warn("No terminals received from UEX API. Aborting terminal synchronization.");
       return;
     }
     Instant syncedAt = Instant.now();
