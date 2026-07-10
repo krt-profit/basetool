@@ -249,6 +249,18 @@ class UexItemSyncServiceTest {
     assertEquals(4752, persisted.getUexItemId());
     assertEquals("Pulse Greycat Laser Pistol", persisted.getName(), "other columns still sync");
     assertEquals(GameItemKind.ARMOR, persisted.getKind());
+
+    // The decline is expected steady state (no per-item WARN, #1205): the run summary surfaces it
+    // as
+    // a single aggregate count so prod keeps visibility without one warning per sync per sibling.
+    verify(syncReportService)
+        .logUexEvent(
+            any(),
+            eq(SyncEventType.SYNC_RUN_SUMMARY),
+            eq("game_item"),
+            isNull(),
+            isNull(),
+            contains("sharedUuidDeclined=1"));
   }
 
   @Test
