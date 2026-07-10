@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryStackDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.InventoryForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
@@ -446,7 +445,10 @@ public class InventoryPageController {
     model.addAttribute("locations", fetchLocations());
     model.addAttribute("jobOrders", fetchActiveJobOrders());
     model.addAttribute("missions", fetchMissions());
-    model.addAttribute("users", fetchUsers());
+    // #1193: the /all book-out/transfer target-user picker (inventory-admin.html) now searches
+    // users
+    // on demand (remote-users combobox -> /users/search), so the preloaded users list is no longer
+    // populated here. fetchUsers() is still used by the /my view's picker below.
     model.addAttribute("authUserId", currentAuthName());
     model.addAttribute("canEditForeignNotes", hasLogisticianOrAbove());
 
@@ -675,28 +677,60 @@ public class InventoryPageController {
     // page
     // degrades exactly as the serial version did.
     final InventoryForm boundForm = form;
-    boolean global = boundForm != null && Boolean.TRUE.equals(boundForm.getIsGlobal());
-    CompletableFuture<List<UserReferenceDto>> usersFuture = null;
-    if (global) {
-      usersFuture = parallelPageLoader.loadAsync(this::fetchUsers);
-    }
+    // #1193: the admin "assign to user" picker (inventory-input.html, shown when isGlobal) now
+    // searches users on demand (remote-users combobox -> /users/search), so the preloaded roster is
+    // no longer fetched here. Only the currently-chosen target user is seeded (edit-mode label), so
+    // a re-render after a validation/backend error still shows — and keeps — the picked user.
     var materialsFuture = parallelPageLoader.loadAsync(this::fetchMaterials);
     var locationsFuture = parallelPageLoader.loadAsync(this::fetchLocations);
     var missionsFuture = parallelPageLoader.loadAsync(this::fetchMissions);
     var jobOrdersFuture = parallelPageLoader.loadAsync(this::fetchActiveJobOrders);
     var ownerFuture = parallelPageLoader.loadAsync(() -> fetchOwnerPickerOptions(boundForm));
+    var selectedUserFuture = parallelPageLoader.loadAsync(() -> fetchSelectedInputUser(boundForm));
     CompletableFuture.allOf(
-            materialsFuture, locationsFuture, missionsFuture, jobOrdersFuture, ownerFuture)
+            materialsFuture,
+            locationsFuture,
+            missionsFuture,
+            jobOrdersFuture,
+            ownerFuture,
+            selectedUserFuture)
         .join();
-    if (usersFuture != null) {
-      model.addAttribute("users", usersFuture.join());
-    }
     model.addAttribute("materials", materialsFuture.join());
     model.addAttribute("locations", locationsFuture.join());
     model.addAttribute("missions", missionsFuture.join());
     model.addAttribute("jobOrders", jobOrdersFuture.join());
     model.addAttribute("ownerOptions", ownerFuture.join());
+    model.addAttribute("selectedUser", selectedUserFuture.join());
     return "inventory-input";
+  }
+
+  /**
+   * Resolves the admin-chosen target user for the inventory-input "assign to user" picker's
+   * edit-mode seed (#1193): the picker now searches server-side rather than preloading the roster,
+   * so only the currently-selected user's option is rendered and needs a display name. Returns
+   * {@code null} when the form is not a global entry, has no chosen user, or the lookup fails
+   * (leaving the picker on its "own entry" placeholder).
+   *
+   * @param form the inbound inventory form; may be {@code null} before binding.
+   * @return the selected user DTO for the seed option, or {@code null}.
+   */
+  private de.greluc.krt.profit.basetool.frontend.model.dto.UserDto fetchSelectedInputUser(
+      InventoryForm form) {
+    if (form == null || !Boolean.TRUE.equals(form.getIsGlobal()) || form.getUserId() == null) {
+      return null;
+    }
+    try {
+      return backendApiClient.get(
+          "/api/v1/users/" + form.getUserId(),
+          de.greluc.krt.profit.basetool.frontend.model.dto.UserDto.class);
+    } catch (Exception e) {
+      // REQ-OBS-004: log the id only, never the resolved name.
+      log.warn(
+          "Failed to resolve selected user {} for inventory-input picker seed",
+          form.getUserId(),
+          e);
+      return null;
+    }
   }
 
   /**

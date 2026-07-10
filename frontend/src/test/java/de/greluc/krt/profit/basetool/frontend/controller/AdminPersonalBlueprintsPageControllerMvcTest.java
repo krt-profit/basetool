@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyClass;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
@@ -74,14 +75,13 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void view_rendersForAdmin_withUserPicker() throws Exception {
-    PageResponse<UserDto> users = new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(users);
-
+    // #1193: the bare page (no user selected) makes no backend call — the picker searches on
+    // demand.
     mockMvc
         .perform(get("/admin/personal-blueprints"))
         .andExpect(status().isOk())
         .andExpect(view().name("admin/personal-blueprints"))
-        .andExpect(model().attributeExists("users"))
+        .andExpect(content().string(containsString("data-krt-combobox=\"remote-users\"")))
         .andExpect(model().attributeExists("blueprints"))
         .andExpect(model().attribute("adminMode", Boolean.TRUE));
   }
@@ -140,13 +140,25 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
         .andExpect(content().string(not(containsString("krt-admin-banner"))));
   }
 
-  // covers REQ-FE-011 — the admin user picker is the shared searchable combobox, and each option
-  // carries the username as a secondary search term (data-search) so typing the login name matches
-  // a
-  // user whose display name differs from it.
+  // covers REQ-FE-011 (post-#1193) — the admin member picker is the shared searchable combobox in
+  // server-side-search mode: it carries the remote-users marker and, with no selection, ships NO
+  // preloaded option roster (no data-search terms), so it scales to the 5000-account target.
   @Test
   @WithMockUser(roles = "ADMIN")
-  void view_userPicker_isSearchableComboboxWithUsernameSearchTerm() throws Exception {
+  void view_userPicker_isRemoteSearchCombobox_withoutRosterPreload() throws Exception {
+    mockMvc
+        .perform(get("/admin/personal-blueprints"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-krt-combobox=\"remote-users\"")))
+        .andExpect(content().string(not(containsString("data-search"))));
+  }
+
+  // covers REQ-FE-011 (post-#1193) — edit mode: when a member is selected the picker seeds exactly
+  // that member's option (id + display name) via the single-user lookup, so the box shows the name
+  // rather than a raw sub even though the roster is no longer preloaded.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void view_userPicker_seedsSelectedMemberInEditMode() throws Exception {
     UserDto user =
         new UserDto(
             UUID.fromString("00000000-0000-0000-0000-000000000009"),
@@ -167,18 +179,22 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
             0L,
             null,
             null);
-    // With no userSub the only backend call is the user-list fetch (blueprints default to empty),
-    // so
-    // a single stub safely seeds the picker options without leaking into the blueprint table.
-    PageResponse<UserDto> users = new PageResponse<>(List.of(user), 0, 1000, 1L, 1, List.of());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(users);
+    PageResponse<PersonalBlueprintDto> emptyBlueprints =
+        new PageResponse<>(List.of(), 0, 200, 0, 0, List.of());
+    // fetchUser uses the Class overload (UserDto.class); fetchOwned uses the
+    // ParameterizedTypeReference
+    // overload — stub each so the seed option and the (empty) blueprint table both resolve.
+    when(backendApiClient.get(anyString(), anyClass())).thenReturn(user);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(emptyBlueprints);
 
     mockMvc
-        .perform(get("/admin/personal-blueprints"))
+        .perform(
+            get("/admin/personal-blueprints")
+                .param("userSub", "00000000-0000-0000-0000-000000000009"))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("data-krt-combobox")))
-        .andExpect(content().string(containsString("data-search=\"alice_login\"")))
-        .andExpect(content().string(containsString("Alice Display")));
+        .andExpect(content().string(containsString("data-krt-combobox=\"remote-users\"")))
+        .andExpect(content().string(containsString("Alice Display")))
+        .andExpect(content().string(containsString("00000000-0000-0000-0000-000000000009")));
   }
 
   // covers REQ-INV-024 — the global "delete all users' blueprints" danger zone renders for an admin

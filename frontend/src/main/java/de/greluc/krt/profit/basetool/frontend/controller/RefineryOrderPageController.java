@@ -45,8 +45,11 @@ import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
@@ -122,10 +125,6 @@ public class RefineryOrderPageController {
   private static final ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>
       ORG_UNIT_MEMBERSHIP_OPTION_LIST =
           new ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>() {};
-
-  /** Captured generic type for decoding the paged users catalog. */
-  private static final ParameterizedTypeReference<PageResponse<UserDto>> USER_PAGE =
-      new ParameterizedTypeReference<PageResponse<UserDto>>() {};
 
   /** Captured generic type for the active job-order reference projections (store dropdown). */
   private static final ParameterizedTypeReference<List<JobOrderReferenceDto>>
@@ -353,7 +352,14 @@ public class RefineryOrderPageController {
     var methodsFuture = parallelPageLoader.loadAsync(this::fetchMethods);
     var locationsFuture = parallelPageLoader.loadAsync(this::fetchLocations);
     var missionsFuture = parallelPageLoader.loadAsync(this::fetchMissions);
-    var usersFuture = parallelPageLoader.loadAsync(this::fetchUsers);
+    // Owner picker is a server-side searchable combobox (remote-users, #1193): seed only the
+    // current
+    // owner's display name (the caller by default), not the whole roster.
+    var seedNamesFuture =
+        parallelPageLoader.loadAsync(
+            () ->
+                resolveSeedUserNames(
+                    boundForm.getOwnerId() == null ? List.of() : List.of(boundForm.getOwnerId())));
     var roundingFuture = parallelPageLoader.loadAsync(this::fetchRoundingMode);
     var yieldsFuture =
         parallelPageLoader.loadAsync(() -> fetchYieldsForLocation(preselectedLocationId));
@@ -364,7 +370,7 @@ public class RefineryOrderPageController {
             methodsFuture,
             locationsFuture,
             missionsFuture,
-            usersFuture,
+            seedNamesFuture,
             roundingFuture,
             yieldsFuture,
             ownerFuture)
@@ -373,7 +379,7 @@ public class RefineryOrderPageController {
     model.addAttribute("methods", methodsFuture.join());
     model.addAttribute("locations", locationsFuture.join());
     model.addAttribute("missions", missionsFuture.join());
-    model.addAttribute("users", usersFuture.join());
+    model.addAttribute("seedUserNames", seedNamesFuture.join());
     model.addAttribute("roundingMode", roundingFuture.join());
     model.addAttribute("materialYieldBonuses", yieldsFuture.join());
     model.addAttribute("ownerOptions", ownerFuture.join());
@@ -628,7 +634,23 @@ public class RefineryOrderPageController {
     RefineryOrderForm formInModel = (RefineryOrderForm) model.getAttribute("refineryOrderForm");
     UUID preserveMissionId = formInModel != null ? formInModel.getMissionId() : null;
     model.addAttribute("missions", fetchMissions(preserveMissionId));
-    model.addAttribute("users", fetchUsers());
+    // The owner + per-item receiver pickers are now server-side searchable comboboxes
+    // (remote-users,
+    // #1193): instead of preloading the whole roster, seed only the display names of the users the
+    // form actually references (the owner and each store item's receiver — all default to the
+    // caller). Bounded by the distinct referenced ids, not the roster size.
+    Set<UUID> seedIds = new LinkedHashSet<>();
+    if (formInModel != null && formInModel.getOwnerId() != null) {
+      seedIds.add(formInModel.getOwnerId());
+    }
+    if (model.getAttribute("storeForm") instanceof RefineryOrderStoreForm storeFormInModel) {
+      for (RefineryOrderStoreItemForm storeItem : storeFormInModel.getItems()) {
+        if (storeItem.getUserId() != null) {
+          seedIds.add(storeItem.getUserId());
+        }
+      }
+    }
+    model.addAttribute("seedUserNames", resolveSeedUserNames(seedIds));
     model.addAttribute("jobOrders", fetchActiveJobOrders());
     model.addAttribute("roundingMode", fetchRoundingMode());
 
@@ -899,16 +921,34 @@ public class RefineryOrderPageController {
     }
   }
 
-  private List<UserDto> fetchUsers() {
-    try {
-      PageResponse<UserDto> p = backendApiClient.get("/api/v1/users?size=1000", USER_PAGE);
-      if (p != null && p.content() != null) {
-        return new ArrayList<>(p.content());
+  /**
+   * Resolves the display names of exactly the users the owner + per-item receiver pickers
+   * reference, so those server-side searchable comboboxes (remote-users, #1193) can seed their
+   * preselected option without preloading the whole roster. Bounded by the distinct referenced ids
+   * (owner + store receivers — all default to the caller, so usually one), never the roster size. A
+   * failed or unknown id is simply absent from the map (the picker then shows its placeholder
+   * rather than a raw id); {@code effectiveName} falls back to the username.
+   *
+   * @param ids the distinct user ids the form references; never {@code null}, possibly empty.
+   * @return a map from user id to display name for the referenced users; never {@code null}.
+   */
+  private Map<UUID, String> resolveSeedUserNames(Collection<UUID> ids) {
+    Map<UUID, String> names = new HashMap<>();
+    for (UUID id : ids) {
+      if (id == null || names.containsKey(id)) {
+        continue;
       }
-    } catch (Exception e) {
-      log.error("Failed to fetch users", e);
+      try {
+        UserDto user = backendApiClient.get("/api/v1/users/" + id, UserDto.class);
+        if (user != null) {
+          names.put(id, user.effectiveName() != null ? user.effectiveName() : user.username());
+        }
+      } catch (Exception e) {
+        // REQ-OBS-004: log the id only, never the resolved name.
+        log.warn("Failed to resolve seed user name for refinery picker (id {})", id, e);
+      }
     }
-    return new ArrayList<>();
+    return names;
   }
 
   /**

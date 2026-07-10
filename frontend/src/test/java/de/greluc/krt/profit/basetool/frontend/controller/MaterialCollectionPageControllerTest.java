@@ -25,7 +25,6 @@ import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
@@ -48,24 +47,21 @@ class MaterialCollectionPageControllerTest {
     UUID jobOrderId = UUID.randomUUID();
 
     List<Map<String, Object>> entries = List.of(Map.of("materialName", "Laranite"));
-    List<UserReferenceDto> users =
-        List.of(new UserReferenceDto(UUID.randomUUID(), "user1", "User One", "User One", 1));
     List<LocationReferenceDto> locations =
         List.of(new LocationReferenceDto(UUID.randomUUID(), "Port Olisar"));
 
     when(backendApiClient.get(contains("/material-collection"), anyTypeRef())).thenReturn(entries);
-    when(backendApiClient.get(contains("/users/lookup"), anyTypeRef())).thenReturn(users);
     when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
         .thenReturn(locations);
 
     // When
     String viewName = controller.viewMaterialCollection(jobOrderId, model);
 
-    // Then
+    // Then — #1193: the owner picker searches on demand, so no user roster is preloaded/modelled.
     assertEquals("material-collection", viewName);
     assertEquals(jobOrderId, model.getAttribute("jobOrderId"));
     assertEquals(entries, model.getAttribute("entries"));
-    assertEquals(users, model.getAttribute("users"));
+    assertNull(model.getAttribute("users"));
     assertEquals(locations, model.getAttribute("locations"));
   }
 
@@ -80,7 +76,6 @@ class MaterialCollectionPageControllerTest {
 
     when(backendApiClient.get(contains("/material-collection"), anyTypeRef()))
         .thenThrow(new BackendServiceException("Backend error", null, 500));
-    when(backendApiClient.get(contains("/users/lookup"), anyTypeRef())).thenReturn(List.of());
     when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
         .thenReturn(List.of());
 
@@ -95,32 +90,6 @@ class MaterialCollectionPageControllerTest {
   }
 
   @Test
-  void viewMaterialCollection_shouldHandleBackendErrorForUsers() {
-    // Given
-    BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MaterialCollectionPageController controller =
-        new MaterialCollectionPageController(backendApiClient);
-    Model model = new ConcurrentModel();
-    UUID jobOrderId = UUID.randomUUID();
-
-    when(backendApiClient.get(contains("/material-collection"), anyTypeRef()))
-        .thenReturn(List.of());
-    when(backendApiClient.get(contains("/users/lookup"), anyTypeRef()))
-        .thenThrow(new BackendServiceException("Backend error", null, 500));
-    when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
-        .thenReturn(List.of());
-
-    // When
-    String viewName = controller.viewMaterialCollection(jobOrderId, model);
-
-    // Then
-    assertEquals("material-collection", viewName);
-    List<?> users = (List<?>) model.getAttribute("users");
-    assertNotNull(users);
-    assertTrue(users.isEmpty());
-  }
-
-  @Test
   void viewMaterialCollection_shouldHandleBackendErrorForLocations() {
     // Given
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
@@ -131,7 +100,6 @@ class MaterialCollectionPageControllerTest {
 
     when(backendApiClient.get(contains("/material-collection"), anyTypeRef()))
         .thenReturn(List.of());
-    when(backendApiClient.get(contains("/users/lookup"), anyTypeRef())).thenReturn(List.of());
     when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
         .thenThrow(new BackendServiceException("Backend error", null, 500));
 

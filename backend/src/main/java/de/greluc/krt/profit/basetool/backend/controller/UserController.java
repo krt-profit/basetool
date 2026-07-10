@@ -182,6 +182,58 @@ public class UserController {
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort) {
+    return runSearch(query, page, size, sort);
+  }
+
+  /**
+   * Bank-audience twin of {@link #searchUsers}: the paged username/displayName substring search
+   * behind the bank pickers that resolve grantees / holders across the whole user base (register a
+   * holder, grant the Bank-Employee role, set an approval limit — ADR-0089, the {@code
+   * remoteSource} scaling switch of #1193 / ADR-0053). Query, scope and projection are identical to
+   * {@link #searchUsers} — {@link UserService#searchByUsername(String, Pageable)} already resolves
+   * the same {@code currentUserListScopeSquadronIds} scope, which for an org-role-less bank manager
+   * is the unfiltered all-users set. The ONLY difference is the widened role gate: it mirrors
+   * {@code /lookup} (adds {@code BANK_EMPLOYEE}, which covers {@code BANK_MANAGEMENT} via the role
+   * hierarchy) so a bank employee/manager who holds no org role can drive the picker. Kept as a
+   * separate path rather than widening {@code /search} so the ordinary picker's authorization
+   * regime stays unchanged (REQ-BANK-008/009/044).
+   *
+   * @return paged user DTOs (peer-redacted for non-elevated callers, exactly as {@code /search})
+   */
+  @GetMapping("/search-bank")
+  @PreAuthorize(
+      "hasAnyRole('"
+          + Roles.ADMIN
+          + "', '"
+          + Roles.OFFICER
+          + "', '"
+          + Roles.KRT_MEMBER
+          + "', '"
+          + Roles.BANK_EMPLOYEE
+          + "')")
+  @Transactional(readOnly = true)
+  public PageResponse<UserDto> searchUsersForBank(
+      @RequestParam String query,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String sort) {
+    return runSearch(query, page, size, sort);
+  }
+
+  /**
+   * Shared body of the two user-search endpoints ({@link #searchUsers} / {@link
+   * #searchUsersForBank}): resolves the page request against the whitelisted sort fields, runs the
+   * squadron-scoped username/displayName search, and maps each hit through the peer redaction. The
+   * two endpoints differ only in their {@code @PreAuthorize} role gate, so the query + projection
+   * live here once.
+   *
+   * @param query free-text username/displayName filter.
+   * @param page requested page index, or {@code null} for the first page.
+   * @param size requested page size, or {@code null} for the default.
+   * @param sort requested sort expression, or {@code null} for the username default.
+   * @return the paged, peer-redacted search result.
+   */
+  private PageResponse<UserDto> runSearch(String query, Integer page, Integer size, String sort) {
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "username");
     Page<de.greluc.krt.profit.basetool.backend.model.User> p =

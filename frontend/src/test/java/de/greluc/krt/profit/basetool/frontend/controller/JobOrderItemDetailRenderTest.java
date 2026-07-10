@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -791,11 +792,13 @@ class JobOrderItemDetailRenderTest {
         .perform(get("/orders/" + orderId).with(authentication(logisticianToken(userId))))
         .andExpect(status().isOk());
 
-    // Each of the four independent logistician lookups fires exactly once — the parallel fan-out
-    // does not duplicate any round-trip.
+    // Each of the independent logistician lookups fires exactly once — the parallel fan-out does
+    // not
+    // duplicate any round-trip. The assignee-add picker no longer preloads the roster (#1193: it
+    // searches /users/search on demand), so the page issues no /api/v1/users?size=1000 fetch.
     verify(backendApiClient, times(1))
         .getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef());
-    verify(backendApiClient, times(1)).get(eq("/api/v1/users?size=1000"), anyTypeRef());
+    verify(backendApiClient, never()).get(eq("/api/v1/users?size=1000"), anyTypeRef());
     verify(backendApiClient, times(1))
         .getCached(eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef(), eq(true));
     verify(backendApiClient, times(1))
