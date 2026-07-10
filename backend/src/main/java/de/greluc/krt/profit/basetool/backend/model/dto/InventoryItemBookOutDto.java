@@ -40,7 +40,7 @@ import org.jetbrains.annotations.Nullable;
  * refused with 400 until the destructive cleanup release loosens NOT NULL on the legacy {@code
  * owning_squadron_id} column.
  *
- * <p>Ignored for {@link CheckoutType#CONSUME} and {@link CheckoutType#SELL} — both terminate the
+ * <p>Ignored for {@link CheckoutType#DISCARD} and {@link CheckoutType#SELL} — both terminate the
  * inventory row and never create a new ownership stamp.
  */
 public record InventoryItemBookOutDto(
