@@ -154,9 +154,16 @@ every other UEX column still syncs. Without this guard the loser sibling (e.g. U
 "Pulse Greycat Laser Pistol" skin) logged a `uk_game_item_external_uuid` ERROR on each sync and never
 updated any of its own columns.
 
+A declined backfill is the **expected, permanent steady state** for a shared-uuid sibling, not a
+fault: no admin action can make two rows own one UNIQUE `external_uuid`. It is therefore logged at
+`DEBUG` (not `WARN`) so a production run at `INFO` stays clean, and the run instead reports a single
+aggregate `sharedUuidDeclined` count on both the `Finished …` summary line and the
+`SYNC_RUN_SUMMARY` event — one number per run rather than one warning per sibling per sync (#1205).
+
 **Acceptance** (`UexItemSyncServiceTest`): each item upsert runs through the `self` proxy; the
-per-item `catch` keeps the run going past a failure so the remaining items still persist; and an
-incoming uuid already owned by another row leaves the row's `external_uuid` null instead of throwing.
+per-item `catch` keeps the run going past a failure so the remaining items still persist; an incoming
+uuid already owned by another row leaves the row's `external_uuid` null instead of throwing; and the
+run summary carries the `sharedUuidDeclined` count of such rows.
 
 ### REQ-DATA-006 — every hot predicate and foreign key has a covering index
 
