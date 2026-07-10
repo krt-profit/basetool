@@ -34,6 +34,97 @@
 
 /* global OPS_DETAIL_MSG, MSG_PAYOUT_PAID_ERROR, MSG_PAYOUT_PAID_FORBIDDEN, MSG_PAYOUT_PAID_UNSET_LOCKED, OPS_FINANCE_DETAIL_ERROR */
 
+// ---- Live multi-user sync (REQ-FE-010 / REQ-FE-015, ADR-0092) -------------------------------
+// A peer's core save / paid-out toggle re-renders the affected operation section fragment in place
+// for every other viewer, over the shared /ws/sync socket. Only opaque section keys cross the wire;
+// each viewer re-pulls its own authorization-checked fragment. OPERATION_SECTIONS is the single
+// source of truth shared by the write-side broadcast and the receive-side refresh (the three-mirror-
+// points rule): its keys mirror the server-side LiveSyncTopicClass.OPERATION whitelist.
+const OPERATION_SECTIONS = {
+    overview: { container: '#op-overview-results', fragmentValue: 'overview' },
+    missions: { container: '#op-missions-results', fragmentValue: 'missions' },
+    payout: { container: '#op-payout-results', fragmentValue: 'payout' },
+    finance: { container: '#op-finance-results', fragmentValue: 'finance' },
+};
+
+(function () {
+    if (!window.krtFetch || typeof window.krtFetch.sectionWrite !== 'function') {
+        return; // no-JS / no-foundation: the classic POST->redirect forms run.
+    }
+    const operationSeam = window.krtFetch.sectionWrite({
+        dict: function () {
+            return { 'operation.section.refresh.error': OPS_DETAIL_MSG.sectionRefreshError };
+        },
+        keys: { refreshErrorKey: 'operation.section.refresh.error' },
+        sections: OPERATION_SECTIONS,
+        pageUrl: function () {
+            return window.operationId ? '/operations/' + window.operationId : null;
+        },
+        // Tell other users viewing this operation that these sections changed (REQ-FE-015).
+        broadcast: function (keys) {
+            if (
+                window.operationId &&
+                window.krtLiveSync &&
+                typeof window.krtLiveSync.sendChanged === 'function'
+            ) {
+                window.krtLiveSync.sendChanged('operation:' + window.operationId, keys);
+            }
+        },
+    });
+    // opRefreshSection re-renders one or more sections in place (and broadcasts unless
+    // {broadcast:false}); opNotifyChanged broadcasts only (for handlers that already patched their
+    // own DOM surgically, e.g. the paid-out toggle keeps its per-row cell patch).
+    window.opRefreshSection = operationSeam.refresh;
+    window.opNotifyChanged = operationSeam.notify;
+
+    // Inbound peer changes: subscribe to operation:{id} on /ws/sync and re-fetch the affected section
+    // fragments locally with {broadcast:false} so an applied peer change never echoes back.
+    if (window.operationId && window.krtLiveSync && window.krtLiveSync.createReceiver) {
+        window.krtLiveSync.createReceiver({
+            topic: 'operation:' + window.operationId,
+            sections: OPERATION_SECTIONS,
+            refresh: function (keys) {
+                if (window.opRefreshSection) {
+                    window.opRefreshSection(keys, { broadcast: false });
+                }
+            },
+            pill: {
+                label: function () {
+                    return OPS_DETAIL_MSG.livesyncUpdates;
+                },
+            },
+        });
+    }
+
+    // After an in-place OVERVIEW swap (local OR peer-driven) patch the sticky header parts that live
+    // outside the fragment — the title (#operation-title) and the status pill — from the fresh values
+    // #operation-head-meta exposes.
+    document.addEventListener('krt:swapped', function (ev) {
+        const container = ev && ev.detail && ev.detail.container;
+        if (!container || container.id !== 'op-overview-results') {
+            return;
+        }
+        const meta = document.getElementById('operation-head-meta');
+        if (!meta) {
+            return;
+        }
+        const name = meta.getAttribute('data-name');
+        const title = document.getElementById('operation-title');
+        if (title && name != null) {
+            title.textContent = OPS_DETAIL_MSG.prefix + ' ' + name;
+        }
+        const status = (meta.getAttribute('data-status') || '').trim();
+        const statusLabel = meta.getAttribute('data-status-label');
+        const pill = document.querySelector('.mission-head-title .status-pill');
+        if (pill && status) {
+            pill.className = 'status-pill status-' + status;
+            if (statusLabel != null) {
+                pill.textContent = statusLabel;
+            }
+        }
+    });
+})();
+
 // ---- Tab switching (deeplink ?tab= + localStorage fallback, WAI-ARIA tabs) -----------------
 (function () {
     const tabs = Array.from(document.querySelectorAll('.tab-nav[role="tablist"] > .tab[data-tab]'));
@@ -263,9 +354,13 @@ function opsDetailConflict() {
                     if (body && body.version != null && versionInput) {
                         versionInput.value = body.version;
                     }
-                    const title = document.getElementById('operation-title');
-                    if (title && body && body.name != null) {
-                        title.textContent = OPS_DETAIL_MSG.prefix + ' ' + body.name;
+                    // Re-render the overview section in place (status pill, description, at-a-glance)
+                    // and broadcast 'overview' to peers; the krt:swapped header patcher repaints the
+                    // sticky title + status pill from #operation-head-meta. Replaces the former
+                    // title-only patch so a core save reflects everywhere, locally and for peers
+                    // (REQ-FE-015).
+                    if (window.opRefreshSection) {
+                        window.opRefreshSection('overview');
                     }
                 },
             });
@@ -379,6 +474,11 @@ async function handlePayoutPaidToggle(checkbox) {
         });
         if (result && result.ok && result.body) {
             refreshPayoutPaidStatusCell(checkbox.closest('tr[data-participant-id]'), result.body);
+            // Actor keeps its surgical per-row patch; broadcast 'payout' so peers re-fetch the whole
+            // payout fragment and see the new paid-out state (REQ-FE-015).
+            if (window.opNotifyChanged) {
+                window.opNotifyChanged(['payout']);
+            }
         }
     } finally {
         if (!(checkbox.checked && !canUnsetPaidOut())) {
@@ -387,12 +487,14 @@ async function handlePayoutPaidToggle(checkbox) {
     }
 }
 
-document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('.payout-paid-checkbox').forEach(function (checkbox) {
-        checkbox.addEventListener('change', function () {
-            handlePayoutPaidToggle(checkbox);
-        });
-    });
+// Document-delegated so the checkboxes survive a peer-driven payout fragment swap (their listeners
+// would die if bound directly at load, #571/#574). `change` bubbles, so plain delegation suffices.
+document.addEventListener('change', function (ev) {
+    const checkbox =
+        ev.target && ev.target.closest ? ev.target.closest('.payout-paid-checkbox') : null;
+    if (checkbox) {
+        handlePayoutPaidToggle(checkbox);
+    }
 });
 
 // ---- Lazy per-mission finance breakdown (#1121) ----
@@ -434,9 +536,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 body.appendChild(p);
             });
     }
-    document.querySelectorAll('details[data-op-finance-mission]').forEach(function (details) {
-        details.addEventListener('toggle', function () {
-            loadDetail(details);
-        });
-    });
+    // Document-delegated on the CAPTURE phase: the `toggle` event does not bubble, so a plain
+    // bubbling delegation would never fire — capture catches it at the document. This also survives a
+    // peer-driven finance fragment swap that replaces the <details> elements (REQ-FE-015).
+    document.addEventListener(
+        'toggle',
+        function (ev) {
+            const details = ev.target;
+            if (details && details.matches && details.matches('details[data-op-finance-mission]')) {
+                loadDetail(details);
+            }
+        },
+        true,
+    );
 })();

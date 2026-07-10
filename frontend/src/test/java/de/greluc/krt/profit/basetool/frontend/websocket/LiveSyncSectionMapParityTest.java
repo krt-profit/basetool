@@ -56,6 +56,16 @@ class LiveSyncSectionMapParityTest {
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.MISSION.allowedSections());
   }
 
+  @Test
+  void operationSeamMap_matchesTheOperationTopicWhitelist() throws IOException {
+    Set<String> jsKeys = seamMapKeys("/static/js/operation-detail.js", "OPERATION_SECTIONS");
+    assertThat(jsKeys)
+        .as(
+            "OPERATION_SECTIONS keys in operation-detail.js vs LiveSyncTopicClass.OPERATION"
+                + " whitelist")
+        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.OPERATION.allowedSections());
+  }
+
   /**
    * Extracts the top-level keys of a JS object literal assigned to {@code variableName} in the
    * given classpath resource.

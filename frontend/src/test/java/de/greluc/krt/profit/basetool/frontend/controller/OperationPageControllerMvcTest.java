@@ -38,6 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import de.greluc.krt.profit.basetool.frontend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.frontend.model.dto.FinanceType;
@@ -333,6 +334,115 @@ class OperationPageControllerMvcTest {
             eq("/api/v1/operations/" + opId + "/payouts"),
             eq(OperationPayoutSummaryDto.class),
             anyBoolean());
+  }
+
+  // ── Live-sync section fragments (REQ-FE-015, ADR-0092) — the peer-refresh swap targets ──────
+  // overview / payout / finance each render only their own fragment and load only the reads that
+  // fragment needs (ADR-0078/ADR-0081 fragment-gating); an unknown fragment or a backend failure
+  // degrades to the inline section error, never a redirect.
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void operationDetail_fragmentOverview_rendersOverviewSection() throws Exception {
+    UUID opId = UUID.randomUUID();
+    stubDetailEndpoints(
+        opId, new OperationDto(opId, "Op Frag", "", "PLANNED", null, 0L, null, null, null));
+
+    mockMvc
+        .perform(get("/operations/" + opId).param("fragment", "overview").locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andExpect(view().name("operation-detail :: overviewSection"))
+        // The head-meta carrier the sticky-header patcher reads is inside the fragment.
+        .andExpect(content().string(containsString("id=\"operation-head-meta\"")))
+        // The sticky-header shell lives OUTSIDE the fragment and must not be re-rendered.
+        .andExpect(content().string(not(containsString("id=\"operation-head-sticky\""))));
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void operationDetail_fragmentPayout_rendersPayoutSection_andSkipsFinanceAndMissions()
+      throws Exception {
+    UUID opId = UUID.randomUUID();
+    when(backendApiClient.get(
+            eq("/api/v1/operations/" + opId), eq(OperationDto.class), anyBoolean()))
+        .thenReturn(new OperationDto(opId, "Op", "", "PLANNED", null, 0L, null, null, null));
+    when(backendApiClient.get(
+            eq("/api/v1/operations/" + opId + "/payouts"),
+            eq(OperationPayoutSummaryDto.class),
+            anyBoolean()))
+        .thenReturn(new OperationPayoutSummaryDto(BigDecimal.ZERO, List.of()));
+
+    mockMvc
+        .perform(get("/operations/" + opId).param("fragment", "payout").locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andExpect(view().name("operation-detail :: payoutSection"))
+        // The pane shell (with the data attributes) lives outside the swapped fragment.
+        .andExpect(content().string(not(containsString("id=\"pane-op-payout\""))));
+
+    // Fragment-gating: the payout fragment must not pay the finance-summary or missions reads.
+    verify(backendApiClient, never())
+        .get(
+            eq("/api/v1/operations/" + opId + "/finance-summary"),
+            eq(OperationFinanceSummaryDto.class),
+            anyBoolean());
+    verify(backendApiClient, never())
+        .get(contains("/api/v1/missions/search?operationId=" + opId), anyTypeRef(), anyBoolean());
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void operationDetail_fragmentFinance_rendersFinanceSection_andSkipsOperationRead()
+      throws Exception {
+    UUID opId = UUID.randomUUID();
+    when(backendApiClient.get(
+            eq("/api/v1/operations/" + opId + "/finance-summary"),
+            eq(OperationFinanceSummaryDto.class),
+            anyBoolean()))
+        .thenReturn(new OperationFinanceSummaryDto(opId, BigDecimal.ZERO, List.of(), false));
+    when(backendApiClient.get(
+            eq("/api/v1/operations/" + opId + "/payouts"),
+            eq(OperationPayoutSummaryDto.class),
+            anyBoolean()))
+        .thenReturn(new OperationPayoutSummaryDto(BigDecimal.ZERO, List.of()));
+    when(backendApiClient.get(
+            contains("/api/v1/missions/search?operationId=" + opId), anyTypeRef(), anyBoolean()))
+        .thenReturn(new PageResponse<>(List.<MissionListDto>of(), 0, 10, 0L, 0, List.of()));
+
+    mockMvc
+        .perform(get("/operations/" + opId).param("fragment", "finance").locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andExpect(view().name("operation-detail :: financeSection"))
+        .andExpect(content().string(not(containsString("id=\"pane-op-fin\""))));
+
+    // Fragment-gating: the finance fragment does not need the operation-detail read.
+    verify(backendApiClient, never())
+        .get(eq("/api/v1/operations/" + opId), eq(OperationDto.class), anyBoolean());
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void operationDetail_fragmentUnknown_rendersFragmentError() throws Exception {
+    UUID opId = UUID.randomUUID();
+
+    mockMvc
+        .perform(get("/operations/" + opId).param("fragment", "bogus").locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andExpect(view().name("operation-detail :: fragmentError"));
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void operationDetail_fragmentBackendFailure_rendersFragmentError() throws Exception {
+    UUID opId = UUID.randomUUID();
+    when(backendApiClient.get(
+            eq("/api/v1/operations/" + opId), eq(OperationDto.class), anyBoolean()))
+        .thenThrow(new RuntimeException("backend down"));
+
+    mockMvc
+        .perform(get("/operations/" + opId).param("fragment", "payout").locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andExpect(view().name("operation-detail :: fragmentError"))
+        .andExpect(content().string(containsString("Abschnitt konnte nicht aktualisiert werden")));
   }
 
   // #1121: the per-mission finance breakdown loads lazily via GET /operations/{id}/finance/{mid}
