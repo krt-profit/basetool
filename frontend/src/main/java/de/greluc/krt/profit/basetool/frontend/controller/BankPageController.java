@@ -30,7 +30,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankTransferFeeRateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.math.BigDecimal;
@@ -76,13 +75,6 @@ public class BankPageController {
    * /api/v1/bank/accounts?size=500}) that fills the transfer-destination select.
    */
   private static final ParameterizedTypeReference<PageResponse<BankAccountDto>> BANK_ACCOUNT_PAGE =
-      new ParameterizedTypeReference<>() {};
-
-  /**
-   * Response type for the deposit/withdrawal counterparty picker lookup ({@code
-   * /api/v1/users/lookup}, REQ-BANK-044).
-   */
-  private static final ParameterizedTypeReference<List<UserReferenceDto>> USER_REFERENCE_LIST =
       new ParameterizedTypeReference<>() {};
 
   /**
@@ -194,11 +186,12 @@ public class BankPageController {
    * Assembles the shared "Kontobewegung" direct-booking modal's catalog data for the dashboard's
    * full-page render (REQ-BANK-023, #997). Every active account is both a bookable source and a
    * transfer destination on this non-account-scoped surface (a same-account transfer is rejected by
-   * the backend, REQ-BANK-006); the holder registry, counterparty user lookup, all-kinds org-unit
-   * picklist and the in-game transfer-fee rate feed the modal's selectors and live fee preview. The
-   * modal books through the unchanged {@code /deposits} / {@code /withdrawals} / {@code /transfers}
-   * endpoints, so this adds no new endpoint, audit event or metric. Mirrors {@code
-   * BankRequestQueuePageController}.
+   * the backend, REQ-BANK-006); the holder registry, all-kinds org-unit picklist and the in-game
+   * transfer-fee rate feed the modal's selectors and live fee preview. The deposit/withdrawal
+   * counterparty picker is a server-side searchable combobox (remote-bank-users, #1193 follow-up),
+   * so no user roster is preloaded here. The modal books through the unchanged {@code /deposits} /
+   * {@code /withdrawals} / {@code /transfers} endpoints, so this adds no new endpoint, audit event
+   * or metric. Mirrors {@code BankRequestQueuePageController}.
    *
    * @param model the MVC model populated with the movement-modal catalogs and {@code canBook}
    */
@@ -221,9 +214,6 @@ public class BankPageController {
         holders == null
             ? List.<BankHolderDto>of()
             : holders.stream().filter(BankHolderDto::active).toList());
-    List<UserReferenceDto> users =
-        backendApiClient.get("/api/v1/users/lookup", USER_REFERENCE_LIST);
-    model.addAttribute("users", users == null ? List.<UserReferenceDto>of() : users);
     List<OrgUnitMembershipOptionDto> allOrgUnits =
         backendApiClient.get("/api/v1/org-units/active-all-kinds", ORG_UNIT_OPTION_LIST);
     model.addAttribute(
@@ -402,14 +392,12 @@ public class BankPageController {
                     .filter(a -> "ACTIVE".equals(a.status()))
                     .toList(),
                 BankAccountDto::name));
-    // User lookup feeds the deposit/withdrawal counterparty picker (Einzahler / Empfänger,
-    // REQ-BANK-044) on the always-present booking modals, so it is fetched on every detail render
-    // (the /lookup gate now admits BANK_EMPLOYEE). Approval limits are read-only on this surface
-    // (REQ-BANK-041) — they are configured only in the org-unit bank — so the lookup no longer
-    // feeds a limit editor here.
-    List<UserReferenceDto> lookup =
-        backendApiClient.get("/api/v1/users/lookup", USER_REFERENCE_LIST);
-    model.addAttribute("users", lookup == null ? List.<UserReferenceDto>of() : lookup);
+    // The deposit/withdrawal counterparty picker (Einzahler / Empfänger, REQ-BANK-044) on the
+    // always-present booking modals is a server-side searchable combobox (remote-bank-users, #1193
+    // follow-up) that queries /users/search-bank on demand, so no user roster is preloaded here.
+    // Approval limits are read-only on this surface (REQ-BANK-041) — they are configured only in
+    // the
+    // org-unit bank — so no user lookup is needed for a limit editor either.
     // All active org units (all kinds) feed the external-counterparty unit picklist (REQ-BANK-044,
     // #994): an external Einzahler/Empfänger may be attributed to any org unit, not just a tool
     // user's own memberships. isAuthenticated on the backend, so a bank employee may read it.

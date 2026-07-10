@@ -26,6 +26,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
+import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.assertions.LocatorAssertions;
@@ -64,6 +65,7 @@ class BankBookingE2eTest {
   private static String holderBId;
   private static String uiAccountId;
   private static String uiHolderId;
+  private static String employeeId;
 
   @BeforeAll
   static void setUp() {
@@ -74,8 +76,12 @@ class BankBookingE2eTest {
     }
     seeder = new BackendSeeder();
 
-    String employeeId = seeder.getUserId(EMPLOYEE_USER, EMPLOYEE_PASSWORD);
+    employeeId = seeder.getUserId(EMPLOYEE_USER, EMPLOYEE_PASSWORD);
     String mgmtId = seeder.getUserId(MGMT_USER, MGMT_PASSWORD);
+    // Give the employee a single org-unit (IRIDIUM) membership so the counterparty picker's
+    // dependent Einheit select has a membership to resolve and auto-select (REQ-BANK-044, #1193
+    // follow-up: the counterparty-picker E2E below). Idempotent + harmless to the booking flows.
+    seeder.ensureIridiumMembership(EMPLOYEE_USER, EMPLOYEE_PASSWORD);
 
     accountId =
         seeder.createBankAccount(MGMT_USER, MGMT_PASSWORD, "E2E Booking Account", "SPECIAL");
@@ -263,6 +269,60 @@ class BankBookingE2eTest {
         0,
         balance(uiAccountId).compareTo(before.add(new BigDecimal("1554"))),
         "both in-place UI deposits increased the balance by 777 each");
+  }
+
+  /**
+   * Drives the deposit/withdrawal counterparty picker end to end (REQ-BANK-044, #1193 follow-up):
+   * it is now a server-side searchable combobox (remote-bank-users → {@code /users/search-bank}),
+   * not a preloaded {@code <select>}. Proves the two interacting behaviours a straight conversion
+   * must not break: (1) picking a registered tool user drives the dependent Einheit select from
+   * that user's memberships — the combobox's hidden-input {@code change} still fires bank.js's
+   * {@code fillCounterpartyOrgUnits}, which enables the select and auto-selects a single
+   * membership; and (2) the "kein Tool-Account" external toggle swaps the registered combobox for
+   * the free-text name input and keeps the (now all-org-units-widened) Einheit select usable. The
+   * counterparty is add-only and optional, so this exercises only the picker — it does not submit.
+   */
+  @Test
+  void counterpartyPickerRemoteSearchDrivesOrgUnitAndExternalToggle() {
+    String baseUrl = STACK.baseUrl();
+    try (BrowserContext context =
+        browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.login(page, baseUrl, EMPLOYEE_USER, EMPLOYEE_PASSWORD);
+        E2eSupport.navigate(page, baseUrl + "/bank/accounts/" + uiAccountId);
+        page.waitForLoadState();
+        // Open the unified Kontobewegung modal; Einzahlung is the default type, so its Einzahler
+        // counterparty block is the active one.
+        page.locator("[data-testid='bank-movement-open']")
+            .click(new Locator.ClickOptions().setTimeout(20_000));
+
+        // The counterparty user picker is a remote combobox: opening it fetches from
+        // /users/search-bank on demand, and picking the employee (seeded with a single IRIDIUM
+        // membership) commits the value via the enhancer's hidden input.
+        Locator cpUser = page.locator("[data-testid='bank-mv-cp-deposit-user']");
+        E2eSupport.selectComboboxByValue(cpUser, employeeId);
+
+        // (1) Org-unit dependency: the hidden input's bubbling `change` drives
+        // fillCounterpartyOrgUnits,
+        // which enables the Einheit select and auto-selects the user's single membership.
+        Locator cpOrg = page.locator("[data-testid='bank-mv-cp-deposit-ou']");
+        assertThat(cpOrg).isEnabled(new LocatorAssertions.IsEnabledOptions().setTimeout(20_000));
+        assertThat(cpOrg).not().hasValue("");
+
+        // (2) External toggle: "kein Tool-Account" swaps to the free-text name input and hides the
+        // registered combobox, while the Einheit select stays usable (widened to all org units).
+        page.locator("[data-testid='bank-mv-cp-deposit-external']").check();
+        Locator cpName = page.locator("[data-testid='bank-mv-cp-deposit-name']");
+        assertThat(cpName).isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
+        assertThat(cpName).isEnabled();
+        assertThat(cpUser).isHidden();
+        assertThat(cpOrg).isEnabled();
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "bank-counterparty-picker");
+        throw failure;
+      }
+    }
   }
 
   /**

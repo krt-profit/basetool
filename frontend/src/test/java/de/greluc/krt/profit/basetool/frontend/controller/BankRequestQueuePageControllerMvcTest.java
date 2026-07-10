@@ -23,6 +23,8 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -234,7 +236,13 @@ class BankRequestQueuePageControllerMvcTest {
         // Field hints are inline "?" tooltip markers, not sub-field text.
         .andExpect(content().string(Matchers.containsString("field-hint-marker")))
         // A type-gated row is present for the JS to switch.
-        .andExpect(content().string(Matchers.containsString("data-movement-types")));
+        .andExpect(content().string(Matchers.containsString("data-movement-types")))
+        // #1193 follow-up: the deposit/withdrawal counterparty picker is a server-side searchable
+        // combobox (remote-bank-users), not a preloaded <select>.
+        .andExpect(
+            content().string(Matchers.containsString("data-krt-combobox=\"remote-bank-users\"")));
+    // ...and the roster is fetched on demand, so no all-users lookup is issued to preload it.
+    verify(backendApiClient, never()).get(eq("/api/v1/users/lookup"), anyTypeRef());
   }
 
   /**
