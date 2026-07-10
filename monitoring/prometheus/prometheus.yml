@@ -58,31 +58,31 @@ scrape_configs:
         labels:
           application: basetool-backend
 
+  # ADR-0090: frontend + ingest serve Actuator on a DEDICATED internal-only management port (18091 /
+  # 11272), never host-published nor NPM-proxied, so /actuator/** is off the public connector. The
+  # management port is unauthenticated (Boot's management-context security backs off given the apps'
+  # custom chains), so — unlike the backend below — these jobs carry NO basic_auth: ADR-0072's
+  # fail-closed basic-auth is superseded by the port isolation (REQ-OBS-005 amended). Still HTTPS with
+  # the pinned CA (same keystore.p12, SAN dns:frontend / dns:ingest) so REQ-OBS-008 holds unchanged.
   - job_name: basetool-frontend
     metrics_path: /actuator/prometheus
     scheme: https
-    basic_auth:
-      username: monitoring
-      password_file: /etc/prometheus/secrets/scrape_password
     tls_config:
       ca_file: /etc/prometheus/certs/basetool-ca.crt
       server_name: frontend
     static_configs:
-      - targets: ["frontend:18081"]
+      - targets: ["frontend:18091"]
         labels:
           application: basetool-frontend
 
   - job_name: basetool-ingest
     metrics_path: /actuator/prometheus
     scheme: https
-    basic_auth:
-      username: monitoring
-      password_file: /etc/prometheus/secrets/scrape_password
     tls_config:
       ca_file: /etc/prometheus/certs/basetool-ca.crt
       server_name: ingest
     static_configs:
-      - targets: ["ingest:11262"]
+      - targets: ["ingest:11272"]
         labels:
           application: basetool-ingest
 
@@ -195,8 +195,16 @@ scrape_configs:
       module: [http_deny_404]
     static_configs:
       - targets:
+          # The whole `/actuator` prefix is denied at the NPM edge (`location /actuator` → 404),
+          # so NEITHER the metrics endpoint NOR the health endpoint is internet-reachable. Both are
+          # asserted per public host: `/actuator/prometheus` (the credentialed metrics surface) and
+          # `/actuator/health` (liveness/readiness/build info — a passive info leak if it drifts
+          # open). Health/metrics reach Prometheus over net-monitoring-scrape and the Docker
+          # HEALTHCHECK over localhost, so neither needs any edge exposure (REQ-OBS-005/-012).
           - https://profit-base.online/actuator/prometheus
+          - https://profit-base.online/actuator/health
           - https://ingest.profit-base.online/actuator/prometheus
+          - https://ingest.profit-base.online/actuator/health
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target

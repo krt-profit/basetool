@@ -90,6 +90,29 @@ public final class MetricNames {
   /** Error code: the identity provider (Keycloak JWKS) was unreachable — retryable 503. */
   public static final String CODE_SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE";
 
+  /**
+   * Counter {@code basetool_bot_blocked_total} — tag {@code rule} ({@link #BOT_RULE_METHOD} /
+   * {@link #BOT_RULE_PATH_PREFIX} / {@link #BOT_RULE_FILE_EXTENSION}). Bumped by {@link
+   * de.greluc.krt.profit.basetool.ingest.filter.BotProtectionFilter} at its three reject branches
+   * (REQ-INGEST-009), which are otherwise {@code log.debug}-only (prod-invisible). Shares its name
+   * with the frontend bot counter; the {@code application} common tag distinguishes the module. The
+   * counter also surfaces a self-inflicted false positive when a new legit route matches a blocked
+   * prefix (REQ-OBS-011).
+   */
+  public static final String BOT_BLOCKED = "basetool.bot.blocked";
+
+  /** Tag key: the bot-protection reject rule on {@link #BOT_BLOCKED}. */
+  public static final String TAG_RULE = "rule";
+
+  /** Bot-block rule: a disallowed HTTP method (answered 405). */
+  public static final String BOT_RULE_METHOD = "method";
+
+  /** Bot-block rule: a known bot/scanner path prefix (answered 404). */
+  public static final String BOT_RULE_PATH_PREFIX = "path_prefix";
+
+  /** Bot-block rule: a never-served file extension (answered 404). */
+  public static final String BOT_RULE_FILE_EXTENSION = "file_extension";
+
   private MetricNames() {
     // Constants holder — not instantiable.
   }

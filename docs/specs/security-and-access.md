@@ -519,6 +519,13 @@ isolated `net-monitoring-scrape` network so **Prometheus scrapes `http://keycloa
 plain HTTP** there. Dev/test are exempt (Keycloak stays HTTP; the admin URL is plain HTTP and no
 `keycloak-trust` bundle is defined, so `KeycloakService` falls back to the default client).
 
+Since **ADR-0090** the two internet-facing Spring Boot modules (`frontend`, `ingest`) adopt the same
+"management interface on an internal-only port, never host-published nor NPM-proxied" pattern in
+prod: `/actuator/**` moves to a dedicated `management.server.port` (frontend `18091`, ingest `11272`,
+HTTPS via the shared keystore) reachable only from `net-monitoring-scrape` and the container-local
+`HEALTHCHECK`, so their public connectors expose no Actuator at all. See `REQ-OBS-005` (amended) for
+the authoritative rule.
+
 **Monitoring-plane cleartext carve-out (owner-approved amendment, 2026-07-02).** The HTTPS-only edge
 posture above still holds for every app/Keycloak/NPM edge. It is deliberately amended for traffic that
 stays **inside the isolated monitoring Docker networks** (`net-monitoring-scrape` /

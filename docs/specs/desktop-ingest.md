@@ -42,7 +42,10 @@ network only.
 **Acceptance**
 
 - [x] The gateway exposes only the two documented ingest endpoints plus the actuator
-  health endpoint; every other path is 404/401.
+  health endpoint; every other path is 404/401. (Since **ADR-0090**, in prod the actuator
+  endpoints move to a dedicated internal-only `management.server.port` — port `11272`, reachable
+  only from the scrape network and the container-local healthcheck — so the **public** connector
+  exposes only the two `/v1` ingest endpoints; `/actuator/**` there answers 404.)
 - [x] An ingest call results in exactly one forwarded call to the matching backend import
   endpoint, carrying the caller's bearer, and no backend write.
 - [x] The gateway declares no `DataSource`/JPA and runs no schema migration (architecture
@@ -234,6 +237,47 @@ authorization-annotated; the gateway adds no new authority) · **Code:** ingest 
 backend `SecurityConfig` audience knob; Keycloak realm config per
 [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md); `ROLES_AND_PERMISSIONS.md` unchanged ·
 **Issues:** #641
+
+### REQ-INGEST-009 — Bot / scanner hardening at the edge
+
+The gateway is the only new internet-reachable surface (`REQ-INGEST-001`), so it is a constant
+target of automated scanners probing for WordPress, PHP, Actuator, WebDAV and hidden-config paths.
+A pre-security `BotProtectionFilter` (the gateway mirror of the frontend filter) rejects these
+before they reach Spring Security — so a scan never spins up the resource-server bearer-token filter
+or an identity-provider round-trip — using three fixed, case-insensitive strategies:
+
+- **Disallowed HTTP method → 405.** The gateway only ever uses `GET` (actuator / api-docs), `POST`
+  (the two `/v1` ingest endpoints), `HEAD` (health probes) and `OPTIONS` (CORS preflight). Every
+  other method — `PUT`/`DELETE`/`PATCH` verb-tampering, `TRACE`/`CONNECT`, WebDAV `PROPFIND`/`MKCOL`/…
+  — is refused. This method set is deliberately narrower than the frontend's.
+- **Known bot/scanner path prefix → 404** (`/wp-*`, `/.env`, `/phpmyadmin`, `/actuator/env`, …).
+- **Never-served file extension → 404** (`.php`, `.asp`, `.sql`, `.env`, …).
+
+The filter runs after `CorrelationIdFilter` (a blocked request is still correlation-tagged) and
+before the size-cap, rate-limit and Spring Security filters. The gateway's real surface — `/v1/**`,
+`/actuator/health` (+ liveness/readiness), `/actuator/prometheus` (exact match → the fail-closed
+scrape chain still runs) and `/v3/api-docs` (non-prod) — is never blocked. Each reject bumps
+`basetool_bot_blocked_total{rule}` (bounded `rule` ∈ {`method`, `path_prefix`, `file_extension`};
+never the URI or method — `REQ-OBS-006/-011`), shared with the frontend counter and distinguished by
+the `application` common tag; it makes the otherwise `log.debug`-only rejects visible and surfaces a
+self-inflicted false positive if a future legit route matches a blocked prefix.
+
+**Acceptance**
+
+- [x] A request for a known bot path (`/wp-admin/…`, `/.env`, `/actuator/env`, …) or a never-served
+  file extension is answered 404 without reaching the security chain; a disallowed method is
+  answered 405.
+- [x] The gateway's real surface (`/v1/**`, `/actuator/health*`, `/actuator/prometheus`,
+  `/v3/api-docs*`) passes the filter unchanged.
+- [x] Every reject increments `basetool_bot_blocked_total` under its bounded `rule` tag and nothing
+  else (no URI/method label).
+
+**Enforced by:** `BotProtectionFilterTest` (path-prefix / file-extension 404, disallowed-method 405,
+real-surface pass-through incl. `/v3/api-docs` and the exact-match prometheus whitelist, per-`rule`
+counter) · **Code:** `BotProtectionFilter`, `MetricNames` (`BOT_BLOCKED` + `rule` values);
+`observability.md` (`REQ-OBS-011`), the "Bot-blocked/hour by rule" panel in
+[`07-basetool-operations.json`](../../monitoring/grafana/dashboards/07-basetool-operations.json) ·
+**Issues:** #1202
 
 ## Out of scope
 
