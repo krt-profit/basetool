@@ -39,7 +39,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -89,10 +88,6 @@ public class AdminPersonalBlueprintsPageController {
   /** Page size for the owned-blueprint list — one row per product. */
   private static final int PAGE_SIZE = 200;
 
-  /** Response type for the paged {@code /api/v1/users} member-picker read. */
-  private static final ParameterizedTypeReference<PageResponse<UserDto>> USER_PAGE_TYPE =
-      new ParameterizedTypeReference<>() {};
-
   /** Response type for the paged admin owned-blueprint list read. */
   private static final ParameterizedTypeReference<PageResponse<PersonalBlueprintDto>>
       PERSONAL_BLUEPRINT_PAGE_TYPE = new ParameterizedTypeReference<>() {};
@@ -120,10 +115,12 @@ public class AdminPersonalBlueprintsPageController {
       @RequestParam(required = false) String fragment,
       Model model) {
     boolean isFragment = "results".equals(fragment);
-    // The member <select> (and the user list it needs) live OUTSIDE the swap target, so a same-user
-    // filter swap does not re-render the picker.
-    if (!isFragment) {
-      model.addAttribute("users", fetchUsers());
+    // The member picker is now a server-side searchable combobox (remote-users, #1193): instead of
+    // preloading the whole roster, seed only the selected member's option (edit-mode label) via a
+    // single lookup. It lives OUTSIDE the swap target, so a same-user filter swap does not touch
+    // it.
+    if (!isFragment && userSub != null && !userSub.isBlank()) {
+      model.addAttribute("selectedUser", fetchUser(userSub));
     }
     model.addAttribute("selectedUserSub", userSub);
     model.addAttribute("filterQuery", q == null ? "" : q);
@@ -380,25 +377,22 @@ public class AdminPersonalBlueprintsPageController {
   }
 
   /**
-   * Fetches the squadron member list for the picker, sorted alphabetically by username.
+   * Resolves a single member for the picker's edit-mode seed (#1193): the picker now searches
+   * server-side rather than preloading the roster, so only the currently-selected member's option
+   * is rendered and needs its display name. Returns {@code null} on any failure (a malformed sub is
+   * rejected by the backend {@code UUID} binding), leaving the picker with just its placeholder.
    *
-   * @return the user list, or an empty list on failure
+   * @param userSub the selected member's Keycloak {@code sub}; never {@code null}/blank here.
+   * @return the member DTO for the seed option, or {@code null} when the lookup fails.
    */
-  private List<UserDto> fetchUsers() {
+  private UserDto fetchUser(String userSub) {
     try {
-      PageResponse<UserDto> result =
-          backendApiClient.get("/api/v1/users?size=1000", USER_PAGE_TYPE);
-      if (result == null || result.content() == null) {
-        return Collections.emptyList();
-      }
-      List<UserDto> users = new ArrayList<>(result.content());
-      users.sort(
-          Comparator.comparing(
-              u -> u.username() == null ? "" : u.username(), String.CASE_INSENSITIVE_ORDER));
-      return users;
+      return backendApiClient.get("/api/v1/users/" + enc(userSub), UserDto.class);
     } catch (Exception e) {
-      log.error("Failed to fetch user list for admin personal blueprints", e);
-      return Collections.emptyList();
+      // REQ-OBS-004: log the id only, never the resolved name.
+      log.warn(
+          "Failed to fetch selected member {} for admin personal blueprints picker", userSub, e);
+      return null;
     }
   }
 

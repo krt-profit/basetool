@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankGrantDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.LinkedHashMap;
@@ -57,16 +56,13 @@ public class BankGrantsPageController {
   private static final ParameterizedTypeReference<PageResponse<BankAccountDto>>
       BANK_ACCOUNT_PAGE_TYPE = new ParameterizedTypeReference<>() {};
 
-  /** Response type for the user-reference lookup ({@code GET /api/v1/users/lookup}). */
-  private static final ParameterizedTypeReference<List<UserReferenceDto>> USER_REFERENCE_LIST_TYPE =
-      new ParameterizedTypeReference<>() {};
-
   private final BackendApiClient backendApiClient;
 
   /**
    * Renders the grants matrix. The {@code view} parameter switches the grouping (G2 toggle): {@code
    * account} (default) filters by the selected account, {@code employee} filters by the selected
-   * grantee. The user lookup feeds the grant-creation modal's searchable select.
+   * grantee. The grant-creation modal's user picker is a server-side search combobox (#1193), so no
+   * full user roster is loaded here.
    *
    * @param view grouping mode ({@code account} default, {@code employee})
    * @param accountId selected account in per-account mode; absent = all accounts
@@ -104,8 +100,6 @@ public class BankGrantsPageController {
         backendApiClient.get("/api/v1/bank/grants", BANK_GRANT_LIST_TYPE);
     PageResponse<BankAccountDto> accounts =
         backendApiClient.get("/api/v1/bank/accounts?size=500", BANK_ACCOUNT_PAGE_TYPE);
-    final List<UserReferenceDto> users =
-        backendApiClient.get("/api/v1/users/lookup", USER_REFERENCE_LIST_TYPE);
 
     // The per-employee selector lists every grantee that currently holds at least one grant.
     Map<UUID, String> grantees = new LinkedHashMap<>();
@@ -118,7 +112,6 @@ public class BankGrantsPageController {
         accounts == null
             ? List.<BankAccountDto>of()
             : BankAccountOrder.byName(accounts.content(), BankAccountDto::name));
-    model.addAttribute("users", users == null ? List.<UserReferenceDto>of() : users);
     model.addAttribute("grantees", grantees);
     model.addAttribute("byEmployee", byEmployee);
     model.addAttribute("selectedAccountId", accountId);

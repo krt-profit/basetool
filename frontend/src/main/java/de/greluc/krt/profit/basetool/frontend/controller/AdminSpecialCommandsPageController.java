@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitKind;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SpecialCommandDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.MembershipFlagsForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.SpecialCommandForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -100,8 +99,7 @@ public class AdminSpecialCommandsPageController {
       new ParameterizedTypeReference<>() {};
 
   /**
-   * Response type for the raw-JSON list reads (SK members and the user lookup). Both endpoints emit
-   * the same {@code List<Map<String, Object>>} shape, so one shared constant serves both.
+   * Response type for the raw-JSON SK member list read ({@code /special-commands/{id}/members}).
    */
   private static final ParameterizedTypeReference<List<Map<String, Object>>> MAP_LIST_TYPE =
       new ParameterizedTypeReference<>() {};
@@ -328,14 +326,14 @@ public class AdminSpecialCommandsPageController {
   /**
    * Renders the per-SK detail page with the member roster. Loads the SK + its members in two
    * sequential backend calls (the roster is small and serial latency is dominated by render time,
-   * not by the round-trips). The add-member modal preloads the user-lookup list so the picker has a
-   * starting set without an AJAX fetch.
+   * not by the round-trips). The add-member picker is a server-side searchable combobox
+   * (remote-users, #1193) that fetches matches from {@code /users/search} on demand, so the roster
+   * is no longer preloaded into the model.
    *
    * @param id Spezialkommando id.
    * @param fragment when {@code "members"} only the member-roster fragment is rendered (AJAX
    *     re-swap after an in-place member mutation, REQ-FE-005); otherwise the full page.
-   * @param model Thymeleaf model populated with the SK, the member roster + every known user for
-   *     the add-member picker.
+   * @param model Thymeleaf model populated with the SK and the member roster.
    * @return the {@code admin/special-command-detail} view name, or its {@code membersResults}
    *     fragment for an AJAX swap.
    */
@@ -352,11 +350,6 @@ public class AdminSpecialCommandsPageController {
       }
       model.addAttribute("specialCommand", sc);
       model.addAttribute("members", fetchMembers(id));
-      // The add-member picker (allUsers) lives outside the swappable roster fragment, so the
-      // re-swap path skips that lookup.
-      if (!membersFragment) {
-        model.addAttribute("allUsers", fetchUserLookup());
-      }
     } catch (Exception e) {
       log.error("Load SpecialCommand detail failed", e);
       return "redirect:/admin/special-commands?error=LoadSpecialCommandDetailFailed";
@@ -777,29 +770,6 @@ public class AdminSpecialCommandsPageController {
     return members;
   }
 
-  private List<UserReferenceDto> fetchUserLookup() {
-    List<Map<String, Object>> raw = backendApiClient.get("/api/v1/users/lookup", MAP_LIST_TYPE);
-    if (raw == null) {
-      return List.of();
-    }
-    List<UserReferenceDto> users =
-        raw.stream()
-            .map(
-                m ->
-                    new UserReferenceDto(
-                        parseUuid(m.get("id")),
-                        parseString(m.get("username")),
-                        parseString(m.get("displayName")),
-                        parseString(m.get("effectiveName")),
-                        parseInt(m.get("rank"))))
-            .collect(Collectors.toCollection(ArrayList::new));
-    users.sort(
-        Comparator.comparing(
-            u -> u.effectiveName() == null ? "" : u.effectiveName(),
-            String.CASE_INSENSITIVE_ORDER));
-    return users;
-  }
-
   // ---------- payload-parsing helpers (mirror AdminMissionDataPageController) -----------
 
   private static String parseString(Object o) {
@@ -838,25 +808,6 @@ public class AdminSpecialCommandsPageController {
       return Long.parseLong(String.valueOf(o));
     } catch (Exception ignored) {
       return 0L;
-    }
-  }
-
-  /**
-   * Parses a {@link Number} or string-encoded integer into {@link Integer}. Used for the user's
-   * {@code rank} field on the member-picker dropdown — Jackson decodes JSON integers as either
-   * {@link Integer} or {@link Long} depending on size, so the helper accepts both.
-   */
-  private static Integer parseInt(Object o) {
-    if (o == null) {
-      return null;
-    }
-    if (o instanceof Number n) {
-      return n.intValue();
-    }
-    try {
-      return Integer.parseInt(String.valueOf(o));
-    } catch (Exception ignored) {
-      return null;
     }
   }
 

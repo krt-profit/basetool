@@ -3066,14 +3066,16 @@ class MissionPageControllerMvcTest {
   }
 
   /**
-   * Asserts the mgmt-only manager-list read was NOT issued. The owner-picker read ({@code
-   * /users/me/pickable-org-units}) lives in the same {@code !anonymous && needMgmt} gated block,
-   * but {@code fetchCallerMembershipOptions} short-circuits to an empty list when the {@code
-   * OidcUser} principal is null — and {@code @WithMockUser} injects a plain user, not an OidcUser —
-   * so that read is never reached here and cannot be asserted separately. {@code /users/lookup}
-   * (not principal-guarded) is therefore the testable proxy for the whole mgmt-block gate.
+   * Asserts the all-users roster read ({@code /users/lookup}) was NOT issued. Since #1193 the owner
+   * / manager pickers are server-side searchable comboboxes that fetch matches from {@code
+   * /users/search} on demand, so this preload no longer happens on <em>any</em> render path — full
+   * page or fragment. (The owner-picker's org-unit read {@code /users/me/pickable-org-units} still
+   * lives in the {@code !anonymous && needMgmt} block but is principal-guarded: {@code
+   * fetchCallerMembershipOptions} short-circuits to an empty list when the {@code OidcUser}
+   * principal is null, and {@code @WithMockUser} injects a plain user, so it is never reached
+   * here.)
    */
-  private void verifyNoManagerReads() {
+  private void verifyNoUserLookupRead() {
     verify(backendApiClient, never()).get(eq("/api/v1/users/lookup"), anyTypeRef(), anyBoolean());
   }
 
@@ -3093,7 +3095,7 @@ class MissionPageControllerMvcTest {
 
     // A crew-board refetch renders neither finance data nor the manager/owner pickers.
     verifyNoFinanceReads(missionId);
-    verifyNoManagerReads();
+    verifyNoUserLookupRead();
   }
 
   @Test
@@ -3112,7 +3114,7 @@ class MissionPageControllerMvcTest {
 
     // The overview fragment needs none of finance / manager pickers / unit-ship options.
     verifyNoFinanceReads(missionId);
-    verifyNoManagerReads();
+    verifyNoUserLookupRead();
     verify(backendApiClient, never())
         .get(
             eq("/api/v1/missions/" + missionId + "/unit-ship-options"), anyTypeRef(), anyBoolean());
@@ -3155,7 +3157,7 @@ class MissionPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = "OFFICER")
-  void missionDetail_MgmtFragment_IssuesManagerReadsButNotFinance() throws Exception {
+  void missionDetail_MgmtFragment_SkipsFinanceAndUserLookupReads() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
         .thenReturn(editableMission(missionId));
@@ -3167,11 +3169,11 @@ class MissionPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("mission-detail :: mgmtPanels"));
 
-    // The Verwaltung panel IS the one that renders the manager list (and, with a real OidcUser
-    // principal, the owner picker — see verifyNoManagerReads for why that read is not asserted
-    // here).
-    verify(backendApiClient).get(eq("/api/v1/users/lookup"), anyTypeRef(), anyBoolean());
-    // ... but not the finance trio.
+    // #1193: the Verwaltung owner/manager pickers are now server-side searchable comboboxes, so the
+    // mgmt fragment no longer preloads the all-users roster. (The owner-picker's org-unit read is
+    // principal-guarded and not observable under @WithMockUser — see verifyNoUserLookupRead.)
+    verifyNoUserLookupRead();
+    // ... and it still does not touch the finance trio.
     verifyNoFinanceReads(missionId);
   }
 
@@ -3193,7 +3195,9 @@ class MissionPageControllerMvcTest {
             eq("/api/v1/missions/" + missionId + "/finance-entries/summary"),
             eq(MissionFinanceTotalsDto.class),
             eq(false));
-    verify(backendApiClient).get(eq("/api/v1/users/lookup"), anyTypeRef(), anyBoolean());
+    // #1193: even a full-page render no longer preloads the all-users roster — the owner/manager
+    // pickers search it server-side on demand.
+    verifyNoUserLookupRead();
     verify(backendApiClient)
         .get(eq("/api/v1/missions/" + missionId + "/unit-ship-options"), anyTypeRef(), eq(false));
   }

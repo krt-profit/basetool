@@ -10755,8 +10755,8 @@
     "/api/v1/material-exchange/offers/{id}/remark" : {
       "put" : {
         "tags" : [ "Material Exchange" ],
-        "summary" : "Edit a Materialbörse offer remark.",
-        "operationId" : "updateRemark",
+        "summary" : "Edit a Materialbörse offer (offered amount and remark).",
+        "operationId" : "updateOffer",
         "parameters" : [ {
           "name" : "id",
           "in" : "path",
@@ -10770,7 +10770,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/MaterialExchangeRemarkUpdateRequest"
+                "$ref" : "#/components/schemas/MaterialExchangeOfferUpdateRequest"
               }
             }
           },
@@ -32869,6 +32869,132 @@
         }
       }
     },
+    "/api/v1/users/search-bank" : {
+      "get" : {
+        "tags" : [ "user-controller" ],
+        "operationId" : "searchUsersForBank",
+        "parameters" : [ {
+          "name" : "query",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "sort",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseUserDto"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/users/me" : {
       "get" : {
         "tags" : [ "user-controller" ],
@@ -53030,9 +53156,13 @@
           }
         }
       },
-      "MaterialExchangeRemarkUpdateRequest" : {
+      "MaterialExchangeOfferUpdateRequest" : {
         "type" : "object",
         "properties" : {
+          "offeredAmount" : {
+            "type" : "number",
+            "format" : "double"
+          },
           "remark" : {
             "type" : "string",
             "maxLength" : 20000,
@@ -53044,7 +53174,7 @@
             "minimum" : 0
           }
         },
-        "required" : [ "version" ]
+        "required" : [ "offeredAmount", "version" ]
       },
       "MaterialExchangeOfferDto" : {
         "type" : "object",
@@ -53073,6 +53203,10 @@
             "format" : "int32"
           },
           "amount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "availableAmount" : {
             "type" : "number",
             "format" : "double"
           },
@@ -54879,13 +55013,17 @@
             "type" : "string",
             "format" : "uuid"
           },
+          "offeredAmount" : {
+            "type" : "number",
+            "format" : "double"
+          },
           "remark" : {
             "type" : "string",
             "maxLength" : 20000,
             "minLength" : 0
           }
         },
-        "required" : [ "inventoryItemId" ]
+        "required" : [ "inventoryItemId", "offeredAmount" ]
       },
       "InventoryItemCreateDto" : {
         "type" : "object",

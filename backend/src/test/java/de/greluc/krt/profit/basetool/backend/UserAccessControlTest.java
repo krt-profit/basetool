@@ -73,4 +73,57 @@ public class UserAccessControlTest {
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_OFFICER"))))
         .andExpect(status().isOk());
   }
+
+  // The regular /search stays closed to bank staff (ADR-0089, #1193): a role-less bank employee
+  // must
+  // use the dedicated /search-bank twin, so the ordinary picker's authorization regime is
+  // unchanged.
+  @Test
+  void testSearchUsers_BankEmployee_Forbidden() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/users/search")
+                .param("query", "test")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_BANK_EMPLOYEE"))))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void testSearchUsersForBank_Anonymous_Forbidden() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/users/search-bank").param("query", "test"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void testSearchUsersForBank_Guest_Forbidden() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/users/search-bank")
+                .param("query", "test")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_GUEST"))))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void testSearchUsersForBank_Officer_Allowed() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/users/search-bank")
+                .param("query", "test")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_OFFICER"))))
+        .andExpect(status().isOk());
+  }
+
+  // The bank widening (ADR-0089, REQ-BANK-008/009/044): a bank employee/manager who holds no org
+  // role can drive the bank pickers' server-side search via the dedicated /search-bank endpoint.
+  @Test
+  void testSearchUsersForBank_BankEmployee_Allowed() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/users/search-bank")
+                .param("query", "test")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_BANK_EMPLOYEE"))))
+        .andExpect(status().isOk());
+  }
 }

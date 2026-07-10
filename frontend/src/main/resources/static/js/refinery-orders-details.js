@@ -141,18 +141,30 @@ function duplicateStoreItem(btn) {
         }
     });
 
-    // The receiver picker is a searchable combobox; cloning its enhanced DOM yields a dead
-    // control. Carry over the source row's chosen receiver, then swap the dead clone for a fresh
-    // <select data-krt-combobox> from the pristine template (re-enhanced below). Resolve the
-    // control by its preserved id (works whether the source was enhanced or still a plain select).
+    // The receiver picker is a server-side searchable combobox (remote-users, #1193); cloning its
+    // enhanced DOM yields a dead control. Carry over the source row's chosen receiver, then swap the
+    // dead clone for a fresh <select data-krt-combobox> from the pristine template (re-enhanced
+    // below). Resolve the control by its preserved id (works whether the source was enhanced or
+    // still a plain select). Because the template no longer preloads the roster, the source's chosen
+    // receiver is carried over by SEEDING one option (value + the visible committed label) so the
+    // fresh combobox shows the same receiver instead of resetting to empty.
     const tpl = document.getElementById('store-user-select-tpl');
     const sourceUser = blockToCopy.querySelector('[id^="storeUser_"]');
     const sourceUserValue = sourceUser ? sourceUser.value : '';
+    const sourceUserInput = blockToCopy.querySelector('.krt-combobox__input');
+    const sourceUserLabel = sourceUserInput ? sourceUserInput.value : '';
     const clonedUser = newBlock.querySelector('[id^="storeUser_"]');
     if (tpl && clonedUser) {
         const freshUser = tpl.content.firstElementChild.cloneNode(true);
         freshUser.id = `storeUser_${newIndex}`;
         freshUser.name = `items[${newIndex}].userId`;
+        if (sourceUserValue) {
+            const seed = document.createElement('option');
+            seed.value = sourceUserValue;
+            seed.textContent = sourceUserLabel || sourceUserValue;
+            seed.selected = true;
+            freshUser.appendChild(seed);
+        }
         freshUser.value = sourceUserValue;
         (clonedUser.closest('.krt-combobox') || clonedUser).replaceWith(freshUser);
     }

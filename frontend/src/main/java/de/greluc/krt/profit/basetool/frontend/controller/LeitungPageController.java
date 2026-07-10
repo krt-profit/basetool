@@ -20,21 +20,15 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.LeitungViewDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -73,20 +67,17 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @Slf4j
 public class LeitungPageController {
 
-  /** Captured generic type for decoding the raw-{@code Map} user-lookup list response. */
-  private static final ParameterizedTypeReference<List<Map<String, Object>>> MAP_LIST =
-      new ParameterizedTypeReference<>() {};
-
   private final BackendApiClient backendApiClient;
 
   /**
    * Renders the Leitung page (or just its {@code leitungSections} fragment for an in-place
-   * re-swap). Loads the caller's manageable view and the user-lookup list for the appointment
-   * pickers.
+   * re-swap). Loads the caller's manageable view; the appointment pickers are server-side
+   * searchable comboboxes (remote-users, #1193) that fetch matches from {@code /users/search} on
+   * demand, so the roster is no longer preloaded.
    *
    * @param fragment when {@code "leitungSections"}, only the sections fragment is rendered for an
    *     AJAX swap; otherwise the full page.
-   * @param model the Thymeleaf model, populated with {@code leitung} and {@code allUsers}.
+   * @param model the Thymeleaf model, populated with {@code leitung}.
    * @return the view name, or its {@code leitungSections} selector for the fragment path.
    */
   @GetMapping
@@ -111,7 +102,6 @@ public class LeitungPageController {
     if ("leitungSections".equals(fragment)) {
       return "organisation/leitung :: leitungSections";
     }
-    model.addAttribute("allUsers", fetchUserLookup());
     return "organisation/leitung";
   }
 
@@ -442,68 +432,5 @@ public class LeitungPageController {
      * @return the backend result, possibly {@code null}.
      */
     Object run();
-  }
-
-  /**
-   * Fetches the slim user-lookup list for the appointment pickers, sorted case-insensitively by
-   * effective name. Mirrors {@code OrgChartPageController#fetchUserLookup}.
-   *
-   * @return the users; never {@code null}, possibly empty.
-   */
-  private List<UserReferenceDto> fetchUserLookup() {
-    try {
-      List<Map<String, Object>> raw = backendApiClient.get("/api/v1/users/lookup", MAP_LIST);
-      if (raw == null) {
-        return List.of();
-      }
-      List<UserReferenceDto> users =
-          raw.stream()
-              .map(
-                  m ->
-                      new UserReferenceDto(
-                          parseUuid(m.get("id")),
-                          parseString(m.get("username")),
-                          parseString(m.get("displayName")),
-                          parseString(m.get("effectiveName")),
-                          parseInt(m.get("rank"))))
-              .collect(Collectors.toCollection(ArrayList::new));
-      users.sort(
-          Comparator.comparing(
-              u -> u.effectiveName() == null ? "" : u.effectiveName(),
-              String.CASE_INSENSITIVE_ORDER));
-      return users;
-    } catch (Exception e) {
-      log.error("Failed to load user lookup for Leitung pickers", e);
-      return List.of();
-    }
-  }
-
-  private static String parseString(Object o) {
-    return o == null ? null : String.valueOf(o);
-  }
-
-  private static UUID parseUuid(Object o) {
-    if (o == null) {
-      return null;
-    }
-    try {
-      return UUID.fromString(String.valueOf(o));
-    } catch (IllegalArgumentException ignored) {
-      return null;
-    }
-  }
-
-  private static Integer parseInt(Object o) {
-    if (o == null) {
-      return null;
-    }
-    if (o instanceof Number n) {
-      return n.intValue();
-    }
-    try {
-      return Integer.parseInt(String.valueOf(o));
-    } catch (NumberFormatException ignored) {
-      return null;
-    }
   }
 }

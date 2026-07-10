@@ -148,12 +148,6 @@ public class JobOrderPageController {
           new ParameterizedTypeReference<PageResponse<GameItemReferenceDto>>() {};
 
   /**
-   * Response type for the user-list pull backing the assignee picker ({@code GET /api/v1/users}).
-   */
-  private static final ParameterizedTypeReference<PageResponse<UserDto>> PAGE_OF_USER =
-      new ParameterizedTypeReference<PageResponse<UserDto>>() {};
-
-  /**
    * Response type for the job-order material catalog ({@code GET /api/v1/materials/job-order})
    * feeding the create/edit material picker.
    */
@@ -411,26 +405,16 @@ public class JobOrderPageController {
         // These logistician-only lookups are independent; fetch them concurrently and apply the
         // results on the request thread. Each fetch helper swallows its own failure and returns an
         // empty list, so join() never throws and the page degrades exactly as the serial version
-        // did. Of the four only fetchUsers() is an uncached round-trip (/users?size=1000) — the
-        // materials / squadrons / all-kinds org-unit lookups are cache-backed catalogue reads.
-        // #1126: the user list feeds the assignee picker, which lives in the full-page-only
-        // assigneesSection (no section-swap fragment re-emits it), so skip that uncached read on
-        // in-place section refetches — otherwise every section swap re-ran the /users load-all.
-        boolean needUsers = fragment == null;
-        CompletableFuture<List<UserDto>> usersFuture =
-            needUsers
-                ? parallelPageLoader.loadAsync(this::fetchUsers)
-                : CompletableFuture.<List<UserDto>>completedFuture(new ArrayList<>());
+        // did. The materials / squadrons / all-kinds org-unit lookups are cache-backed catalogue
+        // reads. #1193: the assignee-add picker now searches users on demand (remote-users combobox
+        // -> /users/search), so the former uncached /users?size=1000 load-all is gone.
         CompletableFuture<List<MaterialDto>> materialsFuture =
             parallelPageLoader.loadAsync(this::fetchMaterials);
         CompletableFuture<List<SquadronDto>> squadronsFuture =
             parallelPageLoader.loadAsync(this::fetchSquadrons);
         CompletableFuture<List<OrgUnitMembershipOptionDto>> requestingOptionsFuture =
             parallelPageLoader.loadAsync(this::fetchRequestingOrgUnitOptions);
-        CompletableFuture.allOf(
-                usersFuture, materialsFuture, squadronsFuture, requestingOptionsFuture)
-            .join();
-        model.addAttribute("users", usersFuture.join());
+        CompletableFuture.allOf(materialsFuture, squadronsFuture, requestingOptionsFuture).join();
         model.addAttribute("materials", materialsFuture.join());
         model.addAttribute("squadrons", squadronsFuture.join());
         applyOwnerPickerOptions(model, requestingOptionsFuture.join());
@@ -458,8 +442,6 @@ public class JobOrderPageController {
           }
           model.addAttribute("jobOrderForm", form);
         }
-      } else {
-        model.addAttribute("users", new ArrayList<>());
       }
 
       int yellowDays = 30;
@@ -817,18 +799,6 @@ public class JobOrderPageController {
           org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR,
           "Failed to load inventory items");
     }
-  }
-
-  private List<UserDto> fetchUsers() {
-    try {
-      PageResponse<UserDto> p = backendApiClient.get("/api/v1/users?size=1000", PAGE_OF_USER);
-      if (p != null && p.content() != null) {
-        return new ArrayList<>(p.content());
-      }
-    } catch (Exception e) {
-      log.warn("Failed to fetch users (might not be an admin/officer)");
-    }
-    return new ArrayList<>();
   }
 
   private List<MaterialDto> fetchMaterials() {
