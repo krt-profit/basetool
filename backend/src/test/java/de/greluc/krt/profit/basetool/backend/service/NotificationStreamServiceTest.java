@@ -252,6 +252,59 @@ class NotificationStreamServiceTest {
     verify(service.created.get(count - 1), never()).complete();
   }
 
+  @Test
+  void subscribe_connectedSendFailure_countsUnderConnectedAndDoesNotRegister() throws Exception {
+    // Given the very first `connected` handshake send throws (stream dead at handshake).
+    CapturingStreamService service = new CapturingStreamService();
+    doThrow(new IOException("broken pipe"))
+        .when(service.emitter)
+        .send(any(SseEmitter.SseEventBuilder.class));
+
+    // When a browser subscribes
+    service.subscribe(UUID.randomUUID());
+
+    // Then the failure is counted under the `connected` event...
+    assertEquals(
+        1.0,
+        service
+            .registry
+            .get(MetricNames.SSE_SEND_FAILURES)
+            .tag(MetricNames.TAG_EVENT, MetricNames.SSE_EVENT_CONNECTED)
+            .counter()
+            .count());
+    // ...and the dead-at-handshake emitter is dropped, so it cannot linger in the registry
+    // permanently inflating basetool_sse_connections and starving the per-user cap.
+    assertEquals(0.0, sseConnections(service));
+  }
+
+  @Test
+  void heartbeat_sendFailure_countsUnderHeartbeatAndDropsEmitter() throws Exception {
+    // Given a registered subscriber whose stream then goes half-open.
+    CapturingStreamService service = new CapturingStreamService();
+    UUID recipientSub = UUID.randomUUID();
+    service.subscribe(recipientSub); // `connected` send succeeds, emitter registered
+    clearInvocations(service.emitter); // drop the `connected` send from subscribe()
+    doThrow(new IOException("broken pipe"))
+        .when(service.emitter)
+        .send(any(SseEmitter.SseEventBuilder.class));
+
+    // When the scheduled heartbeat fires on the now-dead emitter
+    service.heartbeat();
+
+    // Then the failure is counted under the `heartbeat` event...
+    assertEquals(
+        1.0,
+        service
+            .registry
+            .get(MetricNames.SSE_SEND_FAILURES)
+            .tag(MetricNames.TAG_EVENT, MetricNames.SSE_EVENT_HEARTBEAT)
+            .counter()
+            .count());
+    // ...and the dead emitter is reaped immediately instead of leaking until the 30-min timeout,
+    // which would inflate the gauge that drives the SsePushChannelDead alert.
+    assertEquals(0.0, sseConnections(service));
+  }
+
   /**
    * Reads the {@code basetool_sse_connections} gauge value from the service's registry.
    *

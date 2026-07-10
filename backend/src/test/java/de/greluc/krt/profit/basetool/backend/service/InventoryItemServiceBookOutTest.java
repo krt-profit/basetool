@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -34,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.model.FinanceType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -656,6 +658,34 @@ class InventoryItemServiceBookOutTest {
           targetUser, saveCaptor.getValue().getUser(), "the saved row is the new target row");
       verify(inventoryItemRepository, never()).delete(any());
     }
+
+    @Test
+    void explicitTransferWithoutTargets_fallsThroughToDiscard() {
+      // Gap 5: an explicit type=TRANSFER with NEITHER a target user NOR a target location fails the
+      // guard `checkoutType == TRANSFER && (targetUserId != null || targetLocationId != null)`, so
+      // the transfer branch is skipped and control falls through to the DISCARD/consume tail. This
+      // pins the CURRENT contract: the request is NOT rejected — the source stock is simply
+      // decremented as a discard and NO new target row is inserted (never save()). (See the
+      // book-out spec note on this unguarded target-less TRANSFER stock loss.)
+      InventoryItem item = newItem(10.0, 1L);
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+      when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
+
+      service.bookOutInventoryItem(
+          ITEM_ID, newDto(4.0, null, null, CheckoutType.TRANSFER, null, null, 1L), OWNER_ID, false);
+
+      // Discard fall-through: source decremented in place, NO new target row inserted.
+      assertEquals(6.0, item.getAmount(), "source is decremented as a discard, not transferred");
+      verify(inventoryItemRepository).saveAndFlush(item);
+      verify(inventoryItemRepository, never()).save(any());
+      verify(inventoryItemRepository, never()).delete(any());
+      // The tail records a CONSUMED (discard) event, not a TRANSFERRED event.
+      verify(auditService)
+          .record(
+              eq(AuditEventType.INVENTORY_ITEM_CONSUMED), eq(ITEM_ID), any(), eq(OWNER_ID), any());
+      verify(auditService, never())
+          .record(eq(AuditEventType.INVENTORY_ITEM_TRANSFERRED), any(), any(), any(), any());
+    }
   }
 
   // ---------------------------------------------------------------
@@ -695,6 +725,51 @@ class InventoryItemServiceBookOutTest {
       assertSame(participant, entry.getParticipant());
       assert entry.getNote().contains("Quantanium");
       assert entry.getNote().contains("TDD");
+    }
+
+    @Test
+    void fullSellWithMission_createsIncomeAndDeletesRow() {
+      // Gap 1: a SELL of the WHOLE mission-linked stack (amount == available). The squadron INCOME
+      // MissionFinanceEntry must be created off the still-managed row BEFORE the depletion branch
+      // deletes it, the source row is delete()d (not saveAndFlush()ed), the method returns null so
+      // the frontend drops the depleted row, and the SOLD audit still carries the pre-delete id.
+      Mission mission = new Mission();
+      mission.setId(UUID.randomUUID());
+      MissionParticipant participant = new MissionParticipant();
+      participant.setId(UUID.randomUUID());
+
+      InventoryItem item = newItem(5.0, 1L);
+      item.setMission(mission);
+
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+      when(missionParticipantRepository.findByMissionIdAndUserId(mission.getId(), OWNER_ID))
+          .thenReturn(Optional.of(participant));
+
+      InventoryItemDto result =
+          service.bookOutInventoryItem(
+              ITEM_ID,
+              newDto(5.0, null, null, CheckoutType.SELL, "TDD", BigDecimal.valueOf(500), 1L),
+              OWNER_ID,
+              false);
+
+      // INCOME finance entry created from the managed (not-yet-deleted) row.
+      ArgumentCaptor<MissionFinanceEntry> captor =
+          ArgumentCaptor.forClass(MissionFinanceEntry.class);
+      verify(missionFinanceEntryRepository).save(captor.capture());
+      MissionFinanceEntry entry = captor.getValue();
+      assertEquals(FinanceType.INCOME, entry.getType());
+      assertEquals(BigDecimal.valueOf(500), entry.getAmount());
+      assertSame(mission, entry.getMission());
+      assertSame(participant, entry.getParticipant());
+
+      // Depleted -> source row deleted, null returned (frontend removes the row), never re-saved.
+      verify(inventoryItemRepository).delete(item);
+      assertNull(result, "a full sale depletes the stack and returns null");
+      verify(inventoryItemRepository, never()).saveAndFlush(any());
+
+      // The SOLD audit carries the pre-delete source id snapshot and the owner as target user.
+      verify(auditService)
+          .record(eq(AuditEventType.INVENTORY_ITEM_SOLD), eq(ITEM_ID), any(), eq(OWNER_ID), any());
     }
 
     @Test
@@ -779,6 +854,124 @@ class InventoryItemServiceBookOutTest {
       assertNull(result, "full discard returns null");
       verify(inventoryItemRepository).delete(item);
       verify(inventoryItemRepository, never()).save(any());
+    }
+
+    @Test
+    void depletionBoundary_subEpsilonResidualDeletesRow() {
+      // Gap 3: booking out 9.9999 of 10.0 leaves 0.0001, which roundAmount() rounds to 0.000 — at
+      // or below QUANTITY_EPSILON (1e-4), so the row is DELETED (no phantom near-zero sliver is
+      // stranded in the append-only Lager) and null is returned.
+      InventoryItem item = newItem(10.0, 1L);
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+
+      InventoryItemDto result =
+          service.bookOutInventoryItem(
+              ITEM_ID,
+              newDto(9.9999, null, null, CheckoutType.DISCARD, null, null, 1L),
+              OWNER_ID,
+              false);
+
+      assertNull(result, "a sub-epsilon residual depletes the stack and returns null");
+      verify(inventoryItemRepository).delete(item);
+      verify(inventoryItemRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void smallResidualAboveEpsilon_keepsRow() {
+      // Gap 3: booking out 9.998 of 10.0 leaves 0.002 (> QUANTITY_EPSILON 1e-4), so the row is KEPT
+      // with the rounded 0.002 residual and saveAndFlush()ed — never deleted. Pins that the epsilon
+      // guard does not swallow a legitimate small remainder.
+      InventoryItem item = newItem(10.0, 1L);
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+      when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
+
+      service.bookOutInventoryItem(
+          ITEM_ID,
+          newDto(9.998, null, null, CheckoutType.DISCARD, null, null, 1L),
+          OWNER_ID,
+          false);
+
+      assertEquals(0.002, item.getAmount(), 1e-9, "the small residual is kept, rounded to 3 dp");
+      verify(inventoryItemRepository).saveAndFlush(item);
+      verify(inventoryItemRepository, never()).delete(any());
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // REQ-AUDIT-001 Lager audit trail (Gap 2)
+  // ---------------------------------------------------------------
+
+  @Nested
+  class AuditTrailTests {
+
+    @Test
+    void discardBookOut_recordsConsumedAuditWithPreDeleteSnapshot() {
+      // Gap 2: a DISCARD that depletes the row still records INVENTORY_ITEM_CONSUMED carrying the
+      // pre-delete source id snapshot — the audit trail survives the row deletion.
+      InventoryItem item = newItem(5.0, 1L);
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+
+      service.bookOutInventoryItem(
+          ITEM_ID, newDto(5.0, null, null, CheckoutType.DISCARD, null, null, 1L), OWNER_ID, false);
+
+      verify(inventoryItemRepository).delete(item);
+      verify(auditService)
+          .record(
+              eq(AuditEventType.INVENTORY_ITEM_CONSUMED), eq(ITEM_ID), any(), eq(OWNER_ID), any());
+    }
+
+    @Test
+    void sellBookOut_recordsSoldAudit() {
+      // Gap 2: a SELL records INVENTORY_ITEM_SOLD against the source id and the owner.
+      Mission mission = new Mission();
+      mission.setId(UUID.randomUUID());
+      MissionParticipant participant = new MissionParticipant();
+      participant.setId(UUID.randomUUID());
+
+      InventoryItem item = newItem(10.0, 1L);
+      item.setMission(mission);
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+      when(missionParticipantRepository.findByMissionIdAndUserId(mission.getId(), OWNER_ID))
+          .thenReturn(Optional.of(participant));
+      when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
+
+      service.bookOutInventoryItem(
+          ITEM_ID,
+          newDto(1.0, null, null, CheckoutType.SELL, "TDD", BigDecimal.valueOf(500), 1L),
+          OWNER_ID,
+          false);
+
+      verify(auditService)
+          .record(eq(AuditEventType.INVENTORY_ITEM_SOLD), eq(ITEM_ID), any(), eq(OWNER_ID), any());
+    }
+
+    @Test
+    void transferBookOut_recordsTransferredAuditToTargetUser() {
+      // Gap 2: a TRANSFER records INVENTORY_ITEM_TRANSFERRED against the source id, with the TARGET
+      // user (not the owner) as the audit's target user.
+      UUID targetUserId = UUID.randomUUID();
+      User targetUser = new User();
+      targetUser.setId(targetUserId);
+
+      InventoryItem item = newItem(10.0, 1L);
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+      when(userRepository.findById(targetUserId)).thenReturn(Optional.of(targetUser));
+      when(inventoryItemRepository.save(any(InventoryItem.class)))
+          .thenAnswer(inv -> inv.getArgument(0));
+
+      service.bookOutInventoryItem(
+          ITEM_ID,
+          newDto(3.0, targetUserId, null, CheckoutType.TRANSFER, null, null, 1L),
+          OWNER_ID,
+          false);
+
+      verify(auditService)
+          .record(
+              eq(AuditEventType.INVENTORY_ITEM_TRANSFERRED),
+              eq(ITEM_ID),
+              any(),
+              eq(targetUserId),
+              any());
     }
   }
 

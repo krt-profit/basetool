@@ -27,11 +27,13 @@ import de.greluc.krt.profit.basetool.backend.model.BankAccount;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountType;
 import de.greluc.krt.profit.basetool.backend.model.BankHolder;
+import de.greluc.krt.profit.basetool.backend.model.BankHolderPosting;
 import de.greluc.krt.profit.basetool.backend.model.BankPosting;
 import de.greluc.krt.profit.basetool.backend.model.BankTransaction;
 import de.greluc.krt.profit.basetool.backend.model.BankTransactionType;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankDepositRequest;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
+import de.greluc.krt.profit.basetool.backend.repository.BankHolderPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepository;
@@ -59,6 +61,7 @@ class BankLedgerIntegrityServiceTest {
   @Autowired private BankHolderRepository holderRepository;
   @Autowired private BankTransactionRepository transactionRepository;
   @Autowired private BankPostingRepository postingRepository;
+  @Autowired private BankHolderPostingRepository holderPostingRepository;
 
   private BankAccount account;
   private BankHolder holder;
@@ -176,6 +179,117 @@ class BankLedgerIntegrityServiceTest {
     assertFalse(
         report.transactionsWithoutAudit().contains(wipe.getId()),
         "WIPE_RESET transactions are summarized once, not flagged per row");
+  }
+
+  @Test
+  void verify_flagsABrokenAccountReversal() {
+    // Given: an original DEPOSIT with a +100 account leg and a REVERSAL whose account leg (-50)
+    // does not negate it, so the two transactions' account legs do not net to zero for the account
+    // (a genuine account-side mirror would be -100). Inserted raw, past the guarded reversal flow.
+    Instant now = Instant.now();
+    BankTransaction original =
+        transactionRepository.save(
+            BankTransaction.builder().type(BankTransactionType.DEPOSIT).createdAt(now).build());
+    postingRepository.save(
+        BankPosting.builder()
+            .transaction(original)
+            .account(account)
+            .amount(new BigDecimal("100"))
+            .createdAt(now)
+            .build());
+    BankTransaction reversal =
+        transactionRepository.save(
+            BankTransaction.builder()
+                .type(BankTransactionType.REVERSAL)
+                .reversedTransaction(original)
+                .createdAt(now)
+                .build());
+    postingRepository.save(
+        BankPosting.builder()
+            .transaction(reversal)
+            .account(account)
+            .amount(new BigDecimal("-50"))
+            .createdAt(now)
+            .build());
+
+    // When
+    BankLedgerIntegrityService.IntegrityReport report = integrityService.verify();
+
+    // Then
+    assertFalse(report.isSound(), "the corrupted ledger must not be reported sound");
+    assertTrue(
+        report.brokenReversals().contains(reversal.getId()),
+        "a reversal that is not the negated account-side mirror of its original must be flagged");
+  }
+
+  @Test
+  void verify_flagsABrokenHolderReversal() {
+    // Given: an original DEPOSIT with a +100 holder leg and a REVERSAL whose holder leg (-50) does
+    // not negate it, so the two transactions' holder legs do not net to zero for the holder. Only
+    // holder legs are written, so only the holder-side mirror query can fire.
+    Instant now = Instant.now();
+    BankTransaction original =
+        transactionRepository.save(
+            BankTransaction.builder().type(BankTransactionType.DEPOSIT).createdAt(now).build());
+    holderPostingRepository.save(
+        BankHolderPosting.builder()
+            .transaction(original)
+            .holder(holder)
+            .amount(new BigDecimal("100"))
+            .createdAt(now)
+            .build());
+    BankTransaction reversal =
+        transactionRepository.save(
+            BankTransaction.builder()
+                .type(BankTransactionType.REVERSAL)
+                .reversedTransaction(original)
+                .createdAt(now)
+                .build());
+    holderPostingRepository.save(
+        BankHolderPosting.builder()
+            .transaction(reversal)
+            .holder(holder)
+            .amount(new BigDecimal("-50"))
+            .createdAt(now)
+            .build());
+
+    // When
+    BankLedgerIntegrityService.IntegrityReport report = integrityService.verify();
+
+    // Then
+    assertFalse(report.isSound(), "the corrupted ledger must not be reported sound");
+    assertTrue(
+        report.brokenHolderReversals().contains(reversal.getId()),
+        "a reversal that is not the negated holder-side mirror of its original must be flagged");
+  }
+
+  @Test
+  void verify_flagsAnUnbalancedHolderMovement() {
+    // Given: a fee-free HOLDER_TRANSFER (whose holder legs must net to zero) with a single
+    // non-netting +250 holder leg inserted raw, past the balanced-legs service guard.
+    Instant now = Instant.now();
+    BankTransaction tx =
+        transactionRepository.save(
+            BankTransaction.builder()
+                .type(BankTransactionType.HOLDER_TRANSFER)
+                .createdAt(now)
+                .build());
+    holderPostingRepository.save(
+        BankHolderPosting.builder()
+            .transaction(tx)
+            .holder(holder)
+            .amount(new BigDecimal("250"))
+            .createdAt(now)
+            .build());
+
+    // When
+    BankLedgerIntegrityService.IntegrityReport report = integrityService.verify();
+
+    // Then
+    assertFalse(report.isSound(), "the corrupted ledger must not be reported sound");
+    assertTrue(
+        report.unbalancedHolderMovements().contains(tx.getId()),
+        "a holder movement whose legs do not net to -transfer_fee must be flagged");
   }
 
   private BankAccount newAccount(String name) {

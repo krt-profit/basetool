@@ -418,6 +418,48 @@ class ProfitCalculationServiceTest {
   }
 
   // ----------------------------------------------------------------
+  // Loss-making material — both sides positive but maxSell < minBuy
+  // ----------------------------------------------------------------
+
+  @Test
+  void negativeMargin_materialIsStillIncludedWithNegativeProfit() {
+    // A material whose cheapest buy (30) is dearer than its best sell (20). Both
+    // sides are individually positive, so it passes the both-sides-positive filter
+    // and MUST be kept — the profit page shows loss rows so a trader sees them.
+    // profitPerScu = 20 - 30 = -10; margin = -10 * 100 / 30 = -33.3333%;
+    // maxProfitFullLoad = -10 * 100 = -1000.
+    UUID shipId = UUID.randomUUID();
+    ShipType ship = newShip(shipId, "Cutlass", 100);
+
+    Material material = newMaterial("Quantanium");
+    MaterialPrice price = newPrice(material, newTerminal(true), 30, 20);
+
+    when(shipTypeRepository.findById(shipId)).thenReturn(Optional.of(ship));
+    when(materialPriceRepository.findAllAutoLoadPrices()).thenReturn(List.of(price));
+
+    List<ProfitCalculationDto> result = profitCalculationService.calculateProfit(shipId, null);
+
+    assertEquals(
+        1, result.size(), "a loss-making material must NOT be dropped — loss rows are shown");
+    ProfitCalculationDto row = result.get(0);
+    assertEquals(
+        0,
+        BigDecimal.valueOf(-10).compareTo(row.profitPerScu()),
+        "profitPerScu must be the negative maxSell - minBuy (20 - 30)");
+    assertEquals(
+        0,
+        new BigDecimal("-33.3333").compareTo(row.marginPercent()),
+        "margin must be signed and negative — no abs() around the loss");
+    assertEquals(
+        0,
+        BigDecimal.valueOf(-1000).compareTo(row.maxProfitFullLoad()),
+        "full-load profit scales the per-SCU loss by the ship's SCU (-10 * 100)");
+    assertTrue(
+        row.maxProfitFullLoad().compareTo(BigDecimal.ZERO) < 0,
+        "a loss ship-load must surface as a negative full-load profit");
+  }
+
+  // ----------------------------------------------------------------
   // helpers
   // ----------------------------------------------------------------
 

@@ -28,6 +28,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.model.Bereich;
+import de.greluc.krt.profit.basetool.backend.model.KommandoGroup;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
@@ -100,6 +101,12 @@ class OrgRoleManagementSecurityServiceTest {
     sc.setId(id);
     sc.setParent(parent);
     return sc;
+  }
+
+  private KommandoGroup kommandoGroupOf(UUID squadronId) {
+    KommandoGroup g = new KommandoGroup();
+    g.setSquadron(squadronUnder(squadronId, null));
+    return g;
   }
 
   private void callerIs(UUID orgUnitId, MembershipRole role) {
@@ -265,5 +272,120 @@ class OrgRoleManagementSecurityServiceTest {
 
     // The delegated verdict is rank-derived only; admin is decided at @PreAuthorize, never here.
     verify(authHelperService, never()).isAdmin();
+  }
+
+  // --- Bereich role removal (routing by the target's current rank) -----------
+
+  @Test
+  void removeBereichRole_bereichsleiterRemovableByPureOlMember_allowed() {
+    UUID bereichId = UUID.randomUUID();
+    UUID targetUser = UUID.randomUUID();
+    UUID olId = UUID.randomUUID();
+    when(membershipRepository.findById(new OrgUnitMembershipId(targetUser, bereichId)))
+        .thenReturn(Optional.of(membership(targetUser, bereichId, MembershipRole.BEREICHSLEITER)));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
+    when(membershipRepository.findAllByIdUserId(callerId))
+        .thenReturn(List.of(membership(callerId, olId, MembershipRole.OL_MEMBER)));
+
+    assertTrue(service.canRemoveBereichRole(bereichId, targetUser, authed));
+  }
+
+  @Test
+  void removeBereichRole_koordinatorRemovableByOwnBereichsleiter_allowed() {
+    UUID bereichId = UUID.randomUUID();
+    UUID targetUser = UUID.randomUUID();
+    when(membershipRepository.findById(new OrgUnitMembershipId(targetUser, bereichId)))
+        .thenReturn(
+            Optional.of(membership(targetUser, bereichId, MembershipRole.BEREICHSKOORDINATOR)));
+    callerIs(bereichId, MembershipRole.BEREICHSLEITER);
+
+    assertTrue(service.canRemoveBereichRole(bereichId, targetUser, authed));
+  }
+
+  @Test
+  void removeBereichRole_koordinatorByForeignBereichsleiter_denied() {
+    UUID bereichId = UUID.randomUUID();
+    UUID targetUser = UUID.randomUUID();
+    when(membershipRepository.findById(new OrgUnitMembershipId(targetUser, bereichId)))
+        .thenReturn(
+            Optional.of(membership(targetUser, bereichId, MembershipRole.BEREICHSOPERATOR)));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
+    // The caller does not lead this Bereich (no membership row on it), so removing an Operator of a
+    // Bereich they do not lead is denied.
+    when(membershipRepository.findById(new OrgUnitMembershipId(callerId, bereichId)))
+        .thenReturn(Optional.empty());
+
+    assertFalse(service.canRemoveBereichRole(bereichId, targetUser, authed));
+  }
+
+  // --- singular Kommandogruppe management (squadron from the group's edge) ----
+
+  @Test
+  void manageKommandoGroup_byStaffelleiterOfGroupsSquadron_allowed() {
+    UUID groupId = UUID.randomUUID();
+    UUID squadronId = UUID.randomUUID();
+    when(kommandoGroupRepository.findById(groupId))
+        .thenReturn(Optional.of(kommandoGroupOf(squadronId)));
+    callerIs(squadronId, MembershipRole.STAFFELLEITER);
+
+    assertTrue(service.canManageKommandoGroup(groupId, authed));
+  }
+
+  @Test
+  void manageKommandoGroup_byForeignStaffelleiter_denied() {
+    UUID groupId = UUID.randomUUID();
+    UUID squadronId = UUID.randomUUID();
+    when(kommandoGroupRepository.findById(groupId))
+        .thenReturn(Optional.of(kommandoGroupOf(squadronId)));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
+    // The squadron is read from the group's persisted edge; the caller is not that squadron's
+    // Staffelleiter (no membership row on it), so renaming / deleting a foreign group is denied.
+    when(membershipRepository.findById(new OrgUnitMembershipId(callerId, squadronId)))
+        .thenReturn(Optional.empty());
+
+    assertFalse(service.canManageKommandoGroup(groupId, authed));
+  }
+
+  @Test
+  void manageKommandoGroup_missingGroup_denied() {
+    UUID groupId = UUID.randomUUID();
+    when(kommandoGroupRepository.findById(groupId)).thenReturn(Optional.empty());
+
+    assertFalse(service.canManageKommandoGroup(groupId, authed));
+  }
+
+  // --- squadron rank removal: the STAFFELLEITER target routes to the parent ---
+
+  @Test
+  void removeSquadronRank_staffelleiterRemovableByParentBereichsleiter_allowed() {
+    UUID squadronId = UUID.randomUUID();
+    UUID bereichId = UUID.randomUUID();
+    UUID targetUser = UUID.randomUUID();
+    when(membershipRepository.findById(new OrgUnitMembershipId(targetUser, squadronId)))
+        .thenReturn(Optional.of(membership(targetUser, squadronId, MembershipRole.STAFFELLEITER)));
+    when(orgUnitRepository.findById(squadronId))
+        .thenReturn(Optional.of(squadronUnder(squadronId, bereich(bereichId))));
+    callerIs(bereichId, MembershipRole.BEREICHSLEITER);
+
+    assertTrue(service.canRemoveSquadronRank(squadronId, targetUser, authed));
+  }
+
+  @Test
+  void removeSquadronRank_staffelleiterByOwnSquadronStaffelleiter_denied() {
+    UUID squadronId = UUID.randomUUID();
+    UUID bereichId = UUID.randomUUID();
+    UUID targetUser = UUID.randomUUID();
+    when(membershipRepository.findById(new OrgUnitMembershipId(targetUser, squadronId)))
+        .thenReturn(Optional.of(membership(targetUser, squadronId, MembershipRole.STAFFELLEITER)));
+    when(orgUnitRepository.findById(squadronId))
+        .thenReturn(Optional.of(squadronUnder(squadronId, bereich(bereichId))));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
+    // Removing a Staffelleiter routes to the parent Bereichsleiter, never the squadron's own
+    // Staffelleiter — a caller who only leads the squadron has no membership row on the parent
+    // Bereich and is denied (no self / peer demotion at the same tier).
+    when(membershipRepository.findById(new OrgUnitMembershipId(callerId, bereichId)))
+        .thenReturn(Optional.empty());
+
+    assertFalse(service.canRemoveSquadronRank(squadronId, targetUser, authed));
   }
 }

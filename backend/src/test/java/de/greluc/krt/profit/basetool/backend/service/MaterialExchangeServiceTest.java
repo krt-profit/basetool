@@ -23,8 +23,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -68,6 +70,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
@@ -461,6 +464,148 @@ class MaterialExchangeServiceTest {
         .as("no display name or remark body leaks into the audit details")
         .doesNotContain("Venture Helmet")
         .doesNotContain("gegen aUEC");
+  }
+
+  /**
+   * Re-releasing a Lager row that already carries an ACTIVE offer updates that same offer in place
+   * (Gap 1): the existing offer is kept (same id/kind), its offered amount and release instant are
+   * refreshed, no second offer is inserted, and the audit detail flags {@code reRelease=true} — so
+   * a member re-releasing never double-advertises one item on the board.
+   */
+  @Test
+  void release_existingActiveOffer_updatesInPlaceAndFlagsReRelease() {
+    InventoryItem item = offer.getInventoryItem(); // stock = 340 SCU, owned by ownerId
+    UUID itemId = item.getId();
+    Instant past = Instant.now().minusSeconds(3600);
+    offer.setReleasedAt(past);
+    offer.setOfferedAmount(340.0);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+    when(offerRepository.findByInventoryItemIdAndStatus(itemId, MaterialExchangeOfferStatus.ACTIVE))
+        .thenReturn(Optional.of(offer));
+    when(offerRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(interestRepository.findByOfferIdOrderByCreatedAtDesc(any())).thenReturn(List.of());
+
+    service.release(new MaterialExchangeReleaseRequest(itemId, 120.0, "x"));
+
+    ArgumentCaptor<MaterialExchangeOffer> captor = ArgumentCaptor.captor();
+    verify(offerRepository).saveAndFlush(captor.capture());
+    MaterialExchangeOffer saved = captor.getValue();
+    assertThat(saved).as("re-release updates the existing offer in place").isSameAs(offer);
+    assertThat(saved.getId()).isEqualTo(offerId);
+    assertThat(saved.getKind()).isEqualTo(MaterialExchangeOfferKind.MATERIAL);
+    assertThat(saved.getOfferedAmount()).isEqualTo(120.0);
+    assertThat(saved.getReleasedAt()).as("release instant refreshed").isAfter(past);
+
+    ArgumentCaptor<AuditDetails> detailsCaptor = ArgumentCaptor.captor();
+    verify(auditService)
+        .record(
+            eq(AuditEventType.MARKET_OFFER_RELEASED),
+            eq(offerId),
+            any(),
+            eq(ownerId),
+            detailsCaptor.capture());
+    assertThat(detailsCaptor.getValue().toString()).contains("reRelease=true");
+  }
+
+  /**
+   * A concurrent duplicate interest registration is swallowed as an idempotent success (Gap 2):
+   * when the {@code REQUIRES_NEW} inner insert throws a {@link DataIntegrityViolationException}
+   * (the unique {@code (offer, user)} constraint losing a race), the orchestrator catches it and
+   * still returns the re-read offer detail instead of propagating a 500 (CLAUDE.md find-or-create
+   * rule).
+   */
+  @Test
+  void registerInterest_concurrentDuplicate_isIdempotent() {
+    MaterialExchangeService spy = spy(service);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
+    when(selfProvider.getObject()).thenReturn(spy);
+    doThrow(new DataIntegrityViolationException("uq"))
+        .when(spy)
+        .registerInterestInNewTransaction(offerId, otherId);
+    when(offerRepository.findWithDetailById(offerId)).thenReturn(Optional.of(offer));
+
+    MaterialExchangeOfferDto dto = service.registerInterest(offerId);
+
+    assertThat(dto).as("duplicate race returns the offer detail, not a 500").isNotNull();
+    assertThat(dto.id()).isEqualTo(offerId);
+  }
+
+  /**
+   * A real withdrawal (a registration was removed) records exactly one {@code
+   * MARKET_INTEREST_WITHDRAWN} audit event (Gap 3).
+   */
+  @Test
+  void withdrawInterest_removed_recordsAudit() {
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
+    when(offerRepository.findById(offerId)).thenReturn(Optional.of(offer));
+    when(interestRepository.deleteByOfferIdAndInterestedUserId(offerId, otherId)).thenReturn(1L);
+
+    service.withdrawInterest(offerId);
+
+    verify(auditService)
+        .record(
+            eq(AuditEventType.MARKET_INTEREST_WITHDRAWN), eq(offerId), any(), eq(ownerId), any());
+  }
+
+  /**
+   * An idempotent no-op withdrawal (no registration existed, zero rows removed) records nothing —
+   * keeping phantom withdrawals out of the append-only MARKET audit trail (Gap 3, REQ-AUDIT-001).
+   */
+  @Test
+  void withdrawInterest_noRegistration_recordsNoAudit() {
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
+    when(offerRepository.findById(offerId)).thenReturn(Optional.of(offer));
+    when(interestRepository.deleteByOfferIdAndInterestedUserId(offerId, otherId)).thenReturn(0L);
+
+    service.withdrawInterest(offerId);
+
+    verify(auditService, never()).record(any(), any(), any(), any(), any());
+  }
+
+  /** Deactivating another member's offer is forbidden and persists nothing (Gap 4). */
+  @Test
+  void deactivate_nonOwner_forbidden() {
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
+    when(offerRepository.findById(offerId)).thenReturn(Optional.of(offer));
+
+    assertThatThrownBy(() -> service.deactivate(offerId)).isInstanceOf(AccessDeniedException.class);
+    verify(offerRepository, never()).saveAndFlush(any());
+    verify(auditService, never()).record(any(), any(), any(), any(), any());
+  }
+
+  /**
+   * Deactivating an already-DEACTIVATED offer is idempotent (Gap 4): the status flip and the audit
+   * event fire only while the offer is still ACTIVE, so a re-deactivation writes nothing and emits
+   * no second {@code MARKET_OFFER_DEACTIVATED} event.
+   */
+  @Test
+  void deactivate_alreadyDeactivated_noSecondAudit() {
+    offer.setStatus(MaterialExchangeOfferStatus.DEACTIVATED);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(offerRepository.findById(offerId)).thenReturn(Optional.of(offer));
+    when(interestRepository.findByOfferIdOrderByCreatedAtDesc(any())).thenReturn(List.of());
+
+    service.deactivate(offerId);
+
+    verify(offerRepository, never()).saveAndFlush(any());
+    verify(auditService, never()).record(any(), any(), any(), any(), any());
+  }
+
+  /**
+   * Un-releasing a Lager row that carries no active offer raises a not-found (Gap 4): the
+   * item-keyed deactivation entry point has nothing to take off the board.
+   */
+  @Test
+  void deactivateForItem_noActiveOffer_notFound() {
+    UUID itemId = offer.getInventoryItem().getId();
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(offerRepository.findByInventoryItemIdAndStatus(itemId, MaterialExchangeOfferStatus.ACTIVE))
+        .thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> service.deactivateForItem(itemId))
+        .isInstanceOf(NotFoundException.class);
+    verify(auditService, never()).record(any(), any(), any(), any(), any());
   }
 
   private static User user(UUID id, String name) {
