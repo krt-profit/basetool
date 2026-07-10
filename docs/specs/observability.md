@@ -29,6 +29,17 @@ must never reach `ERROR`, or it inflates `logback_events_total{level="error"}` a
 `LogbackErrorSpike` alert on normal user-input mistakes. Only a genuinely unexpected failure (a bare
 `catch (Exception …)`, not a mapped `BackendServiceException`) logs at `ERROR`.
 
+A call **short-circuited by an open circuit breaker** (`CallNotPermittedException`) is logged at
+`DEBUG`, never `WARN`. The one-time breaker state transition (`ResilienceEventLogger.onStateTransition`,
+`WARN`) plus the `basetool_backend_client_errors_total{reason="circuit_open"}` counter and the
+`resilience4j_circuitbreaker_state`-backed `CircuitBreakerOpen` alert are the health signal; the
+per-blocked-call line at all three touch points (`ResilienceEventLogger.onCallNotPermitted`, the
+`WebClientLoggingFilter` outer log filter, and the `BackendApiClient` boundary) would otherwise emit
+**three identical `WARN` lines for every** short-circuited call for the whole open window, flooding
+the log during a routine backend restart/deploy and making an expected self-healing blip
+indistinguishable from a real incident (issue #1203). Genuine transport failures (timeout, connection
+reset) that *open* the breaker still log at `WARN` — those are the signal that the backend is down.
+
 ### REQ-OBS-002 — Correlation-id propagation
 
 `correlationId` comes from the inbound `X-Correlation-Id` header (configurable via

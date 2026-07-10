@@ -47,10 +47,11 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Data-level coverage for the Materialbörse repositories ({@link MaterialExchangeOfferRepository} /
  * {@link MaterialExchangeInterestRepository}) against the real Postgres test schema (Testcontainers
- * + Flyway V210 via the {@code test} profile). Validates the board JPQL (including the nested-path
- * sort and the live-item filters), the anonymity-safe grouped interest counts, and the two DB
- * invariants the migration enforces: one {@code ACTIVE} offer per Lager row (partial-unique) and
- * one interest registration per {@code (offer, user)}.
+ * + Flyway V210/V212 via the {@code test} profile). Validates the board JPQL (including the
+ * nested-path sort, the live-item filters and the offered-amount filter/sort of ADR-0086), the
+ * anonymity-safe grouped interest counts, and the two DB invariants the migration enforces: one
+ * {@code ACTIVE} offer per Lager row (partial-unique) and one interest registration per {@code
+ * (offer, user)}.
  *
  * <p>{@link Transactional} so each method rolls back — the seeded rows must never commit to the
  * shared Testcontainers database. Reads still see the rows because they are flushed within the test
@@ -118,6 +119,42 @@ class MaterialExchangeRepositoryDataTest {
         .containsExactly(lowOffer);
   }
 
+  /**
+   * The amount filter and the "menge" sort use the effective offered quantity {@code
+   * LEAST(offeredAmount, stock)} (ADR-0086) — with stock above the offer here, that is the
+   * owner-chosen partial amount, not the underlying item's stock: a small offer off a large row
+   * sorts and filters by the 30 SCU it offers, not the 500 SCU in stock.
+   */
+  @Test
+  void findBoard_amountFilterAndSortUseOfferedAmount_notItemStock() {
+    User owner = persistUser("partial-anbieter");
+    InventoryItem bigStock = persistItem(owner, "Quantanium", 900, 500.0);
+    MaterialExchangeOffer smallOffer =
+        persistOffer(bigStock, owner, MaterialExchangeOfferStatus.ACTIVE, 30.0);
+    InventoryItem smallStock = persistItem(owner, "Tungsten", 400, 200.0);
+    MaterialExchangeOffer bigOffer =
+        persistOffer(smallStock, owner, MaterialExchangeOfferStatus.ACTIVE, 200.0);
+    entityManager.flush();
+
+    var byAmount =
+        offerRepository.findBoard(
+            owner.getId(),
+            false,
+            null,
+            0,
+            null,
+            PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "offeredAmount")));
+    assertThat(byAmount.getContent())
+        .as("sorted by offered amount desc — the 200-SCU offer outranks the 30-SCU one")
+        .containsExactly(bigOffer, smallOffer);
+
+    var minAmount =
+        offerRepository.findBoard(owner.getId(), false, null, 0, 100.0, PageRequest.of(0, 20));
+    assertThat(minAmount.getContent())
+        .as("min-amount 100 filters on offered amount, so the 30-SCU-off-500-stock offer is out")
+        .containsExactly(bigOffer);
+  }
+
   /** The Lager-status lookups and the tab counts see only active offers and the right owner. */
   @Test
   void lagerStatusAndTabCounts() {
@@ -138,6 +175,38 @@ class MaterialExchangeRepositoryDataTest {
             offerRepository.countByStatusAndOwnerId(
                 MaterialExchangeOfferStatus.ACTIVE, owner.getId()))
         .isEqualTo(1);
+  }
+
+  /**
+   * The board clamps to live stock (ADR-0086): after part of a row is booked out, the min-amount
+   * filter uses the effective {@code LEAST(offeredAmount, stock)} — so a partially-booked-out offer
+   * is filtered by what actually remains, not what was originally stated. (A <em>fully</em>
+   * booked-out row is deleted and its offer cascade-deleted, so it never reaches the board — no
+   * separate hide is needed.)
+   */
+  @Test
+  void findBoard_clampsAmountFilterToRemainingStock() {
+    User owner = persistUser("clamp-anbieter");
+    // Stated 200 SCU, but the row has been booked out to 80 SCU since release.
+    InventoryItem partly = persistItem(owner, "Titanium", 700, 80.0);
+    MaterialExchangeOffer partialOffer =
+        persistOffer(partly, owner, MaterialExchangeOfferStatus.ACTIVE, 200.0);
+    entityManager.flush();
+
+    var all = offerRepository.findBoard(owner.getId(), false, null, 0, null, PageRequest.of(0, 20));
+    assertThat(all.getContent()).containsExactly(partialOffer);
+
+    var minAbove =
+        offerRepository.findBoard(owner.getId(), false, null, 0, 100.0, PageRequest.of(0, 20));
+    assertThat(minAbove.getContent())
+        .as("min-amount 100 filters on the remaining 80 SCU (LEAST), not the stated 200")
+        .isEmpty();
+
+    var minBelow =
+        offerRepository.findBoard(owner.getId(), false, null, 0, 50.0, PageRequest.of(0, 20));
+    assertThat(minBelow.getContent())
+        .as("min-amount 50 keeps the offer since 80 SCU remain")
+        .containsExactly(partialOffer);
   }
 
   /** Interest registration is a grouped, name-free count; withdrawal removes exactly one row. */
@@ -183,6 +252,7 @@ class MaterialExchangeRepositoryDataTest {
     MaterialExchangeOffer duplicate = new MaterialExchangeOffer();
     duplicate.setInventoryItem(item);
     duplicate.setOwner(owner);
+    duplicate.setOfferedAmount(item.getAmount());
     duplicate.setStatus(MaterialExchangeOfferStatus.ACTIVE);
     duplicate.setReleasedAt(Instant.now());
 
@@ -219,12 +289,22 @@ class MaterialExchangeRepositoryDataTest {
     return inventoryItemRepository.save(item);
   }
 
-  /** Persists an offer in the given status for the item (owningOrgUnit left null). */
+  /**
+   * Persists an offer in the given status for the item (owningOrgUnit left null), offering the
+   * whole row's stock.
+   */
   private MaterialExchangeOffer persistOffer(
       InventoryItem item, User owner, MaterialExchangeOfferStatus status) {
+    return persistOffer(item, owner, status, item.getAmount());
+  }
+
+  /** Persists an ACTIVE-or-other offer that releases a specific offered amount (partial offers). */
+  private MaterialExchangeOffer persistOffer(
+      InventoryItem item, User owner, MaterialExchangeOfferStatus status, double offeredAmount) {
     MaterialExchangeOffer offer = new MaterialExchangeOffer();
     offer.setInventoryItem(item);
     offer.setOwner(owner);
+    offer.setOfferedAmount(offeredAmount);
     offer.setRemark("Tausche gegen **Titanium**.");
     offer.setStatus(status);
     offer.setReleasedAt(Instant.now());

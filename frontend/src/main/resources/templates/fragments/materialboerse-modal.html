@@ -35,7 +35,17 @@
                 <div class="facts-bar mb-modal-facts">
                     <span><span class="fact-k" th:text="#{materialboerse.facts.material}">Material</span><span class="fact-v" data-mb-fact-material>—</span></span>
                     <span><span class="fact-k" th:text="#{materialboerse.facts.quality}">Qualität</span><span class="fact-v" data-mb-fact-quality>—</span></span>
-                    <span><span class="fact-k" th:text="#{materialboerse.facts.amount}">Menge</span><span class="fact-v" data-mb-fact-amount>—</span></span>
+                </div>
+                <div class="mb-modal-amount">
+                    <label class="form-label-sm" for="mb-amount" th:text="#{materialboerse.modal.offeredAmount.label}">Menge anbieten</label>
+                    <div class="mb-modal-amount-row">
+                        <input id="mb-amount" data-mb-amount type="number" min="0" step="0.001"
+                               inputmode="decimal" th:aria-label="#{materialboerse.modal.offeredAmount.label}"/>
+                        <span class="mb-modal-amount-unit" data-mb-amount-unit th:text="#{material.quantity.scu}">SCU</span>
+                        <button type="button" class="btn btn-ghost btn-xs" data-mb-amount-max
+                                th:text="#{materialboerse.modal.offeredAmount.all}">Alles</button>
+                    </div>
+                    <span class="mb-modal-amount-hint" data-mb-amount-hint></span>
                 </div>
                 <label class="form-label-sm mb-modal-remark-label" for="mb-remark">
                     <span th:text="#{materialboerse.modal.remark.label}">Bemerkung</span>
@@ -63,9 +73,12 @@
     <script th:inline="javascript" th:attr="nonce=${cspNonce}">
         window.materialboerseI18n = Object.assign(window.materialboerseI18n || {}, {
             releaseTitle: /*[[#{materialboerse.modal.release.title}]]*/ 'Material für die Börse freigeben',
-            editTitle: /*[[#{materialboerse.modal.edit.title}]]*/ 'Bemerkung bearbeiten',
+            editTitle: /*[[#{materialboerse.modal.edit.title}]]*/ 'Angebot bearbeiten',
             submitRelease: /*[[#{materialboerse.modal.submit.release}]]*/ 'Freigeben',
             submitSave: /*[[#{materialboerse.modal.submit.save}]]*/ 'Speichern',
+            amountMax: /*[[#{materialboerse.modal.offeredAmount.max}]]*/ 'max. {0} verfügbar',
+            amountInvalid: /*[[#{materialboerse.modal.offeredAmount.invalid}]]*/ 'Bitte eine Menge größer als 0 angeben.',
+            amountExceeds: /*[[#{materialboerse.modal.offeredAmount.exceeds}]]*/ 'Die Menge darf den Lagerbestand nicht überschreiten.',
             released: /*[[#{materialboerse.toast.released}]]*/ 'Auf die Börse gestellt.',
             remarkSaved: /*[[#{materialboerse.toast.remarkSaved}]]*/ 'Bemerkung gespeichert.',
             error: /*[[#{notification.error.save}]]*/ 'Fehler.',

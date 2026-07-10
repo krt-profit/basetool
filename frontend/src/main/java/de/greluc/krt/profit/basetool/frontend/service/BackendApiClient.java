@@ -445,7 +445,11 @@ public class BackendApiClient {
     }
     Throwable root = unwrap(e);
     if (root instanceof CallNotPermittedException) {
-      log.warn("Circuit breaker open for {} {}: {}", method, uri, root.getMessage());
+      // DEBUG, not WARN: the breaker's one-time OPEN transition already logged WARN
+      // (ResilienceEventLogger). This branch fires for every call blocked while the breaker stays
+      // open, so at WARN a routine backend restart floods the log (issue #1203, REQ-OBS-001). The
+      // failure is still metered under reason=circuit_open below, so the count is never lost.
+      log.debug("Circuit breaker open for {} {}: {}", method, uri, root.getMessage());
       countBackendError(MetricNames.REASON_CIRCUIT_OPEN, method);
       throw new BackendServiceException(
           "Backend circuit breaker open",
