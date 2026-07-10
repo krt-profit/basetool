@@ -12,6 +12,8 @@
 
 - **Fehler behoben: Keine wiederkehrenden Warnungen mehr im Log nach der UEX-Synchronisation.** UEX vergibt mehreren Item-IDs (Basis-Item und seine Skins) dieselbe Spiel-UUID; da `external_uuid` eindeutig ist, kann nur eine Zeile die UUID führen. Das ist erwartetes, dauerhaftes Verhalten, wurde aber bisher bei jedem Lauf pro betroffener Zeile als Warnung geloggt. Diese Fälle werden jetzt auf DEBUG geloggt; die Laufzusammenfassung nennt stattdessen die Gesamtzahl (`sharedUuidDeclined`) (#1205).
 
+- **Fehler behoben: Keine `aurora_version()`-Fehlermeldungen mehr im Keycloak-Datenbanklog.** Die in Keycloak 26.7 neu standardmäßig aktive „Asynchronous-Commit"-Optimierung führte beim Start `SELECT aurora_version()` zur AWS-Aurora-Erkennung aus; auf unserer normalen PostgreSQL-Datenbank existiert diese Funktion nicht, sodass bei jedem Keycloak-Start ein (harmloser, von Keycloak abgefangener) `ERROR: function aurora_version() does not exist` das db-keycloak-Log verschmutzte. Die Optimierung ist nun per `KC_SPI_CONNECTIONS_JPA_QUARKUS_ASYNC_COMMIT=false` abgeschaltet — Verhalten wie vor dem 26.7-Update, die Probe wird an der Quelle vermieden (#1207).
+
 ## [v1.2.6](https://github.com/krt-profit/basetool/releases/tag/v1.2.6) - 2026-07-09
 
 ### Added
