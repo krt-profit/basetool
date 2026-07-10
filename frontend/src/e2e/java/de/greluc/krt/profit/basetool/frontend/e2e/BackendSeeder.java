@@ -87,15 +87,25 @@ public final class BackendSeeder {
   private static final int MAX_VERSION_RETRIES = 4;
 
   /**
-   * How many times to re-mint a fresh admin token and re-issue an authenticated seeding request
-   * when the resource server spuriously answers {@code 401}/{@code 403}. During the dense early-run
-   * seeding burst a freshly-issued, otherwise-valid bearer very occasionally resolves to {@code
-   * anonymous} for a single request (no JWT/JWKS error is logged and the same token authenticates
-   * the calls immediately before and after), which trips an {@code ADMIN}-gated endpoint. A bounded
-   * fresh-token retry rides out that transient auth blip; a non-auth status is a real error and is
-   * not retried.
+   * How many times to re-issue an authenticated seeding request when the resource server spuriously
+   * answers {@code 401}/{@code 403}. During the dense early-run seeding burst a valid admin bearer
+   * (it authenticates the {@code GET /users/me} calls immediately before and after) very
+   * occasionally resolves to {@code anonymous} at the resource server for a single state-changing
+   * request across a sub-second-to-few-second window — no JWT/JWKS error is logged, and the same
+   * token succeeds again once the window closes — which trips an {@code ADMIN}-gated endpoint.
+   * Because the token is already valid, re-minting does not help (an immediate re-issue lands
+   * inside the same window); instead the retry keeps the token and spaces attempts with a growing
+   * backoff ({@link #AUTH_RETRY_BACKOFF_MILLIS}) so a later attempt lands after the window has
+   * closed. A non-auth status is a real error and is not retried.
    */
-  private static final int MAX_AUTH_RETRIES = 3;
+  private static final int MAX_AUTH_RETRIES = 6;
+
+  /**
+   * Base backoff between the {@link #MAX_AUTH_RETRIES} auth retries: the wait before the next
+   * attempt grows as {@code attempt ×} this value, so the six attempts span roughly eleven seconds
+   * of waiting in total — comfortably outlasting the observed transient {@code anonymous} window.
+   */
+  private static final long AUTH_RETRY_BACKOFF_MILLIS = 750L;
 
   private final HttpClient http;
 
@@ -127,8 +137,10 @@ public final class BackendSeeder {
       // removed). The reconcile carries no user-row version, so there is no 409 retry loop.
       //
       // The reconcile IS declarative and idempotent, so on a spurious 401/403 (the transient
-      // early-run "anonymous" auth blip described on MAX_AUTH_RETRIES) re-mint a fresh admin token
-      // and re-issue the PATCH a bounded number of times. A non-auth status fails fast unchanged.
+      // early-run "anonymous" auth window described on MAX_AUTH_RETRIES) re-issue the PATCH with
+      // the
+      // same already-validated token after a growing backoff, so a later attempt lands after the
+      // window has closed. A non-auth status fails fast unchanged.
       int status = 0;
       for (int attempt = 1; attempt <= MAX_AUTH_RETRIES; attempt++) {
         status = patchSquadron(token, userId);
@@ -138,7 +150,9 @@ public final class BackendSeeder {
         if (status != 401 && status != 403) {
           break;
         }
-        token = passwordGrant(username, password);
+        if (attempt < MAX_AUTH_RETRIES) {
+          sleepQuietly(AUTH_RETRY_BACKOFF_MILLIS * attempt);
+        }
       }
       throw new IllegalStateException("Membership seeding PATCH failed: HTTP " + status);
     } catch (IllegalStateException e) {
@@ -2299,6 +2313,21 @@ public final class BackendSeeder {
             .method("PATCH", HttpRequest.BodyPublishers.ofString(body))
             .build();
     return http.send(request, BodyHandlers.ofString()).statusCode();
+  }
+
+  /**
+   * Sleeps for the given backoff between auth retries. Restores the thread's interrupt flag and
+   * aborts the seed (rather than silently swallowing the interruption) if interrupted mid-wait.
+   *
+   * @param millis backoff duration in milliseconds
+   */
+  private static void sleepQuietly(long millis) {
+    try {
+      Thread.sleep(millis);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Interrupted while backing off a seeding auth retry", e);
+    }
   }
 
   /**
