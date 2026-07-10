@@ -97,6 +97,14 @@
             <span th:text="#{personalInventory.blueprints.craft.refineryToggle}">Raffinerie-Ertrag einrechnen</span>
         </label>
         <span class="krt-bp-craft-toolbar-hint" th:text="#{personalInventory.blueprints.craft.refineryHint}">Offene &amp; laufende Raffinerie-Auftr&auml;ge einrechnen</span>
+        <!-- Craftable-only filter: a purely client-side view filter over the same craftability data
+             the refinery toggle drives. Lives outside the swapped #krt-bp-list fragment (like the
+             refinery toggle) so its state survives a batch-add / import / remove re-render; recipe.js
+             hides every master row that is not craftable under the current refinery-toggle state. -->
+        <label class="krt-bp-refinery-toggle krt-bp-craftable-toggle" for="krt-bp-craftable-toggle">
+            <input type="checkbox" id="krt-bp-craftable-toggle">
+            <span th:text="#{personalInventory.blueprints.craft.craftableFilter}">Nur craftbare anzeigen</span>
+        </label>
     </div>
 
     <div id="krt-bp-list">

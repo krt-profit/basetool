@@ -51,6 +51,12 @@
     let refineryOn = false;
     let activeCraftability = null;
 
+    // "Show only craftable" view filter: a client-side filter over the same craftability data,
+    // combined (AND) with the master search filter. Honours the refinery toggle, so a blueprint
+    // craftable only via refinery is shown iff the refinery toggle is on.
+    let craftableToggle = null;
+    let craftableOnly = false;
+
     // Marker on a craft badge/count when the blueprint is craftable ONLY thanks to refinery yield.
     const REFINERY_GLYPH = '⟢';
 
@@ -586,6 +592,9 @@
                     });
                 }
                 decorateRows();
+                // The craftability data has just arrived; if "show only craftable" is active it was
+                // hiding every row until now, so re-run the combined view filter.
+                applyClientFilter();
                 if (activeRow) {
                     const id = attr(activeRow, 'data-id');
                     activeCraftability = craftabilityById.get(id) || null;
@@ -759,6 +768,8 @@
     function onRefineryToggle() {
         refineryOn = !!(refineryToggle && refineryToggle.checked);
         decorateRows();
+        // The craftable set widens/narrows with the refinery toggle, so re-run the view filter too.
+        applyClientFilter();
         if (activeRow) {
             const id = attr(activeRow, 'data-id');
             renderCraftDetail(id);
@@ -768,16 +779,38 @@
         }
     }
 
+    // "Show only craftable" toggle: no badge/detail recompute needed — just re-run the view filter.
+    function onCraftableToggle() {
+        craftableOnly = !!(craftableToggle && craftableToggle.checked);
+        applyClientFilter();
+    }
+
     /* ----------------------------------------------------- filter + keyboard */
 
+    // Mirrors decorateRows' craftable determination: a blueprint counts as craftable iff its recipe
+    // resolved, it has evaluable RESOURCE ingredients, and the current-toggle craftable count is > 0.
+    // Rows with no craftability data yet (fetch in flight) are treated as not craftable.
+    function isRowCraftable(id) {
+        const data = craftabilityById.get(id);
+        if (!data || !data.recipeResolved || !data.hasResourceIngredients) {
+            return false;
+        }
+        const count = refineryOn ? data.craftableWithRefinery : data.craftable;
+        return count > 0;
+    }
+
+    // Combined view filter: a row is visible iff it matches the master search text AND — when the
+    // "show only craftable" toggle is on — it is currently craftable. Re-run whenever the search
+    // text, either toggle, or the craftability data changes.
     function applyClientFilter() {
-        if (!filterInput) {
+        if (!rowsEl) {
             return;
         }
-        const q = (filterInput.value || '').trim().toLowerCase();
+        const q = filterInput ? (filterInput.value || '').trim().toLowerCase() : '';
         rows().forEach(function (r) {
-            const name = attr(r, 'data-name').toLowerCase();
-            r.hidden = q !== '' && name.indexOf(q) === -1;
+            const matchesSearch = q === '' || attr(r, 'data-name').toLowerCase().indexOf(q) !== -1;
+            const matchesCraft = !craftableOnly || isRowCraftable(attr(r, 'data-id'));
+            r.hidden = !(matchesSearch && matchesCraft);
         });
     }
 
@@ -840,6 +873,17 @@
             if (!refineryToggle.dataset.wired) {
                 refineryToggle.addEventListener('change', onRefineryToggle);
                 refineryToggle.dataset.wired = '1';
+            }
+        }
+
+        // The "show only craftable" toggle likewise lives outside the swapped collection card, so its
+        // checkbox state survives a re-render; mirror it here and wire the change handler exactly once.
+        craftableToggle = document.getElementById('krt-bp-craftable-toggle');
+        if (craftableToggle) {
+            craftableOnly = craftableToggle.checked;
+            if (!craftableToggle.dataset.wired) {
+                craftableToggle.addEventListener('change', onCraftableToggle);
+                craftableToggle.dataset.wired = '1';
             }
         }
 
