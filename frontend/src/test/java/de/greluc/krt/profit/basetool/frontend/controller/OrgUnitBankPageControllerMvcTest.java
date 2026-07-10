@@ -42,7 +42,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitBankAccountSettin
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitBankBalanceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitBankViewUserDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -402,7 +401,8 @@ class OrgUnitBankPageControllerMvcTest {
   /**
    * Stubs the read-only account drill-in (REQ-BANK-038) plus the holder/OL settings region: an
    * ORG_UNIT account with a balance target, a single booking, one granted role bucket and one
-   * granted user, and a user-lookup for the "grant a user" picker.
+   * granted user. The visibility/limit user pickers are server-side search comboboxes (#1193), so
+   * no user roster is stubbed here.
    *
    * @param accountId the account id used in every backend URI
    */
@@ -491,8 +491,6 @@ class OrgUnitBankPageControllerMvcTest {
             null);
     PageResponse<BankBookingDto> bookings =
         new PageResponse<>(List.of(booking), 0, 20, 1L, 1, List.of());
-    UserReferenceDto user =
-        new UserReferenceDto(UUID.randomUUID(), "cmdr.valk", "cmdr.valk", "cmdr.valk", 1);
 
     String detailUri = "/api/v1/org-units/bank/accounts/" + accountId;
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
@@ -502,7 +500,6 @@ class OrgUnitBankPageControllerMvcTest {
         .thenReturn(settings);
     when(backendApiClient.get(contains(detailUri + "/transactions"), anyTypeRef()))
         .thenReturn(bookings);
-    when(backendApiClient.get(eq("/api/v1/users/lookup"), anyTypeRef())).thenReturn(List.of(user));
   }
 
   @Test

@@ -7,7 +7,7 @@
   limitsDisplay(limits): read-only list of the configured per-tier ceilings, shown to every viewer
   who cannot edit (a manager sees the editor instead). Rendered only when at least one limit is set.
 
-  limitsEditor(acct, limits, users, refresh): the per-tier set/clear editor for a caller who may edit
+  limitsEditor(acct, limits, refresh): the per-tier set/clear editor for a caller who may edit
   (responsible holder / bank management / admin). Mirrors the visibility-settings vis-row pattern:
   each tier carries a compact number input + "set" (PUT) and, when a limit is set, a "clear" (DELETE)
   against /api/proxy/org-units/bank/accounts/{id}/approval-limit/... . The `refresh` parameter is the
@@ -46,7 +46,7 @@
     </div>
 </th:block>
 
-<th:block th:fragment="limitsEditor(acct, limits, users, refresh)">
+<th:block th:fragment="limitsEditor(acct, limits, refresh)">
     <div th:if="${limits != null and limits.canEdit()}" data-testid="bank-approval-limit-settings">
         <h3 class="sub-h" th:text="#{bank.approvalLimit.title}">Freigabe-Limits</h3>
         <p class="text-muted" style="font-size: 0.8rem;" th:text="#{bank.approvalLimit.hint}">
@@ -162,10 +162,12 @@
             <div class="field-row">
                 <div class="bank-form-row grow">
                     <label for="bank-limit-user-select" th:text="#{bank.approvalLimit.user.add}">Limit f&uuml;r Nutzer</label>
-                    <select id="bank-limit-user-select" name="_userId" required data-krt-combobox data-testid="bank-limit-user-select">
+                    <!-- Server-side searchable combobox (remote-users, #1193): the roster is no longer
+                         preloaded. Typing queries /users/search on demand; this editor renders only on
+                         the org-unit bank page (MEMBER_OR_ABOVE), so the squadron-scoped endpoint fits.
+                         Add-only picker, only the placeholder is seeded. -->
+                    <select id="bank-limit-user-select" name="_userId" required data-krt-combobox="remote-users" data-testid="bank-limit-user-select">
                         <option value="" th:text="#{bank.field.user.placeholder}">Nutzer w&auml;hlen &hellip;</option>
-                        <option th:each="usr : ${users}" th:value="${usr.id()}" th:attr="data-search=${usr.username()}"
-                                th:text="${usr.effectiveName() != null ? usr.effectiveName() : usr.username()}">greluc</option>
                     </select>
                 </div>
                 <div class="bank-form-row">

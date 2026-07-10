@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -43,10 +44,11 @@ import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
 /**
- * Pure-method unit tests for {@link LeitungPageController}: the page loads the delegated view + the
- * user-lookup picker (skipping the lookup on the fragment re-swap path), and the AJAX write proxies
- * relay the backend's status + {@code {code, detail}} body on failure so the page JS can toast the
- * right message and recognise the {@code OPTIMISTIC_LOCK} code.
+ * Pure-method unit tests for {@link LeitungPageController}: the page loads the delegated view (the
+ * appointment pickers are server-side searchable comboboxes since #1193, so no user roster is
+ * preloaded), and the AJAX write proxies relay the backend's status + {@code {code, detail}} body
+ * on failure so the page JS can toast the right message and recognise the {@code OPTIMISTIC_LOCK}
+ * code.
  */
 @SuppressWarnings("unchecked")
 class LeitungPageControllerTest {
@@ -56,24 +58,25 @@ class LeitungPageControllerTest {
   }
 
   @Test
-  void leitung_loadsViewAndUserPicker() {
+  void leitung_loadsView_doesNotPreloadUserRoster() {
     BackendApiClient backend = mock(BackendApiClient.class);
     LeitungPageController controller = new LeitungPageController(backend);
     LeitungViewDto view = emptyView();
     when(backend.get("/api/v1/leitung/view", LeitungViewDto.class)).thenReturn(view);
-    when(backend.get(eq("/api/v1/users/lookup"), anyTypeRef()))
-        .thenReturn(List.of(Map.of("id", UUID.randomUUID().toString(), "username", "pilot")));
     Model model = new ConcurrentModel();
 
     String result = controller.leitung(null, model);
 
     assertEquals("organisation/leitung", result);
     assertSame(view, model.getAttribute("leitung"));
-    assertEquals(1, ((List<?>) model.getAttribute("allUsers")).size());
+    // #1193: the appointment pickers search the roster server-side on demand, so the full page
+    // render no longer preloads the user lookup or sets the allUsers attribute.
+    assertNull(model.getAttribute("allUsers"));
+    verify(backend, never()).get(eq("/api/v1/users/lookup"), anyTypeRef());
   }
 
   @Test
-  void leitung_fragment_returnsFragmentSelectorAndSkipsUserLookup() {
+  void leitung_fragment_returnsFragmentSelector() {
     BackendApiClient backend = mock(BackendApiClient.class);
     LeitungPageController controller = new LeitungPageController(backend);
     when(backend.get("/api/v1/leitung/view", LeitungViewDto.class)).thenReturn(emptyView());

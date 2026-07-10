@@ -244,9 +244,9 @@
         <p class="leitung-modal-unit" id="leitung-modal-unit"></p>
         <div class="form-group">
             <label for="leitung-modal-user" th:text="#{leitung.modal.user}">Nutzer</label>
-            <select id="leitung-modal-user" data-krt-combobox>
+            <!-- Server-side searchable combobox (remote-users, #1193): roster is searched on demand, not preloaded. -->
+            <select id="leitung-modal-user" data-krt-combobox="remote-users">
                 <option value="" th:text="#{leitung.modal.user.placeholder}">-- Bitte wählen --</option>
-                <option th:each="u : ${allUsers}" th:value="${u.id()}" th:attr="data-search=${u.username()}" th:text="${u.effectiveName() ?: u.username()}">User</option>
             </select>
         </div>
         <div class="form-group" id="leitung-modal-role-group">

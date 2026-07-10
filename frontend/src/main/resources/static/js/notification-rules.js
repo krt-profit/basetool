@@ -74,18 +74,56 @@
             setValue(row, '[data-selector-orgRelativeRole]', selector.orgRelativeRole);
             setValue(row, '[data-selector-contextRole]', selector.contextRole);
             setValue(row, '[data-selector-roleCode]', selector.roleCode);
-            setValue(row, '[data-selector-userSub]', selector.userSub);
         }
         container.appendChild(row);
         const appended = container.lastElementChild;
         toggleRow(appended);
-        // Upgrade the freshly cloned SPECIFIC_USER picker into a searchable combobox: the row comes
-        // from an inert <template>, so its <select data-krt-combobox> arrives un-enhanced. The value
-        // set above (edit mode) is seeded by the enhancer. Idempotent; safe if the helper is absent.
-        if (window.krtEnhanceComboboxes) {
-            window.krtEnhanceComboboxes(appended);
-        }
+        // Upgrade the freshly cloned selector row's SPECIFIC_USER picker into a searchable combobox.
+        // The picker now searches the roster server-side (remote-users, #1193) instead of preloading
+        // every user, so an existing rule's chosen user is seeded here in edit mode: resolve its
+        // display name via /users/{id}, inject one selected <option>, THEN enhance (the enhancer
+        // seeds its committed value/label from that option). New rows have no user and enhance at
+        // once.
+        enhanceSelectorRow(appended, selector);
         return appended;
+    }
+
+    // Enhances a selector row's SPECIFIC_USER combobox. When the row carries a preselected user
+    // (edit mode), seeds one <option> (value + resolved display name) before enhancing so the box
+    // shows the name, not a blank field; a failed name lookup falls back to the raw id so the value
+    // is never lost. All other rows (and non-user selectors) enhance immediately.
+    function enhanceSelectorRow(row, selector) {
+        const enhance = function () {
+            if (window.krtEnhanceComboboxes) {
+                window.krtEnhanceComboboxes(row);
+            }
+        };
+        if (!selector || selector.kind !== 'SPECIFIC_USER' || !selector.userSub) {
+            enhance();
+            return;
+        }
+        const select = row.querySelector('[data-selector-userSub]');
+        fetch('/users/' + encodeURIComponent(selector.userSub), {
+            headers: { Accept: 'application/json' },
+        })
+            .then(function (response) {
+                return response.ok ? response.json() : null;
+            })
+            .catch(function () {
+                return null;
+            })
+            .then(function (user) {
+                if (select) {
+                    const option = document.createElement('option');
+                    option.value = selector.userSub;
+                    option.textContent =
+                        (user && (user.effectiveName || user.displayName || user.username)) ||
+                        selector.userSub;
+                    option.selected = true;
+                    select.appendChild(option);
+                }
+                enhance();
+            });
     }
 
     function setValue(row, selector, value) {

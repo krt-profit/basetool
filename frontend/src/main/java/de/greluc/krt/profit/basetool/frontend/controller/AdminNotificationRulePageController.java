@@ -23,7 +23,6 @@ import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorRespons
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationRuleDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationRuleWriteRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
@@ -63,8 +62,6 @@ public class AdminNotificationRulePageController {
   private static final String BACKEND_BASE = "/api/v1/notification-rules";
   private static final ParameterizedTypeReference<List<NotificationRuleDto>> LIST_TYPE =
       new ParameterizedTypeReference<>() {};
-  private static final ParameterizedTypeReference<List<UserReferenceDto>> USERS_TYPE =
-      new ParameterizedTypeReference<>() {};
 
   private final BackendApiClient backendApiClient;
 
@@ -84,15 +81,10 @@ public class AdminNotificationRulePageController {
       model.addAttribute("rules", List.of());
       model.addAttribute("error", "admin.notificationRules.error.load");
     }
-    // Candidate users for the SPECIFIC_USER selector's searchable picker (REQ-FE-011). Fetched
-    // separately so a lookup failure leaves the rules list intact; the picker then renders empty.
-    try {
-      List<UserReferenceDto> users = backendApiClient.get("/api/v1/users/lookup", USERS_TYPE);
-      model.addAttribute("users", users == null ? List.of() : users);
-    } catch (Exception e) {
-      log.debug("Failed to load users for the notification-rule user picker", e);
-      model.addAttribute("users", List.of());
-    }
+    // The SPECIFIC_USER selector is now a server-side searchable combobox (remote-users, #1193):
+    // the
+    // roster is searched on demand via /users/search, and notification-rules.js seeds an existing
+    // rule's chosen user in edit mode by resolving its name through /users/{id}. No roster preload.
     return "admin/notification-rules";
   }
 
