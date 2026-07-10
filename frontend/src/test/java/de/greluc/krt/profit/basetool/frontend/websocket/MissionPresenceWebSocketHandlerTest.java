@@ -20,23 +20,34 @@
 package de.greluc.krt.profit.basetool.frontend.websocket;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.frontend.service.MissionPresenceService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.security.Principal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -374,6 +385,106 @@ class MissionPresenceWebSocketHandlerTest {
     assertThat(frameCounter(MetricNames.FRAME_CHANGED)).isZero();
   }
 
+  @Test
+  void broadcastableSections_matchMissionDetailSeamMapKeys() throws Exception {
+    // REQ-FE-010 parity guard: the server relay accept-list (BROADCASTABLE_SECTIONS) must carry
+    // exactly the top-level keys of the MISSION_SECTIONS seam map in mission-detail.js — the single
+    // source of truth the acting client broadcasts from and every peer's live-sync receiver derives
+    // from. A key present in the JS map but missing from the accept-list is silently dropped at the
+    // relay, leaving every other viewer's section stale until a manual reload (this happened to
+    // steps/objectives/frequencies once). Reading the JS keys from the classpath fails the build
+    // the
+    // moment the two diverge, instead of re-stating the server list on both sides of the assertion.
+    String js = missionDetailModuleSource();
+    Pattern sectionsBlock =
+        Pattern.compile("const\\s+MISSION_SECTIONS\\s*=\\s*\\{(.*?)\\n\\};", Pattern.DOTALL);
+    Matcher blockMatcher = sectionsBlock.matcher(js);
+    assertThat(blockMatcher.find())
+        .as("MISSION_SECTIONS object literal present in mission-detail.js")
+        .isTrue();
+    // Within the block only the top-level section keys have an object literal as their value
+    // ("crew: { ... }"); the nested "container:" / "fragmentValue:" keys carry a string, so
+    // matching "<word>: {" extracts exactly the seam-map keys.
+    Set<String> seamKeys = new HashSet<>();
+    Matcher keyMatcher = Pattern.compile("(\\w+)\\s*:\\s*\\{").matcher(blockMatcher.group(1));
+    while (keyMatcher.find()) {
+      seamKeys.add(keyMatcher.group(1));
+    }
+    assertThat(seamKeys).as("extracted seam-map keys").isNotEmpty();
+    assertThat(seamKeys).isEqualTo(broadcastableSections());
+  }
+
+  @Test
+  void tickReaper_broadcastsFreshSnapshotToAffectedRoom() throws Exception {
+    // The reaper tick must fan a fresh snapshot into every room that lost a TTL-expired entry;
+    // otherwise an editor who closes their tab without a blur lingers forever in every peer's
+    // "X is editing this section" indicator, defeating the collision-avoidance the feature exists
+    // for. Drive tickReaper() against a mocked service so the handler's own
+    // reap -> dedup-missions -> broadcastSnapshot wiring is exercised in isolation.
+    UUID missionId = UUID.randomUUID();
+    SimpleMeterRegistry reaperRegistry = new SimpleMeterRegistry();
+    MissionPresenceService mockService = mock(MissionPresenceService.class);
+    when(mockService.snapshot(any(UUID.class), any(Instant.class))).thenReturn(Map.of());
+    when(mockService.reapExpired(any(Instant.class)))
+        .thenReturn(List.of(new MissionPresenceService.MissionSectionRef(missionId, "details")));
+    MissionPresenceWebSocketHandler reaperHandler =
+        new MissionPresenceWebSocketHandler(mockService, objectMapper, reaperRegistry);
+
+    FakeSession session = new FakeSession();
+    session.open = true;
+    session.uri = URI.create("ws://localhost/ws/missions/" + missionId + "/presence");
+    session.principal =
+        new UsernamePasswordAuthenticationToken(
+            oidcUser("user-1", "Alice"), "n/a", List.of(new SimpleGrantedAuthority("ROLE_USER")));
+    reaperHandler.afterConnectionEstablished(session);
+    session.sent.clear();
+
+    reaperHandler.tickReaper();
+
+    // The reaper fans exactly one fresh presence snapshot to the affected room's socket.
+    assertThat(session.sent).hasSize(1);
+    JsonNode frame = objectMapper.readTree(((TextMessage) session.sent.get(0)).getPayload());
+    assertThat(frame.get("type").asString()).isEqualTo("presence");
+  }
+
+  @Test
+  void afterConnectionEstablished_refusesSocketWithoutMissionId() throws Exception {
+    // Defense-in-depth: a socket whose URI carries no mission id must be closed NOT_ACCEPTABLE and
+    // never registered — no room entry, no snapshot. A refactor that mis-orders the guard or drops
+    // the early return would let it register and receive presence snapshots (leaking editor
+    // identities) or NPE on the missing attributes during a later broadcast.
+    FakeSession session = new FakeSession();
+    session.open = true;
+    session.uri = URI.create("ws://localhost/ws/missions"); // missing {id}/presence segments
+    session.principal =
+        new UsernamePasswordAuthenticationToken(
+            oidcUser("user-1", "Alice"), "n/a", List.of(new SimpleGrantedAuthority("ROLE_USER")));
+
+    handler.afterConnectionEstablished(session);
+
+    assertThat(session.closeStatus).isEqualTo(CloseStatus.NOT_ACCEPTABLE);
+    assertThat(presenceGauge()).isZero();
+    assertThat(session.sent).isEmpty();
+  }
+
+  @Test
+  void afterConnectionEstablished_refusesSocketWithoutPrincipal() throws Exception {
+    // A socket that reaches the handler with no authenticated principal (Spring Security failed to
+    // attach one) must be refused NOT_ACCEPTABLE, not registered, and sent no snapshot — otherwise
+    // editor identities leak to an unauthenticated/malformed socket.
+    UUID missionId = UUID.randomUUID();
+    FakeSession session = new FakeSession();
+    session.open = true;
+    session.uri = URI.create("ws://localhost/ws/missions/" + missionId + "/presence");
+    session.principal = null;
+
+    handler.afterConnectionEstablished(session);
+
+    assertThat(session.closeStatus).isEqualTo(CloseStatus.NOT_ACCEPTABLE);
+    assertThat(presenceGauge()).isZero();
+    assertThat(session.sent).isEmpty();
+  }
+
   // ── helpers ────────────────────────────────────────────────────────────────────────────────
 
   private double presenceGauge() {
@@ -393,6 +504,22 @@ class MissionPresenceWebSocketHandlerTest {
             .tag(MetricNames.TAG_REASON, reason)
             .counter();
     return counter == null ? 0.0 : counter.count();
+  }
+
+  private static String missionDetailModuleSource() throws IOException {
+    try (var in = new ClassPathResource("static/js/mission-detail.js").getInputStream()) {
+      return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+    }
+  }
+
+  // Reads the handler's private BROADCASTABLE_SECTIONS accept-list reflectively so the parity test
+  // can compare it against the JS seam map without a production-code change to widen its
+  // visibility.
+  @SuppressWarnings("unchecked") // The field is a Set<String>; the reflective read erases the type.
+  private static Set<String> broadcastableSections() throws ReflectiveOperationException {
+    Field field = MissionPresenceWebSocketHandler.class.getDeclaredField("BROADCASTABLE_SECTIONS");
+    field.setAccessible(true);
+    return (Set<String>) field.get(null);
   }
 
   private FakeSession openSession(UUID missionId, OidcUser user) throws Exception {
@@ -529,8 +656,9 @@ class MissionPresenceWebSocketHandlerTest {
       this.open = false;
     }
 
-    // Suppress unused-field warnings for `closeStatus` / `ByteBuffer` import — both are part of
-    // the WebSocketSession contract we mirror but the current tests do not assert on them.
+    // Keep the `ByteBuffer` import referenced — it is part of the WebSocketSession contract we
+    // mirror but no handler path exercises it, so a throwaway allocation avoids an unused-import
+    // finding. (`closeStatus` is now asserted by the connection-refusal tests.)
     @SuppressWarnings("unused")
     private void touchUnusedSymbols() {
       ByteBuffer.allocate(0);

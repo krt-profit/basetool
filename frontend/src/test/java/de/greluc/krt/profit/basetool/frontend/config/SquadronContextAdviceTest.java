@@ -23,18 +23,24 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.config.SquadronContextAdvice.ActiveOrgUnitResponse;
 import de.greluc.krt.profit.basetool.frontend.config.SquadronContextAdvice.CapabilitiesResponse;
+import de.greluc.krt.profit.basetool.frontend.controller.MeFrontendController;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -44,13 +50,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
 
 /**
- * Unit tests for {@link SquadronContextAdvice}. Two groups: (1) the per-principal capability gates
- * — the shared {@code meCapabilities} resolver (a single backend round-trip, admins
+ * Unit tests for {@link SquadronContextAdvice}. Three groups: (1) the per-principal capability
+ * gates — the shared {@code meCapabilities} resolver (a single backend round-trip, admins
  * short-circuited, anonymous short-circuited, fail-closed on error) and the two derived sidebar
  * flags {@code canSeeBlueprintOverview} (#364) and {@code canViewJobOrders} (profit-eligible order
  * visibility); (2) the {@code appTitle} composition (REQ-ORG-010) — the single surface for the
  * active OrgUnit context after the redundant top-right chip was removed, including the SK-pin case
- * the chip used to be the only surface for.
+ * the chip used to be the only surface for; (3) the {@code activeSquadronId} resolver and its four
+ * branches (session pin, admin-without-pin → all-scopes null, non-admin → backend active-org-unit
+ * fallback, and backend-failure → null) — the value every OrgUnit-derived attribute (title, badge,
+ * all-squadrons mode, promotion visibility) hangs off.
  */
 @ExtendWith(MockitoExtension.class)
 class SquadronContextAdviceTest {
@@ -58,6 +67,7 @@ class SquadronContextAdviceTest {
   @Mock private BackendApiClient backendApiClient;
   @Mock private MessageSource messageSource;
   @Mock private FrontendAuthHelperService authHelper;
+  @Mock private HttpServletRequest request;
 
   private SquadronContextAdvice advice() {
     return new SquadronContextAdvice(backendApiClient, messageSource, authHelper);
@@ -210,6 +220,60 @@ class SquadronContextAdviceTest {
     stubEchoMessages();
 
     assertEquals("app.title", advice().appTitle(null, false));
+  }
+
+  @Test
+  void activeSquadronId_sessionPin_isReturned() {
+    // Branch 1: an active session pin (set by MeFrontendController) wins outright — no isAdmin
+    // check, no backend round-trip. A regression here makes an admin's pinned OrgUnit invisible to
+    // the layout (title/badge show "Alle Staffeln" while data is scoped to the pin).
+    UUID pinned = UUID.randomUUID();
+    when(authHelper.isAuthenticated()).thenReturn(true);
+    HttpSession session = mock(HttpSession.class);
+    when(request.getSession(false)).thenReturn(session);
+    when(session.getAttribute(MeFrontendController.ACTIVE_ORG_UNIT_SESSION_KEY)).thenReturn(pinned);
+
+    assertEquals(pinned, advice().activeSquadronId(request));
+    verify(backendApiClient, never()).get(any(String.class), anyClass());
+  }
+
+  @Test
+  void activeSquadronId_adminWithoutPin_isNull() {
+    // Branch 2: an authenticated admin with no session pin resolves to null (all-scopes mode) and
+    // must NOT fall through to the non-admin backend lookup.
+    when(authHelper.isAuthenticated()).thenReturn(true);
+    when(request.getSession(false)).thenReturn(null);
+    when(authHelper.isAdmin()).thenReturn(true);
+
+    assertNull(advice().activeSquadronId(request));
+    verify(backendApiClient, never()).get(any(String.class), anyClass());
+  }
+
+  @Test
+  void activeSquadronId_nonAdmin_fallsBackToBackendActiveOrgUnit() {
+    // Branch 3: a non-admin without a session pin resolves the persistent home Staffel via the
+    // backend GET /api/v1/me/active-org-unit. A break here stops resolving the home staffel.
+    UUID home = UUID.randomUUID();
+    when(authHelper.isAuthenticated()).thenReturn(true);
+    when(request.getSession(false)).thenReturn(null);
+    when(authHelper.isAdmin()).thenReturn(false);
+    when(backendApiClient.get("/api/v1/me/active-org-unit", ActiveOrgUnitResponse.class))
+        .thenReturn(new ActiveOrgUnitResponse(home));
+
+    assertEquals(home, advice().activeSquadronId(request));
+  }
+
+  @Test
+  void activeSquadronId_backendFailure_degradesToNull() {
+    // Branch 4: a backend hiccup on the non-admin fallback degrades silently to null rather than
+    // 500ing the layout render.
+    when(authHelper.isAuthenticated()).thenReturn(true);
+    when(request.getSession(false)).thenReturn(null);
+    when(authHelper.isAdmin()).thenReturn(false);
+    when(backendApiClient.get("/api/v1/me/active-org-unit", ActiveOrgUnitResponse.class))
+        .thenThrow(new RuntimeException("boom"));
+
+    assertNull(advice().activeSquadronId(request));
   }
 
   /**

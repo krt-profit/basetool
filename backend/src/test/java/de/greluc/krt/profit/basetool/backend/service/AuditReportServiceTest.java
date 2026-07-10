@@ -40,8 +40,11 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -64,6 +67,26 @@ class AuditReportServiceTest {
   @Mock private MessageSource messageSource;
 
   @InjectMocks private AuditReportService auditReportService;
+
+  /**
+   * The independent source of truth for the {@code AuditDomain -> *_AUDIT_EXPORTED} mapping, kept
+   * separate from the production {@code AuditReportService.exportEventType} switch so a copy-pasted
+   * or reused arm (e.g. {@code MISSION -> OPERATION_AUDIT_EXPORTED}) is caught. A future domain
+   * added without an entry here surfaces as a missing key in {@link
+   * #export_recordsDomainSpecificExportEventType(AuditDomain)}.
+   */
+  private static final Map<AuditDomain, AuditEventType> EXPECTED_EXPORT_TYPE =
+      Map.ofEntries(
+          Map.entry(AuditDomain.INVENTORY, AuditEventType.INVENTORY_AUDIT_EXPORTED),
+          Map.entry(AuditDomain.JOB_ORDER, AuditEventType.JOB_ORDER_AUDIT_EXPORTED),
+          Map.entry(AuditDomain.REFINERY, AuditEventType.REFINERY_AUDIT_EXPORTED),
+          Map.entry(
+              AuditDomain.PERSONAL_INVENTORY, AuditEventType.PERSONAL_INVENTORY_AUDIT_EXPORTED),
+          Map.entry(AuditDomain.MISSION, AuditEventType.MISSION_AUDIT_EXPORTED),
+          Map.entry(AuditDomain.OPERATION, AuditEventType.OPERATION_AUDIT_EXPORTED),
+          Map.entry(AuditDomain.ROLE, AuditEventType.ROLE_AUDIT_EXPORTED),
+          Map.entry(AuditDomain.PROMOTION, AuditEventType.PROMOTION_AUDIT_EXPORTED),
+          Map.entry(AuditDomain.MARKET, AuditEventType.MARKET_AUDIT_EXPORTED));
 
   @Test
   void export_rendersEventsAndRecordsExportEvent() throws IOException {
@@ -182,6 +205,29 @@ class AuditReportServiceTest {
     org.junit.jupiter.api.Assertions.assertNotNull(pdf);
     verify(auditService)
         .record(eq(AuditEventType.REFINERY_AUDIT_EXPORTED), isNull(), isNull(), isNull(), any());
+  }
+
+  @ParameterizedTest
+  @EnumSource(AuditDomain.class)
+  void export_recordsDomainSpecificExportEventType(AuditDomain domain) {
+    // Given an empty period so every arm renders without needing per-domain fixtures.
+    lenient()
+        .when(messageSource.getMessage(any(String.class), isNull(), eq(Locale.GERMAN)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    Instant from = Instant.now().minus(1, ChronoUnit.HOURS);
+    Instant to = Instant.now().plus(1, ChronoUnit.HOURS);
+    when(auditEventRepository.countForExport(domain, from, to)).thenReturn(0L);
+    when(auditEventRepository.findForExport(domain, from, to)).thenReturn(List.of());
+
+    // When
+    auditReportService.generateAuditLogPdf(domain, from, to, null);
+
+    // Then the export is recorded under this domain's own *_AUDIT_EXPORTED type — pins all 9 arms
+    // and forces a new enum constant to gain both a production arm and a test mapping.
+    AuditEventType expected = EXPECTED_EXPORT_TYPE.get(domain);
+    org.junit.jupiter.api.Assertions.assertNotNull(
+        expected, "no expected export event type mapped for domain " + domain);
+    verify(auditService).record(eq(expected), isNull(), isNull(), isNull(), any());
   }
 
   private static String extractText(byte[] pdf) throws IOException {

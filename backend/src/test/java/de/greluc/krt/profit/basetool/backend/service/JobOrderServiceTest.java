@@ -1486,6 +1486,213 @@ class JobOrderServiceTest {
   }
 
   // ---------------------------------------------------------------
+  // updateJobOrderStatus — COMPLETED audit edge-gating (JobOrderService.java:568-582)
+  // ---------------------------------------------------------------
+
+  @Test
+  void updateJobOrderStatus_openToCompleted_recordsJobOrderCompletedNotStatusChanged() {
+    // A genuine OPEN -> COMPLETED manual transition crosses the completion EDGE
+    // (previousStatus != COMPLETED), so the endpoint records exactly one JOB_ORDER_COMPLETED
+    // (autoCompleted=false) and NEVER a JOB_ORDER_STATUS_CHANGED — the same single-event funnel the
+    // auto-completion path uses. Gating on the edge (not on status alone) is what keeps a real
+    // completion from being misclassified as a plain status change.
+    jobOrder.setPriority(3);
+    jobOrder.setStatus(JobOrderStatus.OPEN);
+    jobOrder.setVersion(1L);
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+    when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
+    when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>(List.of(jobOrder)));
+    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(
+            any(UUID.class), any(UUID.class), any()))
+        .thenReturn(10.0);
+
+    jobOrderService.updateJobOrderStatus(
+        orderId, new UpdateJobOrderStatusDto(JobOrderStatus.COMPLETED, 1L));
+
+    // Exactly one JOB_ORDER_COMPLETED, carrying the from-status and the autoCompleted=false marker.
+    verify(auditService)
+        .record(
+            eq(de.greluc.krt.profit.basetool.backend.model.AuditEventType.JOB_ORDER_COMPLETED),
+            eq(orderId),
+            any(),
+            any(),
+            argThat(d -> d != null && d.toString().equals("from=OPEN autoCompleted=false")));
+    // The manual completion is NOT also emitted as a STATUS_CHANGED (no duplicate audit row).
+    verify(auditService, never())
+        .record(
+            eq(de.greluc.krt.profit.basetool.backend.model.AuditEventType.JOB_ORDER_STATUS_CHANGED),
+            any(),
+            any(),
+            any(),
+            any());
+  }
+
+  @Test
+  void updateJobOrderStatus_completedToCompleted_recordsStatusChangedOnly() {
+    // An idempotent re-save of an already-COMPLETED order does NOT cross the completion edge
+    // (previousStatus == COMPLETED), so it is a plain JOB_ORDER_STATUS_CHANGED and must NEVER emit
+    // a
+    // second JOB_ORDER_COMPLETED — otherwise every no-op PUT status=COMPLETED would double-count a
+    // completion in the audit log and any basetool_* completion metric derived from it.
+    jobOrder.setPriority(null);
+    jobOrder.setStatus(JobOrderStatus.COMPLETED);
+    jobOrder.setVersion(1L);
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+    when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
+    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    when(inventoryItemRepository.sumAmountByMaterialAndJobOrderAndMinQuality(
+            any(UUID.class), any(UUID.class), any()))
+        .thenReturn(10.0);
+
+    jobOrderService.updateJobOrderStatus(
+        orderId, new UpdateJobOrderStatusDto(JobOrderStatus.COMPLETED, 1L));
+
+    // A no-op completed->completed re-save records STATUS_CHANGED (from == to), not COMPLETED.
+    verify(auditService)
+        .record(
+            eq(de.greluc.krt.profit.basetool.backend.model.AuditEventType.JOB_ORDER_STATUS_CHANGED),
+            eq(orderId),
+            any(),
+            any(),
+            argThat(d -> d != null && d.toString().equals("from=COMPLETED to=COMPLETED")));
+    verify(auditService, never())
+        .record(
+            eq(de.greluc.krt.profit.basetool.backend.model.AuditEventType.JOB_ORDER_COMPLETED),
+            any(),
+            any(),
+            any(),
+            any());
+    // Not a terminal EDGE, so no priority reshuffle / inventory unlink runs on the idempotent save.
+    verify(inventoryItemRepository, never()).unlinkJobOrder(any());
+  }
+
+  // ---------------------------------------------------------------
+  // reassignResponsibleOrgUnit — non-admin escalation gate (JobOrderService.java:1310-1320)
+  // ---------------------------------------------------------------
+
+  @Test
+  void reassignResponsibleOrgUnit_NonAdmin_EscalatesOwnSquadronToSk_succeeds() {
+    // The one move a non-admin logistician/officer may make: escalate an order responsible to a
+    // squadron they may edit up to a Spezialkommando. All three sub-conditions hold
+    // (currentIsSquadron && targetIsSpecialCommand && mayEditCurrent), so the gate lets it through
+    // and the responsible org unit is flipped to the SK target.
+    UUID currentId = UUID.randomUUID();
+    Squadron current = new Squadron();
+    current.setId(currentId);
+    current.setShorthand("CUR");
+    jobOrder.setResponsibleOrgUnit(current);
+
+    UUID targetId = UUID.randomUUID();
+    SpecialCommand target = new SpecialCommand();
+    target.setId(targetId);
+    target.setShorthand("SK");
+    target.setProfitEligible(true);
+
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+    when(orgUnitRepository.findById(targetId)).thenReturn(Optional.of(target));
+    when(authHelperService.isAdmin()).thenReturn(false);
+    when(authHelperService.canEditOrgUnit(currentId)).thenReturn(true);
+    when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
+    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    // The order is now SK-responsible, so mapToDtoWithStock enriches it with the claim view.
+    when(materialClaimService.getClaimBucketsForOrder(any(JobOrder.class)))
+        .thenReturn(java.util.List.of());
+
+    jobOrderService.reassignResponsibleOrgUnit(orderId, targetId);
+
+    assertSame(target, jobOrder.getResponsibleOrgUnit());
+    verify(jobOrderRepository).save(jobOrder);
+  }
+
+  @Test
+  void reassignResponsibleOrgUnit_NonAdmin_ToAnotherSquadron_throwsAccessDenied() {
+    // targetIsSpecialCommand regression guard: even from an editable own squadron, a non-admin may
+    // NOT hand the order to another squadron — only escalate to an SK. The target is a squadron, so
+    // the gate denies it and nothing is persisted (cross-tenant escalation prevented).
+    UUID currentId = UUID.randomUUID();
+    Squadron current = new Squadron();
+    current.setId(currentId);
+    current.setShorthand("CUR");
+    jobOrder.setResponsibleOrgUnit(current);
+
+    UUID targetId = UUID.randomUUID();
+    Squadron target = new Squadron();
+    target.setId(targetId);
+    target.setShorthand("OTHER");
+    target.setProfitEligible(true);
+
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+    when(orgUnitRepository.findById(targetId)).thenReturn(Optional.of(target));
+    when(authHelperService.isAdmin()).thenReturn(false);
+    when(authHelperService.canEditOrgUnit(currentId)).thenReturn(true);
+
+    assertThrows(
+        org.springframework.security.access.AccessDeniedException.class,
+        () -> jobOrderService.reassignResponsibleOrgUnit(orderId, targetId));
+    verify(jobOrderRepository, never()).save(any(JobOrder.class));
+  }
+
+  @Test
+  void reassignResponsibleOrgUnit_NonAdmin_OnSkResponsibleOrder_throwsAccessDenied() {
+    // currentIsSquadron regression guard: a non-admin may not mutate an order already responsible
+    // to
+    // an SK (currentIsSquadron == false), even when the target is a profit-eligible SK and the
+    // caller may edit the current unit. The gate denies it and nothing is persisted.
+    UUID currentId = UUID.randomUUID();
+    SpecialCommand current = new SpecialCommand();
+    current.setId(currentId);
+    current.setShorthand("SKCUR");
+    jobOrder.setResponsibleOrgUnit(current);
+
+    UUID targetId = UUID.randomUUID();
+    SpecialCommand target = new SpecialCommand();
+    target.setId(targetId);
+    target.setShorthand("SK");
+    target.setProfitEligible(true);
+
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+    when(orgUnitRepository.findById(targetId)).thenReturn(Optional.of(target));
+    when(authHelperService.isAdmin()).thenReturn(false);
+    when(authHelperService.canEditOrgUnit(currentId)).thenReturn(true);
+
+    assertThrows(
+        org.springframework.security.access.AccessDeniedException.class,
+        () -> jobOrderService.reassignResponsibleOrgUnit(orderId, targetId));
+    verify(jobOrderRepository, never()).save(any(JobOrder.class));
+  }
+
+  @Test
+  void reassignResponsibleOrgUnit_NonAdmin_CannotEditCurrentSquadron_throwsAccessDenied() {
+    // mayEditCurrent regression guard: escalating to an SK is allowed only for a squadron the
+    // caller
+    // may edit. A foreign squadron's order (canEditOrgUnit == false) must be denied so a
+    // logistician
+    // cannot escalate another squadron's order across the tenant boundary.
+    UUID currentId = UUID.randomUUID();
+    Squadron current = new Squadron();
+    current.setId(currentId);
+    current.setShorthand("FOREIGN");
+    jobOrder.setResponsibleOrgUnit(current);
+
+    UUID targetId = UUID.randomUUID();
+    SpecialCommand target = new SpecialCommand();
+    target.setId(targetId);
+    target.setShorthand("SK");
+    target.setProfitEligible(true);
+
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+    when(orgUnitRepository.findById(targetId)).thenReturn(Optional.of(target));
+    when(authHelperService.isAdmin()).thenReturn(false);
+    when(authHelperService.canEditOrgUnit(currentId)).thenReturn(false);
+
+    assertThrows(
+        org.springframework.security.access.AccessDeniedException.class,
+        () -> jobOrderService.reassignResponsibleOrgUnit(orderId, targetId));
+    verify(jobOrderRepository, never()).save(any(JobOrder.class));
+  }
+
+  // ---------------------------------------------------------------
   // updateItemJobOrder — item-order edit (item lines + metadata)
   // ---------------------------------------------------------------
 

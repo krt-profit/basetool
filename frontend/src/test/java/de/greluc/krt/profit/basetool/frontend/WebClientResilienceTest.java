@@ -253,4 +253,41 @@ class WebClientResilienceTest {
     assertTrue(duration < 2000, method + " should time out quickly, took " + duration + "ms");
     assertTrue(after >= before + 1, "A " + method + " request should have been attempted");
   }
+
+  /**
+   * Pins the idempotency verb-guard in {@link
+   * de.greluc.krt.profit.basetool.frontend.config.WebClientConfig#resilienceFilter}: the {@code
+   * RetryOperator} is wired ONLY for the safe/idempotent verbs (GET/HEAD/OPTIONS/TRACE), so a
+   * state-changing POST/PUT/DELETE/PATCH that receives a 5xx must be attempted <b>exactly once</b>
+   * and never replayed. Contrast {@link #retry_ShouldPerformMultipleAttempts_On5xx()}, where the
+   * same 500 on a GET incurs {@code 1 initial + 2 retries = 3} backend hits.
+   *
+   * <p>Regression guard: if the verb-guard branch (WebClientConfig ~lines 349-357) is dropped or
+   * refactored to retry unconditionally, a write that receives a 500 <i>after</i> the backend
+   * already committed the mutation (a bank booking / transfer, a job order) would be silently
+   * double-submitted by the retry operator — a financial-correctness defect (double-charge /
+   * duplicate order). The {@code backendApi} breaker is reset per iteration so an earlier test that
+   * tripped it cannot short-circuit the call and mask the request count.
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {"POST", "PUT", "DELETE", "PATCH"})
+  void write5xx_IsAttemptedOnce_NotRetried(String method) {
+    circuitBreakerRegistry.circuitBreaker("backendApi").reset();
+    int before = server.getRequestCount();
+    try {
+      publicWebClient
+          .method(HttpMethod.valueOf(method))
+          .uri("/api/v1/ping")
+          .retrieve()
+          .toBodilessEntity()
+          .block();
+      fail("Expected 5xx for " + method);
+    } catch (Exception ignored) {
+      // The 500 surfaces as an error; a write verb must NOT be retried.
+    }
+    assertEquals(
+        before + 1,
+        server.getRequestCount(),
+        method + " must be attempted exactly once on a 5xx (writes are never retried)");
+  }
 }
