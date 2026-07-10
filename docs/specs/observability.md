@@ -255,11 +255,14 @@ Tracing on the OTel SDK) behind a hard master gate:
   `basetool_notification_relay_connections` meters.
 - Trace retention is short (14 days, Tempo, Phase 2) and access is admin-only via Grafana
   (REQ-OBS-008).
-- **Traces are consumed** (#1041 item 22): the `14-tracing.json` dashboard runs TraceQL-metrics
-  RED/latency panels (`{ kind = server } | rate() by (span:name)`, `quantile_over_time`) and
-  TraceQL search tables (`{ duration > 1s }`, `{ status = error }`) **directly against the Tempo
-  datasource** — zero new Prometheus series (TraceQL metrics are GA in Tempo 3.0; they read only
-  3.0-written RF1 blocks and exclude ~the last 30s). Tempo pipeline health is alerted in `meta.yml`:
+- **Traces are consumed** (#1041 item 22): the `14-tracing.json` dashboard runs RED/latency panels
+  (request rate / p95 / 5xx **by route**) off the server-side `http_server_requests` histograms on the
+  **Prometheus** datasource — the same series that back the latency / 5xx alerts, so panels and alerts
+  stay consistent and no new Prometheus series are added (ADR-0076 amendment 2026-07-10; the panels
+  were originally TraceQL-metrics, but those require the metrics-generator `local-blocks` processor,
+  which is not enabled — only `service-graphs` is). Trace data itself is queried by the TraceQL search
+  tables (`{ duration > 1s }`, `{ status = error }`) **directly against the Tempo datasource**. Tempo
+  pipeline health is alerted in `meta.yml`:
   `TempoSpansRefused` (`tempo_receiver_refused_spans`), `TempoReceiverSilent`
   (`tempo_receiver_accepted_spans` rate 0 for 1h while the counter is non-zero, so it stays quiet
   when tracing is disabled) and `TempoWritePathFailing` (live-store completion/flush failures) —

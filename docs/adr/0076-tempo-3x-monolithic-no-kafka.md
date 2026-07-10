@@ -92,9 +92,41 @@ in-process under `-target=all` (the distributor pushes to it directly — no Kaf
   alerts if the cap is ever hit; `TempoGeneratorRemoteWriteFailing` alerts if the shared credential
   drifts.
 - **Span-metrics remote_write stays a non-goal**: the server-side `http_server_requests` histograms
-  back the latency alerts, and the RED dashboard (`14-tracing.json`) uses TraceQL metrics on the
-  Tempo datasource directly (zero new Prometheus series).
+  back the latency alerts and the RED dashboard (`14-tracing.json`), so no new Prometheus series are
+  introduced (see the 2026-07-10 amendment below for why the RED panels are Prometheus- rather than
+  TraceQL-metrics-backed).
 - **Memory:** the 512M cap is unchanged; the generator's embedded agent adds pressure, and a raise (if
   needed) stays tracked under #937, not a revert. `tempo.yaml` needs a container **restart** (not a
   SIGHUP) to pick up the generator.
+
+## Amendment 2026-07-10 — the RED dashboard runs on Prometheus, not TraceQL metrics
+
+The `14-tracing.json` RED panels (request rate / p95 / 5xx by route) were originally authored as
+**TraceQL-metrics** queries (`{ kind = server } | rate() by (span:name)`, `quantile_over_time`)
+against the Tempo datasource. In prod they rendered a query error + "No data" while the two TraceQL
+*search* tables (`{ duration > 1s }`, `{ status = error }`) worked. Root cause: TraceQL metrics are
+served by the metrics-generator's **`local-blocks` processor**, and only `service-graphs` is enabled
+(the 22a amendment) — so nothing produced the metrics blocks those panels read. The premise "TraceQL
+metrics read RF1 blocks directly" was wrong: `local-blocks` (with `flush_to_storage`) is what *writes*
+those blocks.
+
+Rather than enable `local-blocks`, we **rebuilt the three panels on the existing
+`http_server_requests_seconds` histograms** (Prometheus datasource, grouped `by (application, uri)`;
+5xx via `status=~"5.."`, matching the `Http5xxRateHigh` alert). Rationale, consistent with this ADR's
+span-metrics-as-non-goal stance:
+
+- **No memory cost.** `local-blocks` keeps recent spans in memory to serve metrics; the host already
+  went 512M→1G for `service-graphs` alone and has an OOM-flap history. This adds zero Tempo memory,
+  needs no restart, and requires no further raise under #937.
+- **Zero new series** — the histograms already exist (Spring-Boot default; `percentiles-histogram`
+  on for `http.server.requests` in backend/frontend/ingest, and Keycloak exports them under
+  `job="keycloak"`), and are already used by `03-spring-apps.json`.
+- **Alert-consistent & robust** — same series the latency/5xx alerts fire on; exact counters, full
+  Prometheus retention, no RF1/last-30s caveat and no `query_frontend.metrics.max_duration` 3h vs 6h
+  clash.
+
+**Accepted loss:** the "Error rate" panel now counts HTTP 5xx only, not the broader OTel span-error
+status (a failed DB/outbound span that didn't surface as 5xx) — but that broader view stays visible in
+the **Error traces** Tempo table. `local-blocks` remains the option if per-span-level RED
+(DB/outbound/ad-hoc grouping, client-perceived latency) is ever wanted, at the documented memory cost.
 
