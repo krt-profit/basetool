@@ -33,8 +33,8 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <p>Exposes {@code /ws/materialboerse/board} as a native Spring WebSocket endpoint — one global
  * room served by a single {@link MaterialboardPresenceWebSocketHandler}. The WebSocket machinery is
- * enabled once by {@link MissionPresenceWebSocketConfig}'s {@code @EnableWebSocket}; this class
- * only contributes an additional {@link WebSocketConfigurer}, so it must <b>not</b> repeat the
+ * enabled once by {@link LiveSyncWebSocketConfig}'s {@code @EnableWebSocket}; this class only
+ * contributes an additional {@link WebSocketConfigurer}, so it must <b>not</b> repeat the
  * annotation.
  *
  * <p>The handshake is pinned to the same explicit {@code app.websocket.allowed-origin-patterns}

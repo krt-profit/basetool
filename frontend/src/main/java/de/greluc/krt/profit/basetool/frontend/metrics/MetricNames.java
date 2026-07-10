@@ -31,8 +31,19 @@ package de.greluc.krt.profit.basetool.frontend.metrics;
  */
 public final class MetricNames {
 
-  /** Gauge {@code basetool_mission_presence_missions} — missions with a live editor (frontend). */
+  /**
+   * Gauge {@code basetool_mission_presence_missions} — live-sync topics with a live editor
+   * (frontend). Name legacy-pinned: presence is mission-only at ship time, so the value is
+   * unchanged and the existing dashboard panel keeps meaning (REQ-OBS-011 forbids a rename that
+   * breaks a dashboard).
+   */
   public static final String MISSION_PRESENCE_MISSIONS = "basetool.mission.presence.missions";
+
+  /**
+   * Gauge {@code basetool_livesync_subscriptions} — tag {@code topic_class}; live live-sync topic
+   * subscriptions per topic class in {@code LiveSyncWebSocketHandler} (REQ-FE-015, ADR-0092).
+   */
+  public static final String LIVESYNC_SUBSCRIPTIONS = "basetool.livesync.subscriptions";
 
   /** Gauge {@code basetool_active_sessions} — active Spring Session sessions (frontend). */
   public static final String ACTIVE_SESSIONS = "basetool.active.sessions";
@@ -48,22 +59,23 @@ public final class MetricNames {
       "basetool.notification.relay.connections";
 
   /**
-   * Gauge {@code basetool_presence_ws_sessions} — live mission-presence WebSocket sessions summed
-   * across all missions in {@code MissionPresenceWebSocketHandler} (#1041 item 17).
+   * Gauge {@code basetool_presence_ws_sessions} — live live-sync WebSocket sessions summed across
+   * all topic rooms in {@code LiveSyncWebSocketHandler} (#1041 item 17, REQ-FE-015).
    */
   public static final String PRESENCE_WS_SESSIONS = "basetool.presence.ws.sessions";
 
   /**
-   * Counter {@code basetool_presence_relay_frames_total} — tag {@code type} ({@link #FRAME_CHANGED}
-   * / {@link #FRAME_SNAPSHOT}). A {@code changed}-frame flatline while {@code snapshot} frames keep
-   * flowing is the early indicator for the REQ-FE-010 live-multi-user-sync defect class.
+   * Counter {@code basetool_presence_relay_frames_total} — tags {@code type} ({@link
+   * #FRAME_CHANGED} / {@link #FRAME_SNAPSHOT}) and {@code topic_class} (REQ-FE-015). A {@code
+   * changed}-frame flatline while {@code snapshot} frames keep flowing is the early indicator for
+   * the REQ-FE-010 live-multi-user-sync defect class.
    */
   public static final String PRESENCE_RELAY_FRAMES = "basetool.presence.relay.frames";
 
   /**
-   * Counter {@code basetool_presence_relay_dropped_total} — tag {@code reason} ({@link
-   * #DROPPED_THROTTLED} / {@link #DROPPED_SEND_FAILED}) at the currently-silent throttle and
-   * send-failure branches of the presence relay (#1041 item 17).
+   * Counter {@code basetool_presence_relay_dropped_total} — tags {@code reason} ({@link
+   * #DROPPED_THROTTLED} / {@link #DROPPED_SEND_FAILED}) and {@code topic_class} at the throttle and
+   * send-failure branches of the relay (#1041 item 17, REQ-FE-015).
    */
   public static final String PRESENCE_RELAY_DROPPED = "basetool.presence.relay.dropped";
 
@@ -100,6 +112,12 @@ public final class MetricNames {
 
   /** Tag key: the presence-relay frame type on {@link #PRESENCE_RELAY_FRAMES}. */
   public static final String TAG_TYPE = "type";
+
+  /**
+   * Tag key: the bounded live-sync {@code topic_class} on the relay counters and {@link
+   * #LIVESYNC_SUBSCRIPTIONS} — one of the {@code LiveSyncTopicClass} metric labels (REQ-OBS-011).
+   */
+  public static final String TAG_TOPIC_CLASS = "topic_class";
 
   /** Tag key: the login outcome on {@link #LOGIN}. */
   public static final String TAG_OUTCOME = "outcome";

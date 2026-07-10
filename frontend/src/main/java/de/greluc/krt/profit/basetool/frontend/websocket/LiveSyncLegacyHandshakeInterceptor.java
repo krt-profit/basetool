@@ -22,11 +22,15 @@ package de.greluc.krt.profit.basetool.frontend.websocket;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.ServerHttpRequest;
@@ -35,27 +39,26 @@ import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.server.HandshakeInterceptor;
 
 /**
- * Authorizes the mission-presence WebSocket handshake against actual mission access.
+ * Authorizes the legacy per-resource live-sync WebSocket handshakes and binds each socket to its
+ * implicit topic (REQ-FE-015, ADR-0092).
  *
- * <p>The Spring Security chain only proves the upgrade request is <em>authenticated</em>; it does
- * not prove the user may see the mission the socket targets. Without this interceptor any
- * authenticated user could open {@code /ws/missions/{anyId}/presence} and — via the {@code changed}
- * relay — drive re-fetches in that mission's other viewers (bounded amplification,
- * REQ-SEC/ADR-0031). This gate closes that by mirroring the mission-detail page's own
- * authorization: it issues the same authenticated {@code GET /api/v1/missions/{id}} the page does,
- * so exactly the users who can load the page can open its socket — no legitimate viewer is ever
- * rejected.
+ * <p>The multiplexed {@code /ws/sync} socket authorizes each topic at {@code subscribe} time; the
+ * legacy per-resource endpoints (today {@code /ws/missions/{id}/presence}) instead authorize at
+ * handshake time and stuff the resolved canonical topic into {@link
+ * LiveSyncWebSocketHandler#ATTR_TOPIC} so {@link LiveSyncWebSocketHandler} auto-binds the socket to
+ * that already-authorized room. This keeps tabs opened before the {@code /ws/sync} rollout working
+ * for one release.
  *
- * <p><b>Fail-open on transient errors.</b> Only an <em>explicit</em> backend denial (HTTP 403/404)
- * closes the handshake. A transient failure (5xx, timeout, circuit open) or any other error allows
- * the socket so a backend blip never silently kills presence for a legitimate viewer — safe because
- * no mission data crosses the socket and every downstream fragment re-fetch re-authorizes per
- * viewer, so allowing the socket can never leak data. A malformed path (no parseable mission id) is
- * rejected with 400.
+ * <p>Mirrors the mission-detail page's own authorization: it issues the same authenticated {@code
+ * GET /api/v1/missions/{id}} the page does, so exactly the users who can load the page can open its
+ * socket. Only an <em>explicit</em> backend 403/404 refuses the handshake; a transient failure
+ * (5xx, timeout, circuit open) or any other error fails open so a backend blip never silently kills
+ * presence — safe because no mission data crosses the socket and every downstream fragment re-fetch
+ * re-authorizes per viewer. A path that names no known legacy topic is rejected with 400.
  */
 @Slf4j
 @RequiredArgsConstructor
-public class MissionPresenceHandshakeAuthInterceptor implements HandshakeInterceptor {
+public class LiveSyncLegacyHandshakeInterceptor implements HandshakeInterceptor {
 
   /** Response type for the authenticated {@code /api/v1/missions/{id}} access-probe read. */
   private static final ParameterizedTypeReference<MissionDto> MISSION_TYPE =
@@ -64,14 +67,13 @@ public class MissionPresenceHandshakeAuthInterceptor implements HandshakeInterce
   private final BackendApiClient backendApiClient;
 
   /**
-   * Gates the handshake: parses the mission id from the upgrade URI and authorizes it against the
-   * backend before the socket is established.
+   * Gates a legacy handshake: resolves the implicit topic from the upgrade URI, authorizes it, and
+   * binds it to the future session's attributes.
    *
    * @param request the handshake (HTTP upgrade) request
-   * @param response the handshake response; its status is set to 400/403 when the handshake is
-   *     refused
+   * @param response the handshake response; its status is set to 400/403 when refused
    * @param wsHandler the target handler (unused)
-   * @param attributes the future WebSocket-session attributes (unused)
+   * @param attributes the future WebSocket-session attributes; the resolved topic is stored here
    * @return {@code true} to proceed with the handshake, {@code false} to refuse it
    */
   @Override
@@ -80,7 +82,7 @@ public class MissionPresenceHandshakeAuthInterceptor implements HandshakeInterce
       @NotNull ServerHttpResponse response,
       @NotNull WebSocketHandler wsHandler,
       @NotNull Map<String, Object> attributes) {
-    UUID missionId = MissionPresenceWebSocketHandler.extractMissionId(request.getURI());
+    UUID missionId = extractMissionId(request.getURI());
     if (missionId == null) {
       response.setStatusCode(HttpStatus.BAD_REQUEST);
       return false;
@@ -89,24 +91,27 @@ public class MissionPresenceHandshakeAuthInterceptor implements HandshakeInterce
       // Same authenticated read the mission-detail page performs; success means this user may see
       // the mission, so they may join its presence room.
       backendApiClient.get("/api/v1/missions/{id}", MISSION_TYPE, missionId);
+      attributes.put(LiveSyncWebSocketHandler.ATTR_TOPIC, "mission:" + missionId);
       return true;
     } catch (BackendServiceException e) {
       int status = e.getStatusCode();
       if (status == 403 || status == 404) {
-        log.debug("Presence handshake denied for mission {} (backend {})", missionId, status);
+        log.debug("Live-sync handshake denied for mission {} (backend {})", missionId, status);
         response.setStatusCode(HttpStatus.FORBIDDEN);
         return false;
       }
       log.debug(
-          "Presence handshake allowed despite transient backend status {} for mission {}",
+          "Live-sync handshake allowed despite transient backend status {} for mission {}",
           status,
           missionId);
+      attributes.put(LiveSyncWebSocketHandler.ATTR_TOPIC, "mission:" + missionId);
       return true;
     } catch (RuntimeException e) {
       log.debug(
-          "Presence handshake authorization check failed for mission {}; allowing (fail-open)",
+          "Live-sync handshake authorization check failed for mission {}; allowing (fail-open)",
           missionId,
           e);
+      attributes.put(LiveSyncWebSocketHandler.ATTR_TOPIC, "mission:" + missionId);
       return true;
     }
   }
@@ -126,5 +131,37 @@ public class MissionPresenceHandshakeAuthInterceptor implements HandshakeInterce
       @NotNull WebSocketHandler wsHandler,
       Exception exception) {
     // intentionally empty
+  }
+
+  /**
+   * Extracts the mission id from a {@code /ws/missions/{uuid}/presence} upgrade URI.
+   *
+   * @param uri the handshake URI (may be {@code null})
+   * @return the mission id, or {@code null} if the path is not the canonical mission-presence shape
+   *     or the id segment is not a UUID
+   */
+  @Nullable
+  static UUID extractMissionId(@Nullable URI uri) {
+    if (uri == null || uri.getPath() == null) {
+      return null;
+    }
+    String[] parts = uri.getPath().split("/");
+    List<String> nonEmpty = new ArrayList<>(parts.length);
+    for (String p : parts) {
+      if (!p.isEmpty()) {
+        nonEmpty.add(p);
+      }
+    }
+    if (nonEmpty.size() != 4
+        || !"ws".equals(nonEmpty.get(0))
+        || !"missions".equals(nonEmpty.get(1))
+        || !"presence".equals(nonEmpty.get(3))) {
+      return null;
+    }
+    try {
+      return UUID.fromString(nonEmpty.get(2));
+    } catch (IllegalArgumentException e) {
+      return null;
+    }
   }
 }

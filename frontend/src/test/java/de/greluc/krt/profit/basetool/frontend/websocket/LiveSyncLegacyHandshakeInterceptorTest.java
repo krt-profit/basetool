@@ -31,6 +31,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,34 +44,39 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.socket.WebSocketHandler;
 
 /**
- * Tests for {@link MissionPresenceHandshakeAuthInterceptor}: the handshake passes when the backend
- * authorizes the mission read, is refused on an explicit 403/404 (the membership gate), fails open
- * on a transient backend error, and is rejected with 400 for a malformed path.
+ * Tests for {@link LiveSyncLegacyHandshakeInterceptor} (ported from {@code
+ * MissionPresenceHandshakeAuthInterceptorTest}): the handshake passes and binds the implicit {@code
+ * mission:{id}} topic when the backend authorizes the mission read, is refused on an explicit
+ * 403/404 (the membership gate), fails open on a transient backend error, and is rejected with 400
+ * for a malformed path.
  */
-class MissionPresenceHandshakeAuthInterceptorTest {
+class LiveSyncLegacyHandshakeInterceptorTest {
 
   private static final String URI_TEMPLATE = "/api/v1/missions/{id}";
 
   private BackendApiClient backendApiClient;
-  private MissionPresenceHandshakeAuthInterceptor interceptor;
+  private LiveSyncLegacyHandshakeInterceptor interceptor;
   private WebSocketHandler handler;
 
   @BeforeEach
   void setUp() {
     backendApiClient = mock(BackendApiClient.class);
-    interceptor = new MissionPresenceHandshakeAuthInterceptor(backendApiClient);
+    interceptor = new LiveSyncLegacyHandshakeInterceptor(backendApiClient);
     handler = mock(WebSocketHandler.class);
   }
 
   @Test
-  void allowsHandshake_whenBackendAuthorizesTheMissionRead() {
+  void allowsHandshake_andBindsTopic_whenBackendAuthorizesTheMissionRead() {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(eq(URI_TEMPLATE), anyTypeRef(), any())).thenReturn(null);
     MockHttpServletResponse servletResponse = new MockHttpServletResponse();
+    Map<String, Object> attributes = new HashMap<>();
 
-    boolean allowed = invoke(missionId.toString(), servletResponse);
+    boolean allowed = invoke(missionId.toString(), servletResponse, attributes);
 
     assertThat(allowed).isTrue();
+    assertThat(attributes.get(LiveSyncWebSocketHandler.ATTR_TOPIC))
+        .isEqualTo("mission:" + missionId);
   }
 
   @Test
@@ -79,11 +85,13 @@ class MissionPresenceHandshakeAuthInterceptorTest {
     when(backendApiClient.get(eq(URI_TEMPLATE), anyTypeRef(), any()))
         .thenThrow(new BackendServiceException("forbidden", null, 403));
     MockHttpServletResponse servletResponse = new MockHttpServletResponse();
+    Map<String, Object> attributes = new HashMap<>();
 
-    boolean allowed = invoke(missionId.toString(), servletResponse);
+    boolean allowed = invoke(missionId.toString(), servletResponse, attributes);
 
     assertThat(allowed).isFalse();
     assertThat(servletResponse.getStatus()).isEqualTo(403);
+    assertThat(attributes).doesNotContainKey(LiveSyncWebSocketHandler.ATTR_TOPIC);
   }
 
   @Test
@@ -93,7 +101,7 @@ class MissionPresenceHandshakeAuthInterceptorTest {
         .thenThrow(new BackendServiceException("not found", null, 404));
     MockHttpServletResponse servletResponse = new MockHttpServletResponse();
 
-    boolean allowed = invoke(missionId.toString(), servletResponse);
+    boolean allowed = invoke(missionId.toString(), servletResponse, new HashMap<>());
 
     assertThat(allowed).isFalse();
     assertThat(servletResponse.getStatus()).isEqualTo(403);
@@ -105,11 +113,14 @@ class MissionPresenceHandshakeAuthInterceptorTest {
     when(backendApiClient.get(eq(URI_TEMPLATE), anyTypeRef(), any()))
         .thenThrow(new BackendServiceException("unavailable", null, 503));
     MockHttpServletResponse servletResponse = new MockHttpServletResponse();
+    Map<String, Object> attributes = new HashMap<>();
 
-    boolean allowed = invoke(missionId.toString(), servletResponse);
+    boolean allowed = invoke(missionId.toString(), servletResponse, attributes);
 
     // Fail-open: a backend blip must not silently kill presence for a legitimate viewer.
     assertThat(allowed).isTrue();
+    assertThat(attributes.get(LiveSyncWebSocketHandler.ATTR_TOPIC))
+        .isEqualTo("mission:" + missionId);
   }
 
   @Test
@@ -131,13 +142,15 @@ class MissionPresenceHandshakeAuthInterceptorTest {
    *
    * @param missionId the mission id segment to embed in the upgrade path
    * @param servletResponse the response whose status the interceptor may set
+   * @param attributes the future-session attribute map the interceptor may populate
    * @return the interceptor's allow/deny decision
    */
-  private boolean invoke(String missionId, MockHttpServletResponse servletResponse) {
+  private boolean invoke(
+      String missionId, MockHttpServletResponse servletResponse, Map<String, Object> attributes) {
     MockHttpServletRequest servletRequest =
         new MockHttpServletRequest("GET", "/ws/missions/" + missionId + "/presence");
     ServerHttpRequest request = new ServletServerHttpRequest(servletRequest);
     ServerHttpResponse response = new ServletServerHttpResponse(servletResponse);
-    return interceptor.beforeHandshake(request, response, handler, new HashMap<>());
+    return interceptor.beforeHandshake(request, response, handler, attributes);
   }
 }

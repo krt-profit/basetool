@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.websocket;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.frontend.service.MissionPresenceService;
+import de.greluc.krt.profit.basetool.frontend.service.LiveSyncPresenceService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -53,65 +53,48 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Tests for {@link MissionPresenceWebSocketHandler}.
+ * Tests for {@link LiveSyncWebSocketHandler} (ported from {@code
+ * MissionPresenceWebSocketHandlerTest} with the mission topic driving the generic relay; every
+ * original assertion is preserved).
  *
- * <p>Drives the handler through a hand-rolled {@link FakeSession} that records outbound messages in
- * a buffer so the JSON wire format, mission-id extraction, principal-resolution, and broadcast
- * behaviour can be verified without starting a real servlet container.
+ * <p>Drives the handler through a hand-rolled {@link FakeSession} that records outbound messages so
+ * the JSON wire format, room membership, principal-resolution and broadcast behaviour can be
+ * verified without a real servlet container. Each session is bound to a {@code mission:{id}} topic
+ * via the {@link LiveSyncWebSocketHandler#ATTR_TOPIC} attribute the handshake interceptor would
+ * set.
  */
-class MissionPresenceWebSocketHandlerTest {
+class LiveSyncWebSocketHandlerTest {
 
-  private MissionPresenceService service;
+  private LiveSyncPresenceService service;
   private ObjectMapper objectMapper;
-  private MissionPresenceWebSocketHandler handler;
+  private LiveSyncWebSocketHandler handler;
+  private CapturingFanout fanout;
   private SimpleMeterRegistry registry;
 
   @BeforeEach
   void setUp() {
     registry = new SimpleMeterRegistry();
-    service = new MissionPresenceService(registry);
+    service = new LiveSyncPresenceService(registry);
     objectMapper = JsonMapper.builder().build();
-    handler = new MissionPresenceWebSocketHandler(service, objectMapper, registry);
-  }
-
-  @Test
-  void extractMissionId_acceptsCanonicalPath() {
-    UUID id = UUID.randomUUID();
-    UUID extracted =
-        MissionPresenceWebSocketHandler.extractMissionId(
-            URI.create("ws://localhost/ws/missions/" + id + "/presence"));
-    assertThat(extracted).isEqualTo(id);
-  }
-
-  @Test
-  void extractMissionId_rejectsWrongShape() {
-    assertThat(MissionPresenceWebSocketHandler.extractMissionId(URI.create("ws://x/ws/missions")))
-        .isNull();
-    assertThat(
-            MissionPresenceWebSocketHandler.extractMissionId(
-                URI.create("ws://x/api/missions/" + UUID.randomUUID() + "/presence")))
-        .isNull();
-    assertThat(
-            MissionPresenceWebSocketHandler.extractMissionId(
-                URI.create("ws://x/ws/missions/not-a-uuid/presence")))
-        .isNull();
+    fanout = new CapturingFanout();
+    handler = new LiveSyncWebSocketHandler(service, fanout, objectMapper, registry);
   }
 
   @Test
   void focusMessage_recordsPresence_andBroadcastsSnapshot() throws Exception {
-    UUID missionId = UUID.randomUUID();
-    FakeSession session = openSession(missionId, oidcUser("user-1", "Alice"));
+    String topic = missionTopic();
+    FakeSession session = openSession(topic, oidcUser("user-1", "Alice"));
 
     session.sent.clear();
     handler.handleTextMessage(
-        session, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"details\"}"));
+        session, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"crew\"}"));
 
-    assertThat(service.get(missionId, "details", "user-1")).isNotNull();
-    assertThat(service.get(missionId, "details", "user-1").displayName()).isEqualTo("Alice");
+    assertThat(service.get(topic, "crew", "user-1")).isNotNull();
+    assertThat(service.get(topic, "crew", "user-1").displayName()).isEqualTo("Alice");
 
     JsonNode broadcast = lastBroadcast(session);
     assertThat(broadcast.get("type").asString()).isEqualTo("presence");
-    JsonNode editors = broadcast.get("sections").get("details");
+    JsonNode editors = broadcast.get("sections").get("crew");
     assertThat(editors).isNotNull();
     assertThat(editors.get(0).get("userId").asString()).isEqualTo("user-1");
     assertThat(editors.get(0).get("displayName").asString()).isEqualTo("Alice");
@@ -119,16 +102,16 @@ class MissionPresenceWebSocketHandlerTest {
 
   @Test
   void blurMessage_clearsPresence_andBroadcastsEmptySection() throws Exception {
-    UUID missionId = UUID.randomUUID();
-    FakeSession session = openSession(missionId, oidcUser("user-1", "Alice"));
+    String topic = missionTopic();
+    FakeSession session = openSession(topic, oidcUser("user-1", "Alice"));
     handler.handleTextMessage(
-        session, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"details\"}"));
+        session, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"crew\"}"));
 
     session.sent.clear();
     handler.handleTextMessage(
-        session, new TextMessage("{\"type\":\"blur\",\"sectionKey\":\"details\"}"));
+        session, new TextMessage("{\"type\":\"blur\",\"sectionKey\":\"crew\"}"));
 
-    assertThat(service.get(missionId, "details", "user-1")).isNull();
+    assertThat(service.get(topic, "crew", "user-1")).isNull();
     JsonNode broadcast = lastBroadcast(session);
     // After the blur the snapshot has no sections at all (the entry was the only one).
     assertThat(broadcast.get("type").asString()).isEqualTo("presence");
@@ -137,25 +120,26 @@ class MissionPresenceWebSocketHandlerTest {
 
   @Test
   void heartbeat_doesNotBroadcast_whenUserAlreadyKnown() throws Exception {
-    UUID missionId = UUID.randomUUID();
-    FakeSession session = openSession(missionId, oidcUser("user-1", "Alice"));
+    String topic = missionTopic();
+    FakeSession session = openSession(topic, oidcUser("user-1", "Alice"));
     handler.handleTextMessage(
-        session, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"details\"}"));
+        session, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"crew\"}"));
 
     int countAfterFocus = session.sent.size();
     handler.handleTextMessage(
-        session, new TextMessage("{\"type\":\"heartbeat\",\"sectionKey\":\"details\"}"));
+        session, new TextMessage("{\"type\":\"heartbeat\",\"sectionKey\":\"crew\"}"));
 
-    // Heartbeat from an already-known editor must NOT trigger a broadcast — generating one
-    // frame per heartbeat per connected client per mission would be wasteful and visually
-    // pointless because the state didn't change.
+    // Heartbeat from an already-known editor must NOT trigger a broadcast — generating one frame
+    // per
+    // heartbeat per connected client per topic would be wasteful and visually pointless because the
+    // state didn't change.
     assertThat(session.sent).hasSize(countAfterFocus);
   }
 
   @Test
   void malformedPayload_isSilentlyDropped() throws Exception {
-    UUID missionId = UUID.randomUUID();
-    FakeSession session = openSession(missionId, oidcUser("user-1", "Alice"));
+    String topic = missionTopic();
+    FakeSession session = openSession(topic, oidcUser("user-1", "Alice"));
     session.sent.clear();
 
     handler.handleTextMessage(session, new TextMessage("{this is not json"));
@@ -164,56 +148,56 @@ class MissionPresenceWebSocketHandlerTest {
         session, new TextMessage("{\"type\":\"unknown\",\"sectionKey\":\"x\"}"));
 
     // No state mutation, no broadcasts.
-    assertThat(service.trackedMissions()).isEmpty();
+    assertThat(service.trackedTopics()).isEmpty();
     assertThat(session.sent).isEmpty();
   }
 
   @Test
   void connectionClosed_clearsAllPresence_andBroadcastsToRemainingClients() throws Exception {
-    UUID missionId = UUID.randomUUID();
-    FakeSession aliceSession = openSession(missionId, oidcUser("user-1", "Alice"));
-    FakeSession bobSession = openSession(missionId, oidcUser("user-2", "Bob"));
+    String topic = missionTopic();
+    FakeSession aliceSession = openSession(topic, oidcUser("user-1", "Alice"));
+    FakeSession bobSession = openSession(topic, oidcUser("user-2", "Bob"));
     handler.handleTextMessage(
-        aliceSession, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"details\"}"));
+        aliceSession, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"crew\"}"));
     handler.handleTextMessage(
-        bobSession, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"schedule\"}"));
+        bobSession, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"steps\"}"));
 
     bobSession.sent.clear();
     aliceSession.open = false;
     handler.afterConnectionClosed(aliceSession, CloseStatus.NORMAL);
 
     // Alice's presence is gone on every section.
-    assertThat(service.get(missionId, "details", "user-1")).isNull();
+    assertThat(service.get(topic, "crew", "user-1")).isNull();
     // Bob's presence is untouched.
-    assertThat(service.get(missionId, "schedule", "user-2")).isNotNull();
-    // Bob's session received an updated snapshot (no Alice in `details`).
+    assertThat(service.get(topic, "steps", "user-2")).isNotNull();
+    // Bob's session received an updated snapshot (no Alice in `crew`).
     JsonNode broadcast = lastBroadcast(bobSession);
-    assertThat(broadcast.get("sections").has("details")).isFalse();
-    assertThat(broadcast.get("sections").get("schedule").get(0).get("userId").asString())
+    assertThat(broadcast.get("sections").has("crew")).isFalse();
+    assertThat(broadcast.get("sections").get("steps").get(0).get("userId").asString())
         .isEqualTo("user-2");
   }
 
   @Test
   void connectionClosed_keepsPresence_whenSameUserHasAnotherOpenTab() throws Exception {
-    UUID missionId = UUID.randomUUID();
-    FakeSession tabA = openSession(missionId, oidcUser("user-1", "Alice"));
-    FakeSession tabB = openSession(missionId, oidcUser("user-1", "Alice"));
+    String topic = missionTopic();
+    FakeSession tabA = openSession(topic, oidcUser("user-1", "Alice"));
+    FakeSession tabB = openSession(topic, oidcUser("user-1", "Alice"));
     handler.handleTextMessage(
-        tabA, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"details\"}"));
+        tabA, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"crew\"}"));
 
     tabA.open = false;
     handler.afterConnectionClosed(tabA, CloseStatus.NORMAL);
 
-    // The other tab is still alive — Alice's "details" presence must survive.
-    assertThat(service.get(missionId, "details", "user-1")).isNotNull();
+    // The other tab is still alive — Alice's "crew" presence must survive.
+    assertThat(service.get(topic, "crew", "user-1")).isNotNull();
     assertThat(tabB.isOpen()).isTrue();
   }
 
   @Test
   void changedSignal_isRelayedToOtherSessions_butNotToOrigin() throws Exception {
-    UUID missionId = UUID.randomUUID();
-    FakeSession alice = openSession(missionId, oidcUser("user-1", "Alice"));
-    FakeSession bob = openSession(missionId, oidcUser("user-2", "Bob"));
+    String topic = missionTopic();
+    FakeSession alice = openSession(topic, oidcUser("user-1", "Alice"));
+    FakeSession bob = openSession(topic, oidcUser("user-2", "Bob"));
     alice.sent.clear();
     bob.sent.clear();
 
@@ -222,19 +206,18 @@ class MissionPresenceWebSocketHandlerTest {
 
     // The originator already applied its own change locally — it must not receive the echo.
     assertThat(alice.sent).isEmpty();
-    // Every other socket on the same mission gets the section keys (and nothing else).
+    // Every other socket in the same room gets the section keys (and nothing else).
     JsonNode relayed = lastBroadcast(bob);
     assertThat(relayed.get("type").asString()).isEqualTo("changed");
-    List<String> sections = new ArrayList<>();
-    relayed.get("sections").forEach(node -> sections.add(node.asString()));
-    assertThat(sections).containsExactly("crew", "finance");
+    assertThat(relayed.get("topic").asString()).isEqualTo(topic);
+    assertThat(sectionsOf(relayed)).containsExactly("crew", "finance");
   }
 
   @Test
   void changedSignal_dropsUnknownKeysAndDeduplicates() throws Exception {
-    UUID missionId = UUID.randomUUID();
-    FakeSession alice = openSession(missionId, oidcUser("user-1", "Alice"));
-    FakeSession bob = openSession(missionId, oidcUser("user-2", "Bob"));
+    String topic = missionTopic();
+    FakeSession alice = openSession(topic, oidcUser("user-1", "Alice"));
+    FakeSession bob = openSession(topic, oidcUser("user-2", "Bob"));
     bob.sent.clear();
 
     handler.handleTextMessage(
@@ -243,22 +226,21 @@ class MissionPresenceWebSocketHandlerTest {
             "{\"type\":\"changed\",\"sections\":[\"crew\",\"bogus\",\"crew\",\"mgmt\",42]}"));
 
     JsonNode relayed = lastBroadcast(bob);
-    List<String> sections = new ArrayList<>();
-    relayed.get("sections").forEach(node -> sections.add(node.asString()));
     // "bogus" and the non-string 42 are dropped; the duplicate "crew" appears once.
-    assertThat(sections).containsExactly("crew", "mgmt");
+    assertThat(sectionsOf(relayed)).containsExactly("crew", "mgmt");
   }
 
   @Test
   void changedSignal_relaysEverySectionOfTheMissionSeamMap() throws Exception {
-    UUID missionId = UUID.randomUUID();
-    FakeSession alice = openSession(missionId, oidcUser("user-1", "Alice"));
-    FakeSession bob = openSession(missionId, oidcUser("user-2", "Bob"));
+    String topic = missionTopic();
+    FakeSession alice = openSession(topic, oidcUser("user-1", "Alice"));
+    FakeSession bob = openSession(topic, oidcUser("user-2", "Bob"));
     bob.sent.clear();
 
-    // Every key of the MISSION_SECTIONS seam map in mission-detail.js must pass the relay
-    // whitelist — steps/objectives/frequencies were once dropped here, leaving peers' Verwaltung
-    // editors stale until a manual reload (REQ-FE-010).
+    // Every key of the MISSION_SECTIONS seam map in mission-detail.js must pass the relay whitelist
+    // — steps/objectives/frequencies were once dropped here, leaving peers' Verwaltung editors
+    // stale
+    // until a manual reload (REQ-FE-010).
     handler.handleTextMessage(
         alice,
         new TextMessage(
@@ -266,18 +248,16 @@ class MissionPresenceWebSocketHandlerTest {
                 + "\"steps\",\"objectives\",\"frequencies\"]}"));
 
     JsonNode relayed = lastBroadcast(bob);
-    List<String> sections = new ArrayList<>();
-    relayed.get("sections").forEach(node -> sections.add(node.asString()));
-    assertThat(sections)
+    assertThat(sectionsOf(relayed))
         .containsExactly(
             "crew", "finance", "mgmt", "overview", "steps", "objectives", "frequencies");
   }
 
   @Test
   void changedSignal_withNoValidSections_relaysNothing() throws Exception {
-    UUID missionId = UUID.randomUUID();
-    FakeSession alice = openSession(missionId, oidcUser("user-1", "Alice"));
-    FakeSession bob = openSession(missionId, oidcUser("user-2", "Bob"));
+    String topic = missionTopic();
+    FakeSession alice = openSession(topic, oidcUser("user-1", "Alice"));
+    FakeSession bob = openSession(topic, oidcUser("user-2", "Bob"));
     bob.sent.clear();
 
     handler.handleTextMessage(
@@ -285,41 +265,89 @@ class MissionPresenceWebSocketHandlerTest {
     handler.handleTextMessage(alice, new TextMessage("{\"type\":\"changed\",\"sections\":[]}"));
     handler.handleTextMessage(alice, new TextMessage("{\"type\":\"changed\"}"));
 
-    // Nothing valid to relay — peers receive no frame, and presence state is untouched.
+    // Nothing valid to relay — peers receive no frame, presence is untouched, and nothing fans out.
     assertThat(bob.sent).isEmpty();
-    assertThat(service.trackedMissions()).isEmpty();
+    assertThat(service.trackedTopics()).isEmpty();
+    assertThat(fanout.publishedTopics).isEmpty();
   }
 
   @Test
   void changedSignal_isRateLimitedPerSession() throws Exception {
-    UUID missionId = UUID.randomUUID();
-    FakeSession alice = openSession(missionId, oidcUser("user-1", "Alice"));
-    FakeSession bob = openSession(missionId, oidcUser("user-2", "Bob"));
+    String topic = missionTopic();
+    FakeSession alice = openSession(topic, oidcUser("user-1", "Alice"));
+    FakeSession bob = openSession(topic, oidcUser("user-2", "Bob"));
     bob.sent.clear();
 
     // Emit far more than the per-session burst in a tight synchronous loop (well under one token's
     // refill interval), simulating a crafted flooding client.
-    int emitted = MissionPresenceWebSocketHandler.CHANGED_BURST + 40;
+    int emitted = LiveSyncWebSocketHandler.CHANGED_BURST + 40;
     for (int i = 0; i < emitted; i++) {
       handler.handleTextMessage(
           alice, new TextMessage("{\"type\":\"changed\",\"sections\":[\"crew\"]}"));
     }
 
     // The token bucket caps relayed frames at the burst (a negligible refill may add at most ~1),
-    // so the peer receives far fewer frames than were emitted.
+    // so
+    // the peer receives far fewer frames than were emitted.
     assertThat(bob.sent.size())
         .isGreaterThan(0)
-        .isLessThanOrEqualTo(MissionPresenceWebSocketHandler.CHANGED_BURST + 1)
+        .isLessThanOrEqualTo(LiveSyncWebSocketHandler.CHANGED_BURST + 1)
         .isLessThan(emitted);
   }
 
   @Test
+  void changedSignal_isPublishedToTheFanoutAfterLocalRelay() throws Exception {
+    String topic = missionTopic();
+    FakeSession alice = openSession(topic, oidcUser("user-1", "Alice"));
+    openSession(topic, oidcUser("user-2", "Bob"));
+
+    handler.handleTextMessage(
+        alice, new TextMessage("{\"type\":\"changed\",\"sections\":[\"crew\",\"finance\"]}"));
+
+    // A cross-replica fan-out publish carries the canonical topic and the sanitised sections.
+    assertThat(fanout.publishedTopics).containsExactly(topic);
+    assertThat(fanout.publishedSections).containsExactly(List.of("crew", "finance"));
+  }
+
+  @Test
+  void changedSignal_staysWithinItsOwnRoom() throws Exception {
+    String topicA = missionTopic();
+    String topicB = missionTopic();
+    FakeSession alice = openSession(topicA, oidcUser("user-1", "Alice"));
+    FakeSession carol = openSession(topicB, oidcUser("user-3", "Carol"));
+    carol.sent.clear();
+
+    handler.handleTextMessage(
+        alice, new TextMessage("{\"type\":\"changed\",\"sections\":[\"crew\"]}"));
+
+    // A change in room A never reaches a viewer of room B (cross-room isolation).
+    assertThat(carol.sent).isEmpty();
+  }
+
+  @Test
+  void deliverFromFanout_relaysToLocalRoom_withoutOriginExclusion() throws Exception {
+    String topic = missionTopic();
+    FakeSession alice = openSession(topic, oidcUser("user-1", "Alice"));
+    FakeSession bob = openSession(topic, oidcUser("user-2", "Bob"));
+    alice.sent.clear();
+    bob.sent.clear();
+
+    // A frame arriving from a peer replica has no local origin — every local socket receives it.
+    handler.deliverFromFanout(topic, List.of("crew"));
+
+    assertThat(sectionsOf(lastBroadcast(alice))).containsExactly("crew");
+    assertThat(sectionsOf(lastBroadcast(bob))).containsExactly("crew");
+    // Consuming a fan-out frame must not re-publish it (that would loop across replicas).
+    assertThat(fanout.publishedTopics).isEmpty();
+  }
+
+  @Test
   void openSessions_areCountedInPresenceWsSessionsGauge() throws Exception {
-    UUID missionId = UUID.randomUUID();
+    String topic = missionTopic();
     assertThat(presenceGauge()).isZero();
 
-    FakeSession alice = openSession(missionId, oidcUser("user-1", "Alice"));
-    FakeSession bob = openSession(missionId, oidcUser("user-2", "Bob"));
+    FakeSession alice = openSession(topic, oidcUser("user-1", "Alice"));
+    FakeSession bob = openSession(topic, oidcUser("user-2", "Bob"));
     assertThat(presenceGauge()).isEqualTo(2.0);
 
     alice.open = false;
@@ -330,9 +358,9 @@ class MissionPresenceWebSocketHandlerTest {
 
   @Test
   void broadcasts_countSnapshotAndChangedRelayFrames() throws Exception {
-    UUID missionId = UUID.randomUUID();
-    FakeSession alice = openSession(missionId, oidcUser("user-1", "Alice"));
-    openSession(missionId, oidcUser("user-2", "Bob"));
+    String topic = missionTopic();
+    FakeSession alice = openSession(topic, oidcUser("user-1", "Alice"));
+    openSession(topic, oidcUser("user-2", "Bob"));
 
     handler.handleTextMessage(
         alice, new TextMessage("{\"type\":\"changed\",\"sections\":[\"crew\"]}"));
@@ -344,11 +372,11 @@ class MissionPresenceWebSocketHandlerTest {
 
   @Test
   void throttledChangedFrames_areCountedAsDroppedThrottled() throws Exception {
-    UUID missionId = UUID.randomUUID();
-    FakeSession alice = openSession(missionId, oidcUser("user-1", "Alice"));
-    openSession(missionId, oidcUser("user-2", "Bob"));
+    String topic = missionTopic();
+    FakeSession alice = openSession(topic, oidcUser("user-1", "Alice"));
+    openSession(topic, oidcUser("user-2", "Bob"));
 
-    int emitted = MissionPresenceWebSocketHandler.CHANGED_BURST + 40;
+    int emitted = LiveSyncWebSocketHandler.CHANGED_BURST + 40;
     for (int i = 0; i < emitted; i++) {
       handler.handleTextMessage(
           alice, new TextMessage("{\"type\":\"changed\",\"sections\":[\"crew\"]}"));
@@ -360,9 +388,9 @@ class MissionPresenceWebSocketHandlerTest {
 
   @Test
   void sendFailureToBrokenPeer_isCountedAsDroppedSendFailed() throws Exception {
-    UUID missionId = UUID.randomUUID();
-    FakeSession alice = openSession(missionId, oidcUser("user-1", "Alice"));
-    FakeSession bob = openSession(missionId, oidcUser("user-2", "Bob"));
+    String topic = missionTopic();
+    FakeSession alice = openSession(topic, oidcUser("user-1", "Alice"));
+    FakeSession bob = openSession(topic, oidcUser("user-2", "Bob"));
     // Bob's socket reports open but every write throws (a half-broken connection).
     bob.failSend = true;
 
@@ -376,13 +404,27 @@ class MissionPresenceWebSocketHandlerTest {
 
   // ── helpers ────────────────────────────────────────────────────────────────────────────────
 
+  private static String missionTopic() {
+    return "mission:" + UUID.randomUUID();
+  }
+
+  private static List<String> sectionsOf(JsonNode relayed) {
+    List<String> sections = new ArrayList<>();
+    relayed.get("sections").forEach(node -> sections.add(node.asString()));
+    return sections;
+  }
+
   private double presenceGauge() {
     return registry.get(MetricNames.PRESENCE_WS_SESSIONS).gauge().value();
   }
 
   private double frameCounter(String type) {
     var counter =
-        registry.find(MetricNames.PRESENCE_RELAY_FRAMES).tag(MetricNames.TAG_TYPE, type).counter();
+        registry
+            .find(MetricNames.PRESENCE_RELAY_FRAMES)
+            .tag(MetricNames.TAG_TYPE, type)
+            .tag(MetricNames.TAG_TOPIC_CLASS, "mission")
+            .counter();
     return counter == null ? 0.0 : counter.count();
   }
 
@@ -391,14 +433,18 @@ class MissionPresenceWebSocketHandlerTest {
         registry
             .find(MetricNames.PRESENCE_RELAY_DROPPED)
             .tag(MetricNames.TAG_REASON, reason)
+            .tag(MetricNames.TAG_TOPIC_CLASS, "mission")
             .counter();
     return counter == null ? 0.0 : counter.count();
   }
 
-  private FakeSession openSession(UUID missionId, OidcUser user) throws Exception {
+  private FakeSession openSession(String topic, OidcUser user) throws Exception {
     FakeSession session = new FakeSession();
     session.open = true;
-    session.uri = URI.create("ws://localhost/ws/missions/" + missionId + "/presence");
+    session.uri =
+        URI.create(
+            "ws://localhost/ws/missions/" + topic.substring("mission:".length()) + "/presence");
+    session.attributes.put(LiveSyncWebSocketHandler.ATTR_TOPIC, topic);
     session.principal =
         new UsernamePasswordAuthenticationToken(
             user, "n/a", List.of(new SimpleGrantedAuthority("ROLE_USER")));
@@ -422,6 +468,18 @@ class MissionPresenceWebSocketHandlerTest {
     WebSocketMessage<?> last = sent.get(sent.size() - 1);
     assertThat(last).isInstanceOf(TextMessage.class);
     return objectMapper.readTree(((TextMessage) last).getPayload());
+  }
+
+  /** Captures fan-out publishes so tests can assert the cross-replica hand-off. */
+  private static final class CapturingFanout implements LiveSyncFanout {
+    private final List<String> publishedTopics = new ArrayList<>();
+    private final List<List<String>> publishedSections = new ArrayList<>();
+
+    @Override
+    public void publish(String canonicalTopic, List<String> sections) {
+      publishedTopics.add(canonicalTopic);
+      publishedSections.add(List.copyOf(sections));
+    }
   }
 
   /**
@@ -529,8 +587,8 @@ class MissionPresenceWebSocketHandlerTest {
       this.open = false;
     }
 
-    // Suppress unused-field warnings for `closeStatus` / `ByteBuffer` import — both are part of
-    // the WebSocketSession contract we mirror but the current tests do not assert on them.
+    // Suppress unused-field warnings for `closeStatus` / `ByteBuffer` import — both are part of the
+    // WebSocketSession contract we mirror but the current tests do not assert on them.
     @SuppressWarnings("unused")
     private void touchUnusedSymbols() {
       ByteBuffer.allocate(0);
