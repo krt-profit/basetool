@@ -63,6 +63,22 @@ groups:
           summary: "External fetch errors ({{ $labels.source }})"
           description: "The {{ $labels.source }} client swallowed more than 3 fetch/parse errors in 6 hours — the catalogue sync may be silently importing nothing while still recording a success. Check the upstream API and the sync logs."
 
+      # (logging audit) The Keycloak roster fetch (KeycloakService.fetchUsers) swallows any Admin-API
+      # failure into an empty list, so UserSyncService records outcome=success with 0 users and
+      # UserSyncStale / UserSyncZeroItems stay quiet — a Keycloak outage is indistinguishable from a
+      # legitimately empty roster. basetool_keycloak_sync_fetch_failures_total is the distinct signal;
+      # a stalled sync is access-control-relevant (departed users keep their local roles). The series
+      # is absent until the first failure, so this cannot fire before one occurs.
+      # baseline-tune: any failure in 6h (the sync runs daily plus manual "Sync now").
+      - alert: KeycloakSyncFetchFailing
+        expr: sum(increase(basetool_keycloak_sync_fetch_failures_total[6h])) > 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Keycloak user-sync roster fetch failing"
+          description: "The Keycloak Admin-API roster fetch threw and was swallowed into an empty roster in the last 6h — the user sync is recording success with zero users while local roles drift from Keycloak (departed users keep access). Check Keycloak reachability and the backend sync logs."
+
       # (#1041 item 2) Zero-item catalogue outage. An upstream that returns empty 200s processes NO
       # rows, yet the sweep still "succeeds" and last_success stays fresh — so ExternalSyncStale never
       # fires and ExternalFetchErrors stays quiet (an empty 200 is not a fetch error). basetool_
@@ -84,6 +100,21 @@ groups:
         annotations:
           summary: "Catalogue sync importing zero items ({{ $labels.task }})"
           description: "The {{ $labels.task }} sync has processed zero items in 48h while still recording successful runs — the upstream catalogue is likely returning empty responses. Check the upstream API and the sync-report admin page."
+
+      # (logging audit) A single SC-Wiki sync step (ScWikiScheduler.runStep) can throw and be swallowed
+      # so the other steps still run: the umbrella scwiki_sync job then records outcome=success with a
+      # non-zero item tally, so ScheduledJobFailureStreak / SyncZeroItems / ExternalSyncStale never
+      # fire for a persistently-failing single step. basetool_scheduled_job_step_failures_total{step}
+      # counts it (step = commodity/vehicle/item/blueprint/manufacturer, a bounded literal).
+      # baseline-tune: >=2 failures of the same step in 48h = two consecutive daily runs = persistent.
+      - alert: ScWikiStepFailing
+        expr: sum by (step) (increase(basetool_scheduled_job_step_failures_total{task="scwiki_sync"}[48h])) > 1
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "SC-Wiki sync step failing ({{ $labels.step }})"
+          description: "The {{ $labels.step }} step of the daily SC-Wiki sync has failed on at least two runs in 48h while the umbrella job keeps recording success — that catalogue slice is silently importing nothing. Check the SC-Wiki upstream and the backend sync logs."
 
       # (#1041 item 3) All-jobs staleness. UserSyncStale/ExternalSyncStale covered only user_sync and
       # the two catalogue syncs; the daily notification-retention purge and the hourly default-
@@ -186,6 +217,22 @@ groups:
         annotations:
           summary: "403 access-denied spike ({{ $labels.application }})"
           description: "{{ $labels.application }} is returning 403 access-denied at an elevated rate — possible authorization probing or a broken permission gate after a deploy."
+
+      # (logging audit) The REQ-SEC-017 pending-approval gate 403s every /api/** write from a user who
+      # carries only ROLE_PENDING_APPROVAL. It writes the 403 at the servlet-filter level, bypassing
+      # GlobalExceptionHandler, so it now increments basetool_http_error_total{code="PENDING_APPROVAL"}
+      # directly (like IdentityProviderUnavailableFilter). A spike means a converter / approval-sync
+      # regression left legitimate users with only the pending marker and is mass-403ing them — the
+      # WARN log was the only prior signal (LogbackErrorSpike is ERROR-only, so it would not catch it).
+      # baseline-tune: 0.2/s mirrors AccessDeniedSpike; a genuinely-pending user hits this rarely.
+      - alert: PendingApprovalBlockSpike
+        expr: sum by (application) (rate(basetool_http_error_total{code="PENDING_APPROVAL"}[5m])) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pending-approval 403 spike ({{ $labels.application }})"
+          description: "{{ $labels.application }} is 403-blocking pending-approval users at an elevated rate — likely an authorities-converter or approval-sync regression leaving legitimate users with only ROLE_PENDING_APPROVAL, not just the occasional genuinely-pending account."
 
       - alert: RateLimitRejectionSpike
         expr: sum by (application) (rate(basetool_ratelimit_rejections_total[5m])) > 1

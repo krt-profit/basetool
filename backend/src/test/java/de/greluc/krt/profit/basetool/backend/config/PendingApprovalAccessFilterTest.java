@@ -29,7 +29,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.FilterChain;
 import java.util.Arrays;
 import org.junit.jupiter.api.AfterEach;
@@ -47,6 +49,7 @@ import tools.jackson.databind.json.JsonMapper;
 class PendingApprovalAccessFilterTest {
 
   private PendingApprovalAccessFilter filter;
+  private SimpleMeterRegistry meterRegistry;
 
   @BeforeEach
   void setUp() {
@@ -55,9 +58,10 @@ class PendingApprovalAccessFilterTest {
     MessageSource messageSource = mock(MessageSource.class);
     when(messageSource.getMessage(anyString(), any(), anyString(), any()))
         .thenAnswer(invocation -> invocation.getArgument(2));
+    meterRegistry = new SimpleMeterRegistry();
     filter =
         new PendingApprovalAccessFilter(
-            messageSource, new AppProblemProperties(), JsonMapper.builder().build());
+            messageSource, new AppProblemProperties(), JsonMapper.builder().build(), meterRegistry);
   }
 
   @AfterEach
@@ -161,5 +165,24 @@ class PendingApprovalAccessFilterTest {
 
     assertEquals(200, response.getStatus());
     verify(chain).doFilter(any(), any());
+  }
+
+  @Test
+  void pendingUser_isForbidden_incrementsHttpErrorCounter() throws Exception {
+    // REQ-OBS-011: the 403 is written at the filter level, bypassing GlobalExceptionHandler, so it
+    // must increment basetool_http_error_total{code=PENDING_APPROVAL} here
+    // (PendingApprovalBlockSpike).
+    authenticateWith(PendingApprovalAccessFilter.PENDING_AUTHORITY);
+
+    run("POST", "/api/v1/inventory", mock(FilterChain.class));
+
+    assertEquals(
+        1.0,
+        meterRegistry
+            .counter(
+                MetricNames.HTTP_ERROR,
+                MetricNames.TAG_CODE,
+                PendingApprovalAccessFilter.CODE_PENDING_APPROVAL)
+            .count());
   }
 }
