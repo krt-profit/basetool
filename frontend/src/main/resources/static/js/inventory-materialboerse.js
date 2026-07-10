@@ -72,8 +72,10 @@
                     serialize: 'materialboerse',
                     onSuccess: function () {
                         setStatus(itemId, false);
-                        if (window.krtMaterialboardPresence) {
-                            window.krtMaterialboardPresence.sendChanged(['board']);
+                        // REQ-FE-015 (ADR-0092): notify board viewers over the shared multiplexed
+                        // /ws/sync `materialboard` room (was the retired materialboerse-presence.js).
+                        if (window.krtLiveSync) {
+                            window.krtLiveSync.sendChanged('materialboard', ['board']);
                         }
                     },
                     onError: function () {

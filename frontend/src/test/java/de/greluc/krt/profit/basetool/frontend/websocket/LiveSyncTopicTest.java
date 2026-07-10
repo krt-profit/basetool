@@ -126,6 +126,17 @@ class LiveSyncTopicTest {
   }
 
   @Test
+  void parse_acceptsGlobalMaterialboardTopic_andRejectsAnIdOnIt() {
+    LiveSyncTopic topic = LiveSyncTopic.parse("materialboard");
+    assertThat(topic).isNotNull();
+    assertThat(topic.topicClass()).isEqualTo(LiveSyncTopicClass.MATERIALBOARD);
+    assertThat(topic.resourceId()).isNull();
+    assertThat(topic.canonical()).isEqualTo("materialboard");
+    // A global room; a prefixed id violates its scope.
+    assertThat(LiveSyncTopic.parse("materialboard:" + UUID.randomUUID())).isNull();
+  }
+
+  @Test
   void everyScopedClassExposesAnAuthProbePathWithAnIdPlaceholder() {
     for (LiveSyncTopicClass topicClass : LiveSyncTopicClass.values()) {
       if (topicClass.scoped()) {

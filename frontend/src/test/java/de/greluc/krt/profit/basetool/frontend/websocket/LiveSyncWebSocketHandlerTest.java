@@ -665,6 +665,56 @@ class LiveSyncWebSocketHandlerTest {
     assertThat(fanout.publishedTopics).isEmpty();
   }
 
+  // ── Materialbörse board (legacy /ws/materialboerse/board alias + multiplexed materialboard) ───
+
+  @Test
+  void boardChanged_overLegacyAlias_isRelayedToOtherSessionsOnly() throws Exception {
+    // Migrated from the deleted MaterialboardPresenceWebSocketHandlerTest: a legacy board socket
+    // sends a topic-less `changed` frame (its implicit ATTR_TOPIC binds it to the materialboard
+    // room) — the path the pre-rollout materialboerse-presence.js uses — and it relays to peers
+    // (carrying the canonical topic) but not back to the origin.
+    FakeSession origin = openBoardLegacySession(oidcUser("user-1", "Alice"));
+    FakeSession peer = openBoardLegacySession(oidcUser("user-2", "Bob"));
+    origin.sent.clear();
+    peer.sent.clear();
+
+    handler.handleTextMessage(
+        origin, new TextMessage("{\"type\":\"changed\",\"sections\":[\"board\"]}"));
+
+    JsonNode relayed = lastBroadcast(peer);
+    assertThat(relayed.get("type").asString()).isEqualTo("changed");
+    assertThat(relayed.get("topic").asString()).isEqualTo("materialboard");
+    assertThat(sectionsOf(relayed)).containsExactly("board");
+    assertThat(origin.sent).isEmpty();
+  }
+
+  @Test
+  void boardChanged_dropsSectionsOutsideTheMaterialboardWhitelist() throws Exception {
+    FakeSession origin = openBoardLegacySession(oidcUser("user-1", "Alice"));
+    FakeSession peer = openBoardLegacySession(oidcUser("user-2", "Bob"));
+    peer.sent.clear();
+
+    handler.handleTextMessage(
+        origin, new TextMessage("{\"type\":\"changed\",\"sections\":[\"secret\"]}"));
+
+    // Only `board` is accept-listed for the materialboard class; anything else is dropped.
+    assertThat(peer.sent).isEmpty();
+  }
+
+  @Test
+  void multiplexedChanged_materialboardRoom_relaysBoardSection() throws Exception {
+    // A new /ws/sync board client subscribes to the global materialboard room and receives a peer's
+    // board change — the same room the legacy alias joins, so both transports interoperate.
+    FakeSession subscriber = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    subscribe(subscriber, "materialboard");
+    subscriber.sent.clear();
+    FakeSession publisher = openMultiplexedSession(oidcUser("user-1", "Alice"));
+
+    handler.handleTextMessage(publisher, changedFrame("materialboard", "board"));
+
+    assertThat(sectionsOf(lastBroadcast(subscriber))).containsExactly("board");
+  }
+
   // ── helpers ────────────────────────────────────────────────────────────────────────────────
 
   private static String missionTopic() {
@@ -748,6 +798,27 @@ class LiveSyncWebSocketHandlerTest {
         URI.create(
             "ws://localhost/ws/missions/" + topic.substring("mission:".length()) + "/presence");
     session.attributes.put(LiveSyncWebSocketHandler.ATTR_TOPIC, topic);
+    session.principal =
+        new UsernamePasswordAuthenticationToken(
+            user, "n/a", List.of(new SimpleGrantedAuthority("ROLE_USER")));
+    handler.afterConnectionEstablished(session);
+    return session;
+  }
+
+  /**
+   * Opens a legacy board socket bound to the fixed global {@code materialboard} topic, as the
+   * {@code /ws/materialboerse/board} handshake interceptor binds it via {@link
+   * LiveSyncWebSocketHandler#ATTR_TOPIC}.
+   *
+   * @param user the socket owner
+   * @return the established fake session
+   * @throws Exception if the handler's connect callback throws
+   */
+  private FakeSession openBoardLegacySession(OidcUser user) throws Exception {
+    FakeSession session = new FakeSession();
+    session.open = true;
+    session.uri = URI.create("ws://localhost/ws/materialboerse/board");
+    session.attributes.put(LiveSyncWebSocketHandler.ATTR_TOPIC, "materialboard");
     session.principal =
         new UsernamePasswordAuthenticationToken(
             user, "n/a", List.of(new SimpleGrantedAuthority("ROLE_USER")));

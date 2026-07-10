@@ -291,6 +291,19 @@ class LiveSyncSubscriptionAuthorizerTest {
         .isEqualTo(Decision.DENY);
   }
 
+  // ── Authenticated-only global room (the materialboard board) — no probe, no role gate ────────
+
+  @Test
+  void authorize_materialboard_allowsOnAuthenticationAlone_withoutProbing() {
+    // The materialboard room carries no probe path and no role gate: an authenticated socket is
+    // authorized by its authentication alone, so the authorizer never touches the backend.
+    LiveSyncTopic board = LiveSyncTopic.parse("materialboard");
+    assertThat(authorizer.authorize(board, TOKEN, PIN, null)).isEqualTo(Decision.ALLOW);
+    assertThat(authorizer.authorize(board, null, null, Set.of("ROLE_GUEST")))
+        .isEqualTo(Decision.ALLOW);
+    assertThat(server.getRequestCount()).isZero();
+  }
+
   private static MockResponse jsonResponse(String body) {
     return new MockResponse()
         .setResponseCode(200)

@@ -195,7 +195,17 @@ public enum LiveSyncTopicClass {
       null,
       null,
       null,
-      Roles.MEMBER_AUTHORITIES);
+      Roles.MEMBER_AUTHORITIES),
+
+  /**
+   * Global Materialbörse board room: the material-exchange trade board (REQ-MARKET-010). A single
+   * global room carrying one opaque {@code board} section key; every peer re-pulls its own {@code
+   * KRT_MEMBER}-gated board fragment, so no board data crosses the socket. No editor-presence dots.
+   * A subscribe is authorized by the socket's authentication alone (no probe path, no capability,
+   * no role gate) — the same "authenticated member" bar the {@code /ws/materialboerse/board} legacy
+   * alias and the board page itself already carry.
+   */
+  MATERIALBOARD("materialboard", false, Set.of("board"), false, "materialboard", null, null);
 
   private final String prefix;
   private final boolean scoped;

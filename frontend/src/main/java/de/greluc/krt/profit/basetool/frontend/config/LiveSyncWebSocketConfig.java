@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.config;
 
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.LiveSyncPresenceService;
+import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncBoardLegacyHandshakeInterceptor;
 import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncFanout;
 import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncLegacyHandshakeInterceptor;
 import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncSubscriptionAuthorizer;
@@ -46,14 +47,16 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * Wires the live-sync WebSocket endpoints (REQ-FE-015, ADR-0092).
  *
- * <p>Registers the shared {@link LiveSyncWebSocketHandler} on two paths: the legacy per-resource
- * {@code /ws/missions/{missionId}/presence} (the {@link LiveSyncLegacyHandshakeInterceptor}
- * authorizes the handshake and binds the socket to its implicit {@code mission:{id}} topic, keeping
- * tabs opened before the {@code /ws/sync} rollout working for one release) and the multiplexed
- * {@code /ws/sync} (the {@link LiveSyncSyncHandshakeInterceptor} captures the OAuth2 token + pin
- * for per-subscribe authorization). The subscribe-authorization probes run on a dedicated bounded
- * {@link #liveSyncSubscribeAuthExecutor()} thread pool so the WebSocket container threads never
- * block on a backend read.
+ * <p>Registers the shared {@link LiveSyncWebSocketHandler} on three paths: the two legacy
+ * per-surface aliases {@code /ws/missions/{missionId}/presence} (the {@link
+ * LiveSyncLegacyHandshakeInterceptor} authorizes the handshake and binds the socket to its implicit
+ * {@code mission:{id}} topic) and {@code /ws/materialboerse/board} (the {@link
+ * LiveSyncBoardLegacyHandshakeInterceptor} binds the fixed global {@code materialboard} topic) —
+ * both keeping tabs opened before the {@code /ws/sync} rollout working for one release — and the
+ * multiplexed {@code /ws/sync} (the {@link LiveSyncSyncHandshakeInterceptor} captures the OAuth2
+ * token + pin for per-subscribe authorization). The subscribe-authorization probes run on a
+ * dedicated bounded {@link #liveSyncSubscribeAuthExecutor()} thread pool so the WebSocket container
+ * threads never block on a backend read.
  *
  * <p>The handshake is gated by an explicit {@code setAllowedOriginPatterns} list (driven by {@code
  * app.websocket.allowed-origin-patterns}) — {@code setAllowedOriginPatterns("*")} would leave the
@@ -182,6 +185,10 @@ public class LiveSyncWebSocketConfig implements WebSocketConfigurer {
     registry
         .addHandler(handler, "/ws/missions/{missionId}/presence")
         .addInterceptors(new LiveSyncLegacyHandshakeInterceptor(backendApiClient))
+        .setAllowedOriginPatterns(origins);
+    registry
+        .addHandler(handler, "/ws/materialboerse/board")
+        .addInterceptors(new LiveSyncBoardLegacyHandshakeInterceptor())
         .setAllowedOriginPatterns(origins);
     registry
         .addHandler(handler, "/ws/sync")
