@@ -534,6 +534,20 @@ groups:
           summary: "Ingest cannot reach the backend (handoffs failing)"
           description: "The ingest gateway could not reach the backend to relay handoffs in the last 5 minutes — staged identity data is not being applied. Check backend health and the ingest→backend path."
 
+      # (logging audit) The oversized-body DoS guard (PayloadSizeLimitFilter, INGEST-DOS-1) rejects a
+      # too-large /v1 body with 413. It was previously silent — no log, no metric — unlike the sibling
+      # bot / rate-limit filters, so a flood of oversized-body probes against the only internet-facing
+      # surface was undetectable. basetool_ingest_payload_rejected_total counts each reject.
+      # baseline-tune: >0.2/s sustained is a probing/DoS pattern (a real oversized upload is rare).
+      - alert: IngestPayloadRejectedSpike
+        expr: rate(basetool_ingest_payload_rejected_total[5m]) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Ingest oversized-payload rejections spiking"
+          description: "The ingest gateway is refusing oversized /v1 request bodies (413) at an elevated rate — likely an oversized-body probing / DoS attempt against the public ingest surface, or a misconfigured client. Check the NPM edge and the fail2ban jails."
+
       # Keycloak login errors / Discord IdP broker error spike (primary login path).
       - alert: KeycloakLoginErrorSpike
         expr: rate(keycloak_user_events_total{event=~"login_error|identity_provider_login_error"}[5m]) > 0.2

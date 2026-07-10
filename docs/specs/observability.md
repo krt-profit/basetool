@@ -15,10 +15,12 @@ guarantees; REQ-OBS-005 onward record its binding rules.
 
 ### REQ-OBS-001 — Access log + MDC enrichment
 
-Both modules emit one access-log line per request and enrich every log line with MDC fields
-`correlationId`, `userId`, and `orgUnitId` (the last per
+The backend and frontend emit one access-log line per request and enrich every log line with MDC
+fields `correlationId`, `userId`, and `orgUnitId` (the last per
 [`org-unit-tenancy.md`](org-unit-tenancy.md) REQ-ORG-007). Logback patterns must include
-`%X{orgUnitId}` to keep audit trails intact.
+`%X{orgUnitId}` to keep audit trails intact. The ingest gateway emits the same
+one-line-per-request access log (`RequestLoggingFilter`, scoped to `/v1`) but carries only the
+`correlationId` MDC field — it owns no per-user data (REQ-OBS-003).
 
 A relayed backend failure is logged **exactly once, at the level its status warrants.** The
 frontend's `BackendApiClient` boundary logs every backend error once — a 5xx server fault at
@@ -541,6 +543,12 @@ the same `basetool_bot_blocked_total{rule}` series, distinguished by the `applic
 with the backend counter, the `application` common tag separating the modules) — paired since #1041
 item 19 with `basetool_ratelimit_requests_total{bucket}` on the per-IP filter and the per-subject
 limiter, feeding the same `RateLimitRejectionRatioHigh` ratio alert.
+`basetool_ingest_payload_rejected_total` (untagged, `PayloadSizeLimitFilter`) counts each
+oversized-body 413 the INGEST-DOS-1 guard refuses — previously silent (no log, no metric) unlike the
+sibling bot / rate-limit filters — and backs `IngestPayloadRejectedSpike` (logging audit). The
+gateway also now emits one INFO access-log line per `/v1` request (`RequestLoggingFilter`; method /
+path / status / duration), matching the backend/frontend one-line-per-request contract
+(REQ-OBS-001).
 
 **Deliberately excluded** (documented so the gap is intentional, not an oversight): notifications
 (no org-wide queue — only per-recipient unread, which is PII-adjacent), org units (no lifecycle

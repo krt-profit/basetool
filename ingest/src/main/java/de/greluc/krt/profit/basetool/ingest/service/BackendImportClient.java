@@ -67,6 +67,19 @@ public class BackendImportClient {
       WebClient backendWebClient, CircuitBreakerRegistry circuitBreakerRegistry) {
     this.backendWebClient = backendWebClient;
     this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("backend");
+    // Log the one-time OPEN/CLOSED transition at WARN so a backend outage leaves a breadcrumb in
+    // the
+    // ingest log (the frontend has ResilienceEventLogger; ingest had only ported the breaker). This
+    // is the sanctioned health signal that pairs with the per-call DEBUG in GlobalExceptionHandler
+    // and the resilience4j_circuitbreaker_state gauge (REQ-OBS-001).
+    circuitBreaker
+        .getEventPublisher()
+        .onStateTransition(
+            event ->
+                log.warn(
+                    "Backend circuit breaker {} -> {}",
+                    event.getStateTransition().getFromState(),
+                    event.getStateTransition().getToState()));
   }
 
   /**
