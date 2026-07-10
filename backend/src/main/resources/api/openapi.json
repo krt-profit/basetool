@@ -33040,7 +33040,7 @@
         "parameters" : [ {
           "name" : "query",
           "in" : "query",
-          "required" : true,
+          "required" : false,
           "schema" : {
             "type" : "string"
           }
@@ -33166,7 +33166,7 @@
         "parameters" : [ {
           "name" : "query",
           "in" : "query",
-          "required" : true,
+          "required" : false,
           "schema" : {
             "type" : "string"
           }

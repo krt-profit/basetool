@@ -178,7 +178,7 @@ public class UserController {
       "hasAnyRole('" + Roles.ADMIN + "', '" + Roles.OFFICER + "', '" + Roles.KRT_MEMBER + "')")
   @Transactional(readOnly = true)
   public PageResponse<UserDto> searchUsers(
-      @RequestParam String query,
+      @RequestParam(required = false) String query,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort) {
@@ -213,7 +213,7 @@ public class UserController {
           + "')")
   @Transactional(readOnly = true)
   public PageResponse<UserDto> searchUsersForBank(
-      @RequestParam String query,
+      @RequestParam(required = false) String query,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort) {
@@ -227,7 +227,13 @@ public class UserController {
    * two endpoints differ only in their {@code @PreAuthorize} role gate, so the query + projection
    * live here once.
    *
-   * @param query free-text username/displayName filter.
+   * <p>A {@code null} query — the browse-mode empty {@code ?query=} that the global {@code
+   * emptyAsNull} string binder collapses to {@code null} — is normalised to the empty string, which
+   * the {@code LIKE '%%'} search treats as a match-all filter. This makes opening a {@code
+   * remoteSource} picker without typing return the scoped roster rather than 500ing on the required
+   * param (#1193).
+   *
+   * @param query free-text username/displayName filter, or {@code null}/blank to match all.
    * @param page requested page index, or {@code null} for the first page.
    * @param size requested page size, or {@code null} for the default.
    * @param sort requested sort expression, or {@code null} for the username default.
@@ -237,7 +243,7 @@ public class UserController {
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "username");
     Page<de.greluc.krt.profit.basetool.backend.model.User> p =
-        userService.searchByUsername(query, pageable);
+        userService.searchByUsername(query == null ? "" : query, pageable);
     List<UserDto> content =
         p.getContent().stream().map(userMapper::toDto).map(this::redactForPeerIfNeeded).toList();
     return new PageResponse<>(

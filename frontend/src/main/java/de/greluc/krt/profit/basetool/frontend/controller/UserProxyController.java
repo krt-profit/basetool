@@ -75,12 +75,18 @@ public class UserProxyController {
    * into a flat list. Empty list on backend failure or missing content — the autocomplete renders
    * an empty result rather than surfacing the error.
    *
-   * @param query free-text query to forward to the backend
+   * <p>{@code query} is optional: the combobox fires an empty-query fetch when it is opened without
+   * typing (browse mode), and the global {@code emptyAsNull} string binder collapses a blank {@code
+   * ?query=} to {@code null}. Accepting it as optional — rather than a required param that 500s on
+   * the null — lets that browse click return the (scoped, capped) roster; {@link #forwardSearch}
+   * normalises {@code null} back to the empty match-all filter.
+   *
+   * @param query free-text query to forward to the backend, or {@code null}/blank to match all
    * @return matching user records (raw JSON maps), never {@code null}
    */
   @GetMapping("/search")
   @PreAuthorize("isAuthenticated()")
-  public List<Map<String, Object>> searchUsers(@RequestParam String query) {
+  public List<Map<String, Object>> searchUsers(@RequestParam(required = false) String query) {
     return forwardSearch("/api/v1/users/search", query);
   }
 
@@ -92,12 +98,13 @@ public class UserProxyController {
    * holds no org role can still resolve candidates. The real authorization is enforced by the
    * backend; this proxy only requires an authenticated session.
    *
-   * @param query free-text query to forward to the backend
+   * @param query free-text query to forward to the backend, or {@code null}/blank to match all
    * @return matching user records (raw JSON maps), never {@code null}
    */
   @GetMapping("/search-bank")
   @PreAuthorize("isAuthenticated()")
-  public List<Map<String, Object>> searchUsersForBank(@RequestParam String query) {
+  public List<Map<String, Object>> searchUsersForBank(
+      @RequestParam(required = false) String query) {
     return forwardSearch("/api/v1/users/search-bank", query);
   }
 
@@ -108,14 +115,19 @@ public class UserProxyController {
    * Empty list on backend failure or missing content — the autocomplete renders an empty result
    * rather than surfacing the error.
    *
+   * <p>A {@code null} query (the browse-mode empty fetch collapsed by the {@code emptyAsNull}
+   * string binder) is normalised to the empty string, which the backend search treats as a
+   * match-all filter, so opening the picker without typing returns the scoped roster instead of
+   * failing.
+   *
    * @param backendPath the backend search endpoint path to forward to
-   * @param query the free-text query to forward
+   * @param query the free-text query to forward, or {@code null}/blank to match all
    * @return matching user records (raw JSON maps), never {@code null}
    */
   private List<Map<String, Object>> forwardSearch(String backendPath, String query) {
     String uri =
         org.springframework.web.util.UriComponentsBuilder.fromPath(backendPath)
-            .queryParam("query", query)
+            .queryParam("query", query == null ? "" : query)
             .queryParam("size", 1000)
             .queryParam("sort", "username,asc")
             .toUriString();
