@@ -1170,6 +1170,50 @@ public final class BackendSeeder {
   }
 
   /**
+   * Overload of {@link #createJobOrder(String, String, String, String, String, int, double)} that
+   * names <em>distinct</em> responsible (processing) and requesting (customer) org units — used to
+   * model an order a (possibly non-profit) ordering unit <em>placed</em> with a profit-eligible
+   * processing unit, so the requesting unit's members can exercise the requesting-owner escape
+   * (REQ-ORDERS-023). The responsible unit must be profit-eligible; the requesting unit may be any
+   * org unit.
+   *
+   * @param username the Keycloak username of the (admin) test user
+   * @param password the Keycloak password of the test user
+   * @param responsibleOrgUnitId the responsible (processing) org unit id; must be profit-eligible
+   * @param requestingOrgUnitId the requesting (customer / Auftraggeber) org unit id
+   * @param handle the free-text contact handle of the order
+   * @param materialId the id of the (job-order) material to request
+   * @param minQuality the minimum acceptable quality of the requested material ({@code >= 650})
+   * @param amount the requested amount of the material
+   * @return the created job order's id
+   */
+  public String createJobOrder(
+      String username,
+      String password,
+      String responsibleOrgUnitId,
+      String requestingOrgUnitId,
+      String handle,
+      String materialId,
+      int minQuality,
+      double amount) {
+    String body =
+        "{\"responsibleOrgUnitId\":\""
+            + responsibleOrgUnitId
+            + "\",\"requestingOrgUnitId\":\""
+            + requestingOrgUnitId
+            + "\",\"handle\":\""
+            + handle
+            + "\",\"materials\":[{\"materialId\":\""
+            + materialId
+            + "\",\"minQuality\":"
+            + minQuality
+            + ",\"amount\":"
+            + amount
+            + "}]}";
+    return seedEntity(username, password, "/api/v1/orders", body);
+  }
+
+  /**
    * Creates an inventory item linked to a job order via {@code POST /api/v1/inventory} and returns
    * its id, so it surfaces in the order's handover item dropdown (populated from {@code
    * findByJobOrderIdOrdered}). The item is non-personal (personal items may not carry a job-order
