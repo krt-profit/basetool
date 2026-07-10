@@ -116,6 +116,31 @@ class WebClientLoggingFilterTest {
   }
 
   @Test
+  void logsSlowSuccessfulCallAtInfoNotWarn() {
+    // A zero-ms threshold makes any successful call count as "slow" deterministically.
+    LoggingProperties slowProps =
+        new LoggingProperties("X-Correlation-Id", "correlationId", "userId", 2000L, 0L, false);
+    WebClientLoggingFilter slowFilter = new WebClientLoggingFilter(slowProps);
+    server.enqueue(new MockResponse().setResponseCode(200).setBody("{}"));
+    WebClient wc =
+        WebClient.builder()
+            .baseUrl(server.url("/").toString())
+            .filter(slowFilter.callLogging())
+            .build();
+
+    wc.post().uri("/api/v1/users/sync").retrieve().toBodilessEntity().block();
+
+    assertThat(appender.list).noneMatch(e -> e.getLevel() == Level.WARN);
+    assertThat(appender.list)
+        .anyMatch(
+            e ->
+                e.getLevel() == Level.INFO
+                    && e.getFormattedMessage().contains("Slow backend call")
+                    && e.getFormattedMessage().contains("/api/v1/users/sync")
+                    && e.getFormattedMessage().contains("-> 200"));
+  }
+
+  @Test
   void escalatesToWarnOnServerError() {
     server.enqueue(new MockResponse().setResponseCode(500).setBody(""));
     WebClient wc =
