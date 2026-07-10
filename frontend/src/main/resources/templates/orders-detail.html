@@ -526,13 +526,13 @@
                         data-trigger="oa-add-me" th:data-user-id="${currentUserId}"
                         th:text="#{orders.detail.assignees.addMe}">Mich eintragen</button>
 
-                <div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)" th:if="${users != null and !users.isEmpty()}"
+                <!-- #1193: server-side user search (remote-users) replaces the preloaded ${users} full list; the roster is queried on demand via /users/search.
+                     (a) The former th:if="${users != null and !users.isEmpty()}" gate is dropped - with the list gone it would always hide the picker; the sec:authorize logistician gate is kept so only logisticians see it.
+                     (b) The per-option exclusion of already-assigned users cannot be reproduced in remote mode (server search returns all matches). This is acceptable: the add-assignee flow must tolerate/ignore an already-assigned pick. -->
+                <div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)"
                      style="display: flex; gap: 0.5rem; align-items: center;">
-                    <select id="assignee-add-select" data-krt-combobox style="padding: 0.5rem 2.5rem 0.5rem 0.5rem; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1);">
+                    <select id="assignee-add-select" data-krt-combobox="remote-users" style="padding: 0.5rem 2.5rem 0.5rem 0.5rem; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1);">
                         <option value="" disabled selected th:text="#{orders.detail.assignees.selectUser}">-- Nutzer wählen --</option>
-                        <th:block th:each="u : ${users}">
-                            <option th:if="${order.assignees == null or !#lists.contains(order.assignees.![user.id], u.id)}" th:value="${u.id}" th:attr="data-search=${u.username}" th:text="${u.effectiveName}"></option>
-                        </th:block>
                     </select>
                     <button type="button" class="btn btn-ghost" data-trigger="oa-add-user" th:text="#{orders.detail.assignees.addUser}">Hinzufügen</button>
                 </div>

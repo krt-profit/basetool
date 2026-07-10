@@ -61,6 +61,13 @@ public class UserProxyController {
   private static final ParameterizedTypeReference<List<Map<String, Object>>>
       MEMBERSHIP_OPTION_LIST = new ParameterizedTypeReference<>() {};
 
+  /**
+   * Response type for the single-user lookup ({@code /api/v1/users/{id}}), whose raw JSON is
+   * decoded as a map.
+   */
+  private static final ParameterizedTypeReference<Map<String, Object>> USER_MAP =
+      new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -74,10 +81,40 @@ public class UserProxyController {
   @GetMapping("/search")
   @PreAuthorize("isAuthenticated()")
   public List<Map<String, Object>> searchUsers(@RequestParam String query) {
-    // L-1: UriComponentsBuilder so the user-supplied query is properly query-param-encoded
-    // and cannot inject extra parameters via crafted `&`-separators.
+    return forwardSearch("/api/v1/users/search", query);
+  }
+
+  /**
+   * Bank-audience twin of {@link #searchUsers}: forwards to the backend {@code
+   * /api/v1/users/search-bank}, which mirrors {@code /search} but widens the role gate to bank
+   * staff (ADR-0086, #1193). Backs the bank pickers' {@code remote-bank-users} combobox source
+   * (register holder, grant the Bank-Employee role, approval limits) so a bank employee/manager who
+   * holds no org role can still resolve candidates. The real authorization is enforced by the
+   * backend; this proxy only requires an authenticated session.
+   *
+   * @param query free-text query to forward to the backend
+   * @return matching user records (raw JSON maps), never {@code null}
+   */
+  @GetMapping("/search-bank")
+  @PreAuthorize("isAuthenticated()")
+  public List<Map<String, Object>> searchUsersForBank(@RequestParam String query) {
+    return forwardSearch("/api/v1/users/search-bank", query);
+  }
+
+  /**
+   * Shared body of the two search proxies: builds the properly-encoded backend URI (via {@link
+   * org.springframework.web.util.UriComponentsBuilder} so a crafted {@code &} in the query cannot
+   * inject extra parameters — L-1), forwards it, and unwraps the page payload into a flat list.
+   * Empty list on backend failure or missing content — the autocomplete renders an empty result
+   * rather than surfacing the error.
+   *
+   * @param backendPath the backend search endpoint path to forward to
+   * @param query the free-text query to forward
+   * @return matching user records (raw JSON maps), never {@code null}
+   */
+  private List<Map<String, Object>> forwardSearch(String backendPath, String query) {
     String uri =
-        org.springframework.web.util.UriComponentsBuilder.fromPath("/api/v1/users/search")
+        org.springframework.web.util.UriComponentsBuilder.fromPath(backendPath)
             .queryParam("query", query)
             .queryParam("size", 1000)
             .queryParam("sort", "username,asc")
@@ -112,5 +149,28 @@ public class UserProxyController {
             .toUriString();
     List<Map<String, Object>> memberships = backendApiClient.get(uri, MEMBERSHIP_OPTION_LIST);
     return memberships != null ? memberships : List.of();
+  }
+
+  /**
+   * Resolves a single user by id to their raw JSON (id, username, displayName, effectiveName, …).
+   * Backs the edit-mode seed of the {@code remote-users} combobox where the picker holds only a
+   * stored user id and must display that user's name without preloading the roster — the
+   * notification-rule SPECIFIC_USER selector (#1193). The backend {@code /api/v1/users/{id}}
+   * enforces the real role gate (and peer redaction); this proxy only requires an authenticated
+   * session and returns {@code null} on any failure so the caller can fall back to the raw id. The
+   * {@link UUID} path type rejects a malformed id before any backend call — so it never shadows the
+   * literal {@code /search} / {@code /search-bank} routes.
+   *
+   * @param userId the user to resolve; never {@code null}.
+   * @return the user's raw JSON map, or {@code null} when the lookup fails.
+   */
+  @GetMapping("/{userId}")
+  @PreAuthorize("isAuthenticated()")
+  public Map<String, Object> getUser(@PathVariable UUID userId) {
+    try {
+      return backendApiClient.get("/api/v1/users/" + userId, USER_MAP);
+    } catch (Exception e) {
+      return null;
+    }
   }
 }

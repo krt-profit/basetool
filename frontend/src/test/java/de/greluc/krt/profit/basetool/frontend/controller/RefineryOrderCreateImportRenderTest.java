@@ -20,8 +20,8 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.hamcrest.Matchers.anEmptyMap;
 import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.ImportIssueSeverity;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ImportSuggestionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.RefineryGoodForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.RefineryOrderForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -246,22 +247,23 @@ class RefineryOrderCreateImportRenderTest {
   /**
    * Graceful-degradation guard for the parallelized create-form catalog fan-out (#769): the lookups
    * run concurrently through the real {@link de.greluc.krt.profit.basetool.frontend.service
-   * .ParallelPageLoader}, but each fetch helper swallows its own failure and returns an empty
-   * list/map, so {@code allOf(...).join()} must never propagate an exception. Here the users lookup
-   * throws while the materials lookup (stubbed in {@code setUp}) succeeds; the page must still
-   * render {@code 200} with an empty {@code users} model attribute and the populated {@code
-   * materials} attribute — exactly as the serial version degraded.
+   * .ParallelPageLoader}, but each fetch helper swallows its own failure, so {@code
+   * allOf(...).join()} must never propagate an exception. Post-#1193 the owner picker no longer
+   * preloads the roster — it seeds only the owner's name via a single-user lookup — so this pins
+   * the seed path: with the owner-name resolution failing (the {@code /users/me} id fallback
+   * throws), the page still renders {@code 200} with an empty {@code seedUserNames} map and the
+   * populated {@code materials} attribute, exactly as the serial version degraded.
    */
   @Test
-  void createPage_WhenOneCatalogFetchFails_StillRendersWithEmptyList() throws Exception {
-    when(backendApiClient.get(eq("/api/v1/users?size=1000"), anyTypeRef()))
+  void createPage_WhenOwnerSeedLookupFails_StillRendersWithEmptyMap() throws Exception {
+    when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class)))
         .thenThrow(new RuntimeException("backend down"));
 
     mockMvc
         .perform(get("/refinery-orders/create").with(oidcLogin()))
         .andExpect(status().isOk())
         .andExpect(view().name("refinery-orders-create"))
-        .andExpect(model().attribute("users", empty()))
+        .andExpect(model().attribute("seedUserNames", anEmptyMap()))
         .andExpect(model().attribute("materials", hasSize(2)));
   }
 

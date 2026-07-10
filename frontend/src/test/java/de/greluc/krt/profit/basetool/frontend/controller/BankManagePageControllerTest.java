@@ -103,7 +103,6 @@ class BankManagePageControllerTest {
     when(backendApiClient.get(eq("/api/v1/bank/holders"), anyTypeRef()))
         .thenReturn(List.of(holder));
     when(backendApiClient.get(eq("/api/v1/org-units/active"), anyTypeRef())).thenReturn(List.of());
-    when(backendApiClient.get(eq("/api/v1/users/lookup"), anyTypeRef())).thenReturn(List.of());
 
     // When
     String view =
@@ -158,12 +157,11 @@ class BankManagePageControllerTest {
     assertEquals(List.of(), model.getAttribute("accounts"));
     assertEquals(List.of(), model.getAttribute("holders"));
     assertEquals(List.of(), model.getAttribute("orgUnits"));
-    assertEquals(List.of(), model.getAttribute("users"));
   }
 
   // covers REQ-FE-005 (#579) — an in-place re-render (fragment=manageBody) returns only the tab-nav
-  // + active panel fragment and skips the creation-modal lookups (org-units, users) that live
-  // outside the swapped region.
+  // + active panel fragment and skips the creation-modal lookups (org-units) that live outside the
+  // swapped region.
   @Test
   void manage_fragmentManageBody_rendersOnlyBodyFragment_andSkipsModalLookups() {
     // Given
@@ -186,7 +184,6 @@ class BankManagePageControllerTest {
     assertNotNull(model.getAttribute("holders"));
     // The fragment path must not load the creation-modal lookups.
     verify(backendApiClient, never()).get(eq("/api/v1/org-units/active"), anyTypeRef());
-    verify(backendApiClient, never()).get(eq("/api/v1/users/lookup"), anyTypeRef());
   }
 
   // Regression for the holder self-link bug (#876 follow-up): a plain bank employee never saw the

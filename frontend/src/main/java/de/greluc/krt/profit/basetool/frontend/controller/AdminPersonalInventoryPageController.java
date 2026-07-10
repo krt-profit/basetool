@@ -33,7 +33,6 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -67,10 +66,6 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class AdminPersonalInventoryPageController {
 
   private final BackendApiClient backendApiClient;
-
-  /** Response type for one paginated page of the squadron user list feeding the member picker. */
-  private static final ParameterizedTypeReference<PageResponse<UserDto>> USER_PAGE_TYPE =
-      new ParameterizedTypeReference<>() {};
 
   /** Response type for one paginated page of a target user's personal-inventory items. */
   private static final ParameterizedTypeReference<PageResponse<PersonalInventoryItemDto>>
@@ -108,14 +103,8 @@ public class AdminPersonalInventoryPageController {
     if (!model.containsAttribute("personalInventoryForm")) {
       model.addAttribute("personalInventoryForm", new PersonalInventoryForm());
     }
-    boolean isFragment = "results".equals(fragment);
+    final boolean isFragment = "results".equals(fragment);
 
-    // The member <select> (and the selectedUser it drives) live OUTSIDE the swap target, so an
-    // AJAX results swap neither re-renders the dropdown nor needs the (up to 1000-row) user list.
-    List<UserDto> users = isFragment ? List.of() : fetchUsers();
-    if (!isFragment) {
-      model.addAttribute("users", users);
-    }
     model.addAttribute("selectedUserSub", userSub);
     model.addAttribute("filterQuery", q == null ? "" : q);
     model.addAttribute("adminMode", Boolean.TRUE);
@@ -124,13 +113,12 @@ public class AdminPersonalInventoryPageController {
       PageResponse<PersonalInventoryItemDto> items = fetchItems(userSub, q, page, size, sort);
       model.addAttribute("items", items != null ? items.content() : Collections.emptyList());
       model.addAttribute("page", items);
+      // The member picker is now a server-side searchable combobox (remote-users, #1193): instead
+      // of
+      // preloading the whole roster, seed only the selected member's option (edit-mode label) via a
+      // single lookup. Lives OUTSIDE the AJAX swap target, so a results-fragment swap skips it.
       if (!isFragment) {
-        UserDto selected =
-            users.stream()
-                .filter(u -> u.id() != null && userSub.equals(u.id().toString()))
-                .findFirst()
-                .orElse(null);
-        model.addAttribute("selectedUser", selected);
+        model.addAttribute("selectedUser", fetchUser(userSub));
       }
     } else {
       model.addAttribute("items", Collections.emptyList());
@@ -263,21 +251,24 @@ public class AdminPersonalInventoryPageController {
         + URLEncoder.encode(userSub, StandardCharsets.UTF_8);
   }
 
-  private List<UserDto> fetchUsers() {
+  /**
+   * Resolves a single member for the picker's edit-mode seed (#1193): the picker now searches
+   * server-side rather than preloading the roster, so only the currently-selected member's option
+   * is rendered and needs its display name. Returns {@code null} on any failure (a malformed sub is
+   * rejected by the backend {@code UUID} binding), leaving the picker with just its placeholder.
+   *
+   * @param userSub the selected member's Keycloak {@code sub}; never {@code null}/blank here.
+   * @return the member DTO for the seed option, or {@code null} when the lookup fails.
+   */
+  private UserDto fetchUser(String userSub) {
     try {
-      PageResponse<UserDto> result =
-          backendApiClient.get("/api/v1/users?size=1000", USER_PAGE_TYPE);
-      if (result == null || result.content() == null) {
-        return Collections.emptyList();
-      }
-      List<UserDto> users = new ArrayList<>(result.content());
-      users.sort(
-          Comparator.comparing(
-              u -> u.username() == null ? "" : u.username(), String.CASE_INSENSITIVE_ORDER));
-      return users;
+      return backendApiClient.get(
+          "/api/v1/users/" + URLEncoder.encode(userSub, StandardCharsets.UTF_8), UserDto.class);
     } catch (Exception e) {
-      log.error("Failed to fetch user list for admin personal inventory", e);
-      return Collections.emptyList();
+      // REQ-OBS-004: log the id only, never the resolved name.
+      log.warn(
+          "Failed to fetch selected member {} for admin personal inventory picker", userSub, e);
+      return null;
     }
   }
 

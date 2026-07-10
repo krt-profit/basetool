@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **Verbesserung: Nutzer-Auswahlfelder suchen jetzt serverseitig statt die ganze Mitgliederliste vorzuladen.** Die Auswahlfelder, die bisher alle Mitglieder komplett vorluden (u. a. in Lager, Raffinerie, Aufträgen, Missionen, Rollen-/Leitungsverwaltung und der Kartellbank), durchsuchen die Mitglieder jetzt erst bei der Eingabe über den Server — schneller und skalierbar für tausende Konten. Gäste-Felder und die Halter-Auswahl bleiben unverändert (#1193).
+
 - **Fehler behoben: Weiße Rahmen und helle Überlagerung in der Materialbörse-Liste entfernt.** Die Angebotsliste rendert ihre Einträge als Schaltflächen; ohne zurückgesetzte Browser-Standardoptik zeigten nicht ausgewählte Einträge eine helle Überlagerung und weiße Rahmen. Die Liste folgt jetzt wieder dem KRT-Designsystem (#1184).
 
 ## [v1.2.5](https://github.com/krt-profit/basetool/releases/tag/v1.2.5) - 2026-07-09

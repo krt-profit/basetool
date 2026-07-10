@@ -712,6 +712,23 @@ dynamically (cloned modal/selector rows). Shared default labels live once in `wi
 (`userSelect.search.*`). A new or changed user-selection surface that ships a plain `<select>` or a
 hand-rolled picker is **incomplete**.
 
+**Server-side search mode for the all-users pickers (#1193, ADR-0085/ADR-0086).** At the 5000-account
+target, a picker that preloads the full (or admin-"all-squadrons") roster ships thousands of
+`<option>`s. Every such picker now opts into the component's `remoteSource` mode **declaratively by
+the marker value**: `data-krt-combobox="remote-users"` searches the squadron/admin-scoped
+`/users/search`, and `data-krt-combobox="remote-bank-users"` searches the bank-audience
+`/users/search-bank` (ADR-0086 — same query/scope, role gate widened to bank staff; backs the
+register-holder / grant-Bank-Employee / approval-limit pickers). The enhancer looks the marker up in
+the shared `window.krtComboboxRemoteSources` registry (`krt-user-search.js`), so no per-page JS is
+needed; the roster is fetched on demand (debounced, paginated), not preloaded. **Edit-mode seeding**
+is preserved: a picker with a current value renders exactly one seeded `<option>` for it (its display
+name sourced from the aggregate the page already loads, or a single `/users/{id}` lookup) so the box
+shows the name, not a raw id — the no-JS `<select>` fallback still submits it. Pickers bounded to a
+**small scoped** set (a single mission's `${participants}`) stay in local-filter mode; the carve-outs
+below are unchanged. *(Known remaining preload: the bank deposit/withdrawal **counterparty** picker is
+a plain `<select>` with intertwined enable/disable JS; its conversion is tracked as a #1193
+follow-up.)*
+
 The combobox preserves the original control's `name`, `id` and generic `data-*` (incl. `data-role` /
 `data-trigger`) onto its hidden input, so existing `getElementById` lookups, form submission and
 change-delegation keep working unchanged; code that sets a value **after** enhancement (edit modals)
@@ -741,15 +758,20 @@ separate username/display-name term). Deviation beyond these carve-outs needs pr
   handle.
 
 **Enforced by:** `AdminPersonalBlueprintsPageControllerMvcTest`
-(`view_userPicker_isSearchableComboboxWithUsernameSearchTerm` — the rendered picker carries
-`data-krt-combobox` and each option carries the `username` as a `data-search` term) · the
-converted-picker flows now drive the combobox end-to-end (open → pick → submit) in
-`BankBookingE2eTest`, `BankOrgUnitRequestsE2eTest`, `MissionFinanceEntryE2eTest` and
-`RefineryOrderCreateE2eTest` (via `E2eSupport.selectComboboxByValue` / `selectComboboxFirstOption`) ·
-**Code:** `krt-searchable-select.js`
-(`makeItem` + `data-search` local filter, global `enhanceWithin` on `DOMContentLoaded` + `krt:swapped`,
-`id`/`data-*` passthrough, `setValue` API, `window.krtEnhanceComboboxes`), `fragments/head.html`
-(global load + `window.krtComboboxI18n`), and the converted templates/selects · **ADR:** ADR-0053
+(`view_userPicker_isRemoteSearchCombobox_withoutRosterPreload` — the rendered picker carries the
+`data-krt-combobox="remote-users"` marker and ships **no** preloaded option roster — and
+`view_userPicker_seedsSelectedMemberInEditMode` — a selected member is seeded by name) ·
+`UserAccessControlTest` (`/users/search-bank` allows bank staff, `/users/search` still 403s them) ·
+`UserProxyControllerTest` (the `search-bank` + single-user `/users/{id}` proxies) · the
+converted-picker flows drive the combobox end-to-end (open → pick → submit) in `BankBookingE2eTest`,
+`BankOrgUnitRequestsE2eTest`, `MissionFinanceEntryE2eTest` and `RefineryOrderCreateE2eTest` (via
+`E2eSupport.selectComboboxByValue` / `selectComboboxFirstOption`) · **Code:**
+`krt-searchable-select.js` (`makeItem` + `data-search` local filter, the marker→`remoteSource`
+registry lookup in `autoConfig`, global `enhanceWithin` on `DOMContentLoaded` + `krt:swapped`,
+`id`/`data-*` passthrough, `setValue` API, `window.krtEnhanceComboboxes`), `krt-user-search.js`
+(the `remote-users` / `remote-bank-users` `window.krtComboboxRemoteSources` entries),
+`fragments/head.html` (global load + `window.krtComboboxI18n`), `UserController.searchUsersForBank` /
+`UserProxyController`, and the converted templates/selects · **ADR:** ADR-0053, ADR-0086
 
 ### REQ-FE-012 — A user's own back-to-back writes to one lock scope never self-collide
 

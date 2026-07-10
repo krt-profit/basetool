@@ -95,31 +95,11 @@ class OfficerRefineryAccessTest {
             null,
             false);
     when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(userDto);
-
-    // Mocking user list for dropdown
-    UserDto memberDto =
-        new UserDto(
-            UUID.randomUUID(),
-            "member",
-            "Member",
-            "Member",
-            null,
-            null,
-            null,
-            Set.of("KRT_MEMBER"),
-            Collections.emptySet(),
-            null,
-            false,
-            false,
-            true,
-            null,
-            java.util.List.of(),
-            1L,
-            null,
-            false);
-    PageResponse<UserDto> userPage =
-        new PageResponse<>(List.of(userDto, memberDto), 0, 10, 2L, 1, Collections.emptyList());
-    when(backendApiClient.get(eq("/api/v1/users?size=1000"), anyTypeRef())).thenReturn(userPage);
+    // #1193: the owner picker is a server-side searchable combobox (remote-users). The create form
+    // defaults the owner to the caller and seeds only that one option via a single-user lookup — no
+    // preloaded roster. Stub the seed lookup so the box shows the officer's name.
+    when(backendApiClient.get(eq("/api/v1/users/" + userId), eq(UserDto.class)))
+        .thenReturn(userDto);
 
     // Mock other data
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
@@ -148,7 +128,10 @@ class OfficerRefineryAccessTest {
         .andExpect(status().isOk())
         .andExpect(content().string(not(containsString("disabled=\"disabled\" id=\"ownerId\""))))
         .andExpect(content().string(containsString("id=\"ownerId\"")))
-        .andExpect(content().string(containsString("Member")));
+        // The picker is the enabled server-side searchable combobox (not a preloaded dropdown), and
+        // it seeds the defaulted owner (the officer) so edit mode shows a name, not a raw id.
+        .andExpect(content().string(containsString("data-krt-combobox=\"remote-users\"")))
+        .andExpect(content().string(containsString("Officer")));
   }
 
   @Test

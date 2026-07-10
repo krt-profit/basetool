@@ -1328,9 +1328,9 @@
                                         <span th:text="${mission.owner != null ? mission.owner.effectiveName : '-'}">Besitzer Name</span>
                                     </div>
                                     <div th:if="${mission.canEdit}" class="flex-gap-xs">
-                                        <select id="new-owner-id" class="flex-1" data-krt-combobox>
+                                        <!-- Server-side searchable combobox (remote-users, #1193): roster is searched on demand, not preloaded. -->
+                                        <select id="new-owner-id" class="flex-1" data-krt-combobox="remote-users">
                                             <option value="" th:text="#{mission.owner.select}">-- Neuen Besitzer w&auml;hlen --</option>
-                                            <option th:each="u : ${allUsers}" th:value="${u.id}" th:attr="data-search=${u.username}" th:text="${u.effectiveName}" th:selected="${mission.owner != null and u.id == mission.owner.id}"></option>
                                         </select>
                                         <button type="button" class="btn btn-outline" data-trigger="mission-change-owner"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{general.save}">Speichern</span></button>
                                     </div>
@@ -1376,9 +1376,9 @@
                                 </div>
 
                                 <div th:if="${mission.canEdit}" class="flex-gap-xs">
-                                    <select id="new-manager-id" class="flex-1" data-krt-combobox>
+                                    <!-- Server-side searchable combobox (remote-users, #1193): roster is searched on demand, not preloaded. -->
+                                    <select id="new-manager-id" class="flex-1" data-krt-combobox="remote-users">
                                         <option value="" th:text="#{mission.manager.select}">-- Manager w&auml;hlen --</option>
-                                        <option th:each="u : ${allUsers}" th:value="${u.id}" th:attr="data-search=${u.username}" th:text="${u.effectiveName}"></option>
                                     </select>
                                     <button type="button" class="btn btn-ghost" data-trigger="mission-add-manager"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{general.add}">Hinzuf&uuml;gen</span></button>
                                 </div>

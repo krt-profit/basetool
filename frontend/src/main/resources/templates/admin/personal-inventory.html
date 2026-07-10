@@ -36,13 +36,15 @@
              already required JS for this select, so the no-JS baseline is unchanged. -->
         <form th:action="@{/admin/personal-inventory}" method="get" class="krt-pi-userform no-track">
             <label for="krt-pi-user-select" th:text="#{admin.personalInventory.userSelect.label}">Mitglied</label>
-            <select id="krt-pi-user-select" name="userSub" data-krt-combobox>
+            <!-- Server-side searchable combobox (remote-users, #1193): the roster is no longer
+                 preloaded; only the currently-selected member is seeded so edit mode shows their
+                 name. Typing queries /users/search on demand. -->
+            <select id="krt-pi-user-select" name="userSub" data-krt-combobox="remote-users">
                 <option value="" th:text="#{admin.personalInventory.userSelect.placeholder}">-- bitte waehlen --</option>
-                <option th:each="u : ${users}"
-                        th:value="${u.id}"
-                        th:attr="data-search=${u.username}"
-                        th:selected="${selectedUserSub != null and selectedUserSub == u.id?.toString()}"
-                        th:text="${u.effectiveName != null ? u.effectiveName : u.username}">User</option>
+                <option th:if="${selectedUser != null}"
+                        th:value="${selectedUser.id}"
+                        th:selected="true"
+                        th:text="${selectedUser.effectiveName != null ? selectedUser.effectiveName : selectedUser.username}">User</option>
             </select>
         </form>
 
