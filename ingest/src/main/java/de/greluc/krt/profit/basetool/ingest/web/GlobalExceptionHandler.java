@@ -217,7 +217,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
    */
   @ExceptionHandler(CallNotPermittedException.class)
   public @NotNull ProblemDetail handleBackendCircuitOpen(@NotNull CallNotPermittedException ex) {
-    log.debug("Backend circuit open; rejecting relay");
+    // Reference the exception (class name only — no stack trace at DEBUG for a routine
+    // short-circuit).
+    log.debug("Backend circuit open ({}); rejecting relay", ex.getClass().getSimpleName());
     return backendUnavailable();
   }
 
