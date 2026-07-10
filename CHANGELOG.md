@@ -31,6 +31,8 @@
 
 - **Fehler behoben: Wiederkehrende WARN-Meldung im Frontend-Log entfernt.** Spring Data warnte bei jedem Seitenaufruf, ein `@ModelAttribute`-Parameter des Staffel-Kontexts sei „nicht mit @ProjectedPayload annotiert" — ein Fehlalarm, da es sich um normale Listen und nicht um Projektionen handelt. Die im Frontend ohnehin ungenutzte Spring-Data-Web-Unterstützung wird jetzt nicht mehr geladen, wodurch die Fehlmeldung an der Wurzel entfällt (statt nur den Logger stummzuschalten) (#1202).
 
+- **Fehler behoben: Die RED-Panels im Tracing-Dashboard zeigten „No data" mit Fehlerhinweis.** Die drei Panels (Request-Rate, p95-Latenz, Fehlerrate) liefen als TraceQL-Metrics-Abfragen gegen Tempo, was den nicht aktivierten `local-blocks`-Prozessor voraussetzt. Sie beziehen ihre Werte jetzt — nach Route gruppiert — aus den vorhandenen `http_server_requests`-Histogrammen (Prometheus), denselben Serien wie die Latenz-/5xx-Alarme. Kein zusätzlicher Speicher-, Tempo-Neustart- oder Reihen-Aufwand; die Trace-Tabellen „Slow traces"/„Error traces" bleiben unverändert an Tempo (ADR-0076).
+
 ## [v1.2.6](https://github.com/krt-profit/basetool/releases/tag/v1.2.6) - 2026-07-09
 
 ### Added
