@@ -77,7 +77,7 @@ non-admins see the union of their memberships unless they pin one.
   Responsible = SK → public to all squadrons (shared SK queue); responsible = Squadron →
   private to that squadron + admins. `findScopedJobOrders` adds the SK-public escape
   `TYPE(responsibleOrgUnit) = SpecialCommand`. SK-order *edits* are governed by the role gate
-  (LOGISTICIAN+), not by squadron scope. **Requesting-owner escape (REQ-ORDERS-023, ADR-0090):** a
+  (LOGISTICIAN+), not by squadron scope. **Requesting-owner escape (REQ-ORDERS-023, ADR-0091):** a
   direct member of the `requesting_org_unit` may additionally view (redacted — no Bearbeiter, no
   materials summary) and, while the order is still fully undelivered, limitedly edit their own placed
   order via dedicated non-LOGISTICIAN endpoints (`GET /orders/requested`, `PUT /orders/{id}/requested`,

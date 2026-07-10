@@ -346,7 +346,7 @@ reassign) and set/withdraw **material claims** — the profit gate
 also applies to the role-only claim endpoints. Anyone who is exclusively in
 non-profit-eligible units cannot browse the order queue, but **can now view and
 edit their own placed orders within limits** — the requesting-owner escape
-(REQ-ORDERS-023, ADR-0090): they see the orders their own org unit requested under
+(REQ-ORDERS-023, ADR-0091): they see the orders their own org unit requested under
 „Meine Aufträge", and may edit them (change quantities, add/remove not-yet-delivered
 items/materials, adjust min-quality, edit the comment) while the order is still fully
 undelivered, with the Bearbeiter section and the materials summary redacted. Admins

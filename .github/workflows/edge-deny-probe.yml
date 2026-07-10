@@ -42,7 +42,9 @@ jobs:
           fail=0
           for url in \
             https://profit-base.online/actuator/prometheus \
-            https://ingest.profit-base.online/actuator/prometheus
+            https://profit-base.online/actuator/health \
+            https://ingest.profit-base.online/actuator/prometheus \
+            https://ingest.profit-base.online/actuator/health
           do
             code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 --retry 2 --retry-delay 10 \
               "$url" || true)

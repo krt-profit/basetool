@@ -733,6 +733,27 @@ services:
     <<: *frontend-template
     profiles: ["prod"]
     container_name: frontend
+    # ADR-0090: in prod Actuator is served on the internal-only management port 18091 (see
+    # application-prod.yml), so override the image's default HEALTHCHECK (which probes 18081) to hit
+    # the readiness probe on the management port over localhost. Params mirror the Dockerfile. Only
+    # the prod service carries this override; frontend-dev keeps the image default (no management
+    # port in the dev profile).
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "-q",
+          "--no-check-certificate",
+          "-O",
+          "/dev/null",
+          "https://localhost:18091/actuator/health/readiness",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 90s
+      start_interval: 5s
+      retries: 3
     depends_on:
       backend:
         condition: service_healthy
@@ -778,6 +799,27 @@ services:
     <<: *ingest-template
     profiles: ["prod"]
     container_name: ingest
+    # ADR-0090: in prod Actuator is served on the internal-only management port 11272 (see
+    # application-prod.yml), so override the image's default HEALTHCHECK (which probes 11262) to hit
+    # the readiness probe on the management port over localhost. Params mirror the Dockerfile. Only
+    # the prod service carries this override; ingest-dev keeps the image default (no management port
+    # in the dev profile).
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "-q",
+          "--no-check-certificate",
+          "-O",
+          "/dev/null",
+          "https://localhost:11272/actuator/health/readiness",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      start_interval: 5s
+      retries: 3
     depends_on:
       backend:
         condition: service_healthy

@@ -53,6 +53,29 @@ spring.thymeleaf.cache: true
 server:
   shutdown: graceful
 
+# ADR-0090: serve Actuator (/actuator/health for the Docker HEALTHCHECK, /actuator/prometheus for the
+# scrape) on a DEDICATED internal-only management port instead of the public 18081 connector. NPM
+# fronts only 18081, and this port is never host-published nor on any net-proxy-* network, so
+# /actuator/** is unreachable from the internet by construction — the public connector answers 404
+# for it (belt to the REQ-OBS-012 NPM edge-deny braces). Prometheus reaches it over
+# net-monitoring-scrape; the Docker HEALTHCHECK reaches it over localhost (compose overrides the
+# image's default healthcheck to this port). HTTPS with the SAME bind-mounted keystore.p12 as the
+# 18081 connector (cert SAN carries dns:frontend) so the scrape stays HTTPS + pinned-CA (REQ-OBS-008).
+# Boot serves this from a separate management context whose security auto-config backs off given the
+# custom SecurityConfig chains, so the endpoint is UNAUTHENTICATED here — acceptable because it is
+# internal-only, mirroring Keycloak's port 9000 (REQ-SEC-014); ADR-0072's basic-auth is superseded by
+# this port isolation (REQ-OBS-005 amended). Prod-only: dev/test/e2e set no management port and keep
+# Actuator on 18081 with MonitoringScrapeSecurityConfig's fail-closed guard.
+management:
+  server:
+    port: 18091
+    ssl:
+      enabled: true
+      key-store: ${SERVER_SSL_KEY_STORE:classpath:keystore.p12}
+      key-store-password: ${SERVER_SSL_KEY_STORE_PASSWORD}
+      key-store-type: PKCS12
+      key-alias: basetool
+
 app:
   backend-url: ${BACKEND_URL:https://backend:11261}
   logging:
