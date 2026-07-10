@@ -95,7 +95,8 @@ class JobOrderPageControllerItemEditMvcTest {
         List.of(),
         itemHandovers,
         Instant.now(),
-        1L);
+        1L,
+        false);
   }
 
   @Test
@@ -217,7 +218,8 @@ class JobOrderPageControllerItemEditMvcTest {
             List.of(),
             List.of(),
             Instant.now(),
-            1L);
+            1L,
+            false);
     doReturn(order).when(backendApiClient).get(eq("/api/v1/orders/" + id), eq(JobOrderDto.class));
 
     // The saved item's name must reach the page (inlined into window.EDIT_ITEMS) so the now

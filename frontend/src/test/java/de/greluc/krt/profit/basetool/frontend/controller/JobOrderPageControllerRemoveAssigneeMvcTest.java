@@ -97,7 +97,8 @@ class JobOrderPageControllerRemoveAssigneeMvcTest {
         List.of(),
         List.of(),
         Instant.now(),
-        1L);
+        1L,
+        false);
   }
 
   @Test

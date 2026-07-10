@@ -136,7 +136,8 @@ class JobOrderControllerTest {
         List.of(),
         List.of(),
         Instant.parse("2026-01-01T00:00:00Z"),
-        1L);
+        1L,
+        false);
   }
 
   // ── POST /api/v1/orders (permitAll) ──────────────────────────────────
@@ -274,25 +275,27 @@ class JobOrderControllerTest {
   // ── GET /api/v1/orders/{id} ──────────────────────────────────────────
 
   @Test
-  void getJobOrderById_returnsServiceResultUnchanged() {
+  void getJobOrderById_fullViewerDtoPassesThroughUnredacted() {
     UUID id = UUID.randomUUID();
-    JobOrderDto dto = jobOrderDto(id);
+    // The service stamps the per-order redaction decision; a full viewer's DTO carries
+    // redacted=false, so the controller returns it verbatim without re-evaluating any gate.
+    JobOrderDto dto = jobOrderDto(id); // redacted=false
     when(jobOrderService.getJobOrderById(id)).thenReturn(dto);
-    // A full viewer (canSeeJobOrder=true) gets the DTO unredacted, straight from the service.
-    when(ownerScopeService.canSeeJobOrder(id)).thenReturn(true);
 
     JobOrderDto result = controller.getJobOrderById(id);
 
     assertThat(result).isSameAs(dto);
+    verify(ownerScopeService, never()).canSeeJobOrder(any(UUID.class));
   }
 
   @Test
   void getJobOrderById_requesterOnlyViewer_redactsProgressAssigneesAndAggregates() {
-    // REQ-ORDERS-023: a caller who is NOT a full viewer (canSeeJobOrder=false) but reached the
-    // endpoint via the requesting-org-unit escape gets the redacted view — Bearbeiter, aggregated
-    // materials and handovers/item-handovers emptied, each material line's collection progress
-    // (currentStock/claims/openAmount) stripped — while the ordered facts (line id/min-quality/
-    // amount/version, items, handle, comment, version) survive in position (field-order guard).
+    // REQ-ORDERS-023: the service stamps redacted=true on a requester-only viewer's DTO, so the
+    // controller redacts — Bearbeiter, aggregated materials and handovers/item-handovers emptied,
+    // each material line's collection progress (currentStock/claims/openAmount) stripped — while
+    // the
+    // ordered facts (line id/min-quality/amount/version, items, handle, comment, version) and the
+    // redacted flag survive in position (field-order guard).
     UUID id = UUID.randomUUID();
     UUID matLineId = UUID.randomUUID();
     de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto matLine =
@@ -317,9 +320,9 @@ class JobOrderControllerTest {
             java.util.Collections.singletonList(null), // handovers — redacted
             java.util.Collections.singletonList(null), // itemHandovers — redacted
             Instant.parse("2026-01-01T00:00:00Z"),
-            9L);
+            9L,
+            true); // the service already decided this is a requester-only (redacted) view
     when(jobOrderService.getJobOrderById(id)).thenReturn(full);
-    when(ownerScopeService.canSeeJobOrder(id)).thenReturn(false);
 
     JobOrderDto result = controller.getJobOrderById(id);
 
@@ -347,6 +350,10 @@ class JobOrderControllerTest {
     assertThat(result.handle()).isEqualTo("alice");
     assertThat(result.comment()).isEqualTo("deliver to ArcCorp");
     assertThat(result.version()).isEqualTo(9L);
+    // The redacted flag is carried through so the client renders the limited template (finding 2).
+    assertThat(result.redacted()).isTrue();
+    // The controller keys off the DTO's flag; it does NOT re-evaluate the gate (finding 4).
+    verify(ownerScopeService, never()).canSeeJobOrder(any(UUID.class));
   }
 
   @Test

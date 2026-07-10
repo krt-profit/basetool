@@ -464,7 +464,10 @@ public class JobOrderController {
         java.util.Collections.emptyList(),
         java.util.Collections.emptyList(),
         dto.createdAt(),
-        null);
+        null,
+        // Not the requesting-owner redacted view (this is the anonymous create acknowledgement, a
+        // separate redaction); the `redacted` flag drives the requester detail page only.
+        false);
   }
 
   /**
@@ -506,7 +509,10 @@ public class JobOrderController {
         java.util.Collections.emptyList(),
         java.util.Collections.emptyList(),
         dto.createdAt(),
-        dto.version());
+        dto.version(),
+        // This IS the requesting-owner redacted view — carry the flag so the client renders the
+        // limited template regardless of its global capabilities (review finding 2).
+        true);
   }
 
   /**
@@ -652,15 +658,12 @@ public class JobOrderController {
   @Transactional(readOnly = true)
   public JobOrderDto getJobOrderById(@PathVariable UUID id) {
     JobOrderDto dto = jobOrderService.getJobOrderById(id);
-    // A caller who can see the order fully (responsible-side member / admin) gets the complete
-    // view;
-    // a requester-only viewer (reached via the requesting-org-unit escape, REQ-ORDERS-023) gets a
-    // redacted view without the Bearbeiter section, the materials summary or the collection
-    // progress.
-    if (!ownerScopeService.canSeeJobOrder(id)) {
-      dto = cleanupJobOrderForRequester(dto);
-    }
-    return dto;
+    // The service already stamped the per-order redaction decision (computed from the loaded
+    // entity,
+    // so no second canSeeJobOrder load here — review finding 4). A requester-only viewer's DTO
+    // carries redacted=true; strip the processing-side surfaces (Bearbeiter section, materials
+    // summary, collection progress) at this HTTP boundary. A full viewer keeps the complete view.
+    return dto.redacted() ? cleanupJobOrderForRequester(dto) : dto;
   }
 
   /**

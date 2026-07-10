@@ -56,6 +56,12 @@ import java.util.UUID;
  * @param itemHandovers item-handover events (populated for {@code ITEM} orders)
  * @param createdAt creation instant (UTC)
  * @param version optimistic-lock version
+ * @param redacted whether this DTO is the requesting-owner redacted view (REQ-ORDERS-023): {@code
+ *     true} when the caller reached the order via the requesting-org-unit escape rather than as a
+ *     full (responsible-side / admin) viewer, so the processing-side surfaces
+ *     (Bearbeiter/aggregated/handovers, per-line collection progress) have been stripped. Lets a
+ *     client key its rendering off THIS order's per-order signal instead of a global capability.
+ *     {@code false} for the full view.
  */
 public record JobOrderDto(
     UUID id,
@@ -75,4 +81,38 @@ public record JobOrderDto(
     List<JobOrderHandoverDto> handovers,
     List<JobOrderItemHandoverDto> itemHandovers,
     Instant createdAt,
-    Long version) {}
+    Long version,
+    boolean redacted) {
+
+  /**
+   * Returns a copy of this DTO with the {@link #redacted()} flag overridden and every other
+   * component unchanged. Used by the read path to stamp the per-order redaction decision onto an
+   * otherwise-complete projection without re-listing all eighteen preceding fields at the call
+   * site.
+   *
+   * @param value the new {@code redacted} flag
+   * @return a copy differing only in {@code redacted}
+   */
+  public JobOrderDto withRedacted(boolean value) {
+    return new JobOrderDto(
+        id,
+        displayId,
+        responsibleOrgUnit,
+        requestingOrgUnit,
+        handle,
+        comment,
+        priority,
+        status,
+        type,
+        countBlueprintsWithVariants,
+        materials,
+        items,
+        aggregatedMaterials,
+        assignees,
+        handovers,
+        itemHandovers,
+        createdAt,
+        version,
+        value);
+  }
+}

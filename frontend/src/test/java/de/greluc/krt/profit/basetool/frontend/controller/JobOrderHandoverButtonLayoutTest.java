@@ -124,7 +124,8 @@ class JobOrderHandoverButtonLayoutTest {
             List.of(),
             List.of(),
             Instant.now(),
-            1L);
+            1L,
+            false);
 
     when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
         .thenReturn(order);

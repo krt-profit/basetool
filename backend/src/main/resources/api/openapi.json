@@ -52163,6 +52163,9 @@
           "version" : {
             "type" : "integer",
             "format" : "int64"
+          },
+          "redacted" : {
+            "type" : "boolean"
           }
         }
       },

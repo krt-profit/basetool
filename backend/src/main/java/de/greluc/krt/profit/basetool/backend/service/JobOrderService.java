@@ -414,7 +414,15 @@ public class JobOrderService {
         jobOrderRepository
             .findById(id)
             .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
-    return jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
+    JobOrderDto dto = jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
+    // Stamp the per-order redaction decision here, computed from the ALREADY-LOADED entity via the
+    // managed-entity gate overload — so the controller no longer re-evaluates canSeeJobOrder(id)
+    // (review finding 4) and the flag lets the frontend key its detail rendering off THIS order
+    // rather than a global capability (review finding 2, REQ-ORDERS-023). The actual field
+    // stripping
+    // still happens at the HTTP boundary (JobOrderController#cleanupJobOrderForRequester) when the
+    // flag is set; a full viewer keeps the complete view.
+    return ownerScopeService.canSeeJobOrder(jobOrder) ? dto : dto.withRedacted(true);
   }
 
   /**

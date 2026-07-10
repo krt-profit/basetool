@@ -131,7 +131,8 @@ class JobOrderServicePriorityAndStatusTest {
                   List.of(),
                   List.of(),
                   null,
-                  o.getVersion());
+                  o.getVersion(),
+                  false);
             });
 
     // Multi-tenant: createJobOrder + updateJobOrder resolve the caller's squadron through

@@ -399,6 +399,9 @@ public class JobOrderPageController {
     // (REQ-ORDERS-023) or 403 for a foreign order (caught below). requesterView renders the limited
     // template (no Bearbeiter, no materials summary; comment + not-yet-delivered material edit
     // only).
+    // Provisional, capability-based value: enough to gate the redirect below and to render the
+    // error path if the order fetch fails. Once the order is loaded it is overridden with the
+    // backend's authoritative PER-ORDER redaction signal (review finding 2).
     boolean requesterView = !canViewJobOrders && canViewOwnJobOrders;
     if (!canViewJobOrders && !canViewOwnJobOrders) {
       // Neither capability: route to the create form (only order surface open to them).
@@ -407,6 +410,14 @@ public class JobOrderPageController {
     model.addAttribute("requesterView", requesterView);
     try {
       JobOrderDto order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
+      // Finding 2: key the detail rendering off the backend's per-order redaction flag, not the
+      // global capability. A profit-eligible member who is ALSO the requester of a
+      // foreign-processed
+      // order (canViewJobOrders=true, so the capability value above was false) still receives the
+      // redacted data from the backend — this makes the limited template match it, instead of
+      // rendering the full chrome over zeroed/absent values.
+      requesterView = order.redacted();
+      model.addAttribute("requesterView", requesterView);
       model.addAttribute("order", order);
       model.addAttribute("currentUserId", getCurrentUserId(principal));
       model.addAttribute("itemsWithoutMaterials", itemsWithoutDerivedMaterials(order));

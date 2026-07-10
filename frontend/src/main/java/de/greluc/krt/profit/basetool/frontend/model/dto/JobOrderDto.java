@@ -28,6 +28,11 @@ import java.util.UUID;
  * orders populate {@code materials} + {@code handovers}; {@code ITEM} orders populate {@code
  * items}, {@code aggregatedMaterials} and {@code itemHandovers}. The unused lists are empty for the
  * respective kind, so the detail UI renders both through one shape.
+ *
+ * <p>{@code redacted} mirrors the backend's per-order requesting-owner redaction signal
+ * (REQ-ORDERS-023): {@code true} when the caller reached the order via the requesting-org-unit
+ * escape rather than as a full viewer, so the detail page keys its limited rendering off THIS order
+ * rather than the caller's global capability.
  */
 public record JobOrderDto(
     UUID id,
@@ -47,4 +52,5 @@ public record JobOrderDto(
     List<JobOrderHandoverDto> handovers,
     List<JobOrderItemHandoverDto> itemHandovers,
     Instant createdAt,
-    Long version) {}
+    Long version,
+    boolean redacted) {}

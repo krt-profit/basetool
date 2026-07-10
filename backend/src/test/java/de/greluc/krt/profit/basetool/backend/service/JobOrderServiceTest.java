@@ -214,7 +214,8 @@ class JobOrderServiceTest {
             List.of(),
             List.of(),
             Instant.now(),
-            1L);
+            1L,
+            false);
   }
 
   @Test
@@ -1620,7 +1621,8 @@ class JobOrderServiceTest {
               List.of(),
               List.of(),
               Instant.now(),
-              1L);
+              1L,
+              false);
       when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(itemBase);
       when(jobOrderItemService.toItemDtos(any())).thenReturn(List.of());
       when(jobOrderItemService.aggregateMaterials(any()))
@@ -1693,7 +1695,8 @@ class JobOrderServiceTest {
                     List.of(),
                     List.of(),
                     Instant.now(),
-                    o.getVersion());
+                    o.getVersion(),
+                    false);
               });
     }
 

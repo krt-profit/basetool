@@ -141,7 +141,8 @@ class JobOrderServiceAssigneeAndListTest {
                   List.of(),
                   List.of(),
                   null,
-                  o.getVersion());
+                  o.getVersion(),
+                  false);
             });
     // The paged list path batches stock once per page via findMaterialStockRowsByJobOrderIds
     // (REQ-DATA-003); default to an empty index so the routing tests need not model stock.
@@ -700,7 +701,8 @@ class JobOrderServiceAssigneeAndListTest {
         List.of(),
         List.of(),
         null,
-        order.getVersion());
+        order.getVersion(),
+        false);
   }
 
   private User newUser(UUID id) {
