@@ -947,6 +947,34 @@ public final class BackendSeeder {
   }
 
   /**
+   * Raises a confirm-before-post {@code DEPOSIT} booking request against the given account via
+   * {@code POST /api/v1/org-units/bank/requests} and returns the created request's id. The request
+   * is recorded {@code PENDING} and moves no money; a deposit may target any active account and is
+   * never approval-limited (REQ-BANK-042), so any authenticated caller may raise it. Used by the
+   * live-sync e2e to seed a pending request a staff decision then broadcasts to peer viewers.
+   *
+   * @param username the requester's Keycloak username
+   * @param password the password
+   * @param accountId the source (credited) account
+   * @param amount the whole-aUEC amount ({@code >= 1})
+   * @return the created pending request's id
+   */
+  public String raiseBankDepositRequest(
+      String username, String password, String accountId, long amount) {
+    String body =
+        "{\"sourceAccountId\":\""
+            + accountId
+            + "\",\"type\":\"DEPOSIT\",\"amount\":"
+            + amount
+            + ",\"note\":\"e2e live-sync\"}";
+    return JsonParser.parseString(
+            postBody(username, password, "/api/v1/org-units/bank/requests", body))
+        .getAsJsonObject()
+        .get("id")
+        .getAsString();
+  }
+
+  /**
    * Books a deposit via {@code POST /api/v1/bank/deposits}.
    *
    * @param username the booking user's Keycloak username

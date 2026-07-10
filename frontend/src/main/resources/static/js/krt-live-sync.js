@@ -211,6 +211,17 @@
                     publishBuffer.push({ topic: topic, sections: secs });
                 }
             },
+            // Test-support only: the canonical topics this tab has an acknowledged (`subscribed`)
+            // subscription for. The two-context live-sync e2e tests poll this to wait deterministically
+            // until the passive viewer is registered with the relay before the acting viewer mutates —
+            // the /ws/sync analogue of the mission adapter's `missionPresence.socket.readyState === 1`
+            // (a subscribe, unlike a mission legacy socket, is only registered once its async server
+            // authorization has acked). Not used by application code.
+            subscribedTopics: function () {
+                return Object.keys(topics).filter(function (t) {
+                    return topics[t].state === 'subscribed';
+                });
+            },
         };
     })();
 
@@ -400,5 +411,6 @@
         createReceiver: createReceiver,
         subscribe: syncSocket.subscribe,
         sendChanged: syncSocket.sendChanged,
+        subscribedTopics: syncSocket.subscribedTopics,
     };
 })();
