@@ -52,10 +52,10 @@ public record RefineryOrderDto(
     Double profit,
     RefiningMethodDto refiningMethod,
     String status,
-    // @Valid cascades the @NotNull/@Min(1) constraints on each RefineryGoodDto into the list
-    // elements (audit M-4 sweep): without it a good with inputQuantity <= 0 or a null material
-    // would bypass bean validation and reach the service.
-    @NotEmpty @Valid List<RefineryGoodDto> goods,
+    // @Valid on the element type cascades the @NotNull/@Min(1) constraints on each RefineryGoodDto
+    // into the list elements (audit M-4 sweep): without it a good with inputQuantity <= 0 or a null
+    // material would bypass bean validation and reach the service.
+    @NotEmpty List<@Valid RefineryGoodDto> goods,
     SquadronReferenceDto owningSquadron,
     Long version,
     UUID owningOrgUnitId) {}

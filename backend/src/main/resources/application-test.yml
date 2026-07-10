@@ -33,7 +33,6 @@ spring:
       maximum-pool-size: 5
       minimum-idle: 0
   jpa:
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
     open-in-view: false
     properties:
       hibernate:
