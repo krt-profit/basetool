@@ -207,7 +207,7 @@ class NotificationRuleServiceTest {
 
     IllegalArgumentException ex =
         assertThrows(IllegalArgumentException.class, () -> notificationRuleService.create(request));
-    assertThat(ex.getMessage()).contains(expectedMessage);
+    assertThat(ex.getMessage()).as(label).contains(expectedMessage);
     verify(notificationRuleRepository, never()).saveAndFlush(any());
   }
 
