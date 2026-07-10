@@ -57,7 +57,7 @@ class UserProxyControllerTest {
         .get(eq("/api/v1/users/search?query=query&size=1000&sort=username,asc"), anyTypeRef());
   }
 
-  // #1193: the bank-audience twin forwards to the widened backend search endpoint (ADR-0087) with
+  // #1193: the bank-audience twin forwards to the widened backend search endpoint (ADR-0089) with
   // the same paging/sort contract as the regular search.
   @Test
   void searchUsersForBank_ShouldCallBankSearchEndpoint() {

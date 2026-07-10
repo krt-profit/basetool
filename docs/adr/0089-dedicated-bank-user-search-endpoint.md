@@ -1,4 +1,4 @@
-# ADR-0087 — Dedicated bank-audience user-search endpoint for the remoteSource picker switch
+# ADR-0089 — Dedicated bank-audience user-search endpoint for the remoteSource picker switch
 
 - **Status:** Accepted
 - **Date:** 2026-07-10

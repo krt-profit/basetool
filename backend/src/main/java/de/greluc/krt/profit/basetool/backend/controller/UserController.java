@@ -188,7 +188,7 @@ public class UserController {
   /**
    * Bank-audience twin of {@link #searchUsers}: the paged username/displayName substring search
    * behind the bank pickers that resolve grantees / holders across the whole user base (register a
-   * holder, grant the Bank-Employee role, set an approval limit — ADR-0087, the {@code
+   * holder, grant the Bank-Employee role, set an approval limit — ADR-0089, the {@code
    * remoteSource} scaling switch of #1193 / ADR-0053). Query, scope and projection are identical to
    * {@link #searchUsers} — {@link UserService#searchByUsername(String, Pageable)} already resolves
    * the same {@code currentUserListScopeSquadronIds} scope, which for an org-role-less bank manager
