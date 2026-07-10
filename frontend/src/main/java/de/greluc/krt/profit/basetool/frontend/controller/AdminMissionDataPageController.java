@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -128,7 +129,7 @@ public class AdminMissionDataPageController {
             .loadAsync(() -> fetchJobTypes(includeInactiveJobTypes))
             .exceptionally(
                 e -> {
-                  log.error("Error loading job types", e);
+                  logFragmentLoadFailure("job types", e);
                   anyFailure.set(true);
                   return null;
                 });
@@ -138,7 +139,7 @@ public class AdminMissionDataPageController {
             .loadAsync(() -> fetchSquadrons(includeInactiveSquadrons))
             .exceptionally(
                 e -> {
-                  log.error("Error loading squadrons", e);
+                  logFragmentLoadFailure("squadrons", e);
                   anyFailure.set(true);
                   return null;
                 });
@@ -148,7 +149,7 @@ public class AdminMissionDataPageController {
             .loadAsync(() -> fetchFrequencyTypes(includeInactiveFrequencyTypes))
             .exceptionally(
                 e -> {
-                  log.error("Error loading frequency types", e);
+                  logFragmentLoadFailure("frequency types", e);
                   anyFailure.set(true);
                   return null;
                 });
@@ -170,6 +171,26 @@ public class AdminMissionDataPageController {
       case "freqtypes-results" -> "admin/mission-data :: freqtypes-results";
       default -> "admin/mission-data";
     };
+  }
+
+  /**
+   * Logs a parallel fragment-load failure at the level REQ-OBS-001 mandates. A {@link
+   * BackendServiceException} (wrapped in a {@link CompletionException} by {@link
+   * CompletableFuture#exceptionally}) was already logged once at the {@code BackendApiClient}
+   * boundary, so it stays at DEBUG here — a routine backend blip while this admin page loads must
+   * not re-inflate {@code logback_events_total{level="error"}} and trip {@code LogbackErrorSpike}.
+   * A genuinely unexpected failure is still logged at ERROR.
+   *
+   * @param what short label of the fragment that failed to load (e.g. {@code "job types"})
+   * @param e the throwable handed to {@link CompletableFuture#exceptionally}
+   */
+  private static void logFragmentLoadFailure(String what, Throwable e) {
+    Throwable cause = (e instanceof CompletionException && e.getCause() != null) ? e.getCause() : e;
+    if (cause instanceof BackendServiceException) {
+      log.debug("Error loading {}", what, cause);
+    } else {
+      log.error("Error loading {}", what, e);
+    }
   }
 
   /**

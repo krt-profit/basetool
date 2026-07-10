@@ -19,9 +19,11 @@
 
 package de.greluc.krt.profit.basetool.frontend.config;
 
+import de.greluc.krt.profit.basetool.frontend.exception.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RegistrationStatusDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -136,8 +138,14 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
       RegistrationStatusDto dto =
           backendApiClient.get("/api/v1/users/me/registration-status", RegistrationStatusDto.class);
       return dto == null ? null : dto.approvalStatus();
+    } catch (BackendServiceException e) {
+      // Boundary already logged it; this probe re-runs on every request until it succeeds, so keep
+      // the expected backend-unavailable case at DEBUG to avoid per-request WARN spam
+      // (REQ-OBS-001).
+      log.debug("Could not read approval status; treating as non-pending for this request.", e);
+      return null;
     } catch (Exception e) {
-      log.warn("Could not read approval status; treating as non-pending for this request.");
+      log.warn("Could not read approval status; treating as non-pending for this request.", e);
       return null;
     }
   }
@@ -320,6 +328,18 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
       }
 
       return true;
+    } catch (BackendServiceException | ReauthenticationRequiredException e) {
+      // REQ-OBS-001: the BackendApiClient boundary already logged this once (5xx=ERROR, 4xx=WARN,
+      // circuit-open=DEBUG). syncRoles re-runs on EVERY request until it succeeds
+      // (SYNC_COMPLETE_FLAG
+      // is only set on success), so re-logging a relayed backend failure at ERROR here turns one
+      // backend outage into a per-request ERROR storm and undoes the #1203 circuit-open-at-DEBUG
+      // design. Defer quietly; the principal gains ROLE_* on the next good request.
+      log.debug(
+          "Backend role sync deferred (backend unavailable) for user: {}",
+          maskPrincipal(token.getName()),
+          e);
+      return false;
     } catch (Exception e) {
       log.error("Failed to sync backend roles for user: {}", maskPrincipal(token.getName()), e);
       return false;

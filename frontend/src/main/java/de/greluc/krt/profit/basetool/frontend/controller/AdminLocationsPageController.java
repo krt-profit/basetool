@@ -92,6 +92,9 @@ public class AdminLocationsPageController {
       }
       model.addAttribute("locations", locations);
 
+    } catch (BackendServiceException e) {
+      log.debug("Error loading locations data", e);
+      model.addAttribute("error", "error.admin.locations.load");
     } catch (Exception e) {
       log.error("Error loading locations data", e);
       model.addAttribute("error", "error.admin.locations.load");

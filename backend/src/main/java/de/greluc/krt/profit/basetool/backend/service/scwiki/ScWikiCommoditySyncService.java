@@ -186,7 +186,7 @@ public class ScWikiCommoditySyncService {
         }
         materialRepository.save(material);
       } catch (Exception e) {
-        log.error("Failed to process SC Wiki commodity dto: {}", dto, e);
+        log.error("Failed to process SC Wiki commodity dto: {}", dto.uuid(), e);
       }
     }
 

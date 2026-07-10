@@ -134,6 +134,9 @@ public class AdminUexPageController {
       model.addAttribute("totalOutposts", outposts.size());
       model.addAttribute("totalPois", pois.size());
       model.addAttribute("totalTerminals", terminals.size());
+    } catch (BackendServiceException e) {
+      log.debug("Error loading UEX admin data", e);
+      model.addAttribute("error", "error.admin.uex.load");
     } catch (Exception e) {
       log.error("Error loading UEX admin data", e);
       model.addAttribute("error", "error.admin.uex.load");

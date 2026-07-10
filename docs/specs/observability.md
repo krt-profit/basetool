@@ -15,10 +15,12 @@ guarantees; REQ-OBS-005 onward record its binding rules.
 
 ### REQ-OBS-001 — Access log + MDC enrichment
 
-Both modules emit one access-log line per request and enrich every log line with MDC fields
-`correlationId`, `userId`, and `orgUnitId` (the last per
+The backend and frontend emit one access-log line per request and enrich every log line with MDC
+fields `correlationId`, `userId`, and `orgUnitId` (the last per
 [`org-unit-tenancy.md`](org-unit-tenancy.md) REQ-ORG-007). Logback patterns must include
-`%X{orgUnitId}` to keep audit trails intact.
+`%X{orgUnitId}` to keep audit trails intact. The ingest gateway emits the same
+one-line-per-request access log (`RequestLoggingFilter`, scoped to `/v1`) but carries only the
+`correlationId` MDC field — it owns no per-user data (REQ-OBS-003).
 
 A relayed backend failure is logged **exactly once, at the level its status warrants.** The
 frontend's `BackendApiClient` boundary logs every backend error once — a 5xx server fault at
@@ -375,6 +377,16 @@ transaction per pass) rather than per-scrape.
   job still records a success, this is the only signal of a sustained catalogue outage; it backs the
   `ExternalFetchErrors` alert. The backend `WebClient.Builder` is wired to the `ObservationRegistry`
   (REQ-OBS-009) so these same calls also emit `http_client_requests_seconds` + client spans.
+- `basetool_keycloak_sync_fetch_failures_total` counter (untagged, `KeycloakService.fetchUsers`) and
+  `basetool_scheduled_job_step_failures_total{task,step}` counter (`ScWikiScheduler.runStep`; `step`
+  = the bounded `commodity`/`vehicle`/`item`/`blueprint`/`manufacturer` literal) both cover a
+  swallowed failure the scheduled-job *outcome* signal cannot see. The Keycloak roster fetch is
+  swallowed to an empty list, so the user sync records `success`/0-items and a Keycloak Admin-API
+  outage is indistinguishable from a legitimately empty roster (access-control-relevant — a stalled
+  sync leaves departed users with their local roles); a single SC-Wiki sync step throws but the
+  other steps still run, so `scwiki_sync` records `success` with a non-zero item tally and a
+  reliably-failing step is invisible to `UserSyncStale` / `SyncZeroItems` / `ExternalSyncStale`. They
+  back `KeycloakSyncFetchFailing` and `ScWikiStepFailing` (logging audit).
 - Frontend→backend seam (#1041 item 11): the frontend enables the `http.client.requests`
   percentile-histogram (same bounded 5ms..10s window as `http.server.requests`, so both stay on the
   same ~14 buckets) to drive a client-p95-vs-server-p95 overlay that separates "backend slow" from
@@ -408,12 +420,15 @@ transaction per pass) rather than per-scrape.
   per-app CPU.
 - `basetool_http_error_total{code}` counter at the `GlobalExceptionHandler` 409/401/403 methods
   (`OPTIMISTIC_LOCK` = optimistic-locking regression indicator, `PESSIMISTIC_LOCK`,
-  `UNAUTHENTICATED`, `ACCESS_DENIED`) plus `SERVICE_UNAVAILABLE`, incremented directly by
-  `IdentityProviderUnavailableFilter` when an unreachable Keycloak JWKS is re-mapped to a retryable
-  503 (REQ-SEC-024) — a filter-level site that bypasses the advice, so "one non-double-counted
-  increment site" holds per code, not per handler. The ingest gateway emits the same metric name
-  with the `SERVICE_UNAVAILABLE` code from its own filter; the `application` common tag
-  distinguishes the module.
+  `UNAUTHENTICATED`, `ACCESS_DENIED`) plus two filter-level codes that bypass the advice and are
+  incremented directly at their servlet-filter reject site: `SERVICE_UNAVAILABLE`
+  (`IdentityProviderUnavailableFilter`, an unreachable Keycloak JWKS re-mapped to a retryable 503,
+  REQ-SEC-024) and `PENDING_APPROVAL` (`PendingApprovalAccessFilter`, the REQ-SEC-017 403 that
+  refuses a `ROLE_PENDING_APPROVAL`-only user on every `/api/**` endpoint — a mass spike means the
+  authorities converter / approval sync regressed and is 403ing legitimate users, backing
+  `PendingApprovalBlockSpike`). "One non-double-counted increment site" therefore holds per code, not
+  per handler. The ingest gateway emits the same metric name with the `SERVICE_UNAVAILABLE` code from
+  its own filter; the `application` common tag distinguishes the module.
 - `basetool_audit_events_total{domain}` counter at the single `AuditService.record` choke point
   (`domain` = the `AuditDomain` values, including `MARKET` since the Materialbörse). Silence
   detection is two-tier: `AuditSilenceAnomaly` (no audited mutation anywhere for 5 d while the
@@ -528,6 +543,12 @@ the same `basetool_bot_blocked_total{rule}` series, distinguished by the `applic
 with the backend counter, the `application` common tag separating the modules) — paired since #1041
 item 19 with `basetool_ratelimit_requests_total{bucket}` on the per-IP filter and the per-subject
 limiter, feeding the same `RateLimitRejectionRatioHigh` ratio alert.
+`basetool_ingest_payload_rejected_total` (untagged, `PayloadSizeLimitFilter`) counts each
+oversized-body 413 the INGEST-DOS-1 guard refuses — previously silent (no log, no metric) unlike the
+sibling bot / rate-limit filters — and backs `IngestPayloadRejectedSpike` (logging audit). The
+gateway also now emits one INFO access-log line per `/v1` request (`RequestLoggingFilter`; method /
+path / status / duration), matching the backend/frontend one-line-per-request contract
+(REQ-OBS-001).
 
 **Deliberately excluded** (documented so the gap is intentional, not an oversight): notifications
 (no org-wide queue — only per-recipient unread, which is PII-adjacent), org units (no lifecycle
@@ -543,11 +564,13 @@ incomplete (epic [#936](https://github.com/krt-profit/basetool/issues/936); the 
 **Alert coverage of these signals.** Previously-unalerted `basetool_*` signals now back named alerts
 so an exported metric cannot silently regress unnoticed: the ingest handoff metrics feed
 `IngestHandoffErrors` / `IngestBackendUnavailable`; the `basetool_http_error_total`
-`SERVICE_UNAVAILABLE` and `ACCESS_DENIED` codes feed `IdentityProviderUnavailable` /
-`AccessDeniedSpike` (and the all-codes HTTP-error panel on dashboard `07`); and
-`KeycloakEventMetricsAbsent` guards the `keycloak_user_events_total` series that
-`KeycloakLoginErrorSpike` depends on. Adding, renaming or removing one of these metrics keeps its
-alert in `monitoring/prometheus/alerts/business.yml` in sync in the same change.
+`SERVICE_UNAVAILABLE`, `ACCESS_DENIED` and `PENDING_APPROVAL` codes feed `IdentityProviderUnavailable`
+/ `AccessDeniedSpike` / `PendingApprovalBlockSpike` (and the all-codes HTTP-error panel on dashboard
+`07`); the `basetool_keycloak_sync_fetch_failures_total` and `basetool_scheduled_job_step_failures_total`
+counters feed `KeycloakSyncFetchFailing` / `ScWikiStepFailing`; and `KeycloakEventMetricsAbsent` guards
+the `keycloak_user_events_total` series that `KeycloakLoginErrorSpike` depends on. Adding, renaming or
+removing one of these metrics keeps its alert in `monitoring/prometheus/alerts/business.yml` in sync in
+the same change.
 
 ### REQ-OBS-012 — Edge posture assertions (deny / redirect / HSTS probes)
 

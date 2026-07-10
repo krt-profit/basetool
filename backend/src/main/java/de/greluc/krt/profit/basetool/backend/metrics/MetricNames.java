@@ -49,6 +49,17 @@ public final class MetricNames {
   /** Counter {@code basetool_scheduled_job_items_total} — items processed, tag {@code task}. */
   public static final String SCHEDULED_JOB_ITEMS = "basetool.scheduled.job.items";
 
+  /**
+   * Counter {@code basetool_scheduled_job_step_failures_total} — tags {@code task}, {@code step}.
+   * Bumped when one step of a multi-step sync job throws and is swallowed so the remaining steps
+   * still run: the umbrella job then records {@code outcome=success} with a non-zero item tally
+   * from the other steps, so a single reliably-failing step is invisible to the outcome / items /
+   * stale signals. Only the SC-Wiki sync is multi-step today; {@code step} is a bounded literal
+   * ({@code commodity} / {@code vehicle} / {@code item} / {@code blueprint} / {@code manufacturer},
+   * REQ-OBS-011).
+   */
+  public static final String SCHEDULED_JOB_STEP_FAILURES = "basetool.scheduled.job.step.failures";
+
   // --- External-sync events (SyncReportService) ------------------------------------------
 
   /** Counter {@code basetool_sync_events_total} — tags {@code source}, {@code event_type}. */
@@ -63,6 +74,18 @@ public final class MetricNames {
    * "succeeds" (REQ-OBS-011).
    */
   public static final String EXTERNAL_FETCH_ERRORS = "basetool.external.fetch.errors";
+
+  // --- Keycloak Admin-API sync (KeycloakService) -----------------------------------------
+
+  /**
+   * Counter {@code basetool_keycloak_sync_fetch_failures_total} (untagged). Bumped when the daily
+   * user-sync roster fetch against the Keycloak Admin API throws and is swallowed into an empty
+   * list: the sync then records a {@code success} with zero users and {@code UserSyncStale} /
+   * {@code UserSyncZeroItems} stay quiet, so a Keycloak outage is otherwise indistinguishable from
+   * a legitimately empty roster. Access-control-relevant — a stalled sync means departed users keep
+   * their local roles (REQ-OBS-011).
+   */
+  public static final String KEYCLOAK_SYNC_FETCH_FAILURES = "basetool.keycloak.sync.fetch.failures";
 
   // --- HTTP error rate (GlobalExceptionHandler) ------------------------------------------
 
@@ -237,6 +260,12 @@ public final class MetricNames {
    * Tag key: the P4K import job kind ({@code P4kImportJobKind#name()}) on {@link #P4K_IMPORT_JOBS}.
    */
   public static final String TAG_KIND = "kind";
+
+  /**
+   * Tag key: the sync step ({@code commodity} / {@code vehicle} / {@code item} / {@code blueprint}
+   * / {@code manufacturer}) on {@link #SCHEDULED_JOB_STEP_FAILURES}. Bounded literal set.
+   */
+  public static final String TAG_STEP = "step";
 
   /** Tag key: the SSE event name that failed to send, on {@link #SSE_SEND_FAILURES}. */
   public static final String TAG_EVENT = "event";

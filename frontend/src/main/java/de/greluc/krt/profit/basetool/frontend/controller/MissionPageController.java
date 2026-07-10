@@ -987,7 +987,7 @@ public class MissionPageController {
           e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
-      log.debug("UNEXPECTED ERROR in getUnassignedParticipantsAjax for mission {}", id, e);
+      log.error("UNEXPECTED ERROR in getUnassignedParticipantsAjax for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
     }
   }

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
+import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialCreateAjaxRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
@@ -128,6 +129,9 @@ public class AdminMaterialsPageController {
           backendApiClient.get("/api/v1/material-categories", MATERIAL_CATEGORY_LIST_TYPE);
       model.addAttribute("categories", categories);
 
+    } catch (BackendServiceException e) {
+      log.debug("Error loading materials data", e);
+      model.addAttribute("error", "error.admin.materials.load");
     } catch (Exception e) {
       log.error("Error loading materials data", e);
       model.addAttribute("error", "error.admin.materials.load");
@@ -151,6 +155,9 @@ public class AdminMaterialsPageController {
           new MaterialCategoryDto(null, name, null),
           MaterialCategoryDto.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
+    } catch (BackendServiceException e) {
+      BackendErrorLogging.warn(log, "POST /api/v1/material-categories", e);
+      redirectAttributes.addFlashAttribute("errorToast", "notification.error.save");
     } catch (Exception e) {
       log.error("Create category failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "notification.error.save");
@@ -172,6 +179,9 @@ public class AdminMaterialsPageController {
     try {
       backendApiClient.delete("/api/v1/material-categories/" + id, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
+    } catch (BackendServiceException e) {
+      BackendErrorLogging.warn(log, "DELETE /api/v1/material-categories", id, e);
+      redirectAttributes.addFlashAttribute("errorToast", "notification.error.delete");
     } catch (Exception e) {
       log.error("Delete category failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "notification.error.delete");
@@ -325,6 +335,10 @@ public class AdminMaterialsPageController {
       MaterialDto updatedMaterial =
           backendApiClient.get("/api/v1/materials/" + id, MaterialDto.class);
       return ResponseEntity.ok(updatedMaterial);
+    } catch (BackendServiceException e) {
+      BackendErrorLogging.warn(log, "PUT /api/v1/materials", id, e);
+      // In case of OptimisticLocking, backend usually returns 409 Conflict
+      return ResponseEntity.status(500).build();
     } catch (Exception e) {
       log.error("Ajax update material failed", e);
       // In case of OptimisticLocking, backend usually returns 409 Conflict

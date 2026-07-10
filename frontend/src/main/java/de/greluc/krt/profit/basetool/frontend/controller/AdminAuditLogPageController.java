@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.AuditRowView;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAuditEventDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.List;
 import java.util.Map;
@@ -336,6 +337,9 @@ public class AdminAuditLogPageController {
               ? adaptBank(backendApiClient.get(uri.toUriString(), BANK_AUDIT_PAGE), eventKeyPrefix)
               : adaptGeneric(
                   backendApiClient.get(uri.toUriString(), GENERIC_AUDIT_PAGE), eventKeyPrefix);
+    } catch (BackendServiceException e) {
+      log.debug("Failed to load audit log for domain {}", activeDomain, e);
+      model.addAttribute("error", "admin.audit.error.load");
     } catch (Exception e) {
       log.error("Failed to load audit log for domain {}", activeDomain, e);
       model.addAttribute("error", "admin.audit.error.load");

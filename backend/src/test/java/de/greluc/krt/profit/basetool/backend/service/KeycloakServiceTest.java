@@ -28,7 +28,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.config.KeycloakSyncProperties;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.security.KeyStore;
 import java.util.List;
 import java.util.Set;
@@ -56,6 +58,8 @@ class KeycloakServiceTest {
 
   @Mock private SslBundles sslBundles;
 
+  private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+
   /**
    * When the {@code keycloak-trust} SSL bundle is present, the constructor must parse its
    * truststore and build the pinned request factory without error.
@@ -70,7 +74,8 @@ class KeycloakServiceTest {
     when(bundle.getStores()).thenReturn(stores);
     when(sslBundles.getBundle("keycloak-trust")).thenReturn(bundle);
 
-    assertDoesNotThrow(() -> new KeycloakService(new KeycloakSyncProperties(), sslBundles));
+    assertDoesNotThrow(
+        () -> new KeycloakService(new KeycloakSyncProperties(), sslBundles, meterRegistry));
     verify(sslBundles).getBundle("keycloak-trust");
   }
 
@@ -86,10 +91,41 @@ class KeycloakServiceTest {
     KeycloakSyncProperties properties = new KeycloakSyncProperties();
     properties.setEnabled(false);
 
-    KeycloakService service = new KeycloakService(properties, sslBundles);
+    KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
 
     assertTrue(service.fetchUsers(List.of(), Set.of()).isEmpty());
     verify(sslBundles).getBundle("keycloak-trust");
+  }
+
+  /**
+   * REQ-OBS-011: when the roster fetch throws (here the client-credentials token request returns
+   * 500), {@code fetchUsers} swallows it to an empty list and increments {@code
+   * basetool_keycloak_sync_fetch_failures_total} so a Keycloak outage is distinguishable from a
+   * legitimately empty roster (which returns empty <em>without</em> throwing).
+   */
+  @Test
+  void fetchUsers_onFetchFailure_incrementsFailureCounterAndReturnsEmpty() throws Exception {
+    when(sslBundles.getBundle("keycloak-trust"))
+        .thenThrow(new NoSuchSslBundleException("keycloak-trust", "no such bundle"));
+    MockWebServer server = new MockWebServer();
+    server.start();
+    try {
+      KeycloakSyncProperties properties = new KeycloakSyncProperties();
+      properties.setEnabled(true);
+      properties.setAdminUrl(server.url("/").toString().replaceAll("/+$", ""));
+      properties.setRealm("iri");
+      properties.setClientId("client");
+      properties.setClientSecret("secret");
+      // The client-credentials token request fails → getAccessToken throws → fetchUsers swallows.
+      server.enqueue(new MockResponse().setResponseCode(500));
+
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
+
+      assertTrue(service.fetchUsers(List.of(), Set.of()).isEmpty());
+      assertEquals(1.0, meterRegistry.counter(MetricNames.KEYCLOAK_SYNC_FETCH_FAILURES).count());
+    } finally {
+      server.shutdown();
+    }
   }
 
   /**
@@ -136,7 +172,7 @@ class KeycloakServiceTest {
       server.enqueue(jsonResponse("[]"));
       server.enqueue(jsonResponse("[]"));
 
-      KeycloakService service = new KeycloakService(properties, sslBundles);
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
 
       List<KeycloakUserDto> users = service.fetchUsers(List.of(), Set.of());
 
@@ -191,7 +227,7 @@ class KeycloakServiceTest {
               "[{\"identityProvider\":\"discord\",\"userId\":\"123456789012345678\","
                   + "\"userName\":\"a#1\"}]"));
 
-      KeycloakService service = new KeycloakService(properties, sslBundles);
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
 
       List<KeycloakUserDto> users = service.fetchUsers(List.of(), Set.of());
 
@@ -232,7 +268,7 @@ class KeycloakServiceTest {
       server.enqueue(
           jsonResponse("[{\"identityProvider\":\"github\",\"userId\":\"99\",\"userName\":\"a\"}]"));
 
-      KeycloakService service = new KeycloakService(properties, sslBundles);
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
 
       List<KeycloakUserDto> users = service.fetchUsers(List.of(), Set.of());
 
@@ -278,7 +314,7 @@ class KeycloakServiceTest {
       server.enqueue(jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\"}]"));
       server.enqueue(jsonResponse("[]"));
 
-      KeycloakService service = new KeycloakService(properties, sslBundles);
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
 
       List<KeycloakUserDto> users = service.fetchUsers(List.of("ADMIN"), Set.of());
 
@@ -335,7 +371,7 @@ class KeycloakServiceTest {
       server.enqueue(jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\"}]"));
       server.enqueue(jsonResponse("[]"));
 
-      KeycloakService service = new KeycloakService(properties, sslBundles);
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
 
       List<KeycloakUserDto> users = service.fetchUsers(List.of("ADMIN"), Set.of());
 
@@ -391,7 +427,7 @@ class KeycloakServiceTest {
       server.enqueue(jsonResponse("[{\"name\":\"ADMIN\"}]"));
       server.enqueue(errorResponse(500));
 
-      KeycloakService service = new KeycloakService(properties, sslBundles);
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
 
       List<KeycloakUserDto> users = service.fetchUsers(List.of("ADMIN"), Set.of());
 
@@ -437,7 +473,7 @@ class KeycloakServiceTest {
       server.enqueue(errorResponse(404));
       server.enqueue(jsonResponse("[]"));
 
-      KeycloakService service = new KeycloakService(properties, sslBundles);
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
 
       List<KeycloakUserDto> users = service.fetchUsers(List.of("ADMIN"), Set.of());
 
@@ -477,7 +513,7 @@ class KeycloakServiceTest {
       server.enqueue(
           jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
 
-      KeycloakService service = new KeycloakService(properties, sslBundles);
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
 
       List<KeycloakUserDto> users = service.fetchUsers(List.of(), Set.of(userA));
 

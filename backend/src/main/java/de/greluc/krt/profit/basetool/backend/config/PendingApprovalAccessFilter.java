@@ -19,7 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -82,6 +84,7 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
   private final MessageSource messageSource;
   private final AppProblemProperties problemProperties;
   private final ObjectMapper objectMapper;
+  private final MeterRegistry meterRegistry;
 
   @Override
   protected void doFilterInternal(
@@ -141,6 +144,16 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
         request.getMethod(),
         request.getRequestURI(),
         correlationId);
+
+    // REQ-OBS-011: this 403 is written at the servlet-filter level and bypasses
+    // GlobalExceptionHandler, so it never reaches basetool_http_error_total via the advice. Count
+    // it
+    // here (mirroring IdentityProviderUnavailableFilter) so a converter / approval-sync regression
+    // that mass-403s legitimate users surfaces on PendingApprovalBlockSpike, not only in the WARN
+    // log.
+    meterRegistry
+        .counter(MetricNames.HTTP_ERROR, MetricNames.TAG_CODE, CODE_PENDING_APPROVAL)
+        .increment();
 
     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
     response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);

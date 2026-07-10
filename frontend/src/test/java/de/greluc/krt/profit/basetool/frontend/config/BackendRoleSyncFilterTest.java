@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.config;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -27,9 +28,14 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RegistrationStatusDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -40,6 +46,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
@@ -160,6 +167,39 @@ class BackendRoleSyncFilterTest {
     // Then — successful read marks the session synced
     verify(session).setAttribute(SYNC_COMPLETE_FLAG, true);
     verify(chain).doFilter(request, response);
+  }
+
+  @Test
+  void doFilterInternal_whenBackendServiceException_logsAtDebugNotError() throws Exception {
+    // REQ-OBS-001: a relayed BackendServiceException was already logged once at the
+    // BackendApiClient
+    // boundary. syncRoles re-runs on every request until it succeeds, so re-logging it at ERROR
+    // here
+    // would turn one backend outage into a per-request ERROR storm and trip LogbackErrorSpike.
+    Logger logger = (Logger) LoggerFactory.getLogger(BackendRoleSyncFilter.class);
+    Level original = logger.getLevel();
+    logger.setLevel(Level.DEBUG);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    try {
+      when(backendApiClient.get(USERS_ME, UserDto.class))
+          .thenThrow(new BackendServiceException("backend down", null, 503));
+
+      filter.doFilterInternal(request, response, chain);
+
+      assertThat(appender.list).noneMatch(e -> e.getLevel() == Level.ERROR);
+      assertThat(appender.list)
+          .anyMatch(
+              e ->
+                  e.getLevel() == Level.DEBUG
+                      && e.getFormattedMessage().contains("Backend role sync deferred"));
+      verify(session, never()).setAttribute(eq(SYNC_COMPLETE_FLAG), any());
+      verify(chain).doFilter(request, response);
+    } finally {
+      logger.detachAppender(appender);
+      logger.setLevel(original);
+    }
   }
 
   @Test

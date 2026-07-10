@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BulkCheckoutRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemCreateDto;
@@ -28,6 +29,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemPersonalReb
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemUpdateDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.InventoryForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -125,6 +127,11 @@ public class InventoryWriteController {
               form.getOwningOrgUnitId());
       backendApiClient.post("/api/v1/inventory", request, InventoryItemDto.class);
       redirectAttributes.addFlashAttribute("successToast", "success.inventory.add");
+    } catch (BackendServiceException e) {
+      BackendErrorLogging.warn(log, "addInventoryItem", e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.inventory.add.failed");
+      redirectAttributes.addFlashAttribute("inventoryForm", form);
+      return "redirect:/inventory/input";
     } catch (Exception e) {
       log.error("Failed to add inventory item", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.inventory.add.failed");
@@ -314,6 +321,9 @@ public class InventoryWriteController {
               form.getTargetOwningOrgUnitId());
       backendApiClient.post("/api/v1/inventory/" + id + "/book-out", request, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "success.inventory.bookout");
+    } catch (BackendServiceException e) {
+      BackendErrorLogging.warn(log, "bookOutInventoryItem", id, e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.inventory.bookout.failed");
     } catch (Exception e) {
       log.error("Failed to book out inventory item", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.inventory.bookout.failed");

@@ -634,12 +634,10 @@ public class OperationService {
             .setPayoutStatusWithinTransaction(operationId, participantKey, paidOut);
       } catch (DataIntegrityViolationException | ObjectOptimisticLockingFailureException race) {
         log.debug(
-            "Concurrent payout toggle race (attempt {}/{}) for operation {} participant {} —"
-                + " retrying",
+            "Concurrent payout toggle race (attempt {}/{}) for operation {} — retrying",
             attempt,
             MAX_PAYOUT_TOGGLE_ATTEMPTS,
-            operationId,
-            participantKey);
+            operationId);
       }
     }
     return self.getObject().setPayoutStatusWithinTransaction(operationId, participantKey, paidOut);
