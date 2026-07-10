@@ -41,6 +41,17 @@ old per-user endpoint and the role endpoint report **directly-assigned** realm r
 reconstructed `user → roles` sets are equivalent — the call count is now bounded by the (small)
 number of mappable roles × their page count, not by the user count.
 
+> **Refinement (2026-07-10, Discord account-creation regression audit).** Two hardening tweaks to
+> the role read, both pinned by REQ-SEC-018: (1) the local catalog names are matched
+> **case-insensitively** against the realm's actual role names — resolved once via a paged `GET
+> /roles` — before the member read, so a role whose Keycloak casing differs from the local name is
+> still resolved (removing a scheduled-vs-interactive asymmetry, since the JWT path already maps via
+> `findByNameIgnoreCase`). (2) A transient role-member read failure (5xx/timeout/…) now **skips the
+> whole run** instead of being swallowed — persisting a role-stripped set had let a brand-new admin
+> be created `PENDING` and mass-downgraded existing admins. Only a benign `404` on one role (a TOCTOU
+> after the listing) is swallowed. The N→#roles scaling shape is unchanged (one extra `GET /roles`
+> listing per run is O(#roles), not O(users)).
+
 ### 2. Incremental Discord federated-identity back-fill
 
 Read `GET /users/{id}/federated-identity` only for roster users **without a local Discord link**
