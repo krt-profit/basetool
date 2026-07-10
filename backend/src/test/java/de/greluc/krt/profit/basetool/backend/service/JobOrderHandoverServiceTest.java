@@ -20,11 +20,12 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderHandoverMapper;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderHandover;
@@ -43,6 +44,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -568,5 +570,188 @@ class JobOrderHandoverServiceTest {
     assertEquals(7.0, jobOrderMaterial.getAmount());
     verify(inventoryItemRepository).save(inventoryItem);
     verify(jobOrderHandoverRepository).save(any(JobOrderHandover.class));
+  }
+
+  @Test
+  void createHandover_emitsPerItemHandedOverAudit_andHandoverCreatedWithAutoCompletedFlag() {
+    // Given — two materials, each fully handed over in a single handover, so the whole JobOrder
+    // is fulfilled. Aufträge/Lager are audited areas (REQ-AUDIT-001): the method must emit exactly
+    // one INVENTORY_HANDED_OVER per handed item plus one JOB_ORDER_HANDOVER_CREATED carrying the
+    // item count and the autoCompleted flag. The events are emitted from loop-captured snapshots
+    // AFTER the bulk unlinks, never by re-reading a detached/deleted inventory entity.
+    UUID inventoryId2 = UUID.randomUUID();
+    UUID materialId2 = UUID.randomUUID();
+
+    de.greluc.krt.profit.basetool.backend.model.Material material2 =
+        new de.greluc.krt.profit.basetool.backend.model.Material();
+    material2.setId(materialId2);
+
+    de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial jobOrderMaterial2 =
+        new de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial();
+    jobOrderMaterial2.setId(UUID.randomUUID());
+    jobOrderMaterial2.setMaterial(material2);
+    jobOrderMaterial2.setAmount(8.0);
+    order.addMaterial(jobOrderMaterial2);
+
+    InventoryItem inventoryItem2 = new InventoryItem();
+    inventoryItem2.setId(inventoryId2);
+    inventoryItem2.setJobOrder(order);
+    inventoryItem2.setMaterial(material2);
+    inventoryItem2.setAmount(8.0);
+
+    JobOrderHandoverItemCreateDto itemDto1 = new JobOrderHandoverItemCreateDto(inventoryId, 10.0);
+    JobOrderHandoverItemCreateDto itemDto2 = new JobOrderHandoverItemCreateDto(inventoryId2, 8.0);
+    JobOrderHandoverCreateDto createDto =
+        new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto1, itemDto2));
+
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
+    when(inventoryItemRepository.findByIdForUpdate(inventoryId2))
+        .thenReturn(Optional.of(inventoryItem2));
+    when(jobOrderHandoverRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+    when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
+        .thenReturn(mock(JobOrderHandoverDto.class));
+
+    // When
+    service.createHandover(orderId, createDto);
+
+    // Then — exactly one INVENTORY_HANDED_OVER per handed item (two here)
+    verify(auditService, times(2))
+        .record(eq(AuditEventType.INVENTORY_HANDED_OVER), any(), any(), any(), any());
+    // ... plus one JOB_ORDER_HANDOVER_CREATED whose details carry the item count and the
+    // autoCompleted flag (true, because both materials are now fulfilled).
+    ArgumentCaptor<CharSequence> detailsCaptor = ArgumentCaptor.forClass(CharSequence.class);
+    verify(auditService)
+        .record(
+            eq(AuditEventType.JOB_ORDER_HANDOVER_CREATED),
+            eq(orderId),
+            any(),
+            any(),
+            detailsCaptor.capture());
+    String rendered = detailsCaptor.getValue().toString();
+    assertTrue(rendered.contains("items=2"), "handover-created audit must carry the item count");
+    assertTrue(
+        rendered.contains("autoCompleted=true"),
+        "a fully-fulfilling handover must flag autoCompleted=true");
+    verify(jobOrderService).completeJobOrderWithinTransaction(order);
+  }
+
+  @Test
+  void createHandover_handoverCreatedAudit_flagsAutoCompletedFalse_whenPartial() {
+    // Given — only 4.0 of the required 10.0 is handed over, so the order stays open. The
+    // JOB_ORDER_HANDOVER_CREATED audit must report items=1 and autoCompleted=false, and there
+    // must be exactly one INVENTORY_HANDED_OVER event for the single handed item.
+    JobOrderHandoverItemCreateDto itemDto = new JobOrderHandoverItemCreateDto(inventoryId, 4.0);
+    JobOrderHandoverCreateDto createDto =
+        new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
+
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
+    when(jobOrderHandoverRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+    when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
+        .thenReturn(mock(JobOrderHandoverDto.class));
+
+    // When
+    service.createHandover(orderId, createDto);
+
+    // Then — one INVENTORY_HANDED_OVER for the single item
+    verify(auditService, times(1))
+        .record(eq(AuditEventType.INVENTORY_HANDED_OVER), any(), any(), any(), any());
+    // ... and a JOB_ORDER_HANDOVER_CREATED that flags the order was NOT auto-completed
+    ArgumentCaptor<CharSequence> detailsCaptor = ArgumentCaptor.forClass(CharSequence.class);
+    verify(auditService)
+        .record(
+            eq(AuditEventType.JOB_ORDER_HANDOVER_CREATED),
+            eq(orderId),
+            any(),
+            any(),
+            detailsCaptor.capture());
+    String rendered = detailsCaptor.getValue().toString();
+    assertTrue(rendered.contains("items=1"), "handover-created audit must carry the item count");
+    assertTrue(
+        rendered.contains("autoCompleted=false"),
+        "a partial handover must flag autoCompleted=false");
+    verify(jobOrderService, never()).completeJobOrderWithinTransaction(any());
+  }
+
+  @Test
+  void createHandover_subEpsilonResidual_deletesRowAndUnlinksMaterial() {
+    // Given — a floating-point inventory row whose post-decrement residual (10.00003 - 10.0 =
+    // 3e-5) is below QUANTITY_EPSILON (1e-4). The row must be treated as depleted: DELETED (never
+    // saved) and, because the matching JobOrderMaterial also drops sub-epsilon, its material must
+    // be unlinked. A comparison against 0.0 instead of the epsilon would leave a phantom sub-SCU
+    // row and its material link behind, so the order would never auto-complete.
+    inventoryItem.setAmount(10.00003);
+    jobOrderMaterial.setAmount(10.00003);
+
+    JobOrderHandoverItemCreateDto itemDto = new JobOrderHandoverItemCreateDto(inventoryId, 10.0);
+    JobOrderHandoverCreateDto createDto =
+        new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
+
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
+    when(jobOrderHandoverRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+    when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
+        .thenReturn(mock(JobOrderHandoverDto.class));
+
+    // When
+    service.createHandover(orderId, createDto);
+
+    // Then — the sub-epsilon inventory row is deleted, never saved, and its material is unlinked
+    verify(inventoryItemRepository).delete(inventoryItem);
+    verify(inventoryItemRepository, never()).save(any());
+    verify(inventoryItemRepository).unlinkJobOrderMaterial(orderId, materialId);
+    // ... and the INVENTORY_HANDED_OVER audit snapshot reflects the depleted state
+    verify(auditService)
+        .record(
+            eq(AuditEventType.INVENTORY_HANDED_OVER),
+            eq(inventoryId),
+            any(),
+            any(),
+            argThat(
+                d ->
+                    d != null
+                        && d.toString().contains("depleted=true")
+                        && d.toString().contains("remaining=0.0")));
+  }
+
+  @Test
+  void createHandover_residualAboveEpsilon_savesRow_withoutDeleteOrUnlink() {
+    // Given — the mirror of the sub-epsilon case: the residual (10.0002 - 10.0 = ~2e-4) is just
+    // ABOVE QUANTITY_EPSILON (1e-4), so the row is a real surplus and must be SAVED with the
+    // reduced amount, never deleted. The JobOrderMaterial requirement is intentionally larger than
+    // the handover so the material never depletes and no unlink fires.
+    inventoryItem.setAmount(10.0002);
+    jobOrderMaterial.setAmount(50.0);
+
+    JobOrderHandoverItemCreateDto itemDto = new JobOrderHandoverItemCreateDto(inventoryId, 10.0);
+    JobOrderHandoverCreateDto createDto =
+        new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
+
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
+    when(jobOrderHandoverRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+    when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
+        .thenReturn(mock(JobOrderHandoverDto.class));
+
+    // When
+    service.createHandover(orderId, createDto);
+
+    // Then — the above-epsilon row survives: saved with the residual, no delete, no unlink
+    assertEquals(0.0002, inventoryItem.getAmount(), 1e-6);
+    verify(inventoryItemRepository).save(inventoryItem);
+    verify(inventoryItemRepository, never()).delete(any());
+    verify(inventoryItemRepository, never()).unlinkJobOrderMaterial(any(), any());
+    verify(auditService)
+        .record(
+            eq(AuditEventType.INVENTORY_HANDED_OVER),
+            eq(inventoryId),
+            any(),
+            any(),
+            argThat(d -> d != null && d.toString().contains("depleted=false")));
   }
 }

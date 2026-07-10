@@ -171,4 +171,76 @@ class MissionServicePayoutTest {
     verify(missionRepository, never()).save(any(Mission.class));
     verify(missionParticipantRepository).save(p);
   }
+
+  @Test
+  void checkOut_clampsEndTimeToActualEndTime_whenMissionAlreadyEnded() {
+    // The mission ended an hour ago; the participant (who started before the mission end) checks
+    // out
+    // late. checkOut must clamp endTime to the mission's actual end time — crediting the extra
+    // hours
+    // since the mission closed would inflate this participant's credited window and skew the payout
+    // (the primary clamp branch, financial-correctness guard).
+    // Given
+    UUID missionId = UUID.randomUUID();
+    UUID participantId = UUID.randomUUID();
+    Instant missionEnd = Instant.now().minusSeconds(3600);
+    Mission mission = new Mission();
+    mission.setId(missionId);
+    mission.setActualEndTime(missionEnd);
+
+    MissionParticipant p = new MissionParticipant();
+    p.setId(participantId);
+    p.setMission(mission);
+    // Started well before the mission ended, so the negative-duration guard does not apply.
+    p.setStartTime(Instant.now().minusSeconds(3 * 3600));
+    mission.getParticipants().add(p);
+
+    when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(p));
+
+    // When
+    Mission updatedMission = missionParticipantService.checkOut(missionId, participantId);
+
+    // Then
+    MissionParticipant updated = updatedMission.getParticipants().iterator().next();
+    assertEquals(
+        missionEnd,
+        updated.getEndTime(),
+        "late check-out must clamp end time to the mission's actual end time, not now()");
+    verify(missionRepository, never()).save(any(Mission.class));
+    verify(missionParticipantRepository).saveAndFlush(p);
+  }
+
+  @Test
+  void checkOut_setsEndTimeToStartTime_whenParticipantStartedAfterMissionEnd() {
+    // The mission ended two hours ago but the participant's recorded start time is after that end.
+    // Clamping to actualEndTime would produce endTime < startTime (a negative credited window), so
+    // the negative-duration guard pins endTime to startTime instead — never before it.
+    // Given
+    UUID missionId = UUID.randomUUID();
+    UUID participantId = UUID.randomUUID();
+    Mission mission = new Mission();
+    mission.setId(missionId);
+    mission.setActualEndTime(Instant.now().minusSeconds(2 * 3600));
+
+    Instant startAfterEnd = Instant.now().minusSeconds(3600); // after the mission's actual end
+    MissionParticipant p = new MissionParticipant();
+    p.setId(participantId);
+    p.setMission(mission);
+    p.setStartTime(startAfterEnd);
+    mission.getParticipants().add(p);
+
+    when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(p));
+
+    // When
+    Mission updatedMission = missionParticipantService.checkOut(missionId, participantId);
+
+    // Then
+    MissionParticipant updated = updatedMission.getParticipants().iterator().next();
+    assertEquals(
+        startAfterEnd,
+        updated.getEndTime(),
+        "end time must never be set before the participant's own start time");
+    verify(missionRepository, never()).save(any(Mission.class));
+    verify(missionParticipantRepository).saveAndFlush(p);
+  }
 }

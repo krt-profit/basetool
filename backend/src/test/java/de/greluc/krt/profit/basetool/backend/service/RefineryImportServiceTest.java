@@ -760,6 +760,21 @@ class RefineryImportServiceTest {
   }
 
   @Test
+  void matchRefineryLocation_returnsEmptyWhenMultipleCandidatesShareTheFold() {
+    // Given — two refinery-equipped locations whose names both fold to the canonical core
+    // "levski" ("Levski" and "LEVSKI " differ only by case and trailing space)
+    Location levskiDuplicate = new Location();
+    levskiDuplicate.setId(UUID.randomUUID());
+    levskiDuplicate.setName("LEVSKI ");
+    Mockito.when(locationRepository.findLocationsWithRefinery())
+        .thenReturn(List.of(levski, levskiDuplicate));
+
+    // When / Then — ambiguity (hits.size() != 1) yields no match rather than an arbitrary
+    // first-hit guess, so the draft is left unresolved for the user to correct
+    assertThat(service.matchRefineryLocation("LEVSKI")).isEmpty();
+  }
+
+  @Test
   void matchMaterial_exposesTheMatchingChain() {
     assertThat(service.matchMaterial("STILERON (ORE)")).contains(stileron);
     assertThat(service.matchMaterial("XQZWV")).isEmpty();
