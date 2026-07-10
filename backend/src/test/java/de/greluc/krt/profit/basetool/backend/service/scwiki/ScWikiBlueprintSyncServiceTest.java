@@ -39,12 +39,14 @@ import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiBlueprintSummaryPr
 import de.greluc.krt.profit.basetool.backend.integration.scwiki.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.Material;
+import de.greluc.krt.profit.basetool.backend.model.MaterialExternalAliasSource;
 import de.greluc.krt.profit.basetool.backend.model.SyncEventType;
 import de.greluc.krt.profit.basetool.backend.model.scwiki.Blueprint;
 import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintIngredient;
 import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintIngredientKind;
 import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintRequirementGroup;
 import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintRequirementModifier;
+import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintSummaryProperty;
 import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
@@ -507,6 +509,110 @@ class ScWikiBlueprintSyncServiceTest {
             isNull(),
             eq("Antium Arms Maroon"),
             any());
+  }
+
+  @Test
+  void syncBlueprints_detailMiss_preservesExistingRequirementGroupsAndSummary() {
+    // Given an existing blueprint that already carries good stat data (one requirement group + one
+    // summary property) captured on a previous successful detail fetch.
+    UUID bpUuid = UUID.randomUUID();
+    UUID outputUuid = UUID.randomUUID();
+    UUID resourceUuid = UUID.randomUUID();
+    Blueprint existing = new Blueprint();
+    existing.setScwikiUuid(bpUuid);
+    BlueprintRequirementGroup existingGroup = new BlueprintRequirementGroup();
+    existingGroup.setOrderIndex(0);
+    existingGroup.setGroupKey("FRAME");
+    existingGroup.setName("Frame");
+    existingGroup.setKind("group");
+    existingGroup.setRequiredCount(1);
+    existing.addRequirementGroup(existingGroup);
+    BlueprintSummaryProperty existingSummary = new BlueprintSummaryProperty();
+    existingSummary.setOrderIndex(0);
+    existingSummary.setPropertyKey("weapon_damage");
+    existingSummary.setLabel("Impact Force");
+    existingSummary.setBetterWhen("higher");
+    existing.addSummaryProperty(existingSummary);
+
+    // The list row carries the flat ingredients but no requirement_groups; the detail fetch misses
+    // (fetchOne -> null), so the upsert must take the flat-list fallback, NOT
+    // applyRequirementGraph.
+    ScWikiBlueprintIngredientDto resource =
+        new ScWikiBlueprintIngredientDto("Agricium", "resource", resourceUuid, null, 0.36, null);
+    ScWikiBlueprintDto listDto =
+        new ScWikiBlueprintDto(
+            bpUuid,
+            "BP",
+            outputUuid,
+            "Omnisky",
+            null,
+            540,
+            false,
+            "4.8",
+            1,
+            0,
+            List.of(resource),
+            List.of(),
+            null,
+            null,
+            null);
+
+    Material agricium = material("Agricium");
+    when(scWikiClient.fetchAllPages(any(), any(), eq("blueprints"))).thenReturn(List.of(listDto));
+    when(scWikiClient.fetchOne(anyString(), eq(ScWikiBlueprintDto.class), eq("blueprint")))
+        .thenReturn(null);
+    when(blueprintRepository.findByScwikiUuid(bpUuid)).thenReturn(Optional.of(existing));
+    when(materialRepository.findByScwikiUuid(resourceUuid)).thenReturn(Optional.of(agricium));
+    when(blueprintRepository.save(any(Blueprint.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When the sync runs against a transient detail miss.
+    service.syncBlueprints();
+
+    // Then the previously captured group + summary survive untouched (the fallback must NOT clear
+    // them) while the flat ingredient list is reconciled.
+    ArgumentCaptor<Blueprint> saved = ArgumentCaptor.forClass(Blueprint.class);
+    verify(blueprintRepository).save(saved.capture());
+    Blueprint bp = saved.getValue();
+    assertEquals(1, bp.getRequirementGroups().size(), "requirement group must not be wiped");
+    assertSame(existingGroup, bp.getRequirementGroups().get(0), "same group object preserved");
+    assertEquals("Frame", bp.getRequirementGroups().get(0).getName());
+    assertEquals(1, bp.getSummaryProperties().size(), "summary property must not be wiped");
+    assertSame(existingSummary, bp.getSummaryProperties().get(0), "same summary object preserved");
+    assertEquals("Impact Force", bp.getSummaryProperties().get(0).getLabel());
+
+    assertEquals(1, bp.getIngredients().size(), "flat ingredient list is still reconciled");
+    BlueprintIngredient line = bp.getIngredients().get(0);
+    assertEquals(BlueprintIngredientKind.RESOURCE, line.getKind());
+    assertSame(agricium, line.getMaterial());
+  }
+
+  @Test
+  void syncBlueprints_resolvesResourceViaAliasTable_whenUuidMisses() {
+    // Given a RESOURCE line whose scwiki_uuid does not match any material, but the alias table maps
+    // its name to a material — the middle branch of resolveMaterial's uuid -> alias -> name chain.
+    UUID resourceUuid = UUID.randomUUID();
+    ScWikiBlueprintIngredientDto resource =
+        new ScWikiBlueprintIngredientDto("Agricium", "resource", resourceUuid, null, 0.36, null);
+    ScWikiBlueprintDto dto = blueprint(null, List.of(resource), List.of());
+
+    Material aliasMaterial = material("Agricium");
+    when(scWikiClient.fetchAllPages(any(), any(), eq("blueprints"))).thenReturn(List.of(dto));
+    when(blueprintRepository.findByScwikiUuid(dto.uuid())).thenReturn(Optional.empty());
+    when(materialRepository.findByScwikiUuid(resourceUuid)).thenReturn(Optional.empty());
+    when(aliasService.resolveMaterialByAlias(MaterialExternalAliasSource.SCWIKI, "Agricium"))
+        .thenReturn(aliasMaterial);
+    when(blueprintRepository.save(any(Blueprint.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When the sync runs.
+    service.syncBlueprints();
+
+    // Then the ingredient FK is linked via the alias table and no unresolved event is emitted.
+    ArgumentCaptor<Blueprint> saved = ArgumentCaptor.forClass(Blueprint.class);
+    verify(blueprintRepository).save(saved.capture());
+    BlueprintIngredient line = saved.getValue().getIngredients().get(0);
+    assertSame(aliasMaterial, line.getMaterial(), "resource resolved via the SCWIKI alias table");
+    verify(syncReportService, never())
+        .logScwikiEvent(any(), eq(SyncEventType.UNRESOLVED_INGREDIENT), any(), any(), any(), any());
   }
 
   // ─── helpers ────────────────────────────────────────────────────────────

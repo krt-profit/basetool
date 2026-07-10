@@ -1473,6 +1473,192 @@ class OrgUnitBankAccessServiceTest {
     verifyNoInteractions(bankAuditService);
   }
 
+  @Test
+  void createBookingRequest_krtAboveT1_unsetAreaLeadCeiling_routesToBereichsleiterProfit() {
+    // REQ-BANK-047: on the KRT (CARTEL) account an UNSET area-lead ceiling (T2 == null) means the
+    // Bereichsleiter Profit covers everything above T1 and the Organisationsleitung band is empty.
+    // An over-T1 request with T2 unset must route to AREA_LEAD_PROFIT via the `t2 == null ||`
+    // short-circuit — never NPE on compareTo(null) nor mis-route to ORGANISATIONSLEITUNG. The three
+    // existing ladder tests only exercise the both-thresholds-set path, so this pins the null
+    // guard.
+    UUID accountId = UUID.randomUUID();
+    BankAccount cartel =
+        typedAccount(
+            accountId, "KB-0003", BankAccountType.CARTEL, squadron(UUID.randomUUID(), "OL", "OL"));
+    cartel.setEmployeeApprovalCeiling(new BigDecimal("1000"));
+    cartel.setAreaLeadApprovalCeiling(null);
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(cartel));
+    when(ownerScopeService.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    when(viewGrantRepository.findByAccountId(accountId)).thenReturn(List.of());
+    when(authHelperService.isMemberOrAbove()).thenReturn(true);
+    CreateBankBookingRequest request =
+        new CreateBankBookingRequest(
+            accountId, BankBookingRequestType.WITHDRAWAL, null, new BigDecimal("9000"), "reason");
+    when(bankBookingRequestService.create(
+            eq(accountId),
+            eq(BankBookingRequestType.WITHDRAWAL),
+            eq(new BigDecimal("9000")),
+            eq("reason"),
+            eq(null),
+            eq(null),
+            eq(true),
+            eq(new BigDecimal("1000")),
+            eq(BankRequestApprover.AREA_LEAD_PROFIT),
+            eq(false),
+            eq(null)))
+        .thenReturn(requestDto(accountId, UUID.randomUUID()));
+
+    service.createBookingRequest(request);
+
+    // The single create call routed to AREA_LEAD_PROFIT with the T1 display ceiling — never
+    // ORGANISATIONSLEITUNG, whose band is empty when T2 is unset.
+    verify(bankBookingRequestService)
+        .create(
+            eq(accountId),
+            eq(BankBookingRequestType.WITHDRAWAL),
+            eq(new BigDecimal("9000")),
+            eq("reason"),
+            eq(null),
+            eq(null),
+            eq(true),
+            eq(new BigDecimal("1000")),
+            eq(BankRequestApprover.AREA_LEAD_PROFIT),
+            eq(false),
+            eq(null));
+  }
+
+  @Test
+  void createBookingRequest_userLimitWinsOverHigherRoleTier() {
+    // REQ-BANK-041/-047: an individual USER limit wins outright via the early return, even when a
+    // matched membership-role tier is HIGHER. USER=100 and a matched MEMBERSHIP_ROLE=1000 both
+    // apply
+    // to a 500-aUEC withdrawal: the resolved ceiling must be 100, so the request is flagged
+    // (requiresOwnerApproval=true). If the early return regressed into the max() loop the caller
+    // would get 1000 and the withdrawal would auto-approve — a financial-control bypass.
+    UUID orgUnitId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID caller = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(orgUnitId, "Own", "OWN"));
+    CreateBankBookingRequest request =
+        new CreateBankBookingRequest(
+            accountId, BankBookingRequestType.WITHDRAWAL, null, new BigDecimal("500"), null);
+    BankAccountApprovalLimit roleLimit = new BankAccountApprovalLimit();
+    roleLimit.setGranteeKind(BankAccountViewGranteeKind.MEMBERSHIP_ROLE);
+    roleLimit.setRoleCode(MembershipRole.ENSIGN.name());
+    roleLimit.setLimitAmount(new BigDecimal("1000"));
+    BankAccountApprovalLimit userLimit = new BankAccountApprovalLimit();
+    userLimit.setGranteeKind(BankAccountViewGranteeKind.USER);
+    userLimit.setGranteeUserId(caller);
+    userLimit.setLimitAmount(new BigDecimal("100"));
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(ownerScopeService.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(orgUnitId)));
+    when(approvalLimitRepository.findByAccountId(accountId))
+        .thenReturn(List.of(roleLimit, userLimit));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(caller));
+    // The role tier would match and is higher — the USER early return must still win (the role stub
+    // is never reached under correct code; it pins the regression scenario the early return
+    // guards).
+    when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(orgUnitId, MembershipRole.ENSIGN))
+        .thenReturn(true);
+    when(bankBookingRequestService.create(
+            eq(accountId),
+            eq(BankBookingRequestType.WITHDRAWAL),
+            eq(new BigDecimal("500")),
+            eq(null),
+            eq(null),
+            eq(null),
+            eq(true),
+            eq(new BigDecimal("100")),
+            eq(BankRequestApprover.RESPONSIBLE_HOLDER),
+            eq(false),
+            eq(null)))
+        .thenReturn(requestDto(accountId, orgUnitId));
+
+    service.createBookingRequest(request);
+
+    verify(bankBookingRequestService)
+        .create(
+            eq(accountId),
+            eq(BankBookingRequestType.WITHDRAWAL),
+            eq(new BigDecimal("500")),
+            eq(null),
+            eq(null),
+            eq(null),
+            eq(true),
+            eq(new BigDecimal("100")),
+            eq(BankRequestApprover.RESPONSIBLE_HOLDER),
+            eq(false),
+            eq(null));
+  }
+
+  @Test
+  void createBookingRequest_multipleMatchedTiers_usesMostPermissiveMax() {
+    // REQ-BANK-041/-047: with no USER limit, the resolved ceiling is the MOST PERMISSIVE (max)
+    // value
+    // across every membership tier the caller matches. On a Bereichskonto a caller matching both a
+    // MEMBERSHIP_ROLE=100 and the AREA_MEMBERS=1000 cascade must be capped at 1000, so a 500-aUEC
+    // withdrawal auto-approves (requiresOwnerApproval=false). If best.max() regressed to
+    // first-match
+    // or min the caller would be capped at 100 and wrongly forced into approval.
+    UUID bereichId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID caller = UUID.randomUUID();
+    BankAccount account =
+        typedAccount(
+            accountId, "KB-0005", BankAccountType.AREA, bereich(bereichId, "Profit", "PRF"));
+    CreateBankBookingRequest request =
+        new CreateBankBookingRequest(
+            accountId, BankBookingRequestType.WITHDRAWAL, null, new BigDecimal("500"), null);
+    BankAccountApprovalLimit roleLimit = new BankAccountApprovalLimit();
+    roleLimit.setGranteeKind(BankAccountViewGranteeKind.MEMBERSHIP_ROLE);
+    roleLimit.setRoleCode(MembershipRole.BEREICHSKOORDINATOR.name());
+    roleLimit.setLimitAmount(new BigDecimal("100"));
+    BankAccountApprovalLimit areaMembers = new BankAccountApprovalLimit();
+    areaMembers.setGranteeKind(BankAccountViewGranteeKind.AREA_MEMBERS);
+    areaMembers.setLimitAmount(new BigDecimal("1000"));
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(ownerScopeService.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(bereichId)));
+    when(approvalLimitRepository.findByAccountId(accountId))
+        .thenReturn(List.of(roleLimit, areaMembers));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(caller));
+    when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(
+            bereichId, MembershipRole.BEREICHSKOORDINATOR))
+        .thenReturn(true);
+    when(ownerScopeService.currentUserIsMemberOfAreaCascade(bereichId)).thenReturn(true);
+    when(bankBookingRequestService.create(
+            eq(accountId),
+            eq(BankBookingRequestType.WITHDRAWAL),
+            eq(new BigDecimal("500")),
+            eq(null),
+            eq(null),
+            eq(null),
+            eq(false),
+            eq(new BigDecimal("1000")),
+            isNull(),
+            eq(false),
+            eq(null)))
+        .thenReturn(requestDto(accountId, bereichId));
+
+    service.createBookingRequest(request);
+
+    verify(bankBookingRequestService)
+        .create(
+            eq(accountId),
+            eq(BankBookingRequestType.WITHDRAWAL),
+            eq(new BigDecimal("500")),
+            eq(null),
+            eq(null),
+            eq(null),
+            eq(false),
+            eq(new BigDecimal("1000")),
+            isNull(),
+            eq(false),
+            eq(null));
+  }
+
   private static BankBookingRequestDto requestDto(UUID accountId, UUID orgUnitId) {
     return new BankBookingRequestDto(
         UUID.randomUUID(),

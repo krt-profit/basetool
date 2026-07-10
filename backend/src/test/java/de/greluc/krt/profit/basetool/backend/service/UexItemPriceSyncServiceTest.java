@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -39,8 +40,10 @@ import de.greluc.krt.profit.basetool.backend.repository.GameItemPriceRepository;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.TerminalRepository;
 import jakarta.persistence.EntityManager;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -194,6 +197,56 @@ class UexItemPriceSyncServiceTest {
     service.flushAndClearIfBatchFull(UexItemPriceSyncService.FLUSH_BATCH_SIZE + 1);
 
     verifyNoInteractions(entityManager);
+  }
+
+  @Test
+  void syncItemPrices_isolatesPerRow_andSweepsOnlySavedIds() {
+    GameItem item1 = gameItem();
+    GameItem item2 = gameItem();
+    GameItem item3 = gameItem();
+    Terminal terminal1 = terminal();
+    Terminal terminal2 = terminal();
+    Terminal terminal3 = terminal();
+    UUID id1 = UUID.randomUUID();
+    UUID id3 = UUID.randomUUID();
+    when(uexClient.getItemPrices())
+        .thenReturn(
+            List.of(
+                dto(1, 107, 10.0, 0.0, 1L),
+                dto(2, 108, 20.0, 0.0, 2L),
+                dto(3, 109, 30.0, 0.0, 3L)));
+    when(gameItemRepository.findByUexItemId(1)).thenReturn(Optional.of(item1));
+    when(gameItemRepository.findByUexItemId(2)).thenReturn(Optional.of(item2));
+    when(gameItemRepository.findByUexItemId(3)).thenReturn(Optional.of(item3));
+    when(terminalRepository.findByIdTerminal(107)).thenReturn(Optional.of(terminal1));
+    when(terminalRepository.findByIdTerminal(108)).thenReturn(Optional.of(terminal2));
+    when(terminalRepository.findByIdTerminal(109)).thenReturn(Optional.of(terminal3));
+    when(gameItemPriceRepository.findByGameItemIdAndTerminalId(item1.getId(), terminal1.getId()))
+        .thenReturn(Optional.empty());
+    when(gameItemPriceRepository.findByGameItemIdAndTerminalId(item2.getId(), terminal2.getId()))
+        .thenReturn(Optional.empty());
+    when(gameItemPriceRepository.findByGameItemIdAndTerminalId(item3.getId(), terminal3.getId()))
+        .thenReturn(Optional.empty());
+    // The middle row's persistence blows up; the first and third must still save and be swept.
+    when(gameItemPriceRepository.save(any(GameItemPrice.class)))
+        .thenAnswer(
+            inv -> {
+              GameItemPrice p = inv.getArgument(0);
+              if (p.getGameItem() == item2) {
+                throw new IllegalStateException("simulated save failure for the middle row");
+              }
+              p.setId(p.getGameItem() == item1 ? id1 : id3);
+              return p;
+            });
+
+    service.syncItemPrices();
+
+    // All three rows were attempted — the per-row catch did not abort the loop on the middle row.
+    verify(gameItemPriceRepository, times(3)).save(any(GameItemPrice.class));
+    // Only the two successfully-saved ids reach the sweep; the failed row's id is never added.
+    ArgumentCaptor<Collection<UUID>> sweep = ArgumentCaptor.captor();
+    verify(gameItemPriceRepository).clearStalePrices(sweep.capture());
+    assertEquals(Set.of(id1, id3), Set.copyOf(sweep.getValue()));
   }
 
   // ---- helpers ---------------------------------------------------------------------------------

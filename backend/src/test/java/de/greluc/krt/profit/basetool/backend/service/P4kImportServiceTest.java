@@ -749,4 +749,122 @@ class P4kImportServiceTest {
             eq("Quantanium"),
             any());
   }
+
+  // ──────────────────────────────── blueprint ITEM-ingredient resolution ──
+
+  @Test
+  void blueprint_resolvesUnresolvedItemIngredientByWikiItemUuid() {
+    // A matched blueprint carries an ITEM line whose component game item was imported only after
+    // the blueprint: the still-unresolved line (game_item == null, wiki_item_uuid set) must be
+    // re-linked via gameItemRepository.findByExternalUuid and counted in ingredientsResolved. This
+    // is the ITEM twin of the RESOURCE branch and guards against a copy-paste swap to the wrong
+    // repository / UUID field.
+    UUID bpGuid = UUID.randomUUID();
+    UUID itemUuid = UUID.randomUUID();
+
+    Blueprint blueprint = new Blueprint();
+    blueprint.setScwikiUuid(bpGuid);
+    BlueprintIngredient ingredient = new BlueprintIngredient();
+    ingredient.setKind(BlueprintIngredientKind.ITEM);
+    ingredient.setOrderIndex(0);
+    ingredient.setWikiItemUuid(itemUuid);
+    ingredient.setGameItem(null); // unresolved ITEM line
+    blueprint.addIngredient(ingredient);
+
+    when(blueprintRepository.findByScwikiUuid(bpGuid)).thenReturn(Optional.of(blueprint));
+
+    GameItem component = new GameItem();
+    component.setName("Ballistic Gatling");
+    component.setExternalUuid(itemUuid);
+    when(gameItemRepository.findByExternalUuid(itemUuid)).thenReturn(Optional.of(component));
+
+    String json = "{\"blueprints\":[{\"guid\":\"" + bpGuid + "\",\"key\":\"BP_CRAFT_ITEM\"}]}";
+
+    P4kImportResultDto result = service.applyImport(upload(json), false);
+
+    assertEquals(1, result.blueprints().matched());
+    assertEquals(1, result.ingredientsResolved());
+    // The previously-unresolved ITEM line now points at the resolved component game item.
+    assertEquals(component, blueprint.getIngredients().get(0).getGameItem());
+  }
+
+  @Test
+  void blueprint_unresolvedItemIngredient_staysNullWhenComponentAbsent() {
+    // Negative twin: the component game item has not been imported yet, so the lookup misses and
+    // the line is neither counted nor linked (game_item stays null) — no over-count, no mislink.
+    UUID bpGuid = UUID.randomUUID();
+    UUID itemUuid = UUID.randomUUID();
+
+    Blueprint blueprint = new Blueprint();
+    blueprint.setScwikiUuid(bpGuid);
+    BlueprintIngredient ingredient = new BlueprintIngredient();
+    ingredient.setKind(BlueprintIngredientKind.ITEM);
+    ingredient.setOrderIndex(0);
+    ingredient.setWikiItemUuid(itemUuid);
+    ingredient.setGameItem(null);
+    blueprint.addIngredient(ingredient);
+
+    when(blueprintRepository.findByScwikiUuid(bpGuid)).thenReturn(Optional.of(blueprint));
+    when(gameItemRepository.findByExternalUuid(itemUuid)).thenReturn(Optional.empty());
+
+    String json = "{\"blueprints\":[{\"guid\":\"" + bpGuid + "\",\"key\":\"BP_CRAFT_ITEM\"}]}";
+
+    P4kImportResultDto result = service.applyImport(upload(json), false);
+
+    assertEquals(1, result.blueprints().matched());
+    assertEquals(0, result.ingredientsResolved());
+    // No FK link established when the component lookup finds nothing.
+    assertNull(blueprint.getIngredients().get(0).getGameItem());
+  }
+
+  // ──────────────────────────────── dev-token filter: substring is not a word ──
+
+  @Test
+  void item_seedableWhenDevTokenIsOnlyASubstring() {
+    // 'latest_rifle' merely embeds the 'test' token as a substring — the delimited-word guard in
+    // containsToken must NOT classify it as a dev asset (unlike a naive String.contains), so
+    // legitimate player content whose engine identifier embeds a token stays seedable.
+    UUID guid = UUID.randomUUID();
+    when(gameItemRepository.findByExternalUuid(guid)).thenReturn(Optional.empty());
+    when(gameItemRepository.findByClassNameIgnoreCase("latest_rifle")).thenReturn(List.of());
+    when(gameItemRepository.findByNameIgnoreCase("Latest Rifle")).thenReturn(List.of());
+
+    String json =
+        "{\"items\":[{\"guid\":\""
+            + guid
+            + "\",\"className\":\"latest_rifle\",\"name\":\"Latest Rifle\"}]}";
+
+    P4kImportResultDto result = service.applyImport(upload(json), true);
+
+    assertEquals(1, result.items().created());
+    assertEquals(0, result.items().unmatched());
+
+    ArgumentCaptor<GameItem> captor = ArgumentCaptor.forClass(GameItem.class);
+    verify(gameItemRepository).save(captor.capture());
+    assertEquals("Latest Rifle", captor.getValue().getName());
+    assertEquals(guid, captor.getValue().getExternalUuid());
+  }
+
+  // ──────────────────────────────── malformed GUID isolates one record ──
+
+  @Test
+  void item_unparseableGuid_isUnmatchedAndNeverSeeded() {
+    // A present-but-malformed GUID parses to null; every maybeSeed*/resolve* guard requires
+    // guid != null, so the single bad record is isolated as unmatched — never seeded (which would
+    // create a row with no cross-source join key) and never throwing (which would abort the whole
+    // all-or-nothing import as a 500).
+    when(gameItemRepository.findByClassNameIgnoreCase("wpn_realgun")).thenReturn(List.of());
+    when(gameItemRepository.findByNameIgnoreCase("Real Gun")).thenReturn(List.of());
+
+    String json =
+        "{\"items\":[{\"guid\":\"not-a-uuid\",\"className\":\"wpn_realgun\","
+            + "\"name\":\"Real Gun\"}]}";
+
+    P4kImportResultDto result = service.applyImport(upload(json), true);
+
+    assertEquals(0, result.items().matched());
+    assertEquals(0, result.items().created());
+    assertEquals(1, result.items().unmatched());
+    verify(gameItemRepository, never()).save(any());
+  }
 }

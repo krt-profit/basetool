@@ -25,6 +25,7 @@ import static org.mockito.Mockito.*;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
@@ -49,6 +50,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -114,6 +116,36 @@ class InventoryItemServiceBulkCheckoutTest {
     // Then
     verify(inventoryItemRepository).flush();
     verify(inventoryItemRepository).deleteAllById(List.of(itemId1, itemId2));
+  }
+
+  @Test
+  void bulkCheckout_recordsBulkCheckedOutAuditEventWithCount() {
+    // Gap 4: the bulk checkout of the audited Lager area must record INVENTORY_BULK_CHECKED_OUT,
+    // scoped to the acting user, with the removed count in its details payload.
+    UUID userId = UUID.randomUUID();
+    UUID itemId1 = UUID.randomUUID();
+    UUID itemId2 = UUID.randomUUID();
+
+    when(inventoryItemRepository.findByIdForUpdate(itemId1))
+        .thenReturn(Optional.of(itemOwnedBy(itemId1, userId)));
+    when(inventoryItemRepository.findByIdForUpdate(itemId2))
+        .thenReturn(Optional.of(itemOwnedBy(itemId2, userId)));
+
+    BulkCheckoutRequest request = new BulkCheckoutRequest(List.of(itemId1, itemId2));
+
+    inventoryItemService.bulkCheckout(request, userId);
+
+    ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
+    verify(auditService)
+        .record(
+            eq(AuditEventType.INVENTORY_BULK_CHECKED_OUT),
+            isNull(),
+            isNull(),
+            eq(userId),
+            details.capture());
+    assertTrue(
+        details.getValue().toString().contains("count=2"),
+        "the audit details must carry the removed item count");
   }
 
   @Test

@@ -22,12 +22,16 @@ package de.greluc.krt.profit.basetool.frontend.config;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.frontend.logging.ActiveSquadronContext;
+import de.greluc.krt.profit.basetool.frontend.logging.ClientIpContext;
 import de.greluc.krt.profit.basetool.frontend.logging.CorrelationContext;
+import de.greluc.krt.profit.basetool.frontend.logging.GuestEditTokenContext;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.i18n.LocaleContextHolder;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
@@ -47,8 +51,12 @@ import reactor.core.scheduler.Schedulers;
  * <p>The Reactor side relies on {@link
  * reactor.core.publisher.Hooks#enableAutomaticContextPropagation()} being on. That is activated in
  * {@link ReactorContextPropagationConfig#enableContextPropagation()}; we trigger it once at {@link
- * BeforeAll} time, then run two parallel-scheduler-bound assertions — one for each registered
- * accessor.
+ * BeforeAll} time, then run a parallel-scheduler-bound assertion for each registered accessor —
+ * {@link ActiveSquadronContext}, {@link CorrelationContext}, {@link ClientIpContext}, {@link
+ * GuestEditTokenContext} and the {@link LocaleContextHolder}-backed user locale. The three
+ * later-added accessors (client IP for the backend per-IP rate limiter, guest edit token for
+ * anonymous mission sign-up edits, user locale for the {@code Accept-Language} relay) would each
+ * silently drop their outbound header if the registration or its null/blank branch regressed.
  */
 class ReactorContextPropagationConfigTest {
 
@@ -61,6 +69,9 @@ class ReactorContextPropagationConfigTest {
   void clearHolders() {
     ActiveSquadronContext.clear();
     CorrelationContext.clear();
+    ClientIpContext.clear();
+    GuestEditTokenContext.clear();
+    LocaleContextHolder.resetLocaleContext();
   }
 
   @Test
@@ -108,6 +119,90 @@ class ReactorContextPropagationConfigTest {
     assertThat(observedOnReactorThread.get())
         .as("CorrelationContext must be visible on the Reactor parallel-scheduler thread")
         .isEqualTo(correlationId);
+  }
+
+  @Test
+  void guestEditTokenContext_isVisibleInsideMonoOnDifferentScheduler() {
+    String guestToken = "guest-edit-token-" + UUID.randomUUID();
+    GuestEditTokenContext.set(guestToken);
+
+    AtomicReference<String> observedOnReactorThread = new AtomicReference<>();
+    AtomicReference<String> observedThreadName = new AtomicReference<>();
+
+    Mono.fromCallable(
+            () -> {
+              observedOnReactorThread.set(GuestEditTokenContext.get());
+              observedThreadName.set(Thread.currentThread().getName());
+              return "done";
+            })
+        .subscribeOn(Schedulers.parallel())
+        .block();
+
+    assertThat(observedOnReactorThread.get())
+        .as("GuestEditTokenContext must be visible on the Reactor parallel-scheduler thread")
+        .isEqualTo(guestToken);
+    assertThat(observedThreadName.get())
+        .as(
+            "sanity: the callable must have run on a Reactor parallel-N worker, not the JUnit"
+                + " thread")
+        .startsWith("parallel-");
+  }
+
+  @Test
+  void clientIpContext_isVisibleInsideMonoOnDifferentScheduler() {
+    // TEST-NET-3 documentation range (RFC 5737) — synthetic, never a real client address.
+    String clientIp = "203.0.113.7";
+    ClientIpContext.set(clientIp);
+
+    AtomicReference<String> observedOnReactorThread = new AtomicReference<>();
+    AtomicReference<String> observedThreadName = new AtomicReference<>();
+
+    Mono.fromCallable(
+            () -> {
+              observedOnReactorThread.set(ClientIpContext.get());
+              observedThreadName.set(Thread.currentThread().getName());
+              return "done";
+            })
+        .subscribeOn(Schedulers.parallel())
+        .block();
+
+    assertThat(observedOnReactorThread.get())
+        .as("ClientIpContext must be visible on the Reactor parallel-scheduler thread")
+        .isEqualTo(clientIp);
+    assertThat(observedThreadName.get())
+        .as(
+            "sanity: the callable must have run on a Reactor parallel-N worker, not the JUnit"
+                + " thread")
+        .startsWith("parallel-");
+  }
+
+  @Test
+  void userLocaleContext_isVisibleInsideMonoOnDifferentScheduler() {
+    // Pick a locale guaranteed to differ from the JVM default: on a propagation failure the worker
+    // falls back to LocaleContextHolder.getLocale() == default, which must not read as a pass.
+    Locale target = Locale.JAPAN.equals(Locale.getDefault()) ? Locale.CANADA_FRENCH : Locale.JAPAN;
+    LocaleContextHolder.setLocale(target);
+
+    AtomicReference<Locale> observedOnReactorThread = new AtomicReference<>();
+    AtomicReference<String> observedThreadName = new AtomicReference<>();
+
+    Mono.fromCallable(
+            () -> {
+              observedOnReactorThread.set(LocaleContextHolder.getLocale());
+              observedThreadName.set(Thread.currentThread().getName());
+              return "done";
+            })
+        .subscribeOn(Schedulers.parallel())
+        .block();
+
+    assertThat(observedOnReactorThread.get())
+        .as("the user locale must be visible on the Reactor parallel-scheduler thread")
+        .isEqualTo(target);
+    assertThat(observedThreadName.get())
+        .as(
+            "sanity: the callable must have run on a Reactor parallel-N worker, not the JUnit"
+                + " thread")
+        .startsWith("parallel-");
   }
 
   @Test
