@@ -31,7 +31,11 @@ A member of a job order's **requesting org unit** (Auftraggeber) MAY:
   collection-progress fields `currentStock` / `claims` / `openAmount`), the delivery events
   (handovers / item-handovers) and the blueprint-coverage view. The ordered lines the requester
   placed (materials with quantity + min-quality, or ordered items), the comment, the status and the
-  optimistic-lock version are preserved.
+  optimistic-lock version are preserved. The redacted `JobOrderDto` carries a **per-order `redacted`
+  flag** (`true` on this view, `false` on the full view), stamped server-side from the loaded entity;
+  the client keys its limited rendering off that flag rather than a global capability, so a member who
+  is both profit-eligible **and** the requester of a foreign-processed order sees the limited template
+  that matches the redacted data.
 - **Edit** the order — **only while it is still fully undelivered** (the *whole-order freeze*: the
   order has no material handover and no item handover). Within that window the requester may change
   quantities, add or remove material/item lines, change a material's min-quality within the fixed
