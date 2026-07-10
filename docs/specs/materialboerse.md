@@ -1,18 +1,26 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-09.
-> **Owner area:** MARKET · **Related ADRs:** ADR-0082
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-10.
+> **Owner area:** MARKET · **Related ADRs:** ADR-0082, ADR-0087
 
 # Materialbörse — material-exchange trade board
 
 ## Context & goal
 
 The Materialbörse (Flotte & Logistik, `/materialboerse`) is a central, org-wide-visible marketplace
-for materials a player releases for trade. It shows **only** which player offers which material, in
-which quality and quantity; negotiation and handover happen off-tool between the players. It builds
-on the existing Lager (`InventoryItem`): a member releases one of their own stock rows with a
-free-form Markdown remark ("was suchst du im Gegenzug?"), other members register interest, and the
-anbieter takes the negotiation from there. The design is fixed by the DAS KARTELL design proposal
-`proposals/materialboerse-final.html` (locked master-detail layout). Data model + visibility
-decisions are recorded in ADR-0082.
+for things a player releases for trade. It shows **only** which player offers what, in which quality
+and quantity; negotiation and handover happen off-tool between the players. It carries two kinds of
+offer:
+
+- a **material offer** — a thin overlay on the existing Lager (`InventoryItem`): a member releases one
+  of their own stock rows with a free-form Markdown remark ("was suchst du im Gegenzug?"), and
+  material/quality/amount are read **live** from the item (REQ-MARKET-002);
+- an **item offer** (#1185, REQ-MARKET-012) — a **craftable item** ("an item for which a blueprint
+  exists"), which has no Lager row, so the member states the quantity explicitly and there is no
+  quality.
+
+Either way other members register interest and the anbieter takes the negotiation from there. The
+design is fixed by the DAS KARTELL design proposal `proposals/materialboerse-final.html` (locked
+master-detail layout). Data model + visibility decisions are recorded in ADR-0082 (material offers)
+and ADR-0087 (item offers).
 
 ## Requirements
 
@@ -115,8 +123,10 @@ deactivated offer is retained for the audit trail but never listed.
 Every state-mutating Materialbörse activity (offer release, offer deactivate, remark edit, interest
 register, interest withdraw) writes exactly one `audit_event` row under `AuditDomain.MARKET`, in the
 business transaction, with a PII-free `key=value` details payload (ids/quality/amount/remark **length**
-only — never the remark body, never usernames). The unified audit viewer gains a Materialbörse tab.
-See `docs/specs/audit.md` (REQ-AUDIT-001/002).
+only — never the remark body, never usernames). Item offers (REQ-MARKET-012) **reuse** the same five
+`MARKET_*` event types with a kind-aware details payload (`kind`/`product` key/`qty` instead of the
+live `q`/`amt`); the subject label is the item's display name (a non-personal game-asset name). The
+unified audit viewer gains a Materialbörse tab. See `docs/specs/audit.md` (REQ-AUDIT-001/002).
 
 **Acceptance**
 - [ ] Each mutation records its `MARKET_*` event; no name or remark body appears in `details`.
@@ -189,6 +199,42 @@ EN + base bundles, `{interessent}`/`{material}` placeholders).
 `MaterialExchangeService#registerInterestInNewTransaction`,
 `event/MaterialExchangeInterestRegisteredEvent`, `model/NotificationEventType`,
 `model/NotificationType`, `db/migration/V211__seed_material_exchange_interest_notification_rule.sql`
+
+### REQ-MARKET-012 — Offer a craftable item (blueprint product) with a stated quantity
+
+A member may list a **craftable item** on the board via the "Item anbieten" CTA (a second CTA beside
+"Material anbieten"). Only items **an active blueprint produces** are offerable: the item picker is
+the blueprint-product type-ahead, and the release is rejected server-side unless the chosen
+normalized `productKey` resolves through `BlueprintProductService.resolveByProductKey(...)` (#1185).
+Because an item offer has **no** backing Lager row, the member **states the quantity** (a whole
+number ≥ 1) — unlike a material offer, whose amount is read live — and there is **no quality** and
+**no location**. The offer is a discriminated kind of the same `MaterialExchangeOffer` aggregate
+(`kind ∈ {MATERIAL, ITEM}`, ADR-0087): it stores the resolved `productKey`, the canonical display
+name snapshotted at release, and the quantity; owner + squadron badge are stamped from the acting
+member. Item offers are **not** de-duplicated (a member may list the same item several times) — the
+V210 one-active-offer-per-Lager-row index governs only material offers. On the board, an item offer
+renders its item name, an "Item" marker and its quantity (Stück) — no quality; a non-zero
+min-quality filter therefore excludes item offers. Every state-mutating item-offer activity reuses
+the `MARKET_*` audit events with a kind-aware, PII-free `kind`/`product`/`qty` details payload
+(REQ-MARKET-008), lands on the same live-synced board (REQ-MARKET-010, reusing the `board` section
+key), and honours the location-never-exposed / interessenten-anonymity rules unchanged
+(REQ-MARKET-004/006).
+
+**Acceptance**
+- [ ] "Item anbieten" lists an item with a stated quantity; a `productKey` no active blueprint
+produces is rejected (404), and nothing is persisted.
+- [ ] An item offer carries no quality and no location; the board renders its name + quantity, and a
+min-quality filter excludes it.
+- [ ] The same member may hold several active offers for the same item.
+- [ ] Item-offer release/deactivate/remark/interest record `MARKET_*` events whose details never
+contain the display name or remark body.
+
+**Enforced by:** `MaterialExchangeServiceTest`, `MaterialExchangeRepositoryDataTest`,
+`MaterialboersePageControllerMvcTest` · **Code:** `MaterialExchangeService#releaseItem`,
+`MaterialExchangeItemReleaseRequest`, `MaterialExchangeOffer` (`kind`/`itemProductKey`/`itemName`/
+`itemQuantity`), `MaterialExchangeOfferRepository#findBoard`,
+`db/migration/V213__add_material_exchange_item_offers.sql`, `materialboerse.html`,
+`materialboerse-release.js`
 
 ## Out of scope
 

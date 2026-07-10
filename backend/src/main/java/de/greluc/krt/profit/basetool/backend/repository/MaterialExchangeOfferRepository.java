@@ -41,41 +41,86 @@ public interface MaterialExchangeOfferRepository
   /**
    * The Materialbörse board query — every {@code ACTIVE} offer, optionally narrowed to the caller's
    * own offers (the "Meine Angebote" tab) and by the toolbar filters. The board is org-wide (no
-   * OrgUnit scope filter, decision D3): every active offer is visible to every member. Material,
-   * quality and amount are read live off the joined {@link MaterialExchangeOffer#getInventoryItem()
-   * item} — the item's location is never referenced, keeping the Standort private (REQ-MARKET-004).
-   * The associations are eager-loaded via {@link EntityGraph} so the list renders without an N+1;
-   * all of them are single-valued {@code @ManyToOne}, so pagination stays a DB {@code LIMIT}.
+   * OrgUnit scope filter, decision D3): every active offer is visible to every member.
+   *
+   * <p>The board carries both offer kinds (REQ-MARKET-012). Because an item offer has a {@code
+   * NULL} {@code inventory_item_id}, the item / material / owner / org-unit associations are joined
+   * with an explicit {@code LEFT JOIN FETCH} (an implicit path join would be an inner join and
+   * would silently drop item offers) — this both eager-loads them so the list renders without an
+   * N+1 and exposes the aliases the filters and the sort need. The name filter and the sort span
+   * both branches via {@code COALESCE} (material name / amount ⟷ item name / quantity); the
+   * location is never referenced, keeping the Standort private (REQ-MARKET-004). The min-quality
+   * filter applies only to material offers — an item offer has no quality, so a non-zero
+   * min-quality excludes item offers. All fetched associations are single-valued
+   * {@code @ManyToOne}, so pagination stays a DB {@code LIMIT}. The sort is embedded (driven by
+   * {@code sortKey}) rather than carried on the {@link Pageable}, so the caller passes an unsorted
+   * page request.
    *
    * @param viewerId the caller's user id — used only when {@code onlyMine} is {@code true}.
    * @param onlyMine {@code true} for the "Meine Angebote" tab, {@code false} for "Alle Angebote".
-   * @param query a pre-lowercased {@code %fragment%} matched against the material name and the
+   * @param query a pre-lowercased {@code %fragment%} matched against the material/item name and the
    *     owner's username/display name, or {@code null} for no text filter.
-   * @param minQuality the inclusive minimum quality (0 disables the filter).
-   * @param minAmount the inclusive minimum amount in SCU, or {@code null} for no amount filter.
-   * @param pageable the page + whitelisted sort (quality / amount / material name / releasedAt).
+   * @param minQuality the inclusive minimum quality (0 disables the filter; a non-zero value
+   *     excludes item offers, which have no quality).
+   * @param minAmount the inclusive minimum quantity (SCU for a material offer, pieces for an item
+   *     offer), or {@code null} for no amount filter.
+   * @param sortKey the whitelisted sort key — {@code menge} / {@code mat} / {@code neu}, else
+   *     quality (the default); must be non-null.
+   * @param pageable the (unsorted) page request — the ORDER BY is embedded in the query.
    * @return the matching page of active offers, never {@code null}.
    */
-  @EntityGraph(
-      attributePaths = {"inventoryItem", "inventoryItem.material", "owner", "owningOrgUnit"})
   @Query(
-      """
-      SELECT o FROM MaterialExchangeOffer o
-      WHERE o.status = de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus.ACTIVE
-        AND (:onlyMine = false OR o.owner.id = :viewerId)
-        AND (:query IS NULL
-             OR LOWER(o.inventoryItem.material.name) LIKE :query
-             OR LOWER(o.owner.username) LIKE :query
-             OR LOWER(o.owner.displayName) LIKE :query)
-        AND (:minQuality = 0 OR o.inventoryItem.quality >= :minQuality)
-        AND (:minAmount IS NULL OR o.inventoryItem.amount >= :minAmount)
-      """)
+      value =
+          """
+          SELECT o FROM MaterialExchangeOffer o
+          LEFT JOIN FETCH o.inventoryItem ii
+          LEFT JOIN FETCH ii.material m
+          LEFT JOIN FETCH o.owner ow
+          LEFT JOIN FETCH o.owningOrgUnit
+          WHERE o.status = de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus.ACTIVE
+            AND (:onlyMine = false OR ow.id = :viewerId)
+            AND (:query IS NULL
+                 OR LOWER(m.name) LIKE :query
+                 OR LOWER(o.itemName) LIKE :query
+                 OR LOWER(ow.username) LIKE :query
+                 OR LOWER(ow.displayName) LIKE :query)
+            AND (:minQuality = 0 OR ii.quality >= :minQuality)
+            AND (:minAmount IS NULL
+                 OR (ii.id IS NOT NULL AND ii.amount >= :minAmount)
+                 OR (ii.id IS NULL AND o.itemQuantity >= :minAmount))
+          ORDER BY
+            CASE WHEN :sortKey = 'menge' THEN COALESCE(ii.amount, o.itemQuantity) END DESC,
+            CASE WHEN :sortKey = 'mat' THEN LOWER(COALESCE(m.name, o.itemName)) END ASC,
+            CASE WHEN :sortKey = 'neu' THEN o.releasedAt END DESC,
+            CASE WHEN :sortKey NOT IN ('menge', 'mat', 'neu') THEN COALESCE(ii.quality, -1) END DESC,
+            o.releasedAt DESC,
+            o.id DESC
+          """,
+      countQuery =
+          """
+          SELECT COUNT(o) FROM MaterialExchangeOffer o
+          LEFT JOIN o.inventoryItem ii
+          LEFT JOIN ii.material m
+          LEFT JOIN o.owner ow
+          WHERE o.status = de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus.ACTIVE
+            AND (:onlyMine = false OR ow.id = :viewerId)
+            AND (:query IS NULL
+                 OR LOWER(m.name) LIKE :query
+                 OR LOWER(o.itemName) LIKE :query
+                 OR LOWER(ow.username) LIKE :query
+                 OR LOWER(ow.displayName) LIKE :query)
+            AND (:minQuality = 0 OR ii.quality >= :minQuality)
+            AND (:minAmount IS NULL
+                 OR (ii.id IS NOT NULL AND ii.amount >= :minAmount)
+                 OR (ii.id IS NULL AND o.itemQuantity >= :minAmount))
+          """)
   Page<MaterialExchangeOffer> findBoard(
       @Param("viewerId") UUID viewerId,
       @Param("onlyMine") boolean onlyMine,
       @Param("query") String query,
       @Param("minQuality") int minQuality,
       @Param("minAmount") Double minAmount,
+      @Param("sortKey") String sortKey,
       Pageable pageable);
 
   /**

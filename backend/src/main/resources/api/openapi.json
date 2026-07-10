@@ -24010,6 +24010,98 @@
         } ]
       }
     },
+    "/api/v1/material-exchange/item-offers" : {
+      "post" : {
+        "tags" : [ "Material Exchange" ],
+        "summary" : "List a craftable item on the Materialbörse.",
+        "operationId" : "releaseItem",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MaterialExchangeItemReleaseRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "Created",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MaterialExchangeOfferDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/material-categories" : {
       "get" : {
         "tags" : [ "material-category-controller" ],
@@ -53053,8 +53145,19 @@
             "type" : "string",
             "format" : "uuid"
           },
+          "kind" : {
+            "type" : "string",
+            "enum" : [ "MATERIAL", "ITEM" ]
+          },
           "material" : {
             "$ref" : "#/components/schemas/MaterialReferenceDto"
+          },
+          "itemName" : {
+            "type" : "string"
+          },
+          "itemQuantity" : {
+            "type" : "integer",
+            "format" : "int32"
           },
           "owner" : {
             "$ref" : "#/components/schemas/UserReferenceDto"
@@ -54886,6 +54989,28 @@
           }
         },
         "required" : [ "inventoryItemId" ]
+      },
+      "MaterialExchangeItemReleaseRequest" : {
+        "type" : "object",
+        "properties" : {
+          "productKey" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "quantity" : {
+            "type" : "integer",
+            "format" : "int32",
+            "maximum" : 1000000,
+            "minimum" : 1
+          },
+          "remark" : {
+            "type" : "string",
+            "maxLength" : 20000,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "productKey", "quantity" ]
       },
       "InventoryItemCreateDto" : {
         "type" : "object",

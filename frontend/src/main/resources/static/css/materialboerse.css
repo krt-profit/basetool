@@ -20,6 +20,25 @@
 .mb-head-title {
     min-width: 0;
 }
+.mb-head-cta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+/* Small "Item" marker distinguishing a blueprint-product offer from a material offer on the
+   board (REQ-MARKET-012). Composition only — reuses design-system tokens, square corners. */
+.mb-kind-tag {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-primary);
+    border: 1px solid rgb(231 126 35 / 45%);
+    padding: 1px 5px;
+    vertical-align: middle;
+}
 
 /* ---- toolbar (tabs + search + filters) ---- */
 .mb-toolbar {
@@ -311,6 +330,22 @@
 }
 .mb-modal-facts {
     margin-bottom: 14px;
+}
+/* Item-offer quantity field (item mode only, REQ-MARKET-012). */
+.mb-modal-qty {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 14px;
+}
+.mb-modal-qty input[type='number'] {
+    width: 140px;
+    height: 34px;
+    font-variant-numeric: tabular-nums;
+}
+.mb-modal-qty-error {
+    font-size: 11px;
+    color: var(--color-danger-text);
 }
 .mb-modal-remark-label {
     display: block;

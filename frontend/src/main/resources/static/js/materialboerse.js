@@ -231,16 +231,21 @@
                 {
                     offerId: el.getAttribute('data-offer-id'),
                     version: el.getAttribute('data-version'),
+                    kind: el.getAttribute('data-kind'),
                     material: el.getAttribute('data-material'),
                     quality: el.getAttribute('data-quality'),
                     amount: el.getAttribute('data-amount'),
                     quantityType: el.getAttribute('data-quantity-type'),
+                    itemName: el.getAttribute('data-item-name'),
+                    itemQuantity: el.getAttribute('data-item-quantity'),
                     remark: el.getAttribute('data-remark'),
                 },
                 swapBoard,
             );
         } else if (el.hasAttribute('data-mb-open-release') && window.krtMaterialRelease) {
             window.krtMaterialRelease.open('new', {}, onReleased);
+        } else if (el.hasAttribute('data-mb-open-item') && window.krtMaterialRelease) {
+            window.krtMaterialRelease.open('item', {}, onReleased);
         }
     }
 
@@ -274,7 +279,8 @@
             (el = e.target.closest('[data-mb-interest]')) ||
             (el = e.target.closest('[data-mb-deactivate]')) ||
             (el = e.target.closest('[data-mb-edit]')) ||
-            (el = e.target.closest('[data-mb-open-release]'))
+            (el = e.target.closest('[data-mb-open-release]')) ||
+            (el = e.target.closest('[data-mb-open-item]'))
         ) {
             handleAction(el);
             return;

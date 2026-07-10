@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeInterest;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOffer;
+import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferKind;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus;
 import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -40,17 +41,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Data-level coverage for the Materialbörse repositories ({@link MaterialExchangeOfferRepository} /
  * {@link MaterialExchangeInterestRepository}) against the real Postgres test schema (Testcontainers
- * + Flyway V210 via the {@code test} profile). Validates the board JPQL (including the nested-path
- * sort and the live-item filters), the anonymity-safe grouped interest counts, and the two DB
- * invariants the migration enforces: one {@code ACTIVE} offer per Lager row (partial-unique) and
- * one interest registration per {@code (offer, user)}.
+ * + Flyway V210…V213 via the {@code test} profile). Validates the board JPQL (the COALESCE-based
+ * cross-kind filters/sort spanning both material and item offers, REQ-MARKET-012), the
+ * anonymity-safe grouped interest counts, and the DB invariants the migrations enforce: one {@code
+ * ACTIVE} offer per Lager row (partial-unique), one interest registration per {@code (offer,
+ * user)}, and the V213 exactly-one-branch {@code CHECK} on an offer's kind.
  *
  * <p>{@link Transactional} so each method rolls back — the seeded rows must never commit to the
  * shared Testcontainers database. Reads still see the rows because they are flushed within the test
@@ -92,12 +93,7 @@ class MaterialExchangeRepositoryDataTest {
 
     var all =
         offerRepository.findBoard(
-            owner.getId(),
-            false,
-            null,
-            0,
-            null,
-            PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "inventoryItem.quality")));
+            owner.getId(), false, null, 0, null, "qual", PageRequest.of(0, 20));
 
     assertThat(all.getContent())
         .as("only the two ACTIVE offers, quality-sorted desc, deactivated excluded")
@@ -105,14 +101,15 @@ class MaterialExchangeRepositoryDataTest {
         .doesNotContain(deactivated);
 
     var minQual =
-        offerRepository.findBoard(owner.getId(), false, null, 900, null, PageRequest.of(0, 20));
+        offerRepository.findBoard(
+            owner.getId(), false, null, 900, null, "qual", PageRequest.of(0, 20));
     assertThat(minQual.getContent())
         .as("min-quality 900 keeps only the Q920 item (read live from the item)")
         .containsExactly(highOffer);
 
     var byText =
         offerRepository.findBoard(
-            owner.getId(), false, "%tungsten%", 0, null, PageRequest.of(0, 20));
+            owner.getId(), false, "%tungsten%", 0, null, "qual", PageRequest.of(0, 20));
     assertThat(byText.getContent())
         .as("text filter matches the material name live off the item")
         .containsExactly(lowOffer);
@@ -181,12 +178,99 @@ class MaterialExchangeRepositoryDataTest {
     persistOffer(item, owner, MaterialExchangeOfferStatus.ACTIVE);
 
     MaterialExchangeOffer duplicate = new MaterialExchangeOffer();
+    duplicate.setKind(MaterialExchangeOfferKind.MATERIAL);
     duplicate.setInventoryItem(item);
     duplicate.setOwner(owner);
     duplicate.setStatus(MaterialExchangeOfferStatus.ACTIVE);
     duplicate.setReleasedAt(Instant.now());
 
     assertThatThrownBy(() -> offerRepository.saveAndFlush(duplicate))
+        .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  /**
+   * The board carries item offers (REQ-MARKET-012): the JPQL's {@code LEFT JOIN}s keep the
+   * null-inventory-item rows, the name filter matches the item's stored display name, a min-quality
+   * filter excludes item offers (they have no quality), and a min-amount filter compares against
+   * the stated item quantity.
+   */
+  @Test
+  void findBoard_includesItemOffers_withCrossKindFiltersAndSort() {
+    User owner = persistUser("item-anbieter");
+    InventoryItem materialItem = persistItem(owner, "Quantanium", 950, 500.0);
+    MaterialExchangeOffer materialOffer =
+        persistOffer(materialItem, owner, MaterialExchangeOfferStatus.ACTIVE);
+    MaterialExchangeOffer itemOffer =
+        persistItemOffer(owner, "venture helmet", "Venture Helmet", 7);
+    entityManager.flush();
+
+    var all =
+        offerRepository.findBoard(
+            owner.getId(), false, null, 0, null, "neu", PageRequest.of(0, 20));
+    assertThat(all.getContent())
+        .as("both a material and an item offer are on the board")
+        .contains(materialOffer, itemOffer);
+
+    var byItemName =
+        offerRepository.findBoard(
+            owner.getId(), false, "%venture%", 0, null, "mat", PageRequest.of(0, 20));
+    assertThat(byItemName.getContent())
+        .as("the name filter matches the item's stored display name")
+        .containsExactly(itemOffer);
+
+    var minQual =
+        offerRepository.findBoard(
+            owner.getId(), false, null, 500, null, "qual", PageRequest.of(0, 20));
+    assertThat(minQual.getContent())
+        .as("a non-zero min-quality excludes item offers (no quality)")
+        .containsExactly(materialOffer)
+        .doesNotContain(itemOffer);
+
+    var minAmount =
+        offerRepository.findBoard(
+            owner.getId(), false, null, 0, 8.0, "menge", PageRequest.of(0, 20));
+    assertThat(minAmount.getContent())
+        .as("min-amount 8 drops the 7-piece item offer but keeps the 500-SCU material")
+        .contains(materialOffer)
+        .doesNotContain(itemOffer);
+  }
+
+  /**
+   * Item offers are deliberately not de-duplicated (REQ-MARKET-012): unlike a material offer (one
+   * ACTIVE per Lager row), a member may list the same product several times, so two active item
+   * offers for the same (owner, product) coexist.
+   */
+  @Test
+  void multipleActiveItemOffersForSameOwnerAndProductAllowed() {
+    User owner = persistUser("multi-item");
+    MaterialExchangeOffer first = persistItemOffer(owner, "venture helmet", "Venture Helmet", 3);
+    MaterialExchangeOffer second = persistItemOffer(owner, "venture helmet", "Venture Helmet", 9);
+    entityManager.flush();
+
+    var mine =
+        offerRepository.findBoard(owner.getId(), true, null, 0, null, "neu", PageRequest.of(0, 20));
+    assertThat(mine.getContent())
+        .as("both active item offers for the same product survive (no unique constraint)")
+        .contains(first, second);
+  }
+
+  /**
+   * The V213 exactly-one-branch {@code CHECK} rejects a malformed item offer — here one missing its
+   * quantity — surfacing as a translated {@link DataIntegrityViolationException}.
+   */
+  @Test
+  void itemOfferCheckConstraint_rejectsMissingQuantity() {
+    User owner = persistUser("ck-item");
+    MaterialExchangeOffer bad = new MaterialExchangeOffer();
+    bad.setKind(MaterialExchangeOfferKind.ITEM);
+    bad.setOwner(owner);
+    bad.setItemProductKey("venture helmet");
+    bad.setItemName("Venture Helmet");
+    bad.setItemQuantity(null);
+    bad.setStatus(MaterialExchangeOfferStatus.ACTIVE);
+    bad.setReleasedAt(Instant.now());
+
+    assertThatThrownBy(() -> offerRepository.saveAndFlush(bad))
         .isInstanceOf(DataIntegrityViolationException.class);
   }
 
@@ -219,14 +303,30 @@ class MaterialExchangeRepositoryDataTest {
     return inventoryItemRepository.save(item);
   }
 
-  /** Persists an offer in the given status for the item (owningOrgUnit left null). */
+  /** Persists a material offer in the given status for the item (owningOrgUnit left null). */
   private MaterialExchangeOffer persistOffer(
       InventoryItem item, User owner, MaterialExchangeOfferStatus status) {
     MaterialExchangeOffer offer = new MaterialExchangeOffer();
+    offer.setKind(MaterialExchangeOfferKind.MATERIAL);
     offer.setInventoryItem(item);
     offer.setOwner(owner);
     offer.setRemark("Tausche gegen **Titanium**.");
     offer.setStatus(status);
+    offer.setReleasedAt(Instant.now());
+    return offerRepository.save(offer);
+  }
+
+  /** Persists an active item (blueprint-product) offer with a stated quantity and no Lager row. */
+  private MaterialExchangeOffer persistItemOffer(
+      User owner, String productKey, String itemName, int quantity) {
+    MaterialExchangeOffer offer = new MaterialExchangeOffer();
+    offer.setKind(MaterialExchangeOfferKind.ITEM);
+    offer.setOwner(owner);
+    offer.setItemProductKey(productKey);
+    offer.setItemName(itemName);
+    offer.setItemQuantity(quantity);
+    offer.setRemark("Tausche gegen **aUEC**.");
+    offer.setStatus(MaterialExchangeOfferStatus.ACTIVE);
     offer.setReleasedAt(Instant.now());
     return offerRepository.save(offer);
   }

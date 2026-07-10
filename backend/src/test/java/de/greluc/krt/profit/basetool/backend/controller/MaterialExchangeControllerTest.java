@@ -23,9 +23,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferKind;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeCountsDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeItemReleaseRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeOfferDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleasableItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleaseRequest;
@@ -95,6 +97,17 @@ class MaterialExchangeControllerTest {
 
     assertThat(controller.release(request)).isSameAs(dto);
     verify(service).release(request);
+  }
+
+  @Test
+  void releaseItemDelegates() {
+    MaterialExchangeItemReleaseRequest request =
+        new MaterialExchangeItemReleaseRequest("venture helmet", 5, "gegen aUEC");
+    MaterialExchangeOfferDto dto = sampleDto();
+    when(service.releaseItem(request)).thenReturn(dto);
+
+    assertThat(controller.releaseItem(request)).isSameAs(dto);
+    verify(service).releaseItem(request);
   }
 
   @Test
@@ -168,7 +181,10 @@ class MaterialExchangeControllerTest {
   private MaterialExchangeOfferDto sampleDto() {
     return new MaterialExchangeOfferDto(
         offerId,
+        MaterialExchangeOfferKind.MATERIAL,
         new MaterialReferenceDto(UUID.randomUUID(), "Agricium", QuantityType.SCU),
+        null,
+        null,
         new UserReferenceDto(UUID.randomUUID(), "Anbieter", "Anbieter", "Anbieter", null),
         null,
         false,

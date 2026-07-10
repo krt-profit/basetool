@@ -391,8 +391,10 @@ transaction per pass) rather than per-scrape.
   `PROMOTION` / `PERSONAL_INVENTORY` / `MARKET` are excluded as legitimately-quiet and reviewed on
   the operations dashboard's per-domain table instead).
 - `basetool_material_exchange_active_count{status="ACTIVE"}` gauge sampled by
-  `BusinessMetricsCollector` — the number of active Materialbörse offers on the board (REQ-MARKET-*,
-  REQ-OBS-011). Counts only; the board never emits a per-offer, per-user or location label.
+  `BusinessMetricsCollector` — the number of active Materialbörse offers on the board, spanning
+  **both** offer kinds (material and item, REQ-MARKET-012), via `countByStatus(ACTIVE)`
+  (REQ-MARKET-*, REQ-OBS-011). Counts only; the board never emits a per-offer, per-user, per-kind or
+  location label.
 - `basetool_bank_audit_events_total{event_type}` counter at the single `BankAuditService.record`
   choke point (`event_type` = the bounded `BankAuditEventType` enum). The bank keeps a physically
   separate `bank_audit_event` table excluded from `AuditDomain`, so before #1041 item 10 the most

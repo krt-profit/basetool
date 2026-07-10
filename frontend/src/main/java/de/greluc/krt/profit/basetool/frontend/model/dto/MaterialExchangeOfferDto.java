@@ -32,13 +32,16 @@ import java.util.UUID;
  * viewer (anonymity, REQ-MARKET-006).
  *
  * @param id the offer id.
- * @param material the offered material reference.
+ * @param kind the offer kind name (MATERIAL / ITEM); drives which branch is rendered.
+ * @param material the offered material reference for a material offer, else {@code null}.
+ * @param itemName the offered item's display name for an item offer, else {@code null}.
+ * @param itemQuantity the offered whole-piece quantity for an item offer, else {@code null}.
  * @param owner the offering player (the Anbieter).
  * @param squadron the owner's squadron badge, or {@code null}.
  * @param foreign whether the offer's squadron differs from the viewer's.
  * @param mine whether the viewer owns this offer.
- * @param quality the offered quality (0–1000).
- * @param amount the offered quantity in SCU.
+ * @param quality the offered quality (0–1000) for a material offer, else {@code null}.
+ * @param amount the offered quantity in SCU for a material offer, else {@code null}.
  * @param releasedAt when the offer was released.
  * @param remark the raw Markdown trade remark.
  * @param interestCount how many members registered interest.
@@ -49,7 +52,10 @@ import java.util.UUID;
  */
 public record MaterialExchangeOfferDto(
     UUID id,
+    @BackendEnumAsString String kind,
     MaterialReferenceDto material,
+    String itemName,
+    Integer itemQuantity,
     UserReferenceDto owner,
     SquadronReferenceDto squadron,
     boolean foreign,

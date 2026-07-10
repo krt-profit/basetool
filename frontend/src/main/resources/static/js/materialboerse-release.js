@@ -22,19 +22,24 @@
     let state = {
         mode: null,
         itemId: null,
+        productKey: null,
         offerId: null,
         version: null,
         onDone: null,
         onCancel: null,
     };
     let pickerItems = [];
+    let productItems = [];
     let lastFocused = null;
     // Server-side picker search: the input debounces a fresh /releasable-items query rather than
     // filtering a once-loaded, alphabetically-capped snapshot in the client — otherwise a material
     // past the server's row cap (e.g. late-alphabet "Savrilium") is unreachable and the release
-    // silently no-ops. pickerSeq drops stale responses so the last-typed query always wins.
+    // silently no-ops. pickerSeq drops stale responses so the last-typed query always wins. The item
+    // (blueprint-product) picker has its own sequence/timer for the same reason (REQ-MARKET-012).
     let pickerSeq = 0;
     let pickerSearchTimer = null;
+    let itemPickerSeq = 0;
+    let itemPickerSearchTimer = null;
     let PICKER_SEARCH_DEBOUNCE_MS = 200;
 
     function fmt(template, value) {
@@ -110,6 +115,68 @@
         );
     }
 
+    /** Shows/hides an element inside the modal via the hidden attribute. */
+    function showEl(sel, on) {
+        let el = q(sel);
+        if (el) {
+            el.hidden = !on;
+        }
+    }
+
+    /** Formats a whole-piece item quantity (item offers are always counted in pieces). */
+    function formatQuantity(quantity) {
+        let n = Number(quantity);
+        if (isNaN(n)) {
+            return String(quantity);
+        }
+        return (
+            n.toLocaleString('de-DE', { maximumFractionDigits: 0 }) +
+            ' ' +
+            (i18n.unitPiece || 'Stk')
+        );
+    }
+
+    /**
+     * Populates and toggles the read-only fact strip for the given mode/context (REQ-MARKET-012). A
+     * material offer shows Material + Qualität + Menge (live/derived from the Lager row); an item
+     * offer shows Item + Menge with no quality — and the Menge fact only in 'edit' mode (in 'item'
+     * mode the quantity is entered in the input field below, so the fact cell is hidden).
+     */
+    function applyFacts(mode, ctx) {
+        let isItem = mode === 'item' || (mode === 'edit' && ctx.kind === 'ITEM');
+        let label = q('[data-mb-fact-primary-label]');
+        if (label) {
+            label.textContent = isItem ? i18n.factItem || 'Item' : i18n.factMaterial || 'Material';
+        }
+        setText('[data-mb-fact-material]', (isItem ? ctx.itemName : ctx.material) || '—');
+        showEl('[data-mb-fact-quality-cell]', !isItem);
+        if (!isItem) {
+            setText(
+                '[data-mb-fact-quality]',
+                ctx.quality != null && ctx.quality !== '' ? String(ctx.quality) : '—',
+            );
+        }
+        let showAmount = !isItem || mode === 'edit';
+        showEl('[data-mb-fact-amount-cell]', showAmount);
+        if (showAmount) {
+            if (isItem) {
+                setText(
+                    '[data-mb-fact-amount]',
+                    ctx.itemQuantity != null && ctx.itemQuantity !== ''
+                        ? formatQuantity(ctx.itemQuantity)
+                        : '—',
+                );
+            } else {
+                setText(
+                    '[data-mb-fact-amount]',
+                    ctx.amount != null && ctx.amount !== ''
+                        ? formatAmount(ctx.amount, ctx.quantityType)
+                        : '—',
+                );
+            }
+        }
+    }
+
     function updateCharCount() {
         let ta = q('[data-mb-remark]');
         let counter = q('[data-mb-charcount]');
@@ -141,6 +208,7 @@
         state = {
             mode: mode,
             itemId: ctx.itemId || null,
+            productKey: null,
             offerId: ctx.offerId || null,
             version: ctx.version || null,
             onDone: onDone,
@@ -148,10 +216,21 @@
         };
         let isNew = mode === 'new';
         let isEdit = mode === 'edit';
-        setText('[data-mb-modal-title]', isEdit ? i18n.editTitle : i18n.releaseTitle);
+        let isItem = mode === 'item';
+        setText(
+            '[data-mb-modal-title]',
+            isEdit ? i18n.editTitle : isItem ? i18n.itemTitle : i18n.releaseTitle,
+        );
         setText('[data-mb-submit-label]', isEdit ? i18n.submitSave : i18n.submitRelease);
         toggle('[data-mb-picker]', isNew);
-        setFacts(ctx.material, ctx.quality, ctx.amount, ctx.quantityType);
+        toggle('[data-mb-item-picker]', isItem);
+        showEl('[data-mb-qty-block]', isItem);
+        showEl('[data-mb-qty-error]', false);
+        let qtyInput = q('[data-mb-item-qty]');
+        if (qtyInput) {
+            qtyInput.value = '';
+        }
+        applyFacts(mode, ctx);
 
         let ta = q('[data-mb-remark]');
         ta.value = ctx.remark || '';
@@ -159,6 +238,12 @@
 
         if (isNew) {
             loadPicker('');
+        } else if (isItem) {
+            let itemInput = q('[data-mb-item-picker-input]');
+            if (itemInput) {
+                itemInput.value = '';
+            }
+            loadItemPicker('');
         }
 
         lastFocused = document.activeElement;
@@ -166,7 +251,11 @@
         // (the app-wide modal contract), NOT by clearing a hidden attribute — the latter left
         // the CSS display:none in place, so the modal opened invisibly (REQ-MARKET-002/007).
         modal.style.display = 'flex';
-        let first = isNew ? q('[data-mb-picker-input]') : ta;
+        let first = isNew
+            ? q('[data-mb-picker-input]')
+            : isItem
+              ? q('[data-mb-item-picker-input]')
+              : ta;
         if (first) {
             first.focus();
         }
@@ -203,6 +292,7 @@
         state = {
             mode: null,
             itemId: null,
+            productKey: null,
             offerId: null,
             version: null,
             onDone: null,
@@ -307,6 +397,91 @@
         }
     }
 
+    // -------- item (blueprint-product) picker (item offers, REQ-MARKET-012) --------
+
+    function loadItemPicker(query) {
+        let seq = ++itemPickerSeq;
+        let url =
+            '/materialboerse/offerable-products' + (query ? '?q=' + encodeURIComponent(query) : '');
+        fetch(url, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin',
+        })
+            .then(function (r) {
+                return r.ok ? r.json() : [];
+            })
+            .then(function (items) {
+                if (seq !== itemPickerSeq) {
+                    return; // a newer search superseded this response
+                }
+                productItems = Array.isArray(items) ? items : [];
+                renderItemPicker();
+            })
+            .catch(function () {
+                if (seq !== itemPickerSeq) {
+                    return;
+                }
+                productItems = [];
+                renderItemPicker();
+            });
+    }
+
+    /** Debounces a server-side blueprint-product search so every keystroke does not fire a request. */
+    function searchItemPicker(query) {
+        if (itemPickerSearchTimer) {
+            clearTimeout(itemPickerSearchTimer);
+        }
+        itemPickerSearchTimer = setTimeout(function () {
+            loadItemPicker(query);
+        }, PICKER_SEARCH_DEBOUNCE_MS);
+    }
+
+    function renderItemPicker() {
+        let list = q('[data-mb-item-picker-list]');
+        if (!list) {
+            return;
+        }
+        if (!productItems.length) {
+            list.innerHTML =
+                '<li class="krt-combobox__notice">' +
+                escapeHtml(i18n.itemPickerEmpty || '') +
+                '</li>';
+            list.hidden = false;
+            return;
+        }
+        list.innerHTML = productItems
+            .map(function (it) {
+                let meta = it.manufacturerName ? escapeHtml(it.manufacturerName) : '';
+                return (
+                    '<li class="krt-combobox__option" role="option" data-product-key="' +
+                    escapeHtml(it.productKey) +
+                    '" data-name="' +
+                    escapeHtml(it.name) +
+                    '"><strong>' +
+                    escapeHtml(it.name) +
+                    '</strong>' +
+                    (meta ? ' <small>' + meta + '</small>' : '') +
+                    '</li>'
+                );
+            })
+            .join('');
+        list.hidden = false;
+    }
+
+    function pickProduct(li) {
+        state.productKey = li.getAttribute('data-product-key');
+        let name = li.getAttribute('data-name');
+        setText('[data-mb-fact-material]', name || '—');
+        let input = q('[data-mb-item-picker-input]');
+        if (input) {
+            input.value = name;
+        }
+        let list = q('[data-mb-item-picker-list]');
+        if (list) {
+            list.hidden = true;
+        }
+    }
+
     function submit() {
         let remark = q('[data-mb-remark]').value;
         if (state.mode === 'edit') {
@@ -323,6 +498,10 @@
                     return finish(body);
                 },
             });
+            return;
+        }
+        if (state.mode === 'item') {
+            submitItem(remark);
             return;
         }
         if (!state.itemId) {
@@ -342,6 +521,40 @@
         });
     }
 
+    /**
+     * Submits an item offer (#1185): requires a picked blueprint product and a whole quantity ≥ 1
+     * (validated client-side; the backend re-validates the product and the quantity). POSTs to the
+     * item-offer proxy and, on success, notifies peers and closes the modal exactly like a material
+     * release.
+     */
+    function submitItem(remark) {
+        if (!state.productKey) {
+            return;
+        }
+        let qtyInput = q('[data-mb-item-qty]');
+        let quantity = qtyInput ? parseInt(qtyInput.value, 10) : NaN;
+        if (isNaN(quantity) || quantity < 1) {
+            showEl('[data-mb-qty-error]', true);
+            if (qtyInput) {
+                qtyInput.focus();
+            }
+            return;
+        }
+        showEl('[data-mb-qty-error]', false);
+        window.krtFetch.write({
+            method: 'POST',
+            url: '/materialboerse/item-offers/ajax',
+            payload: { productKey: state.productKey, quantity: quantity, remark: remark },
+            successMessage: i18n.itemReleased || i18n.released,
+            errorMessage: i18n.error,
+            serialize: SERIALIZE_KEY,
+            onSuccess: function (body) {
+                notifyPeers();
+                return finish(body);
+            },
+        });
+    }
+
     function notifyPeers() {
         if (window.krtMaterialboardPresence) {
             window.krtMaterialboardPresence.sendChanged(['board']);
@@ -352,7 +565,10 @@
 
     document.addEventListener('click', function (e) {
         if (!isModalOpen()) {
-            if (e.target.closest('[data-mb-picker-list] .krt-combobox__option')) {
+            if (
+                e.target.closest('[data-mb-picker-list] .krt-combobox__option') ||
+                e.target.closest('[data-mb-item-picker-list] .krt-combobox__option')
+            ) {
                 return;
             }
         }
@@ -367,6 +583,11 @@
         let li = e.target.closest('[data-mb-picker-list] .krt-combobox__option');
         if (li) {
             pickItem(li);
+            return;
+        }
+        let pli = e.target.closest('[data-mb-item-picker-list] .krt-combobox__option');
+        if (pli) {
+            pickProduct(pli);
         }
     });
 
@@ -375,6 +596,10 @@
             updateCharCount();
         } else if (e.target.matches('[data-mb-picker-input]')) {
             searchPicker(e.target.value);
+        } else if (e.target.matches('[data-mb-item-picker-input]')) {
+            searchItemPicker(e.target.value);
+        } else if (e.target.matches('[data-mb-item-qty]')) {
+            showEl('[data-mb-qty-error]', false);
         }
     });
 

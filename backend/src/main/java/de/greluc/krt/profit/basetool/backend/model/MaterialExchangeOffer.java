@@ -39,23 +39,39 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * A single offer on the Materialbörse — a Lager row its owner has released for trade
+ * A single offer on the Materialbörse — something its owner has released for trade
  * (REQ-MARKET-001…). The Börse is a central, org-wide-visible marketplace that shows only <b>which
- * player offers which material, in which quality and quantity</b>; negotiation and handover happen
- * off-tool between the players.
+ * player offers what, in which quality and quantity</b>; negotiation and handover happen off-tool
+ * between the players.
  *
- * <p>The offer is a thin overlay on a {@link InventoryItem}: material, quality and amount are read
- * <b>live</b> from {@link #inventoryItem} (single source of truth, no drift), and the item's {@code
- * location} is deliberately <b>never</b> read into any board query or DTO — the Standort stays
- * private (REQ-MARKET-004). {@link #owner} and {@link #owningOrgUnit} are denormalised from the
- * item at release time so the board list and the "Meine Angebote" filter never have to join the
- * item for ownership or the squadron badge.
+ * <p>An offer is one of two {@link MaterialExchangeOfferKind kinds}, discriminated by {@link
+ * #kind}:
+ *
+ * <ul>
+ *   <li>A {@link MaterialExchangeOfferKind#MATERIAL} offer is a thin overlay on a {@link
+ *       InventoryItem}: material, quality and amount are read <b>live</b> from {@link
+ *       #inventoryItem} (single source of truth, no drift), and the item's {@code location} is
+ *       deliberately <b>never</b> read into any board query or DTO — the Standort stays private
+ *       (REQ-MARKET-004).
+ *   <li>A {@link MaterialExchangeOfferKind#ITEM} offer (#1185, REQ-MARKET-012) has <b>no</b> Lager
+ *       row: it references a craftable item ("an item for which a blueprint exists") by its
+ *       normalized {@link #itemProductKey} — with the display {@link #itemName} snapshotted at
+ *       release — and the owner states {@link #itemQuantity} explicitly. Item offers carry no
+ *       quality and no location.
+ * </ul>
+ *
+ * <p>{@link #owner} and {@link #owningOrgUnit} are denormalised at release time (from the item for
+ * a material offer, from the acting member for an item offer) so the board list and the "Meine
+ * Angebote" filter never have to join for ownership or the squadron badge.
  *
  * <p>Offers are <b>signal-only</b>: releasing one never moves inventory. Interest registrations are
  * an independent aggregate ({@link MaterialExchangeInterest}, no mapped collection here), so
  * registering or withdrawing interest never bumps this offer's {@code @Version}. A partial-unique
  * constraint {@code (inventory_item_id) WHERE status = 'ACTIVE'} (V210) enforces one active offer
- * per Lager row, so re-releasing an item re-activates the row instead of inserting a duplicate.
+ * per Lager row, so re-releasing an item re-activates the row instead of inserting a duplicate;
+ * item offers carry a {@code NULL} {@code inventory_item_id} (distinct under that partial index)
+ * and are deliberately not de-duplicated (a member may list the same item several times,
+ * REQ-MARKET-012).
  */
 @Entity
 @Getter
@@ -72,13 +88,53 @@ public class MaterialExchangeOffer extends AbstractEntity<UUID> {
   private UUID id;
 
   /**
-   * The source Lager row. Material, quality and amount are read live from it; its location is never
-   * read. {@code ON DELETE CASCADE} (V210) removes the offer when the underlying stock row is
-   * deleted, so the board never lists an offer whose stock no longer exists.
+   * Which kind of offer this is — a Lager-backed {@link MaterialExchangeOfferKind#MATERIAL} offer
+   * or a blueprint-product {@link MaterialExchangeOfferKind#ITEM} offer. Drives which of the two
+   * mutually-exclusive branches ({@link #inventoryItem} vs {@link #itemProductKey}/{@link
+   * #itemName}/ {@link #itemQuantity}) is populated; the DB {@code CHECK} (V213) enforces the
+   * exclusivity.
    */
-  @ManyToOne(optional = false, fetch = FetchType.LAZY)
-  @JoinColumn(name = "inventory_item_id", nullable = false)
+  @Enumerated(EnumType.STRING)
+  @Column(name = "offer_kind", nullable = false, length = 16)
+  private MaterialExchangeOfferKind kind;
+
+  /**
+   * The source Lager row for a {@link MaterialExchangeOfferKind#MATERIAL} offer; {@code null} for
+   * an {@link MaterialExchangeOfferKind#ITEM} offer. Material, quality and amount are read live
+   * from it; its location is never read. {@code ON DELETE CASCADE} (V210) removes the offer when
+   * the underlying stock row is deleted, so the board never lists an offer whose stock no longer
+   * exists.
+   */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "inventory_item_id")
   private InventoryItem inventoryItem;
+
+  /**
+   * The normalized blueprint {@code product_key} of an {@link MaterialExchangeOfferKind#ITEM} offer
+   * ({@code null} for a material offer). This is the canonical identity of a craftable item, shared
+   * with {@code personal_blueprint} / {@code default_blueprint}; a release validates it against
+   * {@code BlueprintProductService.resolveByProductKey(...)} so only items an active blueprint
+   * produces can be listed (#1185).
+   */
+  @Column(name = "item_product_key", length = 255)
+  private String itemProductKey;
+
+  /**
+   * The display spelling of the offered item, snapshotted from the resolved blueprint product at
+   * release time ({@code null} for a material offer). Stored so the board and detail never have to
+   * re-resolve the product; it is the audit subject label of an item offer.
+   */
+  @Column(name = "item_name", length = 255)
+  private String itemName;
+
+  /**
+   * The user-specified quantity (whole pieces) of an {@link MaterialExchangeOfferKind#ITEM} offer
+   * ({@code null} for a material offer). Unlike a material offer's amount — read live from the
+   * Lager row — an item offer has no backing stock, so the owner states this number; the DB {@code
+   * CHECK} (V213) requires it to be positive.
+   */
+  @Column(name = "item_quantity")
+  private Integer itemQuantity;
 
   /**
    * The offering player (the Anbieter) — denormalised from {@code inventoryItem.user} at release.
@@ -130,8 +186,14 @@ public class MaterialExchangeOffer extends AbstractEntity<UUID> {
   public String toString() {
     return "MaterialExchangeOffer{id="
         + id
+        + ", kind="
+        + kind
         + ", inventoryItemId="
         + (inventoryItem != null ? inventoryItem.getId() : null)
+        + ", itemProductKey="
+        + itemProductKey
+        + ", itemQuantity="
+        + itemQuantity
         + ", ownerId="
         + (owner != null ? owner.getId() : null)
         + ", owningOrgUnitId="

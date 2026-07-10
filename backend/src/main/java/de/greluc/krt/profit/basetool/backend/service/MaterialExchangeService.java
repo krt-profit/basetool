@@ -28,10 +28,12 @@ import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeInterest;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOffer;
+import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferKind;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeCountsDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeInterestCount;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeItemReleaseRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeOfferDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleasableItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleaseRequest;
@@ -43,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeInterestRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.time.Instant;
@@ -62,7 +65,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -110,6 +112,21 @@ public class MaterialExchangeService {
   private final SquadronMapper squadronMapper;
 
   /**
+   * Resolves and validates a blueprint product for an item offer (#1185, REQ-MARKET-012): {@code
+   * resolveByProductKey(...)} is both the "an item for which a blueprint exists" gate and the
+   * source of the canonical display name snapshotted onto the offer.
+   */
+  private final BlueprintProductService blueprintProductService;
+
+  /**
+   * Resolves the acting member's active {@link de.greluc.krt.profit.basetool.backend.model.OrgUnit}
+   * to stamp on an item offer's squadron badge — the item-offer counterpart of copying {@code
+   * inventoryItem.getOwningOrgUnit()} for a material offer (an item offer has no source Lager row
+   * to copy from).
+   */
+  private final OwnerScopeService ownerScopeService;
+
+  /**
    * Publishes the {@link MaterialExchangeInterestRegisteredEvent} that drives the owner's
    * interest-registered notification (#1187, REQ-MARKET-011). The after-commit notification
    * listener consumes it, so the publish stays a side-effect-free scalar hand-off inside the
@@ -154,7 +171,7 @@ public class MaterialExchangeService {
     UUID viewerId = authHelperService.currentUserId().orElse(null);
     UUID viewerSquadronId = authHelperService.currentSquadronId().orElse(null);
     boolean onlyMine = "mein".equalsIgnoreCase(tab);
-    Pageable pageable = PageRequest.of(clampPage(page), clampSize(size), sortFor(sort));
+    Pageable pageable = PageRequest.of(clampPage(page), clampSize(size));
     Page<MaterialExchangeOffer> offers =
         offerRepository.findBoard(
             viewerId,
@@ -162,6 +179,7 @@ public class MaterialExchangeService {
             normalizeQuery(query),
             clampQuality(minQuality),
             minAmount,
+            normalizeSort(sort),
             pageable);
 
     List<UUID> offerIds = offers.getContent().stream().map(MaterialExchangeOffer::getId).toList();
@@ -248,6 +266,7 @@ public class MaterialExchangeService {
     final boolean reRelease = offer != null;
     if (offer == null) {
       offer = new MaterialExchangeOffer();
+      offer.setKind(MaterialExchangeOfferKind.MATERIAL);
       offer.setInventoryItem(item);
       offer.setOwner(item.getUser());
       offer.setOwningOrgUnit(item.getOwningOrgUnit());
@@ -260,13 +279,68 @@ public class MaterialExchangeService {
     auditService.record(
         AuditEventType.MARKET_OFFER_RELEASED,
         saved.getId(),
-        materialLabel(item),
+        offerLabel(saved),
         item.getUser().getId(),
-        AuditDetails.of("item", item.getId())
+        AuditDetails.of("kind", MaterialExchangeOfferKind.MATERIAL)
+            .with("item", item.getId())
             .with("q", item.getQuality())
             .with("amt", item.getAmount())
             .with("remarkLen", remarkLength(request.remark()))
             .with("reRelease", reRelease));
+    return detailDto(saved, viewerId);
+  }
+
+  /**
+   * Lists a craftable item on the board (#1185, REQ-MARKET-012) — the "Item anbieten" counterpart
+   * to {@link #release(MaterialExchangeReleaseRequest)}. Unlike a material release, an item offer
+   * has no backing Lager row: the caller supplies the blueprint {@code productKey} and the
+   * quantity, the product is validated against {@link
+   * BlueprintProductService#resolveByProductKey(String)} (only items an active blueprint produces
+   * can be listed) and its canonical display name is snapshotted, and owner + squadron are stamped
+   * from the acting member. Item offers are not de-duplicated — a member may list the same item
+   * several times — so this always inserts a fresh active offer.
+   *
+   * @param request the blueprint product key, the whole-piece quantity, and the trade remark.
+   * @return the resulting offer detail (the caller is the owner, so names are included).
+   * @throws NotFoundException if the caller is unknown or the product key resolves to no active
+   *     blueprint product.
+   */
+  @Transactional
+  public MaterialExchangeOfferDto releaseItem(MaterialExchangeItemReleaseRequest request) {
+    UUID viewerId = requireViewerId();
+    User owner =
+        userRepository
+            .findById(viewerId)
+            .orElseThrow(() -> new NotFoundException("User not found: " + viewerId));
+    ResolvedProduct product =
+        blueprintProductService
+            .resolveByProductKey(request.productKey())
+            .orElseThrow(
+                () ->
+                    new NotFoundException(
+                        "No craftable item (blueprint product) for key: " + request.productKey()));
+
+    MaterialExchangeOffer offer = new MaterialExchangeOffer();
+    offer.setKind(MaterialExchangeOfferKind.ITEM);
+    offer.setOwner(owner);
+    offer.setOwningOrgUnit(ownerScopeService.currentOrgUnit().orElse(null));
+    offer.setItemProductKey(product.productKey());
+    offer.setItemName(product.productName());
+    offer.setItemQuantity(request.quantity());
+    offer.setRemark(request.remark());
+    offer.setStatus(MaterialExchangeOfferStatus.ACTIVE);
+    offer.setReleasedAt(Instant.now());
+    MaterialExchangeOffer saved = offerRepository.saveAndFlush(offer);
+
+    auditService.record(
+        AuditEventType.MARKET_OFFER_RELEASED,
+        saved.getId(),
+        offerLabel(saved),
+        owner.getId(),
+        AuditDetails.of("kind", MaterialExchangeOfferKind.ITEM)
+            .with("product", product.productKey())
+            .with("qty", request.quantity())
+            .with("remarkLen", remarkLength(request.remark())));
     return detailDto(saved, viewerId);
   }
 
@@ -297,7 +371,7 @@ public class MaterialExchangeService {
     auditService.record(
         AuditEventType.MARKET_REMARK_UPDATED,
         offerId,
-        materialLabel(offer.getInventoryItem()),
+        offerLabel(offer),
         offer.getOwner().getId(),
         AuditDetails.of("remarkLen", remarkLength(request.remark())));
     return detailDto(saved, viewerId);
@@ -405,7 +479,7 @@ public class MaterialExchangeService {
     auditService.record(
         AuditEventType.MARKET_INTEREST_REGISTERED,
         offerId,
-        materialLabel(offer.getInventoryItem()),
+        offerLabel(offer),
         offer.getOwner() == null ? null : offer.getOwner().getId(),
         AuditDetails.of("offer", offerId));
     // Notify the owner about the new interested party (#1187, REQ-MARKET-011). Published only on a
@@ -415,7 +489,7 @@ public class MaterialExchangeService {
       eventPublisher.publishEvent(
           new MaterialExchangeInterestRegisteredEvent(
               offerId,
-              materialLabel(offer.getInventoryItem()),
+              offerLabel(offer),
               viewer.getEffectiveName(),
               offer.getOwner().getId(),
               viewerId));
@@ -442,7 +516,7 @@ public class MaterialExchangeService {
       auditService.record(
           AuditEventType.MARKET_INTEREST_WITHDRAWN,
           offerId,
-          materialLabel(offer.getInventoryItem()),
+          offerLabel(offer),
           offer.getOwner() == null ? null : offer.getOwner().getId(),
           AuditDetails.of("offer", offerId));
     }
@@ -510,9 +584,9 @@ public class MaterialExchangeService {
       auditService.record(
           AuditEventType.MARKET_OFFER_DEACTIVATED,
           offer.getId(),
-          materialLabel(offer.getInventoryItem()),
+          offerLabel(offer),
           offer.getOwner() == null ? null : offer.getOwner().getId(),
-          AuditDetails.of("item", offer.getInventoryItem().getId()));
+          offerSubjectDetails(offer));
     }
     return detailDto(offer, viewerId);
   }
@@ -559,20 +633,39 @@ public class MaterialExchangeService {
       int interestCount,
       boolean viewerInterested,
       @Nullable List<String> interestedHandles) {
-    InventoryItem item = offer.getInventoryItem();
-    Material material = item.getMaterial();
     SquadronReferenceDto squadron = squadronMapper.orgUnitToReferenceDto(offer.getOwningOrgUnit());
     boolean foreign =
         squadron != null && viewerSquadronId != null && !viewerSquadronId.equals(squadron.id());
+
+    MaterialReferenceDto material = null;
+    String itemName = null;
+    Integer itemQuantity = null;
+    Integer quality = null;
+    Double amount = null;
+    if (offer.getKind() == MaterialExchangeOfferKind.ITEM) {
+      // Item offer: no Lager row, no quality — the display name + user-stated quantity live on the
+      // offer itself, so never dereference the (null) inventoryItem here (REQ-MARKET-012).
+      itemName = offer.getItemName();
+      itemQuantity = offer.getItemQuantity();
+    } else {
+      InventoryItem item = offer.getInventoryItem();
+      Material mat = item.getMaterial();
+      material = new MaterialReferenceDto(mat.getId(), mat.getName(), mat.getQuantityType());
+      quality = item.getQuality();
+      amount = item.getAmount();
+    }
     return new MaterialExchangeOfferDto(
         offer.getId(),
-        new MaterialReferenceDto(material.getId(), material.getName(), material.getQuantityType()),
+        offer.getKind(),
+        material,
+        itemName,
+        itemQuantity,
         userMapper.toReferenceDto(offer.getOwner()),
         squadron,
         foreign,
         isMine(offer, viewerId),
-        item.getQuality(),
-        item.getAmount(),
+        quality,
+        amount,
         offer.getReleasedAt(),
         offer.getRemark(),
         interestCount,
@@ -651,13 +744,36 @@ public class MaterialExchangeService {
   }
 
   /**
-   * The material name of an offer's item — a non-personal audit subject label.
+   * The non-personal audit subject label of an offer — the material name for a {@link
+   * MaterialExchangeOfferKind#MATERIAL} offer, the snapshotted item name for a {@link
+   * MaterialExchangeOfferKind#ITEM} offer. Kind-aware so it never dereferences a {@code null}
+   * inventoryItem for an item offer (both are game asset names, never PII).
    *
-   * @param item the offer's Lager item.
-   * @return the material name.
+   * @param offer the offer.
+   * @return the audit subject label.
    */
-  private String materialLabel(InventoryItem item) {
-    return item.getMaterial().getName();
+  private static String offerLabel(MaterialExchangeOffer offer) {
+    if (offer.getKind() == MaterialExchangeOfferKind.ITEM) {
+      return offer.getItemName();
+    }
+    return offer.getInventoryItem().getMaterial().getName();
+  }
+
+  /**
+   * The PII-free {@code kind=… subject=…} audit details identifying an offer's subject — the Lager
+   * row id for a material offer, the blueprint product key for an item offer. Kind-aware so it
+   * never dereferences a {@code null} inventoryItem for an item offer.
+   *
+   * @param offer the offer.
+   * @return the composed audit details.
+   */
+  private static AuditDetails offerSubjectDetails(MaterialExchangeOffer offer) {
+    if (offer.getKind() == MaterialExchangeOfferKind.ITEM) {
+      return AuditDetails.of("kind", MaterialExchangeOfferKind.ITEM)
+          .with("product", offer.getItemProductKey());
+    }
+    return AuditDetails.of("kind", MaterialExchangeOfferKind.MATERIAL)
+        .with("item", offer.getInventoryItem().getId());
   }
 
   /**
@@ -719,23 +835,22 @@ public class MaterialExchangeService {
   }
 
   /**
-   * Maps a board sort key to a Spring Data {@link Sort} over the live item facts, always with a
-   * stable {@code releasedAt desc, id desc} tiebreaker so pagination is deterministic.
+   * Normalises a client board sort key to one of the whitelisted, non-null keys the board query's
+   * embedded {@code ORDER BY} understands — {@code menge} / {@code mat} / {@code neu}, else {@code
+   * qual} (the default, also for {@code null} or any unrecognised value). The query itself spans
+   * both offer kinds via {@code COALESCE} and always applies a stable {@code releasedAt desc, id
+   * desc} tiebreaker, so pagination stays deterministic.
    *
-   * @param key the sort key — {@code menge} / {@code mat} / {@code neu}, else quality (the
-   *     default).
-   * @return the resolved sort.
+   * @param key the raw client sort key, or {@code null}.
+   * @return the normalised sort key, never {@code null}.
    */
-  private static Sort sortFor(@Nullable String key) {
-    Sort primary =
-        switch (key == null ? "qual" : key) {
-          case "menge" -> Sort.by(Sort.Direction.DESC, "inventoryItem.amount");
-          case "mat" -> Sort.by(Sort.Order.asc("inventoryItem.material.name").ignoreCase());
-          case "neu" -> Sort.by(Sort.Direction.DESC, "releasedAt");
-          default -> Sort.by(Sort.Direction.DESC, "inventoryItem.quality");
-        };
-    return primary
-        .and(Sort.by(Sort.Direction.DESC, "releasedAt"))
-        .and(Sort.by(Sort.Direction.DESC, "id"));
+  private static String normalizeSort(@Nullable String key) {
+    if (key == null) {
+      return "qual";
+    }
+    return switch (key) {
+      case "menge", "mat", "neu" -> key;
+      default -> "qual";
+    };
   }
 }

@@ -30,10 +30,16 @@
         <div class="mb-head-title">
             <h1 th:text="#{materialboerse.title}">Materialbörse</h1>
         </div>
-        <button type="button" class="btn btn--cta" data-mb-open-release="new">
-            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
-            <span th:text="#{materialboerse.cta.offer}">Material anbieten</span>
-        </button>
+        <div class="mb-head-cta">
+            <button type="button" class="btn btn--cta" data-mb-open-release="new">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                <span th:text="#{materialboerse.cta.offer}">Material anbieten</span>
+            </button>
+            <button type="button" class="btn btn-outline" data-mb-open-item="item">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                <span th:text="#{materialboerse.cta.offerItem}">Item anbieten</span>
+            </button>
+        </div>
     </div>
 
     <!-- ===================== board (swappable region) ===================== -->
@@ -102,7 +108,10 @@
                             th:data-offer-id="${offer.id()}" data-mb-select role="button"
                             th:aria-pressed="${selectedOffer != null and offer.id() == selectedOffer.id()}">
                         <span class="mb-mrow-main">
-                            <span class="mb-mrow-mat" th:text="${offer.material().name()}">Material</span>
+                            <span class="mb-mrow-mat">
+                                <span th:text="${offer.kind() == 'ITEM' ? offer.itemName() : offer.material().name()}">Material</span>
+                                <span th:if="${offer.kind() == 'ITEM'}" class="mb-kind-tag" th:text="#{materialboerse.kind.item}">Item</span>
+                            </span>
                             <span class="mb-mrow-sub">
                                 <span th:if="${offer.squadron() != null}" class="squadron-badge"
                                       th:classappend="${offer.foreign()} ? 'squadron-badge-foreign' : ''"
@@ -110,12 +119,17 @@
                                 <span class="mb-mrow-owner" th:text="${offer.owner().effectiveName()}">Spieler</span>
                             </span>
                             <span class="mb-mrow-meta">
-                                <span th:text="'Q ' + ${offer.quality()}">Q 0</span>
-                                <span class="mb-dot">·</span>
-                                <span th:switch="${offer.material().quantityType()}">
-                                    <span th:case="'PIECE'" th:text="${#numbers.formatInteger(offer.amount(), 1)} + ' ' + #{material.quantity.piece}">0 Stück</span>
-                                    <span th:case="*" th:text="${#numbers.formatDecimal(offer.amount(), 1, 'POINT', 3, 'DEFAULT')} + ' ' + #{material.quantity.scu}">0 SCU</span>
-                                </span>
+                                <th:block th:if="${offer.kind() == 'ITEM'}">
+                                    <span th:text="${#numbers.formatInteger(offer.itemQuantity(), 1)} + ' ' + #{material.quantity.piece}">0 Stück</span>
+                                </th:block>
+                                <th:block th:unless="${offer.kind() == 'ITEM'}">
+                                    <span th:text="'Q ' + ${offer.quality()}">Q 0</span>
+                                    <span class="mb-dot">·</span>
+                                    <span th:switch="${offer.material().quantityType()}">
+                                        <span th:case="'PIECE'" th:text="${#numbers.formatInteger(offer.amount(), 1)} + ' ' + #{material.quantity.piece}">0 Stück</span>
+                                        <span th:case="*" th:text="${#numbers.formatDecimal(offer.amount(), 1, 'POINT', 3, 'DEFAULT')} + ' ' + #{material.quantity.scu}">0 SCU</span>
+                                    </span>
+                                </th:block>
                                 <span class="mb-dot">·</span>
                                 <span data-mb-ago th:data-ts="${offer.releasedAt()}" th:text="${offer.releasedAt()}">vor …</span>
                             </span>
@@ -138,7 +152,10 @@
                         <th:block th:if="${selectedOffer != null}" th:with="offer=${selectedOffer}">
                             <div class="mb-dp-head">
                                 <div class="mb-dp-title">
-                                    <h2 th:text="${offer.material().name()}">Material</h2>
+                                    <h2>
+                                        <span th:text="${offer.kind() == 'ITEM' ? offer.itemName() : offer.material().name()}">Material</span>
+                                        <span th:if="${offer.kind() == 'ITEM'}" class="mb-kind-tag" th:text="#{materialboerse.kind.item}">Item</span>
+                                    </h2>
                                     <span class="mb-dp-owner">
                                         <span th:text="#{materialboerse.detail.from}">von</span>
                                         <span class="mb-dp-owner-name" th:text="${offer.owner().effectiveName()}">Spieler</span>
@@ -157,8 +174,11 @@
                             </div>
 
                             <div class="facts-bar mb-dp-facts">
-                                <span><span class="fact-k" th:text="#{materialboerse.facts.quality}">Qualität</span><span class="fact-v" th:text="${offer.quality()}">0</span></span>
-                                <span><span class="fact-k" th:text="#{materialboerse.facts.amount}">Menge</span><span class="fact-v" th:switch="${offer.material().quantityType()}"><span th:case="'PIECE'" th:text="${#numbers.formatInteger(offer.amount(), 1)} + ' ' + #{material.quantity.piece}">0 Stück</span><span th:case="*" th:text="${#numbers.formatDecimal(offer.amount(), 1, 'POINT', 3, 'DEFAULT')} + ' ' + #{material.quantity.scu}">0 SCU</span></span></span>
+                                <span th:if="${offer.kind() == 'ITEM'}"><span class="fact-k" th:text="#{materialboerse.facts.type}">Art</span><span class="fact-v" th:text="#{materialboerse.kind.item}">Item</span></span>
+                                <span th:unless="${offer.kind() == 'ITEM'}"><span class="fact-k" th:text="#{materialboerse.facts.quality}">Qualität</span><span class="fact-v" th:text="${offer.quality()}">0</span></span>
+                                <span><span class="fact-k" th:text="#{materialboerse.facts.amount}">Menge</span>
+                                    <span class="fact-v" th:if="${offer.kind() == 'ITEM'}" th:text="${#numbers.formatInteger(offer.itemQuantity(), 1)} + ' ' + #{material.quantity.piece}">0 Stück</span>
+                                    <span class="fact-v" th:unless="${offer.kind() == 'ITEM'}" th:switch="${offer.material().quantityType()}"><span th:case="'PIECE'" th:text="${#numbers.formatInteger(offer.amount(), 1)} + ' ' + #{material.quantity.piece}">0 Stück</span><span th:case="*" th:text="${#numbers.formatDecimal(offer.amount(), 1, 'POINT', 3, 'DEFAULT')} + ' ' + #{material.quantity.scu}">0 SCU</span></span></span>
                                 <span><span class="fact-k" th:text="#{materialboerse.facts.released}">Freigegeben</span><span class="fact-v" data-mb-ago th:data-ts="${offer.releasedAt()}" th:text="${offer.releasedAt()}">vor …</span></span>
                             </div>
 
@@ -202,8 +222,13 @@
                                         <th:block th:if="${offer.mine()}">
                                             <button type="button" class="btn btn-ghost btn-xs" data-mb-edit
                                                     th:data-offer-id="${offer.id()}" th:data-version="${offer.version()}"
-                                                    th:data-material="${offer.material().name()}" th:data-quality="${offer.quality()}"
-                                                    th:data-amount="${offer.amount()}" th:data-quantity-type="${offer.material().quantityType()}"
+                                                    th:data-kind="${offer.kind()}"
+                                                    th:data-material="${offer.kind() == 'ITEM' ? null : offer.material().name()}"
+                                                    th:data-quality="${offer.kind() == 'ITEM' ? null : offer.quality()}"
+                                                    th:data-amount="${offer.kind() == 'ITEM' ? null : offer.amount()}"
+                                                    th:data-quantity-type="${offer.kind() == 'ITEM' ? null : offer.material().quantityType()}"
+                                                    th:data-item-name="${offer.kind() == 'ITEM' ? offer.itemName() : null}"
+                                                    th:data-item-quantity="${offer.kind() == 'ITEM' ? offer.itemQuantity() : null}"
                                                     th:data-remark="${offer.remark()}">
                                                 <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg>
                                                 <span th:text="#{materialboerse.action.editRemark}">Bemerkung bearbeiten</span>

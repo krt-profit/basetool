@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeCountsDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeItemReleaseRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeOfferDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleasableItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleaseRequest;
@@ -125,6 +126,22 @@ public class MaterialExchangeController {
   public MaterialExchangeOfferDto release(
       @Valid @RequestBody MaterialExchangeReleaseRequest request) {
     return service.release(request);
+  }
+
+  /**
+   * Lists a craftable item on the board ("Item anbieten", #1185). Unlike a material release the
+   * caller supplies the blueprint product and the quantity; only items an active blueprint produces
+   * are accepted.
+   *
+   * @param request the blueprint product key, the whole-piece quantity and the trade remark.
+   * @return the resulting offer detail.
+   */
+  @PostMapping("/item-offers")
+  @ResponseStatus(HttpStatus.CREATED)
+  @Operation(summary = "List a craftable item on the Materialbörse.")
+  public MaterialExchangeOfferDto releaseItem(
+      @Valid @RequestBody MaterialExchangeItemReleaseRequest request) {
+    return service.releaseItem(request);
   }
 
   /**

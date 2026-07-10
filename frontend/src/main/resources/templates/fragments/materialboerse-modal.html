@@ -32,10 +32,24 @@
                         <ul class="krt-combobox__listbox" role="listbox" data-mb-picker-list hidden></ul>
                     </div>
                 </div>
+                <div class="mb-modal-picker" data-mb-item-picker hidden>
+                    <label class="form-label-sm" th:text="#{materialboerse.modal.item.label}">Item</label>
+                    <div class="krt-combobox" data-mb-item-combobox>
+                        <input class="krt-combobox__input" type="text" data-mb-item-picker-input autocomplete="off"
+                               th:placeholder="#{materialboerse.modal.item.placeholder}"/>
+                        <ul class="krt-combobox__listbox" role="listbox" data-mb-item-picker-list hidden></ul>
+                    </div>
+                </div>
                 <div class="facts-bar mb-modal-facts">
-                    <span><span class="fact-k" th:text="#{materialboerse.facts.material}">Material</span><span class="fact-v" data-mb-fact-material>—</span></span>
-                    <span><span class="fact-k" th:text="#{materialboerse.facts.quality}">Qualität</span><span class="fact-v" data-mb-fact-quality>—</span></span>
-                    <span><span class="fact-k" th:text="#{materialboerse.facts.amount}">Menge</span><span class="fact-v" data-mb-fact-amount>—</span></span>
+                    <span data-mb-fact-primary-cell><span class="fact-k" data-mb-fact-primary-label th:text="#{materialboerse.facts.material}">Material</span><span class="fact-v" data-mb-fact-material>—</span></span>
+                    <span data-mb-fact-quality-cell><span class="fact-k" th:text="#{materialboerse.facts.quality}">Qualität</span><span class="fact-v" data-mb-fact-quality>—</span></span>
+                    <span data-mb-fact-amount-cell><span class="fact-k" th:text="#{materialboerse.facts.amount}">Menge</span><span class="fact-v" data-mb-fact-amount>—</span></span>
+                </div>
+                <div class="mb-modal-qty" data-mb-qty-block hidden>
+                    <label class="form-label-sm" for="mb-item-qty" th:text="#{materialboerse.modal.quantity.label}">Menge (Stück)</label>
+                    <input id="mb-item-qty" type="number" min="1" step="1" inputmode="numeric" data-mb-item-qty
+                           th:placeholder="#{materialboerse.modal.quantity.placeholder}"/>
+                    <span class="mb-modal-qty-error" data-mb-qty-error hidden th:text="#{materialboerse.modal.quantity.invalid}">Bitte eine Menge angeben.</span>
                 </div>
                 <label class="form-label-sm mb-modal-remark-label" for="mb-remark">
                     <span th:text="#{materialboerse.modal.remark.label}">Bemerkung</span>
@@ -64,14 +78,20 @@
         window.materialboerseI18n = Object.assign(window.materialboerseI18n || {}, {
             releaseTitle: /*[[#{materialboerse.modal.release.title}]]*/ 'Material für die Börse freigeben',
             editTitle: /*[[#{materialboerse.modal.edit.title}]]*/ 'Bemerkung bearbeiten',
+            itemTitle: /*[[#{materialboerse.modal.itemOffer.title}]]*/ 'Item für die Börse freigeben',
             submitRelease: /*[[#{materialboerse.modal.submit.release}]]*/ 'Freigeben',
             submitSave: /*[[#{materialboerse.modal.submit.save}]]*/ 'Speichern',
             released: /*[[#{materialboerse.toast.released}]]*/ 'Auf die Börse gestellt.',
+            itemReleased: /*[[#{materialboerse.toast.itemReleased}]]*/ 'Item auf die Börse gestellt.',
             remarkSaved: /*[[#{materialboerse.toast.remarkSaved}]]*/ 'Bemerkung gespeichert.',
             error: /*[[#{notification.error.save}]]*/ 'Fehler.',
             charCounter: /*[[#{materialboerse.modal.remark.counter}]]*/ '{0} / 20.000',
             pickerEmpty: /*[[#{materialboerse.modal.material.empty}]]*/ 'Keine freigebbaren Lager-Posten gefunden.',
             pickerAlready: /*[[#{materialboerse.modal.material.already}]]*/ 'bereits auf der Börse',
+            itemPickerEmpty: /*[[#{materialboerse.modal.item.empty}]]*/ 'Keine craftbaren Items gefunden.',
+            quantityInvalid: /*[[#{materialboerse.modal.quantity.invalid}]]*/ 'Bitte eine Menge angeben.',
+            factMaterial: /*[[#{materialboerse.facts.material}]]*/ 'Material',
+            factItem: /*[[#{materialboerse.facts.item}]]*/ 'Item',
             unitScu: /*[[#{material.quantity.scu}]]*/ 'SCU',
             unitPiece: /*[[#{material.quantity.piece}]]*/ 'Stück',
             conflict: window.materialboerseI18n && window.materialboerseI18n.conflict ? window.materialboerseI18n.conflict : {
