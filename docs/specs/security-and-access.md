@@ -812,6 +812,45 @@ from masquerading as an application outage (the failure mode that drove the fron
 backend classes across the module boundary, so the pattern is duplicated) · `application-prod.yml`
 in both modules (`app.security.jwt.jwk-set-uri` + the `keycloak-trust` bundle).
 
+### REQ-SEC-025 — Two-tier session idle timeout (anonymous vs authenticated)
+
+The frontend's Redis-backed Spring Session store applies a **short** idle window to un-authenticated
+sessions and the long "stay logged in" window **only after a successful login**. Rationale: with
+`@EnableRedisIndexedHttpSession` a single 30-day default let every throwaway session Spring Security
+mints for anonymous traffic — chiefly the CSRF-token session created when an anonymous client renders
+a form-bearing permit-all page, plus pre-login OAuth2 `authorizationRequest` state — live for 30
+days. Anonymous probe / crawler traffic thereby accreted **>16 000 orphan CSRF-only sessions against
+~30 real principals** (the `basetool_active_sessions` runaway), on a collision course with the
+Redis `maxmemory noeviction` ceiling, where login / token-refresh writes start failing.
+
+`RedisSessionConfig`'s `SessionRepositoryCustomizer` applies `app.session.anonymous-timeout` (default
+`30m`) as the repository's default `maxInactiveInterval`, so every new session starts short.
+`SessionLifetimeUpgradeSuccessHandler` promotes the session to `app.session.authenticated-timeout`
+(default `720h`) on OAuth2 login success — it runs after Spring Security's session-fixation
+`changeSessionId` (which preserves the interval) and never mints a session when none exists. The
+30-day cookie `max-age`, the `maximumSessions(10)` principal cap, and the CSRF repository/handler
+(`HttpSessionCsrfTokenRepository`, REQ-SEC-010) are all **unchanged** — this is a TTL policy, not a
+CSRF-transport change. Cookie-based CSRF (`CookieCsrfTokenRepository`) was considered as a way to
+stop anonymous CSRF-token sessions at the source and **rejected**: an unsigned double-submit cookie
+is a weaker CSRF model than the retained server-side synchronizer token + `SameSite=Strict` (see
+ADR-0088). Runaway regression is caught by `ActiveSessionsRunaway`
+([`observability.md`](observability.md)).
+
+**Acceptance**
+
+- [ ] A new session's default idle window is `app.session.anonymous-timeout` (the repository
+  default), not the 30-day window.
+- [ ] A successful OAuth2 login promotes its session's idle window to
+  `app.session.authenticated-timeout`.
+- [ ] No throwaway session is created merely to bump the timeout when none exists at login success.
+- [ ] Members keep the 30-day "stay logged in" behaviour (cookie `max-age` + authenticated window).
+
+**Enforced by:** `RedisSessionConfigTest` (anonymous window is the repository default),
+`SessionLifetimeUpgradeSuccessHandlerTest` (login promotes to the authenticated window; no session
+minted when absent) · **Code:** `RedisSessionConfig#sessionRepositoryCustomizer`,
+`SessionLifetimeUpgradeSuccessHandler`, `SecurityConfig#oauth2LoginSuccessHandler` · **Monitoring:**
+`ActiveSessionsRunaway` · **ADR:** [ADR-0088](../adr/0088-two-tier-session-idle-timeout.md)
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the
