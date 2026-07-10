@@ -48,7 +48,10 @@ public interface MaterialExchangeOfferRepository
    * with an explicit {@code LEFT JOIN FETCH} (an implicit path join would be an inner join and
    * would silently drop item offers) — this both eager-loads them so the list renders without an
    * N+1 and exposes the aliases the filters and the sort need. The name filter and the sort span
-   * both branches via {@code COALESCE} (material name / amount ⟷ item name / quantity); the
+   * both branches via {@code COALESCE}: a material offer's effective amount is {@code
+   * LEAST(offeredAmount, item.amount)} — the owner-chosen offered quantity clamped to current stock
+   * (ADR-0086) — and an item offer's is its stated {@code itemQuantity} ({@code
+   * COALESCE(LEAST(...), itemQuantity)}); the material/item name is COALESCE-d likewise. The
    * location is never referenced, keeping the Standort private (REQ-MARKET-004). The min-quality
    * filter applies only to material offers — an item offer has no quality, so a non-zero
    * min-quality excludes item offers. All fetched associations are single-valued
@@ -86,10 +89,10 @@ public interface MaterialExchangeOfferRepository
                  OR LOWER(ow.displayName) LIKE :query)
             AND (:minQuality = 0 OR ii.quality >= :minQuality)
             AND (:minAmount IS NULL
-                 OR (ii.id IS NOT NULL AND ii.amount >= :minAmount)
+                 OR (ii.id IS NOT NULL AND LEAST(o.offeredAmount, ii.amount) >= :minAmount)
                  OR (ii.id IS NULL AND o.itemQuantity >= :minAmount))
           ORDER BY
-            CASE WHEN :sortKey = 'menge' THEN COALESCE(ii.amount, o.itemQuantity) END DESC,
+            CASE WHEN :sortKey = 'menge' THEN COALESCE(LEAST(o.offeredAmount, ii.amount), o.itemQuantity) END DESC,
             CASE WHEN :sortKey = 'mat' THEN LOWER(COALESCE(m.name, o.itemName)) END ASC,
             CASE WHEN :sortKey = 'neu' THEN o.releasedAt END DESC,
             CASE WHEN :sortKey NOT IN ('menge', 'mat', 'neu') THEN COALESCE(ii.quality, -1) END DESC,
@@ -111,7 +114,7 @@ public interface MaterialExchangeOfferRepository
                  OR LOWER(ow.displayName) LIKE :query)
             AND (:minQuality = 0 OR ii.quality >= :minQuality)
             AND (:minAmount IS NULL
-                 OR (ii.id IS NOT NULL AND ii.amount >= :minAmount)
+                 OR (ii.id IS NOT NULL AND LEAST(o.offeredAmount, ii.amount) >= :minAmount)
                  OR (ii.id IS NULL AND o.itemQuantity >= :minAmount))
           """)
   Page<MaterialExchangeOffer> findBoard(

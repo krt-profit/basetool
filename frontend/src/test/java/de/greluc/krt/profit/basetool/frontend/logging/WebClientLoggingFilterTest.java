@@ -26,6 +26,9 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.frontend.config.LoggingProperties;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
@@ -33,7 +36,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 class WebClientLoggingFilterTest {
 
@@ -116,6 +121,31 @@ class WebClientLoggingFilterTest {
   }
 
   @Test
+  void logsSlowSuccessfulCallAtInfoNotWarn() {
+    // A zero-ms threshold makes any successful call count as "slow" deterministically.
+    LoggingProperties slowProps =
+        new LoggingProperties("X-Correlation-Id", "correlationId", "userId", 2000L, 0L, false);
+    WebClientLoggingFilter slowFilter = new WebClientLoggingFilter(slowProps);
+    server.enqueue(new MockResponse().setResponseCode(200).setBody("{}"));
+    WebClient wc =
+        WebClient.builder()
+            .baseUrl(server.url("/").toString())
+            .filter(slowFilter.callLogging())
+            .build();
+
+    wc.post().uri("/api/v1/users/sync").retrieve().toBodilessEntity().block();
+
+    assertThat(appender.list).noneMatch(e -> e.getLevel() == Level.WARN);
+    assertThat(appender.list)
+        .anyMatch(
+            e ->
+                e.getLevel() == Level.INFO
+                    && e.getFormattedMessage().contains("Slow backend call")
+                    && e.getFormattedMessage().contains("/api/v1/users/sync")
+                    && e.getFormattedMessage().contains("-> 200"));
+  }
+
+  @Test
   void escalatesToWarnOnServerError() {
     server.enqueue(new MockResponse().setResponseCode(500).setBody(""));
     WebClient wc =
@@ -132,5 +162,40 @@ class WebClientLoggingFilterTest {
 
     assertThat(appender.list)
         .anyMatch(e -> e.getLevel() == Level.WARN && e.getFormattedMessage().contains("-> 500"));
+  }
+
+  @Test
+  void logsCircuitBreakerShortCircuitAtDebugNotWarn() {
+    // When the breaker is open the resilience filter (inner) short-circuits with a
+    // CallNotPermittedException before any backend hit. The outer callLogging filter must log this
+    // at DEBUG, not WARN, so a routine backend restart/deploy does not flood WARN (issue #1203).
+    logger.setLevel(Level.DEBUG);
+    CircuitBreaker cb = CircuitBreakerRegistry.ofDefaults().circuitBreaker("backendApi");
+    cb.transitionToOpenState();
+    ExchangeFilterFunction openBreaker =
+        (request, next) ->
+            Mono.error(CallNotPermittedException.createCallNotPermittedException(cb));
+    WebClient wc =
+        WebClient.builder()
+            .baseUrl(server.url("/").toString())
+            .filter(filter.callLogging())
+            .filter(openBreaker)
+            .build();
+
+    try {
+      wc.get().uri("/api/v1/blocked").retrieve().toBodilessEntity().block();
+    } catch (Exception ignored) {
+      // expected – the breaker short-circuits with CallNotPermittedException
+    }
+
+    assertThat(appender.list)
+        .anyMatch(
+            e ->
+                e.getLevel() == Level.DEBUG
+                    && e.getFormattedMessage().contains("/api/v1/blocked")
+                    && e.getFormattedMessage().contains("short-circuited"));
+    assertThat(appender.list)
+        .noneMatch(
+            e -> e.getLevel() == Level.WARN && e.getFormattedMessage().contains("/api/v1/blocked"));
   }
 }

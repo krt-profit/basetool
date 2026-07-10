@@ -96,6 +96,7 @@ class MaterialboersePageControllerMvcTest {
             false,
             false,
             796,
+            120.0,
             340.0,
             Instant.now(),
             "Tausche gegen **Titanium**.",
@@ -147,6 +148,7 @@ class MaterialboersePageControllerMvcTest {
             false,
             500,
             12.0,
+            null,
             Instant.now(),
             "Tausche.",
             0,
@@ -186,6 +188,7 @@ class MaterialboersePageControllerMvcTest {
             new SquadronReferenceDto(UUID.randomUUID(), "IRIDIUM", "IRI"),
             false,
             false,
+            null,
             null,
             null,
             Instant.now(),
@@ -252,7 +255,7 @@ class MaterialboersePageControllerMvcTest {
                 .header("X-Requested-With", "XMLHttpRequest")
                 .with(csrf())
                 .contentType("application/json")
-                .content("{\"remark\":\"neu\",\"version\":0}"))
+                .content("{\"offeredAmount\":120,\"remark\":\"neu\",\"version\":0}"))
         .andExpect(status().isConflict())
         .andExpect(content().string(containsString("OPTIMISTIC_LOCK")));
   }

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.event.MaterialExchangeInterestRegisteredEvent;
+import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
@@ -35,9 +36,9 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeCountsDto
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeInterestCount;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeItemReleaseRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeOfferDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeOfferUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleasableItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleaseRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeRemarkUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronReferenceDto;
@@ -72,7 +73,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Application service for the Materialbörse — the org-wide material-exchange trade board of Flotte
- * &amp; Logistik (REQ-MARKET-001…). Owns the board read model, the release / deactivate / remark
+ * &amp; Logistik (REQ-MARKET-001…). Owns the board read model, the release / deactivate / edit
  * lifecycle of an offer, and the interest register / withdraw signals, plus the anonymity redaction
  * and the audit trail for every mutation.
  *
@@ -80,8 +81,9 @@ import org.springframework.transaction.annotation.Transactional;
  * visible to every member regardless of the offer's owning org unit; there is no OrgUnit scope
  * filter. Only real members reach this service (the controller gates reads on {@code KRT_MEMBER}).
  *
- * <p><b>Live facts (decision D1):</b> material, quality and amount are read live from the linked
- * {@link InventoryItem}; the item's location is never read, so the Standort stays private.
+ * <p><b>Facts (decision D1, amended by ADR-0086):</b> material and quality are read live from the
+ * linked {@link InventoryItem}; the offered amount is the owner's stored choice (a whole row or a
+ * part of it); the item's location is never read, so the Standort stays private.
  *
  * <p><b>Anonymity (REQ-MARKET-006):</b> the interessenten names are disclosed only to the offer's
  * owner; every other viewer sees only the count. The redaction lives here, in {@link
@@ -204,7 +206,9 @@ public class MaterialExchangeService {
 
   /**
    * Returns the board tab counts (all active offers, and the caller's own active offers). These are
-   * board totals — deliberately unaffected by the search/quality/amount filters.
+   * board totals — deliberately unaffected by the search/quality/amount filters. No stock guard is
+   * needed: a fully-booked-out row is deleted and its offer cascade-deleted (ADR-0086), so every
+   * {@code ACTIVE} offer is on the board and the badge matches the visible list.
    *
    * @return the tab counts.
    */
@@ -235,15 +239,18 @@ public class MaterialExchangeService {
   }
 
   /**
-   * Releases one of the caller's own Lager rows to the board (REQ-MARKET-002). If an active offer
-   * already exists for the item, its remark and release instant are updated (re-release); otherwise
-   * a new active offer is created. Owner, org unit, material, quality and amount are all derived
-   * from the item — the caller never sets them.
+   * Releases one of the caller's own Lager rows to the board (REQ-MARKET-002). The caller chooses
+   * the offered quantity, which may be the whole row or only a part of it (ADR-0086) but must be
+   * positive and at most the item's current stock. If an active offer already exists for the item,
+   * its offered amount, remark and release instant are updated (re-release); otherwise a new active
+   * offer is created. Owner, org unit, material and quality are all derived from the item — the
+   * caller never sets them.
    *
-   * @param request the item id and the trade remark.
+   * @param request the item id, the offered quantity and the trade remark.
    * @return the resulting offer detail (the caller is the owner, so names are included).
    * @throws NotFoundException if the item does not exist.
    * @throws AccessDeniedException if the item does not belong to the caller.
+   * @throws BadRequestException if the offered amount exceeds the item's current stock.
    */
   @Transactional
   public MaterialExchangeOfferDto release(MaterialExchangeReleaseRequest request) {
@@ -258,6 +265,7 @@ public class MaterialExchangeService {
     if (item.getUser() == null || !viewerId.equals(item.getUser().getId())) {
       throw new AccessDeniedException("Only the item's owner may release it to the Materialbörse.");
     }
+    double offeredAmount = requireOfferableAmount(request.offeredAmount(), item);
 
     MaterialExchangeOffer offer =
         offerRepository
@@ -272,6 +280,7 @@ public class MaterialExchangeService {
       offer.setOwningOrgUnit(item.getOwningOrgUnit());
       offer.setStatus(MaterialExchangeOfferStatus.ACTIVE);
     }
+    offer.setOfferedAmount(offeredAmount);
     offer.setRemark(request.remark());
     offer.setReleasedAt(Instant.now());
     MaterialExchangeOffer saved = offerRepository.saveAndFlush(offer);
@@ -284,7 +293,8 @@ public class MaterialExchangeService {
         AuditDetails.of("kind", MaterialExchangeOfferKind.MATERIAL)
             .with("item", item.getId())
             .with("q", item.getQuality())
-            .with("amt", item.getAmount())
+            .with("amt", offeredAmount)
+            .with("stock", item.getAmount())
             .with("remarkLen", remarkLength(request.remark()))
             .with("reRelease", reRelease));
     return detailDto(saved, viewerId);
@@ -345,18 +355,20 @@ public class MaterialExchangeService {
   }
 
   /**
-   * Edits an offer's trade remark ("Bemerkung bearbeiten", REQ-MARKET-007). Only the owner may
-   * edit; the echoed version guards against a concurrent edit.
+   * Edits an existing offer's offered quantity and trade remark ("Angebot bearbeiten",
+   * REQ-MARKET-007). Only the owner may edit; the echoed version guards against a concurrent edit.
+   * The new offered amount must be positive and at most the linked item's current stock (ADR-0086).
    *
    * @param offerId the offer to edit.
-   * @param request the new remark and the client's last-seen version.
+   * @param request the new offered amount, remark and the client's last-seen version.
    * @return the updated offer detail.
    * @throws NotFoundException if the offer does not exist.
    * @throws AccessDeniedException if the caller is not the owner.
+   * @throws BadRequestException if the offered amount exceeds the item's current stock.
    */
   @Transactional
-  public MaterialExchangeOfferDto updateRemark(
-      UUID offerId, MaterialExchangeRemarkUpdateRequest request) {
+  public MaterialExchangeOfferDto updateOffer(
+      UUID offerId, MaterialExchangeOfferUpdateRequest request) {
     UUID viewerId = requireViewerId();
     MaterialExchangeOffer offer =
         offerRepository
@@ -365,6 +377,9 @@ public class MaterialExchangeService {
     requireOwner(offer, viewerId);
     OptimisticLock.check(
         offer.getVersion(), request.version(), MaterialExchangeOffer.class, offerId);
+    double offeredAmount =
+        requireOfferableAmount(request.offeredAmount(), offer.getInventoryItem());
+    offer.setOfferedAmount(offeredAmount);
     offer.setRemark(request.remark());
     MaterialExchangeOffer saved = offerRepository.saveAndFlush(offer);
 
@@ -373,7 +388,7 @@ public class MaterialExchangeService {
         offerId,
         offerLabel(offer),
         offer.getOwner().getId(),
-        AuditDetails.of("remarkLen", remarkLength(request.remark())));
+        AuditDetails.of("amt", offeredAmount).with("remarkLen", remarkLength(request.remark())));
     return detailDto(saved, viewerId);
   }
 
@@ -636,15 +651,18 @@ public class MaterialExchangeService {
     SquadronReferenceDto squadron = squadronMapper.orgUnitToReferenceDto(offer.getOwningOrgUnit());
     boolean foreign =
         squadron != null && viewerSquadronId != null && !viewerSquadronId.equals(squadron.id());
+    boolean mine = isMine(offer, viewerId);
 
     MaterialReferenceDto material = null;
     String itemName = null;
     Integer itemQuantity = null;
     Integer quality = null;
     Double amount = null;
+    Double availableAmount = null;
     if (offer.getKind() == MaterialExchangeOfferKind.ITEM) {
-      // Item offer: no Lager row, no quality — the display name + user-stated quantity live on the
-      // offer itself, so never dereference the (null) inventoryItem here (REQ-MARKET-012).
+      // Item offer: no Lager row, no quality/live stock — the display name + user-stated quantity
+      // live on the offer itself, so never dereference the (null) inventoryItem here
+      // (REQ-MARKET-012).
       itemName = offer.getItemName();
       itemQuantity = offer.getItemQuantity();
     } else {
@@ -652,7 +670,8 @@ public class MaterialExchangeService {
       Material mat = item.getMaterial();
       material = new MaterialReferenceDto(mat.getId(), mat.getName(), mat.getQuantityType());
       quality = item.getQuality();
-      amount = item.getAmount();
+      amount = effectiveOfferedAmount(offer);
+      availableAmount = mine ? item.getAmount() : null;
     }
     return new MaterialExchangeOfferDto(
         offer.getId(),
@@ -663,9 +682,10 @@ public class MaterialExchangeService {
         userMapper.toReferenceDto(offer.getOwner()),
         squadron,
         foreign,
-        isMine(offer, viewerId),
+        mine,
         quality,
         amount,
+        availableAmount,
         offer.getReleasedAt(),
         offer.getRemark(),
         interestCount,
@@ -741,6 +761,57 @@ public class MaterialExchangeService {
     if (offer.getOwner() == null || !viewerId.equals(offer.getOwner().getId())) {
       throw new AccessDeniedException("Only the offer's owner may perform this action.");
     }
+  }
+
+  /**
+   * Validates and normalises a client-supplied offered quantity against the item's current stock
+   * (partial offers, REQ-MARKET-002 / ADR-0086): it must be a positive number no greater than the
+   * item's amount, and is rounded to three-decimal SCU storage precision so the stored value never
+   * carries floating-point noise. The {@code @Positive}/{@code @NotNull} DTO constraints already
+   * reject the null/non-positive input on the controller path; this re-check keeps the service safe
+   * when called directly and enforces the cross-field ceiling {@code @Valid} cannot express.
+   *
+   * @param requested the client-supplied offered quantity in SCU.
+   * @param item the source Lager row whose current amount caps the offer.
+   * @return the offered quantity rounded to three-decimal SCU precision.
+   * @throws BadRequestException if the amount is not positive or exceeds the item's current stock.
+   */
+  private static double requireOfferableAmount(@Nullable Double requested, InventoryItem item) {
+    if (requested == null || requested <= 0.0) {
+      throw new BadRequestException("The offered amount must be a positive quantity.");
+    }
+    double offered = InventoryItem.roundToScuScale(requested);
+    double available = item.getAmount() == null ? 0.0 : item.getAmount();
+    if (offered <= 0.0) {
+      throw new BadRequestException("The offered amount must be a positive quantity.");
+    }
+    if (offered > available) {
+      throw new BadRequestException(
+          "The offered amount exceeds the item's available stock ("
+              + offered
+              + " > "
+              + available
+              + ").");
+    }
+    return offered;
+  }
+
+  /**
+   * The effective offered quantity served to the board — the stored {@link
+   * MaterialExchangeOffer#getOfferedAmount() offeredAmount} clamped to the item's <em>current</em>
+   * stock ({@code min(offered, item.amount)}), so the board never advertises more than is in stock
+   * and the offer shrinks as the row is booked out (ADR-0086). This mirrors the {@code
+   * LEAST(offeredAmount, item.amount)} the board query filters and sorts on. Never negative.
+   *
+   * @param offer the offer, with its item loaded.
+   * @return the clamped offered quantity in SCU.
+   */
+  private static double effectiveOfferedAmount(MaterialExchangeOffer offer) {
+    Double offered = offer.getOfferedAmount();
+    Double stock = offer.getInventoryItem().getAmount();
+    double offeredValue = offered == null ? 0.0 : offered;
+    double stockValue = stock == null ? 0.0 : stock;
+    return Math.max(0.0, Math.min(offeredValue, stockValue));
   }
 
   /**
@@ -838,8 +909,11 @@ public class MaterialExchangeService {
    * Normalises a client board sort key to one of the whitelisted, non-null keys the board query's
    * embedded {@code ORDER BY} understands — {@code menge} / {@code mat} / {@code neu}, else {@code
    * qual} (the default, also for {@code null} or any unrecognised value). The query itself spans
-   * both offer kinds via {@code COALESCE} and always applies a stable {@code releasedAt desc, id
-   * desc} tiebreaker, so pagination stays deterministic.
+   * both offer kinds via {@code COALESCE}: {@code menge} sorts on the effective offered quantity
+   * {@code COALESCE(LEAST(offeredAmount, item.amount), itemQuantity)} — a material offer ranks by
+   * what is actually on offer (clamped to stock, ADR-0086), an item offer by its stated quantity —
+   * always with a stable {@code releasedAt desc, id desc} tiebreaker so pagination is
+   * deterministic.
    *
    * @param key the raw client sort key, or {@code null}.
    * @return the normalised sort key, never {@code null}.

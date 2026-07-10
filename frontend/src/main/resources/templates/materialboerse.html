@@ -221,17 +221,14 @@
                                     <div class="mb-dp-actions" th:data-offer-id="${offer.id()}" th:data-version="${offer.version()}">
                                         <th:block th:if="${offer.mine()}">
                                             <button type="button" class="btn btn-ghost btn-xs" data-mb-edit
+                                                    th:if="${offer.kind() != 'ITEM'}"
                                                     th:data-offer-id="${offer.id()}" th:data-version="${offer.version()}"
-                                                    th:data-kind="${offer.kind()}"
-                                                    th:data-material="${offer.kind() == 'ITEM' ? null : offer.material().name()}"
-                                                    th:data-quality="${offer.kind() == 'ITEM' ? null : offer.quality()}"
-                                                    th:data-amount="${offer.kind() == 'ITEM' ? null : offer.amount()}"
-                                                    th:data-quantity-type="${offer.kind() == 'ITEM' ? null : offer.material().quantityType()}"
-                                                    th:data-item-name="${offer.kind() == 'ITEM' ? offer.itemName() : null}"
-                                                    th:data-item-quantity="${offer.kind() == 'ITEM' ? offer.itemQuantity() : null}"
+                                                    th:data-material="${offer.material().name()}" th:data-quality="${offer.quality()}"
+                                                    th:data-amount="${offer.amount()}" th:data-available="${offer.availableAmount()}"
+                                                    th:data-quantity-type="${offer.material().quantityType()}"
                                                     th:data-remark="${offer.remark()}">
                                                 <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg>
-                                                <span th:text="#{materialboerse.action.editRemark}">Bemerkung bearbeiten</span>
+                                                <span th:text="#{materialboerse.action.editRemark}">Angebot bearbeiten</span>
                                             </button>
                                             <button type="button" class="btn btn-quiet-danger btn-xs" data-mb-deactivate
                                                     th:data-offer-id="${offer.id()}" th:text="#{materialboerse.action.deactivate}">Angebot deaktivieren</button>
@@ -280,7 +277,7 @@
         agoDays: /*[[#{materialboerse.ago.days}]]*/ 'vor {0} Tagen',
         agoNow: /*[[#{materialboerse.ago.now}]]*/ 'gerade eben',
         charCounter: /*[[#{materialboerse.modal.remark.counter}]]*/ '{0} / 20.000',
-        editTitle: /*[[#{materialboerse.modal.edit.title}]]*/ 'Bemerkung bearbeiten',
+        editTitle: /*[[#{materialboerse.modal.edit.title}]]*/ 'Angebot bearbeiten',
         releaseTitle: /*[[#{materialboerse.modal.release.title}]]*/ 'Material für die Börse freigeben',
         submitRelease: /*[[#{materialboerse.modal.submit.release}]]*/ 'Freigeben',
         submitSave: /*[[#{materialboerse.modal.submit.save}]]*/ 'Speichern',

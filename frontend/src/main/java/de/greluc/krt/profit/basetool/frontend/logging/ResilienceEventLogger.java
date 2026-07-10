@@ -35,10 +35,17 @@ import org.springframework.stereotype.Component;
  * calls start failing with {@code SERVICE_UNAVAILABLE}, but without this logger there is no direct
  * signal in the log file explaining <em>why</em>.
  *
- * <p>State transitions are logged at WARN, individual retry attempts at INFO (DEBUG when they
- * eventually succeed), bulkhead rejections at WARN, and time-limiter timeouts at WARN. The
- * information contained is purely technical (instance name, old/new state, attempt count) and does
- * not leak request-scoped data.
+ * <p>Circuit-breaker <em>state transitions</em> are logged at WARN — the one-time "a downstream
+ * dependency became (un)healthy" signal. Each individual call <em>rejected by an already-open
+ * breaker</em> is logged at DEBUG only: {@code onCallNotPermitted} fires for <em>every</em>
+ * short-circuited call for the whole open window, so at WARN a routine backend restart/deploy
+ * floods the log with identical lines (issue #1203). The rejection is still metered as {@code
+ * basetool_backend_client_errors_total{reason="circuit_open"}} at the {@code BackendApiClient}
+ * boundary, so the count is never lost, and the {@code CircuitBreakerOpen} alert keys off the state
+ * gauge — nothing depends on the per-call WARN. Individual retry attempts are logged at INFO (DEBUG
+ * when they eventually succeed), bulkhead rejections at WARN, and time-limiter timeouts at WARN.
+ * The information contained is purely technical (instance name, old/new state, attempt count) and
+ * does not leak request-scoped data.
  */
 @Slf4j
 @Component
@@ -65,7 +72,13 @@ public class ResilienceEventLogger {
                                 e.getStateTransition().getFromState(),
                                 e.getStateTransition().getToState()))
                     .onCallNotPermitted(
-                        e -> log.warn("CircuitBreaker[{}] call not permitted", cb.getName()))
+                        // DEBUG, not WARN: this fires for every call blocked by an already-open
+                        // breaker for the whole open window. The one-time OPEN state transition
+                        // above carries the WARN; the per-call rejection is metered as circuit_open
+                        // at the BackendApiClient boundary. At WARN a routine backend restart
+                        // floods
+                        // the log with identical lines (issue #1203).
+                        e -> log.debug("CircuitBreaker[{}] call not permitted", cb.getName()))
                     .onError(
                         e ->
                             log.info(

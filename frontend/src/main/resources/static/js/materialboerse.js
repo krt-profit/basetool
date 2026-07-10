@@ -235,6 +235,7 @@
                     material: el.getAttribute('data-material'),
                     quality: el.getAttribute('data-quality'),
                     amount: el.getAttribute('data-amount'),
+                    available: el.getAttribute('data-available'),
                     quantityType: el.getAttribute('data-quantity-type'),
                     itemName: el.getAttribute('data-item-name'),
                     itemQuantity: el.getAttribute('data-item-quantity'),

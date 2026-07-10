@@ -29,9 +29,9 @@ import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeCountsDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeItemReleaseRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeOfferDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeOfferUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleasableItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleaseRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeRemarkUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
@@ -91,7 +91,7 @@ class MaterialExchangeControllerTest {
   @Test
   void releaseDelegates() {
     MaterialExchangeReleaseRequest request =
-        new MaterialExchangeReleaseRequest(UUID.randomUUID(), "tausche gegen X");
+        new MaterialExchangeReleaseRequest(UUID.randomUUID(), 120.0, "tausche gegen X");
     MaterialExchangeOfferDto dto = sampleDto();
     when(service.release(request)).thenReturn(dto);
 
@@ -111,14 +111,14 @@ class MaterialExchangeControllerTest {
   }
 
   @Test
-  void updateRemarkDelegates() {
-    MaterialExchangeRemarkUpdateRequest request =
-        new MaterialExchangeRemarkUpdateRequest("neu", 3L);
-    when(service.updateRemark(offerId, request)).thenReturn(sampleDto());
+  void updateOfferDelegates() {
+    MaterialExchangeOfferUpdateRequest request =
+        new MaterialExchangeOfferUpdateRequest(50.0, "neu", 3L);
+    when(service.updateOffer(offerId, request)).thenReturn(sampleDto());
 
-    controller.updateRemark(offerId, request);
+    controller.updateOffer(offerId, request);
 
-    verify(service).updateRemark(offerId, request);
+    verify(service).updateOffer(offerId, request);
   }
 
   @Test
@@ -190,6 +190,7 @@ class MaterialExchangeControllerTest {
         false,
         false,
         796,
+        120.0,
         340.0,
         Instant.now(),
         "tausche gegen **Titanium**",

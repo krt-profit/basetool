@@ -347,6 +347,35 @@
     font-size: 11px;
     color: var(--color-danger-text);
 }
+/* Partial-offer amount field (material offer, ADR-0086). */
+.mb-modal-amount {
+    margin-bottom: 14px;
+}
+.mb-modal-amount > label {
+    display: block;
+    margin-bottom: 5px;
+}
+.mb-modal-amount-row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+.mb-modal-amount-row input[type='number'] {
+    width: 160px;
+    height: 34px;
+    font-variant-numeric: tabular-nums;
+}
+.mb-modal-amount-unit {
+    font-size: 11px;
+    color: var(--color-gray-2);
+}
+.mb-modal-amount-hint {
+    display: block;
+    margin-top: 5px;
+    font-size: 11px;
+    color: var(--color-gray-2);
+    font-variant-numeric: tabular-nums;
+}
 .mb-modal-remark-label {
     display: block;
     margin-bottom: 5px;

@@ -31,7 +31,8 @@ public record JobOrderHandoverCreateDto(
     @NotNull Instant handoverTime,
     @NotBlank String recipientHandle,
     String recipientSquadron,
-    // @Valid is required for the @Positive on each item's amount to cascade into the list elements
-    // (Bean Validation only descends into collection elements when the field carries @Valid). Audit
-    // M-4: without it a negative amount slipped through and *increased* stock + open requirement.
-    @NotEmpty @Valid List<JobOrderHandoverItemCreateDto> items) {}
+    // @Valid on the element type cascades each item's @Positive amount into the list elements;
+    // Bean Validation only descends into a collection element when the element type carries @Valid.
+    // Audit M-4: without it a negative amount slipped through and *increased* stock + open
+    // requirement.
+    @NotEmpty List<@Valid JobOrderHandoverItemCreateDto> items) {}

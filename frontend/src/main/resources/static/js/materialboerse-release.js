@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: GPL-3.0-only
  *
  * Shared Materialbörse release / edit modal (REQ-MARKET-002/007). Used by both the
- * Materialbörse board page ("Material anbieten" / "Bemerkung bearbeiten") and the
- * Mein-Lager page ("Für Börse freigeben" checkbox). Exposes window.krtMaterialRelease.
+ * Materialbörse board page ("Material anbieten" / "Angebot bearbeiten") and the
+ * Mein-Lager page ("Für Börse freigeben" checkbox). Lets the owner choose how much of
+ * a Lager row to offer (partial offers, ADR-0086). Exposes window.krtMaterialRelease.
  * The modal markup lives in fragments/materialboerse-modal.html; strings come from
  * window.materialboerseI18n. No native dialogs, no full-page reload.
  */
@@ -25,6 +26,8 @@
         productKey: null,
         offerId: null,
         version: null,
+        available: null,
+        quantityType: null,
         onDone: null,
         onCancel: null,
     };
@@ -103,77 +106,83 @@
         );
     }
 
-    function setFacts(material, quality, amount, quantityType) {
+    function setFacts(material, quality) {
         setText('[data-mb-fact-material]', material || '—');
         setText(
             '[data-mb-fact-quality]',
             quality != null && quality !== '' ? String(quality) : '—',
         );
-        setText(
-            '[data-mb-fact-amount]',
-            amount != null && amount !== '' ? formatAmount(amount, quantityType) : '—',
-        );
-    }
-
-    /** Shows/hides an element inside the modal via the hidden attribute. */
-    function showEl(sel, on) {
-        let el = q(sel);
-        if (el) {
-            el.hidden = !on;
-        }
-    }
-
-    /** Formats a whole-piece item quantity (item offers are always counted in pieces). */
-    function formatQuantity(quantity) {
-        let n = Number(quantity);
-        if (isNaN(n)) {
-            return String(quantity);
-        }
-        return (
-            n.toLocaleString('de-DE', { maximumFractionDigits: 0 }) +
-            ' ' +
-            (i18n.unitPiece || 'Stk')
-        );
     }
 
     /**
-     * Populates and toggles the read-only fact strip for the given mode/context (REQ-MARKET-012). A
-     * material offer shows Material + Qualität + Menge (live/derived from the Lager row); an item
-     * offer shows Item + Menge with no quality — and the Menge fact only in 'edit' mode (in 'item'
-     * mode the quantity is entered in the input field below, so the fact cell is hidden).
+     * Sets the editable offered-amount field: its current value, the max the owner may offer (the
+     * item's current stock, kept in state.available for validation), the unit label + step for the
+     * material's quantity type (SCU vs PIECE, #1199/#1182), and the "max. X verfügbar" hint. A null
+     * max disables the input (release-new mode before an item is picked).
+     * @param value the initial offered amount, or '' / null for empty.
+     * @param max the item's current stock as the ceiling, or null for "unknown / disabled".
      */
-    function applyFacts(mode, ctx) {
-        let isItem = mode === 'item' || (mode === 'edit' && ctx.kind === 'ITEM');
-        let label = q('[data-mb-fact-primary-label]');
-        if (label) {
-            label.textContent = isItem ? i18n.factItem || 'Item' : i18n.factMaterial || 'Material';
+    function setAmountField(value, max) {
+        let input = q('[data-mb-amount]');
+        let hint = q('[data-mb-amount-hint]');
+        let unit = q('[data-mb-amount-unit]');
+        let isPiece = state.quantityType === 'PIECE';
+        let maxNum = max == null || max === '' ? NaN : Number(max);
+        state.available = isNaN(maxNum) ? null : maxNum;
+        if (unit) {
+            unit.textContent = isPiece ? i18n.unitPiece || 'Stück' : i18n.unitScu || 'SCU';
         }
-        setText('[data-mb-fact-material]', (isItem ? ctx.itemName : ctx.material) || '—');
-        showEl('[data-mb-fact-quality-cell]', !isItem);
-        if (!isItem) {
-            setText(
-                '[data-mb-fact-quality]',
-                ctx.quality != null && ctx.quality !== '' ? String(ctx.quality) : '—',
-            );
-        }
-        let showAmount = !isItem || mode === 'edit';
-        showEl('[data-mb-fact-amount-cell]', showAmount);
-        if (showAmount) {
-            if (isItem) {
-                setText(
-                    '[data-mb-fact-amount]',
-                    ctx.itemQuantity != null && ctx.itemQuantity !== ''
-                        ? formatQuantity(ctx.itemQuantity)
-                        : '—',
-                );
+        if (input) {
+            input.step = isPiece ? '1' : '0.001';
+            if (state.available != null) {
+                input.max = String(state.available);
+                input.disabled = false;
             } else {
-                setText(
-                    '[data-mb-fact-amount]',
-                    ctx.amount != null && ctx.amount !== ''
-                        ? formatAmount(ctx.amount, ctx.quantityType)
-                        : '—',
-                );
+                input.removeAttribute('max');
+                input.disabled = true;
             }
+            let valNum = value == null || value === '' ? NaN : Number(value);
+            input.value = isNaN(valNum) ? '' : String(valNum);
+        }
+        if (hint) {
+            hint.textContent =
+                state.available != null
+                    ? fmt(
+                          i18n.amountMax || 'max. {0} verfügbar',
+                          formatAmount(state.available, state.quantityType),
+                      )
+                    : '';
+        }
+    }
+
+    /** Reads the offered amount from the field as a Number (NaN when empty/invalid). */
+    function readOfferedAmount() {
+        let input = q('[data-mb-amount]');
+        return input ? Number(input.value) : NaN;
+    }
+
+    /**
+     * Validates the offered amount against >0 and the item's current stock. On failure it shows an
+     * error toast and returns null; on success it returns the numeric amount.
+     */
+    function validateOfferedAmount() {
+        let amount = readOfferedAmount();
+        if (isNaN(amount) || amount <= 0) {
+            showError(i18n.amountInvalid);
+            return null;
+        }
+        // Tolerate float noise so offering the whole row (value === max) is never rejected.
+        if (state.available != null && amount > state.available + 1e-6) {
+            showError(i18n.amountExceeds);
+            return null;
+        }
+        return amount;
+    }
+
+    /** Shows a transient client-side validation error toast. */
+    function showError(message) {
+        if (typeof window.showFrontendErrorToast === 'function') {
+            window.showFrontendErrorToast(message || i18n.error || '');
         }
     }
 
@@ -191,7 +200,10 @@
     /**
      * Opens the modal.
      * @param mode 'new' | 'lager' | 'edit'
-     * @param ctx {itemId?, material?, quantityType?, quality?, amount?, offerId?, version?, remark?}
+     * @param ctx {itemId?, material?, quantityType?, quality?, amount?, available?, offerId?,
+     *        version?, remark?} — quantityType drives the SCU/PIECE unit; for 'edit', amount is the
+     *        current offered quantity and available is the item's total stock (the ceiling); for
+     *        'lager'/'new' amount is the item's stock (the default + max).
      * @param doneOrOpts either an onDone callback(body), or {onDone, onCancel} — onCancel fires when
      *        the dialog is dismissed without submitting (e.g. to revert a Lager checkbox).
      */
@@ -211,6 +223,8 @@
             productKey: null,
             offerId: ctx.offerId || null,
             version: ctx.version || null,
+            available: null,
+            quantityType: ctx.quantityType || null,
             onDone: onDone,
             onCancel: onCancel,
         };
@@ -223,14 +237,30 @@
         );
         setText('[data-mb-submit-label]', isEdit ? i18n.submitSave : i18n.submitRelease);
         toggle('[data-mb-picker]', isNew);
+        // Item mode (REQ-MARKET-012): show the blueprint-product picker + quantity input, hide the
+        // material facts strip + offered-amount block (a craftable item has no live stock, so the
+        // picker input alone carries the chosen item's name).
         toggle('[data-mb-item-picker]', isItem);
-        showEl('[data-mb-qty-block]', isItem);
-        showEl('[data-mb-qty-error]', false);
+        toggle('[data-mb-facts]', !isItem);
+        toggle('[data-mb-amount-block]', !isItem);
+        toggle('[data-mb-qty-block]', isItem);
+        toggle('[data-mb-qty-error]', false);
         let qtyInput = q('[data-mb-item-qty]');
         if (qtyInput) {
             qtyInput.value = '';
         }
-        applyFacts(mode, ctx);
+        if (!isItem) {
+            setFacts(ctx.material, ctx.quality);
+            if (isNew) {
+                // No item picked yet: disable the amount field until the picker selection sets its max.
+                setAmountField('', null);
+            } else {
+                // 'edit': value = current offered amount, ceiling = item's total stock (ctx.available).
+                // 'lager': value = ceiling = the item's stock (offer the whole row by default).
+                let max = isEdit ? ctx.available : ctx.amount;
+                setAmountField(ctx.amount, max);
+            }
+        }
 
         let ta = q('[data-mb-remark]');
         ta.value = ctx.remark || '';
@@ -295,6 +325,8 @@
             productKey: null,
             offerId: null,
             version: null,
+            available: null,
+            quantityType: null,
             onDone: null,
             onCancel: null,
         };
@@ -381,12 +413,12 @@
 
     function pickItem(li) {
         state.itemId = li.getAttribute('data-item-id');
-        setFacts(
-            li.getAttribute('data-material'),
-            li.getAttribute('data-quality'),
-            li.getAttribute('data-amount'),
-            li.getAttribute('data-quantity-type'),
-        );
+        state.quantityType = li.getAttribute('data-quantity-type');
+        let amount = li.getAttribute('data-amount');
+        setFacts(li.getAttribute('data-material'), li.getAttribute('data-quality'));
+        // Offer the whole picked row by default; its stock is the ceiling. setAmountField reads
+        // state.quantityType (just set) to render the SCU/PIECE unit + step.
+        setAmountField(amount, amount);
         let input = q('[data-mb-picker-input]');
         if (input) {
             input.value = li.getAttribute('data-material');
@@ -470,11 +502,9 @@
 
     function pickProduct(li) {
         state.productKey = li.getAttribute('data-product-key');
-        let name = li.getAttribute('data-name');
-        setText('[data-mb-fact-material]', name || '—');
         let input = q('[data-mb-item-picker-input]');
         if (input) {
-            input.value = name;
+            input.value = li.getAttribute('data-name');
         }
         let list = q('[data-mb-item-picker-list]');
         if (list) {
@@ -485,10 +515,18 @@
     function submit() {
         let remark = q('[data-mb-remark]').value;
         if (state.mode === 'edit') {
+            let offeredAmount = validateOfferedAmount();
+            if (offeredAmount === null) {
+                return;
+            }
             window.krtFetch.write({
                 method: 'PUT',
                 url: '/materialboerse/offers/' + state.offerId + '/remark/ajax',
-                payload: { remark: remark, version: Number(state.version) },
+                payload: {
+                    offeredAmount: offeredAmount,
+                    remark: remark,
+                    version: Number(state.version),
+                },
                 successMessage: i18n.remarkSaved,
                 errorMessage: i18n.error,
                 conflict: i18n.conflict,
@@ -504,13 +542,22 @@
             submitItem(remark);
             return;
         }
+        // 'new' / 'lager': an item must be chosen first (the amount field stays disabled until then).
         if (!state.itemId) {
+            return;
+        }
+        let offeredAmount = validateOfferedAmount();
+        if (offeredAmount === null) {
             return;
         }
         window.krtFetch.write({
             method: 'POST',
             url: '/materialboerse/offers/ajax',
-            payload: { inventoryItemId: state.itemId, remark: remark },
+            payload: {
+                inventoryItemId: state.itemId,
+                offeredAmount: offeredAmount,
+                remark: remark,
+            },
             successMessage: i18n.released,
             errorMessage: i18n.error,
             serialize: SERIALIZE_KEY,
@@ -524,8 +571,7 @@
     /**
      * Submits an item offer (#1185): requires a picked blueprint product and a whole quantity ≥ 1
      * (validated client-side; the backend re-validates the product and the quantity). POSTs to the
-     * item-offer proxy and, on success, notifies peers and closes the modal exactly like a material
-     * release.
+     * item-offer proxy and, on success, notifies peers and closes the modal like a material release.
      */
     function submitItem(remark) {
         if (!state.productKey) {
@@ -534,13 +580,13 @@
         let qtyInput = q('[data-mb-item-qty]');
         let quantity = qtyInput ? parseInt(qtyInput.value, 10) : NaN;
         if (isNaN(quantity) || quantity < 1) {
-            showEl('[data-mb-qty-error]', true);
+            toggle('[data-mb-qty-error]', true);
             if (qtyInput) {
                 qtyInput.focus();
             }
             return;
         }
-        showEl('[data-mb-qty-error]', false);
+        toggle('[data-mb-qty-error]', false);
         window.krtFetch.write({
             method: 'POST',
             url: '/materialboerse/item-offers/ajax',
@@ -580,6 +626,16 @@
             submit();
             return;
         }
+        if (e.target.closest('[data-mb-amount-max]')) {
+            // "Alles": fill the offered amount with the item's full available stock.
+            if (state.available != null) {
+                let input = q('[data-mb-amount]');
+                if (input) {
+                    input.value = String(state.available);
+                }
+            }
+            return;
+        }
         let li = e.target.closest('[data-mb-picker-list] .krt-combobox__option');
         if (li) {
             pickItem(li);
@@ -599,7 +655,7 @@
         } else if (e.target.matches('[data-mb-item-picker-input]')) {
             searchItemPicker(e.target.value);
         } else if (e.target.matches('[data-mb-item-qty]')) {
-            showEl('[data-mb-qty-error]', false);
+            toggle('[data-mb-qty-error]', false);
         }
     });
 

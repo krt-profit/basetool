@@ -41,7 +41,10 @@ import java.util.UUID;
  * @param foreign whether the offer's squadron differs from the viewer's.
  * @param mine whether the viewer owns this offer.
  * @param quality the offered quality (0–1000) for a material offer, else {@code null}.
- * @param amount the offered quantity in SCU for a material offer, else {@code null}.
+ * @param amount the offered quantity in SCU (clamped to current stock) for a material offer, else
+ *     {@code null}.
+ * @param availableAmount the item's current total stock in SCU, populated only for the owner of a
+ *     material offer (to bound the edit dialog), otherwise {@code null}.
  * @param releasedAt when the offer was released.
  * @param remark the raw Markdown trade remark.
  * @param interestCount how many members registered interest.
@@ -62,6 +65,7 @@ public record MaterialExchangeOfferDto(
     boolean mine,
     Integer quality,
     Double amount,
+    Double availableAmount,
     Instant releasedAt,
     String remark,
     int interestCount,

@@ -40,10 +40,20 @@
                         <ul class="krt-combobox__listbox" role="listbox" data-mb-item-picker-list hidden></ul>
                     </div>
                 </div>
-                <div class="facts-bar mb-modal-facts">
-                    <span data-mb-fact-primary-cell><span class="fact-k" data-mb-fact-primary-label th:text="#{materialboerse.facts.material}">Material</span><span class="fact-v" data-mb-fact-material>—</span></span>
-                    <span data-mb-fact-quality-cell><span class="fact-k" th:text="#{materialboerse.facts.quality}">Qualität</span><span class="fact-v" data-mb-fact-quality>—</span></span>
-                    <span data-mb-fact-amount-cell><span class="fact-k" th:text="#{materialboerse.facts.amount}">Menge</span><span class="fact-v" data-mb-fact-amount>—</span></span>
+                <div class="facts-bar mb-modal-facts" data-mb-facts>
+                    <span><span class="fact-k" th:text="#{materialboerse.facts.material}">Material</span><span class="fact-v" data-mb-fact-material>—</span></span>
+                    <span><span class="fact-k" th:text="#{materialboerse.facts.quality}">Qualität</span><span class="fact-v" data-mb-fact-quality>—</span></span>
+                </div>
+                <div class="mb-modal-amount" data-mb-amount-block>
+                    <label class="form-label-sm" for="mb-amount" th:text="#{materialboerse.modal.offeredAmount.label}">Menge anbieten</label>
+                    <div class="mb-modal-amount-row">
+                        <input id="mb-amount" data-mb-amount type="number" min="0" step="0.001"
+                               inputmode="decimal" th:aria-label="#{materialboerse.modal.offeredAmount.label}"/>
+                        <span class="mb-modal-amount-unit" data-mb-amount-unit th:text="#{material.quantity.scu}">SCU</span>
+                        <button type="button" class="btn btn-ghost btn-xs" data-mb-amount-max
+                                th:text="#{materialboerse.modal.offeredAmount.all}">Alles</button>
+                    </div>
+                    <span class="mb-modal-amount-hint" data-mb-amount-hint></span>
                 </div>
                 <div class="mb-modal-qty" data-mb-qty-block hidden>
                     <label class="form-label-sm" for="mb-item-qty" th:text="#{materialboerse.modal.quantity.label}">Menge (Stück)</label>
@@ -77,21 +87,22 @@
     <script th:inline="javascript" th:attr="nonce=${cspNonce}">
         window.materialboerseI18n = Object.assign(window.materialboerseI18n || {}, {
             releaseTitle: /*[[#{materialboerse.modal.release.title}]]*/ 'Material für die Börse freigeben',
-            editTitle: /*[[#{materialboerse.modal.edit.title}]]*/ 'Bemerkung bearbeiten',
+            editTitle: /*[[#{materialboerse.modal.edit.title}]]*/ 'Angebot bearbeiten',
             itemTitle: /*[[#{materialboerse.modal.itemOffer.title}]]*/ 'Item für die Börse freigeben',
             submitRelease: /*[[#{materialboerse.modal.submit.release}]]*/ 'Freigeben',
             submitSave: /*[[#{materialboerse.modal.submit.save}]]*/ 'Speichern',
-            released: /*[[#{materialboerse.toast.released}]]*/ 'Auf die Börse gestellt.',
             itemReleased: /*[[#{materialboerse.toast.itemReleased}]]*/ 'Item auf die Börse gestellt.',
+            itemPickerEmpty: /*[[#{materialboerse.modal.item.empty}]]*/ 'Keine craftbaren Items gefunden.',
+            quantityInvalid: /*[[#{materialboerse.modal.quantity.invalid}]]*/ 'Bitte eine Menge angeben.',
+            amountMax: /*[[#{materialboerse.modal.offeredAmount.max}]]*/ 'max. {0} verfügbar',
+            amountInvalid: /*[[#{materialboerse.modal.offeredAmount.invalid}]]*/ 'Bitte eine Menge größer als 0 angeben.',
+            amountExceeds: /*[[#{materialboerse.modal.offeredAmount.exceeds}]]*/ 'Die Menge darf den Lagerbestand nicht überschreiten.',
+            released: /*[[#{materialboerse.toast.released}]]*/ 'Auf die Börse gestellt.',
             remarkSaved: /*[[#{materialboerse.toast.remarkSaved}]]*/ 'Bemerkung gespeichert.',
             error: /*[[#{notification.error.save}]]*/ 'Fehler.',
             charCounter: /*[[#{materialboerse.modal.remark.counter}]]*/ '{0} / 20.000',
             pickerEmpty: /*[[#{materialboerse.modal.material.empty}]]*/ 'Keine freigebbaren Lager-Posten gefunden.',
             pickerAlready: /*[[#{materialboerse.modal.material.already}]]*/ 'bereits auf der Börse',
-            itemPickerEmpty: /*[[#{materialboerse.modal.item.empty}]]*/ 'Keine craftbaren Items gefunden.',
-            quantityInvalid: /*[[#{materialboerse.modal.quantity.invalid}]]*/ 'Bitte eine Menge angeben.',
-            factMaterial: /*[[#{materialboerse.facts.material}]]*/ 'Material',
-            factItem: /*[[#{materialboerse.facts.item}]]*/ 'Item',
             unitScu: /*[[#{material.quantity.scu}]]*/ 'SCU',
             unitPiece: /*[[#{material.quantity.piece}]]*/ 'Stück',
             conflict: window.materialboerseI18n && window.materialboerseI18n.conflict ? window.materialboerseI18n.conflict : {

@@ -7,8 +7,11 @@
 -- name, and the offering player STATES the quantity (there is no live source to read it from). An
 -- item offer carries no quality and no location.
 
--- A MATERIAL offer keeps its Lager row; an ITEM offer has none, so relax the NOT NULL.
+-- A MATERIAL offer keeps its Lager row; an ITEM offer has none, so relax the NOT NULL. Likewise
+-- offered_amount (V212, partial offers) applies only to a Lager-backed offer — an item offer states
+-- its quantity in item_quantity instead — so relax that NOT NULL too; the CHECK below re-scopes it.
 ALTER TABLE material_exchange_offer ALTER COLUMN inventory_item_id DROP NOT NULL;
+ALTER TABLE material_exchange_offer ALTER COLUMN offered_amount DROP NOT NULL;
 
 -- Discriminator + the item-offer branch columns. offer_kind defaults to MATERIAL so every existing
 -- row (all Lager-backed) is stamped correctly; the default is dropped afterwards because the entity
@@ -21,19 +24,22 @@ ALTER TABLE material_exchange_offer
 
 ALTER TABLE material_exchange_offer ALTER COLUMN offer_kind DROP DEFAULT;
 
--- Exactly-one-branch integrity: a MATERIAL offer has a Lager row and no item fields; an ITEM offer
--- has a product key / display name / positive quantity and no Lager row. This is the structural
--- guarantee the entity's nullability and the service's kind branches rely on.
+-- Exactly-one-branch integrity: a MATERIAL offer has a Lager row and a stored offered_amount (V212)
+-- and no item fields; an ITEM offer has a product key / display name / positive quantity and neither
+-- a Lager row nor an offered_amount. This is the structural guarantee the entity's nullability and
+-- the service's kind branches rely on.
 ALTER TABLE material_exchange_offer
     ADD CONSTRAINT ck_material_exchange_offer_kind CHECK (
         (offer_kind = 'MATERIAL'
              AND inventory_item_id IS NOT NULL
+             AND offered_amount IS NOT NULL
              AND item_product_key IS NULL
              AND item_name IS NULL
              AND item_quantity IS NULL)
         OR
         (offer_kind = 'ITEM'
              AND inventory_item_id IS NULL
+             AND offered_amount IS NULL
              AND item_product_key IS NOT NULL
              AND item_name IS NOT NULL
              AND item_quantity IS NOT NULL
