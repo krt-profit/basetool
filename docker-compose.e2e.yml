@@ -101,6 +101,16 @@ services:
       # prod (which keeps h2) is untouched. An env var (highest Spring property precedence) overrides
       # application.yml's server.http2.enabled=true.
       SERVER_HTTP2_ENABLED: "false"
+      # TEMPORARY DIAGNOSTIC (remove once the anonymous-403 seed flake is root-caused): raise the
+      # Spring Security web + resource-server loggers to DEBUG so the backend.log records WHY the
+      # admin membership PATCH resolves to `anonymous`. The distinguishing lines: "Set
+      # SecurityContextHolder to anonymous" (no bearer token reached the resolver -> a
+      # transport/header problem) vs an "Invalid bearer token"/JWT-decode failure (the token WAS
+      # present but rejected -> a JWKS/validation problem). DEBUG on these packages logs filter
+      # decisions and the authenticated principal (sub, already in our MDC) but NOT the raw token, so
+      # no new secret enters the uploaded artifacts.
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY_WEB: "DEBUG"
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY_OAUTH2_SERVER_RESOURCE: "DEBUG"
     # Drop the test stack's host.docker.internal -> host-gateway mapping so the Keycloak network
     # alias (above) resolves instead — the host-gateway route can't reach KC's 127.0.0.1-bound
     # published port on a Linux runner.
