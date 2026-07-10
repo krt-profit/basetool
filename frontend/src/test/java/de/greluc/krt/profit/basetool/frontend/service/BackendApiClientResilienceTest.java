@@ -19,11 +19,16 @@
 
 package de.greluc.krt.profit.basetool.frontend.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.frontend.exception.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import io.github.resilience4j.bulkhead.BulkheadFullException;
@@ -35,6 +40,7 @@ import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.oauth2.client.ClientAuthorizationRequiredException;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
@@ -87,26 +93,52 @@ class BackendApiClientResilienceTest {
 
     @Test
     void circuitBreakerOpen_yields503_serviceUnavailable() {
-      stubGet(webClient, "/api/v1/x", mock(CallNotPermittedException.class));
+      Logger clientLogger = (Logger) LoggerFactory.getLogger(BackendApiClient.class);
+      Level originalLevel = clientLogger.getLevel();
+      ListAppender<ILoggingEvent> appender = new ListAppender<>();
+      appender.start();
+      clientLogger.addAppender(appender);
+      clientLogger.setLevel(Level.DEBUG);
+      try {
+        stubGet(webClient, "/api/v1/x", mock(CallNotPermittedException.class));
 
-      BackendServiceException ex =
-          assertThrows(BackendServiceException.class, () -> client.get("/api/v1/x", String.class));
+        BackendServiceException ex =
+            assertThrows(
+                BackendServiceException.class, () -> client.get("/api/v1/x", String.class));
 
-      assertEquals(503, ex.getStatusCode());
-      assertEquals(BackendServiceException.CODE_SERVICE_UNAVAILABLE, ex.getProblemCode());
-      assertEquals("Backend circuit breaker open", ex.getMessage());
-      // The failure is counted once under the bounded circuit-open reason + GET verb (REQ-OBS-011).
-      assertEquals(
-          1.0d,
-          meterRegistry
-              .get(MetricNames.BACKEND_CLIENT_ERRORS)
-              .tags(
-                  MetricNames.TAG_REASON,
-                  MetricNames.REASON_CIRCUIT_OPEN,
-                  MetricNames.TAG_METHOD,
-                  "GET")
-              .counter()
-              .count());
+        assertEquals(503, ex.getStatusCode());
+        assertEquals(BackendServiceException.CODE_SERVICE_UNAVAILABLE, ex.getProblemCode());
+        assertEquals("Backend circuit breaker open", ex.getMessage());
+        // The failure is counted once under the bounded circuit-open reason + GET verb
+        // (REQ-OBS-011).
+        assertEquals(
+            1.0d,
+            meterRegistry
+                .get(MetricNames.BACKEND_CLIENT_ERRORS)
+                .tags(
+                    MetricNames.TAG_REASON,
+                    MetricNames.REASON_CIRCUIT_OPEN,
+                    MetricNames.TAG_METHOD,
+                    "GET")
+                .counter()
+                .count());
+        // The circuit-open line is DEBUG, not WARN: it fires for every call blocked while the
+        // breaker stays open, so at WARN a routine backend restart floods the log (issue #1203,
+        // REQ-OBS-001). The reason=circuit_open metric above keeps the count either way.
+        assertThat(appender.list)
+            .anyMatch(
+                e ->
+                    e.getLevel() == Level.DEBUG
+                        && e.getFormattedMessage().contains("Circuit breaker open"));
+        assertThat(appender.list)
+            .noneMatch(
+                e ->
+                    e.getLevel() == Level.WARN
+                        && e.getFormattedMessage().contains("Circuit breaker open"));
+      } finally {
+        clientLogger.detachAppender(appender);
+        clientLogger.setLevel(originalLevel);
+      }
     }
 
     @Test

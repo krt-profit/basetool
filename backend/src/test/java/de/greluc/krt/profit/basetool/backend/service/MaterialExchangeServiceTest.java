@@ -28,6 +28,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.event.MaterialExchangeInterestRegisteredEvent;
+import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
@@ -39,9 +40,9 @@ import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeOfferDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeOfferUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleasableItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleaseRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeRemarkUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeInterestRepository;
@@ -151,8 +152,51 @@ class MaterialExchangeServiceTest {
         .thenReturn(Optional.of(offer.getInventoryItem()));
 
     assertThatThrownBy(
-            () -> service.release(new MaterialExchangeReleaseRequest(itemId, "tausche gegen X")))
+            () ->
+                service.release(
+                    new MaterialExchangeReleaseRequest(itemId, 120.0, "tausche gegen X")))
         .isInstanceOf(AccessDeniedException.class);
+    verify(auditService, never()).record(any(), any(), any(), any(), any());
+  }
+
+  /**
+   * Releasing only a part of a Lager row stores the chosen offered amount on the offer and exposes
+   * the item's total stock as {@code availableAmount} to the owner (partial offers,
+   * REQ-MARKET-002).
+   */
+  @Test
+  void release_partialAmount_storesOfferedAmountAndExposesAvailableToOwner() {
+    UUID itemId = offer.getInventoryItem().getId(); // item stock = 340 SCU
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(inventoryItemRepository.findById(itemId))
+        .thenReturn(Optional.of(offer.getInventoryItem()));
+    when(offerRepository.findByInventoryItemIdAndStatus(itemId, MaterialExchangeOfferStatus.ACTIVE))
+        .thenReturn(Optional.empty());
+    when(offerRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(interestRepository.findByOfferIdOrderByCreatedAtDesc(any())).thenReturn(List.of());
+
+    MaterialExchangeOfferDto dto =
+        service.release(new MaterialExchangeReleaseRequest(itemId, 120.0, "tausche gegen X"));
+
+    assertThat(dto.amount()).as("board shows the offered part").isEqualTo(120.0);
+    assertThat(dto.availableAmount()).as("owner sees the item's total stock").isEqualTo(340.0);
+    ArgumentCaptor<MaterialExchangeOffer> captor = ArgumentCaptor.captor();
+    verify(offerRepository).saveAndFlush(captor.capture());
+    assertThat(captor.getValue().getOfferedAmount()).isEqualTo(120.0);
+  }
+
+  /** Offering more than the item's current stock is rejected (400) and persists nothing. */
+  @Test
+  void release_amountExceedsStock_badRequest() {
+    UUID itemId = offer.getInventoryItem().getId(); // item stock = 340 SCU
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(inventoryItemRepository.findById(itemId))
+        .thenReturn(Optional.of(offer.getInventoryItem()));
+
+    assertThatThrownBy(
+            () -> service.release(new MaterialExchangeReleaseRequest(itemId, 999.0, "zu viel")))
+        .isInstanceOf(BadRequestException.class);
+    verify(offerRepository, never()).saveAndFlush(any());
     verify(auditService, never()).record(any(), any(), any(), any(), any());
   }
 
@@ -215,16 +259,51 @@ class MaterialExchangeServiceTest {
     verify(eventPublisher, never()).publishEvent(any());
   }
 
-  /** A stale version on a remark edit raises an optimistic-lock conflict (→ 409). */
+  /** A stale version on an offer edit raises an optimistic-lock conflict (→ 409). */
   @Test
-  void updateRemark_staleVersion_conflict() {
+  void updateOffer_staleVersion_conflict() {
     offer.setVersion(5L);
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
     when(offerRepository.findById(offerId)).thenReturn(Optional.of(offer));
 
     assertThatThrownBy(
-            () -> service.updateRemark(offerId, new MaterialExchangeRemarkUpdateRequest("neu", 2L)))
+            () ->
+                service.updateOffer(
+                    offerId, new MaterialExchangeOfferUpdateRequest(50.0, "neu", 2L)))
         .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+    verify(offerRepository, never()).saveAndFlush(any());
+  }
+
+  /** Editing an offer updates both the offered amount and the remark (REQ-MARKET-007). */
+  @Test
+  void updateOffer_changesOfferedAmountAndRemark() {
+    offer.setVersion(3L);
+    offer.getInventoryItem().setAmount(340.0);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(offerRepository.findById(offerId)).thenReturn(Optional.of(offer));
+    when(offerRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(interestRepository.findByOfferIdOrderByCreatedAtDesc(any())).thenReturn(List.of());
+
+    MaterialExchangeOfferDto dto =
+        service.updateOffer(offerId, new MaterialExchangeOfferUpdateRequest(200.0, "neu", 3L));
+
+    assertThat(dto.amount()).isEqualTo(200.0);
+    assertThat(offer.getOfferedAmount()).isEqualTo(200.0);
+    assertThat(offer.getRemark()).isEqualTo("neu");
+  }
+
+  /** Editing an offer to more than the item's current stock is rejected (400). */
+  @Test
+  void updateOffer_amountExceedsStock_badRequest() {
+    offer.setVersion(1L);
+    offer.getInventoryItem().setAmount(50.0);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(offerRepository.findById(offerId)).thenReturn(Optional.of(offer));
+
+    assertThatThrownBy(
+            () ->
+                service.updateOffer(offerId, new MaterialExchangeOfferUpdateRequest(80.0, "x", 1L)))
+        .isInstanceOf(BadRequestException.class);
     verify(offerRepository, never()).saveAndFlush(any());
   }
 
@@ -240,6 +319,23 @@ class MaterialExchangeServiceTest {
 
     assertThat(counts.all()).isEqualTo(7);
     assertThat(counts.mine()).isEqualTo(3);
+  }
+
+  /**
+   * The board/detail effective amount is clamped to the item's current stock (ADR-0086): an offer
+   * that stated 340 SCU but whose row has since been booked out to 60 SCU shows only 60 — the board
+   * never advertises more than is in stock.
+   */
+  @Test
+  void detail_offeredAmountClampedToCurrentStock() {
+    offer.setOfferedAmount(340.0);
+    offer.getInventoryItem().setAmount(60.0); // booked out since release
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
+    when(offerRepository.findWithDetailById(offerId)).thenReturn(Optional.of(offer));
+
+    MaterialExchangeOfferDto dto = service.detail(offerId);
+
+    assertThat(dto.amount()).as("shown amount is clamped to remaining stock").isEqualTo(60.0);
   }
 
   /** A missing offer on detail raises a not-found. */
@@ -302,6 +398,7 @@ class MaterialExchangeServiceTest {
     offer.setId(id);
     offer.setInventoryItem(item);
     offer.setOwner(owner);
+    offer.setOfferedAmount(item.getAmount());
     offer.setStatus(MaterialExchangeOfferStatus.ACTIVE);
     offer.setReleasedAt(Instant.now());
     offer.setRemark("tausche gegen **Titanium**");

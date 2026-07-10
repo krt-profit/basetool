@@ -27,7 +27,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitBankAccountDetail
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitBankAccountSettingsDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitBankBalanceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
@@ -101,10 +100,6 @@ public class OrgUnitBankPageController {
   /** Response type for one paginated page of an account's booking history. */
   private static final ParameterizedTypeReference<PageResponse<BankBookingDto>>
       BANK_BOOKING_PAGE_TYPE = new ParameterizedTypeReference<>() {};
-
-  /** Response type for the user-lookup dropdown feeding the visibility/limit pickers. */
-  private static final ParameterizedTypeReference<List<UserReferenceDto>> USER_REFERENCE_LIST_TYPE =
-      new ParameterizedTypeReference<>() {};
 
   /**
    * Renders the overview page (or one of its fragments for an in-place swap). The Konten list is
@@ -352,21 +347,16 @@ public class OrgUnitBankPageController {
                 || detail.canConfigureVisibility()
                 || detail.canConfigureApprovalLimits());
     OrgUnitBankAccountSettingsDto settings = null;
-    List<UserReferenceDto> users = List.of();
     if (canManage) {
       settings =
           backendApiClient.get(
               "/api/v1/org-units/bank/accounts/" + id + "/settings",
               OrgUnitBankAccountSettingsDto.class);
-      // The user dropdown feeds both the individual-visibility and the individual-limit pickers.
-      if (detail.canConfigureVisibility() || detail.canConfigureApprovalLimits()) {
-        List<UserReferenceDto> lookup =
-            backendApiClient.get("/api/v1/users/lookup", USER_REFERENCE_LIST_TYPE);
-        users = lookup == null ? List.<UserReferenceDto>of() : lookup;
-      }
     }
+    // The individual-visibility and individual-limit pickers are now server-side search comboboxes
+    // (#1193, data-krt-combobox="remote-users"): the roster is fetched on demand via /users/search,
+    // so no full user list is preloaded into the model here.
     model.addAttribute("settings", settings);
-    model.addAttribute("users", users);
 
     if ("orgUnitBankSettings".equals(fragment)) {
       return "org-unit-bank-account-detail :: orgUnitBankSettings";

@@ -232,10 +232,13 @@
                 <div class="material-row mt-1-5">
                     <div class="form-group flex-2 mb-0">
                         <label for="ownerId" th:text="#{refineryorder.form.owner}">Besitzer</label>
+                        <!-- Server-side searchable combobox (remote-users, #1193): seed only the
+                             current owner (the caller by default); the roster is searched on demand.
+                             Non-logisticians keep the disabled plain select. -->
                         <select id="ownerId" th:field="*{ownerId}" required th:disabled="${!isLogistician}"
-                                th:attr="data-krt-combobox=${isLogistician ? '' : null}">
+                                th:attr="data-krt-combobox=${isLogistician ? 'remote-users' : null}">
                             <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
-                            <option th:each="user : ${users}" th:value="${user.id}" th:attr="data-search=${user.username}" th:text="${user.effectiveName}"></option>
+                            <option th:if="${refineryOrderForm.ownerId != null}" th:value="${refineryOrderForm.ownerId}" th:text="${seedUserNames.get(refineryOrderForm.ownerId)}"></option>
                         </select>
                         <input type="hidden" th:field="*{ownerId}" th:if="${!isLogistician}" />
                     </div>

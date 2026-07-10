@@ -1,9 +1,10 @@
 # ADR-0082 — Materialbörse offer model, visibility and live-read facts
 
-- **Status:** Accepted
+- **Status:** Accepted (decision D1's *amount* live-read amended by ADR-0086 — the offered amount is
+  now an owner-chosen stored quantity; material and quality stay live-read)
 - **Date:** 2026-07-07
 - **Deciders:** @greluc
-- **Related:** spec REQ-MARKET-001…010 (`docs/specs/materialboerse.md`) · REQ-AUDIT-001/002 · REQ-OBS-011 · REQ-FE-010
+- **Related:** spec REQ-MARKET-001…010 (`docs/specs/materialboerse.md`) · ADR-0086 · REQ-AUDIT-001/002 · REQ-OBS-011 · REQ-FE-010
 
 ## Context
 

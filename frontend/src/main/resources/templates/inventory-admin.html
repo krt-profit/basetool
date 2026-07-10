@@ -386,8 +386,9 @@
                 <div class="flex-gap-md">
                     <div class="flex-1">
                         <label for="umbuchenTargetUserId" class="form-label" th:text="#{inventory.bookout.targetUser}">Umbuchen zu Nutzer</label>
-                        <select id="umbuchenTargetUserId" data-trigger="inv-admin-umbuchen-target-user-changed" class="w-full" data-krt-combobox>
-                            <option th:each="user : ${users}" th:value="${user.id}" th:attr="data-search=${user.username}" th:text="${user.effectiveName}"></option>
+                        <!-- #1193: server-side user search (remote-users) replaces the preloaded ${users} full list; the roster is queried on demand via /users/search. Add-only picker, so only the empty placeholder is seeded. -->
+                        <select id="umbuchenTargetUserId" data-trigger="inv-admin-umbuchen-target-user-changed" class="w-full" data-krt-combobox="remote-users">
+                            <option value=""></option>
                         </select>
                     </div>
                     <div class="flex-1">

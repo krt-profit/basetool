@@ -21,12 +21,10 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialCollectionEntryDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -56,10 +54,6 @@ public class MaterialCollectionPageController {
   private static final ParameterizedTypeReference<List<MaterialCollectionEntryDto>>
       MATERIAL_COLLECTION_ENTRY_LIST_TYPE = new ParameterizedTypeReference<>() {};
 
-  /** Response type for the user-reference lookup ({@code GET /api/v1/users/lookup}). */
-  private static final ParameterizedTypeReference<List<UserReferenceDto>> USER_REFERENCE_LIST_TYPE =
-      new ParameterizedTypeReference<>() {};
-
   /** Response type for the location-reference lookup ({@code GET /api/v1/locations/lookup}). */
   private static final ParameterizedTypeReference<List<LocationReferenceDto>>
       LOCATION_REFERENCE_LIST_TYPE = new ParameterizedTypeReference<>() {};
@@ -70,22 +64,22 @@ public class MaterialCollectionPageController {
    * Renders the material-collection page for a single job order ({@code
    * /orders/{jobOrderId}/material-collection}).
    *
-   * <p>Loads three independent datasets and tolerates partial failure: the entries list for the job
-   * order, the user-lookup list (sorted by effective name with a username fallback for users whose
-   * display name is blank), and the cached location lookup. A {@link BackendServiceException} on
-   * any of the three is logged and that section degrades to an empty list — partial-success
-   * rendering is much more useful here than a single full-page error.
+   * <p>Loads two independent datasets and tolerates partial failure: the entries list for the job
+   * order and the cached location lookup. A {@link BackendServiceException} on either is logged and
+   * that section degrades to an empty list — partial-success rendering is much more useful here
+   * than a single full-page error. The per-row owner reassignment picker is now a server-side
+   * searchable combobox (remote-users, #1193) that seeds each entry's current owner from {@code
+   * MaterialCollectionEntryDto.ownerName()}, so the whole roster is no longer preloaded here.
    *
    * @param jobOrderId job order id passed through to the template
-   * @param model Thymeleaf model populated with {@code jobOrderId}, {@code entries}, {@code users},
-   *     {@code locations}
+   * @param model Thymeleaf model populated with {@code jobOrderId}, {@code entries}, {@code
+   *     locations}
    * @return the {@code material-collection} view name
    */
   @GetMapping("/{jobOrderId}/material-collection")
   @PreAuthorize("isAuthenticated()")
   public String viewMaterialCollection(@PathVariable UUID jobOrderId, Model model) {
     List<MaterialCollectionEntryDto> entries = Collections.emptyList();
-    List<UserReferenceDto> users = Collections.emptyList();
     List<LocationReferenceDto> locations = Collections.emptyList();
 
     try {
@@ -99,23 +93,6 @@ public class MaterialCollectionPageController {
     }
 
     try {
-      List<UserReferenceDto> rawUsers =
-          backendApiClient.get("/api/v1/users/lookup", USER_REFERENCE_LIST_TYPE);
-      users =
-          rawUsers.stream()
-              .sorted(
-                  Comparator.comparing(
-                      u ->
-                          (u.effectiveName() != null && !u.effectiveName().isBlank())
-                              ? u.effectiveName()
-                              : u.username(),
-                      String.CASE_INSENSITIVE_ORDER))
-              .toList();
-    } catch (BackendServiceException e) {
-      log.warn("Could not load users: {}", e.getMessage());
-    }
-
-    try {
       locations =
           backendApiClient.getCached(CachedCatalog.LOCATIONS_LOOKUP, LOCATION_REFERENCE_LIST_TYPE);
     } catch (BackendServiceException e) {
@@ -124,7 +101,6 @@ public class MaterialCollectionPageController {
 
     model.addAttribute("jobOrderId", jobOrderId);
     model.addAttribute("entries", entries);
-    model.addAttribute("users", users);
     model.addAttribute("locations", locations);
     return "material-collection";
   }

@@ -26,6 +26,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import io.github.resilience4j.bulkhead.BulkheadRegistry;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.retry.RetryRegistry;
@@ -74,5 +75,42 @@ class ResilienceEventLoggerTest {
                 e.getLevel() == Level.WARN
                     && e.getFormattedMessage().contains("CircuitBreaker[test-instance]")
                     && e.getFormattedMessage().contains("state transition"));
+  }
+
+  @Test
+  void logsCallNotPermittedAsDebugNotWarn() {
+    // A call rejected by an already-open breaker must NOT be logged at WARN: it fires for every
+    // short-circuited call for the whole open window and would flood the log during a routine
+    // backend restart/deploy (issue #1203). The one-time OPEN state transition carries the WARN.
+    CircuitBreakerRegistry cbReg = CircuitBreakerRegistry.ofDefaults();
+    CircuitBreaker cb = cbReg.circuitBreaker("test-instance");
+    ResilienceEventLogger rel =
+        new ResilienceEventLogger(
+            cbReg,
+            RetryRegistry.ofDefaults(),
+            BulkheadRegistry.ofDefaults(),
+            TimeLimiterRegistry.ofDefaults());
+    rel.subscribe();
+    logger.setLevel(Level.DEBUG);
+
+    cb.transitionToOpenState();
+    // Invoking any call while OPEN is rejected and fires onCallNotPermitted.
+    try {
+      cb.executeSupplier(() -> "unreachable");
+    } catch (CallNotPermittedException expected) {
+      // expected — the breaker short-circuits the call
+    }
+
+    assertThat(appender.list)
+        .anyMatch(
+            e ->
+                e.getLevel() == Level.DEBUG
+                    && e.getFormattedMessage().contains("CircuitBreaker[test-instance]")
+                    && e.getFormattedMessage().contains("call not permitted"));
+    assertThat(appender.list)
+        .noneMatch(
+            e ->
+                e.getLevel() == Level.WARN
+                    && e.getFormattedMessage().contains("call not permitted"));
   }
 }

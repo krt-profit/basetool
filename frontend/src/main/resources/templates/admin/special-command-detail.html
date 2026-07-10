@@ -165,9 +165,9 @@
         <form th:action="@{/admin/special-commands/{id}/members(id=${specialCommand.id()})}" method="post">
             <div class="form-group">
                 <label for="add-member-userid" th:text="#{admin.specialcommands.members.user_picker}">Nutzer</label>
-                <select id="add-member-userid" name="userId" required data-krt-combobox>
+                <!-- Server-side searchable combobox (remote-users, #1193): roster is searched on demand, not preloaded. -->
+                <select id="add-member-userid" name="userId" required data-krt-combobox="remote-users">
                     <option value="" th:text="#{admin.specialcommands.members.user_picker.placeholder}">-- Bitte wählen --</option>
-                    <option th:each="u : ${allUsers}" th:value="${u.id()}" th:attr="data-search=${u.username()}" th:text="${u.effectiveName() ?: u.username()}">User</option>
                 </select>
             </div>
             <button type="submit" class="btn btn--cta" th:text="#{admin.specialcommands.members.add.submit}">Hinzufügen</button>

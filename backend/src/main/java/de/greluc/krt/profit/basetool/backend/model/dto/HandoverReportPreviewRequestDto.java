@@ -38,7 +38,7 @@ public record HandoverReportPreviewRequestDto(
     @NotBlank String jobOrderNumber,
     @NotNull LocalDateTime handoverTime,
     @NotBlank String recipientHandle,
-    @NotNull @Valid List<HandoverReportItemDto> items) {
+    @NotNull List<@Valid HandoverReportItemDto> items) {
   /** Represents a single material item in the handover report preview. */
   public record HandoverReportItemDto(
       @NotBlank String materialName,

@@ -82,7 +82,7 @@ public class RateLimitProperties {
    * should still be covered by {@link #getPaths()} — paths outside the global umbrella skip the
    * filter entirely.
    */
-  @Valid private List<Rule> rules = new ArrayList<>();
+  private List<@Valid Rule> rules = new ArrayList<>();
 
   /**
    * List of trusted reverse-proxy IPs, exact match against {@code request.getRemoteAddr()}. Only

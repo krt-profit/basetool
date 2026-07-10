@@ -157,11 +157,12 @@
                     <p class="bank-field-hint" th:text="#{bank.modal.grant.hint}">Der Nutzer braucht die Keycloak-Rolle &quot;Bank Employee&quot;, damit die Berechtigung wirkt.</p>
                     <div class="bank-form-row">
                         <label for="bank-grant-user" th:text="#{bank.field.user}">Nutzer</label>
+                        <!-- Server-side searchable combobox (remote-bank-users, #1193): the roster is no
+                             longer preloaded. Typing queries /users/search-bank on demand (bank-widened so
+                             role-less bank staff can search); add-only picker, only the placeholder is seeded. -->
                         <select id="bank-grant-user" name="userId" required data-role="bank-holder-user"
-                                data-krt-combobox data-testid="bank-grant-user">
+                                data-krt-combobox="remote-bank-users" data-testid="bank-grant-user">
                             <option value="" th:text="#{bank.field.user.placeholder}">Nutzer w&auml;hlen &hellip;</option>
-                            <option th:each="u : ${users}" th:value="${u.id()}" th:attr="data-search=${u.username()}"
-                                    th:text="${u.effectiveName() != null ? u.effectiveName() : u.username()}">greluc</option>
                         </select>
                         <span class="bank-field-error" data-error-for="userId"></span>
                     </div>

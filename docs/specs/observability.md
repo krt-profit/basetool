@@ -29,6 +29,17 @@ must never reach `ERROR`, or it inflates `logback_events_total{level="error"}` a
 `LogbackErrorSpike` alert on normal user-input mistakes. Only a genuinely unexpected failure (a bare
 `catch (Exception …)`, not a mapped `BackendServiceException`) logs at `ERROR`.
 
+A call **short-circuited by an open circuit breaker** (`CallNotPermittedException`) is logged at
+`DEBUG`, never `WARN`. The one-time breaker state transition (`ResilienceEventLogger.onStateTransition`,
+`WARN`) plus the `basetool_backend_client_errors_total{reason="circuit_open"}` counter and the
+`resilience4j_circuitbreaker_state`-backed `CircuitBreakerOpen` alert are the health signal; the
+per-blocked-call line at all three touch points (`ResilienceEventLogger.onCallNotPermitted`, the
+`WebClientLoggingFilter` outer log filter, and the `BackendApiClient` boundary) would otherwise emit
+**three identical `WARN` lines for every** short-circuited call for the whole open window, flooding
+the log during a routine backend restart/deploy and making an expected self-healing blip
+indistinguishable from a real incident (issue #1203). Genuine transport failures (timeout, connection
+reset) that *open* the breaker still log at `WARN` — those are the signal that the backend is down.
+
 ### REQ-OBS-002 — Correlation-id propagation
 
 `correlationId` comes from the inbound `X-Correlation-Id` header (configurable via
@@ -628,3 +639,45 @@ groups) · `monitoring/prometheus/alerts/infrastructure.yml` (container guards) 
 `monitoring/prometheus/prometheus.yml` (the `blackbox-exporter` self-metrics scrape job) ·
 `monitoring/grafana/dashboards/13-meta-monitoring.json` (log-pipeline panels) ·
 `monitoring/README.md` (alert-response runbook).
+
+### REQ-OBS-015 — Framework false-positive log noise is removed at the source, not muted
+
+A framework log line that is a false positive for this application — correct behaviour the framework
+merely warns about — must be eliminated at its source rather than silenced by raising a logger
+threshold (muting hides genuine future messages from the same logger and leaves the dead machinery
+running). The canonical case is Spring Data Web's `ProxyingHandlerMethodArgumentResolver`, which
+inspects every `@ModelAttribute`-annotated handler parameter whose static type is an **interface**
+and, when it is not a `@ProjectedPayload` projection, logs `… is not annotated with @ProjectedPayload
+…` at WARN before correctly delegating to the standard resolver. The frontend's
+`SquadronContextAdvice` cross-injects the already-loaded `List<SquadronDto>` /
+`List<OrgUnitMembershipOptionDto>` catalogues between its `@ModelAttribute` methods so each is fetched
+once per request and reused (re-deriving them in the dependent method would double the un-cached
+`/api/v1/users/me` + `/memberships` round-trip on every non-admin request); `java.util.List` is an
+interface, so the resolver emits that WARN for the `availableSquadrons` and `availableOrgUnits`
+parameters.
+
+The frontend does **no** Spring Data web binding at all — no `Pageable` / `Sort` / projection
+parameters, and the backend is paged through the module's own `PageResponse` DTO — so that resolver
+(and the rest of `@EnableSpringDataWebSupport`) is dead weight, present only because
+`spring-data-commons` arrives transitively via `spring-data-redis` (the session store). The fix is
+therefore to **exclude `DataWebAutoConfiguration`** in the frontend so the resolver is never
+registered; the false positive then cannot be raised, and no application logger is muted. The
+single-fetch `@ModelAttribute` injection is preserved unchanged. This applies to the frontend only —
+the backend genuinely uses Spring Data web paging and keeps the auto-config.
+
+**Acceptance**
+
+- [ ] The frontend context contains no `ProxyingHandlerMethodArgumentResolver` in the
+  `RequestMappingHandlerAdapter` resolver chain, so a page render can no longer emit the
+  `@ProjectedPayload` WARN for the `SquadronContextAdvice` catalogue parameters.
+- [ ] No application logger is muted to achieve this (the fix removes the resolver, not the log line).
+- [ ] `SquadronContextAdvice` still fetches each catalogue at most once per request (the
+  `@ModelAttribute` cross-injection is preserved, not replaced by an in-method re-fetch).
+
+**Enforced by:**
+`frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/FrontendApplication.java`
+(`@SpringBootApplication(exclude = … DataWebAutoConfiguration.class)`) ·
+`frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/FrontendApplicationTests.java`
+(asserts the resolver is absent from the live chain) ·
+`frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/config/SquadronContextAdvice.java`
+(the single-fetch `@ModelAttribute` cross-injection the exclusion protects).

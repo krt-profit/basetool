@@ -149,18 +149,18 @@ public class MaterialboersePageController {
   }
 
   /**
-   * Edits an offer's trade remark ("Bemerkung bearbeiten").
+   * Edits an offer's offered quantity and trade remark ("Angebot bearbeiten").
    *
    * @param id the offer id.
-   * @param body the {@code {remark, version}} payload.
+   * @param body the {@code {offeredAmount, remark, version}} payload.
    * @return the backend result, or its error status + body.
    */
   @PutMapping("/offers/{id}/remark/ajax")
   @ResponseBody
-  public ResponseEntity<Object> updateRemark(
+  public ResponseEntity<Object> updateOffer(
       @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
     return proxy(
-        "Update Materialbörse remark failed",
+        "Update Materialbörse offer failed",
         () ->
             backendApiClient.put(
                 "/api/v1/material-exchange/offers/" + id + "/remark", body, Object.class));

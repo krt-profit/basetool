@@ -31,11 +31,14 @@ import java.util.UUID;
  * MapStruct mapper because {@link #mine}, {@link #foreign}, {@link #interestCount}, {@link
  * #iAmInterested} and {@link #interestedHandles} all depend on the requesting member.
  *
- * <p>{@link #quality} and {@link #amount} are read live from the linked Lager item; there is
- * deliberately <b>no location/Standort field</b> and <b>no category field</b> (REQ-MARKET-004/005).
- * The trade {@link #remark} is the raw Markdown source — the frontend renders it through the
- * sanitizing {@code @markdown} bean into a {@code .markdown-content} block; it is never rendered
- * client-side.
+ * <p>{@link #quality} is read live from the linked Lager item; {@link #amount} is the owner-chosen
+ * offered quantity (which may be only a part of the row's stock, ADR-0086), and {@link
+ * #availableAmount} carries the item's current total stock <b>only for the owner</b> (so the edit
+ * dialog can bound the amount) — it is {@code null} for every other viewer, never leaking how much
+ * stock the anbieter holds beyond what is offered. There is deliberately <b>no location/Standort
+ * field</b> and <b>no category field</b> (REQ-MARKET-004/005). The trade {@link #remark} is the raw
+ * Markdown source — the frontend renders it through the sanitizing {@code @markdown} bean into a
+ * {@code .markdown-content} block; it is never rendered client-side.
  *
  * <p><b>Anonymity (REQ-MARKET-006):</b> {@link #interestedHandles} is populated <b>only</b> when
  * the requesting member is the offer's owner; for every other viewer it is {@code null} and only
@@ -49,7 +52,9 @@ import java.util.UUID;
  * @param foreign whether the offer's squadron differs from the viewer's (drives the foreign badge).
  * @param mine whether the requesting member owns this offer.
  * @param quality the offered quality (0–1000), read live from the Lager item.
- * @param amount the offered quantity in SCU, read live from the Lager item.
+ * @param amount the owner-chosen offered quantity in SCU (may be only a part of the row's stock).
+ * @param availableAmount the item's current total stock in SCU, populated <b>only</b> for the owner
+ *     (to bound the edit dialog), otherwise {@code null}.
  * @param releasedAt when the offer was (last) released — drives "Freigegeben vor X".
  * @param remark the raw Markdown trade remark ("was suchst du im Gegenzug?").
  * @param interestCount how many members have registered interest (the anonymity-safe figure).
@@ -67,6 +72,7 @@ public record MaterialExchangeOfferDto(
     boolean mine,
     Integer quality,
     Double amount,
+    Double availableAmount,
     Instant releasedAt,
     String remark,
     int interestCount,

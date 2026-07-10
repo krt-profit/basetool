@@ -140,6 +140,7 @@ public class UexItemSyncService {
     int categoriesProcessed = 0;
     int itemsProcessed = 0;
     int itemsCreated = 0;
+    int sharedUuidDeclined = 0;
     Instant now = Instant.now();
 
     for (UexCategory category : categories) {
@@ -170,6 +171,14 @@ public class UexItemSyncService {
             if (item.getUexItemId() != null) {
               seenUexItemIds.add(item.getUexItemId());
             }
+            // A row that keeps external_uuid null although UEX shipped a parseable uuid is a
+            // shared-uuid sibling whose uuid another game_item already owns — the expected,
+            // permanent steady state for a base item + its skins (REQ-DATA-005). Tally these so
+            // the run summary reports one aggregate count instead of a per-row WARN on every sync
+            // (issue #1205).
+            if (item.getExternalUuid() == null && parseUuid(dto.uuid()) != null) {
+              sharedUuidDeclined++;
+            }
           }
         } catch (Exception e) {
           log.error("Failed to process UEX item dto: {}", dto, e);
@@ -193,12 +202,14 @@ public class UexItemSyncService {
     // built with the encoded form by UexClient.
     String reportLabel = UriUtils.decode("UEX item sync", "UTF-8");
     log.info(
-        "Finished {}: {} categories visited, {} items upserted ({} new, {} updated)",
+        "Finished {}: {} categories visited, {} items upserted ({} new, {} updated), {} shared-uuid"
+            + " sibling(s) kept external_uuid null",
         reportLabel,
         categoriesProcessed,
         itemsProcessed,
         itemsCreated,
-        itemsProcessed - itemsCreated);
+        itemsProcessed - itemsCreated,
+        sharedUuidDeclined);
 
     // One always-emitted SYNC_RUN_SUMMARY row per run, so the run shows on the admin UEX tab.
     syncReportService.logUexEvent(
@@ -207,13 +218,14 @@ public class UexItemSyncService {
         "game_item",
         null,
         null,
-        "categories=%d, upserted=%d, created=%d, updated=%d, uexDeleted=%d"
+        "categories=%d, upserted=%d, created=%d, updated=%d, uexDeleted=%d, sharedUuidDeclined=%d"
             .formatted(
                 categoriesProcessed,
                 itemsProcessed,
                 itemsCreated,
                 itemsProcessed - itemsCreated,
-                marked));
+                marked,
+                sharedUuidDeclined));
     syncReportService.pruneRuns(SyncSourceSystem.UEX);
     return itemsProcessed;
   }
@@ -266,8 +278,12 @@ public class UexItemSyncService {
           newRow ? Optional.empty() : gameItemRepository.findByExternalUuid(externalUuid);
       if (uuidOwner.isPresent()) {
         GameItem owner = uuidOwner.orElseThrow();
-        log.warn(
-            "UEX item {} carries uuid={} already owned by game_item id={} (uex_item_id={}); leaving"
+        // Expected, permanent steady state — not a fault: UEX gives a base item and its skins one
+        // shared in-game uuid, but external_uuid is UNIQUE, so this sibling can never own it.
+        // Logged at DEBUG (not WARN) because it recurs every sync and no admin action can resolve
+        // it; the caller reports one aggregate sharedUuidDeclined count in the run summary (#1205).
+        log.debug(
+            "UEX item {} shares uuid={} with game_item id={} (uex_item_id={}); keeping"
                 + " external_uuid null to avoid uk_game_item_external_uuid collision",
             dto.id(),
             externalUuid,

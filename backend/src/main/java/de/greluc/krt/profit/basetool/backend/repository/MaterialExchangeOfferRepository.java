@@ -41,19 +41,29 @@ public interface MaterialExchangeOfferRepository
   /**
    * The Materialbörse board query — every {@code ACTIVE} offer, optionally narrowed to the caller's
    * own offers (the "Meine Angebote" tab) and by the toolbar filters. The board is org-wide (no
-   * OrgUnit scope filter, decision D3): every active offer is visible to every member. Material,
-   * quality and amount are read live off the joined {@link MaterialExchangeOffer#getInventoryItem()
-   * item} — the item's location is never referenced, keeping the Standort private (REQ-MARKET-004).
-   * The associations are eager-loaded via {@link EntityGraph} so the list renders without an N+1;
-   * all of them are single-valued {@code @ManyToOne}, so pagination stays a DB {@code LIMIT}.
+   * OrgUnit scope filter, decision D3): every active offer is visible to every member. Material and
+   * quality are read live off the joined {@link MaterialExchangeOffer#getInventoryItem() item}; the
+   * <b>effective</b> offered quantity is {@code LEAST(offeredAmount, item.amount)} — the
+   * owner-chosen {@link MaterialExchangeOffer#getOfferedAmount() offeredAmount} clamped to the
+   * item's <em>current</em> stock (ADR-0086), so the board can never advertise more than is in
+   * stock and the offer shrinks as the row is booked out. The amount filter uses that same
+   * effective quantity. A fully-booked-out row is <em>deleted</em> by the inventory book-out paths
+   * (delete-on-depletion), which cascade-deletes the offer (V210 {@code ON DELETE CASCADE}) — so
+   * there is no lingering zero-stock offer to filter out here; every {@code ACTIVE} offer has a
+   * live row with {@code amount > 0}. The item's location is never referenced, keeping the Standort
+   * private (REQ-MARKET-004). The associations are eager-loaded via {@link EntityGraph} so the list
+   * renders without an N+1; all of them are single-valued {@code @ManyToOne}, so pagination stays a
+   * DB {@code LIMIT}.
    *
    * @param viewerId the caller's user id — used only when {@code onlyMine} is {@code true}.
    * @param onlyMine {@code true} for the "Meine Angebote" tab, {@code false} for "Alle Angebote".
    * @param query a pre-lowercased {@code %fragment%} matched against the material name and the
    *     owner's username/display name, or {@code null} for no text filter.
    * @param minQuality the inclusive minimum quality (0 disables the filter).
-   * @param minAmount the inclusive minimum amount in SCU, or {@code null} for no amount filter.
-   * @param pageable the page + whitelisted sort (quality / amount / material name / releasedAt).
+   * @param minAmount the inclusive minimum <em>effective</em> amount in SCU, or {@code null} for no
+   *     amount filter.
+   * @param pageable the page + whitelisted sort (quality / effective amount / material name /
+   *     releasedAt).
    * @return the matching page of active offers, never {@code null}.
    */
   @EntityGraph(
@@ -68,7 +78,7 @@ public interface MaterialExchangeOfferRepository
              OR LOWER(o.owner.username) LIKE :query
              OR LOWER(o.owner.displayName) LIKE :query)
         AND (:minQuality = 0 OR o.inventoryItem.quality >= :minQuality)
-        AND (:minAmount IS NULL OR o.inventoryItem.amount >= :minAmount)
+        AND (:minAmount IS NULL OR LEAST(o.offeredAmount, o.inventoryItem.amount) >= :minAmount)
       """)
   Page<MaterialExchangeOffer> findBoard(
       @Param("viewerId") UUID viewerId,
@@ -121,7 +131,9 @@ public interface MaterialExchangeOfferRepository
 
   /**
    * Counts offers in the given status across the whole board — the "Alle Angebote" tab count and
-   * the {@code basetool_material_exchange_active_count} business gauge.
+   * the {@code basetool_material_exchange_active_count} business gauge. No stock guard is needed: a
+   * fully-booked-out row is deleted and its offer cascade-deleted (V210), so every {@code ACTIVE}
+   * offer is a live, on-board one (ADR-0086).
    *
    * @param status the status to count.
    * @return the number of offers in that status.

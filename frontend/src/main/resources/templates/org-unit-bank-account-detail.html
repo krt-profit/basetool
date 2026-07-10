@@ -257,10 +257,11 @@
                     <div class="field-row">
                         <div class="bank-form-row grow">
                             <label for="org-unit-vis-user-select" th:text="#{bank.orgUnit.settings.visibility.user.add}">Nutzer freigeben</label>
-                            <select id="org-unit-vis-user-select" name="_userId" required data-krt-combobox data-testid="org-unit-vis-user-select">
+                            <!-- Server-side searchable combobox (remote-users, #1193): the roster is no
+                                 longer preloaded. Typing queries /users/search on demand; add-only picker,
+                                 so only the empty placeholder option is seeded. -->
+                            <select id="org-unit-vis-user-select" name="_userId" required data-krt-combobox="remote-users" data-testid="org-unit-vis-user-select">
                                 <option value="" th:text="#{bank.field.user.placeholder}">Nutzer w&auml;hlen &hellip;</option>
-                                <option th:each="usr : ${users}" th:value="${usr.id()}" th:attr="data-search=${usr.username()}"
-                                        th:text="${usr.effectiveName() != null ? usr.effectiveName() : usr.username()}">greluc</option>
                             </select>
                             <span class="bank-field-error" data-error-for="_global"></span>
                         </div>
@@ -278,7 +279,7 @@
                  th:if="${settings.approvalLimits() != null and settings.approvalLimits().canEdit()}"
                  data-testid="org-unit-bank-approval-limit-tile">
                 <th:block
-                    th:replace="~{fragments/bank-approval-limits :: limitsEditor(${acct}, ${settings.approvalLimits()}, ${users}, 'orgUnitBankSettings')}"></th:block>
+                    th:replace="~{fragments/bank-approval-limits :: limitsEditor(${acct}, ${settings.approvalLimits()}, 'orgUnitBankSettings')}"></th:block>
             </div>
 
             <!-- Balance target tile (REQ-BANK-036): rendered LAST so the settings tab leads with the
