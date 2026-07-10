@@ -4,6 +4,7 @@
 
 ### Added
 
+- **Items auf der Materialbörse anbieten.** Neben „Material anbieten" gibt es jetzt „Item anbieten": craftbare Items (also solche, für die ein Blueprint existiert) lassen sich mit selbst angegebener Menge auf der Börse anbieten. Item-Angebote haben keine Qualität und keinen Standort; ein Mitglied kann dasselbe Item auch mehrfach anbieten (#1185).
 - **Materialbörse: Teilmengen anbieten.** Beim Freigeben eines Lager-Postens lässt sich jetzt wählen, wie viel davon angeboten wird — die ganze Menge (Schaltfläche „Alles") oder nur ein Teil. Die angebotene Menge kann später über „Angebot bearbeiten" angepasst werden und darf den aktuellen Lagerbestand nie überschreiten: Wird ein Teil des Postens ausgebucht, sinkt die angezeigte Angebotsmenge automatisch mit; wird der Posten vollständig ausgebucht, wird er gelöscht und das Angebot damit automatisch von der Börse entfernt. Filter und Sortierung „Menge" beziehen sich auf diese effektive Menge (#1183).
 
 ### Changed

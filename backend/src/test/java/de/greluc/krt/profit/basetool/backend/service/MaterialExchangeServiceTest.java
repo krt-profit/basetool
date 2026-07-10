@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -32,13 +33,16 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeInterest;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOffer;
+import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferKind;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeItemReleaseRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeOfferDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeOfferUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleasableItemDto;
@@ -48,6 +52,8 @@ import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeInterestRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
+import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -82,6 +88,8 @@ class MaterialExchangeServiceTest {
   @Mock private AuditService auditService;
   @Mock private UserMapper userMapper;
   @Mock private SquadronMapper squadronMapper;
+  @Mock private BlueprintProductService blueprintProductService;
+  @Mock private OwnerScopeService ownerScopeService;
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private ObjectProvider<MaterialExchangeService> selfProvider;
 
@@ -368,6 +376,93 @@ class MaterialExchangeServiceTest {
     assertThat(items.get(0).quantityType()).isEqualTo(QuantityType.PIECE);
   }
 
+  /**
+   * Listing a craftable item (#1185, REQ-MARKET-012) persists an ITEM offer carrying the resolved
+   * product key/name and the user-stated quantity, with no Lager row and no quality — and the
+   * returned DTO reflects the same (null material/quality/amount).
+   */
+  @Test
+  void releaseItem_validProduct_persistsItemOfferWithQuantityAndNullQuality() {
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+    when(blueprintProductService.resolveByProductKey("venture helmet"))
+        .thenReturn(Optional.of(new ResolvedProduct("venture helmet", "Venture Helmet", null)));
+    when(ownerScopeService.currentOrgUnit()).thenReturn(Optional.empty());
+    when(offerRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(interestRepository.countByOfferId(any())).thenReturn(0L);
+    when(interestRepository.findByOfferIdOrderByCreatedAtDesc(any())).thenReturn(List.of());
+
+    MaterialExchangeOfferDto dto =
+        service.releaseItem(
+            new MaterialExchangeItemReleaseRequest("venture helmet", 5, "gegen aUEC"));
+
+    ArgumentCaptor<MaterialExchangeOffer> captor = ArgumentCaptor.captor();
+    verify(offerRepository).saveAndFlush(captor.capture());
+    MaterialExchangeOffer saved = captor.getValue();
+    assertThat(saved.getKind()).isEqualTo(MaterialExchangeOfferKind.ITEM);
+    assertThat(saved.getInventoryItem()).as("item offer has no Lager row").isNull();
+    assertThat(saved.getItemProductKey()).isEqualTo("venture helmet");
+    assertThat(saved.getItemName()).isEqualTo("Venture Helmet");
+    assertThat(saved.getItemQuantity()).isEqualTo(5);
+    assertThat(saved.getOwner()).isEqualTo(owner);
+
+    assertThat(dto.kind()).isEqualTo(MaterialExchangeOfferKind.ITEM);
+    assertThat(dto.itemName()).isEqualTo("Venture Helmet");
+    assertThat(dto.itemQuantity()).isEqualTo(5);
+    assertThat(dto.quality()).as("item offers carry no quality").isNull();
+    assertThat(dto.amount()).isNull();
+    assertThat(dto.material()).isNull();
+  }
+
+  /** Listing an item whose key no active blueprint produces is rejected — nothing is persisted. */
+  @Test
+  void releaseItem_noBlueprintProduct_notFound() {
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+    when(blueprintProductService.resolveByProductKey("unknown")).thenReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () -> service.releaseItem(new MaterialExchangeItemReleaseRequest("unknown", 3, "x")))
+        .isInstanceOf(NotFoundException.class);
+    verify(offerRepository, never()).saveAndFlush(any());
+    verify(auditService, never()).record(any(), any(), any(), any(), any());
+    verify(eventPublisher, never()).publishEvent(any());
+  }
+
+  /**
+   * An item release records a {@code MARKET_OFFER_RELEASED} audit event whose details carry only
+   * the PII-free kind / product key / quantity — never the interessent or a free-text value
+   * (REQ-MARKET-008).
+   */
+  @Test
+  void releaseItem_recordsPiiFreeItemAuditDetails() {
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+    when(blueprintProductService.resolveByProductKey("venture helmet"))
+        .thenReturn(Optional.of(new ResolvedProduct("venture helmet", "Venture Helmet", null)));
+    when(ownerScopeService.currentOrgUnit()).thenReturn(Optional.empty());
+    when(offerRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(interestRepository.countByOfferId(any())).thenReturn(0L);
+    when(interestRepository.findByOfferIdOrderByCreatedAtDesc(any())).thenReturn(List.of());
+
+    service.releaseItem(new MaterialExchangeItemReleaseRequest("venture helmet", 5, "gegen aUEC"));
+
+    ArgumentCaptor<AuditDetails> detailsCaptor = ArgumentCaptor.captor();
+    verify(auditService)
+        .record(
+            eq(AuditEventType.MARKET_OFFER_RELEASED),
+            any(),
+            eq("Venture Helmet"),
+            eq(ownerId),
+            detailsCaptor.capture());
+    String details = detailsCaptor.getValue().toString();
+    assertThat(details).contains("kind=ITEM").contains("product=venture helmet").contains("qty=5");
+    assertThat(details)
+        .as("no display name or remark body leaks into the audit details")
+        .doesNotContain("Venture Helmet")
+        .doesNotContain("gegen aUEC");
+  }
+
   private static User user(UUID id, String name) {
     User user = new User();
     user.setId(id);
@@ -396,6 +491,7 @@ class MaterialExchangeServiceTest {
   private static MaterialExchangeOffer offer(UUID id, InventoryItem item, User owner) {
     MaterialExchangeOffer offer = new MaterialExchangeOffer();
     offer.setId(id);
+    offer.setKind(MaterialExchangeOfferKind.MATERIAL);
     offer.setInventoryItem(item);
     offer.setOwner(owner);
     offer.setOfferedAmount(item.getAmount());
