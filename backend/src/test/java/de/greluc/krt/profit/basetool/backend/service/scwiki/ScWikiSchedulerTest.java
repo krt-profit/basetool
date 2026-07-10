@@ -176,6 +176,26 @@ class ScWikiSchedulerTest {
   }
 
   @Test
+  void schedule_continuesRemainingSteps_afterOneStepThrows() {
+    // Given — the master switch is on and the vehicle step (2nd in dependency order) throws.
+    when(properties.getSchedulerEnabled()).thenReturn(true);
+    when(vehicleSyncService.syncVehicles()).thenThrow(new RuntimeException("Wiki vehicle 500"));
+
+    // When — the sweep must not propagate the failure.
+    scheduler.scheduleScWikiSync();
+
+    // Then — each step is wrapped in its own try/catch (runStep), the deliberate opposite of
+    // UexScheduler's whole-block abort: the later item, blueprint and manufacturer syncs STILL run
+    // even though an earlier step threw. A whole-block-abort refactor would skip these and leave
+    // those catalogues stale for the daily tick.
+    verify(itemSyncService).syncItems();
+    verify(blueprintSyncService).syncBlueprints();
+    verify(manufacturerSyncService).syncManufacturers();
+    // And the finally-block eviction still runs after the partially-failing sweep.
+    verify(masterDataCacheEvictionService).evictScWikiSyncedMasterData();
+  }
+
+  @Test
   void schedule_skipsEntireSweep_whenAnotherSyncIsAlreadyRunning() {
     when(properties.getSchedulerEnabled()).thenReturn(true);
     // The shared gate denies entry (a UEX or SC Wiki sync is already in flight) → no step runs.

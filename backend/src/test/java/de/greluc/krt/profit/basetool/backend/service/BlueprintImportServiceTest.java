@@ -142,6 +142,37 @@ class BlueprintImportServiceTest {
   }
 
   @Test
+  void preview_aliasFallsBackToSnapshotWhenProductGoneFromMaster() {
+    // A learned alias must never silently regress to UNMATCHED when the master product it points at
+    // is later renamed / removed (its productKey is gone from allProducts()). resolveViaAlias then
+    // dereferences the alias's own productKey / productName / outputItem snapshot instead of the
+    // (now-missing) master row, so the entry stays MATCHED_BY_ALIAS and the user's
+    // previously-learned
+    // resolution keeps working.
+    when(blueprintProductService.allProducts())
+        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    BlueprintExternalAlias alias = new BlueprintExternalAlias();
+    alias.setSourceSystem(SCMDB);
+    alias.setExternalName("Gone Product");
+    alias.setProductKey("gone-key");
+    alias.setProductName("Gone Product");
+    // Master no longer carries 'gone-key' — only the unrelated 'arclight pistol' is present.
+    when(aliasRepository.findBySourceSystemAndExternalNameIgnoreCase(SCMDB, "Gone Product"))
+        .thenReturn(Optional.of(alias));
+
+    BlueprintImportPreviewDto preview =
+        service.previewImport(SUB, upload("{\"blueprints\":[{\"productName\":\"Gone Product\"}]}"));
+
+    assertEquals(1, preview.total());
+    assertEquals(1, preview.matchedByAlias());
+    BlueprintImportEntryDto entry = preview.entries().get(0);
+    assertEquals(BlueprintImportStatus.MATCHED_BY_ALIAS, entry.status());
+    assertEquals("gone-key", entry.productKey());
+    assertEquals("Gone Product", entry.productName());
+    assertNull(entry.outputItemId());
+  }
+
+  @Test
   void preview_fuzzySuggestsForCloseTypo() {
     when(blueprintProductService.allProducts())
         .thenReturn(List.of(product("calico legs tactical", "Calico Legs Tactical")));

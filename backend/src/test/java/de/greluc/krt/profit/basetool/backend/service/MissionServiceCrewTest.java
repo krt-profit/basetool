@@ -267,4 +267,116 @@ class MissionServiceCrewTest {
         RuntimeException.class,
         () -> missionStructureService.removeCrewFromShip(missionId, unitId, UUID.randomUUID()));
   }
+
+  @Test
+  void addCrewToShip_rejectsNonCrewArchetypeJobType() {
+    // validateAndFetchJobTypes must reject a MISSION-archetype job type: a mission-lead / logistics
+    // role must never be attachable to a ship crew (would corrupt the crew role model). The guard
+    // fires before the crew row is persisted.
+    UUID missionId = UUID.randomUUID();
+    UUID unitId = UUID.randomUUID();
+    UUID participantId = UUID.randomUUID();
+    UUID jobTypeId = UUID.randomUUID();
+
+    Mission mission = new Mission();
+    mission.setId(missionId);
+
+    MissionUnit unit = new MissionUnit();
+    unit.setId(unitId);
+    mission.getAssignedUnits().add(unit);
+
+    MissionParticipant participant = new MissionParticipant();
+    participant.setId(participantId);
+    mission.getParticipants().add(participant);
+
+    JobType missionJobType = new JobType();
+    missionJobType.setId(jobTypeId);
+    missionJobType.setName("Einsatzleiter");
+    missionJobType.setArchetype(JobTypeArchetype.MISSION);
+
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+    when(jobTypeRepository.findById(jobTypeId)).thenReturn(Optional.of(missionJobType));
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            missionStructureService.addCrewToShip(
+                missionId, unitId, participantId, Set.of(jobTypeId)));
+
+    // A wrong-archetype job type must abort before the crew row is written.
+    verify(missionCrewRepository, never()).save(any());
+    assertTrue(unit.getCrew().isEmpty());
+  }
+
+  @Test
+  void addCrewToShip_throwsWhenParticipantNotInMission() {
+    // A participant id that is not on this mission's roster must 404 rather than silently crew a
+    // stranger from another mission.
+    UUID missionId = UUID.randomUUID();
+    UUID unitId = UUID.randomUUID();
+
+    Mission mission = new Mission();
+    mission.setId(missionId);
+
+    MissionUnit unit = new MissionUnit();
+    unit.setId(unitId);
+    mission.getAssignedUnits().add(unit);
+
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+
+    assertThrows(
+        de.greluc.krt.profit.basetool.backend.exception.NotFoundException.class,
+        () ->
+            missionStructureService.addCrewToShip(
+                missionId, unitId, UUID.randomUUID(), Collections.emptySet()));
+
+    verify(missionCrewRepository, never()).save(any());
+  }
+
+  @Test
+  void addCrewToShip_addsCrewWithResolvedCrewJobTypes_andKeepsMissionVersion() {
+    // Happy path: a CREW-archetype job type resolves and the crew is attached; only the child crew
+    // row is written, so the parent Mission.@Version must NOT be bumped (per-row crew scope).
+    UUID missionId = UUID.randomUUID();
+    UUID unitId = UUID.randomUUID();
+    UUID participantId = UUID.randomUUID();
+    UUID jobTypeId = UUID.randomUUID();
+
+    Mission mission = new Mission();
+    mission.setId(missionId);
+    mission.setName("Op Nightfall");
+    mission.setVersion(3L);
+
+    MissionUnit unit = new MissionUnit();
+    unit.setId(unitId);
+    mission.getAssignedUnits().add(unit);
+
+    MissionParticipant participant = new MissionParticipant();
+    participant.setId(participantId);
+    mission.getParticipants().add(participant);
+
+    JobType crewJobType = new JobType();
+    crewJobType.setId(jobTypeId);
+    crewJobType.setName("Gunner");
+    crewJobType.setArchetype(JobTypeArchetype.CREW);
+
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+    when(jobTypeRepository.findById(jobTypeId)).thenReturn(Optional.of(crewJobType));
+
+    Mission result =
+        missionStructureService.addCrewToShip(missionId, unitId, participantId, Set.of(jobTypeId));
+
+    assertNotNull(result);
+    MissionUnit resultUnit = result.getAssignedUnits().iterator().next();
+    assertEquals(1, resultUnit.getCrew().size());
+    MissionCrew addedCrew = resultUnit.getCrew().iterator().next();
+    assertEquals(participantId, addedCrew.getParticipant().getId());
+    assertEquals(1, addedCrew.getJobTypes().size());
+    assertEquals(jobTypeId, addedCrew.getJobTypes().iterator().next().getId());
+
+    verify(missionCrewRepository).save(addedCrew);
+    // A crew write must not touch the parent Mission row.
+    verify(missionRepository, never()).save(any(Mission.class));
+    assertEquals(3L, mission.getVersion());
+  }
 }

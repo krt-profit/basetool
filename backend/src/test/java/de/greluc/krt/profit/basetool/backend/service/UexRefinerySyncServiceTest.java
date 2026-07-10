@@ -21,11 +21,15 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexRefineryYieldDto;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexRefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.integration.UexClient;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.RefineryYield;
 import de.greluc.krt.profit.basetool.backend.model.RefiningMethod;
@@ -321,5 +325,90 @@ class UexRefinerySyncServiceTest {
 
     // Exactly one save — only the good row reached the repo
     verify(refineryYieldRepository, times(1)).save(any());
+  }
+
+  // ── audit-summary events (REQ-AUDIT-001) ───────────────────────────────
+
+  @Test
+  void syncRefiningMethods_recordsAuditSummary() {
+    // Given — a mixed batch of exactly one create, one update and one skipped (blank-name) row,
+    // so the summary must carry added=1 updated=1.
+    UexRefiningMethodDto fresh = new UexRefiningMethodDto(1, "Fresh", "F", 1, 1, 1);
+    UexRefiningMethodDto existing = new UexRefiningMethodDto(2, "Existing", "E", 2, 2, 2);
+    UexRefiningMethodDto skipped = new UexRefiningMethodDto(3, "", null, 0, 0, 0);
+
+    RefiningMethod existingEntity = new RefiningMethod();
+    existingEntity.setId(UUID.randomUUID());
+    existingEntity.setName("Existing");
+
+    when(uexClient.getRefineriesMethods()).thenReturn(List.of(fresh, existing, skipped));
+    when(refiningMethodRepository.findByName("Fresh")).thenReturn(Optional.empty());
+    when(refiningMethodRepository.findByName("Existing")).thenReturn(Optional.of(existingEntity));
+    when(refiningMethodRepository.save(any(RefiningMethod.class)))
+        .thenAnswer(i -> i.getArgument(0));
+
+    service.syncRefiningMethods();
+
+    // Exactly one system-actor summary event (id/label/target all null), with the per-run counts.
+    verify(auditService)
+        .record(
+            eq(AuditEventType.REFINERY_METHODS_SYNCED),
+            isNull(),
+            isNull(),
+            isNull(),
+            argThat(details -> "source=UEX added=1 updated=1".equals(details.toString())));
+    verifyNoMoreInteractions(auditService);
+  }
+
+  @Test
+  void syncRefineryYields_recordsAuditSummary() {
+    // Given — a single upsertable yield, so the summary must carry processed=1.
+    UUID materialId = UUID.randomUUID();
+    UUID terminalId = UUID.randomUUID();
+    Material material = new Material();
+    material.setId(materialId);
+    material.setIdCommodity(1);
+    Terminal terminal = new Terminal();
+    terminal.setId(terminalId);
+    terminal.setIdTerminal(42);
+
+    UexRefineryYieldDto payload = new UexRefineryYieldDto(100, 1, 42, 5);
+
+    when(uexClient.getRefineriesYields()).thenReturn(List.of(payload));
+    when(materialRepository.findByIdCommodity(1)).thenReturn(Optional.of(material));
+    when(terminalRepository.findByIdTerminal(42)).thenReturn(Optional.of(terminal));
+    when(refineryYieldRepository.findByTerminalIdAndMaterialId(terminalId, materialId))
+        .thenReturn(Optional.empty());
+    when(refineryYieldRepository.save(any(RefineryYield.class))).thenAnswer(i -> i.getArgument(0));
+
+    service.syncRefineryYields();
+
+    verify(auditService)
+        .record(
+            eq(AuditEventType.REFINERY_YIELDS_SYNCED),
+            isNull(),
+            isNull(),
+            isNull(),
+            argThat(details -> "source=UEX processed=1".equals(details.toString())));
+    verifyNoMoreInteractions(auditService);
+  }
+
+  @Test
+  void syncRefiningMethods_emptyResponse_recordsNoAudit() {
+    when(uexClient.getRefineriesMethods()).thenReturn(List.of());
+
+    service.syncRefiningMethods();
+
+    // The empty-response early return must never emit a summary event.
+    verifyNoInteractions(auditService);
+  }
+
+  @Test
+  void syncRefineryYields_emptyResponse_recordsNoAudit() {
+    when(uexClient.getRefineriesYields()).thenReturn(List.of());
+
+    service.syncRefineryYields();
+
+    verifyNoInteractions(auditService);
   }
 }

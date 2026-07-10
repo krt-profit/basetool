@@ -47,6 +47,8 @@
 
 - **Ingest-Gateway: bessere Nachvollziehbarkeit und ein bisher blinder DoS-Schutz.** Das Gateway schreibt jetzt pro `/v1`-Anfrage eine Zugriffs-Logzeile (Methode, Pfad, Status, Dauer) — bisher blieb ein erfolgreicher, abgewiesener (413/429) oder fehlgeschlagener Handoff ohne korrelierte Logspur. Ein durch den offenen Circuit-Breaker kurzgeschlossener Backend-Aufruf wird nun als DEBUG statt WARN geführt (bei einem Backend-Neustart floss sonst pro Aufruf eine WARN-Zeile), während der einmalige Breaker-Zustandswechsel als WARN protokolliert wird. Zudem liefert die 413-Abweisung zu großer Payloads jetzt eine Metrik (`basetool_ingest_payload_rejected_total`) samt Alarm (`IngestPayloadRejectedSpike`), sodass ein Flut- oder Scan-Angriff auf die einzige öffentlich erreichbare Fläche erkennbar wird (REQ-OBS-001/-011) (#1232).
 
+- **Fehler behoben: Ein vorübergehender Keycloak-Fehler während der täglichen Nutzer-Synchronisation stuft keine Konten mehr falsch ein.** Schlug beim rollenindizierten Sync das Auslesen der Mitglieder einer Rolle vorübergehend fehl (Timeout/5xx), wurde diese Rolle bisher stillschweigend allen Inhabern entzogen — ein neu angelegtes Admin-Konto konnte so als „ausstehend" in der Freigabe-Warteschlange landen und bestehende Admins wurden kurzzeitig herabgestuft. Ein solcher Fehler überspringt jetzt den ganzen Lauf (kein degradiertes Schreiben), und die Rollenzuordnung ist gegen Groß-/Kleinschreibungs-Unterschiede zwischen lokalem Katalog und Keycloak abgesichert (REQ-SEC-018).
+
 ## [v1.2.6](https://github.com/krt-profit/basetool/releases/tag/v1.2.6) - 2026-07-09
 
 ### Added

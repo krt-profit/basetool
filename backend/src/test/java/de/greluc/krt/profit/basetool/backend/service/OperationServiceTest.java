@@ -37,6 +37,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.FinanceType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
@@ -1745,6 +1746,41 @@ class OperationServiceTest {
           () -> operationService.setPayoutStatus(OPERATION_ID, unknownKey, true));
     }
 
+    @Test
+    void recordsPayoutToggledAuditEvent_withPaidOutDetail_andNoParticipantName() {
+      // Operationen is an audited area (REQ-AUDIT-001): every payout toggle must emit an
+      // OPERATION_PAYOUT_TOGGLED event whose details carry exactly paidOut=<bool> — never the
+      // participant's name / any PII. Regression guard: if the auditService.record(...) call is
+      // dropped, its event type changed, or its payload starts leaking a name, the toggle silently
+      // stops appearing in the audit log (or leaks PII) with zero other test failure.
+      User alice = newUser("alice");
+      String key = alice.getId().toString();
+
+      when(payoutStatusRepository.findByOperationIdAndParticipantKey(OPERATION_ID, key))
+          .thenReturn(Optional.empty());
+      stubOperationWithParticipant(alice);
+
+      User actor = newUser("officer");
+      actor.setDisplayName("Officer Bob");
+      when(userService.getCurrentUser()).thenReturn(Optional.of(actor));
+
+      operationService.setPayoutStatus(OPERATION_ID, key, true);
+
+      ArgumentCaptor<CharSequence> detailsCaptor = ArgumentCaptor.forClass(CharSequence.class);
+      verify(auditService)
+          .record(
+              eq(AuditEventType.OPERATION_PAYOUT_TOGGLED),
+              eq(OPERATION_ID),
+              any(),
+              isNull(),
+              detailsCaptor.capture());
+      String details = detailsCaptor.getValue().toString();
+      assertEquals("paidOut=true", details, "details must carry exactly the paidOut flag");
+      assertFalse(
+          details.contains("alice"),
+          "audit details must not leak the participant name (REQ-AUDIT-001)");
+    }
+
     private Operation stubOperationWithParticipant(User user) {
       Mission m = new Mission();
       m.setId(UUID.randomUUID());
@@ -1842,6 +1878,50 @@ class OperationServiceTest {
           () -> operationService.setPayoutStatus(OPERATION_ID, KEY, true));
       // Exactly MAX_PAYOUT_TOGGLE_ATTEMPTS attempts (two swallowed + one propagating).
       verify(spied, times(3)).setPayoutStatusWithinTransaction(OPERATION_ID, KEY, true);
+    }
+
+    @Test
+    void winsOnTheFinalAttempt_returnsTheCommittedRow() {
+      OperationService spied = spy(operationService);
+      when(self.getObject()).thenReturn(spied);
+      OperationPayoutStatusDto expected = sampleStatusDto();
+      // The first MAX_PAYOUT_TOGGLE_ATTEMPTS-1 attempts (both inside the retry loop) lose the race;
+      // only the final, out-of-loop attempt wins. This pins the success path of the unguarded final
+      // return: a loser that only wins on its very last retry must return the committed row, not
+      // null. The exhaustion test (all attempts throw) and the single-retry test (wins on
+      // attempt 2, in-loop) both leave this exact boundary uncovered.
+      doThrow(new ObjectOptimisticLockingFailureException(OperationPayoutStatus.class, null))
+          .doThrow(
+              new DataIntegrityViolationException(
+                  "uk_operation_payout_status_operation_participant"))
+          .doReturn(expected)
+          .when(spied)
+          .setPayoutStatusWithinTransaction(OPERATION_ID, KEY, true);
+
+      OperationPayoutStatusDto result = operationService.setPayoutStatus(OPERATION_ID, KEY, true);
+
+      assertEquals(
+          expected, result, "the final out-of-loop attempt's returned row must be honoured");
+      verify(spied, times(3)).setPayoutStatusWithinTransaction(OPERATION_ID, KEY, true);
+    }
+
+    @Test
+    void deterministicNotFound_isAttemptedExactlyOnce_neverRetried() {
+      OperationService spied = spy(operationService);
+      when(self.getObject()).thenReturn(spied);
+      // A missing operation makes the within-transaction body throw NotFoundException, which is NOT
+      // in the retry catch clause (DataIntegrityViolationException | ObjectOptimisticLocking...).
+      // It must propagate on the FIRST attempt, never fed through the retry loop. Regression: if
+      // the catch were ever broadened (e.g. to RuntimeException), this deterministic failure would
+      // be re-attempted MAX_PAYOUT_TOGGLE_ATTEMPTS times — needlessly reloading the operation and
+      // re-running validation — yet assertThrows would still pass because the correct type
+      // surfaces on the last attempt, so the regression is invisible without this call-count pin.
+      when(operationRepository.findWithMissionsAndParticipantsById(OPERATION_ID))
+          .thenReturn(Optional.empty());
+
+      assertThrows(
+          NotFoundException.class, () -> operationService.setPayoutStatus(OPERATION_ID, KEY, true));
+      verify(spied, times(1)).setPayoutStatusWithinTransaction(OPERATION_ID, KEY, true);
     }
 
     private OperationPayoutStatusDto sampleStatusDto() {

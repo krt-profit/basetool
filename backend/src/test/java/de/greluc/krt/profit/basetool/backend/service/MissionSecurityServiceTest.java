@@ -166,6 +166,28 @@ class MissionSecurityServiceTest {
     assertFalse(missionSecurityService.canManageManagers(missionId, authentication));
   }
 
+  @Test
+  void canManageManagers_MissionManagerForeignOrgUnit_ShouldReturnFalse() {
+    // Security audit AUTHZ-1 (the negative case promised alongside
+    // canManageManagers_GlobalMissionManager_ShouldReturnTrue): a MISSION_MANAGER whose
+    // owning-OrgUnit scope does NOT cover the target mission (canEditMission == false) and who is
+    // neither the owner nor a listed co-manager must be denied editing the manager list. Without
+    // the
+    // `&& ownerScopeService.canEditMission(missionId)` scope gate on the elevated-authority branch
+    // a
+    // mission-manager of squadron A could add/remove co-managers on squadron B's missions.
+    when(authentication.isAuthenticated()).thenReturn(true);
+    when(authentication.getAuthorities())
+        .thenAnswer(
+            i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
+    when(ownerScopeService.canEditMission(missionId)).thenReturn(false);
+    when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
+    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    // mission has no owner and an empty manager list, so the owner/manager fall-through also fails.
+
+    assertFalse(missionSecurityService.canManageManagers(missionId, authentication));
+  }
+
   // ---------------------------------------------------------------------
   // canAccessParticipant: Self-Edit support for logged-in mission participants.
   // A participant may be edited by its owner (participant.user.id == jwt.sub)
@@ -606,5 +628,30 @@ class MissionSecurityServiceTest {
         .thenReturn(Optional.of(participant));
 
     assertTrue(missionSecurityService.canEditFinanceEntry(entryId, authentication));
+  }
+
+  @Test
+  void canEditFinanceEntry_OwnerButNoLongerParticipant_ShouldReturnFalse() {
+    // The final "still a participant" guard: the caller owns the finance entry (its participant is
+    // linked to the current user) but has since been removed from the mission, so
+    // findByMissionIdAndUserId returns empty. Per the Javadoc this must deny the edit — otherwise a
+    // member expelled from a mission could still tamper with their own payout finance entry. If the
+    // `.isPresent()` check were dropped or inverted this would silently pass.
+    UUID entryId = UUID.randomUUID();
+    MissionParticipant participant = new MissionParticipant();
+    participant.setUser(user);
+    MissionFinanceEntry entry = new MissionFinanceEntry();
+    entry.setMission(mission);
+    entry.setParticipant(participant);
+
+    when(missionFinanceEntryRepository.findById(entryId)).thenReturn(Optional.of(entry));
+    when(authentication.isAuthenticated()).thenReturn(true);
+    when(authentication.getAuthorities())
+        .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
+    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    when(missionParticipantRepository.findByMissionIdAndUserId(missionId, userId))
+        .thenReturn(Optional.empty());
+
+    assertFalse(missionSecurityService.canEditFinanceEntry(entryId, authentication));
   }
 }
