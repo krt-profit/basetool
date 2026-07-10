@@ -685,16 +685,19 @@ Building on 3.11.1/3.11.2, still solely via the seam `OrgUnitBankAccessService` 
 
 ### 3.12 Materialbörse (material-exchange trade board, REQ-MARKET-\*)
 
-The Materialbörse (`/materialboerse`, Flotte & Logistik) is an **org-wide, member-only** trade board
-over the Lager. Reads are gated on `KRT_MEMBER` (authenticated-but-role-less **guests do not see it**);
-every write is **owner-scoped** in `MaterialExchangeService` (not by role). Interessenten names are
-disclosed only to the offer's owner; every other viewer sees only the count. The item's location is
-never exposed to the board (REQ-MARKET-004/006).
+The Materialbörse (`/materialboerse`, Flotte & Logistik) is an **org-wide, member-only** trade board.
+It carries two offer kinds: a **material offer** over a Lager row and a **item offer** for a
+craftable item (one an active blueprint produces), where the member states the quantity (#1185,
+REQ-MARKET-012). Reads are gated on `KRT_MEMBER` (authenticated-but-role-less **guests do not see
+it**); every write is **owner-scoped** in `MaterialExchangeService` (not by role). Interessenten
+names are disclosed only to the offer's owner; every other viewer sees only the count. The item's
+location is never exposed to the board (REQ-MARKET-004/006).
 
 | Action                                                                      | Guest | Member     | Log.       | MM         | Officer    | Admin      |
 |:----------------------------------------------------------------------------|:-----:|:-----------|:-----------|:-----------|:-----------|:-----------|
 | View board / offer detail (`hasRole('KRT_MEMBER')`)                         |   ❌   | ✅          | ✅          | ✅          | ✅          | ✅          |
 | Release own Lager row / edit own remark / deactivate own offer (owner-only) |   ❌   | ✅¹         | ✅¹         | ✅¹         | ✅¹         | ✅¹         |
+| List a craftable item with a stated quantity (own offer)                    |   ❌   | ✅          | ✅          | ✅          | ✅          | ✅          |
 | Register / withdraw interest in a foreign offer                             |   ❌   | ✅          | ✅          | ✅          | ✅          | ✅          |
 | See interessenten names                                                     |   ❌   | owner only | owner only | owner only | owner only | owner only |
 
