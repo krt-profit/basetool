@@ -21,9 +21,9 @@ package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeCountsDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeOfferDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeOfferUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleasableItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleaseRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeRemarkUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.MaterialExchangeService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
@@ -128,17 +128,18 @@ public class MaterialExchangeController {
   }
 
   /**
-   * Edits an offer's trade remark ("Bemerkung bearbeiten"). Owner-only; version-guarded.
+   * Edits an offer's offered quantity and trade remark ("Angebot bearbeiten"). Owner-only;
+   * version-guarded.
    *
    * @param id the offer id.
-   * @param request the new remark and last-seen version.
+   * @param request the new offered amount, remark and last-seen version.
    * @return the updated offer detail.
    */
   @PutMapping("/offers/{id}/remark")
-  @Operation(summary = "Edit a Materialbörse offer remark.")
-  public MaterialExchangeOfferDto updateRemark(
-      @PathVariable UUID id, @Valid @RequestBody MaterialExchangeRemarkUpdateRequest request) {
-    return service.updateRemark(id, request);
+  @Operation(summary = "Edit a Materialbörse offer (offered amount and remark).")
+  public MaterialExchangeOfferDto updateOffer(
+      @PathVariable UUID id, @Valid @RequestBody MaterialExchangeOfferUpdateRequest request) {
+    return service.updateOffer(id, request);
   }
 
   /**

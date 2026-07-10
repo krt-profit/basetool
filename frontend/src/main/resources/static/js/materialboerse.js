@@ -234,6 +234,7 @@
                     material: el.getAttribute('data-material'),
                     quality: el.getAttribute('data-quality'),
                     amount: el.getAttribute('data-amount'),
+                    available: el.getAttribute('data-available'),
                     remark: el.getAttribute('data-remark'),
                 },
                 swapBoard,
