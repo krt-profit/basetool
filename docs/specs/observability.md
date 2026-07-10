@@ -470,7 +470,13 @@ transaction per pass) rather than per-scrape.
   all recipients (unlabelled — `sub` is PII); the counter is bumped at each drop-on-send-failure
   branch with a fixed `event` (`connected` / `notification` / `heartbeat`). Zero connections while
   the frontend still reports active sessions drives `SsePushChannelDead` (a dead push channel, e.g.
-  reverse-proxy buffering drift).
+  reverse-proxy buffering drift). The cross-replica SSE fan-out (#1102, REQ-FE-015 / ADR-0092) adds
+  `basetool_sse_redis_published_total` / `basetool_sse_redis_consumed_total` (real-time notification
+  signals this replica published to / consumed from the `basetool:notify:published` Redis channel;
+  own-origin messages are excluded) and `basetool_sse_redis_errors_total{op}` (`publish` / `consume`
+  — a swallowed fan-out failure; the local same-replica delivery already happened, so it only
+  degrades cross-replica push). These emit only where the fan-out is enabled (prod); a sustained
+  `publish` error stream drives the `LiveSyncRedisFanoutBroken` alert (below).
 
 **Frontend.** `basetool_mission_presence_missions` gauge (missions with a live editor; single-JVM
 edit-awareness, unlabelled), `basetool_active_sessions` gauge (active Spring Session sessions;
@@ -484,13 +490,28 @@ gauge permanently `NaN`, silently disarming `SsePushChannelDead`, #1158), and
 failure branch — never the backend's response-body code, which could be arbitrary — and `method`
 is the HTTP verb. The push-channel surfaces (#1041 item 17) add `basetool_notification_relay_connections`
 (open browser→backend notification SSE relays, `NotificationPageController`) and
-`basetool_presence_ws_sessions` (live mission-presence WebSocket sessions summed across missions,
-`MissionPresenceWebSocketHandler`) gauges, plus the `basetool_presence_relay_frames_total{type}`
-(`changed` / `snapshot`) and `basetool_presence_relay_dropped_total{reason}` (`throttled` /
-`send_failed`) counters at the previously-silent throttle and send-failure branches of the presence
-relay — the component that shipped the REQ-FE-010 staleness defect. A `changed`-frame flatline while
-`snapshot` frames keep flowing is the early indicator for that defect class (panels only, baselined
-before alerting). All labels are fixed literals, pure counts. The `frontend-sse-pool` and
+`basetool_presence_ws_sessions` (live live-sync WebSocket sessions summed across all topic rooms,
+`LiveSyncWebSocketHandler`) gauges, plus the `basetool_presence_relay_frames_total{type,topic_class}`
+(`type` = `changed` / `snapshot`) and `basetool_presence_relay_dropped_total{reason,topic_class}`
+(`reason` = `throttled` / `send_failed` / `topic_cap` / `authorize_saturated`) counters at the
+previously-silent throttle, send-failure, topic-cap and subscribe-saturation branches of the relay —
+the component that shipped the REQ-FE-010 staleness defect. Since #1102 (REQ-FE-015 / ADR-0092) both
+counters carry a bounded `topic_class` label (one of the eight `LiveSyncTopicClass` labels: `mission`,
+`operation`, `order`, `orders`, `bank_account`, `bank_staff`, `orgunit_bank`, `materialboard`), and
+the meter names stay put — a rename would break the `07` panels and this alert set. A `changed`-frame
+flatline (overall on panel 28, or per surface on the `topic_class` breakdown) while `snapshot` frames
+keep flowing is the early indicator for that defect class (panels only, baselined before alerting).
+The tool-wide live-sync relay adds three more meters: `basetool_livesync_subscriptions{topic_class}`
+(open `/ws/sync` subscriptions per topic class — the live per-surface load denominator),
+`basetool_livesync_subscribe_total{topic_class,outcome}` (`outcome` = `allowed` / `denied`, the
+subscribe-authorization verdict; a saturated-executor fail-open is instead a `authorize_saturated`
+relay drop), and the cross-replica fan-out counters
+`basetool_livesync_redis_published_total{topic_class}` / `basetool_livesync_redis_consumed_total{topic_class}`
+(`changed` signals published to / consumed from the `basetool:livesync:changed` Redis channel;
+own-origin excluded) plus `basetool_livesync_redis_errors_total{op}` (`publish` / `consume`, a
+swallowed fan-out failure that degrades only cross-replica delivery). Together with the backend
+`basetool_sse_redis_*` counters above, a sustained `publish`-error stream on either fan-out drives the
+`LiveSyncRedisFanoutBroken` alert (both fire only where the Redis fan-out is enabled, i.e. prod). All labels are fixed literals, pure counts. The `frontend-sse-pool` and
 `frontend-pool` Reactor-Netty connection pools additionally export `reactor.netty.connection.provider.*`
 (`.metrics(true)`, #1127); `basetool_notification_relay_connections` backs the
 `SseRelayPoolNearSaturation` alert (> 0.8 of the 1000-slot SSE pool for 10m) — the early warning
