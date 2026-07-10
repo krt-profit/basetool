@@ -57,6 +57,26 @@ class UserProxyControllerTest {
         .get(eq("/api/v1/users/search?query=query&size=1000&sort=username,asc"), anyTypeRef());
   }
 
+  // #1193: opening the picker without typing (browse mode) fires an empty ?query=, which the
+  // frontend's emptyAsNull string binder collapses to null. The proxy must normalise it back to an
+  // empty match-all filter and still forward query=, so the backend returns the scoped roster
+  // instead of 500ing on a required param.
+  @Test
+  void searchUsers_NullQuery_ForwardsEmptyMatchAllFilter() {
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    UserProxyController controller = new UserProxyController(backendApiClient);
+
+    PageResponse<Map<String, Object>> mockPageResponse =
+        new PageResponse<>(Collections.emptyList(), 0, 1000, 0, 0, Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(mockPageResponse);
+
+    List<Map<String, Object>> result = controller.searchUsers(null);
+
+    assertNotNull(result);
+    verify(backendApiClient)
+        .get(eq("/api/v1/users/search?query=&size=1000&sort=username,asc"), anyTypeRef());
+  }
+
   // #1193: the bank-audience twin forwards to the widened backend search endpoint (ADR-0089) with
   // the same paging/sort contract as the regular search.
   @Test
