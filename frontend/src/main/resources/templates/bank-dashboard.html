@@ -23,7 +23,7 @@
     </nav>
 </header>
 
-<main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-user-id=${#authentication.name},data-transfer-fee-rate=${transferFeeRate}">
+<main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-bank-livesync-updates=#{livesync.updates_available},data-user-id=${#authentication.name},data-transfer-fee-rate=${transferFeeRate}">
     <div class="greeting hud-box flex-between">
         <div>
             <h1 th:text="#{bank.dashboard.title}">Kartellbank</h1>

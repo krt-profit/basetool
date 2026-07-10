@@ -33,7 +33,7 @@
 
 <main class="bank-detail" th:if="${detail != null}"
       th:with="d=${detail.detail()}, acct=${detail.detail().account()}, hasSettingsTab=${settings != null}"
-      th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-user-id=${#authentication.name}">
+      th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-bank-livesync-updates=#{livesync.updates_available},data-bank-account-id=${acct.id()},data-user-id=${#authentication.name}">
 
     <!-- Read-only account drill-in for org-unit viewers (REQ-BANK-038): history + Halter-redacted
          Kontoauszug; no deposit/withdraw/transfer. The responsible holder / OL additionally manages

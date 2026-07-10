@@ -23,7 +23,7 @@
     </nav>
 </header>
 
-<main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-user-id=${#authentication.name}">
+<main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-bank-livesync-updates=#{livesync.updates_available},data-user-id=${#authentication.name}">
     <!-- Page head: title + the single, page-level request CTA (REQ-BANK-022/-042). The CTA opens the
          request modal whose source selector lists every active account for a deposit and the
          caller's request-capable accounts for a withdrawal/transfer; it is shown whenever a request

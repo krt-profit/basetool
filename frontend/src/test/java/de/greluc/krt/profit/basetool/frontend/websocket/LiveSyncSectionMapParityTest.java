@@ -82,6 +82,40 @@ class LiveSyncSectionMapParityTest {
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.ORDER.allowedSections());
   }
 
+  @Test
+  void bankStaffAccountSeamMap_matchesTheBankAccountTopicWhitelist() throws IOException {
+    Set<String> jsKeys = seamMapKeys("/static/js/bank.js", "BANK_ACCOUNT_SECTIONS");
+    assertThat(jsKeys)
+        .as("BANK_ACCOUNT_SECTIONS keys in bank.js vs LiveSyncTopicClass.BANK_ACCOUNT whitelist")
+        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.BANK_ACCOUNT.allowedSections());
+  }
+
+  @Test
+  void orgUnitAccountSeamMap_matchesTheBankAccountTopicWhitelist() throws IOException {
+    // The org-unit account-detail variant carries the SAME bank:{id} section keys as the staff map,
+    // just different sibling containers — so it too must match the BANK_ACCOUNT whitelist.
+    Set<String> jsKeys = seamMapKeys("/static/js/bank.js", "ORGUNIT_ACCOUNT_SECTIONS");
+    assertThat(jsKeys)
+        .as("ORGUNIT_ACCOUNT_SECTIONS keys in bank.js vs LiveSyncTopicClass.BANK_ACCOUNT whitelist")
+        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.BANK_ACCOUNT.allowedSections());
+  }
+
+  @Test
+  void bankStaffSeamMap_matchesTheBankStaffTopicWhitelist() throws IOException {
+    Set<String> jsKeys = seamMapKeys("/static/js/bank.js", "BANK_STAFF_SECTIONS");
+    assertThat(jsKeys)
+        .as("BANK_STAFF_SECTIONS keys in bank.js vs LiveSyncTopicClass.BANK_STAFF whitelist")
+        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.BANK_STAFF.allowedSections());
+  }
+
+  @Test
+  void orgUnitBankSeamMap_matchesTheOrgUnitBankTopicWhitelist() throws IOException {
+    Set<String> jsKeys = seamMapKeys("/static/js/bank.js", "ORGUNIT_BANK_SECTIONS");
+    assertThat(jsKeys)
+        .as("ORGUNIT_BANK_SECTIONS keys in bank.js vs LiveSyncTopicClass.ORGUNIT_BANK whitelist")
+        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.ORGUNIT_BANK.allowedSections());
+  }
+
   /**
    * Extracts the top-level keys of a JS object literal assigned to {@code variableName} in the
    * given classpath resource.

@@ -102,6 +102,193 @@
         canTransfer: 'data-can-transfer',
     };
 
+    // ---- Live multi-user sync — the Kartellbank rooms (REQ-FE-010 / REQ-FE-015, ADR-0092) --------
+    // A peer's booking / request / grant / settings change re-renders the affected bank fragment in
+    // place for every other viewer of the same room, over the shared /ws/sync socket. Only opaque
+    // section keys cross the wire; each viewer re-pulls its OWN authorization-checked fragment (its
+    // own filter/page). The four section maps below are the single source of truth shared with the
+    // server LiveSyncTopicClass whitelists (the three-mirror-points rule, build-enforced by
+    // LiveSyncSectionMapParityTest). This wires the RECEIVE side; the publish (broadcast) side follows
+    // in a later change, so until then these receivers are inert (nothing broadcasts to them yet).
+
+    // bank:{id} on the STAFF account-detail page: the balance chart + booking history are NESTED
+    // inside #bank-account-results (the accountBody fragment), so re-rendering any of the three keys
+    // re-renders all of them — hence the shared container. makeBankReceiverRefresh dedupes by
+    // container so three inbound keys collapse to a single accountBody swap.
+    const BANK_ACCOUNT_SECTIONS = {
+        account: { container: '#bank-account-results', fragmentValue: 'accountBody' },
+        bookings: { container: '#bank-account-results', fragmentValue: 'accountBody' },
+        chart: { container: '#bank-account-results', fragmentValue: 'accountBody' },
+    };
+
+    // bank:{id} on the ORG-UNIT account-detail page: separate sibling containers for the
+    // facts/settings region, the booking history and the balance chart.
+    const ORGUNIT_ACCOUNT_SECTIONS = {
+        account: {
+            container: '#org-unit-bank-settings-results',
+            fragmentValue: 'orgUnitBankSettings',
+        },
+        bookings: {
+            container: '#org-unit-bank-bookings-results',
+            fragmentValue: 'orgUnitBankBookings',
+        },
+        chart: {
+            container: '#org-unit-bank-chart-results',
+            fragmentValue: 'orgUnitBalanceChart',
+        },
+    };
+
+    // bank (staff-global): the dashboard grid, the confirmation queue, the management tab and the
+    // grants matrix — one per staff page, so each page renders only its own container (the receiver
+    // silently skips the absent ones).
+    const BANK_STAFF_SECTIONS = {
+        grid: { container: '#bank-grid-results', fragmentValue: 'bankGrid' },
+        requestQueue: { container: '#bank-request-queue-results', fragmentValue: 'requestQueue' },
+        manage: { container: '#bank-manage-results', fragmentValue: 'manageBody' },
+        grants: { container: '#bank-grants-results', fragmentValue: 'grantsMatrix' },
+    };
+
+    // orgunit-bank (global): the officer/lead overview and the account-detail settings region.
+    const ORGUNIT_BANK_SECTIONS = {
+        orgUnitBank: { container: '#org-unit-bank-results', fragmentValue: 'orgUnitBank' },
+        orgUnitBankSettings: {
+            container: '#org-unit-bank-settings-results',
+            fragmentValue: 'orgUnitBankSettings',
+        },
+    };
+
+    /**
+     * Reads the localized "updates available" pill label from `<main data-bank-livesync-updates>` so
+     * this file stays i18n-free; undefined falls back to the shared receiver default.
+     *
+     * @returns {string|undefined} the pill label, or undefined
+     */
+    function bankLiveSyncUpdates() {
+        const main = document.querySelector('main[data-bank-livesync-updates]');
+        return main ? main.getAttribute('data-bank-livesync-updates') : undefined;
+    }
+
+    /**
+     * The account id of an account-detail page, read from `<main data-bank-account-id>`, or null on a
+     * list/overview page that has no single account.
+     *
+     * @returns {string|null} the account id, or null
+     */
+    function bankAccountId() {
+        const main = document.querySelector('main[data-bank-account-id]');
+        const id = main ? main.getAttribute('data-bank-account-id') : null;
+        return id || null;
+    }
+
+    /**
+     * The dedicated "saved, but reload" refresh-error message (NOT the generic "action failed" text):
+     * a peer's follow-up refresh that bounces must tell the user to reload, never that an action
+     * failed.
+     *
+     * @returns {string} the refresh-error message
+     */
+    function bankRefreshError() {
+        const main = document.querySelector('main[data-bank-refresh-error]');
+        return main ? main.getAttribute('data-bank-refresh-error') : genericError();
+    }
+
+    /**
+     * Builds a live-sync receiver refresh closure for one section map: on an inbound peer change it
+     * re-renders each present container ONCE (deduped by container, since the staff account-detail
+     * collapses account/bookings/chart into a single accountBody swap), re-fetching each viewer's OWN
+     * pathname+query so a peer keeps its filter/page rather than adopting the actor's.
+     *
+     * @param {Object} sectionMap the section → {container, fragmentValue} map for the room
+     * @returns {function(string[]): void} the refresh handler passed to createReceiver
+     */
+    function makeBankReceiverRefresh(sectionMap) {
+        return function (keys) {
+            if (!window.krtFetch || typeof window.krtFetch.swap !== 'function') {
+                return;
+            }
+            const url = window.location.pathname + window.location.search;
+            const errorMessage = bankRefreshError();
+            const done = {};
+            keys.forEach(function (key) {
+                const cfg = sectionMap[key];
+                if (!cfg || done[cfg.container] || !document.querySelector(cfg.container)) {
+                    return;
+                }
+                done[cfg.container] = true;
+                window.krtFetch.swap({
+                    url: url,
+                    container: cfg.container,
+                    fragmentValue: cfg.fragmentValue,
+                    errorMessage: errorMessage,
+                });
+            });
+        };
+    }
+
+    // Subscribe each bank page to the rooms it participates in and re-render present containers on an
+    // inbound peer change. A page subscribes to `bank` when it renders any staff container, to
+    // `orgunit-bank` when it renders an org-unit container, and to `bank:{id}` on an account-detail
+    // page (its section map picked by whether it is the staff or the org-unit account view). All bank
+    // receivers share the default pill; each re-fetches only the containers it actually renders.
+    (function () {
+        if (
+            !window.krtLiveSync ||
+            typeof window.krtLiveSync.createReceiver !== 'function' ||
+            !window.krtFetch ||
+            typeof window.krtFetch.swap !== 'function'
+        ) {
+            return; // no-JS / no-foundation: the classic in-place swaps still run for the actor.
+        }
+        function pill() {
+            return { label: bankLiveSyncUpdates };
+        }
+
+        const hasStaffRoom =
+            document.querySelector('#bank-grid-results') ||
+            document.querySelector('#bank-request-queue-results') ||
+            document.querySelector('#bank-manage-results') ||
+            document.querySelector('#bank-grants-results');
+        if (hasStaffRoom) {
+            window.krtLiveSync.createReceiver({
+                topic: 'bank',
+                sections: BANK_STAFF_SECTIONS,
+                // Global room: coalesce longer to flatten the refetch herd when many staffers get the
+                // same signal at once (#1125).
+                coalesceMs: 1500,
+                refresh: makeBankReceiverRefresh(BANK_STAFF_SECTIONS),
+                pill: pill(),
+            });
+        }
+
+        const hasOrgUnitRoom =
+            document.querySelector('#org-unit-bank-results') ||
+            document.querySelector('#org-unit-bank-settings-results');
+        if (hasOrgUnitRoom) {
+            window.krtLiveSync.createReceiver({
+                topic: 'orgunit-bank',
+                sections: ORGUNIT_BANK_SECTIONS,
+                coalesceMs: 1500,
+                refresh: makeBankReceiverRefresh(ORGUNIT_BANK_SECTIONS),
+                pill: pill(),
+            });
+        }
+
+        const accountId = bankAccountId();
+        if (accountId) {
+            // The staff detail renders #bank-account-results; the org-unit detail its
+            // settings/bookings/chart siblings — pick the section map accordingly.
+            const sectionMap = document.querySelector('#bank-account-results')
+                ? BANK_ACCOUNT_SECTIONS
+                : ORGUNIT_ACCOUNT_SECTIONS;
+            window.krtLiveSync.createReceiver({
+                topic: 'bank:' + accountId,
+                sections: sectionMap,
+                refresh: makeBankReceiverRefresh(sectionMap),
+                pill: pill(),
+            });
+        }
+    })();
+
     /**
      * Builds the JSON + CSRF request headers via the shared window.krtCsrf (#579 migration; replaces
      * bank.js's former bespoke meta-tag reader). Degrades to a minimal meta-tag read only if
