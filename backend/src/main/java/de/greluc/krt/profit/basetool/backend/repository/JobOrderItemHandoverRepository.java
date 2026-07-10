@@ -30,4 +30,15 @@ import org.springframework.stereotype.Repository;
  * are needed beyond the inherited CRUD.
  */
 @Repository
-public interface JobOrderItemHandoverRepository extends JpaRepository<JobOrderItemHandover, UUID> {}
+public interface JobOrderItemHandoverRepository extends JpaRepository<JobOrderItemHandover, UUID> {
+
+  /**
+   * {@code true} iff at least one item handover exists for the given job order. Backs the
+   * whole-order delivery freeze of the requester-edit gate (REQ-ORDERS-023): a requesting owner may
+   * only edit an order that has not yet had any delivery recorded.
+   *
+   * @param jobOrderId the owning job order id; never {@code null}.
+   * @return {@code true} iff any {@link JobOrderItemHandover} references the order.
+   */
+  boolean existsByJobOrderId(UUID jobOrderId);
+}

@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemBlueprintOwnersDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateJobOrderStatusDto;
@@ -43,6 +44,7 @@ import de.greluc.krt.profit.basetool.backend.service.JobOrderItemHandoverReportS
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemHandoverService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderService;
+import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
@@ -104,6 +106,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Orders", description = "Operations related to job orders")
 public class JobOrderController {
   private final JobOrderService jobOrderService;
+  private final OwnerScopeService ownerScopeService;
   private final JobOrderItemService jobOrderItemService;
   private final JobOrderItemBlueprintOwnersService jobOrderItemBlueprintOwnersService;
   private final JobOrderItemHandoverService jobOrderItemHandoverService;
@@ -465,6 +468,73 @@ public class JobOrderController {
   }
 
   /**
+   * Redacts a job-order DTO for a requester-only viewer (REQ-ORDERS-023): a member of the order's
+   * requesting org unit who is not otherwise a full viewer. Drops the Bearbeiter list ({@code
+   * assignees}), the materials summary ({@code aggregatedMaterials}), the delivery events ({@code
+   * handovers} / {@code itemHandovers}) and the collection-progress columns of each material line
+   * ({@code currentStock} / {@code claims} / {@code openAmount}) — the processing-side surfaces the
+   * ordering squad must not see. The ordered lines the requester may edit ({@code materials} with
+   * their quantity + min-quality, and {@code items}), the {@code comment}, the org-unit references,
+   * the status and the optimistic-lock {@code version} (the requester CAN edit, so it is kept) are
+   * preserved. Follows the {@code cleanup…For…} redactor convention of {@link
+   * #cleanupJobOrderForGuest(JobOrderDto)}.
+   *
+   * @param dto the full job-order DTO
+   * @return the redacted DTO safe for a requester-only viewer
+   */
+  private JobOrderDto cleanupJobOrderForRequester(JobOrderDto dto) {
+    return new JobOrderDto(
+        dto.id(),
+        dto.displayId(),
+        dto.responsibleOrgUnit(),
+        dto.requestingOrgUnit(),
+        dto.handle(),
+        dto.comment(),
+        dto.priority(),
+        dto.status(),
+        dto.type(),
+        dto.countBlueprintsWithVariants(),
+        redactMaterialProgress(dto.materials()),
+        dto.items(),
+        java.util.Collections.emptyList(),
+        java.util.Collections.emptyList(),
+        java.util.Collections.emptyList(),
+        java.util.Collections.emptyList(),
+        dto.createdAt(),
+        dto.version());
+  }
+
+  /**
+   * Strips the collection-progress fields ({@code currentStock} / {@code claims} / {@code
+   * openAmount}) from each material line so a requester-only viewer sees only what they ordered
+   * (material, min-quality, amount) and never the internal fulfilment progress. Keeps the line id,
+   * material, min-quality, amount and version so the requester edit form can prefill and echo the
+   * version.
+   *
+   * @param materials the material lines, possibly {@code null}
+   * @return the material lines with their progress fields nulled/emptied; never {@code null}
+   */
+  private static List<JobOrderMaterialDto> redactMaterialProgress(
+      List<JobOrderMaterialDto> materials) {
+    if (materials == null) {
+      return java.util.Collections.emptyList();
+    }
+    return materials.stream()
+        .map(
+            m ->
+                new JobOrderMaterialDto(
+                    m.id(),
+                    m.material(),
+                    m.minQuality(),
+                    m.amount(),
+                    null,
+                    java.util.Collections.emptyList(),
+                    null,
+                    m.version()))
+        .toList();
+  }
+
+  /**
    * Paged job-order list. Default sort is by {@code priority,asc} (lowest priority = top of queue),
    * filterable by one or more statuses and optionally by squadron involvement (responsible OR
    * requesting). The result is always constrained to the caller's visibility scope (Phase 3, #343):
@@ -503,6 +573,47 @@ public class JobOrderController {
   }
 
   /**
+   * Requester-side paged list of the orders the caller's own org unit(s) requested — the "Meine
+   * Auftr&auml;ge" list (REQ-ORDERS-023). Independent of the profit-gated main queue: a member of a
+   * purely non-profit ordering unit, who is redirected away from {@code GET /orders}, sees the
+   * orders their unit placed here. Each row is redacted for the requester (no Bearbeiter, no
+   * materials summary). Same pagination + status-filter shape as {@link #getAllJobOrders}.
+   *
+   * @param status optional status filter (logical OR across values)
+   * @param page zero-based page index
+   * @param size page size
+   * @param sort sort spec (whitelisted: {@code priority}, {@code createdAt})
+   * @return paged, requester-redacted job-order DTOs the caller's org unit(s) requested
+   */
+  @GetMapping("/requested")
+  @Operation(
+      summary = "Get my requested job orders",
+      description =
+          "Returns a paginated list of the orders the caller's own org unit(s) requested"
+              + " (Auftraggeber view), redacted (no Bearbeiter / no materials summary).")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canViewOwnJobOrders()")
+  @Transactional(readOnly = true)
+  public PageResponse<JobOrderDto> getRequestedJobOrders(
+      @RequestParam(required = false) List<JobOrderStatus> status,
+      @RequestParam(required = false, defaultValue = "0") int page,
+      @RequestParam(required = false, defaultValue = "20") int size,
+      @RequestParam(required = false, defaultValue = "priority,asc") String sort) {
+    Pageable pageable =
+        PaginationUtil.createPageRequest(
+            page, size, sort, Set.of("priority", "createdAt"), "priority");
+    Page<JobOrderDto> p = jobOrderService.getRequestedJobOrders(status, pageable);
+    List<JobOrderDto> redacted =
+        p.getContent().stream().map(this::cleanupJobOrderForRequester).toList();
+    return new PageResponse<>(
+        redacted,
+        p.getNumber(),
+        p.getSize(),
+        p.getTotalElements(),
+        p.getTotalPages(),
+        PaginationUtil.toSortStrings(p.getSort()));
+  }
+
+  /**
    * Lightweight projection (id + label) of active job orders for typeaheads. Excludes terminal
    * states.
    *
@@ -530,10 +641,21 @@ public class JobOrderController {
   @Operation(
       summary = "Get job order by ID",
       description = "Returns a job order and calculates the current material stock.")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeJobOrder(#id)")
+  @PreAuthorize(
+      "isAuthenticated() and (@ownerScopeService.canSeeJobOrder(#id) or"
+          + " @ownerScopeService.canSeeJobOrderAsRequester(#id))")
   @Transactional(readOnly = true)
   public JobOrderDto getJobOrderById(@PathVariable UUID id) {
-    return jobOrderService.getJobOrderById(id);
+    JobOrderDto dto = jobOrderService.getJobOrderById(id);
+    // A caller who can see the order fully (responsible-side member / admin) gets the complete
+    // view;
+    // a requester-only viewer (reached via the requesting-org-unit escape, REQ-ORDERS-023) gets a
+    // redacted view without the Bearbeiter section, the materials summary or the collection
+    // progress.
+    if (!ownerScopeService.canSeeJobOrder(id)) {
+      dto = cleanupJobOrderForRequester(dto);
+    }
+    return dto;
   }
 
   /**
@@ -714,6 +836,90 @@ public class JobOrderController {
   public JobOrderDto updateItemJobOrder(
       @PathVariable UUID id, @RequestBody @Valid CreateJobOrderItemRequestDto dto) {
     return jobOrderService.updateItemJobOrder(id, dto);
+  }
+
+  /**
+   * Requester-side edit of a MATERIAL order (REQ-ORDERS-023): a member of the order's requesting
+   * org unit changes quantities, adds/removes not-yet-delivered material lines, edits the
+   * min-quality within the fixed choices, and edits the comment. Permitted only while the order is
+   * still fully undelivered (whole-order freeze, enforced by {@code canEditJobOrderAsRequester} and
+   * re-checked in the service). Carries no {@code hasRole('LOGISTICIAN')} requirement — the
+   * ordering-squad member need not be a logistician. The processing org unit's officers/leads are
+   * notified on commit; the response is redacted for the requester (no Bearbeiter, no materials
+   * summary).
+   *
+   * @param id job-order id
+   * @param dto the new material lines + comment (carries the expected version)
+   * @return the redacted, persisted DTO
+   */
+  @PutMapping("/{id}/requested")
+  @Operation(
+      summary = "Requester edit of a material order",
+      description =
+          "Lets a member of the order's requesting org unit change quantities, add/remove"
+              + " not-yet-delivered materials and edit the comment. Only while the order has no"
+              + " delivery yet.")
+  @io.swagger.v3.oas.annotations.responses.ApiResponses({
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "200",
+        description = "Order updated"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "400",
+        description = "Not a material order, or already has a delivery"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "403",
+        description = "Caller is not a member of the order's requesting org unit"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "404",
+        description = "Order or material not found"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "409",
+        description = "Conflict - optimistic locking failure (version mismatch)")
+  })
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditJobOrderAsRequester(#id)")
+  public JobOrderDto updateJobOrderAsRequester(
+      @PathVariable UUID id, @RequestBody @Valid CreateJobOrderDto dto) {
+    return cleanupJobOrderForRequester(jobOrderService.updateJobOrderAsRequester(id, dto));
+  }
+
+  /**
+   * Requester-side edit of an ITEM order (REQ-ORDERS-023): the requester replaces the ordered-item
+   * lines (change quantity, add/remove lines) and edits the comment; the required materials are
+   * re-derived from each line's blueprint and the inventory of any material no longer required is
+   * unlinked. Same authorisation, whole-order freeze and notification as {@link
+   * #updateJobOrderAsRequester}. The response is redacted for the requester.
+   *
+   * @param id job-order id
+   * @param dto the new item lines + comment (carries the expected version)
+   * @return the redacted, persisted DTO
+   */
+  @PutMapping("/{id}/items/requested")
+  @Operation(
+      summary = "Requester edit of an item order",
+      description =
+          "Lets a member of the order's requesting org unit replace the ordered items and edit the"
+              + " comment. Only while the order has no delivery yet.")
+  @io.swagger.v3.oas.annotations.responses.ApiResponses({
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "200",
+        description = "Order updated"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "400",
+        description = "Not an item order, already has a delivery, or an invalid blueprint choice"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "403",
+        description = "Caller is not a member of the order's requesting org unit"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "404",
+        description = "Order, item or blueprint not found"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "409",
+        description = "Conflict - optimistic locking failure (version mismatch)")
+  })
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditJobOrderAsRequester(#id)")
+  public JobOrderDto updateItemJobOrderAsRequester(
+      @PathVariable UUID id, @RequestBody @Valid CreateJobOrderItemRequestDto dto) {
+    return cleanupJobOrderForRequester(jobOrderService.updateItemJobOrderAsRequester(id, dto));
   }
 
   /**

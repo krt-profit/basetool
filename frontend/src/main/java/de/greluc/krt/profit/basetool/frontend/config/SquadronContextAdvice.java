@@ -459,18 +459,18 @@ public class SquadronContextAdvice {
   @ModelAttribute("meCapabilities")
   public CapabilitiesResponse meCapabilities() {
     if (!authHelper.isAuthenticated()) {
-      return new CapabilitiesResponse(false, false);
+      return new CapabilitiesResponse(false, false, false);
     }
     if (authHelper.isAdmin()) {
-      return new CapabilitiesResponse(true, true);
+      return new CapabilitiesResponse(true, true, true);
     }
     try {
       CapabilitiesResponse resp =
           backendApiClient.get("/api/v1/me/capabilities", CapabilitiesResponse.class);
-      return resp != null ? resp : new CapabilitiesResponse(false, false);
+      return resp != null ? resp : new CapabilitiesResponse(false, false, false);
     } catch (Exception ex) {
       log.debug("Failed to resolve me-capabilities", ex);
-      return new CapabilitiesResponse(false, false);
+      return new CapabilitiesResponse(false, false, false);
     }
   }
 
@@ -508,6 +508,23 @@ public class SquadronContextAdvice {
   }
 
   /**
+   * Whether the authenticated caller may view the orders their own org unit requested — the "Meine
+   * Auftr&auml;ge" requester capability (REQ-ORDERS-023). Drives the sidebar link for a non-profit
+   * ordering-squad member (who fails {@link #canViewJobOrders(CapabilitiesResponse)}) and lets the
+   * {@code JobOrderPageController} render their own placed orders instead of redirecting them to
+   * the create form. The backend gate ({@code OwnerScopeService.canViewOwnJobOrders}) is
+   * authoritative; this attribute only steers the UI and fails closed via {@link
+   * #meCapabilities()}.
+   *
+   * @param caps the per-request capability flags resolved by {@link #meCapabilities()}.
+   * @return {@code true} iff the caller may view the orders their own org unit requested.
+   */
+  @ModelAttribute("canViewOwnJobOrders")
+  public boolean canViewOwnJobOrders(@ModelAttribute("meCapabilities") CapabilitiesResponse caps) {
+    return caps != null && caps.canViewOwnJobOrders();
+  }
+
+  /**
    * The caller's unread-notification count, fed to the always-on bell badge rendered on every page
    * (REQ-NOTIF-006). Resolved once per request; fails soft to zero so a backend hiccup hides the
    * badge rather than breaking the chrome, and the bell's client-side polling keeps it fresh after
@@ -538,8 +555,11 @@ public class SquadronContextAdvice {
    * @param canSeeBlueprintOverview {@code true} iff the caller may open the blueprint availability
    *     overview.
    * @param canViewJobOrders {@code true} iff the caller may enter the Job-Order area.
+   * @param canViewOwnJobOrders {@code true} iff the caller may view the orders their own org unit
+   *     requested (the "Meine Auftr&auml;ge" requester capability, REQ-ORDERS-023).
    */
-  public record CapabilitiesResponse(boolean canSeeBlueprintOverview, boolean canViewJobOrders) {}
+  public record CapabilitiesResponse(
+      boolean canSeeBlueprintOverview, boolean canViewJobOrders, boolean canViewOwnJobOrders) {}
 
   /**
    * The request URI the sidebar switcher form posts back as {@code _referer} so the redirect after

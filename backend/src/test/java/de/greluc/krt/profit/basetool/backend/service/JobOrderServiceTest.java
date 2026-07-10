@@ -911,6 +911,48 @@ class JobOrderServiceTest {
   }
 
   @Test
+  void updateJobOrderAsRequester_publishesEventAndAudits() {
+    // REQ-ORDERS-023: a requester's material edit audits as JOB_ORDER_UPDATED and notifies the
+    // processing unit (a JobOrderUpdatedByRequesterEvent is published on commit).
+    CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
+    CreateJobOrderDto updateDto =
+        new CreateJobOrderDto(null, null, null, "requester note", List.of(updateMat), null);
+
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(jobOrderRepository.saveAndFlush(any(JobOrder.class))).thenReturn(jobOrder);
+    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+
+    jobOrderService.updateJobOrderAsRequester(orderId, updateDto);
+
+    verify(eventPublisher)
+        .publishEvent(
+            any(de.greluc.krt.profit.basetool.backend.event.JobOrderUpdatedByRequesterEvent.class));
+    verify(auditService)
+        .record(
+            eq(de.greluc.krt.profit.basetool.backend.model.AuditEventType.JOB_ORDER_UPDATED),
+            eq(orderId),
+            any(),
+            any(),
+            any());
+  }
+
+  @Test
+  void updateJobOrderAsRequester_frozenOnceDelivered_throws400() {
+    // Whole-order freeze: a requester cannot edit an order that already has a delivery.
+    jobOrder.getHandovers().add(new de.greluc.krt.profit.basetool.backend.model.JobOrderHandover());
+    CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
+    CreateJobOrderDto updateDto =
+        new CreateJobOrderDto(null, null, null, "note", List.of(updateMat), null);
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+
+    assertThrows(
+        BadRequestException.class,
+        () -> jobOrderService.updateJobOrderAsRequester(orderId, updateDto));
+    verify(eventPublisher, never()).publishEvent(any());
+  }
+
+  @Test
   void
       completeJobOrderWithinTransaction_ShouldFlushBeforeLockQuery_ToAvoidOptimisticLockConflict() {
     // Given — reproduces the root cause of the 409 bug:

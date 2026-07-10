@@ -77,7 +77,7 @@ class JobOrderPaginationMvcTest {
     // Pass the profit gate so viewOrders renders the list instead of redirecting to /orders/create.
     when(backendApiClient.get(
             "/api/v1/me/capabilities", SquadronContextAdvice.CapabilitiesResponse.class))
-        .thenReturn(new SquadronContextAdvice.CapabilitiesResponse(true, true));
+        .thenReturn(new SquadronContextAdvice.CapabilitiesResponse(true, true, true));
   }
 
   /**

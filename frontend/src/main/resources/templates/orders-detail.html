@@ -25,7 +25,7 @@
         <h1 th:text="#{orders.detail.title}">Auftrag Details</h1>
         <div class="flex-gap-sm">
             <a th:href="@{/orders}" class="btn btn-ghost" th:text="#{orders.detail.back}">Zurück zur Übersicht</a>
-            <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)" th:if="${order.type != 'ITEM'}" type="button" class="btn btn-outline" data-trigger="open-modal-display" data-modal-id="edit-modal"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span th:text="#{orders.detail.edit}">Bearbeiten</span></button>
+            <button th:if="${(isLogistician or requesterView) and order.type != 'ITEM'}" type="button" class="btn btn-outline" data-trigger="open-modal-display" data-modal-id="edit-modal"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span th:text="#{orders.detail.edit}">Bearbeiten</span></button>
             <!-- Item orders are edited on the reused create form; only while no item-handover has
                  been recorded (afterwards the lines are frozen). -->
             <a sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)"
@@ -196,10 +196,10 @@
                 <th th:text="#{orders.material.name}">Material</th>
                 <th th:text="#{orders.material.minQuality}">Min. Qualität</th>
                 <th th:text="#{orders.detail.amount}">Benötigt</th>
-                <th th:text="#{orders.detail.stock}">Im Lager</th>
+                <th th:unless="${requesterView}" th:text="#{orders.detail.stock}">Im Lager</th>
                 <th th:if="${showClaims}" th:text="#{orders.detail.claims}">Eingetragen</th>
                 <th th:if="${showClaims}" th:text="#{orders.detail.open}">Offen</th>
-                <th th:text="#{orders.detail.status}">Status</th>
+                <th th:unless="${requesterView}" th:text="#{orders.detail.status}">Status</th>
             </tr>
             </thead>
             <tbody>
@@ -219,7 +219,7 @@
                     <span th:case="'PIECE'" th:text="|${mat.amount != null ? #numbers.formatInteger(mat.amount, 1) : '0'} #{material.quantity.piece}|"></span>
                     <span th:case="*" th:text="|${mat.amount != null ? #numbers.formatDecimal(mat.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
                 </td>
-                <td th:switch="${mat.material.quantityType}">
+                <td th:unless="${requesterView}" th:switch="${mat.material.quantityType}">
                     <span th:case="'PIECE'" th:text="|${mat.currentStock != null ? #numbers.formatInteger(mat.currentStock, 1) : '0'} #{material.quantity.piece}|"></span>
                     <span th:case="*" th:text="|${mat.currentStock != null ? #numbers.formatDecimal(mat.currentStock, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
                 </td>
@@ -262,7 +262,7 @@
                                 th:text="#{orders.claim.add}">Eintragen</button>
                     </div>
                 </td>
-                <td>
+                <td th:unless="${requesterView}">
                     <span th:if="${mat.currentStock >= mat.amount}" class="text-success" th:text="'✓ ' + #{orders.detail.status.fulfilled}">✓ Erfüllt</span>
                     <span th:if="${mat.currentStock < mat.amount}" class="text-danger" th:text="'✗ ' + #{orders.detail.status.missing}">✗ Fehlend</span>
                 </td>
@@ -336,7 +336,7 @@
 
         <!-- In-place AJAX swap container (#571/#575): for ITEM orders the claims live on the
              aggregated table; a claim create/edit/withdraw re-renders it via ?fragment=aggregated. -->
-        <div id="order-aggregated-results" class="mt-2"><th:block th:fragment="aggregatedSection">
+        <div id="order-aggregated-results" class="mt-2" th:unless="${requesterView}"><th:block th:fragment="aggregatedSection">
         <h3 class="section-title" th:text="#{orders.detail.aggregated.title}">Aggregierte Materialien</h3>
         <div class="table-responsive">
         <!-- Claim columns (Phase 5, #345) appear only for public SK orders (backend populates
@@ -474,7 +474,7 @@
              section's outerHTML is replaced. -->
         <!-- The wrapper makes the heading a :first-child, which zeroes .section-title's 2rem top
              margin — restore it here so the section keeps the same gap as its unwrapped siblings. -->
-        <div id="assignees-section" th:fragment="assigneesSection" th:data-order-id="${order.id}" style="margin-top: 2rem;">
+        <div id="assignees-section" th:fragment="assigneesSection" th:data-order-id="${order.id}" style="margin-top: 2rem;" th:unless="${requesterView}">
         <h3 class="section-title" th:text="#{orders.detail.assignees.title}">Bearbeiter</h3>
         <div class="flex-col-gap">
             <ul style="list-style-type: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.75rem;">
@@ -640,7 +640,7 @@
              handover history gains a row) via GET /orders/{id}?fragment=handovers. The "Übergabe
              protokollieren" button + the per-row report-download are document-delegated, so they
              survive the swap; the requirement table and header are swapped separately. -->
-        <div id="order-handovers-results" class="mt-2"><th:block th:fragment="materialHandoverSection">
+        <div id="order-handovers-results" class="mt-2" th:unless="${requesterView}"><th:block th:fragment="materialHandoverSection">
         <h3 class="section-title" th:text="#{orders.detail.handovers.title}">Übergaben</h3>
 
         <div sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
@@ -701,7 +701,7 @@
         <!-- In-place AJAX swap container (#575): an item handover re-renders this section (history
              gains a row; the open button hides once every line is delivered) via
              GET /orders/{id}?fragment=item-handovers. -->
-        <div id="order-item-handovers-results" class="mt-2"><th:block th:fragment="itemHandoverSection">
+        <div id="order-item-handovers-results" class="mt-2" th:unless="${requesterView}"><th:block th:fragment="itemHandoverSection">
         <h3 class="section-title" th:text="#{orders.detail.itemHandovers.title}">Item-Übergaben</h3>
 
         <!-- Handover toolbar — mirrors the MATERIAL handover toolbar by sitting the
@@ -758,15 +758,15 @@
     </div>
 </main>
 
-<div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)" id="edit-modal" class="modal" style="display: none;">
+<div th:if="${isLogistician or requesterView}" id="edit-modal" class="modal" style="display: none;">
     <div class="modal-content hud-box" style="width: 100%; max-width: 800px; max-height: 90vh; overflow-y: auto; position: relative;">
         <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-gray-1); font-size: 1.5rem; cursor: pointer;" data-trigger="close-modal-display" data-modal-id="edit-modal">&times;</button>
         <h2 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: var(--font-headline);" th:text="#{orders.detail.edit}">Auftrag bearbeiten</h2>
         
-        <form id="edit-order-form" th:data-order-id="${order.id}" th:action="@{/orders/{id}/update(id=${order.id})}" method="post" th:object="${jobOrderForm}" class="krt-form">
+        <form id="edit-order-form" th:data-order-id="${order.id}" th:data-requester-view="${requesterView}" th:action="${requesterView} ? @{/orders/{id}/requested-update(id=${order.id})} : @{/orders/{id}/update(id=${order.id})}" method="post" th:object="${jobOrderForm}" class="krt-form">
             <input type="hidden" th:field="*{version}">
-            
-            <div class="form-group mb-1">
+
+            <div class="form-group mb-1" th:unless="${requesterView}">
                 <label for="requestingOrgUnitId" th:text="#{orders.detail.requesting}" class="form-label">Auftraggeber</label>
                 <select id="requestingOrgUnitId" th:field="*{requestingOrgUnitId}" required class="w-full">
                     <option value="" disabled selected th:text="#{orders.create.select}">-- Bitte wählen --</option>
@@ -801,7 +801,7 @@
                       th:text="#{orders.detail.responsible.readonly_hint}">(nur über Umschreiben)</span>
             </div>
 
-            <div class="form-group mb-1">
+            <div class="form-group mb-1" th:unless="${requesterView}">
                 <label for="handle" th:text="#{orders.detail.handle}" class="form-label">Handle (Ingame-Name)</label>
                 <input type="text" id="handle" th:field="*{handle}" class="w-full">
             </div>

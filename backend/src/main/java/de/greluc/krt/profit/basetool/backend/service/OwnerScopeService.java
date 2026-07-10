@@ -160,6 +160,18 @@ public class OwnerScopeService {
   }
 
   /**
+   * Delegates to {@link RequestScopeResolver#currentDirectMembershipOrgUnitIds()}: the caller's
+   * direct-membership org-unit ids (no leadership cascade), the "own placed orders" key for the
+   * requester-side job-order list (REQ-ORDERS-023).
+   *
+   * @return the caller's direct-membership org-unit ids, never {@code null}.
+   */
+  @NotNull
+  public java.util.Set<UUID> currentDirectMembershipOrgUnitIds() {
+    return requestScopeResolver.currentDirectMembershipOrgUnitIds();
+  }
+
+  /**
    * Delegates to {@link RequestScopeResolver#canViewJobOrders()}: the viewer-side
    * profit-eligibility gate for the Job-Order area.
    *
@@ -167,6 +179,17 @@ public class OwnerScopeService {
    */
   public boolean canViewJobOrders() {
     return requestScopeResolver.canViewJobOrders();
+  }
+
+  /**
+   * Delegates to {@link RequestScopeResolver#canViewOwnJobOrders()}: whether the caller may view
+   * the orders their own org unit requested (the requester-side "Meine Auftr&auml;ge" capability,
+   * REQ-ORDERS-023), independent of the profit-eligibility gate.
+   *
+   * @return {@code true} iff the caller may view the orders their own org unit placed.
+   */
+  public boolean canViewOwnJobOrders() {
+    return requestScopeResolver.canViewOwnJobOrders();
   }
 
   /**
@@ -482,6 +505,30 @@ public class OwnerScopeService {
    */
   public boolean canEditJobOrder(@NotNull UUID jobOrderId) {
     return accessGateService.canEditJobOrder(jobOrderId);
+  }
+
+  /**
+   * Delegates to {@link AccessGateService#canSeeJobOrderAsRequester(UUID)}: whether the caller may
+   * read job order {@code jobOrderId} as its requester (a direct member of its requesting org
+   * unit), the profit-gate-independent requester escape (REQ-ORDERS-023).
+   *
+   * @param jobOrderId job order to inspect; never {@code null}.
+   * @return {@code true} iff the caller may read the order as its requester.
+   */
+  public boolean canSeeJobOrderAsRequester(@NotNull UUID jobOrderId) {
+    return accessGateService.canSeeJobOrderAsRequester(jobOrderId);
+  }
+
+  /**
+   * Delegates to {@link AccessGateService#canEditJobOrderAsRequester(UUID)}: whether the caller may
+   * edit job order {@code jobOrderId} within the requester limits — a direct member of its
+   * requesting org unit and the order still fully undelivered (REQ-ORDERS-023).
+   *
+   * @param jobOrderId job order to inspect; never {@code null}.
+   * @return {@code true} iff the caller may edit the order as its (still-undelivered) requester.
+   */
+  public boolean canEditJobOrderAsRequester(@NotNull UUID jobOrderId) {
+    return accessGateService.canEditJobOrderAsRequester(jobOrderId);
   }
 
   /**

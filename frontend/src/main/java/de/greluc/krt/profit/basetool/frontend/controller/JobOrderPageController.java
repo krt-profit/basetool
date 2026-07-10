@@ -221,18 +221,21 @@ public class JobOrderPageController {
       @CookieValue(name = "orders_filter_scope", required = false) String cookieScope,
       @ModelAttribute("activeSquadronId") UUID activeSquadronId,
       @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
+      @ModelAttribute("canViewOwnJobOrders") boolean canViewOwnJobOrders,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       HttpServletResponse response,
       @RequestParam(required = false) String fragment,
       Model model) {
-    if (!canViewJobOrders) {
-      // Non-profit members (anyone without a profit-eligible org unit, and not an admin) are not
-      // part of the order workflow: they may place orders but not browse the queue. Route them to
-      // the create form — the only order surface open to them — mirroring the anonymous "submit but
-      // don't track" flow. The backend list returns empty for them regardless; this is the UX.
+    // Non-profit ordering-squad members (canViewJobOrders=false) still see the orders THEY placed —
+    // the requester-side "Meine Auftraege" list (REQ-ORDERS-023). Only a caller with neither the
+    // queue nor the requester capability is routed to the create form. requesterView drives the
+    // redacted list rendering + hides the reorder/progress affordances in the template.
+    boolean requesterView = !canViewJobOrders && canViewOwnJobOrders;
+    if (!canViewJobOrders && !canViewOwnJobOrders) {
       return "redirect:/orders/create";
     }
+    model.addAttribute("requesterView", requesterView);
     if (status == null || status.isEmpty()) {
       if (cookieStatus != null && !cookieStatus.isBlank()) {
         List<String> parsed = Arrays.asList(cookieStatus.split("-"));
@@ -284,12 +287,17 @@ public class JobOrderPageController {
     int redDays = 90;
     try {
       String statusParam = String.join(",", status);
-      String squadronParam = filterToOwnSquadron ? "&squadronId=" + activeSquadronId : "";
-      // Paginated server-side (REQ-ORDERS-020) instead of the former unbounded size=1000 pull;
-      // sort stays priority,asc so the drag-reorder queue order is preserved across pages.
+      // The requester "Meine Auftraege" list (REQ-ORDERS-023) is keyed on the caller's own
+      // requesting
+      // org units and takes no squadron display filter; the main queue keeps the "involving my
+      // squadron" toggle. Both are paginated server-side (REQ-ORDERS-020), sorted priority,asc.
+      String squadronParam =
+          !requesterView && filterToOwnSquadron ? "&squadronId=" + activeSquadronId : "";
+      String listBase = requesterView ? "/api/v1/orders/requested" : "/api/v1/orders";
       p =
           backendApiClient.get(
-              "/api/v1/orders?page="
+              listBase
+                  + "?page="
                   + effectivePage
                   + "&size="
                   + effectiveSize
@@ -388,24 +396,56 @@ public class JobOrderPageController {
   public String viewOrderDetail(
       @PathVariable UUID id,
       @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
+      @ModelAttribute("canViewOwnJobOrders") boolean canViewOwnJobOrders,
       Model model,
       @AuthenticationPrincipal OidcUser principal,
       @RequestParam(required = false) String fragment) {
-    if (!canViewJobOrders) {
-      // Non-profit members may not open order details — the backend returns 403 for them anyway.
-      // Route to the create form (their only order surface) so a stray bookmark/link is graceful;
-      // a section-swap caller gets a section-sized error fragment instead of a redirect it would
-      // otherwise follow into a small results container (#571/#575, mirrors the #574 fix).
+    // A non-profit ordering-squad member (canViewJobOrders=false) may still open the detail of an
+    // order THEY placed — the backend returns a redacted view via the requester escape
+    // (REQ-ORDERS-023) or 403 for a foreign order (caught below). requesterView renders the limited
+    // template (no Bearbeiter, no materials summary; comment + not-yet-delivered material edit
+    // only).
+    boolean requesterView = !canViewJobOrders && canViewOwnJobOrders;
+    if (!canViewJobOrders && !canViewOwnJobOrders) {
+      // Neither capability: route to the create form (only order surface open to them).
       return fragment != null ? "orders-detail :: fragmentError" : "redirect:/orders/create";
     }
+    model.addAttribute("requesterView", requesterView);
     try {
       JobOrderDto order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
       model.addAttribute("order", order);
       model.addAttribute("currentUserId", getCurrentUserId(principal));
       model.addAttribute("itemsWithoutMaterials", itemsWithoutDerivedMaterials(order));
 
-      boolean canAssign = isLogistician(principal);
+      boolean canAssign = !requesterView && isLogistician(principal);
       model.addAttribute("isLogistician", canAssign);
+      // The requester edit modal reuses the material editor, so it needs the materials catalogue to
+      // populate the "add material" picker and a prefilled jobOrderForm (comment + material lines +
+      // version). No user/squadron/owner-picker lookups — the requester touches none of those.
+      if (requesterView) {
+        model.addAttribute("materials", fetchMaterials());
+        model.addAttribute("users", new ArrayList<>());
+        if (!model.containsAttribute("jobOrderForm")) {
+          JobOrderForm form = new JobOrderForm();
+          form.setComment(order.comment());
+          form.setVersion(order.version());
+          form.getMaterials().clear();
+          if (order.materials() != null) {
+            for (de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderMaterialDto mat :
+                order.materials()) {
+              JobOrderForm.JobOrderMaterialForm mf = new JobOrderForm.JobOrderMaterialForm();
+              mf.setMaterialId(mat.material().id());
+              mf.setMinQuality(mat.minQuality());
+              mf.setAmount(mat.amount());
+              form.getMaterials().add(mf);
+            }
+          }
+          if (form.getMaterials().isEmpty()) {
+            form.getMaterials().add(new JobOrderForm.JobOrderMaterialForm());
+          }
+          model.addAttribute("jobOrderForm", form);
+        }
+      }
 
       if (canAssign) {
         // These logistician-only lookups are independent; fetch them concurrently and apply the

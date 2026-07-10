@@ -72,11 +72,18 @@ non-admins see the union of their memberships unless they pin one.
 
   `responsible_org_unit_id` (the **processing** unit — a profit-eligible squadron or SK;
   governs visibility; mutable only via `PATCH /api/v1/orders/{id}/responsible-org-unit`) and
-  `requesting_org_unit_id` (the **customer**; any active OrgUnit; does NOT grant visibility).
+  `requesting_org_unit_id` (the **customer**; any active OrgUnit; does NOT grant the general-queue
+  visibility — but see the requesting-owner escape below).
   Responsible = SK → public to all squadrons (shared SK queue); responsible = Squadron →
   private to that squadron + admins. `findScopedJobOrders` adds the SK-public escape
   `TYPE(responsibleOrgUnit) = SpecialCommand`. SK-order *edits* are governed by the role gate
-  (LOGISTICIAN+), not by squadron scope. Inventory items linked via `job_order_id` surface
+  (LOGISTICIAN+), not by squadron scope. **Requesting-owner escape (REQ-ORDERS-023, ADR-0087):** a
+  direct member of the `requesting_org_unit` may additionally view (redacted — no Bearbeiter, no
+  materials summary) and, while the order is still fully undelivered, limitedly edit their own placed
+  order via dedicated non-LOGISTICIAN endpoints (`GET /orders/requested`, `PUT /orders/{id}/requested`,
+  `PUT /orders/{id}/items/requested`), even when they fail the profit gate; this never widens the
+  responsible-scoped queue (`findRequestedOrders` matches purely on the requesting side, keyed on the
+  caller's direct memberships). Inventory items linked via `job_order_id` surface
   cross-OrgUnit inside the order UI but NEVER leak into a foreign Lager-View
   (`findGlobalByFilters` is gated, `findByJobOrderIdOrdered` is not).
 

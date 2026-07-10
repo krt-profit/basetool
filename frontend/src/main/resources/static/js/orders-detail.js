@@ -597,9 +597,15 @@ function _serializeEditForm() {
             showFrontendErrorToast(MSG_MATERIAL_INVALID);
             return;
         }
+        // REQ-ORDERS-023: a requesting owner's limited edit posts to the dedicated requester endpoint
+        // (comment + not-yet-delivered materials only); the backend ignores handle/org-unit/status.
+        const requesterView = form.getAttribute('data-requester-view') === 'true';
+        const updateUrl = requesterView
+            ? '/orders/' + orderId + '/requested-update'
+            : '/orders/' + orderId + '/update';
         await krtOrderWrite({
             method: 'POST',
-            url: '/orders/' + orderId + '/update',
+            url: updateUrl,
             payload: payload,
             toast: false,
             errorMessage: MSG_UPDATE_ERROR,

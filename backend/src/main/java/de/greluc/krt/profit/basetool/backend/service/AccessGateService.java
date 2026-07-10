@@ -28,6 +28,8 @@ import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
+import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
+import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
@@ -67,6 +69,8 @@ public class AccessGateService {
   private final AuthHelperService authHelper;
   private final MissionRepository missionRepository;
   private final JobOrderRepository jobOrderRepository;
+  private final JobOrderHandoverRepository jobOrderHandoverRepository;
+  private final JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   private final InventoryItemRepository inventoryItemRepository;
   private final RefineryOrderRepository refineryOrderRepository;
   private final OperationRepository operationRepository;
@@ -425,6 +429,74 @@ public class AccessGateService {
       return true;
     }
     return canEditSquadron(responsible.getId());
+  }
+
+  /**
+   * {@code true} iff the current principal may read job order {@code jobOrderId} as its
+   * <em>requester</em> (Auftraggeber) — a direct member of the order's requesting org unit — even
+   * when the profit-eligibility gate ({@link RequestScopeResolver#canViewJobOrders()}) would
+   * otherwise deny them (REQ-ORDERS-023). This is an <em>additional</em> escape, ORed with {@link
+   * #canSeeJobOrder(UUID)} at the endpoint level; it never widens the general order queue (which
+   * stays responsible-scoped) — it only unlocks the caller's own placed order, whose detail
+   * response the controller redacts (no Bearbeiter, no materials summary). Non-existent ids return
+   * {@code false}.
+   *
+   * @param jobOrderId job order to inspect; never {@code null}.
+   * @return {@code true} iff the caller is a direct member of the order's requesting org unit.
+   */
+  public boolean canSeeJobOrderAsRequester(@NotNull UUID jobOrderId) {
+    return jobOrderRepository.findById(jobOrderId).map(this::isOrderRequesterRow).orElse(false);
+  }
+
+  /**
+   * {@code true} iff the current principal may edit job order {@code jobOrderId} within the
+   * requester limits (REQ-ORDERS-023): they are a direct member of the order's requesting org unit
+   * AND the order is still <em>fully undelivered</em> — it has no material handover and no item
+   * handover yet (the whole-order freeze). Once any delivery is recorded the requesting owner can
+   * no longer change quantities, add/remove lines, or edit the comment. This gates the dedicated
+   * requester-edit endpoints, which carry no {@code hasRole('LOGISTICIAN')} requirement (a
+   * requesting-unit member need not be a logistician). Non-existent ids return {@code false}.
+   *
+   * @param jobOrderId job order to inspect; never {@code null}.
+   * @return {@code true} iff the caller may edit the order as its (still-undelivered) requester.
+   */
+  public boolean canEditJobOrderAsRequester(@NotNull UUID jobOrderId) {
+    return jobOrderRepository
+        .findById(jobOrderId)
+        .map(o -> isOrderRequesterRow(o) && !orderHasAnyDelivery(o.getId()))
+        .orElse(false);
+  }
+
+  /**
+   * Per-row requester check shared by {@link #canSeeJobOrderAsRequester(UUID)} and {@link
+   * #canEditJobOrderAsRequester(UUID)}: {@code true} iff the order carries a requesting org unit
+   * and the caller is a <em>direct</em> member of it (no leadership cascade — see {@link
+   * RequestScopeResolver#currentUserIsMemberOfOrgUnit(UUID)}). Deliberately independent of the
+   * profit gate, so a non-profit ordering-squad member matches their own placed orders.
+   *
+   * @param o the job order whose requesting org unit gates the escape.
+   * @return {@code true} iff the caller directly belongs to the order's requesting org unit.
+   */
+  private boolean isOrderRequesterRow(JobOrder o) {
+    OrgUnit requesting = o.getRequestingOrgUnit();
+    return requesting != null
+        && requestScopeResolver.currentUserIsMemberOfOrgUnit(requesting.getId());
+  }
+
+  /**
+   * {@code true} iff the order has recorded at least one delivery — a material handover ({@link
+   * de.greluc.krt.profit.basetool.backend.model.JobOrderHandover}) or an item handover ({@link
+   * de.greluc.krt.profit.basetool.backend.model.JobOrderItemHandover}). Drives the whole-order
+   * freeze of {@link #canEditJobOrderAsRequester(UUID)}: once any delivery exists the requesting
+   * owner may no longer edit the order (REQ-ORDERS-023). Uses lightweight existence queries rather
+   * than loading the handover collections.
+   *
+   * @param jobOrderId the order to inspect; never {@code null}.
+   * @return {@code true} iff at least one material or item handover exists for the order.
+   */
+  private boolean orderHasAnyDelivery(@NotNull UUID jobOrderId) {
+    return jobOrderHandoverRepository.existsByJobOrderId(jobOrderId)
+        || jobOrderItemHandoverRepository.existsByJobOrderId(jobOrderId);
   }
 
   /**

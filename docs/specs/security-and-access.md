@@ -201,7 +201,10 @@ What a mission outsider (anonymous OR GUEST) **may** do — and nothing more:
 - **Orders:** create a job order only (`POST /api/v1/orders`, `/api/v1/orders/items`, plus
   the supporting `permitAll` catalog reads). They may **not** list, view, edit or delete
   orders. (This holds for GUEST too: a memberless account fails the profit-eligibility gate
-  `canViewJobOrders`, exactly like an anonymous caller — see `org-unit-tenancy.md`.)
+  `canViewJobOrders`, exactly like an anonymous caller — see `org-unit-tenancy.md`.) A non-profit
+  **member** (not a memberless guest) is the exception: they may view and limitedly edit the orders
+  their own org unit requested — the requesting-owner escape (REQ-ORDERS-023, ADR-0087) — but still
+  cannot browse the general queue or see other units' orders.
 - **Missions (non-internal only):** see the mission detail in its **redacted** form, sign up
   as a participant, and edit / check-in / check-out / delete / change-payout-preference on
   **unlinked guest participants** (`participant.user == null`, which includes their own

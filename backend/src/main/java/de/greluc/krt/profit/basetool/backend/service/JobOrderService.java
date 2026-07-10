@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.event.JobOrderCreatedEvent;
+import de.greluc.krt.profit.basetool.backend.event.JobOrderUpdatedByRequesterEvent;
 import de.greluc.krt.profit.basetool.backend.event.OrgUnitRef;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
@@ -48,6 +49,7 @@ import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -201,27 +203,7 @@ public class JobOrderService {
             .requestingOrgUnit(requesting)
             .build();
 
-    Map<Integer, JobOrderItem> byClientId = new HashMap<>();
-    List<JobOrderItem> built = new ArrayList<>();
-    for (CreateJobOrderItemLineDto line : createDto.items()) {
-      JobOrderItem item = jobOrderItemService.buildItemLine(line);
-      jobOrder.addItem(item);
-      built.add(item);
-      if (line.clientLineId() != null) {
-        byClientId.put(line.clientLineId(), item);
-      }
-    }
-    // Resolve sub-assembly provenance once every line exists, ignoring dangling or self references.
-    for (int i = 0; i < createDto.items().size(); i++) {
-      Integer parentClientId = createDto.items().get(i).parentClientLineId();
-      if (parentClientId == null) {
-        continue;
-      }
-      JobOrderItem parent = byClientId.get(parentClientId);
-      if (parent != null && parent != built.get(i)) {
-        built.get(i).setParentItem(parent);
-      }
-    }
+    populateItemLines(jobOrder, createDto.items());
 
     jobOrder = jobOrderRepository.save(jobOrder);
     jobOrderRepository.flush();
@@ -260,6 +242,31 @@ public class JobOrderService {
             responsible.getShorthand(),
             requesting == null ? null : new OrgUnitRef(requesting.getId(), requesting.getKind()),
             jobOrder.getType() == null ? null : jobOrder.getType().name(),
+            authHelperService.currentUserId().orElse(null)));
+  }
+
+  /**
+   * Publishes a {@link JobOrderUpdatedByRequesterEvent} for a job order a requesting owner just
+   * edited, so the notification pipeline can notify the processing (responsible) org unit's
+   * officers and leads after commit (REQ-ORDERS-023). Reads only managed-entity scalars and never
+   * re-saves the order, so it adds no second {@code @Version} bump. The actor is the current
+   * authenticated user — a requester edit is always authenticated (the endpoint is not {@code
+   * permitAll()}).
+   *
+   * @param jobOrder the persisted, flushed job order after the requester edit
+   */
+  private void publishJobOrderUpdatedByRequester(JobOrder jobOrder) {
+    OrgUnit responsible = jobOrder.getResponsibleOrgUnit();
+    OrgUnit requesting = jobOrder.getRequestingOrgUnit();
+    eventPublisher.publishEvent(
+        new JobOrderUpdatedByRequesterEvent(
+            jobOrder.getId(),
+            jobOrder.getDisplayId(),
+            jobOrder.getHandle(),
+            new OrgUnitRef(responsible.getId(), responsible.getKind()),
+            responsible.getShorthand(),
+            requesting == null ? null : new OrgUnitRef(requesting.getId(), requesting.getKind()),
+            requesting == null ? null : requesting.getShorthand(),
             authHelperService.currentUserId().orElse(null)));
   }
 
@@ -330,6 +337,31 @@ public class JobOrderService {
 
     // The whole-page per-row enrichment (batched stock + SK claims, REQ-DATA-003) lives in the
     // extracted projection service alongside the single-order path, so both behave identically.
+    return jobOrderStockProjectionService.mapPageWithStock(page);
+  }
+
+  /**
+   * Paged list of the orders the caller's own org unit(s) <em>requested</em> — the requester-side
+   * "Meine Auftr&auml;ge" list (REQ-ORDERS-023). Returns every order whose requesting org unit is
+   * one the caller is a <em>direct</em> member of, regardless of profit eligibility and independent
+   * of the responsible-scoped queue in {@link #getAllJobOrders(List, UUID, Pageable)} (which never
+   * grants the requester side visibility). Each returned DTO is redacted for the requester at the
+   * controller boundary (no Bearbeiter, no materials summary). An anonymous / memberless caller
+   * gets an empty page.
+   *
+   * @param statuses optional status filter; null/empty means "all"
+   * @param pageable page request
+   * @return paged job orders the caller's org unit(s) requested, scoped to direct membership
+   */
+  public Page<JobOrderDto> getRequestedJobOrders(List<JobOrderStatus> statuses, Pageable pageable) {
+    Set<UUID> requesterOrgUnitIds = ownerScopeService.currentDirectMembershipOrgUnitIds();
+    if (requesterOrgUnitIds.isEmpty()) {
+      return Page.empty(pageable);
+    }
+    List<JobOrderStatus> effectiveStatuses =
+        (statuses == null || statuses.isEmpty()) ? List.of(JobOrderStatus.values()) : statuses;
+    Page<JobOrder> page =
+        jobOrderRepository.findRequestedOrders(effectiveStatuses, requesterOrgUnitIds, pageable);
     return jobOrderStockProjectionService.mapPageWithStock(page);
   }
 
@@ -652,60 +684,101 @@ public class JobOrderService {
     jobOrder.setHandle(updateDto.handle());
     jobOrder.setComment(normalizeComment(updateDto.comment()));
 
+    MaterialReplaceOutcome outcome =
+        replaceMaterialsWithinTransaction(id, jobOrder, updateDto.materials());
+    auditService.record(
+        AuditEventType.JOB_ORDER_UPDATED,
+        outcome.order().getId(),
+        orderLabel(outcome.order()),
+        null,
+        AuditDetails.of("materialsRemoved", outcome.removedCount())
+            .with("materials", outcome.order().getMaterials().size())
+            .with("orphanedClaimsWithdrawn", outcome.orphanedClaimsWithdrawn()));
+    return jobOrderStockProjectionService.mapToDtoWithStock(outcome.order());
+  }
+
+  /**
+   * Shared, concurrency-safe material full-replace used by both the logistician {@link
+   * #updateJobOrder(UUID, CreateJobOrderDto)} and the requester {@link
+   * #updateJobOrderAsRequester(UUID, CreateJobOrderDto)}. It diffs the current material lines
+   * against the new set, rebuilds the collection on the managed aggregate, and unlinks the
+   * inventory of every removed material.
+   *
+   * <p>Ordering follows the canonical {@code createHandover} pattern (CLAUDE.md "Bulk updates
+   * inside loops"): the aggregate is mutated and {@code saveAndFlush}ed <em>first</em>, and only
+   * <em>then</em> are the {@code @Modifying(clearAutomatically = true)} {@code
+   * unlinkJobOrderMaterial} bulk updates run — once each, after the persist — so the context clear
+   * can never degrade the aggregate save into a stale merge (a second {@code @Version} bump → 409).
+   * Because those bulk updates detach the context, a fresh managed instance is re-fetched for the
+   * post-clear reads (claim reconciliation, audit label, DTO mapping). There is no FK from {@code
+   * InventoryItem} to {@code JobOrderMaterial}, so deleting the removed requirement rows before
+   * unlinking the stock rows is safe. The re-fetched {@code @Version} is the flushed value (the
+   * unlink UPDATE touches {@code InventoryItem}, never the order), so the in-place AJAX writeback
+   * (REQ-FE-003) still receives a fresh version.
+   *
+   * @param id the order id (used for the post-clear re-fetch and the bulk unlink).
+   * @param managed the managed job order whose scalars the caller has already set.
+   * @param materials the new material lines (full replacement).
+   * @return the re-fetched managed order plus the removed-count and withdrawn-claim count for
+   *     audit.
+   */
+  private MaterialReplaceOutcome replaceMaterialsWithinTransaction(
+      UUID id, JobOrder managed, List<CreateJobOrderMaterialDto> materials) {
     List<UUID> newMaterialIds =
-        updateDto.materials().stream().map(CreateJobOrderMaterialDto::materialId).toList();
-
-    List<UUID> removedMaterialIds =
-        jobOrder.getMaterials().stream()
-            .map(mat -> mat.getMaterial().getId())
-            .filter(matId -> !newMaterialIds.contains(matId))
-            .toList();
-
-    for (UUID removedId : removedMaterialIds) {
-      inventoryItemRepository.unlinkJobOrderMaterial(jobOrder.getId(), removedId);
+        materials.stream().map(CreateJobOrderMaterialDto::materialId).toList();
+    Set<UUID> removedMaterialIds = new LinkedHashSet<>();
+    for (JobOrderMaterial mat : managed.getMaterials()) {
+      UUID matId = mat.getMaterial().getId();
+      if (!newMaterialIds.contains(matId)) {
+        removedMaterialIds.add(matId);
+      }
     }
 
-    jobOrder.getMaterials().clear();
-
-    for (CreateJobOrderMaterialDto matDto : updateDto.materials()) {
+    managed.getMaterials().clear();
+    for (CreateJobOrderMaterialDto matDto : materials) {
       Material material =
           materialRepository
               .findById(matDto.materialId())
               .orElseThrow(
                   () -> new NotFoundException("Material not found: " + matDto.materialId()));
-
-      JobOrderMaterial jobOrderMaterial =
+      managed.addMaterial(
           JobOrderMaterial.builder()
               .material(material)
               .minQuality(matDto.minQuality())
               .amount(matDto.amount())
-              .build();
+              .build());
+    }
+    // Persist the rebuilt aggregate FIRST (still managed), so the returned @Version is fresh and no
+    // later merge can collide.
+    jobOrderRepository.saveAndFlush(managed);
 
-      jobOrder.addMaterial(jobOrderMaterial);
+    // THEN run the clearAutomatically inventory unlinks — once per removed material, after the
+    // persist. Each detaches the context, so `managed` must not be touched afterwards.
+    for (UUID removedId : removedMaterialIds) {
+      inventoryItemRepository.unlinkJobOrderMaterial(id, removedId);
     }
 
-    // saveAndFlush so the flushed @Version reaches the response DTO: this is an in-place AJAX edit
-    // whose returned version is written back onto the edit-modal's hidden version input (which
-    // lives
-    // outside the swapped fragments), so a stale pre-flush version would 409 the next consecutive
-    // edit. The sibling updateItemJobOrder / updateJobOrderStatus already flush; this path was the
-    // one order write missed by the #610 sweep.
-    jobOrder = jobOrderRepository.saveAndFlush(jobOrder);
-
-    // Reconciliation (Phase 4 / #344, decision #6): an edit that drops a material bucket withdraws
-    // any now-orphaned claims on that bucket. No-op for non-SK orders (which carry no claims).
+    // Re-fetch a managed instance for the post-clear reads (claim reconciliation, audit, DTO).
+    JobOrder refreshed =
+        jobOrderRepository
+            .findById(id)
+            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
     int orphanedClaimsWithdrawn =
-        materialClaimService.withdrawOrphanedClaimsWithinTransaction(jobOrder);
-    auditService.record(
-        AuditEventType.JOB_ORDER_UPDATED,
-        jobOrder.getId(),
-        orderLabel(jobOrder),
-        null,
-        AuditDetails.of("materialsRemoved", removedMaterialIds.size())
-            .with("materials", jobOrder.getMaterials().size())
-            .with("orphanedClaimsWithdrawn", orphanedClaimsWithdrawn));
-    return jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
+        materialClaimService.withdrawOrphanedClaimsWithinTransaction(refreshed);
+    return new MaterialReplaceOutcome(
+        refreshed, removedMaterialIds.size(), orphanedClaimsWithdrawn);
   }
+
+  /**
+   * Outcome of {@link #replaceMaterialsWithinTransaction(UUID, JobOrder, List)}: the re-fetched
+   * managed order and the two counts the callers record in their audit payload.
+   *
+   * @param order the re-fetched managed job order after the replace + unlink
+   * @param removedCount how many material lines were removed by the replace
+   * @param orphanedClaimsWithdrawn how many now-orphaned claims the reconciliation withdrew
+   */
+  private record MaterialReplaceOutcome(
+      JobOrder order, int removedCount, int orphanedClaimsWithdrawn) {}
 
   /**
    * Full edit of an {@code ITEM} order's ordered-item lines plus its metadata. Rebuilds the item
@@ -763,26 +836,7 @@ public class JobOrderService {
     // derived JobOrderItemMaterial rows; buildItemLine re-derives + re-snapshots from the
     // blueprint.
     jobOrder.getItems().clear();
-    Map<Integer, JobOrderItem> byClientId = new HashMap<>();
-    List<JobOrderItem> built = new ArrayList<>();
-    for (CreateJobOrderItemLineDto line : updateDto.items()) {
-      JobOrderItem item = jobOrderItemService.buildItemLine(line);
-      jobOrder.addItem(item);
-      built.add(item);
-      if (line.clientLineId() != null) {
-        byClientId.put(line.clientLineId(), item);
-      }
-    }
-    for (int i = 0; i < updateDto.items().size(); i++) {
-      Integer parentClientId = updateDto.items().get(i).parentClientLineId();
-      if (parentClientId == null) {
-        continue;
-      }
-      JobOrderItem parent = byClientId.get(parentClientId);
-      if (parent != null && parent != built.get(i)) {
-        built.get(i).setParentItem(parent);
-      }
-    }
+    populateItemLines(jobOrder, updateDto.items());
 
     jobOrder = jobOrderRepository.save(jobOrder);
     jobOrderRepository.flush();
@@ -799,6 +853,197 @@ public class JobOrderService {
         AuditDetails.of("lines", jobOrder.getItems().size())
             .with("orphanedClaimsWithdrawn", orphanedClaimsWithdrawn));
     return jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
+  }
+
+  /**
+   * Builds the ordered-item lines from the given create-line DTOs onto {@code jobOrder} and wires
+   * up each line's sub-assembly provenance from the transient {@code clientLineId}/{@code
+   * parentClientLineId} hints. Each line's required materials are derived + snapshotted from its
+   * chosen blueprint by {@link JobOrderItemService#buildItemLine}. Shared by {@link
+   * #createItemJobOrder}, {@link #updateItemJobOrder} and {@link #updateItemJobOrderAsRequester} so
+   * the three build the lines identically; the edit paths clear the existing lines first.
+   *
+   * @param jobOrder the order to attach the built lines to (mutated in place).
+   * @param lines the ordered-item line create DTOs.
+   */
+  private void populateItemLines(JobOrder jobOrder, List<CreateJobOrderItemLineDto> lines) {
+    Map<Integer, JobOrderItem> byClientId = new HashMap<>();
+    List<JobOrderItem> built = new ArrayList<>();
+    for (CreateJobOrderItemLineDto line : lines) {
+      JobOrderItem item = jobOrderItemService.buildItemLine(line);
+      jobOrder.addItem(item);
+      built.add(item);
+      if (line.clientLineId() != null) {
+        byClientId.put(line.clientLineId(), item);
+      }
+    }
+    // Resolve sub-assembly provenance once every line exists, ignoring dangling or self references.
+    for (int i = 0; i < lines.size(); i++) {
+      Integer parentClientId = lines.get(i).parentClientLineId();
+      if (parentClientId == null) {
+        continue;
+      }
+      JobOrderItem parent = byClientId.get(parentClientId);
+      if (parent != null && parent != built.get(i)) {
+        built.get(i).setParentItem(parent);
+      }
+    }
+  }
+
+  /**
+   * Requester-side full edit of a {@code MATERIAL} order (REQ-ORDERS-023): a member of the order's
+   * requesting org unit changes quantities, adds/removes material lines, edits the min-quality
+   * within the fixed choices, and edits the comment — all as one full-replace, permitted only while
+   * the order is still fully undelivered (the whole-order freeze). The requester may NOT change the
+   * handle, the requesting/responsible org unit, the status or the priority; those DTO inputs are
+   * ignored. Removed materials have their linked inventory unlinked via the shared safe ordering
+   * ({@link #replaceMaterialsWithinTransaction}). On commit the processing (responsible) org unit's
+   * officers/leads are notified ({@link #publishJobOrderUpdatedByRequester}). Audited as {@code
+   * JOB_ORDER_UPDATED} with a {@code byRequester=true} discriminator.
+   *
+   * <p>Authorisation (member of the requesting org unit + undelivered) is enforced by the {@code
+   * @ownerScopeService.canEditJobOrderAsRequester} gate on the endpoint; the freeze is re-asserted
+   * here to close the TOCTOU window where a handover could land between the gate and the commit.
+   *
+   * @param id the order id.
+   * @param updateDto the new material lines + comment (carries the expected version); org-unit /
+   *     status / priority fields are ignored.
+   * @return the persisted order DTO.
+   * @throws NotFoundException when the order or a material id is unknown.
+   * @throws BadRequestException when the order is not a material order or already has a delivery.
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the version is
+   *     stale.
+   */
+  @Transactional
+  public JobOrderDto updateJobOrderAsRequester(UUID id, CreateJobOrderDto updateDto) {
+    JobOrder jobOrder =
+        jobOrderRepository
+            .findById(id)
+            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
+    if (jobOrder.getType() != JobOrderType.MATERIAL) {
+      throw new BadRequestException(
+          "Order " + id + " is not a material order; use the requester item-update endpoint.");
+    }
+    OptimisticLock.checkOptionalClient(
+        jobOrder.getVersion(), updateDto.version(), JobOrder.class, id);
+    assertRequesterEditable(jobOrder);
+
+    // Requester edits are limited to the comment and the material lines. The handle, the
+    // requesting/responsible org units, the status and the priority are NOT touched (their DTO
+    // inputs are ignored) — those stay processing-side concerns.
+    jobOrder.setComment(normalizeComment(updateDto.comment()));
+
+    MaterialReplaceOutcome outcome =
+        replaceMaterialsWithinTransaction(id, jobOrder, updateDto.materials());
+    auditService.record(
+        AuditEventType.JOB_ORDER_UPDATED,
+        outcome.order().getId(),
+        orderLabel(outcome.order()),
+        null,
+        AuditDetails.of("materialsRemoved", outcome.removedCount())
+            .with("materials", outcome.order().getMaterials().size())
+            .with("orphanedClaimsWithdrawn", outcome.orphanedClaimsWithdrawn())
+            .with("byRequester", true));
+    publishJobOrderUpdatedByRequester(outcome.order());
+    return jobOrderStockProjectionService.mapToDtoWithStock(outcome.order());
+  }
+
+  /**
+   * Requester-side full edit of an {@code ITEM} order (REQ-ORDERS-023): a member of the order's
+   * requesting org unit replaces the ordered-item lines (change quantity, add/remove lines) and
+   * edits the comment, permitted only while the order is still fully undelivered (the whole-order
+   * freeze). Each line's required materials are re-derived from its blueprint. Unlike the
+   * logistician {@link #updateItemJobOrder} — which leaves now-unrequired links as REQ-ORDERS-019
+   * orphan warnings — the requester path unlinks the inventory of every material no longer required
+   * by any surviving line, honouring the issue's "removing an item unlinks the linked inventory"
+   * rule, via the same safe post-persist unlink ordering. On commit the processing org unit's
+   * officers/leads are notified. Audited as {@code JOB_ORDER_ITEM_UPDATED} with {@code
+   * byRequester=true}.
+   *
+   * @param id the order id.
+   * @param updateDto the new item lines + comment (carries the expected version); org-unit / status
+   *     / priority fields are ignored.
+   * @return the persisted order DTO with re-derived materials.
+   * @throws NotFoundException when the order, a game item or a blueprint id is unknown.
+   * @throws BadRequestException when the order is not an item order or already has a delivery.
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the version is
+   *     stale.
+   */
+  @Transactional
+  public JobOrderDto updateItemJobOrderAsRequester(
+      UUID id, CreateJobOrderItemRequestDto updateDto) {
+    JobOrder jobOrder =
+        jobOrderRepository
+            .findById(id)
+            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
+    if (jobOrder.getType() != JobOrderType.ITEM) {
+      throw new BadRequestException(
+          "Order " + id + " is not an item order; use the requester material-update endpoint.");
+    }
+    OptimisticLock.checkOptionalClient(
+        jobOrder.getVersion(), updateDto.version(), JobOrder.class, id);
+    assertRequesterEditable(jobOrder);
+
+    jobOrder.setComment(normalizeComment(updateDto.comment()));
+
+    // Snapshot the required materials before the rebuild so we can unlink the inventory of any
+    // material the new line set no longer requires.
+    final Set<UUID> requiredBefore =
+        new LinkedHashSet<>(jobOrderItemService.requiredMaterialIds(jobOrder));
+
+    jobOrder.getItems().clear();
+    populateItemLines(jobOrder, updateDto.items());
+
+    // Persist the rebuilt aggregate FIRST (still managed), then run the clearAutomatically unlinks
+    // —
+    // canonical createHandover ordering (CLAUDE.md "Bulk updates inside loops").
+    jobOrderRepository.saveAndFlush(jobOrder);
+
+    Set<UUID> noLongerRequired = new LinkedHashSet<>(requiredBefore);
+    noLongerRequired.removeAll(jobOrderItemService.requiredMaterialIds(jobOrder));
+    for (UUID removedMaterialId : noLongerRequired) {
+      inventoryItemRepository.unlinkJobOrderMaterial(id, removedMaterialId);
+    }
+
+    // Re-fetch a managed instance for the post-clear reads (claim reconciliation, audit, DTO).
+    JobOrder refreshed =
+        jobOrderRepository
+            .findById(id)
+            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
+    int orphanedClaimsWithdrawn =
+        materialClaimService.withdrawOrphanedClaimsWithinTransaction(refreshed);
+    auditService.record(
+        AuditEventType.JOB_ORDER_ITEM_UPDATED,
+        refreshed.getId(),
+        orderLabel(refreshed),
+        null,
+        AuditDetails.of("lines", refreshed.getItems().size())
+            .with("orphanedClaimsWithdrawn", orphanedClaimsWithdrawn)
+            .with("byRequester", true));
+    publishJobOrderUpdatedByRequester(refreshed);
+    return jobOrderStockProjectionService.mapToDtoWithStock(refreshed);
+  }
+
+  /**
+   * Re-asserts the whole-order delivery freeze at the top of a requester edit (REQ-ORDERS-023): a
+   * requesting owner may edit an order only while it has no material handover and no item handover
+   * yet. The {@code canEditJobOrderAsRequester} gate already checks this, but re-checking here
+   * closes the TOCTOU window where a handover could be recorded between the gate evaluation and the
+   * commit.
+   *
+   * @param jobOrder the managed order being edited.
+   * @throws BadRequestException when the order already has a delivery and is therefore frozen.
+   */
+  private static void assertRequesterEditable(JobOrder jobOrder) {
+    boolean hasDelivery =
+        (jobOrder.getHandovers() != null && !jobOrder.getHandovers().isEmpty())
+            || (jobOrder.getItemHandovers() != null && !jobOrder.getItemHandovers().isEmpty());
+    if (hasDelivery) {
+      throw new BadRequestException(
+          "Order "
+              + jobOrder.getId()
+              + " already has a delivery and can no longer be edited by the requester.");
+    }
   }
 
   /**

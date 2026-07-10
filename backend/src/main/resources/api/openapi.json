@@ -6252,6 +6252,105 @@
         }
       }
     },
+    "/api/v1/orders/{id}/requested" : {
+      "put" : {
+        "tags" : [ "Orders" ],
+        "summary" : "Requester edit of a material order",
+        "description" : "Lets a member of the order's requesting org unit change quantities, add/remove not-yet-delivered materials and edit the comment. Only while the order has no delivery yet.",
+        "operationId" : "updateJobOrderAsRequester",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateJobOrderDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Order updated",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JobOrderDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/orders/{id}/priority" : {
       "put" : {
         "tags" : [ "Orders" ],
@@ -6377,6 +6476,105 @@
         "responses" : {
           "200" : {
             "description" : "Item order updated",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JobOrderDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orders/{id}/items/requested" : {
+      "put" : {
+        "tags" : [ "Orders" ],
+        "summary" : "Requester edit of an item order",
+        "description" : "Lets a member of the order's requesting org unit replace the ordered items and edit the comment. Only while the order has no delivery yet.",
+        "operationId" : "updateItemJobOrderAsRequester",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateJobOrderItemRequestDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Order updated",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -39299,6 +39497,141 @@
         }
       }
     },
+    "/api/v1/orders/requested" : {
+      "get" : {
+        "tags" : [ "Orders" ],
+        "summary" : "Get my requested job orders",
+        "description" : "Returns a paginated list of the orders the caller's own org unit(s) requested (Auftraggeber view), redacted (no Bearbeiter / no materials summary).",
+        "operationId" : "getRequestedJobOrders",
+        "parameters" : [ {
+          "name" : "status",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED" ]
+            }
+          }
+        }, {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 0
+          }
+        }, {
+          "name" : "size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 20
+          }
+        }, {
+          "name" : "sort",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "priority,asc"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseJobOrderDto"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/orders/lookup" : {
       "get" : {
         "tags" : [ "Orders" ],
@@ -52073,11 +52406,11 @@
         "properties" : {
           "eventType" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED" ]
+            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED" ]
           },
           "notificationType" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED" ]
+            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED" ]
           },
           "description" : {
             "type" : "string",
@@ -52112,11 +52445,11 @@
           },
           "eventType" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED" ]
+            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED" ]
           },
           "notificationType" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED" ]
+            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED" ]
           },
           "description" : {
             "type" : "string"
@@ -58573,6 +58906,9 @@
             "type" : "boolean"
           },
           "canViewJobOrders" : {
+            "type" : "boolean"
+          },
+          "canViewOwnJobOrders" : {
             "type" : "boolean"
           }
         }

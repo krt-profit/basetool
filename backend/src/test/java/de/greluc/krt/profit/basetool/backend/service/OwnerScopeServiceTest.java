@@ -48,6 +48,8 @@ import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
+import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
+import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
@@ -93,6 +95,8 @@ class OwnerScopeServiceTest {
   @Mock private SquadronRepository squadronRepository;
   @Mock private MissionRepository missionRepository;
   @Mock private JobOrderRepository jobOrderRepository;
+  @Mock private JobOrderHandoverRepository jobOrderHandoverRepository;
+  @Mock private JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private RefineryOrderRepository refineryOrderRepository;
   @Mock private OperationRepository operationRepository;
@@ -197,6 +201,8 @@ class OwnerScopeServiceTest {
             authHelper,
             missionRepository,
             jobOrderRepository,
+            jobOrderHandoverRepository,
+            jobOrderItemHandoverRepository,
             inventoryItemRepository,
             refineryOrderRepository,
             operationRepository,
@@ -802,6 +808,80 @@ class OwnerScopeServiceTest {
       when(jobOrderRepository.findById(orderId)).thenReturn(Optional.empty());
 
       assertFalse(service.canSeeJobOrder(orderId));
+    }
+  }
+
+  /**
+   * REQ-ORDERS-023: the requester escape — a member of an order's requesting org unit may read it
+   * and (while it is still fully undelivered) edit it within limits, independent of the profit gate
+   * that blocks the normal {@code canSeeJobOrder}/{@code canEditJobOrder} paths.
+   */
+  @Nested
+  class RequesterEscapeGateTests {
+
+    @Test
+    void nonProfitRequester_canSeeOwnRequestedOrder() {
+      // A non-profit member may read an order their OWN org unit requested via the requester
+      // escape,
+      // even though the profit gate denies the normal canSeeJobOrder path.
+      UUID orderId = UUID.randomUUID();
+      var order = jobOrderResponsibleTo(orderId, newSpecialCommand());
+      order.setRequestingOrgUnit(squadronA);
+      when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+      stubNonProfitMember();
+
+      assertFalse(service.canSeeJobOrder(orderId));
+      assertTrue(service.canSeeJobOrderAsRequester(orderId));
+    }
+
+    @Test
+    void nonProfitMember_cannotSeeForeignRequestedOrder() {
+      // An order requested by a DIFFERENT org unit is not the caller's own — no requester escape.
+      UUID orderId = UUID.randomUUID();
+      var order = jobOrderResponsibleTo(orderId, newSpecialCommand());
+      order.setRequestingOrgUnit(squadronB);
+      when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+      stubNonProfitMember();
+
+      assertFalse(service.canSeeJobOrderAsRequester(orderId));
+    }
+
+    @Test
+    void nonProfitRequester_canEditOwnUndeliveredOrder() {
+      // The whole-order freeze is not tripped (no handover) → the requester may edit their own
+      // order.
+      UUID orderId = UUID.randomUUID();
+      var order = jobOrderResponsibleTo(orderId, newSpecialCommand());
+      order.setRequestingOrgUnit(squadronA);
+      when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+      stubNonProfitMember();
+
+      assertFalse(service.canEditJobOrder(orderId));
+      assertTrue(service.canEditJobOrderAsRequester(orderId));
+    }
+
+    @Test
+    void requester_cannotEditOwnOrder_onceDelivered() {
+      // Whole-order freeze: once any handover exists the requester can no longer edit.
+      UUID orderId = UUID.randomUUID();
+      var order = jobOrderResponsibleTo(orderId, newSpecialCommand());
+      order.setRequestingOrgUnit(squadronA);
+      when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+      stubNonProfitMember();
+      when(jobOrderHandoverRepository.existsByJobOrderId(orderId)).thenReturn(true);
+
+      assertFalse(service.canEditJobOrderAsRequester(orderId));
+    }
+
+    @Test
+    void nonProfitMember_cannotEditForeignRequestedOrder() {
+      UUID orderId = UUID.randomUUID();
+      var order = jobOrderResponsibleTo(orderId, newSpecialCommand());
+      order.setRequestingOrgUnit(squadronB);
+      when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+      stubNonProfitMember();
+
+      assertFalse(service.canEditJobOrderAsRequester(orderId));
     }
   }
 

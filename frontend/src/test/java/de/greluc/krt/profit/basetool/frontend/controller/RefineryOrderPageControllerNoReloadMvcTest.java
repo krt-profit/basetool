@@ -70,7 +70,7 @@ class RefineryOrderPageControllerNoReloadMvcTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     when(backendApiClient.get(
             "/api/v1/me/capabilities", SquadronContextAdvice.CapabilitiesResponse.class))
-        .thenReturn(new SquadronContextAdvice.CapabilitiesResponse(true, true));
+        .thenReturn(new SquadronContextAdvice.CapabilitiesResponse(true, true, true));
   }
 
   @Test

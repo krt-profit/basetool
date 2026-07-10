@@ -80,7 +80,7 @@ class JobOrderListRenderTest {
     // renders.
     when(backendApiClient.get(
             "/api/v1/me/capabilities", SquadronContextAdvice.CapabilitiesResponse.class))
-        .thenReturn(new SquadronContextAdvice.CapabilitiesResponse(true, true));
+        .thenReturn(new SquadronContextAdvice.CapabilitiesResponse(true, true, true));
   }
 
   private MaterialDto material(String name, String quantityType) {

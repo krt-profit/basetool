@@ -30,4 +30,14 @@ import org.springframework.stereotype.Repository;
 public interface JobOrderHandoverRepository extends JpaRepository<JobOrderHandover, UUID> {
   /** Derived Spring-Data query - returns entities matching {@code JobOrderId}. */
   List<JobOrderHandover> findByJobOrderId(UUID jobOrderId);
+
+  /**
+   * {@code true} iff at least one material handover exists for the given job order. Backs the
+   * whole-order delivery freeze of the requester-edit gate (REQ-ORDERS-023): a requesting owner may
+   * only edit an order that has not yet had any delivery recorded.
+   *
+   * @param jobOrderId the owning job order id; never {@code null}.
+   * @return {@code true} iff any {@link JobOrderHandover} references the order.
+   */
+  boolean existsByJobOrderId(UUID jobOrderId);
 }

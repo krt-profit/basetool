@@ -46,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.service.JobOrderHandoverReportServi
 import de.greluc.krt.profit.basetool.backend.service.JobOrderHandoverService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemBlueprintOwnersService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderService;
+import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -104,6 +105,7 @@ class JobOrderControllerTest {
   @Mock private JobOrderHandoverReportService jobOrderHandoverReportService;
   @Mock private UserService userService;
   @Mock private AuthHelperService authHelperService;
+  @Mock private OwnerScopeService ownerScopeService;
 
   @InjectMocks private JobOrderController controller;
 
@@ -276,6 +278,8 @@ class JobOrderControllerTest {
     UUID id = UUID.randomUUID();
     JobOrderDto dto = jobOrderDto(id);
     when(jobOrderService.getJobOrderById(id)).thenReturn(dto);
+    // A full viewer (canSeeJobOrder=true) gets the DTO unredacted, straight from the service.
+    when(ownerScopeService.canSeeJobOrder(id)).thenReturn(true);
 
     JobOrderDto result = controller.getJobOrderById(id);
 

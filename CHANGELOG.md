@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Auftraggeber können ihre eigenen Aufträge jetzt einsehen und eingeschränkt bearbeiten.** Mitglieder rein nicht-profit-berechtigter Einheiten, die bisher Aufträge nur anlegen konnten, sehen nun unter „Meine Aufträge" die von ihrer Einheit angeforderten Aufträge und dürfen sie – solange noch nichts geliefert wurde – bearbeiten: Mengen ändern, noch nicht gelieferte Materialien hinzufügen oder entfernen (samt Lösen der zugeordneten Lagerbestände), die Mindestqualität anpassen und den Kommentar bearbeiten. Bearbeiter und Materialübersicht bleiben für sie ausgeblendet. Ändert der Auftraggeber einen Auftrag, werden Offiziere und Leads der bearbeitenden Einheit benachrichtigt (#1186).
+
 ## [v1.2.6](https://github.com/krt-profit/basetool/releases/tag/v1.2.6) - 2026-07-09
 
 ### Added
