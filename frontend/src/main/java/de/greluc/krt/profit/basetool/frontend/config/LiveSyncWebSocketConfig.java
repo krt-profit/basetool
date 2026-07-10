@@ -27,8 +27,8 @@ import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncWebSocketHandler
 import de.greluc.krt.profit.basetool.frontend.websocket.NoopLiveSyncFanout;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
@@ -63,18 +63,20 @@ public class LiveSyncWebSocketConfig implements WebSocketConfigurer {
   private final LiveSyncPresenceService presenceService;
   private final BackendApiClient backendApiClient;
   private final MeterRegistry meterRegistry;
+  private final ObjectProvider<LiveSyncFanout> fanoutProvider;
   private final List<String> allowedOriginPatterns;
 
   /**
    * Constructor injection of the shared presence store, the backend client used by the handshake
-   * gate, the Micrometer registry, and the WebSocket origin allowlist. The fan-out seam is not
-   * injected here (this config also <em>produces</em> the fallback {@link LiveSyncFanout}, which
-   * would be a self-referential cycle); the handler {@code @Bean} takes it as a method parameter
-   * instead.
+   * gate, the Micrometer registry, the fan-out seam and the WebSocket origin allowlist. The fan-out
+   * is injected lazily via an {@link ObjectProvider} so a Redis binding (when present) is used and
+   * the no-op fallback is created only when none is registered — order-independent, no
+   * {@code @ConditionalOnMissingBean} and no self-referential cycle.
    *
    * @param presenceService in-memory editor-presence store
    * @param backendApiClient client used by the handshake interceptor to authorize resource access
    * @param meterRegistry registry the handler binds its gauges and relay counters to
+   * @param fanoutProvider lazy provider of the cross-replica fan-out (Redis when enabled)
    * @param allowedOriginPatterns origin patterns accepted on the WebSocket handshake; sourced from
    *     {@code app.websocket.allowed-origin-patterns} with a production default
    */
@@ -82,39 +84,28 @@ public class LiveSyncWebSocketConfig implements WebSocketConfigurer {
       LiveSyncPresenceService presenceService,
       BackendApiClient backendApiClient,
       MeterRegistry meterRegistry,
+      ObjectProvider<LiveSyncFanout> fanoutProvider,
       @Value(
               "${app.websocket.allowed-origin-patterns:https://profit-base.online,https://localhost:18081,http://localhost:18081}")
           List<String> allowedOriginPatterns) {
     this.presenceService = presenceService;
     this.backendApiClient = backendApiClient;
     this.meterRegistry = meterRegistry;
+    this.fanoutProvider = fanoutProvider;
     this.allowedOriginPatterns = allowedOriginPatterns;
-  }
-
-  /**
-   * Fallback single-instance fan-out, used unless a Redis binding supplies its own {@link
-   * LiveSyncFanout}. Contributed as a {@code @Bean} rather than a component-scanned
-   * {@code @ConditionalOnMissingBean} class (which evaluates before the bean type is known and
-   * would silently back off, leaving the seam unsatisfied) so it always resolves.
-   *
-   * @return the no-op fan-out bean
-   */
-  @Bean
-  @ConditionalOnMissingBean(LiveSyncFanout.class)
-  public LiveSyncFanout noopLiveSyncFanout() {
-    return new NoopLiveSyncFanout();
   }
 
   /**
    * Builds the singleton {@link LiveSyncWebSocketHandler}. Declared as a bean so Spring triggers
    * its {@code @PreDestroy} on shutdown and so the Redis fan-out can inject it for consume-side
-   * delivery.
+   * delivery. Uses the registered {@link LiveSyncFanout} if one exists (the Redis binding), else a
+   * fresh {@link NoopLiveSyncFanout} (single-instance).
    *
-   * @param fanout the resolved fan-out seam (no-op when single-instance, Redis when enabled)
    * @return the handler bean
    */
   @Bean
-  public LiveSyncWebSocketHandler liveSyncWebSocketHandler(LiveSyncFanout fanout) {
+  public LiveSyncWebSocketHandler liveSyncWebSocketHandler() {
+    LiveSyncFanout fanout = fanoutProvider.getIfAvailable(NoopLiveSyncFanout::new);
     return new LiveSyncWebSocketHandler(
         presenceService, fanout, JsonMapper.builder().build(), meterRegistry);
   }
@@ -123,8 +114,7 @@ public class LiveSyncWebSocketConfig implements WebSocketConfigurer {
   @Override
   public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
     registry
-        .addHandler(
-            liveSyncWebSocketHandler(noopLiveSyncFanout()), "/ws/missions/{missionId}/presence")
+        .addHandler(liveSyncWebSocketHandler(), "/ws/missions/{missionId}/presence")
         .addInterceptors(new LiveSyncLegacyHandshakeInterceptor(backendApiClient))
         .setAllowedOriginPatterns(allowedOriginPatterns.toArray(new String[0]));
   }

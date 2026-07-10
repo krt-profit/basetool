@@ -162,6 +162,9 @@ dependencies {
   // version; we invoke `.check(CLASSES)` from plain @Test methods). Enforces the
   // frontend's "no JpaRepository / no direct JDBC" rule.
   testImplementation(libs.archunit.core)
+  // Testcontainers for the live-sync Redis pub/sub fan-out integration test (a throwaway
+  // redis container + a real Lettuce connection), mirroring the ingest module's pattern.
+  testImplementation(libs.testcontainers.junit)
 }
 
 // Test, JavaCompile, BootRun and JaCoCo setup is shared with the backend module

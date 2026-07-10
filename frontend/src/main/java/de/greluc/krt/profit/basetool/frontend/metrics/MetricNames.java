@@ -45,6 +45,25 @@ public final class MetricNames {
    */
   public static final String LIVESYNC_SUBSCRIPTIONS = "basetool.livesync.subscriptions";
 
+  /**
+   * Counter {@code basetool_livesync_redis_published_total} — tag {@code topic_class}; {@code
+   * changed} signals this instance published to the cross-replica Redis channel (ADR-0092).
+   */
+  public static final String LIVESYNC_REDIS_PUBLISHED = "basetool.livesync.redis.published";
+
+  /**
+   * Counter {@code basetool_livesync_redis_consumed_total} — tag {@code topic_class}; {@code
+   * changed} signals this instance consumed from a peer replica (own-origin messages excluded).
+   */
+  public static final String LIVESYNC_REDIS_CONSUMED = "basetool.livesync.redis.consumed";
+
+  /**
+   * Counter {@code basetool_livesync_redis_errors_total} — tag {@code op} ({@link #OP_PUBLISH} /
+   * {@link #OP_CONSUME}); a Redis fan-out publish or consume that failed (swallowed — local relay
+   * already happened, so the failure only degrades cross-replica delivery, ADR-0092).
+   */
+  public static final String LIVESYNC_REDIS_ERRORS = "basetool.livesync.redis.errors";
+
   /** Gauge {@code basetool_active_sessions} — active Spring Session sessions (frontend). */
   public static final String ACTIVE_SESSIONS = "basetool.active.sessions";
 
@@ -118,6 +137,15 @@ public final class MetricNames {
    * #LIVESYNC_SUBSCRIPTIONS} — one of the {@code LiveSyncTopicClass} metric labels (REQ-OBS-011).
    */
   public static final String TAG_TOPIC_CLASS = "topic_class";
+
+  /** Tag key: the Redis fan-out operation on {@link #LIVESYNC_REDIS_ERRORS}. */
+  public static final String TAG_OP = "op";
+
+  /** Redis fan-out operation: publishing a {@code changed} signal to peers. */
+  public static final String OP_PUBLISH = "publish";
+
+  /** Redis fan-out operation: consuming a peer's {@code changed} signal. */
+  public static final String OP_CONSUME = "consume";
 
   /** Tag key: the login outcome on {@link #LOGIN}. */
   public static final String TAG_OUTCOME = "outcome";
