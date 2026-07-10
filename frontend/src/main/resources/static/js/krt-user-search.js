@@ -19,7 +19,7 @@
 
 /*
  * Shared server-side user-search sources for the searchable combobox (REQ-FE-011, ADR-0053 +
- * ADR-0086, #1193). Registers the `remoteSource` functions the global combobox auto-initialiser
+ * ADR-0087, #1193). Registers the `remoteSource` functions the global combobox auto-initialiser
  * (krt-searchable-select.js) wires up by marker value, so an all-users picker fetches only the
  * matching users on demand from the backend instead of shipping the whole roster as <option>s —
  * the scaling switch for 5000 accounts (ADR-0085).

@@ -501,7 +501,7 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/api/v1/users/search")
                     .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER)
-                    // Bank-audience search twin (ADR-0086, the #1193 remoteSource switch): the bank
+                    // Bank-audience search twin (ADR-0087, the #1193 remoteSource switch): the bank
                     // pickers (register holder, grant Bank-Employee role, approval limits) resolve
                     // candidates across the whole user base and must stay reachable for a bank
                     // employee/manager who holds no org-role (REQ-BANK-008/009/044) — same widening

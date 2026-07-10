@@ -10755,8 +10755,8 @@
     "/api/v1/material-exchange/offers/{id}/remark" : {
       "put" : {
         "tags" : [ "Material Exchange" ],
-        "summary" : "Edit a Materialbörse offer remark.",
-        "operationId" : "updateRemark",
+        "summary" : "Edit a Materialbörse offer (offered amount and remark).",
+        "operationId" : "updateOffer",
         "parameters" : [ {
           "name" : "id",
           "in" : "path",
@@ -10770,7 +10770,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/MaterialExchangeRemarkUpdateRequest"
+                "$ref" : "#/components/schemas/MaterialExchangeOfferUpdateRequest"
               }
             }
           },
@@ -53156,9 +53156,13 @@
           }
         }
       },
-      "MaterialExchangeRemarkUpdateRequest" : {
+      "MaterialExchangeOfferUpdateRequest" : {
         "type" : "object",
         "properties" : {
+          "offeredAmount" : {
+            "type" : "number",
+            "format" : "double"
+          },
           "remark" : {
             "type" : "string",
             "maxLength" : 20000,
@@ -53170,7 +53174,7 @@
             "minimum" : 0
           }
         },
-        "required" : [ "version" ]
+        "required" : [ "offeredAmount", "version" ]
       },
       "MaterialExchangeOfferDto" : {
         "type" : "object",
@@ -53199,6 +53203,10 @@
             "format" : "int32"
           },
           "amount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "availableAmount" : {
             "type" : "number",
             "format" : "double"
           },
@@ -55005,13 +55013,17 @@
             "type" : "string",
             "format" : "uuid"
           },
+          "offeredAmount" : {
+            "type" : "number",
+            "format" : "double"
+          },
           "remark" : {
             "type" : "string",
             "maxLength" : 20000,
             "minLength" : 0
           }
         },
-        "required" : [ "inventoryItemId" ]
+        "required" : [ "inventoryItemId", "offeredAmount" ]
       },
       "InventoryItemCreateDto" : {
         "type" : "object",

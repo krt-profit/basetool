@@ -111,7 +111,7 @@ owner later wants a shorter login window, that is a separate product decision.
 - **Async server-side user pickers instead of the squadron-scoped reference list.** The admin
   "all-squadrons" picker can return up to 5000 slim rows; converting the pickers to async search is a
   UI feature (design + tests + wiki), not a scaling knob, and the rows are already scoped and tiny.
-  Deferred as a follow-up rather than half-built here. **Done in #1193 / ADR-0086:** the all-users
+  Deferred as a follow-up rather than half-built here. **Done in #1193 / ADR-0087:** the all-users
   pickers were switched to the combobox `remoteSource` mode (server-side `/users/search`, and the
   bank-audience `/users/search-bank`), so no converted picker ships the full roster anymore.
 

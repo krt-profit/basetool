@@ -712,12 +712,12 @@ dynamically (cloned modal/selector rows). Shared default labels live once in `wi
 (`userSelect.search.*`). A new or changed user-selection surface that ships a plain `<select>` or a
 hand-rolled picker is **incomplete**.
 
-**Server-side search mode for the all-users pickers (#1193, ADR-0085/ADR-0086).** At the 5000-account
+**Server-side search mode for the all-users pickers (#1193, ADR-0085/ADR-0087).** At the 5000-account
 target, a picker that preloads the full (or admin-"all-squadrons") roster ships thousands of
 `<option>`s. Every such picker now opts into the component's `remoteSource` mode **declaratively by
 the marker value**: `data-krt-combobox="remote-users"` searches the squadron/admin-scoped
 `/users/search`, and `data-krt-combobox="remote-bank-users"` searches the bank-audience
-`/users/search-bank` (ADR-0086 — same query/scope, role gate widened to bank staff; backs the
+`/users/search-bank` (ADR-0087 — same query/scope, role gate widened to bank staff; backs the
 register-holder / grant-Bank-Employee / approval-limit pickers). The enhancer looks the marker up in
 the shared `window.krtComboboxRemoteSources` registry (`krt-user-search.js`), so no per-page JS is
 needed; the roster is fetched on demand (debounced, paginated), not preloaded. **Edit-mode seeding**
@@ -771,7 +771,7 @@ registry lookup in `autoConfig`, global `enhanceWithin` on `DOMContentLoaded` + 
 `id`/`data-*` passthrough, `setValue` API, `window.krtEnhanceComboboxes`), `krt-user-search.js`
 (the `remote-users` / `remote-bank-users` `window.krtComboboxRemoteSources` entries),
 `fragments/head.html` (global load + `window.krtComboboxI18n`), `UserController.searchUsersForBank` /
-`UserProxyController`, and the converted templates/selects · **ADR:** ADR-0053, ADR-0086
+`UserProxyController`, and the converted templates/selects · **ADR:** ADR-0053, ADR-0087
 
 ### REQ-FE-012 — A user's own back-to-back writes to one lock scope never self-collide
 

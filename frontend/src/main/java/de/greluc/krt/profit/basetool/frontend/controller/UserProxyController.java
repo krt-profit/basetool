@@ -87,7 +87,7 @@ public class UserProxyController {
   /**
    * Bank-audience twin of {@link #searchUsers}: forwards to the backend {@code
    * /api/v1/users/search-bank}, which mirrors {@code /search} but widens the role gate to bank
-   * staff (ADR-0086, #1193). Backs the bank pickers' {@code remote-bank-users} combobox source
+   * staff (ADR-0087, #1193). Backs the bank pickers' {@code remote-bank-users} combobox source
    * (register holder, grant the Bank-Employee role, approval limits) so a bank employee/manager who
    * holds no org role can still resolve candidates. The real authorization is enforced by the
    * backend; this proxy only requires an authenticated session.

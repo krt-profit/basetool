@@ -61,10 +61,10 @@ binding requirement (REQ-FE-011).
   full user list as `<option>`s. Acceptable at the current scale; if the list grows into the
   thousands the same fields can switch to the component's existing `remoteSource` mode (the orders
   item search already uses it) behind `/users/search` without changing the contract.
-  **Follow-up (2026-07-10, #1193 / ADR-0085 / ADR-0086):** that trigger was reached. Every picker that
+  **Follow-up (2026-07-10, #1193 / ADR-0085 / ADR-0087):** that trigger was reached. Every picker that
   preloaded the full or admin-"all-squadrons" roster now runs in `remoteSource` mode — driven
   declaratively by the marker value (`data-krt-combobox="remote-users"` → `/users/search`,
-  `remote-bank-users` → the new bank-audience `/users/search-bank`, ADR-0086) via the shared
+  `remote-bank-users` → the new bank-audience `/users/search-bank`, ADR-0087) via the shared
   `window.krtComboboxRemoteSources` registry — with edit-mode seeding (one seeded `<option>` /
   `/users/{id}` name lookup) and the no-JS `<select>` fallback preserved. Local-filter stays only for
   the small **scoped** pickers (a single mission's participants), and the two carve-outs below are

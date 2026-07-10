@@ -672,7 +672,7 @@
     // A backend-backed picker opts in declaratively via the MARKER VALUE: `data-krt-combobox` set to
     // a key registered in `window.krtComboboxRemoteSources` (e.g. `remote-users` /
     // `remote-bank-users`, defined in krt-user-search.js) makes the picker fetch its options on
-    // demand from that source instead of filtering a preloaded list (REQ-FE-011, ADR-0053/0086,
+    // demand from that source instead of filtering a preloaded list (REQ-FE-011, ADR-0053/0087,
     // #1193). Keeps this module generic — the search URLs live in the registry, not here. (A page
     // may still pass an explicit `remoteSource` via the direct krtSearchableSelect API — e.g. the
     // orders item search.)

@@ -74,7 +74,7 @@ public class UserAccessControlTest {
         .andExpect(status().isOk());
   }
 
-  // The regular /search stays closed to bank staff (ADR-0086, #1193): a role-less bank employee
+  // The regular /search stays closed to bank staff (ADR-0087, #1193): a role-less bank employee
   // must
   // use the dedicated /search-bank twin, so the ordinary picker's authorization regime is
   // unchanged.
@@ -115,7 +115,7 @@ public class UserAccessControlTest {
         .andExpect(status().isOk());
   }
 
-  // The bank widening (ADR-0086, REQ-BANK-008/009/044): a bank employee/manager who holds no org
+  // The bank widening (ADR-0087, REQ-BANK-008/009/044): a bank employee/manager who holds no org
   // role can drive the bank pickers' server-side search via the dedicated /search-bank endpoint.
   @Test
   void testSearchUsersForBank_BankEmployee_Allowed() throws Exception {
