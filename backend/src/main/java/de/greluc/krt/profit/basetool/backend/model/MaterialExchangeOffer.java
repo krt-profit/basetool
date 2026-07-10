@@ -44,12 +44,14 @@ import lombok.Setter;
  * player offers which material, in which quality and quantity</b>; negotiation and handover happen
  * off-tool between the players.
  *
- * <p>The offer is a thin overlay on a {@link InventoryItem}: material, quality and amount are read
- * <b>live</b> from {@link #inventoryItem} (single source of truth, no drift), and the item's {@code
- * location} is deliberately <b>never</b> read into any board query or DTO — the Standort stays
- * private (REQ-MARKET-004). {@link #owner} and {@link #owningOrgUnit} are denormalised from the
- * item at release time so the board list and the "Meine Angebote" filter never have to join the
- * item for ownership or the squadron badge.
+ * <p>The offer is a thin overlay on a {@link InventoryItem}: material and quality are read
+ * <b>live</b> from {@link #inventoryItem} (single source of truth, no drift), while the offered
+ * quantity is the owner-chosen {@link #offeredAmount} — a member may offer only a <b>part</b> of
+ * the row's stock (REQ-MARKET-002, ADR-0086). The item's {@code location} is deliberately
+ * <b>never</b> read into any board query or DTO — the Standort stays private (REQ-MARKET-004).
+ * {@link #owner} and {@link #owningOrgUnit} are denormalised from the item at release time so the
+ * board list and the "Meine Angebote" filter never have to join the item for ownership or the
+ * squadron badge.
  *
  * <p>Offers are <b>signal-only</b>: releasing one never moves inventory. Interest registrations are
  * an independent aggregate ({@link MaterialExchangeInterest}, no mapped collection here), so
@@ -99,6 +101,18 @@ public class MaterialExchangeOffer extends AbstractEntity<UUID> {
   private OrgUnit owningOrgUnit;
 
   /**
+   * The offered quantity in SCU — the part of the linked item's stock the owner releases to the
+   * board (REQ-MARKET-002, ADR-0086). Unlike material and quality (read live from {@link
+   * #inventoryItem}), this is a stored, owner-chosen value: it may be the whole row or only a part
+   * of it. The service validates it to be {@code > 0} and {@code <=} the item's <em>current</em>
+   * amount at every release and edit; it is deliberately not re-clamped on read, so a signal-only
+   * offer keeps its stated quantity even if the underlying stock later shrinks (the owner adjusts
+   * or deactivates it). Backfilled (V212) to the item's amount for pre-partial-offer rows.
+   */
+  @Column(name = "offered_amount", nullable = false)
+  private Double offeredAmount;
+
+  /**
    * The trade remark — free-form Markdown ("was suchst du im Gegenzug?"), up to 20 000 characters.
    * Stored raw; rendered server-side through the sanitizing {@code @markdown} renderer on display
    * (never a client-side Markdown library). Never copied into an audit details payload — only its
@@ -136,6 +150,8 @@ public class MaterialExchangeOffer extends AbstractEntity<UUID> {
         + (owner != null ? owner.getId() : null)
         + ", owningOrgUnitId="
         + (owningOrgUnit != null ? owningOrgUnit.getId() : null)
+        + ", offeredAmount="
+        + offeredAmount
         + ", status="
         + status
         + ", releasedAt="
