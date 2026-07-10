@@ -46,4 +46,4 @@ public record NotificationRuleWriteRequest(
     boolean enabled,
     boolean excludeActor,
     Long version,
-    @NotNull @Valid List<NotificationRuleSelectorWriteRequest> selectors) {}
+    @NotNull List<@Valid NotificationRuleSelectorWriteRequest> selectors) {}

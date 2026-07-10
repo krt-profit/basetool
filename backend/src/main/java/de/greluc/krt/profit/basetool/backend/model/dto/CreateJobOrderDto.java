@@ -51,5 +51,5 @@ public record CreateJobOrderDto(
     @Nullable UUID requestingOrgUnitId,
     @Size(max = 200) String handle,
     @Size(max = 1000) String comment,
-    @NotEmpty @Size(max = 50) @Valid List<CreateJobOrderMaterialDto> materials,
+    @NotEmpty @Size(max = 50) List<@Valid CreateJobOrderMaterialDto> materials,
     Long version) {}

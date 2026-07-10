@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Fehler behoben: Hibernate-Warnungen aus dem Backend-Log entfernt.** Die überflüssige explizite `hibernate.dialect`-Angabe (PostgreSQL wird automatisch erkannt) wurde entfernt und die veralteten `@Valid`-Container-Annotationen auf die Typargument-Form (`List<@Valid X>`) umgestellt. Die Validierung bleibt unverändert; das Backend-Log startet nun ohne diese Warnungen (#1206).
+
 ## [v1.2.6](https://github.com/krt-profit/basetool/releases/tag/v1.2.6) - 2026-07-09
 
 ### Added
