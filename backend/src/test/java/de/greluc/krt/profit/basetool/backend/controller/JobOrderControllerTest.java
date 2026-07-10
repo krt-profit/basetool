@@ -287,6 +287,69 @@ class JobOrderControllerTest {
   }
 
   @Test
+  void getJobOrderById_requesterOnlyViewer_redactsProgressAssigneesAndAggregates() {
+    // REQ-ORDERS-023: a caller who is NOT a full viewer (canSeeJobOrder=false) but reached the
+    // endpoint via the requesting-org-unit escape gets the redacted view — Bearbeiter, aggregated
+    // materials and handovers/item-handovers emptied, each material line's collection progress
+    // (currentStock/claims/openAmount) stripped — while the ordered facts (line id/min-quality/
+    // amount/version, items, handle, comment, version) survive in position (field-order guard).
+    UUID id = UUID.randomUUID();
+    UUID matLineId = UUID.randomUUID();
+    de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto matLine =
+        new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto(
+            matLineId, null, 650, 50.0, 999.0, java.util.Collections.singletonList(null), 12.0, 7L);
+    JobOrderDto full =
+        new JobOrderDto(
+            id,
+            42,
+            null,
+            null,
+            "alice",
+            "deliver to ArcCorp",
+            1,
+            JobOrderStatus.OPEN,
+            JobOrderType.MATERIAL,
+            true,
+            List.of(matLine),
+            java.util.Collections.singletonList(null), // items — pass through (own-order progress)
+            java.util.Collections.singletonList(null), // aggregatedMaterials — redacted
+            java.util.Collections.singletonList(null), // assignees (Bearbeiter/PII) — redacted
+            java.util.Collections.singletonList(null), // handovers — redacted
+            java.util.Collections.singletonList(null), // itemHandovers — redacted
+            Instant.parse("2026-01-01T00:00:00Z"),
+            9L);
+    when(jobOrderService.getJobOrderById(id)).thenReturn(full);
+    when(ownerScopeService.canSeeJobOrder(id)).thenReturn(false);
+
+    JobOrderDto result = controller.getJobOrderById(id);
+
+    // Member-identifying / processing-side collections are emptied ...
+    assertThat(result.assignees()).isEmpty();
+    assertThat(result.aggregatedMaterials()).isEmpty();
+    assertThat(result.handovers()).isEmpty();
+    assertThat(result.itemHandovers()).isEmpty();
+    // ... each material line keeps what was ordered but loses the fulfilment progress ...
+    assertThat(result.materials()).hasSize(1);
+    de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto redacted =
+        result.materials().get(0);
+    assertThat(redacted.id()).isEqualTo(matLineId);
+    assertThat(redacted.minQuality()).isEqualTo(650);
+    assertThat(redacted.amount()).isEqualTo(50.0);
+    assertThat(redacted.version()).isEqualTo(7L);
+    assertThat(redacted.currentStock()).isNull();
+    assertThat(redacted.openAmount()).isNull();
+    assertThat(redacted.claims()).isEmpty();
+    // ... items pass through (the Auftraggeber may see their own order's item fulfilment) ...
+    assertThat(result.items()).hasSize(1);
+    // ... and the ordered facts + version survive in the right positions.
+    assertThat(result.id()).isEqualTo(id);
+    assertThat(result.displayId()).isEqualTo(42);
+    assertThat(result.handle()).isEqualTo("alice");
+    assertThat(result.comment()).isEqualTo("deliver to ArcCorp");
+    assertThat(result.version()).isEqualTo(9L);
+  }
+
+  @Test
   void getInventoryItemsForJobOrderMaterial_delegatesBothPathParameters() {
     UUID jobOrderId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();

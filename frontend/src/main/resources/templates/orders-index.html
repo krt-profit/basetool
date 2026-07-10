@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
-    <title th:text="#{nav.orders}">Aufträge</title>
+    <title th:text="${requesterView} ? #{nav.orders.own} : #{nav.orders}">Aufträge</title>
 </head>
 <body>
 <th:block th:replace="~{fragments/sidebar :: sidebar}" />
@@ -22,7 +22,7 @@
 
 <main>
     <div class="greeting hud-box flex-between">
-        <h1 th:text="#{nav.orders}">Aufträge</h1>
+        <h1 th:text="${requesterView} ? #{nav.orders.own} : #{nav.orders}">Aufträge</h1>
         <a th:href="@{/orders/create(source='index')}" class="btn btn--cta">Neuer Auftrag</a>
     </div>
 

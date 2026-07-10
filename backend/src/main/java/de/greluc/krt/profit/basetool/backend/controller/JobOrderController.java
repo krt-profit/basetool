@@ -495,6 +495,11 @@ public class JobOrderController {
         dto.type(),
         dto.countBlueprintsWithVariants(),
         redactMaterialProgress(dto.materials()),
+        // Item lines pass through in full — deliberately lighter than the material-progress
+        // redaction above. An ITEM order's per-line deliveredAmount + derived material breakdown
+        // are
+        // the requester's OWN order fulfilment (no processing-side stock/claims, no member PII), so
+        // the Auftraggeber may see them (REQ-ORDERS-023; confirmed in the #1186 security review).
         dto.items(),
         java.util.Collections.emptyList(),
         java.util.Collections.emptyList(),
