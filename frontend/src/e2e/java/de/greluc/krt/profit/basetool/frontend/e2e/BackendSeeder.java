@@ -86,6 +86,17 @@ public final class BackendSeeder {
    */
   private static final int MAX_VERSION_RETRIES = 4;
 
+  /**
+   * How many times to re-mint a fresh admin token and re-issue an authenticated seeding request
+   * when the resource server spuriously answers {@code 401}/{@code 403}. During the dense early-run
+   * seeding burst a freshly-issued, otherwise-valid bearer very occasionally resolves to {@code
+   * anonymous} for a single request (no JWT/JWKS error is logged and the same token authenticates
+   * the calls immediately before and after), which trips an {@code ADMIN}-gated endpoint. A bounded
+   * fresh-token retry rides out that transient auth blip; a non-auth status is a real error and is
+   * not retried.
+   */
+  private static final int MAX_AUTH_RETRIES = 3;
+
   private final HttpClient http;
 
   /** Builds a seeder whose HTTP client trusts the backend's self-signed dev certificate. */
@@ -114,10 +125,22 @@ public final class BackendSeeder {
       String userId = me.get("id").getAsString();
       // REQ-ORG-017: assign via the membership-delta reconcile (the legacy /squadron endpoint was
       // removed). The reconcile carries no user-row version, so there is no 409 retry loop.
-      int status = patchSquadron(token, userId);
-      if (status < 200 || status >= 300) {
-        throw new IllegalStateException("Membership seeding PATCH failed: HTTP " + status);
+      //
+      // The reconcile IS declarative and idempotent, so on a spurious 401/403 (the transient
+      // early-run "anonymous" auth blip described on MAX_AUTH_RETRIES) re-mint a fresh admin token
+      // and re-issue the PATCH a bounded number of times. A non-auth status fails fast unchanged.
+      int status = 0;
+      for (int attempt = 1; attempt <= MAX_AUTH_RETRIES; attempt++) {
+        status = patchSquadron(token, userId);
+        if (status >= 200 && status < 300) {
+          return;
+        }
+        if (status != 401 && status != 403) {
+          break;
+        }
+        token = passwordGrant(username, password);
       }
+      throw new IllegalStateException("Membership seeding PATCH failed: HTTP " + status);
     } catch (IllegalStateException e) {
       throw e;
     } catch (Exception e) {
