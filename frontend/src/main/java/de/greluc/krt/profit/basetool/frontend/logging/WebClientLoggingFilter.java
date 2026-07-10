@@ -38,15 +38,17 @@ import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
  *       (configurable via {@link LoggingProperties#getCorrelationIdHeader()}) into outbound backend
  *       calls so the backend log line shares the same id.
  *   <li><b>Structured call logging</b> – logs one line per outbound call with method, host, path,
- *       status and elapsed time. Slow calls (above {@link
- *       LoggingProperties#getSlowBackendCallThresholdMs()}) escalate to WARN so they can be flagged
- *       in dashboards. Network-level failures are logged at WARN as well, with the exception class
- *       and message only (no stack trace – the exception is re-thrown and the frontend {@code
- *       GlobalExceptionHandler} decides on user-facing behaviour). A {@link
- *       CallNotPermittedException} is the exception: it means the circuit breaker short-circuited
- *       the call locally (0 ms, no backend hit), an expected self-healing state that repeats for
- *       every call for the whole open window — logged at DEBUG so a routine backend restart/deploy
- *       does not flood WARN (issue #1203, REQ-OBS-001).
+ *       status and elapsed time. A {@code 5xx} server fault is logged at WARN; a non-{@code 5xx}
+ *       response that merely exceeds {@link LoggingProperties#slowBackendCallThresholdMs()} is
+ *       still a success and is logged at INFO with an explicit {@code Slow backend call} marker
+ *       rather than escalated to WARN (issue #1204) – backend-call latency is alerted on through
+ *       the {@code http.client.requests} p95 histogram, not this log line. Network-level failures
+ *       are logged at WARN as well, with the exception class and message only (no stack trace – the
+ *       exception is re-thrown and the frontend {@code GlobalExceptionHandler} decides on
+ *       user-facing behaviour). A {@link CallNotPermittedException} is the exception: it means the
+ *       circuit breaker short-circuited the call locally (0 ms, no backend hit), an expected
+ *       self-healing state that repeats for every call for the whole open window — logged at DEBUG
+ *       so a routine backend restart/deploy does not flood WARN (issue #1203, REQ-OBS-001).
  * </ul>
  *
  * <p>Query strings are intentionally excluded from the log line because they may carry PII such as
@@ -81,11 +83,12 @@ public class WebClientLoggingFilter {
   }
 
   /**
-   * Returns filter that logs one line per call including method/host/path/status/duration. Slow
-   * calls are escalated to WARN.
+   * Returns filter that logs one line per call including method/host/path/status/duration. A {@code
+   * 5xx} is logged at WARN; a slow-but-non-{@code 5xx} call is logged at INFO with a {@code Slow
+   * backend call} marker rather than escalated to WARN (issue #1204).
    *
-   * @return filter that logs one line per call including method/host/path/status/duration. Slow
-   *     calls are escalated to WARN.
+   * @return filter that logs one line per call including method/host/path/status/duration, with
+   *     only {@code 5xx} responses (and network failures) at WARN.
    */
   @NotNull
   public ExchangeFilterFunction callLogging() {
@@ -107,8 +110,20 @@ public class WebClientLoggingFilter {
       int status,
       long startNanos) {
     long durationMs = (System.nanoTime() - startNanos) / 1_000_000L;
-    if (durationMs >= loggingProperties.slowBackendCallThresholdMs() || status >= 500) {
+    if (status >= 500) {
       log.warn("Backend call {} {}{} -> {} in {} ms", method, host, path, status, durationMs);
+    } else if (durationMs >= loggingProperties.slowBackendCallThresholdMs()) {
+      // A non-5xx response that merely took a while is still a success — surface the latency at
+      // INFO with an explicit marker instead of crying wolf at WARN (issue #1204). Backend-call
+      // slowness is alerted on through the http.client.requests p95 histogram, not this line.
+      log.info(
+          "Slow backend call {} {}{} -> {} in {} ms (threshold {} ms)",
+          method,
+          host,
+          path,
+          status,
+          durationMs,
+          loggingProperties.slowBackendCallThresholdMs());
     } else if (log.isInfoEnabled()) {
       log.info("Backend call {} {}{} -> {} in {} ms", method, host, path, status, durationMs);
     }
