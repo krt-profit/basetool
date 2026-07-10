@@ -76,6 +76,14 @@ const MISSION_SECTIONS = {
         container: '#mission-frequencies-results',
         fragmentValue: 'frequencies-editor',
     },
+    // #1120: the Verwaltung "Organisation" panel (party lead + typed-frequency overview) used to
+    // sit outside every broadcastable fragment, so a peer's change left their view — and their
+    // #party-lead-version — stale (a needless 409 on their next edit). It is now its own section;
+    // custom "Weitere Frequenzen" stays the sibling `frequencies` section (not nested).
+    organisation: {
+        container: '#mission-organisation-results',
+        fragmentValue: 'organisation',
+    },
 };
 
 const missionSeam = window.krtFetch.sectionWrite({
@@ -1243,16 +1251,20 @@ document.addEventListener('DOMContentLoaded', function () {
     const frequencyForm = document.getElementById('frequency-form');
 
     if (frequencyModal) {
-        document.querySelectorAll('.set-freq-btn').forEach((btn) => {
-            btn.addEventListener('click', function () {
-                // Paket 3B: AJAX submission via MissionSubresource
-                frequencyForm.setAttribute('data-action', this.getAttribute('data-action'));
-                const typeId = this.getAttribute('data-type-id');
-                document.getElementById('freq-type-id').value = typeId;
-                const current = this.getAttribute('data-current-value') || '';
-                document.getElementById('freq-value').value = current;
-                window.krtModalOpen(frequencyModal);
-            });
+        // #1120: document-delegated so the .set-freq-btn buttons survive a live-sync swap of the
+        // #mission-organisation-results fragment (REQ-FE-015). A per-button listener bound here
+        // would be dead the first time a peer's typed-frequency edit re-renders the panel.
+        document.addEventListener('click', function (event) {
+            const btn = event.target.closest && event.target.closest('.set-freq-btn');
+            if (!btn) {
+                return;
+            }
+            frequencyForm.setAttribute('data-action', btn.getAttribute('data-action'));
+            const typeId = btn.getAttribute('data-type-id');
+            document.getElementById('freq-type-id').value = typeId;
+            const current = btn.getAttribute('data-current-value') || '';
+            document.getElementById('freq-value').value = current;
+            window.krtModalOpen(frequencyModal);
         });
 
         // Paket 3B: intercept submit and call PUT /frequencies/ajax, then
@@ -1314,9 +1326,16 @@ document.addEventListener('DOMContentLoaded', function () {
                     // overview section in place. krtRefreshMissionSection also broadcasts 'overview'
                     // to peers (REQ-FE-010), replacing the prior notify.
                     if (window.krtRefreshMissionSection) {
+                        // Refresh + broadcast the overview mirror (a first-time value only renders
+                        // there, #816), and additionally broadcast `organisation` so peers re-render
+                        // the typed-frequency panel — the actor already patched it in place above
+                        // (#1120).
                         window.krtRefreshMissionSection('overview');
+                        if (window.krtNotifyMissionChanged) {
+                            window.krtNotifyMissionChanged('organisation');
+                        }
                     } else if (window.krtNotifyMissionChanged) {
-                        window.krtNotifyMissionChanged('overview');
+                        window.krtNotifyMissionChanged(['overview', 'organisation']);
                     }
                 }
             });
@@ -2117,141 +2136,168 @@ document.addEventListener('DOMContentLoaded', function () {
     // Party Lead autocomplete — same /users/search mechanic as the participant add: picking a
     // member fills the hidden userId, typing a free-text name clears it so the backend resolves
     // the name (unique member -> linked, unknown -> kept as a guest handle).
-    const partyLeadInput = document.getElementById('party-lead-search-input');
-    const partyLeadUserId = document.getElementById('party-lead-user-id');
-    const partyLeadResults = document.getElementById('party-lead-search-results');
-    const partyLeadClearBtn = document.getElementById('party-lead-clear-btn');
-    const partyLeadForm = document.getElementById('party-lead-form');
+    //
+    // #1120: every handler here is document-delegated (not bound to the elements at load) so the
+    // party-lead form + clear button survive a live-sync swap of the #mission-organisation-results
+    // fragment (REQ-FE-015). A peer's party-lead or typed-frequency change re-renders this panel,
+    // and a per-element listener would then be dead on the next edit; the elements are re-queried
+    // inside each handler.
+    let partyLeadDebounce;
 
-    if (partyLeadInput && partyLeadResults && partyLeadUserId) {
-        let partyLeadDebounce;
-
-        function partyLeadCloseLists() {
-            while (partyLeadResults.firstChild) {
-                partyLeadResults.removeChild(partyLeadResults.firstChild);
-            }
+    function partyLeadCloseLists() {
+        const results = document.getElementById('party-lead-search-results');
+        if (!results) {
+            return;
         }
+        while (results.firstChild) {
+            results.removeChild(results.firstChild);
+        }
+    }
 
-        partyLeadInput.addEventListener('input', function () {
-            const val = this.value;
-            // Any manual edit drops a previously resolved id; the backend re-resolves the name.
-            partyLeadUserId.value = '';
-            clearTimeout(partyLeadDebounce);
-            if (!val) {
-                partyLeadCloseLists();
-                return;
-            }
-            partyLeadDebounce = setTimeout(() => {
-                fetch('/users/search?query=' + encodeURIComponent(val))
-                    .then((response) => {
-                        if (!response.ok) throw new Error('Network response was not ok');
-                        return response.json();
-                    })
-                    .then((users) => {
-                        partyLeadCloseLists();
-                        if (!users || users.length === 0) return;
-                        users.forEach((user) => {
-                            const div = document.createElement('div');
-                            const regex = new RegExp(
-                                '(' + val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')',
-                                'gi',
-                            );
-                            const displayName = user.effectiveName || '';
-                            displayName.split(regex).forEach((part, i) => {
-                                if (i % 2 === 1) {
-                                    const strong = document.createElement('strong');
-                                    strong.textContent = part;
-                                    div.appendChild(strong);
-                                } else if (part) {
-                                    div.appendChild(document.createTextNode(part));
-                                }
-                            });
-                            div.addEventListener('click', function () {
-                                partyLeadInput.value = displayName;
-                                partyLeadUserId.value = user.id;
-                                partyLeadCloseLists();
-                            });
-                            partyLeadResults.appendChild(div);
+    document.addEventListener('input', function (e) {
+        if (!e.target || e.target.id !== 'party-lead-search-input') {
+            return;
+        }
+        const input = e.target;
+        const userIdEl = document.getElementById('party-lead-user-id');
+        const results = document.getElementById('party-lead-search-results');
+        if (!userIdEl || !results) {
+            return;
+        }
+        const val = input.value;
+        // Any manual edit drops a previously resolved id; the backend re-resolves the name.
+        userIdEl.value = '';
+        clearTimeout(partyLeadDebounce);
+        if (!val) {
+            partyLeadCloseLists();
+            return;
+        }
+        partyLeadDebounce = setTimeout(() => {
+            fetch('/users/search?query=' + encodeURIComponent(val))
+                .then((response) => {
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    return response.json();
+                })
+                .then((users) => {
+                    partyLeadCloseLists();
+                    if (!users || users.length === 0) return;
+                    users.forEach((user) => {
+                        const div = document.createElement('div');
+                        const regex = new RegExp(
+                            '(' + val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')',
+                            'gi',
+                        );
+                        const displayName = user.effectiveName || '';
+                        displayName.split(regex).forEach((part, i) => {
+                            if (i % 2 === 1) {
+                                const strong = document.createElement('strong');
+                                strong.textContent = part;
+                                div.appendChild(strong);
+                            } else if (part) {
+                                div.appendChild(document.createTextNode(part));
+                            }
                         });
-                    })
-                    .catch((err) => console.error('Error fetching users:', err));
-            }, 300);
-        });
+                        div.addEventListener('click', function () {
+                            input.value = displayName;
+                            userIdEl.value = user.id;
+                            partyLeadCloseLists();
+                        });
+                        results.appendChild(div);
+                    });
+                })
+                .catch((err) => console.error('Error fetching users:', err));
+        }, 300);
+    });
 
-        document.addEventListener('click', function (e) {
-            if (e.target !== partyLeadInput) {
-                partyLeadCloseLists();
-            }
-        });
-    }
+    document.addEventListener('click', function (e) {
+        // Close the autocomplete dropdown when clicking outside its input.
+        if (!e.target || e.target.id !== 'party-lead-search-input') {
+            partyLeadCloseLists();
+        }
+    });
 
-    if (partyLeadClearBtn && partyLeadForm && partyLeadInput && partyLeadUserId) {
-        partyLeadClearBtn.addEventListener('click', function () {
-            // Clear the inputs and submit empty userId + guestName so the backend clears the
-            // party lead. requestSubmit() fires the 'submit' event (unlike .submit()) so the
-            // in-place interceptor below handles it.
-            partyLeadInput.value = '';
-            partyLeadUserId.value = '';
-            partyLeadForm.requestSubmit();
-        });
-    }
+    document.addEventListener('click', function (e) {
+        const clearBtn = e.target.closest && e.target.closest('#party-lead-clear-btn');
+        if (!clearBtn) {
+            return;
+        }
+        const input = document.getElementById('party-lead-search-input');
+        const userIdEl = document.getElementById('party-lead-user-id');
+        const form = document.getElementById('party-lead-form');
+        if (!input || !userIdEl || !form) {
+            return;
+        }
+        // Clear the inputs and submit empty userId + guestName so the backend clears the party
+        // lead. requestSubmit() fires the 'submit' event (unlike .submit()) so the delegated submit
+        // handler below runs.
+        input.value = '';
+        userIdEl.value = '';
+        form.requestSubmit();
+    });
 
     // In-place party-lead set/clear (#574): patch the display + bumped partyLeadVersion without a
-    // reload. The autocomplete form is not re-rendered, so its per-element handlers stay valid.
-    if (partyLeadForm && partyLeadInput && partyLeadUserId) {
-        partyLeadForm.addEventListener('submit', async function (ev) {
-            ev.preventDefault();
-            const versionInput = document.getElementById('party-lead-version');
-            // Snapshot THIS submit's userId/guestName intent now, but read the version live at send
-            // time (#1143). A static payload baked in the pre-bump partyLeadVersion, so a set
-            // immediately followed by Clear queued a second write with a stale version that 409'd,
-            // leaving the wrong lead assigned. Only the version is re-read in the thunk — re-reading
-            // userId/guestName would let a queued Clear wipe a queued set's captured value.
-            const submittedUserId = partyLeadUserId.value || null;
-            const submittedGuestName = partyLeadInput.value || null;
-            const res = await window.krtMissionWrite({
-                method: 'PUT',
-                url: '/missions/' + window.missionId + '/party-lead/ajax',
-                payload: function () {
-                    return {
-                        userId: submittedUserId,
-                        guestName: submittedGuestName,
-                        version:
-                            versionInput && versionInput.value !== ''
-                                ? parseInt(versionInput.value, 10)
-                                : 0,
-                    };
-                },
-                sectionKey: 'party_lead',
-            });
-            if (!res.ok || !res.body) {
-                return;
-            }
-            const dto = res.body;
-            const display = document.getElementById('party-lead-display');
-            const overview = document.getElementById('overview-party-lead');
-            const noneLabel = (display && display.getAttribute('data-none-label')) || '';
-            const resolvedName = dto.partyLeadUser
-                ? dto.partyLeadUser.effectiveName || ''
-                : dto.partyLeadGuestName || noneLabel;
-            if (display) display.textContent = resolvedName;
-            if (overview) overview.textContent = resolvedName;
-            // The facts-bar "Leiter" now shows the Einsatzleiter (mission-lead participant), not
-            // the party lead, so a party-lead change no longer patches it here (REQ-MISSION-013).
-            if (versionInput && dto.partyLeadVersion != null) {
-                versionInput.value = dto.partyLeadVersion;
-            }
-            partyLeadUserId.value = dto.partyLeadUser ? dto.partyLeadUser.id || '' : '';
-            partyLeadInput.value = dto.partyLeadUser
-                ? dto.partyLeadUser.effectiveName || ''
-                : dto.partyLeadGuestName || '';
-            // Already patched in place above; just signal peers to re-render their overview
-            // (party lead is mirrored there) — live sync, REQ-FE-010.
-            if (window.krtNotifyMissionChanged) {
-                window.krtNotifyMissionChanged('overview');
-            }
+    // reload, then broadcast overview + organisation so peers re-render both the mirror and this
+    // panel — refreshing a peer's stale #party-lead-version that would otherwise 409 their next
+    // edit (#1120 / REQ-FE-010).
+    document.addEventListener('submit', async function (ev) {
+        if (!ev.target || ev.target.id !== 'party-lead-form') {
+            return;
+        }
+        ev.preventDefault();
+        const input = document.getElementById('party-lead-search-input');
+        const userIdEl = document.getElementById('party-lead-user-id');
+        const versionInput = document.getElementById('party-lead-version');
+        if (!input || !userIdEl) {
+            return;
+        }
+        // Snapshot THIS submit's userId/guestName intent now, but read the version live at send time
+        // (#1143). A static payload baked in the pre-bump partyLeadVersion, so a set immediately
+        // followed by Clear queued a second write with a stale version that 409'd, leaving the wrong
+        // lead assigned. Only the version is re-read in the thunk.
+        const submittedUserId = userIdEl.value || null;
+        const submittedGuestName = input.value || null;
+        const res = await window.krtMissionWrite({
+            method: 'PUT',
+            url: '/missions/' + window.missionId + '/party-lead/ajax',
+            payload: function () {
+                return {
+                    userId: submittedUserId,
+                    guestName: submittedGuestName,
+                    version:
+                        versionInput && versionInput.value !== ''
+                            ? parseInt(versionInput.value, 10)
+                            : 0,
+                };
+            },
+            sectionKey: 'party_lead',
         });
-    }
+        if (!res.ok || !res.body) {
+            return;
+        }
+        const dto = res.body;
+        const display = document.getElementById('party-lead-display');
+        const overview = document.getElementById('overview-party-lead');
+        const noneLabel = (display && display.getAttribute('data-none-label')) || '';
+        const resolvedName = dto.partyLeadUser
+            ? dto.partyLeadUser.effectiveName || ''
+            : dto.partyLeadGuestName || noneLabel;
+        if (display) display.textContent = resolvedName;
+        if (overview) overview.textContent = resolvedName;
+        // The facts-bar "Leiter" now shows the Einsatzleiter (mission-lead participant), not the
+        // party lead, so a party-lead change no longer patches it here (REQ-MISSION-013).
+        if (versionInput && dto.partyLeadVersion != null) {
+            versionInput.value = dto.partyLeadVersion;
+        }
+        userIdEl.value = dto.partyLeadUser ? dto.partyLeadUser.id || '' : '';
+        input.value = dto.partyLeadUser
+            ? dto.partyLeadUser.effectiveName || ''
+            : dto.partyLeadGuestName || '';
+        // Already patched in place above; signal peers to re-render their overview mirror AND their
+        // Organisation panel (fresh party-lead display + version) — live sync, #1120 / REQ-FE-010.
+        if (window.krtNotifyMissionChanged) {
+            window.krtNotifyMissionChanged(['overview', 'organisation']);
+        }
+    });
 });
 
 function setNowToInput(inputId) {

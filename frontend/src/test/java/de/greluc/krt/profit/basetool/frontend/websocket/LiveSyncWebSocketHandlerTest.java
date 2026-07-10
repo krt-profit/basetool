@@ -245,12 +245,19 @@ class LiveSyncWebSocketHandlerTest {
         alice,
         new TextMessage(
             "{\"type\":\"changed\",\"sections\":[\"crew\",\"finance\",\"mgmt\",\"overview\","
-                + "\"steps\",\"objectives\",\"frequencies\"]}"));
+                + "\"steps\",\"objectives\",\"frequencies\",\"organisation\"]}"));
 
     JsonNode relayed = lastBroadcast(bob);
     assertThat(sectionsOf(relayed))
         .containsExactly(
-            "crew", "finance", "mgmt", "overview", "steps", "objectives", "frequencies");
+            "crew",
+            "finance",
+            "mgmt",
+            "overview",
+            "steps",
+            "objectives",
+            "frequencies",
+            "organisation");
   }
 
   @Test

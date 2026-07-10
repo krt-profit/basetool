@@ -55,7 +55,15 @@ public enum LiveSyncTopicClass {
   MISSION(
       "mission",
       true,
-      Set.of("crew", "finance", "mgmt", "overview", "steps", "objectives", "frequencies"),
+      Set.of(
+          "crew",
+          "finance",
+          "mgmt",
+          "overview",
+          "steps",
+          "objectives",
+          "frequencies",
+          "organisation"),
       true,
       "mission");
 
