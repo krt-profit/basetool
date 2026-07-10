@@ -252,6 +252,26 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   @Query("SELECT o FROM JobOrder o ORDER BY o.id")
   List<JobOrder> lockAllJobOrders();
 
+  /**
+   * Acquires a {@link LockModeType#PESSIMISTIC_WRITE} row lock on a single job order — the
+   * material-claim upsert takes it before summing a bucket's existing claims so concurrent
+   * claimants of the same order serialise and each reads the others' <em>committed</em> claim rows
+   * (REQ-ORDERS-024, ADR-0092). Without it, two different squadrons lodging their first claim on
+   * one bucket at once each read an empty already-claimed sum under {@code READ COMMITTED} (the
+   * other's uncommitted INSERT is invisible), both pass the no-overclaim guard and both commit —
+   * and because the unique index {@code uq_material_claim_bucket_org_unit} keys per claiming
+   * squadron it never collides across distinct squadrons, so the upsert's own {@code REQUIRES_NEW}
+   * retry (which only catches a same-{@code (bucket, squadron)} unique / {@code @Version}
+   * violation) cannot catch the cross-squadron overclaim. A bare single-row lock (no join fetch) so
+   * it serialises only this one order's claim writers, never an unrelated order or bucket.
+   *
+   * @param id the order to row-lock.
+   * @return the locked order, or {@link Optional#empty} when the id is unknown.
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT o FROM JobOrder o WHERE o.id = :id")
+  Optional<JobOrder> lockForClaimUpsert(@Param("id") UUID id);
+
   /** Returns every job order the given user is an assignee of. */
   @Query("SELECT j FROM JobOrder j JOIN j.assignees a WHERE a.user.id = :userId")
   List<JobOrder> findByAssigneeId(@Param("userId") UUID userId);
