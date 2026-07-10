@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Weniger Log-Rauschen, wenn das Backend kurz nicht erreichbar ist (z. B. bei einem Neustart/Deploy).** Ein durch den offenen Circuit-Breaker kurzgeschlossener Aufruf wurde bisher dreifach als `WARN` protokolliert und flutete bei jedem Backend-Neustart das Log, sodass ein erwarteter, sich selbst behebender Aussetzer kaum von einem echten Vorfall zu unterscheiden war. Solche kurzgeschlossenen Aufrufe werden jetzt auf `DEBUG` gestuft; das einmalige Öffnen des Breakers, die Metrik und der Alert bleiben als Signal erhalten (#1203).
+
 ## [v1.2.6](https://github.com/krt-profit/basetool/releases/tag/v1.2.6) - 2026-07-09
 
 ### Added

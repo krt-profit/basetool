@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.logging;
 
 import de.greluc.krt.profit.basetool.frontend.config.LoggingProperties;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -41,7 +42,11 @@ import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
  *       LoggingProperties#getSlowBackendCallThresholdMs()}) escalate to WARN so they can be flagged
  *       in dashboards. Network-level failures are logged at WARN as well, with the exception class
  *       and message only (no stack trace – the exception is re-thrown and the frontend {@code
- *       GlobalExceptionHandler} decides on user-facing behaviour).
+ *       GlobalExceptionHandler} decides on user-facing behaviour). A {@link
+ *       CallNotPermittedException} is the exception: it means the circuit breaker short-circuited
+ *       the call locally (0 ms, no backend hit), an expected self-healing state that repeats for
+ *       every call for the whole open window — logged at DEBUG so a routine backend restart/deploy
+ *       does not flood WARN (issue #1203, REQ-OBS-001).
  * </ul>
  *
  * <p>Query strings are intentionally excluded from the log line because they may carry PII such as
@@ -116,6 +121,20 @@ public class WebClientLoggingFilter {
       @NotNull Throwable err,
       long startNanos) {
     long durationMs = (System.nanoTime() - startNanos) / 1_000_000L;
+    // A CallNotPermittedException here is the circuit breaker short-circuiting the call (0 ms, no
+    // backend hit) — an expected, self-healing state that repeats for every call for the whole open
+    // window, not a backend failure. Log it at DEBUG so a routine backend restart/deploy does not
+    // flood WARN with "Backend call … failed" lines (issue #1203). Genuine transport failures
+    // (timeout, connection reset) still log at WARN — they are the signal the backend is down.
+    if (err instanceof CallNotPermittedException) {
+      log.debug(
+          "Backend call {} {}{} short-circuited after {} ms (circuit breaker open)",
+          method,
+          host,
+          path,
+          durationMs);
+      return;
+    }
     log.warn(
         "Backend call {} {}{} failed after {} ms: {}: {}",
         method,
