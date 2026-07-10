@@ -147,6 +147,11 @@ class BankPageControllerTest {
     // Rising series: first point at the padded bottom (y=24), last at the padded top (y=2).
     assertEquals("0.0,24.0 96.0,2.0", cards.get(0).sparklinePoints());
     assertFalse(cards.get(0).flat());
+    // #1193 follow-up: the dashboard's booking-modal counterparty picker is server-side searched
+    // (remote-bank-users), so the full-page render must NOT preload the all-users roster.
+    verify(backendApiClient, never()).get(eq("/api/v1/users/lookup"), anyTypeRef());
+    assertNull(
+        model.getAttribute("users"), "no user roster is preloaded for the counterparty picker");
   }
 
   @Test
@@ -363,6 +368,11 @@ class BankPageControllerTest {
             .startsWith("/bank/accounts/" + accountId + "?from="));
     // The transfer-fee rate feeds the withdraw/transfer modals' live fee preview (REQ-BANK-033).
     assertEquals(new BigDecimal("0.005"), model.getAttribute("transferFeeRate"));
+    // #1193 follow-up: the deposit/withdrawal counterparty picker is a server-side searchable
+    // combobox now (remote-bank-users), so the detail render must NOT preload the all-users roster.
+    verify(backendApiClient, never()).get(eq("/api/v1/users/lookup"), anyTypeRef());
+    assertNull(
+        model.getAttribute("users"), "no user roster is preloaded for the counterparty picker");
   }
 
   @Test

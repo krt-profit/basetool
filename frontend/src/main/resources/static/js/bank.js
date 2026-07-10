@@ -258,7 +258,8 @@
      * while loading or when no user is selected; auto-selects when the user has exactly
      * one membership. A read-only same-origin GET, so no CSRF / krtFetch is involved.
      *
-     * @param {HTMLSelectElement} userSelect the counterparty user picker
+     * @param {HTMLElement} userSelect the counterparty user picker — a native {@code <select>}, or
+     *     the searchable combobox's hidden value input after enhancement (both expose {@code .value})
      * @param {HTMLSelectElement} orgSelect the dependent org-unit picker
      */
     async function fillCounterpartyOrgUnits(userSelect, orgSelect) {
@@ -303,9 +304,13 @@
     }
 
     // Delegated so it survives the accountBody fragment swap (REQ-FE-005): a change on a
-    // counterparty user picker (re)loads its paired org-unit select.
+    // counterparty user picker (re)loads its paired org-unit select. The picker is a searchable
+    // combobox (remote-bank-users, #1193 follow-up), so [data-counterparty-user] resolves to the
+    // enhancer's hidden VALUE input (an <input>, not a <select>) — it inherits the marker attributes
+    // and re-dispatches a bubbling `change` on commit, which this catches (so match on the attribute,
+    // not the tag).
     document.addEventListener('change', function (event) {
-        const userSelect = event.target.closest('select[data-counterparty-user]');
+        const userSelect = event.target.closest('[data-counterparty-user]');
         if (!userSelect) {
             return;
         }
@@ -314,21 +319,6 @@
             fillCounterpartyOrgUnits(userSelect, orgSelect);
         }
     });
-
-    /**
-     * Enables/disables one control in a counterparty block, clearing its value when disabling so a
-     * gated-off field (the hidden registered-user vs external-name alternative) is omitted from the
-     * submitted JSON (submitBankForm skips disabled controls).
-     *
-     * @param {HTMLElement} control the counterparty control
-     * @param {boolean} on whether it is the active alternative
-     */
-    function setCounterpartyControl(control, on) {
-        control.disabled = !on;
-        if (!on) {
-            control.value = '';
-        }
-    }
 
     /**
      * Resets a counterparty org-unit select to just its placeholder option and clears the selection,
@@ -354,6 +344,13 @@
      * {@link fillCounterpartyOrgUnits} fills it from that user's memberships). A no-op for a
      * gated-off (movement-type-inactive) block, since its toggle is disabled.
      *
+     * <p>The registered-user lookup is a searchable combobox (remote-bank-users, #1193 follow-up), so
+     * enabling/disabling + clearing it routes through {@link setMovementControlActive}: that resets
+     * the value via the combobox controller ({@code krtCombobox.setValue('')}) and mirrors the
+     * disabled state onto the visible textbox — setting {@code .disabled} on the hidden value input
+     * alone would not stop the user typing into the box. The plain free-text name input goes through
+     * the same helper (its non-combobox branch), so both alternatives share one code path.
+     *
      * @param {HTMLInputElement} toggle the "kein Tool-Account" checkbox
      */
     function toggleCounterpartyExternal(toggle) {
@@ -371,13 +368,13 @@
             registeredRow.hidden = external;
         }
         if (userSelect) {
-            setCounterpartyControl(userSelect, !external);
+            setMovementControlActive(userSelect, !external);
         }
         if (externalRow) {
             externalRow.hidden = !external;
         }
         if (nameInput) {
-            setCounterpartyControl(nameInput, external);
+            setMovementControlActive(nameInput, external);
         }
         if (orgSelect) {
             resetCounterpartyOrgUnitOptions(orgSelect);

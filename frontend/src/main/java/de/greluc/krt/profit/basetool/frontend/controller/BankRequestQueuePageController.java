@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankTransferFeeRateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.math.BigDecimal;
@@ -80,13 +79,6 @@ public class BankRequestQueuePageController {
    * modal's source and transfer-destination selectors (REQ-BANK-023, #997).
    */
   private static final ParameterizedTypeReference<PageResponse<BankAccountDto>> BANK_ACCOUNT_PAGE =
-      new ParameterizedTypeReference<>() {};
-
-  /**
-   * Response type for the direct-booking counterparty picker lookup ({@code /api/v1/users/lookup},
-   * REQ-BANK-044).
-   */
-  private static final ParameterizedTypeReference<List<UserReferenceDto>> USER_REFERENCE_LIST =
       new ParameterizedTypeReference<>() {};
 
   /**
@@ -158,9 +150,9 @@ public class BankRequestQueuePageController {
     model.addAttribute("movementAccounts", activeAccounts);
     model.addAttribute("transferTargets", activeAccounts);
     model.addAttribute("canBook", !activeAccounts.isEmpty());
-    List<UserReferenceDto> users =
-        backendApiClient.get("/api/v1/users/lookup", USER_REFERENCE_LIST);
-    model.addAttribute("users", users == null ? List.<UserReferenceDto>of() : users);
+    // The direct-booking counterparty picker (REQ-BANK-044) is a server-side searchable combobox
+    // (remote-bank-users, #1193 follow-up) that queries /users/search-bank on demand, so no user
+    // roster is preloaded here.
     // All active org units (all kinds) feed the external-counterparty unit picklist (REQ-BANK-044,
     // #994) in the direct-booking modal.
     List<OrgUnitMembershipOptionDto> allOrgUnits =
