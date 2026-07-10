@@ -21,7 +21,10 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -33,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItemMaterial;
@@ -61,6 +65,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -301,6 +306,38 @@ class MaterialClaimServiceTest {
           BadRequestException.class, () -> service.upsertClaim(ORDER_ID, dto(SQUADRON_A, 4.0)));
       verify(materialClaimRepository, never()).save(any());
     }
+
+    @Test
+    void editOwnClaimUpwardExcludesOwnAmountFromCeiling() {
+      // Regression guard for the self-exclusion filter in upsertClaimWithinTransaction: the
+      // claimedByOthers sum skips the caller's own org unit. Squadron A already holds 8 on a 10-SCU
+      // bucket and raises it to 10 — its own 8 must NOT count against the ceiling (double-counting
+      // would compute 8+10=18>10 and wrongly reject the edit), so the raise is accepted and the new
+      // amount lands in place. Drops or inverts of the !equals filter re-break this.
+      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
+      MaterialClaim ownExisting = claim(order, QualityRequirement.GOOD, squadronA, 8.0);
+      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+      adminCaller();
+      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityRequirement(
+              ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD))
+          .thenReturn(List.of(ownExisting));
+      when(materialClaimRepository
+              .findByJobOrderIdAndMaterialIdAndQualityRequirementAndClaimingOrgUnitId(
+                  ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD, SQUADRON_A))
+          .thenReturn(Optional.of(ownExisting));
+      when(authHelperService.currentUserId()).thenReturn(Optional.empty());
+      when(materialClaimRepository.save(any(MaterialClaim.class)))
+          .thenAnswer(inv -> inv.getArgument(0));
+
+      service.upsertClaim(ORDER_ID, dto(SQUADRON_A, 10.0));
+
+      assertEquals(
+          10.0,
+          ownExisting.getAmount(),
+          "a squadron raising its own claim to fill the bucket must not be blocked by its own"
+              + " amount");
+      verify(materialClaimRepository).save(ownExisting);
+    }
   }
 
   // ---------------------------------------------------------------
@@ -360,6 +397,86 @@ class MaterialClaimServiceTest {
       assertEquals(6.0, existing.getAmount(), "existing claim's amount is updated in place");
       verify(orgUnitRepository, never()).findById(any());
       verify(materialClaimRepository).save(existing);
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // audit: claim upsert mode (created vs. updated)
+  // ---------------------------------------------------------------
+
+  @Nested
+  class ClaimUpsertAuditTests {
+
+    @BeforeEach
+    void delegateSelfToRealService() {
+      when(self.getObject()).thenReturn(service);
+    }
+
+    @Test
+    void insert_recordsUpsertEvent_withModeCreated() {
+      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
+      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+      adminCaller();
+      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityRequirement(
+              ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD))
+          .thenReturn(List.of());
+      when(materialClaimRepository
+              .findByJobOrderIdAndMaterialIdAndQualityRequirementAndClaimingOrgUnitId(
+                  ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD, SQUADRON_A))
+          .thenReturn(Optional.empty());
+      when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
+      when(authHelperService.currentUserId()).thenReturn(Optional.empty());
+      when(materialClaimRepository.save(any(MaterialClaim.class)))
+          .thenAnswer(inv -> inv.getArgument(0));
+
+      service.upsertClaim(ORDER_ID, dto(SQUADRON_A, 4.0));
+
+      ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
+      verify(auditService)
+          .record(
+              eq(AuditEventType.JOB_ORDER_CLAIM_UPSERTED),
+              eq(ORDER_ID),
+              any(),
+              isNull(),
+              details.capture());
+      String payload = details.getValue().toString();
+      assertTrue(payload.contains("mode=created"), "a fresh claim audits as mode=created");
+      assertTrue(
+          payload.contains("claimingOrgUnit=" + SQUADRON_A),
+          "the audit detail carries the squadron id, never its name");
+    }
+
+    @Test
+    void update_recordsUpsertEvent_withModeUpdated() {
+      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
+      MaterialClaim existing = claim(order, QualityRequirement.GOOD, squadronA, 3.0);
+      existing.setId(UUID.randomUUID());
+      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+      adminCaller();
+      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityRequirement(
+              ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD))
+          .thenReturn(List.of(existing));
+      when(materialClaimRepository
+              .findByJobOrderIdAndMaterialIdAndQualityRequirementAndClaimingOrgUnitId(
+                  ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD, SQUADRON_A))
+          .thenReturn(Optional.of(existing));
+      when(authHelperService.currentUserId()).thenReturn(Optional.empty());
+      when(materialClaimRepository.save(any(MaterialClaim.class)))
+          .thenAnswer(inv -> inv.getArgument(0));
+
+      service.upsertClaim(ORDER_ID, dto(SQUADRON_A, 6.0));
+
+      ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
+      verify(auditService)
+          .record(
+              eq(AuditEventType.JOB_ORDER_CLAIM_UPSERTED),
+              eq(ORDER_ID),
+              any(),
+              isNull(),
+              details.capture());
+      assertTrue(
+          details.getValue().toString().contains("mode=updated"),
+          "a repeat post on an existing claim audits as mode=updated");
     }
   }
 
@@ -549,6 +666,36 @@ class MaterialClaimServiceTest {
       service.withdrawClaim(ORDER_ID, claimId);
 
       verify(materialClaimRepository).delete(claim);
+    }
+
+    @Test
+    void withdrawClaim_recordsWithdrawnAuditEvent() {
+      // A withdrawal on the audited Auftraege area must emit JOB_ORDER_CLAIM_WITHDRAWN carrying the
+      // claim + squadron ids (never a name / PII). Dropping the auditService.record call drops the
+      // sign-up cancellation from the job-order audit trail.
+      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
+      MaterialClaim claim = claim(order, QualityRequirement.GOOD, squadronA, 3.0);
+      UUID claimId = UUID.randomUUID();
+      claim.setId(claimId);
+      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+      when(materialClaimRepository.findById(claimId)).thenReturn(Optional.of(claim));
+      when(authHelperService.isAdmin()).thenReturn(true);
+
+      service.withdrawClaim(ORDER_ID, claimId);
+
+      ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
+      verify(auditService)
+          .record(
+              eq(AuditEventType.JOB_ORDER_CLAIM_WITHDRAWN),
+              eq(ORDER_ID),
+              any(),
+              isNull(),
+              details.capture());
+      String payload = details.getValue().toString();
+      assertTrue(payload.contains("claim=" + claimId), "the withdrawal audit carries the claim id");
+      assertTrue(
+          payload.contains("claimingOrgUnit=" + SQUADRON_A),
+          "the withdrawal audit carries the squadron id, never its name");
     }
 
     @Test

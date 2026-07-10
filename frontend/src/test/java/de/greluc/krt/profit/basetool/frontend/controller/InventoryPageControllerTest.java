@@ -536,4 +536,215 @@ class InventoryPageControllerTest {
 
     assertEquals(500, response.getStatusCode().value());
   }
+
+  // --- transferInventoryItem (POST /inventory/{id}/transfer) --------------------------------
+
+  @Test
+  void transferInventoryItem_fullyConsumed_returns204() {
+    // Given — the backend book-out consumed the source row entirely, so it returns no body.
+    UUID id = UUID.randomUUID();
+    InventoryItemBookOutDto dto =
+        new InventoryItemBookOutDto(
+            10.0, UUID.randomUUID(), null, CheckoutType.TRANSFER, null, null, 1L, null);
+    when(backendApiClient.post(
+            eq("/api/v1/inventory/" + id + "/book-out"), eq(dto), eq(InventoryItemDto.class)))
+        .thenReturn(null);
+
+    // When
+    org.springframework.http.ResponseEntity<Object> response =
+        writeController.transferInventoryItem(id, dto);
+
+    // Then — a null result must map to 204 (No Content), not 200-with-empty-body, so the
+    // material-collection page removes/reloads the depleted row instead of rendering an empty one.
+    assertEquals(204, response.getStatusCode().value());
+    assertNull(response.getBody());
+  }
+
+  @Test
+  void transferInventoryItem_notFullyConsumed_returns200WithBody() {
+    // Given — a partial transfer leaves a remaining source row, returned by the backend.
+    UUID id = UUID.randomUUID();
+    InventoryItemBookOutDto dto =
+        new InventoryItemBookOutDto(
+            5.0, UUID.randomUUID(), null, CheckoutType.TRANSFER, null, null, 1L, null);
+    InventoryItemDto remaining =
+        new InventoryItemDto(
+            id, null, null, null, 100, 45.0, false, null, null, null, null, null, null, 2L, null);
+    when(backendApiClient.post(
+            eq("/api/v1/inventory/" + id + "/book-out"), eq(dto), eq(InventoryItemDto.class)))
+        .thenReturn(remaining);
+
+    // When
+    org.springframework.http.ResponseEntity<Object> response =
+        writeController.transferInventoryItem(id, dto);
+
+    // Then — the remaining row is echoed with 200 so the page can re-render it in place.
+    assertEquals(200, response.getStatusCode().value());
+    assertSame(remaining, response.getBody());
+  }
+
+  @Test
+  void transferInventoryItem_conflict_propagatesProblemJsonWithCode() {
+    // Given — a concurrent edit made the backend book-out fail with 409 OPTIMISTIC_LOCK.
+    UUID id = UUID.randomUUID();
+    InventoryItemBookOutDto dto =
+        new InventoryItemBookOutDto(
+            10.0, UUID.randomUUID(), null, CheckoutType.TRANSFER, null, null, 1L, null);
+    de.greluc.krt.profit.basetool.frontend.service.BackendServiceException ex =
+        new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
+            "Backend returned 409 [OPTIMISTIC_LOCK]",
+            null,
+            409,
+            "OPTIMISTIC_LOCK",
+            null,
+            java.util.List.of(),
+            null);
+    when(backendApiClient.post(anyString(), any(), eq(InventoryItemDto.class))).thenThrow(ex);
+
+    // When
+    org.springframework.http.ResponseEntity<Object> response =
+        writeController.transferInventoryItem(id, dto);
+
+    // Then — the 409 must be relayed as problem+json carrying the stable code so krt-fetch.js
+    // keeps its optimistic-lock reload-confirm distinction rather than a bare status / 500.
+    assertEquals(409, response.getStatusCode().value());
+    assertEquals(
+        org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON,
+        response.getHeaders().getContentType());
+    java.util.Map<?, ?> body = (java.util.Map<?, ?>) response.getBody();
+    assertNotNull(body);
+    assertEquals("OPTIMISTIC_LOCK", body.get("code"));
+  }
+
+  // --- updateDelivered (PATCH /inventory/{id}/delivered) ------------------------------------
+
+  @Test
+  void updateDelivered_success_returnsUpdatedDtoWithBumpedVersion() {
+    // Given — the backend accepted the delivered toggle and returns the incremented version.
+    UUID id = UUID.randomUUID();
+    UpdateDeliveredRequest request = new UpdateDeliveredRequest(true, 1L);
+    InventoryItemDto updated =
+        new InventoryItemDto(
+            id, null, null, null, 100, 10.0, false, null, null, null, null, null, null, 2L, null);
+    when(backendApiClient.patch(
+            eq("/api/v1/inventory/" + id + "/delivered"), eq(request), eq(InventoryItemDto.class)))
+        .thenReturn(updated);
+
+    // When
+    org.springframework.http.ResponseEntity<Object> response =
+        writeController.updateDelivered(id, request);
+
+    // Then — the updated DTO (with the bumped version) must be echoed so the DOM data-version
+    // syncs; dropping it would 409 the next toggle click on the same row.
+    assertEquals(200, response.getStatusCode().value());
+    assertSame(updated, response.getBody());
+    assertEquals(Long.valueOf(2L), ((InventoryItemDto) response.getBody()).version());
+  }
+
+  @Test
+  void updateDelivered_conflict_propagatesProblemJsonWithCode() {
+    // Given — a concurrent edit made the delivered relay fail with 409 OPTIMISTIC_LOCK.
+    UUID id = UUID.randomUUID();
+    UpdateDeliveredRequest request = new UpdateDeliveredRequest(true, 1L);
+    de.greluc.krt.profit.basetool.frontend.service.BackendServiceException ex =
+        new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
+            "Backend returned 409 [OPTIMISTIC_LOCK]",
+            null,
+            409,
+            "OPTIMISTIC_LOCK",
+            null,
+            java.util.List.of(),
+            null);
+    when(backendApiClient.patch(anyString(), any(), eq(InventoryItemDto.class))).thenThrow(ex);
+
+    // When
+    org.springframework.http.ResponseEntity<Object> response =
+        writeController.updateDelivered(id, request);
+
+    // Then — must be 409 problem+json with the code preserved, not a bare status / 500, so the
+    // reload-confirm fires and the audited Mein-Inventar relay failure surfaces truthfully.
+    assertEquals(409, response.getStatusCode().value());
+    assertEquals(
+        org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON,
+        response.getHeaders().getContentType());
+    java.util.Map<?, ?> body = (java.util.Map<?, ?>) response.getBody();
+    assertNotNull(body);
+    assertEquals("OPTIMISTIC_LOCK", body.get("code"));
+  }
+
+  // --- rebookPersonalInventoryItem (POST /inventory/{id}/personal-rebook) -------------------
+
+  @Test
+  void rebookPersonalInventoryItem_success_returnsNewRow() {
+    // Given — the backend split the source row and returns the new opposite-personal row.
+    UUID id = UUID.randomUUID();
+    InventoryItemPersonalRebookDto dto = new InventoryItemPersonalRebookDto(5.0, 1L, null);
+    InventoryItemDto newRow =
+        new InventoryItemDto(
+            UUID.randomUUID(),
+            null,
+            null,
+            null,
+            100,
+            5.0,
+            true,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            1L,
+            null);
+    when(backendApiClient.post(
+            eq("/api/v1/inventory/" + id + "/personal-rebook"),
+            eq(dto),
+            eq(InventoryItemDto.class)))
+        .thenReturn(newRow);
+
+    // When
+    org.springframework.http.ResponseEntity<Object> response =
+        writeController.rebookPersonalInventoryItem(id, dto);
+
+    // Then — 200 with the new row (so the page re-swaps the grouped table); the relay path must
+    // hit /personal-rebook, since a wrong path or dropped body would leave the table stale.
+    assertEquals(200, response.getStatusCode().value());
+    assertSame(newRow, response.getBody());
+    verify(backendApiClient)
+        .post(
+            eq("/api/v1/inventory/" + id + "/personal-rebook"),
+            eq(dto),
+            eq(InventoryItemDto.class));
+  }
+
+  @Test
+  void rebookPersonalInventoryItem_conflict_propagatesProblemJson() {
+    // Given — a concurrent edit made the amount-splitting rebook fail with 409 OPTIMISTIC_LOCK.
+    UUID id = UUID.randomUUID();
+    InventoryItemPersonalRebookDto dto = new InventoryItemPersonalRebookDto(5.0, 1L, null);
+    de.greluc.krt.profit.basetool.frontend.service.BackendServiceException ex =
+        new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
+            "Backend returned 409 [OPTIMISTIC_LOCK]",
+            null,
+            409,
+            "OPTIMISTIC_LOCK",
+            null,
+            java.util.List.of(),
+            null);
+    when(backendApiClient.post(anyString(), any(), eq(InventoryItemDto.class))).thenThrow(ex);
+
+    // When
+    org.springframework.http.ResponseEntity<Object> response =
+        writeController.rebookPersonalInventoryItem(id, dto);
+
+    // Then — the 409 must surface as problem+json with the code, not a 500, so an amount-split
+    // conflict drives the reload-confirm instead of silently losing the split.
+    assertEquals(409, response.getStatusCode().value());
+    assertEquals(
+        org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON,
+        response.getHeaders().getContentType());
+    java.util.Map<?, ?> body = (java.util.Map<?, ?>) response.getBody();
+    assertNotNull(body);
+    assertEquals("OPTIMISTIC_LOCK", body.get("code"));
+  }
 }

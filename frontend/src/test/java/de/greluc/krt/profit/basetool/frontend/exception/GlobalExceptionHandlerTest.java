@@ -330,6 +330,32 @@ class GlobalExceptionHandlerTest {
     assertEquals(Boolean.FALSE, body.get("reloadHint"));
   }
 
+  // ─── Kartell bank stable-409 codes (epic #556, K1 mockup) ───────────────
+
+  @Test
+  void bankOverdraft409_mapsToBankKey_andKeepsReloadHintFalse() {
+    // A Kartell bank overdraft is a business 409 that bank.js renders inline at the booking-modal
+    // fields — never a page reload (K1: a bank 409 is never a full-page reload). It must resolve to
+    // its dedicated error.bank.overdraft key (not fall through to error.unexpected) AND, unlike
+    // OPTIMISTIC_LOCK/CONFLICT, keep reloadHint=false so the half-filled booking form survives.
+    BackendServiceException ex =
+        new BackendServiceException(
+            "overdraft", null, 409, "BANK_OVERDRAFT", "corr-bank", List.of(), null);
+
+    Object result = handler.handleBackendServiceException(ex, jsonRequest(), new ConcurrentModel());
+
+    assertInstanceOf(ResponseEntity.class, result);
+    ResponseEntity<?> response = (ResponseEntity<?>) result;
+    assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+    @SuppressWarnings("unchecked")
+    Map<String, Object> body = (Map<String, Object>) response.getBody();
+    assertNotNull(body);
+    assertEquals("BANK_OVERDRAFT", body.get("code"));
+    assertEquals(409, body.get("status"));
+    assertEquals("error.bank.overdraft", body.get("message"));
+    assertEquals(Boolean.FALSE, body.get("reloadHint"));
+  }
+
   // ─── handleNoResourceFoundException ─────────────────────────────────────
 
   @Test

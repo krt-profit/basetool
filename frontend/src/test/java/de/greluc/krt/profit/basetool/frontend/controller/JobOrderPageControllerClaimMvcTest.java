@@ -28,6 +28,7 @@ import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -142,6 +143,44 @@ class JobOrderPageControllerClaimMvcTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(claimBody(materialId, squadronId, 6.0)))
         .andExpect(status().isConflict());
+  }
+
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
+  void upsertClaim_Conflict_PreservesRfc7807Code() throws Exception {
+    // A same-squadron first-claim race that outlasted the backend's bounded upsert retry surfaces a
+    // truthful 409 whose RFC 7807 code (OPTIMISTIC_LOCK) must reach krt-fetch verbatim so it drives
+    // the "stale data, reload?" confirm rather than a plain toast. If propagateBackendError ever
+    // regressed to ResponseEntity.status(409).build(), status().isConflict() would still pass but
+    // the code would be lost — this asserts the content-type AND the code, closing that gap (#1111
+    // collapse-to-500 / lost-code guard).
+    UUID orderId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID squadronId = UUID.randomUUID();
+    doThrow(
+            new BackendServiceException(
+                "optimistic lock",
+                null,
+                409,
+                "OPTIMISTIC_LOCK",
+                null,
+                java.util.List.of(),
+                "The claim was modified concurrently."))
+        .when(backendApiClient)
+        .post(
+            eq("/api/v1/orders/" + orderId + "/claims"),
+            any(CreateClaimDto.class),
+            eq(ClaimDto.class));
+
+    mockMvc
+        .perform(
+            post("/orders/" + orderId + "/claims")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(claimBody(materialId, squadronId, 6.0)))
+        .andExpect(status().isConflict())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.code").value("OPTIMISTIC_LOCK"));
   }
 
   @Test
