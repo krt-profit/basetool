@@ -331,6 +331,8 @@
                         data-modal-id="bank-reverse-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
             </div>
             <form class="bank-ajax-form no-track" data-refresh="accountBody"
+                  data-livesync="bank:@account/account,bookings,chart bank/grid orgunit-bank/orgUnitBank"
+                  th:data-livesync-account="${acct.id()}"
                   data-endpoint="/api/proxy/bank/transactions/{id}/reversal" data-method="POST">
                 <input type="hidden" name="_id">
                 <div class="krt-modal-body">

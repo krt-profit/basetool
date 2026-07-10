@@ -190,6 +190,7 @@
                         data-modal-id="bank-confirm-request-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
             </div>
             <form class="bank-ajax-form no-track" data-refresh="requestQueue"
+                  data-livesync="bank/requestQueue,grid orgunit-bank/orgUnitBank"
                   data-endpoint="/api/proxy/bank/requests/{id}/confirm" data-method="POST">
                 <div class="krt-modal-body">
                     <input type="hidden" name="_id">
@@ -275,6 +276,7 @@
                         data-modal-id="bank-reject-request-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
             </div>
             <form class="bank-ajax-form no-track" data-refresh="requestQueue"
+                  data-livesync="bank/requestQueue,grid orgunit-bank/orgUnitBank"
                   data-endpoint="/api/proxy/bank/requests/{id}/reject" data-method="POST">
                 <div class="krt-modal-body">
                     <input type="hidden" name="_id">

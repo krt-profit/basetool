@@ -170,7 +170,7 @@
                             <td th:text="${r.holderHandle() != null} ? ${r.holderHandle()} : '&ndash;'">&ndash;</td>
                             <td><span class="utc-time" th:text="${r.createdAt()}">2026-06-17T14:02:00Z</span></td>
                             <td>
-                                <form th:if="${r.status() == 'PENDING'}" class="bank-ajax-form no-track" data-refresh="orgUnitBank"
+                                <form th:if="${r.status() == 'PENDING'}" class="bank-ajax-form no-track" data-refresh="orgUnitBank" data-livesync="bank/requestQueue orgunit-bank/orgUnitBank"
                                       data-endpoint="/api/proxy/org-units/bank/requests/{id}/cancel" data-method="POST">
                                     <input type="hidden" name="_id" th:value="${r.id()}">
                                     <input type="hidden" name="version" th:value="${r.version()}">
@@ -232,7 +232,7 @@
                                       class="chip chip--success" data-testid="org-unit-bank-foreign-granted"
                                       th:text="#{bank.approvalLimit.granted}">Freigegeben</span>
                                 <form th:if="${r.requiresOwnerApproval() and !r.ownerApprovalGranted() and r.status() == 'PENDING'}"
-                                      class="bank-ajax-form no-track" data-refresh="orgUnitBank"
+                                      class="bank-ajax-form no-track" data-refresh="orgUnitBank" data-livesync="bank/requestQueue orgunit-bank/orgUnitBank"
                                       data-endpoint="/api/proxy/org-units/bank/requests/{id}/owner-approval" data-method="POST"
                                       style="display:inline;">
                                     <input type="hidden" name="_id" th:value="${r.id()}">
@@ -264,7 +264,7 @@
                 <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
                         data-modal-id="org-unit-request-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
             </div>
-            <form class="bank-ajax-form no-track" data-refresh="orgUnitBank"
+            <form class="bank-ajax-form no-track" data-refresh="orgUnitBank" data-livesync="bank/requestQueue orgunit-bank/orgUnitBank"
                   data-endpoint="/api/proxy/org-units/bank/requests" data-method="POST">
                 <div class="krt-modal-body">
                     <div class="bank-form-row">

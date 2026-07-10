@@ -41,6 +41,7 @@
              the fixed source account (detail); the selectable variant syncs it from the source
              select. data-justification-required carries the fixed account's reason-mandate flag. -->
         <form class="bank-ajax-form no-track" data-method="POST"
+              data-livesync="bank:@account/account,bookings,chart bank:@destination/account,bookings,chart bank/grid orgunit-bank/orgUnitBank"
               th:with="initEndpoint=${canDeposit} ? '/api/proxy/bank/deposits' : (${canWithdraw} ? '/api/proxy/bank/withdrawals' : '/api/proxy/bank/transfers'),initAccountField=${canDeposit or canWithdraw} ? 'accountId' : 'sourceAccountId'"
               th:attr="data-refresh=${refreshTarget},data-account-id=${accountId},data-justification-required=${justificationRequired},data-endpoint=${initEndpoint},data-account-id-field=${initAccountField}">
             <div class="krt-modal-body">

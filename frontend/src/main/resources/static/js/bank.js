@@ -712,6 +712,86 @@
     }
 
     /**
+     * Resolves a bank live-sync account placeholder to a concrete account id: `account` from the
+     * form's dedicated publish-only `data-livesync-account` (or, on the movement modal, its
+     * submitted `data-account-id`), `destination` from an enabled non-empty `destinationAccountId`
+     * (a transfer target). Returns null when the form has no such account (e.g. a deposit has no
+     * transfer destination) so the entry is skipped. `data-livesync-account` is read only here and
+     * never enters the submit body (submitBankForm reads `data-account-id`), so tagging a form for
+     * publishing never changes its money write.
+     *
+     * @param {HTMLFormElement} form the form whose write just succeeded
+     * @param {string} ref the placeholder name (`account` or `destination`)
+     * @returns {string|null} the resolved account id, or null
+     */
+    function resolveBankLiveSyncAccount(form, ref) {
+        if (ref === 'account') {
+            return (
+                form.getAttribute('data-livesync-account') ||
+                form.getAttribute('data-account-id') ||
+                null
+            );
+        }
+        if (ref === 'destination') {
+            const el = form.querySelector('[name="destinationAccountId"]');
+            return el && !el.disabled && el.value ? el.value : null;
+        }
+        return null;
+    }
+
+    /**
+     * Broadcasts a bank form's live-sync publish matrix after a successful write (REQ-FE-015): the
+     * form's `data-livesync` attribute is a space-separated list of `topic/section,section` entries,
+     * where a `bank:@account` / `bank:@destination` topic resolves its placeholder to the form's
+     * account. Publishing needs no subscription (the sanctioned cross-topic case) — the acting page
+     * is not subscribed to most of these rooms, yet their viewers must still update. Fully additive
+     * and fire-and-forget: it never touches the write or the local swap, duplicate topics are
+     * collapsed, and an unresolvable-account entry is simply skipped.
+     *
+     * @param {HTMLFormElement} form the form whose write just succeeded
+     */
+    function publishBankLiveSync(form) {
+        if (!window.krtLiveSync || typeof window.krtLiveSync.sendChanged !== 'function') {
+            return;
+        }
+        const spec = form.getAttribute('data-livesync');
+        if (!spec) {
+            return;
+        }
+        const sent = {};
+        spec.trim()
+            .split(/\s+/)
+            .forEach(function (entry) {
+                const slash = entry.indexOf('/');
+                if (slash < 0) {
+                    return;
+                }
+                let topic = entry.slice(0, slash);
+                const sections = entry
+                    .slice(slash + 1)
+                    .split(',')
+                    .filter(Boolean);
+                if (!sections.length) {
+                    return;
+                }
+                const at = topic.indexOf(':@');
+                if (at >= 0) {
+                    const id = resolveBankLiveSyncAccount(form, topic.slice(at + 2));
+                    if (!id) {
+                        return; // no such account on this form — skip this entry.
+                    }
+                    topic = topic.slice(0, at) + ':' + id;
+                }
+                const key = topic + '|' + sections.join(',');
+                if (sent[key]) {
+                    return;
+                }
+                sent[key] = true;
+                window.krtLiveSync.sendChanged(topic, sections);
+            });
+    }
+
+    /**
      * The in-place success path for a bank AJAX form (#579, REQ-FE-005): closes the form's modal,
      * shows the localized success toast and re-renders the server fragment named by the form's
      * `data-refresh` attribute (accountBody / manageBody / grantsMatrix). Re-rendering server-side
@@ -734,6 +814,10 @@
         if (savedMessage && typeof window.showFrontendSuccessToast === 'function') {
             window.showFrontendSuccessToast(savedMessage);
         }
+        // Tell peers viewing the affected rooms that these sections changed (REQ-FE-015), read from
+        // the form's data-livesync matrix. Done before the local swap and independent of it —
+        // additive and fire-and-forget, so it never affects the actor's own re-render below.
+        publishBankLiveSync(form);
         const spec = REFRESH_TARGETS[form.getAttribute('data-refresh')];
         if (!spec || !window.krtFetch || typeof window.krtFetch.swap !== 'function') {
             window.location.reload();
@@ -1198,6 +1282,11 @@
             errorMessage: genericError(),
             onSuccess: function (payload) {
                 applyGrantFlagResult(flagButton, row, flag, newValue, payload);
+                // The grants matrix changed for every other viewer (REQ-FE-015). This isolated
+                // DOM-patch write does not go through handleBankSuccess, so broadcast here.
+                if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
+                    window.krtLiveSync.sendChanged('bank', ['grants']);
+                }
             },
             onError: function (status, payload) {
                 const message = payload && payload.message ? payload.message : genericError();
