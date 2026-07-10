@@ -139,14 +139,16 @@ class NotificationCenterE2eTest {
         page.waitForLoadState();
         page.evaluate("() => { window.__krtNoReload = true; }");
 
-        // Target the exact notification for the seeded order (a negative lookahead avoids matching
-        // a
-        // longer display id, e.g. #12 must not match #128 on the shared stack).
+        // Target the exact notification for the seeded order. The display id is always numeric, so
+        // it is interpolated directly (NOT via Pattern.quote, whose Java \Q…\E fences are not valid
+        // JS regex quoting once Playwright serialises the pattern to its driver). The negative
+        // lookahead avoids a shorter id matching a longer one, e.g. #1 must not match #12 on the
+        // shared stack where sibling suites also create orders.
         Locator row =
             page.locator(
                 "#notification-page-list .notification-item",
                 new Page.LocatorOptions()
-                    .setHasText(Pattern.compile("#" + Pattern.quote(orderDisplayId) + "(?!\\d)")));
+                    .setHasText(Pattern.compile("#" + orderDisplayId + "(?!\\d)")));
         assertThat(row).isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
         assertThat(row).hasAttribute("data-notif-read", "false");
 
