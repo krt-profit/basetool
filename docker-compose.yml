@@ -556,10 +556,15 @@ services:
     # Prod overrides the template command to add the monitoring ACL file (epic #936). The
     # redis_exporter (monitoring stack) connects as a dedicated ACL user restricted to read-only
     # monitoring commands (no key access), so the session store holding OAuth2 refresh tokens stays
-    # unreadable. `--requirepass` still governs the `default` user the apps authenticate as, so the
-    # ACL file (provisioned on the host by the Phase-2 runbook BEFORE this deploy) MUST NOT define a
-    # `default` user. A missing/empty ACL file makes redis exit at startup, which the deploy
-    # health-gate turns into a clean rollback rather than a silent breakage. Untouched for redis-dev.
+    # unreadable by that user. IMPORTANT (learned the hard way, 2026-07-10): once `--aclfile` is used,
+    # the ACL file is the source of truth for the `default` user too. If it OMITS a `default` entry,
+    # Redis resets `default` to `nopass ~* &* +@all` at load — silently OVERRIDING `--requirepass`, so
+    # the whole session store becomes readable/writable with NO auth on the internal net. Prod shipped
+    # exactly this until it was caught. The host-provisioned `users.acl` therefore MUST define
+    # `default` WITH a password (`user default on >…REDIS_PASSWORD… ~* &* +@all`) alongside the
+    # restricted `monitoring` user; `--requirepass` below is kept only as redundant belt-and-braces.
+    # A missing/empty ACL file makes redis exit at startup, which the deploy health-gate turns into a
+    # clean rollback rather than a silent breakage. Untouched for redis-dev.
     command: redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 384mb --maxmemory-policy noeviction --loglevel notice --aclfile /etc/redis/users.acl --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
     # A service-level `volumes:` replaces the merged template value, so the data volume is re-listed
     # alongside the read-only ACL mount.

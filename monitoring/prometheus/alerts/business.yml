@@ -329,6 +329,24 @@ groups:
           summary: "Notification SSE relay pool near saturation"
           description: "The frontend has held more than 800 of its 1000 SSE relay slots for 10 minutes — past 1000 the next live viewer's push is silently dropped. Check the concurrent viewer count and per-user stream multiplication; consider raising frontend-sse-pool maxConnections or capping streams per user."
 
+      # (REQ-SEC-025) Runaway session store. basetool_active_sessions counts live Spring
+      # Session sessions in Redis. Un-authenticated requests mint throwaway sessions (a CSRF-token
+      # render on a permit-all page, pre-login OAuth2 state); before the two-tier-TTL fix these
+      # inherited the 30-day authenticated window and accreted to >16000 orphan CSRF-only sessions
+      # against ~30 real principals, heading for the Redis `maxmemory noeviction` wall where login /
+      # token-refresh writes start failing. Post-fix the anonymous window is short, so steady state is
+      # a few hundred (concurrent logged-in users x devices, capped at maximumSessions=10, plus a
+      # small anonymous float). >2000 for 1h therefore means the anonymous-session TTL split regressed
+      # (or a genuine surge) — with days of lead time before the Redis ceiling.
+      - alert: ActiveSessionsRunaway
+        expr: basetool_active_sessions > 2000
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Frontend session store growing unbounded (>2000 active sessions)"
+          description: "basetool_active_sessions has held above 2000 for 1h. Expected steady state is a few hundred; a sustained climb means anonymous/orphan sessions are accreting again (REQ-SEC-025 two-tier TTL regressed) and Redis is heading for its maxmemory noeviction ceiling. Check the session store size (redis SCAN 'basetool:session:sessions:*') and the created-vs-login ratio."
+
       # (#1041 item 18) Frontend login broken. A code-to-token / JWKS / state failure breaks ALL
       # logins with no other frontend signal, and KeycloakLoginErrorSpike's event regex misses
       # code-to-token errors. Fire when there are login failures but ZERO successes in the window.
