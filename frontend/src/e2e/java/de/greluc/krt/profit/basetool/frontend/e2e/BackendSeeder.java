@@ -109,10 +109,25 @@ public final class BackendSeeder {
 
   private final HttpClient http;
 
-  /** Builds a seeder whose HTTP client trusts the backend's self-signed dev certificate. */
+  /**
+   * Builds a seeder whose HTTP client trusts the backend's self-signed dev certificate and is
+   * pinned to HTTP/1.1.
+   *
+   * <p>{@link HttpClient} defaults to {@link HttpClient.Version#HTTP_2}, which multiplexes many
+   * concurrent requests over ONE connection per origin. Under the dense parallel CI seeding burst
+   * that exposed an HTTP/2 response-crossing bug on this stack: a {@code passwordGrant(ADMIN)} call
+   * intermittently received ANOTHER user's token (e.g. a bank employee's), so the admin's
+   * subsequent {@code GET /users/me} + membership PATCH ran with the wrong identity/authorities and
+   * 403'd — surfacing as {@code BankBookingE2eTest}'s "Membership seeding PATCH failed: HTTP 403".
+   * Because the seeder reuses that one token, every retry failed identically as the same wrong
+   * user. HTTP/1.1 enforces one in-flight request per connection with strict request↔response
+   * ordering, so a response can never be delivered to the wrong request. This is a test-harness
+   * transport fix; it changes no production behaviour (the frontend/backend keep HTTP/2).
+   */
   public BackendSeeder() {
     this.http =
         HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_1_1)
             .sslContext(backendCertContext())
             .connectTimeout(Duration.ofSeconds(10))
             .build();
