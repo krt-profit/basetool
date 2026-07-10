@@ -41,51 +41,89 @@ public interface MaterialExchangeOfferRepository
   /**
    * The Materialbörse board query — every {@code ACTIVE} offer, optionally narrowed to the caller's
    * own offers (the "Meine Angebote" tab) and by the toolbar filters. The board is org-wide (no
-   * OrgUnit scope filter, decision D3): every active offer is visible to every member. Material and
-   * quality are read live off the joined {@link MaterialExchangeOffer#getInventoryItem() item}; the
-   * <b>effective</b> offered quantity is {@code LEAST(offeredAmount, item.amount)} — the
-   * owner-chosen {@link MaterialExchangeOffer#getOfferedAmount() offeredAmount} clamped to the
-   * item's <em>current</em> stock (ADR-0086), so the board can never advertise more than is in
-   * stock and the offer shrinks as the row is booked out. The amount filter uses that same
-   * effective quantity. A fully-booked-out row is <em>deleted</em> by the inventory book-out paths
-   * (delete-on-depletion), which cascade-deletes the offer (V210 {@code ON DELETE CASCADE}) — so
-   * there is no lingering zero-stock offer to filter out here; every {@code ACTIVE} offer has a
-   * live row with {@code amount > 0}. The item's location is never referenced, keeping the Standort
-   * private (REQ-MARKET-004). The associations are eager-loaded via {@link EntityGraph} so the list
-   * renders without an N+1; all of them are single-valued {@code @ManyToOne}, so pagination stays a
-   * DB {@code LIMIT}.
+   * OrgUnit scope filter, decision D3): every active offer is visible to every member.
+   *
+   * <p>The board carries both offer kinds (REQ-MARKET-012). Because an item offer has a {@code
+   * NULL} {@code inventory_item_id}, the item / material / owner / org-unit associations are joined
+   * with an explicit {@code LEFT JOIN FETCH} (an implicit path join would be an inner join and
+   * would silently drop item offers) — this both eager-loads them so the list renders without an
+   * N+1 and exposes the aliases the filters and the sort need. The name filter and the sort span
+   * both branches via {@code COALESCE}: a material offer's effective amount is {@code
+   * LEAST(offeredAmount, item.amount)} — the owner-chosen offered quantity clamped to current stock
+   * (ADR-0086) — and an item offer's is its stated {@code itemQuantity} ({@code
+   * COALESCE(LEAST(...), itemQuantity)}); the material/item name is COALESCE-d likewise. The
+   * location is never referenced, keeping the Standort private (REQ-MARKET-004). The min-quality
+   * filter applies only to material offers — an item offer has no quality, so a non-zero
+   * min-quality excludes item offers. All fetched associations are single-valued
+   * {@code @ManyToOne}, so pagination stays a DB {@code LIMIT}. The sort is embedded (driven by
+   * {@code sortKey}) rather than carried on the {@link Pageable}, so the caller passes an unsorted
+   * page request.
    *
    * @param viewerId the caller's user id — used only when {@code onlyMine} is {@code true}.
    * @param onlyMine {@code true} for the "Meine Angebote" tab, {@code false} for "Alle Angebote".
-   * @param query a pre-lowercased {@code %fragment%} matched against the material name and the
+   * @param query a pre-lowercased {@code %fragment%} matched against the material/item name and the
    *     owner's username/display name, or {@code null} for no text filter.
-   * @param minQuality the inclusive minimum quality (0 disables the filter).
-   * @param minAmount the inclusive minimum <em>effective</em> amount in SCU, or {@code null} for no
-   *     amount filter.
-   * @param pageable the page + whitelisted sort (quality / effective amount / material name /
-   *     releasedAt).
+   * @param minQuality the inclusive minimum quality (0 disables the filter; a non-zero value
+   *     excludes item offers, which have no quality).
+   * @param minAmount the inclusive minimum quantity (SCU for a material offer, pieces for an item
+   *     offer), or {@code null} for no amount filter.
+   * @param sortKey the whitelisted sort key — {@code menge} / {@code mat} / {@code neu}, else
+   *     quality (the default); must be non-null.
+   * @param pageable the (unsorted) page request — the ORDER BY is embedded in the query.
    * @return the matching page of active offers, never {@code null}.
    */
-  @EntityGraph(
-      attributePaths = {"inventoryItem", "inventoryItem.material", "owner", "owningOrgUnit"})
   @Query(
-      """
-      SELECT o FROM MaterialExchangeOffer o
-      WHERE o.status = de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus.ACTIVE
-        AND (:onlyMine = false OR o.owner.id = :viewerId)
-        AND (:query IS NULL
-             OR LOWER(o.inventoryItem.material.name) LIKE :query
-             OR LOWER(o.owner.username) LIKE :query
-             OR LOWER(o.owner.displayName) LIKE :query)
-        AND (:minQuality = 0 OR o.inventoryItem.quality >= :minQuality)
-        AND (:minAmount IS NULL OR LEAST(o.offeredAmount, o.inventoryItem.amount) >= :minAmount)
-      """)
+      value =
+          """
+          SELECT o FROM MaterialExchangeOffer o
+          LEFT JOIN FETCH o.inventoryItem ii
+          LEFT JOIN FETCH ii.material m
+          LEFT JOIN FETCH o.owner ow
+          LEFT JOIN FETCH o.owningOrgUnit
+          WHERE o.status = de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus.ACTIVE
+            AND (:onlyMine = false OR ow.id = :viewerId)
+            AND (:query IS NULL
+                 OR LOWER(m.name) LIKE :query
+                 OR LOWER(o.itemName) LIKE :query
+                 OR LOWER(ow.username) LIKE :query
+                 OR LOWER(ow.displayName) LIKE :query)
+            AND (:minQuality = 0 OR ii.quality >= :minQuality)
+            AND (:minAmount IS NULL
+                 OR (ii.id IS NOT NULL AND LEAST(o.offeredAmount, ii.amount) >= :minAmount)
+                 OR (ii.id IS NULL AND o.itemQuantity >= :minAmount))
+          ORDER BY
+            CASE WHEN :sortKey = 'menge' THEN COALESCE(LEAST(o.offeredAmount, ii.amount), o.itemQuantity) END DESC,
+            CASE WHEN :sortKey = 'mat' THEN LOWER(COALESCE(m.name, o.itemName)) END ASC,
+            CASE WHEN :sortKey = 'neu' THEN o.releasedAt END DESC,
+            CASE WHEN :sortKey NOT IN ('menge', 'mat', 'neu') THEN COALESCE(ii.quality, -1) END DESC,
+            o.releasedAt DESC,
+            o.id DESC
+          """,
+      countQuery =
+          """
+          SELECT COUNT(o) FROM MaterialExchangeOffer o
+          LEFT JOIN o.inventoryItem ii
+          LEFT JOIN ii.material m
+          LEFT JOIN o.owner ow
+          WHERE o.status = de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus.ACTIVE
+            AND (:onlyMine = false OR ow.id = :viewerId)
+            AND (:query IS NULL
+                 OR LOWER(m.name) LIKE :query
+                 OR LOWER(o.itemName) LIKE :query
+                 OR LOWER(ow.username) LIKE :query
+                 OR LOWER(ow.displayName) LIKE :query)
+            AND (:minQuality = 0 OR ii.quality >= :minQuality)
+            AND (:minAmount IS NULL
+                 OR (ii.id IS NOT NULL AND LEAST(o.offeredAmount, ii.amount) >= :minAmount)
+                 OR (ii.id IS NULL AND o.itemQuantity >= :minAmount))
+          """)
   Page<MaterialExchangeOffer> findBoard(
       @Param("viewerId") UUID viewerId,
       @Param("onlyMine") boolean onlyMine,
       @Param("query") String query,
       @Param("minQuality") int minQuality,
       @Param("minAmount") Double minAmount,
+      @Param("sortKey") String sortKey,
       Pageable pageable);
 
   /**
@@ -131,9 +169,7 @@ public interface MaterialExchangeOfferRepository
 
   /**
    * Counts offers in the given status across the whole board — the "Alle Angebote" tab count and
-   * the {@code basetool_material_exchange_active_count} business gauge. No stock guard is needed: a
-   * fully-booked-out row is deleted and its offer cascade-deleted (V210), so every {@code ACTIVE}
-   * offer is a live, on-board one (ADR-0086).
+   * the {@code basetool_material_exchange_active_count} business gauge.
    *
    * @param status the status to count.
    * @return the number of offers in that status.
