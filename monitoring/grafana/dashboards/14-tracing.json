@@ -27,13 +27,13 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "The **service graph** (node graph) is available in **Explore → Tempo → Service Graph** once the metrics-generator's `service-graphs` processor is enabled (a follow-up to #1041 item 22 — it needs the Prometheus remote-write receiver + auth). The panels below use **TraceQL metrics** queried directly against the Tempo datasource (no new Prometheus series). TraceQL metrics read only 3.0-written (RF1) blocks and exclude roughly the last 30s, so very recent / pre-upgrade traces may not appear."
+        "content": "The **service graph** (node graph) is available in **Explore → Tempo → Service Graph** (metrics-generator `service-graphs` processor, #1041 item 22a). The RED panels below — request rate, p95 latency and 5xx error rate **by route** — are derived from the server-side `http_server_requests` histograms on the **Prometheus** datasource (the same series that back the latency / 5xx alerts, so the panels and alerts stay consistent; ADR-0076). The **Slow traces** and **Error traces** tables query the **Tempo** datasource directly. Keycloak's HTTP RED is on the Keycloak dashboard."
       }
     },
     {
       "id": 2,
       "type": "timeseries",
-      "title": "Server span request rate by name",
+      "title": "Server request rate by route",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -41,23 +41,23 @@
         "y": 4
       },
       "datasource": {
-        "type": "tempo",
-        "uid": "tempo"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "targets": [
         {
           "datasource": {
-            "type": "tempo",
-            "uid": "tempo"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          "queryType": "traceql",
-          "query": "{ kind = server } | rate() by (span:name)",
+          "expr": "sum by (application, uri) (rate(http_server_requests_seconds_count[5m]))",
+          "legendFormat": "{{application}} {{uri}}",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "cps",
+          "unit": "reqps",
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10
@@ -81,7 +81,7 @@
     {
       "id": 3,
       "type": "timeseries",
-      "title": "Server span p95 latency by name",
+      "title": "Server p95 latency by route",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -89,17 +89,17 @@
         "y": 4
       },
       "datasource": {
-        "type": "tempo",
-        "uid": "tempo"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "targets": [
         {
           "datasource": {
-            "type": "tempo",
-            "uid": "tempo"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          "queryType": "traceql",
-          "query": "{ kind = server } | quantile_over_time(duration, .95) by (span:name)",
+          "expr": "histogram_quantile(0.95, sum by (application, uri, le) (rate(http_server_requests_seconds_bucket[5m])))",
+          "legendFormat": "{{application}} {{uri}}",
           "refId": "A"
         }
       ],
@@ -129,7 +129,7 @@
     {
       "id": 4,
       "type": "timeseries",
-      "title": "Error span rate",
+      "title": "Server error rate (5xx) by route",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -137,23 +137,23 @@
         "y": 12
       },
       "datasource": {
-        "type": "tempo",
-        "uid": "tempo"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "targets": [
         {
           "datasource": {
-            "type": "tempo",
-            "uid": "tempo"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          "queryType": "traceql",
-          "query": "{ status = error } | rate()",
+          "expr": "sum by (application, uri) (rate(http_server_requests_seconds_count{status=~\"5..\"}[5m]))",
+          "legendFormat": "{{application}} {{uri}}",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "cps",
+          "unit": "reqps",
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10
