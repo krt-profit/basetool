@@ -84,8 +84,8 @@ public record CreateMissionRequest(
     @Nullable UUID operationId,
     @Nullable UUID owningOrgUnitId,
     @Nullable @Size(max = 200) String meetingPoint,
-    @Nullable @Valid List<NewObjective> objectives,
-    @Nullable @Valid List<NewStep> steps) {
+    @Nullable List<@Valid NewObjective> objectives,
+    @Nullable List<@Valid NewStep> steps) {
 
   /**
    * A goal (Ziel) to create together with the mission on the {@code POST /api/v1/missions} path, so

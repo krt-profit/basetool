@@ -32,4 +32,4 @@ import java.util.List;
  * @param resolutions the per-name decisions; never {@code null}, may be empty (a no-op apply)
  */
 public record BlueprintImportApplyRequest(
-    @NotNull @Valid List<BlueprintImportResolutionDto> resolutions) {}
+    @NotNull List<@Valid BlueprintImportResolutionDto> resolutions) {}

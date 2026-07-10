@@ -114,8 +114,7 @@ public class RefineryOrder extends AbstractEntity<UUID> {
 
   @OneToMany(mappedBy = "refineryOrder", cascade = CascadeType.ALL, orphanRemoval = true)
   @ToString.Exclude
-  @Valid
-  private Set<RefineryGood> goods = new HashSet<>();
+  private Set<@Valid RefineryGood> goods = new HashSet<>();
 
   /**
    * Org-unit owner of this refinery order, or {@code null} for an <em>ownerless personal</em> order

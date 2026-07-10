@@ -48,5 +48,5 @@ public record CreateJobOrderItemRequestDto(
     @Nullable UUID requestingOrgUnitId,
     @Size(max = 200) String handle,
     @Size(max = 1000) String comment,
-    @NotEmpty @Size(max = 50) @Valid List<CreateJobOrderItemLineDto> items,
+    @NotEmpty @Size(max = 50) List<@Valid CreateJobOrderItemLineDto> items,
     Long version) {}
