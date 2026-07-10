@@ -46,6 +46,174 @@
         );
     }
 
+    // ---- Multiplexed /ws/sync transport (REQ-FE-015, ADR-0092) ---------------------------------
+    // One lazily-opened WebSocket per tab carries every peer-synced topic. subscribe(topic, …)
+    // registers an inbound-change handler for a room (authorized async server-side); sendChanged(
+    // topic, sections) publishes a change (no subscription needed — the cross-topic case, e.g. a
+    // requester notifying a staff queue it may not read). Only opaque section keys cross the socket;
+    // the actual re-render is each page's own authenticated, authorization-checked fragment GET.
+    const syncSocket = (function () {
+        const RECONNECT_BASE_MS = 1000;
+        const RECONNECT_MAX_MS = 30000;
+        // topic -> { handlers, state: 'idle'|'pending'|'subscribed'|'denied', ackedOnce }
+        const topics = Object.create(null);
+        const publishBuffer = []; // { topic, sections } queued until the socket is open
+        let ws = null;
+        let reconnectDelay = RECONNECT_BASE_MS;
+        let reconnectTimer = null;
+
+        function socketUrl() {
+            const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            return proto + '//' + window.location.host + '/ws/sync';
+        }
+
+        function isOpen() {
+            return ws && ws.readyState === WebSocket.OPEN;
+        }
+
+        function rawSend(obj) {
+            if (!isOpen()) {
+                return false;
+            }
+            try {
+                ws.send(JSON.stringify(obj));
+                return true;
+            } catch (_e) {
+                return false;
+            }
+        }
+
+        function ensureSocket() {
+            if (
+                ws &&
+                (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)
+            ) {
+                return;
+            }
+            try {
+                ws = new WebSocket(socketUrl());
+            } catch (_e) {
+                scheduleReconnect();
+                return;
+            }
+            ws.addEventListener('open', onOpen);
+            ws.addEventListener('message', onMessage);
+            ws.addEventListener('close', onClose);
+            // 'error' is always followed by 'close', where the reconnect is scheduled.
+            ws.addEventListener('error', function () {});
+        }
+
+        function onOpen() {
+            reconnectDelay = RECONNECT_BASE_MS;
+            // (Re)subscribe every live topic; a denied topic stays dead (no retry).
+            Object.keys(topics).forEach(function (t) {
+                if (topics[t].state !== 'denied') {
+                    topics[t].state = 'pending';
+                    rawSend({ type: 'subscribe', topic: t });
+                }
+            });
+            // Flush any changes published before the socket was open.
+            while (publishBuffer.length) {
+                const p = publishBuffer.shift();
+                rawSend({ type: 'changed', topic: p.topic, sections: p.sections });
+            }
+        }
+
+        function onMessage(ev) {
+            let msg;
+            try {
+                msg = JSON.parse(ev.data);
+            } catch (_e) {
+                return;
+            }
+            const entry = msg && msg.topic ? topics[msg.topic] : null;
+            if (!entry) {
+                return;
+            }
+            if (msg.type === 'subscribed') {
+                const wasAcked = entry.ackedOnce;
+                entry.state = 'subscribed';
+                entry.ackedOnce = true;
+                // Only a RE-subscribe (after a reconnect) triggers a resync: signals may have been
+                // missed while offline. The very first ack means nothing was missed.
+                if (wasAcked && typeof entry.handlers.onResync === 'function') {
+                    entry.handlers.onResync();
+                }
+            } else if (msg.type === 'denied') {
+                entry.state = 'denied';
+                if (typeof entry.handlers.onDenied === 'function') {
+                    entry.handlers.onDenied();
+                }
+            } else if (msg.type === 'changed') {
+                if (typeof entry.handlers.onChanged === 'function') {
+                    entry.handlers.onChanged(Array.isArray(msg.sections) ? msg.sections : []);
+                }
+            } else if (msg.type === 'presence') {
+                if (typeof entry.handlers.onPresence === 'function') {
+                    entry.handlers.onPresence(msg.sections || {});
+                }
+            }
+        }
+
+        function onClose() {
+            ws = null;
+            // Mark every non-denied topic pending so it re-subscribes on the next open.
+            Object.keys(topics).forEach(function (t) {
+                if (topics[t].state !== 'denied') {
+                    topics[t].state = 'pending';
+                }
+            });
+            if (Object.keys(topics).length || publishBuffer.length) {
+                scheduleReconnect();
+            }
+        }
+
+        function scheduleReconnect() {
+            if (reconnectTimer) {
+                return;
+            }
+            // Full-jitter backoff (mission-presence.js precedent): spreads a fleet's reconnects after
+            // a frontend redeploy instead of a synchronized thundering herd.
+            const wait = Math.random() * Math.min(RECONNECT_MAX_MS, reconnectDelay);
+            reconnectTimer = window.setTimeout(function () {
+                reconnectTimer = null;
+                reconnectDelay = Math.min(RECONNECT_MAX_MS, reconnectDelay * 2);
+                ensureSocket();
+            }, wait);
+        }
+
+        return {
+            subscribe: function (topic, handlers) {
+                if (!topic) {
+                    return { unsubscribe: function () {} };
+                }
+                const entry =
+                    topics[topic] || (topics[topic] = { state: 'idle', ackedOnce: false });
+                entry.handlers = handlers || {};
+                ensureSocket();
+                if (isOpen()) {
+                    entry.state = 'pending';
+                    rawSend({ type: 'subscribe', topic: topic });
+                }
+                return {
+                    unsubscribe: function () {
+                        delete topics[topic];
+                    },
+                };
+            },
+            sendChanged: function (topic, sections) {
+                if (!topic) {
+                    return;
+                }
+                const secs = Array.isArray(sections) ? sections : [sections];
+                ensureSocket();
+                if (!rawSend({ type: 'changed', topic: topic, sections: secs })) {
+                    publishBuffer.push({ topic: topic, sections: secs });
+                }
+            },
+        };
+    })();
+
     // Builds the coalescing / busy-guard / deferred-pill receiver for one page (or one topic).
     function createReceiver(cfg) {
         const sections = (cfg && cfg.sections) || {};
@@ -209,10 +377,28 @@
             });
         }
 
-        // Expose apply() so a transport that owns its own subscription (added in a later step) can
-        // drive the receiver directly instead of via DOM events.
+        // Topic-source mode: subscribe to the multiplexed /ws/sync socket and drive the receiver
+        // directly from inbound `changed` (opaque section keys) and post-reconnect `resync`. Mission
+        // stays on events-source mode (mission-presence.js owns its legacy socket); operation, orders
+        // and bank use this.
+        if (cfg && cfg.topic) {
+            syncSocket.subscribe(cfg.topic, {
+                onChanged: function (sections) {
+                    apply(sections);
+                },
+                onResync: function () {
+                    apply(null);
+                },
+            });
+        }
+
+        // Expose apply() so a caller can drive the receiver directly if needed.
         return { apply: apply };
     }
 
-    window.krtLiveSync = { createReceiver: createReceiver };
+    window.krtLiveSync = {
+        createReceiver: createReceiver,
+        subscribe: syncSocket.subscribe,
+        sendChanged: syncSocket.sendChanged,
+    };
 })();

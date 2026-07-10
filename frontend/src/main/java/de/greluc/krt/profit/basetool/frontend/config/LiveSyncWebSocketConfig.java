@@ -23,14 +23,21 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.LiveSyncPresenceService;
 import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncFanout;
 import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncLegacyHandshakeInterceptor;
+import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncSubscriptionAuthorizer;
+import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncSyncHandshakeInterceptor;
 import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncWebSocketHandler;
 import de.greluc.krt.profit.basetool.frontend.websocket.NoopLiveSyncFanout;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
@@ -39,10 +46,14 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * Wires the live-sync WebSocket endpoints (REQ-FE-015, ADR-0092).
  *
- * <p>Registers the shared {@link LiveSyncWebSocketHandler} on the legacy per-resource path {@code
- * /ws/missions/{missionId}/presence}; the {@link LiveSyncLegacyHandshakeInterceptor} authorizes the
- * handshake and binds the socket to its implicit {@code mission:{id}} topic. (The multiplexed
- * {@code /ws/sync} endpoint layers on in a later step.)
+ * <p>Registers the shared {@link LiveSyncWebSocketHandler} on two paths: the legacy per-resource
+ * {@code /ws/missions/{missionId}/presence} (the {@link LiveSyncLegacyHandshakeInterceptor}
+ * authorizes the handshake and binds the socket to its implicit {@code mission:{id}} topic, keeping
+ * tabs opened before the {@code /ws/sync} rollout working for one release) and the multiplexed
+ * {@code /ws/sync} (the {@link LiveSyncSyncHandshakeInterceptor} captures the OAuth2 token + pin
+ * for per-subscribe authorization). The subscribe-authorization probes run on a dedicated bounded
+ * {@link #liveSyncSubscribeAuthExecutor()} thread pool so the WebSocket container threads never
+ * block on a backend read.
  *
  * <p>The handshake is gated by an explicit {@code setAllowedOriginPatterns} list (driven by {@code
  * app.websocket.allowed-origin-patterns}) — {@code setAllowedOriginPatterns("*")} would leave the
@@ -60,23 +71,43 @@ import tools.jackson.databind.json.JsonMapper;
 @EnableWebSocket
 public class LiveSyncWebSocketConfig implements WebSocketConfigurer {
 
+  /**
+   * Subscribe-authorization executor sizing: {@value} worker threads. Kept modest because each
+   * probe is a single short backend read; the deploy-time reconnect storm (~600 subscribes spread
+   * over the client's 1–30 s reconnect jitter) stays well within this pool plus its queue, and any
+   * overflow fails the subscribe open rather than blocking (ADR-0092 capacity model).
+   */
+  private static final int SUBSCRIBE_AUTH_THREADS = 8;
+
+  /**
+   * Bounded queue depth for pending subscribe-authorization probes before saturation fails open.
+   */
+  private static final int SUBSCRIBE_AUTH_QUEUE = 500;
+
   private final LiveSyncPresenceService presenceService;
   private final BackendApiClient backendApiClient;
   private final MeterRegistry meterRegistry;
   private final ObjectProvider<LiveSyncFanout> fanoutProvider;
+  private final LiveSyncSubscriptionAuthorizer subscriptionAuthorizer;
+  private final OAuth2AuthorizedClientRepository authorizedClientRepository;
   private final List<String> allowedOriginPatterns;
 
   /**
-   * Constructor injection of the shared presence store, the backend client used by the handshake
-   * gate, the Micrometer registry, the fan-out seam and the WebSocket origin allowlist. The fan-out
-   * is injected lazily via an {@link ObjectProvider} so a Redis binding (when present) is used and
-   * the no-op fallback is created only when none is registered — order-independent, no
-   * {@code @ConditionalOnMissingBean} and no self-referential cycle.
+   * Constructor injection of the shared presence store, the backend client used by the legacy
+   * handshake gate, the Micrometer registry, the fan-out seam, the multiplexed subscribe
+   * authorizer, the authorized-client store (read at the {@code /ws/sync} handshake to capture the
+   * OAuth2 token) and the WebSocket origin allowlist. The fan-out is injected lazily via an {@link
+   * ObjectProvider} so a Redis binding (when present) is used and the no-op fallback is created
+   * only when none is registered — order-independent, no {@code @ConditionalOnMissingBean} and no
+   * self-referential cycle.
    *
    * @param presenceService in-memory editor-presence store
-   * @param backendApiClient client used by the handshake interceptor to authorize resource access
+   * @param backendApiClient client used by the legacy handshake interceptor to authorize access
    * @param meterRegistry registry the handler binds its gauges and relay counters to
    * @param fanoutProvider lazy provider of the cross-replica fan-out (Redis when enabled)
+   * @param subscriptionAuthorizer authorizes a multiplexed {@code /ws/sync} subscribe
+   * @param authorizedClientRepository authorized-client store read at the {@code /ws/sync}
+   *     handshake
    * @param allowedOriginPatterns origin patterns accepted on the WebSocket handshake; sourced from
    *     {@code app.websocket.allowed-origin-patterns} with a production default
    */
@@ -85,6 +116,8 @@ public class LiveSyncWebSocketConfig implements WebSocketConfigurer {
       BackendApiClient backendApiClient,
       MeterRegistry meterRegistry,
       ObjectProvider<LiveSyncFanout> fanoutProvider,
+      LiveSyncSubscriptionAuthorizer subscriptionAuthorizer,
+      OAuth2AuthorizedClientRepository authorizedClientRepository,
       @Value(
               "${app.websocket.allowed-origin-patterns:https://profit-base.online,https://localhost:18081,http://localhost:18081}")
           List<String> allowedOriginPatterns) {
@@ -92,7 +125,33 @@ public class LiveSyncWebSocketConfig implements WebSocketConfigurer {
     this.backendApiClient = backendApiClient;
     this.meterRegistry = meterRegistry;
     this.fanoutProvider = fanoutProvider;
+    this.subscriptionAuthorizer = subscriptionAuthorizer;
+    this.authorizedClientRepository = authorizedClientRepository;
     this.allowedOriginPatterns = allowedOriginPatterns;
+  }
+
+  /**
+   * Bounded thread pool that runs {@code /ws/sync} subscribe-authorization probes off the WebSocket
+   * container threads. An {@code AbortPolicy} makes a full queue throw {@link
+   * java.util.concurrent.RejectedExecutionException} so the handler fails that subscribe open (and
+   * counts it) rather than blocking. Shut down on context close.
+   *
+   * @return the subscribe-authorization executor
+   */
+  @Bean(destroyMethod = "shutdownNow")
+  public ExecutorService liveSyncSubscribeAuthExecutor() {
+    return new ThreadPoolExecutor(
+        SUBSCRIBE_AUTH_THREADS,
+        SUBSCRIBE_AUTH_THREADS,
+        60L,
+        TimeUnit.SECONDS,
+        new LinkedBlockingQueue<>(SUBSCRIBE_AUTH_QUEUE),
+        runnable -> {
+          Thread thread = new Thread(runnable, "livesync-subauth");
+          thread.setDaemon(true);
+          return thread;
+        },
+        new ThreadPoolExecutor.AbortPolicy());
   }
 
   /**
@@ -107,15 +166,26 @@ public class LiveSyncWebSocketConfig implements WebSocketConfigurer {
   public LiveSyncWebSocketHandler liveSyncWebSocketHandler() {
     LiveSyncFanout fanout = fanoutProvider.getIfAvailable(NoopLiveSyncFanout::new);
     return new LiveSyncWebSocketHandler(
-        presenceService, fanout, JsonMapper.builder().build(), meterRegistry);
+        presenceService,
+        fanout,
+        JsonMapper.builder().build(),
+        meterRegistry,
+        subscriptionAuthorizer,
+        liveSyncSubscribeAuthExecutor());
   }
 
   /** {@inheritDoc} */
   @Override
   public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
+    LiveSyncWebSocketHandler handler = liveSyncWebSocketHandler();
+    String[] origins = allowedOriginPatterns.toArray(new String[0]);
     registry
-        .addHandler(liveSyncWebSocketHandler(), "/ws/missions/{missionId}/presence")
+        .addHandler(handler, "/ws/missions/{missionId}/presence")
         .addInterceptors(new LiveSyncLegacyHandshakeInterceptor(backendApiClient))
-        .setAllowedOriginPatterns(allowedOriginPatterns.toArray(new String[0]));
+        .setAllowedOriginPatterns(origins);
+    registry
+        .addHandler(handler, "/ws/sync")
+        .addInterceptors(new LiveSyncSyncHandshakeInterceptor(authorizedClientRepository))
+        .setAllowedOriginPatterns(origins);
   }
 }

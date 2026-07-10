@@ -509,4 +509,36 @@ public class WebClientConfig {
         .baseUrl(backendProperties.backendUrl())
         .build();
   }
+
+  /**
+   * Backend WebClient for the {@code /ws/sync} subscribe-authorization probe (REQ-FE-015,
+   * ADR-0092).
+   *
+   * <p>Deliberately carries <b>no</b> OAuth2 exchange filter: a subscribe is authorized on a
+   * WebSocket message / auth-executor thread that has no servlet request context, so {@code
+   * ServletOAuth2AuthorizedClientExchangeFilterFunction} could not resolve a bearer there anyway —
+   * and, exactly as for {@link #sseWebClient}, letting it reach {@code
+   * OAuth2AuthorizedClientManager.authorize(...)} against a snapshot token could drive a
+   * refresh-token grant that Keycloak's reuse detection then punishes (REQ-SEC-012). {@code
+   * LiveSyncSubscriptionAuthorizer} therefore sets the captured bearer and active-org-unit pin as
+   * explicit headers instead. Unlike {@link #sseWebClient} this keeps the normal connect/read
+   * timeouts ({@link #connector(boolean)} with {@code false}) — an auth probe is a short request,
+   * and a timeout must abort quickly and fail the subscribe open — and does not need the
+   * Resilience4j chain (a one-shot probe with an explicit block timeout). The correlation-id /
+   * locale / client-IP relays are applied for parity with the other clients; the guest-edit-token
+   * relay is omitted (a {@code /ws/sync} socket is an authenticated-member surface).
+   *
+   * @return the subscribe-authorization WebClient
+   */
+  @Bean
+  public WebClient liveSyncAuthWebClient() {
+    return WebClient.builder()
+        .clientConnector(connector(false))
+        .filter(webClientLoggingFilter.correlationIdPropagation())
+        .filter(userLocaleRelayFilter.relayUserLocale())
+        .filter(clientIpRelayFilter.relayClientIp())
+        .defaultHeaders(headers -> headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON)))
+        .baseUrl(backendProperties.backendUrl())
+        .build();
+  }
 }

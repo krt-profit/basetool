@@ -46,6 +46,14 @@ public final class MetricNames {
   public static final String LIVESYNC_SUBSCRIPTIONS = "basetool.livesync.subscriptions";
 
   /**
+   * Counter {@code basetool_livesync_subscribe_total} — tags {@code topic_class}, {@code outcome}
+   * ({@link #OUTCOME_ALLOWED} / {@link #OUTCOME_DENIED}); the verdict of a multiplexed {@code
+   * /ws/sync} subscribe-authorization check (REQ-FE-015, ADR-0092). A saturated-executor fail-open
+   * is instead counted as a {@link #DROPPED_AUTHORIZE_SATURATED} relay drop.
+   */
+  public static final String LIVESYNC_SUBSCRIBE = "basetool.livesync.subscribe";
+
+  /**
    * Counter {@code basetool_livesync_redis_published_total} — tag {@code topic_class}; {@code
    * changed} signals this instance published to the cross-replica Redis channel (ADR-0092).
    */
@@ -191,6 +199,21 @@ public final class MetricNames {
 
   /** Presence drop reason: a frame that failed to write to a closed/broken session. */
   public static final String DROPPED_SEND_FAILED = "send_failed";
+
+  /** Presence drop reason: a subscribe refused because the socket hit its per-session topic cap. */
+  public static final String DROPPED_TOPIC_CAP = "topic_cap";
+
+  /**
+   * Presence drop reason: a subscribe that failed open because the subscribe-authorization executor
+   * was saturated (the probe could not be scheduled).
+   */
+  public static final String DROPPED_AUTHORIZE_SATURATED = "authorize_saturated";
+
+  /** Live-sync subscribe outcome: the subscribe was authorized (or failed open on a transient). */
+  public static final String OUTCOME_ALLOWED = "allowed";
+
+  /** Live-sync subscribe outcome: the subscribe was refused by an explicit backend 403/404. */
+  public static final String OUTCOME_DENIED = "denied";
 
   /** Reason: the backend returned a 4xx problem response. */
   public static final String REASON_BACKEND_4XX = "backend_4xx";

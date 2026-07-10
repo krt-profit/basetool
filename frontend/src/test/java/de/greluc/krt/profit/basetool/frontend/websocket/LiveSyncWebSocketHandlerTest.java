@@ -20,6 +20,9 @@
 package de.greluc.krt.profit.basetool.frontend.websocket;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.frontend.service.LiveSyncPresenceService;
@@ -35,6 +38,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.RejectedExecutionException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -70,6 +74,7 @@ class LiveSyncWebSocketHandlerTest {
   private LiveSyncWebSocketHandler handler;
   private CapturingFanout fanout;
   private SimpleMeterRegistry registry;
+  private LiveSyncSubscriptionAuthorizer authorizer;
 
   @BeforeEach
   void setUp() {
@@ -77,7 +82,15 @@ class LiveSyncWebSocketHandlerTest {
     service = new LiveSyncPresenceService(registry);
     objectMapper = JsonMapper.builder().build();
     fanout = new CapturingFanout();
-    handler = new LiveSyncWebSocketHandler(service, fanout, objectMapper, registry);
+    authorizer = mock(LiveSyncSubscriptionAuthorizer.class);
+    // Default: authorize any subscribe. Individual tests override to DENY where they need it. The
+    // executor is direct (Runnable::run) so an async subscribe-authorize completes synchronously in
+    // the test thread — the saturation path uses a throwing executor instead.
+    when(authorizer.authorize(any(), any(), any()))
+        .thenReturn(LiveSyncSubscriptionAuthorizer.Decision.ALLOW);
+    handler =
+        new LiveSyncWebSocketHandler(
+            service, fanout, objectMapper, registry, authorizer, Runnable::run);
   }
 
   @Test
@@ -409,10 +422,258 @@ class LiveSyncWebSocketHandlerTest {
     assertThat(frameCounter(MetricNames.FRAME_CHANGED)).isZero();
   }
 
+  // ── Multiplexed /ws/sync tests ───────────────────────────────────────────────────────────────
+
+  @Test
+  void multiplexedSubscribe_authorized_acksAndReceivesPeerChange() throws Exception {
+    String topic = operationTopic();
+    FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    subscribe(alice, topic);
+    subscribe(bob, topic);
+
+    assertThat(lastBroadcast(alice).get("type").asString()).isEqualTo("subscribed");
+    assertThat(lastBroadcast(bob).get("type").asString()).isEqualTo("subscribed");
+
+    bob.sent.clear();
+    handler.handleTextMessage(alice, changedFrame(topic, "overview"));
+
+    JsonNode relayed = lastBroadcast(bob);
+    assertThat(relayed.get("type").asString()).isEqualTo("changed");
+    assertThat(relayed.get("topic").asString()).isEqualTo(topic);
+    assertThat(sectionsOf(relayed)).containsExactly("overview");
+    assertThat(subscribeCounter(MetricNames.OUTCOME_ALLOWED, "operation"))
+        .isGreaterThanOrEqualTo(2.0);
+  }
+
+  @Test
+  void multiplexedSubscribe_denied_refusesAndCounts() throws Exception {
+    when(authorizer.authorize(any(), any(), any()))
+        .thenReturn(LiveSyncSubscriptionAuthorizer.Decision.DENY);
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    subscribe(bob, operationTopic());
+
+    assertThat(lastBroadcast(bob).get("type").asString()).isEqualTo("denied");
+    assertThat(subscribeCounter(MetricNames.OUTCOME_DENIED, "operation")).isEqualTo(1.0);
+  }
+
+  @Test
+  void multiplexedChanged_publishesWithoutSubscription() throws Exception {
+    String topic = operationTopic();
+    FakeSession subscriber = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    subscribe(subscriber, topic);
+    subscriber.sent.clear();
+
+    // The publisher never subscribed to the topic (the cross-topic case: a requester notifying a
+    // queue it may not read) yet its change still reaches the room.
+    FakeSession publisher = openMultiplexedSession(oidcUser("user-1", "Alice"));
+    handler.handleTextMessage(publisher, changedFrame(topic, "payout"));
+
+    assertThat(sectionsOf(lastBroadcast(subscriber))).containsExactly("payout");
+    assertThat(publisher.sent).isEmpty();
+  }
+
+  @Test
+  void multiplexedChanged_sanitisesAgainstOperationWhitelist() throws Exception {
+    String topic = operationTopic();
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    subscribe(bob, topic);
+    bob.sent.clear();
+    FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
+
+    // "crew" is a mission section, not an operation section — dropped; "overview"/"finance" kept.
+    handler.handleTextMessage(
+        alice,
+        new TextMessage(
+            "{\"type\":\"changed\",\"topic\":\""
+                + topic
+                + "\",\"sections\":[\"overview\",\"crew\",\"finance\"]}"));
+
+    assertThat(sectionsOf(lastBroadcast(bob))).containsExactly("overview", "finance");
+  }
+
+  @Test
+  void multiplexedSubscribe_unknownTopic_isDenied() throws Exception {
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    handler.handleTextMessage(
+        bob, new TextMessage("{\"type\":\"subscribe\",\"topic\":\"bogus:not-a-thing\"}"));
+    assertThat(lastBroadcast(bob).get("type").asString()).isEqualTo("denied");
+  }
+
+  @Test
+  void multiplexedSubscribe_reSubscribe_isIdempotent() throws Exception {
+    String topic = operationTopic();
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    subscribe(bob, topic);
+    subscribe(bob, topic); // idempotent: re-ack, no double room join
+
+    assertThat(lastBroadcast(bob).get("type").asString()).isEqualTo("subscribed");
+    FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
+    bob.sent.clear();
+    handler.handleTextMessage(alice, changedFrame(topic, "overview"));
+    // Exactly one room membership → exactly one relayed frame (a double join would send two).
+    assertThat(bob.sent).hasSize(1);
+  }
+
+  @Test
+  void multiplexedSubscribe_beyondTopicCap_isDeniedAndCounted() throws Exception {
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    for (int i = 0; i < 16; i++) {
+      subscribe(bob, operationTopic());
+    }
+    bob.sent.clear();
+    subscribe(bob, operationTopic()); // the 17th exceeds MAX_TOPICS_PER_SESSION
+
+    assertThat(lastBroadcast(bob).get("type").asString()).isEqualTo("denied");
+    assertThat(dropCounter(MetricNames.DROPPED_TOPIC_CAP, "operation")).isEqualTo(1.0);
+  }
+
+  @Test
+  void multiplexedSubscribe_executorSaturated_failsOpenAndCounts() throws Exception {
+    SimpleMeterRegistry reg2 = new SimpleMeterRegistry();
+    LiveSyncPresenceService svc2 = new LiveSyncPresenceService(reg2);
+    LiveSyncSubscriptionAuthorizer denyAll = mock(LiveSyncSubscriptionAuthorizer.class);
+    when(denyAll.authorize(any(), any(), any()))
+        .thenReturn(LiveSyncSubscriptionAuthorizer.Decision.DENY);
+    LiveSyncWebSocketHandler saturated =
+        new LiveSyncWebSocketHandler(
+            svc2,
+            fanout,
+            objectMapper,
+            reg2,
+            denyAll,
+            runnable -> {
+              throw new RejectedExecutionException("auth executor full");
+            });
+
+    FakeSession bob = new FakeSession();
+    bob.open = true;
+    bob.uri = URI.create("ws://localhost/ws/sync");
+    bob.attributes.put(LiveSyncWebSocketHandler.ATTR_MULTIPLEXED, Boolean.TRUE);
+    bob.principal =
+        new UsernamePasswordAuthenticationToken(
+            oidcUser("user-2", "Bob"), "n/a", List.of(new SimpleGrantedAuthority("ROLE_USER")));
+    saturated.afterConnectionEstablished(bob);
+
+    saturated.handleTextMessage(
+        bob, new TextMessage("{\"type\":\"subscribe\",\"topic\":\"" + operationTopic() + "\"}"));
+
+    // Saturation fails the subscribe open: the socket is acked `subscribed` even though the
+    // DENY-everything probe never ran, and the fail-open is counted.
+    assertThat(lastBroadcast(bob).get("type").asString()).isEqualTo("subscribed");
+    var counter =
+        reg2.find(MetricNames.PRESENCE_RELAY_DROPPED)
+            .tag(MetricNames.TAG_REASON, MetricNames.DROPPED_AUTHORIZE_SATURATED)
+            .tag(MetricNames.TAG_TOPIC_CLASS, "operation")
+            .counter();
+    assertThat(counter).isNotNull();
+    assertThat(counter.count()).isEqualTo(1.0);
+  }
+
+  @Test
+  void multiplexedClose_leavesAllSubscribedRooms() throws Exception {
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    subscribe(bob, operationTopic());
+    subscribe(bob, operationTopic());
+
+    // The socket is in two rooms (the gauge sums a socket once per room).
+    assertThat(presenceGauge()).isEqualTo(2.0);
+
+    bob.open = false;
+    handler.afterConnectionClosed(bob, CloseStatus.NORMAL);
+    assertThat(presenceGauge()).isZero();
+  }
+
+  @Test
+  void multiplexedChanged_staysWithinItsOwnRoom() throws Exception {
+    String topicA = operationTopic();
+    String topicB = operationTopic();
+    FakeSession carol = openMultiplexedSession(oidcUser("user-3", "Carol"));
+    subscribe(carol, topicB);
+    carol.sent.clear();
+    FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
+
+    handler.handleTextMessage(alice, changedFrame(topicA, "overview"));
+
+    assertThat(carol.sent).isEmpty();
+  }
+
+  @Test
+  void multiplexedPresence_onSubscribedPresenceTopic_tracksAndBroadcasts() throws Exception {
+    // A presence-enabled class (mission) subscribed over /ws/sync tracks editor presence just like
+    // the legacy socket does — the path the mission migration will use.
+    String topic = missionTopic();
+    FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    subscribe(alice, topic);
+    subscribe(bob, topic);
+    bob.sent.clear();
+
+    handler.handleTextMessage(
+        alice,
+        new TextMessage(
+            "{\"type\":\"focus\",\"topic\":\"" + topic + "\",\"sectionKey\":\"crew\"}"));
+
+    assertThat(service.get(topic, "crew", "user-1")).isNotNull();
+    JsonNode snapshot = lastBroadcast(bob);
+    assertThat(snapshot.get("type").asString()).isEqualTo("presence");
+    assertThat(snapshot.get("sections").get("crew").get(0).get("userId").asString())
+        .isEqualTo("user-1");
+  }
+
+  @Test
+  void multiplexedPresence_onUnsubscribedTopic_isIgnored() throws Exception {
+    String topic = missionTopic();
+    FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
+    // Alice never subscribed to the topic — a presence frame for it is ignored.
+    handler.handleTextMessage(
+        alice,
+        new TextMessage(
+            "{\"type\":\"focus\",\"topic\":\"" + topic + "\",\"sectionKey\":\"crew\"}"));
+
+    assertThat(service.get(topic, "crew", "user-1")).isNull();
+  }
+
   // ── helpers ────────────────────────────────────────────────────────────────────────────────
 
   private static String missionTopic() {
     return "mission:" + UUID.randomUUID();
+  }
+
+  private static String operationTopic() {
+    return "operation:" + UUID.randomUUID();
+  }
+
+  private static TextMessage changedFrame(String topic, String section) {
+    return new TextMessage(
+        "{\"type\":\"changed\",\"topic\":\"" + topic + "\",\"sections\":[\"" + section + "\"]}");
+  }
+
+  private void subscribe(FakeSession session, String topic) throws Exception {
+    handler.handleTextMessage(
+        session, new TextMessage("{\"type\":\"subscribe\",\"topic\":\"" + topic + "\"}"));
+  }
+
+  private FakeSession openMultiplexedSession(OidcUser user) throws Exception {
+    FakeSession session = new FakeSession();
+    session.open = true;
+    session.uri = URI.create("ws://localhost/ws/sync");
+    session.attributes.put(LiveSyncWebSocketHandler.ATTR_MULTIPLEXED, Boolean.TRUE);
+    session.principal =
+        new UsernamePasswordAuthenticationToken(
+            user, "n/a", List.of(new SimpleGrantedAuthority("ROLE_USER")));
+    handler.afterConnectionEstablished(session);
+    return session;
+  }
+
+  private double subscribeCounter(String outcome, String topicClass) {
+    var counter =
+        registry
+            .find(MetricNames.LIVESYNC_SUBSCRIBE)
+            .tag(MetricNames.TAG_OUTCOME, outcome)
+            .tag(MetricNames.TAG_TOPIC_CLASS, topicClass)
+            .counter();
+    return counter == null ? 0.0 : counter.count();
   }
 
   private static List<String> sectionsOf(JsonNode relayed) {
@@ -436,11 +697,15 @@ class LiveSyncWebSocketHandlerTest {
   }
 
   private double dropCounter(String reason) {
+    return dropCounter(reason, "mission");
+  }
+
+  private double dropCounter(String reason, String topicClass) {
     var counter =
         registry
             .find(MetricNames.PRESENCE_RELAY_DROPPED)
             .tag(MetricNames.TAG_REASON, reason)
-            .tag(MetricNames.TAG_TOPIC_CLASS, "mission")
+            .tag(MetricNames.TAG_TOPIC_CLASS, topicClass)
             .counter();
     return counter == null ? 0.0 : counter.count();
   }

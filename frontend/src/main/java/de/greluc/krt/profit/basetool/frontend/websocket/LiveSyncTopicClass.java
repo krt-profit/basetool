@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.websocket;
 
 import java.util.Set;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * The bounded set of live-sync topic <em>classes</em> — the single source of truth for the
@@ -41,7 +42,12 @@ import org.jetbrains.annotations.NotNull;
  *       LiveSyncSectionMapParityTest});
  *   <li>{@link #presenceEnabled} — whether this class carries editor-presence (focus/blur/heartbeat
  *       dots). Only the mission surface does today;
- *   <li>{@link #metricLabel} — the bounded {@code topic_class} metric label value (REQ-OBS-011).
+ *   <li>{@link #metricLabel} — the bounded {@code topic_class} metric label value (REQ-OBS-011);
+ *   <li>{@link #authProbePath} — for a resource-scoped class, the authenticated backend read whose
+ *       success authorizes a {@code /ws/sync} <em>subscribe</em> to a concrete topic of this class
+ *       (the {@code {id}} placeholder is replaced with the topic's resource UUID). {@code null} for
+ *       a global room, which is authorized by the socket's authentication alone (a per-role local
+ *       check is layered on when such a class ships). See {@code LiveSyncSubscriptionAuthorizer}.
  * </ul>
  *
  * <p>Note that {@code bank} and {@code bank:{accountId}} deliberately share the {@link #prefix}
@@ -65,13 +71,27 @@ public enum LiveSyncTopicClass {
           "frequencies",
           "organisation"),
       true,
-      "mission");
+      "mission",
+      "/api/v1/missions/{id}"),
+
+  /**
+   * Per-operation room: the operation detail page (#1115). No editor-presence dots; a subscribe is
+   * authorized by the same authenticated {@code GET /api/v1/operations/{id}} the page performs.
+   */
+  OPERATION(
+      "operation",
+      true,
+      Set.of("overview", "missions", "payout", "finance"),
+      false,
+      "operation",
+      "/api/v1/operations/{id}");
 
   private final String prefix;
   private final boolean scoped;
   private final Set<String> allowedSections;
   private final boolean presenceEnabled;
   private final String metricLabel;
+  private final String authProbePath;
 
   /**
    * Defines one topic class.
@@ -82,18 +102,22 @@ public enum LiveSyncTopicClass {
    * @param allowedSections the section-key whitelist the relay forwards for this class
    * @param presenceEnabled whether this class carries editor-presence dots
    * @param metricLabel the bounded {@code topic_class} metric label value
+   * @param authProbePath the authenticated backend read that authorizes a subscribe to a concrete
+   *     topic of this class ({@code {id}} → resource UUID), or {@code null} for a global room
    */
   LiveSyncTopicClass(
       @NotNull String prefix,
       boolean scoped,
       @NotNull Set<String> allowedSections,
       boolean presenceEnabled,
-      @NotNull String metricLabel) {
+      @NotNull String metricLabel,
+      @Nullable String authProbePath) {
     this.prefix = prefix;
     this.scoped = scoped;
     this.allowedSections = allowedSections;
     this.presenceEnabled = presenceEnabled;
     this.metricLabel = metricLabel;
+    this.authProbePath = authProbePath;
   }
 
   /**
@@ -143,5 +167,17 @@ public enum LiveSyncTopicClass {
   @NotNull
   public String metricLabel() {
     return metricLabel;
+  }
+
+  /**
+   * Returns the authenticated backend read that authorizes a {@code /ws/sync} subscribe to a
+   * concrete topic of this class, with a {@code {id}} placeholder for the resource UUID, or {@code
+   * null} for a global room (authorized by the socket authentication alone).
+   *
+   * @return the subscribe-authorization probe path template, or {@code null}
+   */
+  @Nullable
+  public String authProbePath() {
+    return authProbePath;
   }
 }

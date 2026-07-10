@@ -44,6 +44,30 @@ class LiveSyncTopicTest {
   }
 
   @Test
+  void parse_acceptsScopedOperationTopic() {
+    UUID id = UUID.randomUUID();
+
+    LiveSyncTopic topic = LiveSyncTopic.parse("operation:" + id);
+
+    assertThat(topic).isNotNull();
+    assertThat(topic.topicClass()).isEqualTo(LiveSyncTopicClass.OPERATION);
+    assertThat(topic.resourceId()).isEqualTo(id);
+    assertThat(topic.canonical()).isEqualTo("operation:" + id);
+  }
+
+  @Test
+  void everyScopedClassExposesAnAuthProbePathWithAnIdPlaceholder() {
+    for (LiveSyncTopicClass topicClass : LiveSyncTopicClass.values()) {
+      if (topicClass.scoped()) {
+        assertThat(topicClass.authProbePath())
+            .as("scoped class %s has a subscribe-auth probe path", topicClass)
+            .isNotBlank();
+        assertThat(topicClass.authProbePath()).contains("{id}");
+      }
+    }
+  }
+
+  @Test
   void parse_rejectsUnknownPrefix() {
     assertThat(LiveSyncTopic.parse("bogus:" + UUID.randomUUID())).isNull();
     assertThat(LiveSyncTopic.parse("bogus")).isNull();
