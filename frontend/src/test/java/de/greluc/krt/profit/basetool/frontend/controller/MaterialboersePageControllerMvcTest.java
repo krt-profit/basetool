@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyClass;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
@@ -120,6 +121,44 @@ class MaterialboersePageControllerMvcTest {
         .andExpect(content().string(containsString("Agricium")))
         .andExpect(content().string(containsString("data-mb-tab")))
         .andExpect(content().string(containsString("<strong>Titanium</strong>")));
+  }
+
+  /**
+   * A PIECE material renders its amount as an integer count in the piece unit ("12 Piece"), never
+   * as SCU — the regression from issue #1182 where every offer was shown as SCU. The locale is
+   * pinned to English via {@code ?lang} so the assertion stays ASCII.
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void page_pieceMaterial_rendersPieceUnitNotScu() throws Exception {
+    MaterialExchangeOfferDto piece =
+        new MaterialExchangeOfferDto(
+            offerId,
+            new MaterialReferenceDto(UUID.randomUUID(), "Ballistic Gatling", "PIECE"),
+            new UserReferenceDto(UUID.randomUUID(), "Lenoro", "Lenoro", "Lenoro", null),
+            new SquadronReferenceDto(UUID.randomUUID(), "IRIDIUM", "IRI"),
+            false,
+            false,
+            500,
+            12.0,
+            Instant.now(),
+            "Tausche.",
+            0,
+            null,
+            false,
+            "ACTIVE",
+            0L);
+    when(backendApiClient.get(contains("/material-exchange/offers?"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(piece), 0, 200, 1, 1, List.of()));
+    when(backendApiClient.get(contains("/material-exchange/counts"), anyClass()))
+        .thenReturn(new MaterialExchangeCountsDto(1, 0));
+
+    mockMvc
+        .perform(get("/materialboerse").param("lang", "en"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("12 Piece")))
+        .andExpect(content().string(not(containsString("12.000 SCU"))))
+        .andExpect(content().string(not(containsString("12,000 SCU"))));
   }
 
   /** The list fragment renders on its own for an in-place filter swap. */

@@ -6,7 +6,25 @@
 
 - **Verbesserung: Nutzer-Auswahlfelder suchen jetzt serverseitig statt die ganze Mitgliederliste vorzuladen.** Die Auswahlfelder, die bisher alle Mitglieder komplett vorluden (u. a. in Lager, Raffinerie, Aufträgen, Missionen, Rollen-/Leitungsverwaltung und der Kartellbank), durchsuchen die Mitglieder jetzt erst bei der Eingabe über den Server — schneller und skalierbar für tausende Konten. Gäste-Felder und die Halter-Auswahl bleiben unverändert (#1193).
 
+- **Weniger Log-Rauschen, wenn das Backend kurz nicht erreichbar ist (z. B. bei einem Neustart/Deploy).** Ein durch den offenen Circuit-Breaker kurzgeschlossener Aufruf wurde bisher dreifach als `WARN` protokolliert und flutete bei jedem Backend-Neustart das Log, sodass ein erwarteter, sich selbst behebender Aussetzer kaum von einem echten Vorfall zu unterscheiden war. Solche kurzgeschlossenen Aufrufe werden jetzt auf `DEBUG` gestuft; das einmalige Öffnen des Breakers, die Metrik und der Alert bleiben als Signal erhalten (#1203).
+
+- **Fehler behoben: Ein langsamer, aber erfolgreicher Backend-Aufruf wird nicht mehr als WARN protokolliert.** Erfolgreiche Aufrufe (z. B. `POST /api/v1/users/sync` mit Status 200), die nur die Langsam-Schwelle überschritten, erschienen im Log fälschlich als WARN. Sie werden jetzt als INFO mit dem Marker „Slow backend call" geführt; WARN bleibt echten Serverfehlern (5xx) und Netzwerkfehlern vorbehalten. Die Latenzüberwachung erfolgt weiterhin über das `http.client.requests`-p95-Histogramm (#1204).
+
+- **Fehler behoben: Hibernate-Warnungen aus dem Backend-Log entfernt.** Die überflüssige explizite `hibernate.dialect`-Angabe (PostgreSQL wird automatisch erkannt) wurde entfernt und die veralteten `@Valid`-Container-Annotationen auf die Typargument-Form (`List<@Valid X>`) umgestellt. Die Validierung bleibt unverändert; das Backend-Log startet nun ohne diese Warnungen (#1206).
+
+- **Fehler behoben: Keine wiederkehrenden Warnungen mehr im Log nach der UEX-Synchronisation.** UEX vergibt mehreren Item-IDs (Basis-Item und seine Skins) dieselbe Spiel-UUID; da `external_uuid` eindeutig ist, kann nur eine Zeile die UUID führen. Das ist erwartetes, dauerhaftes Verhalten, wurde aber bisher bei jedem Lauf pro betroffener Zeile als Warnung geloggt. Diese Fälle werden jetzt auf DEBUG geloggt; die Laufzusammenfassung nennt stattdessen die Gesamtzahl (`sharedUuidDeclined`) (#1205).
+
+## [v1.2.6](https://github.com/krt-profit/basetool/releases/tag/v1.2.6) - 2026-07-09
+
+### Added
+
+- **Benachrichtigung, wenn jemand Interesse an einem Materialbörse-Angebot anmeldet.** Anbieter erhalten jetzt eine In-App-Benachrichtigung, sobald ein Mitglied Interesse an einem ihrer Angebote anmeldet, und müssen die Börse dafür nicht mehr selbst im Blick behalten (#1187).
+
+### Changed
+
 - **Fehler behoben: Weiße Rahmen und helle Überlagerung in der Materialbörse-Liste entfernt.** Die Angebotsliste rendert ihre Einträge als Schaltflächen; ohne zurückgesetzte Browser-Standardoptik zeigten nicht ausgewählte Einträge eine helle Überlagerung und weiße Rahmen. Die Liste folgt jetzt wieder dem KRT-Designsystem (#1184).
+
+- **Fehler behoben: Die Materialbörse zeigt jetzt die richtige Mengeneinheit.** Angebote stückbasierter Materialien (Einheit „Stück") wurden auf der Börse, im Detailbereich und im Freigabe-Dialog fälschlich immer als „SCU" angezeigt. Die Menge folgt jetzt der Einheit des Materials (SCU oder Stück) – wie im Lager (#1182).
 
 ## [v1.2.5](https://github.com/krt-profit/basetool/releases/tag/v1.2.5) - 2026-07-09
 
