@@ -34,7 +34,7 @@
 
 /* global OPS_DETAIL_MSG, MSG_PAYOUT_PAID_ERROR, MSG_PAYOUT_PAID_FORBIDDEN, MSG_PAYOUT_PAID_UNSET_LOCKED, OPS_FINANCE_DETAIL_ERROR */
 
-// ---- Live multi-user sync (REQ-FE-010 / REQ-FE-015, ADR-0092) -------------------------------
+// ---- Live multi-user sync (REQ-FE-010 / REQ-FE-015, ADR-0093) -------------------------------
 // A peer's core save / paid-out toggle re-renders the affected operation section fragment in place
 // for every other viewer, over the shared /ws/sync socket. Only opaque section keys cross the wire;
 // each viewer re-pulls its own authorization-checked fragment. OPERATION_SECTIONS is the single

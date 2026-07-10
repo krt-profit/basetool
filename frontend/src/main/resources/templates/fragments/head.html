@@ -121,7 +121,7 @@
     -->
     <script th:src="@{/js/krt-fetch.js}" th:attr="nonce=${cspNonce}"></script>
     <!--
-      Shared tool-wide live-sync client (REQ-FE-015, ADR-0092): window.krtLiveSync.createReceiver,
+      Shared tool-wide live-sync client (REQ-FE-015, ADR-0093): window.krtLiveSync.createReceiver,
       the coalescing / busy-guard / deferred-pill receiver reused by every peer-synced surface
       (mission, operation, orders, bank, materialboard). Loaded globally right after krt-fetch.js —
       like it, a small non-deferred dependency page modules use at load — so a page's inline seam

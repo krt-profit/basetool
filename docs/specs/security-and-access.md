@@ -250,7 +250,7 @@ read). Finance-entry creation is therefore no longer anonymous.
 `MissionController`, `MissionFinanceEntryController`, `AuthHelperService`,
 `SecurityConfig` · **Role matrix:** [`ROLES_AND_PERMISSIONS.md` §1](../../ROLES_AND_PERMISSIONS.md)
 
-**Live-sync WebSocket (`/ws/sync`; REQ-FE-015 / [ADR-0092](../adr/0092-tool-wide-topic-room-live-sync-relay.md)).**
+**Live-sync WebSocket (`/ws/sync`; REQ-FE-015 / [ADR-0093](../adr/0093-tool-wide-topic-room-live-sync-relay.md)).**
 The tool-wide peer-sync transport is one multiplexed `/ws/sync` socket per tab (plus the
 one-release legacy aliases `/ws/missions/{id}/presence` and `/ws/materialboerse/board`).
 `SecurityConfig` gates all `/ws/**` to an **authenticated** principal, and every handshake is pinned

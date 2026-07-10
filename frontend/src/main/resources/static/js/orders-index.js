@@ -31,7 +31,7 @@
 
 /* global KRT_ORDERS_AGE_YELLOW, KRT_ORDERS_AGE_RED, KRT_ORDERS_LIVESYNC_UPDATES, KRT_ORDERS_SECTION_REFRESH_ERROR */
 
-// ---- Live multi-user sync — the staff queue (REQ-FE-010 / REQ-FE-015, ADR-0092) -------------
+// ---- Live multi-user sync — the staff queue (REQ-FE-010 / REQ-FE-015, ADR-0093) -------------
 // When anyone creates / reorders / completes an order, every other viewer's queue re-fetches its
 // OWN filter/page in place over the shared /ws/sync `orders` room. Only the opaque `queue` key
 // crosses the wire; each viewer re-pulls its own authorization-checked list fragment (a non-profit

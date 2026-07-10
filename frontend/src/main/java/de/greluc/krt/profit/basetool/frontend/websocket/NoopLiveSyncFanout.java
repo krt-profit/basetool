@@ -24,7 +24,7 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * Single-instance {@link LiveSyncFanout}: publishing is a no-op because the handler's local relay
- * is the whole story when the frontend runs as one replica (ADR-0092).
+ * is the whole story when the frontend runs as one replica (ADR-0093).
  *
  * <p>Contributed as the fallback {@code @Bean} in {@code LiveSyncWebSocketConfig} via
  * {@code @ConditionalOnMissingBean}, so the Redis binding (when enabled) replaces it and the {@code

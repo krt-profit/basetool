@@ -36,7 +36,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * Two-context live-sync coverage for the mission Verwaltung <em>Organisation</em> panel (#1120,
- * REQ-FE-015 / ADR-0092): a party-lead change one viewer makes on the Verwaltung tab must appear on
+ * REQ-FE-015 / ADR-0093): a party-lead change one viewer makes on the Verwaltung tab must appear on
  * another viewer's (default-tab) overview without a manual reload — the {@code organisation}/{@code
  * overview} section keys crossing the mission relay.
  *

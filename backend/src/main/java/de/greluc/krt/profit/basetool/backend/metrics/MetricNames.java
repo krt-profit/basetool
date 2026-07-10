@@ -192,7 +192,7 @@ public final class MetricNames {
 
   /**
    * Counter {@code basetool_sse_redis_published_total} — real-time notification signals this
-   * instance published to the cross-replica Redis channel (ADR-0092).
+   * instance published to the cross-replica Redis channel (ADR-0093).
    */
   public static final String SSE_REDIS_PUBLISHED = "basetool.sse.redis.published";
 
@@ -206,7 +206,7 @@ public final class MetricNames {
    * Counter {@code basetool_sse_redis_errors_total} — tag {@code op} ({@link #OP_PUBLISH} / {@link
    * #OP_CONSUME}); a Redis fan-out publish or consume that failed (swallowed — local delivery
    * already happened, so the failure only degrades cross-replica push; polling remains the
-   * fallback, ADR-0092).
+   * fallback, ADR-0093).
    */
   public static final String SSE_REDIS_ERRORS = "basetool.sse.redis.errors";
 

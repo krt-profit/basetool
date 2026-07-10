@@ -37,7 +37,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * In-memory editor-presence store for live-sync topics that carry presence dots (REQ-FE-015,
- * ADR-0092) — today only the mission surface.
+ * ADR-0093) — today only the mission surface.
  *
  * <p>Tracks, per topic and per section key, which users are currently editing that section. Entries
  * decay after {@link #ENTRY_TTL} since the last heartbeat — a client that closes its tab or
@@ -45,7 +45,7 @@ import org.springframework.stereotype.Service;
  * by the scheduled cleanup in {@code LiveSyncWebSocketHandler}.
  *
  * <p><b>Per-instance only.</b> The state lives in a {@link ConcurrentHashMap} local to this JVM.
- * Unlike the {@code changed} relay — which fans out across replicas via Redis pub/sub (ADR-0092) —
+ * Unlike the {@code changed} relay — which fans out across replicas via Redis pub/sub (ADR-0093) —
  * presence dots are deliberately <em>not</em> mirrored across instances: they are a best-effort
  * awareness cue, and cross-replica dots would need shared TTL state or presence-frame mirroring for
  * a cosmetic feature. Consequence: viewers on different replicas may see different dot sets. This

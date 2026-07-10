@@ -37,7 +37,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Redis pub/sub {@link LiveSyncFanout} that makes the {@code changed} relay correct across frontend
- * replicas (ADR-0092).
+ * replicas (ADR-0093).
  *
  * <p>The handler always relays a {@code changed} frame to <em>this</em> instance's local rooms
  * first, then calls {@link #publish(String, List)}, which serialises {@code {v, topic, sections,

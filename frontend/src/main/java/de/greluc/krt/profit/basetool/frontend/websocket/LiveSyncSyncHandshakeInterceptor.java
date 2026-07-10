@@ -39,7 +39,7 @@ import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.server.HandshakeInterceptor;
 
 /**
- * Prepares a multiplexed {@code /ws/sync} live-sync handshake (REQ-FE-015, ADR-0092).
+ * Prepares a multiplexed {@code /ws/sync} live-sync handshake (REQ-FE-015, ADR-0093).
  *
  * <p>Unlike the legacy per-resource sockets, {@code /ws/sync} binds no topic at handshake: it marks
  * the future session {@linkplain LiveSyncWebSocketHandler#ATTR_MULTIPLEXED multiplexed} and lets

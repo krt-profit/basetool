@@ -45,7 +45,7 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Wires the live-sync WebSocket endpoints (REQ-FE-015, ADR-0092).
+ * Wires the live-sync WebSocket endpoints (REQ-FE-015, ADR-0093).
  *
  * <p>Registers the shared {@link LiveSyncWebSocketHandler} on three paths: the two legacy
  * per-surface aliases {@code /ws/missions/{missionId}/presence} (the {@link
@@ -78,7 +78,7 @@ public class LiveSyncWebSocketConfig implements WebSocketConfigurer {
    * Subscribe-authorization executor sizing: {@value} worker threads. Kept modest because each
    * probe is a single short backend read; the deploy-time reconnect storm (~600 subscribes spread
    * over the client's 1–30 s reconnect jitter) stays well within this pool plus its queue, and any
-   * overflow fails the subscribe open rather than blocking (ADR-0092 capacity model).
+   * overflow fails the subscribe open rather than blocking (ADR-0093 capacity model).
    */
   private static final int SUBSCRIBE_AUTH_THREADS = 8;
 

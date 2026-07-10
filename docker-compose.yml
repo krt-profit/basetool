@@ -333,7 +333,7 @@ x-backend: &backend-template
     APP_MAIL_ENABLED: ${APP_MAIL_ENABLED:-true}
     APP_MAIL_FROM_ADDRESS: ${APP_MAIL_FROM_ADDRESS:-no-reply@profit-base.online}
     APP_MAIL_FROM_NAME: ${APP_MAIL_FROM_NAME:-Profit Basetool}
-    # Redis for the cross-replica notification SSE fan-out (ADR-0092). Same secret the frontend /
+    # Redis for the cross-replica notification SSE fan-out (ADR-0093). Same secret the frontend /
     # ingest already use for Spring Session / handoff staging. The connection is lazy and only
     # opened when the fan-out is enabled (prod, application-prod.yml); a Redis outage degrades to
     # local-only SSE + the polling fallback (REQ-NOTIF-006).
@@ -573,7 +573,7 @@ services:
     # restricted `monitoring` user; `--requirepass` below is kept only as redundant belt-and-braces.
     # A missing/empty ACL file makes redis exit at startup, which the deploy health-gate turns into a
     # clean rollback rather than a silent breakage. Untouched for redis-dev.
-    # ADR-0092: the live-sync + notification fan-outs PUBLISH/SUBSCRIBE on the pub/sub channels
+    # ADR-0093: the live-sync + notification fan-outs PUBLISH/SUBSCRIBE on the pub/sub channels
     # `basetool:livesync:changed` (frontend) and `basetool:notify:published` (backend). The `default`
     # user's `&*` grant (above) already covers these; the restricted `monitoring` user must NOT gain
     # `&*`. Pub/sub adds no keys, so the 384mb noeviction budget (ADR-0079) is unaffected.
@@ -586,7 +586,7 @@ services:
     networks:
       - net-redis-frontend
       - net-redis-ingest
-      # The backend joins for the notification SSE cross-replica fan-out (ADR-0092).
+      # The backend joins for the notification SSE cross-replica fan-out (ADR-0093).
       - net-redis-backend
 
   redis-dev:
@@ -719,7 +719,7 @@ services:
       - net-backend-frontend
       - net-backend-keycloak
       - net-backend-ingest
-      # Notification SSE cross-replica fan-out (ADR-0092) — reaches the `redis` service.
+      # Notification SSE cross-replica fan-out (ADR-0093) — reaches the `redis` service.
       - net-redis-backend
       # Prometheus scrapes /actuator/prometheus (HTTPS) and Alloy receives OTLP spans here (epic #936).
       - net-monitoring-scrape
@@ -1043,7 +1043,7 @@ networks:
       config:
         - subnet: 172.28.9.0/24
           gateway: 172.28.9.1
-  # Backend ↔ Redis for the notification SSE cross-replica fan-out (ADR-0092). A dedicated network
+  # Backend ↔ Redis for the notification SSE cross-replica fan-out (ADR-0093). A dedicated network
   # (like net-redis-ingest) rather than widening net-redis-frontend, so no new lateral path opens.
   # Explicit `name:` for parity with the other pinned redis nets. Subnet continues the pinned
   # 172.28.0.0/16 block (.11).

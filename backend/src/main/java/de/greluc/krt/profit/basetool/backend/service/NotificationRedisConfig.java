@@ -32,7 +32,7 @@ import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 
 /**
- * Wires the cross-replica Redis pub/sub fan-out behind the notification SSE push (ADR-0092),
+ * Wires the cross-replica Redis pub/sub fan-out behind the notification SSE push (ADR-0093),
  * discharging the ADR-0016 single-instance follow-up.
  *
  * <p>Lives in the {@code service} package (not {@code config}) on purpose: its {@code @Bean}

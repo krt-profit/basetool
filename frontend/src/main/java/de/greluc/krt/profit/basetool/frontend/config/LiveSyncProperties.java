@@ -25,7 +25,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Type-safe configuration for the tool-wide live-sync relay (REQ-FE-015, ADR-0092).
+ * Type-safe configuration for the tool-wide live-sync relay (REQ-FE-015, ADR-0093).
  *
  * @param redis the cross-replica Redis pub/sub fan-out settings
  */

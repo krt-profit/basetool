@@ -23,7 +23,7 @@ import java.util.List;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Cross-replica fan-out seam for the live-sync {@code changed} relay (ADR-0092).
+ * Cross-replica fan-out seam for the live-sync {@code changed} relay (ADR-0093).
  *
  * <p>The handler always relays a {@code changed} frame to its <em>own</em> local room first, then
  * calls {@link #publish(String, List)} so other frontend replicas can relay it to <em>their</em>

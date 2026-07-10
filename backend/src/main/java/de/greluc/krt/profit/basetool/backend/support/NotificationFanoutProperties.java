@@ -26,7 +26,7 @@ import org.springframework.validation.annotation.Validated;
 
 /**
  * Type-safe configuration for the cross-replica notification SSE Redis fan-out (REQ-FE-015,
- * ADR-0092).
+ * ADR-0093).
  *
  * <p>Lives in the dependency-leaf {@code support} package (not {@code config}) to avoid a {@code
  * service}/{@code config} package cycle, like the other backend leaf

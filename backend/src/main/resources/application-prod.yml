@@ -42,7 +42,7 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
-  # Redis for the cross-replica notification SSE fan-out (ADR-0092). The backend reaches the same
+  # Redis for the cross-replica notification SSE fan-out (ADR-0093). The backend reaches the same
   # `redis` service the frontend uses (net-redis-backend); the connection is lazy and only exercised
   # when the fan-out is enabled below.
   data:
@@ -85,7 +85,7 @@ springdoc:
     enabled: false
 
 management:
-  # Prod turns the notification SSE Redis fan-out ON (ADR-0092), so a notification pushed on one
+  # Prod turns the notification SSE Redis fan-out ON (ADR-0093), so a notification pushed on one
   # backend replica reaches a user connected to another. The Redis health indicator is re-enabled
   # for monitoring visibility of an outage; Redis stays OUT of the readiness group (base config), so
   # a Redis blip surfaces in the root health aggregate + metrics without flipping the container

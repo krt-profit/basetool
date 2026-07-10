@@ -24,7 +24,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Cross-replica fan-out seam for the real-time notification push (ADR-0092).
+ * Cross-replica fan-out seam for the real-time notification push (ADR-0093).
  *
  * <p>{@link NotificationEventListener} pushes through this seam instead of calling {@link
  * NotificationStreamService#publish(Collection)} directly. The default binding ({@code

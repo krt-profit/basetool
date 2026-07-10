@@ -84,7 +84,7 @@ public class NotificationEventListener {
     }
     try {
       // Push through the fan-out seam: local-only by default, cross-replica via Redis when enabled
-      // (ADR-0092). Best-effort — the polling fallback keeps the badge correct (REQ-NOTIF-010).
+      // (ADR-0093). Best-effort — the polling fallback keeps the badge correct (REQ-NOTIF-010).
       notificationFanout.publish(recipients);
     } catch (RuntimeException e) {
       log.debug("Real-time notification push failed; polling fallback remains", e);

@@ -102,7 +102,7 @@
         canTransfer: 'data-can-transfer',
     };
 
-    // ---- Live multi-user sync — the Kartellbank rooms (REQ-FE-010 / REQ-FE-015, ADR-0092) --------
+    // ---- Live multi-user sync — the Kartellbank rooms (REQ-FE-010 / REQ-FE-015, ADR-0093) --------
     // A peer's booking / request / grant / settings change re-renders the affected bank fragment in
     // place for every other viewer of the same room, over the shared /ws/sync socket. Only opaque
     // section keys cross the wire; each viewer re-pulls its OWN authorization-checked fragment (its

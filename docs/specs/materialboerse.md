@@ -180,7 +180,7 @@ Complies with `docs/specs/frontend-ajax-mutations.md` (REQ-FE-001…014).
 
 Because the board is a surface several members see at once, a peer's release / deactivate / interest
 change propagates to other viewers without a manual reload, over the shared tool-wide multiplexed
-live-sync relay — the global `materialboard` topic room on `/ws/sync` (REQ-FE-015, ADR-0092), into
+live-sync relay — the global `materialboard` topic room on `/ws/sync` (REQ-FE-015, ADR-0093), into
 which the former dedicated Materialbörse presence relay (ADR-0082, decision D4) was folded so the
 board no longer forks its own single-instance socket. It mirrors the REQ-FE-010 three-mirror-point
 contract (acting-client broadcast ↔ server relay accept-list ↔ receiving-client apply map): the

@@ -61,7 +61,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Generic native-WebSocket relay for the tool-wide live-sync feature (REQ-FE-015, ADR-0092).
+ * Generic native-WebSocket relay for the tool-wide live-sync feature (REQ-FE-015, ADR-0093).
  *
  * <p>Generalises the former per-mission presence relay into a topic-room relay: a socket is bound
  * to a {@link LiveSyncTopic} (its {@link LiveSyncTopicClass} fixes the section whitelist and
@@ -88,7 +88,7 @@ import tools.jackson.databind.node.ObjectNode;
  * local room first, then handed to {@link LiveSyncFanout#publish(String, List)} so peer replicas
  * relay it to their local rooms; {@link #deliverFromFanout(String, List)} is the consume-side entry
  * a Redis subscriber calls. Because local relay happens first, a fan-out outage degrades to
- * single-instance behaviour, never worse (ADR-0092).
+ * single-instance behaviour, never worse (ADR-0093).
  *
  * <p><b>Concurrency &amp; backpressure</b> (preserved verbatim from the mission relay,
  * #1149/#1150): the per-topic session map is a {@link ConcurrentHashMap} whose sets are mutated
@@ -907,7 +907,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Relays a {@code changed} signal that arrived from a peer replica via the fan-out (ADR-0092) to
+   * Relays a {@code changed} signal that arrived from a peer replica via the fan-out (ADR-0093) to
    * this instance's local room. No origin session is excluded — the originator lives on another
    * replica — and nothing is re-published (that would loop).
    *
@@ -923,7 +923,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Publishes a <em>server-originated</em> {@code changed} signal (REQ-FE-015, ADR-0092): relays it
+   * Publishes a <em>server-originated</em> {@code changed} signal (REQ-FE-015, ADR-0093): relays it
    * to this instance's local room (no origin to exclude — there is no acting socket) and hands it
    * to the cross-replica fan-out. This is the seam a controller uses when the mutating actor has no
    * socket to publish from — chiefly an <b>anonymous guest order create</b>, which must still poke

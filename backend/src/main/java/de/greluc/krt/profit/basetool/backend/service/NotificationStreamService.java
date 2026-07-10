@@ -43,7 +43,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * (REQ-NOTIF-010).
  *
  * <p>This registry delivers to <em>this</em> instance's emitters only; cross-replica fan-out is
- * layered on top by {@link NotificationFanout} (local-first, then Redis pub/sub — ADR-0092,
+ * layered on top by {@link NotificationFanout} (local-first, then Redis pub/sub — ADR-0093,
  * discharging the ADR-0016 follow-up), not by this class. Push is strictly best-effort: a failed
  * send simply drops that emitter, and the frontend's polling (REQ-NOTIF-006) remains the guaranteed
  * fallback. A periodic named {@code heartbeat} event keeps idle connections alive across proxies

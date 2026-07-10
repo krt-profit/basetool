@@ -352,7 +352,7 @@ public class SecurityConfig {
                     // here.
                     .requestMatchers("/ws/materialboerse/**")
                     .authenticated()
-                    // Multiplexed tool-wide live-sync WebSocket (REQ-FE-015, ADR-0092): one socket
+                    // Multiplexed tool-wide live-sync WebSocket (REQ-FE-015, ADR-0093): one socket
                     // per tab carrying every peer-sync topic. Authenticated only — anonymous guests
                     // get no socket (their order creates are relayed server-side instead), and both
                     // publish and subscribe require an authenticated principal; only opaque section

@@ -28,7 +28,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Default single-instance {@link NotificationFanout}: delivers only to this backend instance's SSE
- * emitters — byte-for-byte the behaviour before ADR-0092.
+ * emitters — byte-for-byte the behaviour before ADR-0093.
  *
  * <p>Active unless {@code app.notifications.redis-fanout.enabled} is {@code true} (mutually
  * exclusive with {@code RedisNotificationFanout} on the same property, so exactly one binding is

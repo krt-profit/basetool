@@ -208,7 +208,7 @@ app:
       max-age: ${APP_NOTIFICATIONS_RETENTION_MAX_AGE:P90D}
       interval: ${APP_NOTIFICATIONS_RETENTION_INTERVAL:PT24H}
     redis-fanout:
-      # Cross-replica real-time notification push (REQ-FE-015, ADR-0092). Off by default: the
+      # Cross-replica real-time notification push (REQ-FE-015, ADR-0093). Off by default: the
       # backend delivers SSE only to its own emitters (LocalNotificationFanout). Prod turns it on
       # (application-prod.yml) so a notification pushed on one replica reaches a user connected to
       # another; a Redis outage degrades to local-only + the polling fallback (REQ-NOTIF-006).
@@ -333,7 +333,7 @@ management:
       exposure:
         include: health, prometheus
   health:
-    # The backend gained spring-boot-starter-data-redis for the notification SSE fan-out (ADR-0092).
+    # The backend gained spring-boot-starter-data-redis for the notification SSE fan-out (ADR-0093).
     # Its Redis health indicator is disabled by default so a no-Redis dev/test/CI environment never
     # flips the root health aggregate DOWN; prod re-enables it (application-prod.yml) for monitoring
     # visibility, but Redis stays OUT of the readiness group so an optional fan-out's Redis blip can

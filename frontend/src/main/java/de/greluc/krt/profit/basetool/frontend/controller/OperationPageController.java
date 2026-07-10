@@ -252,7 +252,7 @@ public class OperationPageController {
   /**
    * Renders a single operation-detail section fragment for an AJAX swap — the missions pager
    * (REQ-FE-002) and the live-sync peer-refresh targets overview/payout/finance (REQ-FE-015,
-   * ADR-0092). Each case loads only the backend reads its fragment needs (ADR-0078/ADR-0081
+   * ADR-0093). Each case loads only the backend reads its fragment needs (ADR-0078/ADR-0081
    * fragment-gating); an unknown fragment name or a backend failure degrades to a section-sized
    * inline error rather than a redirect, so one flaky peer-refresh never injects an unrelated
    * redirect target into a swap container.

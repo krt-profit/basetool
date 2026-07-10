@@ -19,7 +19,7 @@
     }
 
     let SERIALIZE_KEY = 'materialboerse';
-    // REQ-FE-015 (ADR-0092): the global live-sync room the board publishes to / subscribes from,
+    // REQ-FE-015 (ADR-0093): the global live-sync room the board publishes to / subscribes from,
     // multiplexed over the shared /ws/sync socket (window.krtLiveSync). Replaces the retired
     // per-board materialboerse-presence.js socket.
     let MATERIALBOARD_TOPIC = 'materialboard';

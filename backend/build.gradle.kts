@@ -40,7 +40,7 @@ dependencies {
   implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
   implementation("org.springframework.boot:spring-boot-starter-validation")
   implementation("org.springframework.boot:spring-boot-starter-cache")
-  // Redis for the cross-replica notification SSE pub/sub fan-out (REQ-FE-015, ADR-0092). Brings
+  // Redis for the cross-replica notification SSE pub/sub fan-out (REQ-FE-015, ADR-0093). Brings
   // Lettuce + StringRedisTemplate. The fan-out is property-gated off by default (see
   // NotificationRedisConfig / app.notifications.redis-fanout.enabled) and the Redis health
   // indicator is disabled so no Redis is contacted in dev/test/CI; only prod wires it.

@@ -41,21 +41,21 @@ public final class MetricNames {
 
   /**
    * Gauge {@code basetool_livesync_subscriptions} — tag {@code topic_class}; live live-sync topic
-   * subscriptions per topic class in {@code LiveSyncWebSocketHandler} (REQ-FE-015, ADR-0092).
+   * subscriptions per topic class in {@code LiveSyncWebSocketHandler} (REQ-FE-015, ADR-0093).
    */
   public static final String LIVESYNC_SUBSCRIPTIONS = "basetool.livesync.subscriptions";
 
   /**
    * Counter {@code basetool_livesync_subscribe_total} — tags {@code topic_class}, {@code outcome}
    * ({@link #OUTCOME_ALLOWED} / {@link #OUTCOME_DENIED}); the verdict of a multiplexed {@code
-   * /ws/sync} subscribe-authorization check (REQ-FE-015, ADR-0092). A saturated-executor fail-open
+   * /ws/sync} subscribe-authorization check (REQ-FE-015, ADR-0093). A saturated-executor fail-open
    * is instead counted as a {@link #DROPPED_AUTHORIZE_SATURATED} relay drop.
    */
   public static final String LIVESYNC_SUBSCRIBE = "basetool.livesync.subscribe";
 
   /**
    * Counter {@code basetool_livesync_redis_published_total} — tag {@code topic_class}; {@code
-   * changed} signals this instance published to the cross-replica Redis channel (ADR-0092).
+   * changed} signals this instance published to the cross-replica Redis channel (ADR-0093).
    */
   public static final String LIVESYNC_REDIS_PUBLISHED = "basetool.livesync.redis.published";
 
@@ -68,7 +68,7 @@ public final class MetricNames {
   /**
    * Counter {@code basetool_livesync_redis_errors_total} — tag {@code op} ({@link #OP_PUBLISH} /
    * {@link #OP_CONSUME}); a Redis fan-out publish or consume that failed (swallowed — local relay
-   * already happened, so the failure only degrades cross-replica delivery, ADR-0092).
+   * already happened, so the failure only degrades cross-replica delivery, ADR-0093).
    */
   public static final String LIVESYNC_REDIS_ERRORS = "basetool.livesync.redis.errors";
 

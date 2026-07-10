@@ -38,7 +38,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Redis pub/sub {@link NotificationFanout} that makes the real-time notification push correct
- * across backend replicas (ADR-0092), discharging the ADR-0016 single-instance follow-up.
+ * across backend replicas (ADR-0093), discharging the ADR-0016 single-instance follow-up.
  *
  * <p>{@link #publish(Collection)} delivers to <em>this</em> instance's SSE emitters first (via
  * {@link NotificationStreamService#publish(Collection)}), then publishes {@code {v, recipients,

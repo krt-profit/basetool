@@ -1,4 +1,4 @@
-# ADR-0092 — Tool-wide topic-room live sync over one multiplexed WebSocket with Redis pub/sub fan-out
+# ADR-0093 — Tool-wide topic-room live sync over one multiplexed WebSocket with Redis pub/sub fan-out
 
 - **Status:** Accepted
 - **Date:** 2026-07-10

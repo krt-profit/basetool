@@ -36,7 +36,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 
 /**
  * Authorizes a {@code /ws/sync} <em>subscribe</em> to a resource-scoped live-sync topic
- * (REQ-FE-015, ADR-0092).
+ * (REQ-FE-015, ADR-0093).
  *
  * <p>The legacy per-resource sockets authorize at handshake time, on the servlet thread, through
  * the ordinary {@code BackendApiClient} (see {@code LiveSyncLegacyHandshakeInterceptor}). The

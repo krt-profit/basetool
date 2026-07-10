@@ -25,7 +25,7 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * A parsed, validated live-sync topic: its {@link LiveSyncTopicClass}, the optional resource id,
- * and the canonical wire string used as the room key (REQ-FE-015, ADR-0092).
+ * and the canonical wire string used as the room key (REQ-FE-015, ADR-0093).
  *
  * <p>Only {@link #parse(String)} constructs instances, so a {@code LiveSyncTopic} is always a
  * well-formed topic of a known class with the scope its class demands (a resource UUID present iff

@@ -39,7 +39,7 @@
 let cachedInventoryItems = [];
 let isInventoryCached = false;
 
-// ---- Live multi-user sync — the order detail page (REQ-FE-010 / REQ-FE-015, ADR-0092) ---------
+// ---- Live multi-user sync — the order detail page (REQ-FE-010 / REQ-FE-015, ADR-0093) ---------
 // A peer's status / edit / handover / claim / assignee change re-renders the affected order-detail
 // section fragment in place for every other viewer of the SAME order, over the shared /ws/sync
 // order room. Only opaque section keys cross the wire; each viewer re-pulls its own

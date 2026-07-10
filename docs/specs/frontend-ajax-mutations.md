@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-10.
-> **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0031, ADR-0053, ADR-0069, ADR-0071, ADR-0092
+> **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0031, ADR-0053, ADR-0069, ADR-0071, ADR-0093
 
 # Frontend AJAX mutations — krtFetch, krtCsrf & fragment swaps
 
@@ -600,7 +600,7 @@ edit, an Ablauf-step, Ziele-objective or frequency/custom-frequency edit) must a
 is the in-place sibling of the bfcache gap (REQ-FE-008): the other viewer's DOM is stale until they
 reload.
 
-> **Amendment (#1102 / ADR-0092):** the mission detail page is the **first instance of the
+> **Amendment (#1102 / ADR-0093):** the mission detail page is the **first instance of the
 > tool-wide live-sync standard REQ-FE-015**. The transport described below now rides the
 > `mission:{id}` topic room on the shared multiplexed socket (`/ws/sync`, `krt-live-sync.js`); the
 > legacy `/ws/missions/{id}/presence` path stays aliased for one release. Everything else in this
@@ -653,7 +653,7 @@ random()*COALESCE_MS` — so peers that all received the same `changed` frame wi
 not fire their fragment refetches in one synchronized spike, #1125), and a dropped-then-reconnected
 socket triggers a one-shot resync of every visible section to recover signals missed while offline.
 
-**Multi-instance via Redis pub/sub (ADR-0092).** The `changed` relay fans out across frontend
+**Multi-instance via Redis pub/sub (ADR-0093).** The `changed` relay fans out across frontend
 replicas through the shared Redis channel described in REQ-FE-015 (local-relay first, so a Redis
 outage degrades to single-instance behaviour, never worse). The **presence dots remain
 per-instance** — an accepted, follow-up-tracked limitation: viewers on different replicas may see
@@ -707,7 +707,7 @@ assertion) · **Code:** `LiveSyncWebSocketHandler` / `LiveSyncTopicRegistry` (mi
 broadcast + receiver config — its container map derived from the `MISSION_SECTIONS` seam map — with
 flush-time busy re-check + finance-badge `krt:swapped` listener), `mission-detail.html`
 (`overviewSection` fragment), `MissionPageController` (`overview` fragment case) · **ADR:** ADR-0031,
-ADR-0069, ADR-0092
+ADR-0069, ADR-0093
 
 ### REQ-FE-011 — User-selection fields are searchable comboboxes (username + display name)
 
@@ -957,7 +957,7 @@ key whose container does not exist on the receiving page (guest redaction, reque
 vs ITEM orders, staff vs org-unit bank pages) is silently skipped — that asymmetry is the
 authorization model, not an error.
 
-**Authorization is asymmetric by design (ADR-0092).** *Subscribing* to a topic requires the same
+**Authorization is asymmetric by design (ADR-0093).** *Subscribing* to a topic requires the same
 authenticated read the page itself performs (table above), checked asynchronously off the WS
 container thread; an explicit 403/404 denies, transient failures and authorizer saturation fail
 open (safe: no data rides the socket, every fragment re-fetch re-authorizes per viewer).
@@ -971,7 +971,7 @@ amplification: whitelisted keys only, bucket-capped frames, and every receiver c
 coalesce window regardless of publish rate.
 
 **Pill, coalescing and resync follow REQ-FE-010 unchanged**, with one sizing addition (5000
-accounts / ≥200 concurrent, ADR-0092): detail-topic receivers keep the 400 ms jittered coalesce
+accounts / ≥200 concurrent, ADR-0093): detail-topic receivers keep the 400 ms jittered coalesce
 window; **global-room receivers (`orders`, `bank`, `orgunit-bank`) use 1500 ms** so a change seen by
 up to ~200 viewers spreads its fragment re-fetch herd instead of spiking. Peer-driven re-fetches
 always preserve the **peer's own** query state (filters, paging, view toggles — the page-URL getter
@@ -1008,7 +1008,7 @@ degradation) · `OperationLiveSyncE2eTest` / `JobOrderQueueLiveSyncE2eTest` /
 family) · **Code:** `LiveSyncWebSocketHandler`, `LiveSyncTopicRegistry`, `LiveSyncTopicAuthorizer`,
 `LiveSyncLocalBus`, `RedisLiveSyncFanout`, `krt-live-sync.js`, the per-page seam maps
 (`MISSION_SECTIONS`, `OPERATION_SECTIONS`, `ORDER_SECTIONS`, orders-queue seam, bank
-`LIVESYNC_SECTIONS`, materialboard) · **ADR:** ADR-0092 · **Issues:** #1102, #1115, #1120
+`LIVESYNC_SECTIONS`, materialboard) · **ADR:** ADR-0093 · **Issues:** #1102, #1115, #1120
 
 ## Out of scope
 
@@ -1018,7 +1018,7 @@ family) · **Code:** `LiveSyncWebSocketHandler`, `LiveSyncTopicRegistry`, `LiveS
   explicitly rejected in ADR-0012.
 - Live-collaboration features beyond the section-refresh sync of REQ-FE-010/-015
   (operational-transform text co-editing, server-pushed conflict resolution). Cross-replica fan-out
-  via Redis pub/sub moved **in scope** with REQ-FE-015 / ADR-0092; cross-replica **presence dots**
+  via Redis pub/sub moved **in scope** with REQ-FE-015 / ADR-0093; cross-replica **presence dots**
   remain out of scope (tracked follow-up).
 - Backend business-logic changes beyond adding JSON proxy endpoints that reuse existing backend
   APIs/DTOs.

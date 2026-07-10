@@ -37,7 +37,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * Two-context live-sync coverage for the Kartellbank staff request queue (#1102, REQ-FE-015 /
- * ADR-0092): a staff decision one bank employee makes on {@code /bank/requests} must update another
+ * ADR-0093): a staff decision one bank employee makes on {@code /bank/requests} must update another
  * employee's queue without a manual reload — the {@code requestQueue} section key crossing the
  * global {@code bank} room.
  *
