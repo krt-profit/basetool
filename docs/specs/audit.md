@@ -46,7 +46,9 @@ Coverage is **complete**, including the cross-area writers and the system/automa
 - **Aufträge** — create (material/item) / edit / status / priority / blueprint-coverage variant-counting
   toggle / delete / completion (a single funnel — manual and auto-completion via handover both record
   exactly one `JOB_ORDER_COMPLETED`) / reassign / assignee add/remove/note / material+inventory unlink /
-  material+item handover / claim upsert+withdraw.
+  material+item handover / claim upsert+withdraw. A requesting-owner edit (REQ-ORDERS-023) reuses the
+  existing `JOB_ORDER_UPDATED` / `JOB_ORDER_ITEM_UPDATED` / `JOB_ORDER_MATERIAL_UNLINKED` events with a
+  bounded `byRequester=true` details flag (no new event type; the actor already identifies who edited).
 - **Raffinerie** — order create / update / cancel / store; refining-method reference CRUD; the
   scheduled UEX method+yield sync (one summary event per run, actor `system`); owner-reassignment on
   user deletion.

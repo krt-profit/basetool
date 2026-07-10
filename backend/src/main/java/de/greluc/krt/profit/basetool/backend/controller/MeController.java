@@ -67,7 +67,7 @@ public class MeController {
 
   /**
    * Per-principal UI capability flags the frontend uses to decide which optional menu entries to
-   * show and which pages to redirect away from. Two flags today:
+   * show and which pages to redirect away from. Three flags today:
    *
    * <ul>
    *   <li>{@code canSeeBlueprintOverview} — whether the caller may open the org-unit blueprint
@@ -78,6 +78,11 @@ public class MeController {
    *       for admins and members of any profit-eligible org unit. Mirrors the backend gate folded
    *       into {@code OwnerScopeService.canSeeJobOrder} + the order-list short-circuit, so the
    *       hidden menu / redirect and the empty-list / 403 API stay in lockstep.
+   *   <li>{@code canViewOwnJobOrders} — whether the caller may view the orders their own org unit
+   *       requested (the "Meine Auftr&auml;ge" requester capability, REQ-ORDERS-023): {@code true}
+   *       for admins and any member of at least one org unit, independent of profit eligibility. It
+   *       lets a non-profit ordering-squad member reach their own placed orders instead of being
+   *       redirected to the create form.
    * </ul>
    *
    * @return the caller's UI capability flags; never {@code null}.
@@ -86,7 +91,9 @@ public class MeController {
   @Operation(summary = "Per-principal UI capability flags (blueprint-overview + job-order access).")
   public CapabilitiesResponse getCapabilities() {
     return new CapabilitiesResponse(
-        ownerScopeService.canAccessBlueprintOverview(), ownerScopeService.canViewJobOrders());
+        ownerScopeService.canAccessBlueprintOverview(),
+        ownerScopeService.canViewJobOrders(),
+        ownerScopeService.canViewOwnJobOrders());
   }
 
   /**
@@ -105,6 +112,10 @@ public class MeController {
    *     availability overview (admin, officer, or Spezialkommando lead).
    * @param canViewJobOrders {@code true} iff the caller may enter the Job-Order area (admin, or
    *     member of at least one profit-eligible org unit).
+   * @param canViewOwnJobOrders {@code true} iff the caller may view the orders their own org unit
+   *     requested (admin, or member of at least one org unit), independent of profit eligibility
+   *     (REQ-ORDERS-023).
    */
-  public record CapabilitiesResponse(boolean canSeeBlueprintOverview, boolean canViewJobOrders) {}
+  public record CapabilitiesResponse(
+      boolean canSeeBlueprintOverview, boolean canViewJobOrders, boolean canViewOwnJobOrders) {}
 }

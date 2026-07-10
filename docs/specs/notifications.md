@@ -378,6 +378,34 @@ records the notification-engine consumer.
 `model/NotificationType`,
 `db/migration/V211__seed_material_exchange_interest_notification_rule.sql` · **Issues:** #1187
 
+### REQ-NOTIF-017 — UC5: notify the processing unit on a requester edit
+
+When the requesting owner (Auftraggeber) edits one of their own job orders (REQ-ORDERS-023 — change
+quantities, add/remove not-yet-delivered items or materials, edit the comment), the processing
+(responsible) org unit's **officers and leads** are notified through the engine (#1186). A
+`JOB_ORDER_UPDATED_BY_REQUESTER` event carries the responsible org unit as its `RESPONSIBLE` context
+and is mapped by a seeded default rule (V214) to a same-named notification with two `ORG_RELATIVE_ROLE`
+selectors (`OFFICER` + `LEAD`, both against `RESPONSIBLE`). Unlike the job-order-created rule (UC1,
+V156) it deliberately omits the LOGISTICIAN and global-ADMIN recipients — the issue scopes it to
+officers and leads — but stays admin-editable at runtime. The editing member is excluded
+(`exclude_actor = TRUE`; moot because recipients resolve from the responsible unit while the actor is
+in the requesting unit). The message names the requesting org unit (`{requester}` = its shorthand),
+never the editing member's personal name (no PII in params).
+
+**Acceptance**
+
+- [ ] A requester edit (after commit) notifies the responsible unit's officers + leads, excluding the
+  actor (`JobOrderServiceTest`, `RuleEvaluationServiceTest`).
+- [ ] The new event/notification types need no schema migration (open enums; the seed rule is V214
+  data).
+- [ ] The notification renders via `notifications.type.JOB_ORDER_UPDATED_BY_REQUESTER` (DE + EN + base
+  bundles, named placeholders `{displayId}`/`{orgUnit}`/`{requester}`).
+
+**Enforced by:** `JobOrderServiceTest`, `MessageBundleConsistencyTest` · **Code:**
+`event/JobOrderUpdatedByRequesterEvent`, `service/JobOrderService#publishJobOrderUpdatedByRequester`,
+`model/NotificationEventType`, `model/NotificationType`,
+`db/migration/V214__seed_job_order_requester_update_notification_rule.sql` · **Issues:** #1186
+
 ## Out of scope (v1)
 
 - Per-notification e-mail routing (generic fan-out of in-app notification types to e-mail), user

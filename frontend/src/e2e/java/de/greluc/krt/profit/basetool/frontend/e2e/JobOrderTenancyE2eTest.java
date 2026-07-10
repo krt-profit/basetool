@@ -44,9 +44,9 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *       {@code TYPE(responsibleOrgUnit) = SpecialCommand}).
  *   <li><b>Squadron-private</b> — an order whose responsible unit is a squadron is visible only to
  *       that squadron's members + admins; a member of another squadron does NOT see it.
- *   <li><b>Profit gate</b> — a member whose only membership is a non-profit squadron may not browse
- *       the queue at all: {@code /orders} and any {@code /orders/{id}} redirect to the create form,
- *       the one order surface still open to them.
+ *   <li><b>Requester escape</b> — a member whose only membership is a non-profit squadron may not
+ *       browse the general queue, but sees the orders their own unit <em>requested</em> under
+ *       "Meine Aufträge" (REQ-ORDERS-023) and is denied a foreign order they did not request.
  * </ul>
  *
  * <p>Two non-admin actors carry the matrix: {@code test-officer} is homed in a fresh
@@ -78,6 +78,13 @@ class JobOrderTenancyE2eTest {
 
   /** An order whose responsible unit is the IRIDIUM squadron — the squadron-private case. */
   private static String iridiumOrderId;
+
+  /**
+   * An order <em>requested</em> by the non-profit squadron C (processed by the profit SK) — the
+   * requesting-owner escape case (REQ-ORDERS-023): squadron C's member may view it under "Meine
+   * Aufträge" even though C is non-profit.
+   */
+  private static String cRequestedOrderId;
 
   /**
    * Seeds the tenancy fixture: a profit-eligible SK, a profit-eligible squadron B with {@code
@@ -127,6 +134,20 @@ class JobOrderTenancyE2eTest {
       iridiumOrderId =
           seeder.createJobOrder(
               ADMIN_USER, ADMIN_PASSWORD, IRIDIUM_ID, "E2E Tenancy IRI Order", materialId, 650, 50);
+
+      // An order the non-profit squadron C REQUESTED (processed by the profit SK): squadron C's
+      // member is its requester and may view it under "Meine Aufträge" (REQ-ORDERS-023), even
+      // though squadron C is non-profit.
+      cRequestedOrderId =
+          seeder.createJobOrder(
+              ADMIN_USER,
+              ADMIN_PASSWORD,
+              profitSkId,
+              squadronCId,
+              "E2E Tenancy C-Requested Order",
+              materialId,
+              650,
+              50);
     }
   }
 
@@ -174,11 +195,14 @@ class JobOrderTenancyE2eTest {
   }
 
   /**
-   * A member whose only membership is a non-profit squadron is bounced from the queue: both the
-   * list and a direct order detail link redirect to the create form (their sole order surface).
+   * A member whose only membership is a non-profit squadron does not browse the general queue, but
+   * sees the orders their own unit <em>requested</em> under "Meine Aufträge" (REQ-ORDERS-023): the
+   * C-requested order surfaces, the foreign SK-public order does not, and they are not bounced to
+   * the create form. A direct link to a foreign order they did not request is denied (403 at the
+   * backend requester gate) and bounced back to their own-orders list.
    */
   @Test
-  void nonProfitMemberIsRedirectedFromTheQueueToTheCreateForm() {
+  void nonProfitMemberSeesOwnRequestedOrdersNotTheForeignQueue() {
     assumeTrue(STACK.managesStack(), "needs the ephemeral-seeded non-profit squadron membership");
     String baseUrl = STACK.baseUrl();
     try (BrowserContext context =
@@ -187,19 +211,27 @@ class JobOrderTenancyE2eTest {
       try {
         E2eSupport.login(page, baseUrl, MEMBER_USER, MEMBER_PASSWORD);
 
-        // The list redirects to the create form — asserting the create-only mode toggle is a
-        // locale-independent proof we landed there.
+        // "Meine Aufträge": the order squadron C requested surfaces; the general queue (the
+        // SK-public order, requested by another unit) does not; and the member is NOT bounced to
+        // the
+        // create form.
         E2eSupport.navigate(page, baseUrl + "/orders");
         page.waitForLoadState();
-        assertThat(page.getByTestId("order-mode-material")).isVisible();
+        assertThat(page.locator("[data-testid='order-row'][data-id='" + cRequestedOrderId + "']"))
+            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
+        assertThat(page.locator("[data-testid='order-row'][data-id='" + skOrderId + "']"))
+            .hasCount(0);
+        assertThat(page.getByTestId("order-mode-material")).hasCount(0);
 
-        // A direct SK-public order link redirects the same way: the profit gate short-circuits
-        // before any per-order visibility is even considered.
+        // A direct link to a foreign order the member did not request is denied and bounced back to
+        // their own-orders list — not opened, and not the create form.
         E2eSupport.navigate(page, baseUrl + "/orders/" + skOrderId);
         page.waitForLoadState();
-        assertThat(page.getByTestId("order-mode-material")).isVisible();
+        assertThat(page.locator("[data-testid='order-row'][data-id='" + cRequestedOrderId + "']"))
+            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
+        assertThat(page.getByTestId("order-mode-material")).hasCount(0);
       } catch (RuntimeException | AssertionError failure) {
-        E2eSupport.dump(page, "tenancy-nonprofit-member");
+        E2eSupport.dump(page, "tenancy-nonprofit-requester");
         throw failure;
       }
     }

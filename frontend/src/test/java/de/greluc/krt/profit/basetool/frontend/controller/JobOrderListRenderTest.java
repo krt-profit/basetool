@@ -80,7 +80,7 @@ class JobOrderListRenderTest {
     // renders.
     when(backendApiClient.get(
             "/api/v1/me/capabilities", SquadronContextAdvice.CapabilitiesResponse.class))
-        .thenReturn(new SquadronContextAdvice.CapabilitiesResponse(true, true));
+        .thenReturn(new SquadronContextAdvice.CapabilitiesResponse(true, true, true));
   }
 
   private MaterialDto material(String name, String quantityType) {
@@ -141,7 +141,8 @@ class JobOrderListRenderTest {
             List.of(),
             List.of(),
             Instant.now(),
-            1L);
+            1L,
+            false);
 
     when(backendApiClient.get(
             eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),
@@ -185,7 +186,8 @@ class JobOrderListRenderTest {
             List.of(),
             List.of(),
             Instant.now(),
-            1L);
+            1L,
+            false);
 
     when(backendApiClient.get(
             eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),

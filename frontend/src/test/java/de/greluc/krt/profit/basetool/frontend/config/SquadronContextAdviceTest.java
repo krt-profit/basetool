@@ -91,7 +91,7 @@ class SquadronContextAdviceTest {
     when(authHelper.isAuthenticated()).thenReturn(true);
     when(authHelper.isAdmin()).thenReturn(false);
     when(backendApiClient.get("/api/v1/me/capabilities", CapabilitiesResponse.class))
-        .thenReturn(new CapabilitiesResponse(true, false));
+        .thenReturn(new CapabilitiesResponse(true, false, false));
 
     CapabilitiesResponse caps = advice().meCapabilities();
 
@@ -114,10 +114,12 @@ class SquadronContextAdviceTest {
 
   @Test
   void derivedFlags_readFromCapabilities() {
-    assertTrue(advice().canSeeBlueprintOverview(new CapabilitiesResponse(true, false)));
-    assertFalse(advice().canSeeBlueprintOverview(new CapabilitiesResponse(false, true)));
-    assertTrue(advice().canViewJobOrders(new CapabilitiesResponse(false, true)));
-    assertFalse(advice().canViewJobOrders(new CapabilitiesResponse(true, false)));
+    assertTrue(advice().canSeeBlueprintOverview(new CapabilitiesResponse(true, false, false)));
+    assertFalse(advice().canSeeBlueprintOverview(new CapabilitiesResponse(false, true, false)));
+    assertTrue(advice().canViewJobOrders(new CapabilitiesResponse(false, true, false)));
+    assertFalse(advice().canViewJobOrders(new CapabilitiesResponse(true, false, false)));
+    assertTrue(advice().canViewOwnJobOrders(new CapabilitiesResponse(false, false, true)));
+    assertFalse(advice().canViewOwnJobOrders(new CapabilitiesResponse(false, false, false)));
   }
 
   @Test

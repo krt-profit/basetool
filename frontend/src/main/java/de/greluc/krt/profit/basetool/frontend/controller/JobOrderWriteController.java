@@ -847,6 +847,98 @@ public class JobOrderWriteController {
   }
 
   /**
+   * Classic no-JS fallback for the requester-side MATERIAL edit (REQ-ORDERS-023): a member of the
+   * order's requesting org unit changes quantities, adds/removes not-yet-delivered materials and
+   * edits the comment. Relays to {@code PUT /api/v1/orders/{id}/requested}; only the comment +
+   * materials + version reach the backend (handle / org unit / status / priority are ignored
+   * server-side). No {@code hasRole('LOGISTICIAN')} — authorisation is the backend requester gate.
+   *
+   * @param id the order to update
+   * @param form the edit payload (comment, version, materials[])
+   * @param redirectAttributes flash carrier for the result toast
+   * @return redirect back to the order detail
+   */
+  @PostMapping("/{id}/requested-update")
+  @PreAuthorize("isAuthenticated()")
+  public String updateOrderAsRequester(
+      @PathVariable UUID id,
+      @ModelAttribute("jobOrderForm") JobOrderForm form,
+      RedirectAttributes redirectAttributes) {
+    try {
+      List<CreateJobOrderMaterialDto> materials =
+          form.getMaterials().stream()
+              .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
+              .map(
+                  m ->
+                      new CreateJobOrderMaterialDto(
+                          m.getMaterialId(), m.getMinQuality(), m.getAmount()))
+              .toList();
+      if (materials.isEmpty()) {
+        redirectAttributes.addFlashAttribute("errorToast", "error.joborder.material.invalid");
+        redirectAttributes.addFlashAttribute("jobOrderForm", form);
+        return "redirect:/orders/" + id;
+      }
+      CreateJobOrderDto dto =
+          new CreateJobOrderDto(null, null, null, form.getComment(), materials, form.getVersion());
+      backendApiClient.put("/api/v1/orders/" + id + "/requested", dto, JobOrderDto.class);
+      redirectAttributes.addFlashAttribute("successToast", "success.joborder.update");
+      return "redirect:/orders/" + id;
+    } catch (Exception e) {
+      log.error("Failed to update order {} as requester", id, e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.joborder.update.failed");
+      redirectAttributes.addFlashAttribute("jobOrderForm", form);
+      return "redirect:/orders/" + id;
+    }
+  }
+
+  /**
+   * AJAX twin of {@link #updateOrderAsRequester}: the requester-side MATERIAL edit that returns the
+   * updated (redacted) order so the detail page re-renders the header + material sections in place
+   * (REQ-FE) and picks up the bumped {@code @Version}. Relays to {@code PUT
+   * /api/v1/orders/{id}/requested}; an empty material list is a 400. The RFC 7807 backend error
+   * (incl. 409 optimistic-lock, 400 frozen-after-delivery) is propagated so the page shows a toast
+   * / conflict confirm and stays put.
+   *
+   * @param id the order to update
+   * @param form the edit payload (comment, version, materials[])
+   * @return the updated redacted order on success, or the propagated RFC 7807 backend error
+   */
+  @PostMapping(
+      value = "/{id}/requested-update",
+      consumes = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @PreAuthorize("isAuthenticated()")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Object> updateOrderAsRequesterAjax(
+      @PathVariable UUID id, @RequestBody JobOrderForm form) {
+    List<CreateJobOrderMaterialDto> materials =
+        form.getMaterials().stream()
+            .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
+            .map(
+                m ->
+                    new CreateJobOrderMaterialDto(
+                        m.getMaterialId(), m.getMinQuality(), m.getAmount()))
+            .toList();
+    if (materials.isEmpty()) {
+      return org.springframework.http.ResponseEntity.badRequest().build();
+    }
+    try {
+      CreateJobOrderDto dto =
+          new CreateJobOrderDto(null, null, null, form.getComment(), materials, form.getVersion());
+      JobOrderDto updated =
+          backendApiClient.put("/api/v1/orders/" + id + "/requested", dto, JobOrderDto.class);
+      return org.springframework.http.ResponseEntity.ok(updated);
+    } catch (BackendServiceException bse) {
+      log.debug("Failed requester-update of order {} (ajax): {}", id, bse.getMessage());
+      return propagateBackendError(bse);
+    } catch (Exception e) {
+      log.error("Failed requester-update of order {} (ajax)", id, e);
+      return org.springframework.http.ResponseEntity.status(
+              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+          .build();
+    }
+  }
+
+  /**
    * Cancels (soft-deletes) a job order. Backend rejects the delete when the order has linked
    * inventory items, per the {@code EntityInUseException} pattern.
    *

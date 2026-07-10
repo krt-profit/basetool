@@ -193,7 +193,10 @@ public class JobOrderStockProjectionService {
         baseDto.handovers(),
         itemHandovers,
         baseDto.createdAt(),
-        baseDto.version());
+        baseDto.version(),
+        // The full projection is never redacted; the per-order redaction decision is stamped later
+        // by the read path (JobOrderService.getJobOrderById) via JobOrderDto#withRedacted.
+        false);
   }
 
   /**

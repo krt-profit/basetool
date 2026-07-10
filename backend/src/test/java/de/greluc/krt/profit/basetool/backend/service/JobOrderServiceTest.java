@@ -214,7 +214,8 @@ class JobOrderServiceTest {
             List.of(),
             List.of(),
             Instant.now(),
-            1L);
+            1L,
+            false);
   }
 
   @Test
@@ -911,6 +912,195 @@ class JobOrderServiceTest {
   }
 
   @Test
+  void updateJobOrderAsRequester_publishesEventAndAudits() {
+    // REQ-ORDERS-023: a requester's material edit audits as JOB_ORDER_UPDATED and notifies the
+    // processing unit (a JobOrderUpdatedByRequesterEvent is published on commit).
+    CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
+    CreateJobOrderDto updateDto =
+        new CreateJobOrderDto(null, null, null, "requester note", List.of(updateMat), null);
+
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(jobOrderRepository.saveAndFlush(any(JobOrder.class))).thenReturn(jobOrder);
+    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+
+    jobOrderService.updateJobOrderAsRequester(orderId, updateDto);
+
+    verify(eventPublisher)
+        .publishEvent(
+            any(de.greluc.krt.profit.basetool.backend.event.JobOrderUpdatedByRequesterEvent.class));
+    verify(auditService)
+        .record(
+            eq(de.greluc.krt.profit.basetool.backend.model.AuditEventType.JOB_ORDER_UPDATED),
+            eq(orderId),
+            any(),
+            any(),
+            any());
+  }
+
+  @Test
+  void updateJobOrderAsRequester_frozenOnceDelivered_throws400() {
+    // Whole-order freeze: a requester cannot edit an order that already has a delivery.
+    jobOrder.getHandovers().add(new de.greluc.krt.profit.basetool.backend.model.JobOrderHandover());
+    CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
+    CreateJobOrderDto updateDto =
+        new CreateJobOrderDto(null, null, null, "note", List.of(updateMat), null);
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
+
+    assertThrows(
+        BadRequestException.class,
+        () -> jobOrderService.updateJobOrderAsRequester(orderId, updateDto));
+    verify(eventPublisher, never()).publishEvent(any());
+  }
+
+  @Test
+  void getRequestedJobOrders_emptyMembership_returnsEmptyPageWithoutHittingRepo() {
+    // REQ-ORDERS-023: an anonymous / memberless caller resolves to zero direct memberships and gets
+    // an empty page — the scoped query is never issued (no all-orders leak).
+    when(ownerScopeService.currentDirectMembershipOrgUnitIds()).thenReturn(java.util.Set.of());
+
+    org.springframework.data.domain.Page<JobOrderDto> page =
+        jobOrderService.getRequestedJobOrders(
+            null, org.springframework.data.domain.PageRequest.of(0, 20));
+
+    assertTrue(page.isEmpty(), "no memberships -> empty page");
+    verify(jobOrderRepository, never()).findRequestedOrders(any(), any(), any());
+  }
+
+  @Test
+  void getRequestedJobOrders_nullStatuses_defaultsToAllStatuses_scopedToDirectMembership() {
+    // A null/empty status filter expands to every status, and the scope is the caller's OWN direct
+    // memberships (resolved server-side — clients cannot inject org-unit ids).
+    UUID requestingUnitId = UUID.randomUUID();
+    when(ownerScopeService.currentDirectMembershipOrgUnitIds())
+        .thenReturn(java.util.Set.of(requestingUnitId));
+    when(jobOrderRepository.findRequestedOrders(
+            any(), eq(java.util.Set.of(requestingUnitId)), any()))
+        .thenReturn(org.springframework.data.domain.Page.empty());
+
+    jobOrderService.getRequestedJobOrders(
+        null, org.springframework.data.domain.PageRequest.of(0, 20));
+
+    org.mockito.ArgumentCaptor<List<JobOrderStatus>> statusesCaptor =
+        org.mockito.ArgumentCaptor.captor();
+    verify(jobOrderRepository)
+        .findRequestedOrders(
+            statusesCaptor.capture(), eq(java.util.Set.of(requestingUnitId)), any());
+    assertEquals(
+        JobOrderStatus.values().length,
+        statusesCaptor.getValue().size(),
+        "null status filter expands to every JobOrderStatus");
+  }
+
+  @Test
+  void updateItemJobOrderAsRequester_nonItemOrder_throws400() {
+    // The requester item endpoint refuses a MATERIAL order (mirrors the logistician item path).
+    JobOrder materialOrder = new JobOrder();
+    materialOrder.setId(orderId);
+    materialOrder.setType(JobOrderType.MATERIAL);
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(materialOrder));
+
+    de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemRequestDto dto =
+        new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemRequestDto(
+            null, null, "note", null, List.of(), null);
+
+    assertThrows(
+        BadRequestException.class,
+        () -> jobOrderService.updateItemJobOrderAsRequester(orderId, dto));
+    verify(eventPublisher, never()).publishEvent(any());
+    verify(jobOrderRepository, never()).saveAndFlush(any(JobOrder.class));
+  }
+
+  @Test
+  void updateItemJobOrderAsRequester_frozenOnceItemDelivered_throws400() {
+    // Whole-order freeze: an item order that already has an item handover cannot be edited.
+    JobOrder itemOrder = new JobOrder();
+    itemOrder.setId(orderId);
+    itemOrder.setType(JobOrderType.ITEM);
+    itemOrder.setVersion(1L);
+    itemOrder
+        .getItemHandovers()
+        .add(new de.greluc.krt.profit.basetool.backend.model.JobOrderItemHandover());
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(itemOrder));
+
+    de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemRequestDto dto =
+        new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemRequestDto(
+            null, null, "note", null, List.of(), 1L);
+
+    assertThrows(
+        BadRequestException.class,
+        () -> jobOrderService.updateItemJobOrderAsRequester(orderId, dto));
+    verify(eventPublisher, never()).publishEvent(any());
+    verify(jobOrderRepository, never()).saveAndFlush(any(JobOrder.class));
+  }
+
+  @Test
+  void updateItemJobOrderAsRequester_rebuildsUnlinksRemovedMaterialNotifiesAndAudits() {
+    // REQ-ORDERS-023 canonical unlink ordering: rebuild the lines and saveAndFlush FIRST, THEN run
+    // the clearAutomatically unlink for every material no longer required, then re-fetch, withdraw
+    // orphan claims, notify the processing unit and audit as JOB_ORDER_ITEM_UPDATED (byRequester).
+    JobOrder itemOrder = new JobOrder();
+    itemOrder.setId(orderId);
+    itemOrder.setType(JobOrderType.ITEM);
+    itemOrder.setVersion(1L);
+    itemOrder.setHandle("Tester");
+    // The requester-update notification reads the responsible + requesting org-unit refs, so stamp
+    // both (a bare order would NPE in publishJobOrderUpdatedByRequester).
+    Squadron responsibleUnit = new Squadron();
+    responsibleUnit.setId(UUID.randomUUID());
+    responsibleUnit.setShorthand("RESP");
+    Squadron requestingUnit = new Squadron();
+    requestingUnit.setId(UUID.randomUUID());
+    requestingUnit.setShorthand("REQ");
+    itemOrder.setResponsibleOrgUnit(responsibleUnit);
+    itemOrder.setRequestingOrgUnit(requestingUnit);
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(itemOrder));
+    when(jobOrderItemService.buildItemLine(any()))
+        .thenAnswer(inv -> new de.greluc.krt.profit.basetool.backend.model.JobOrderItem());
+    UUID keptMaterial = UUID.randomUUID();
+    UUID removedMaterial = UUID.randomUUID();
+    // requiredMaterialIds: {kept, removed} before the rebuild, {kept} after -> `removed` is
+    // unlinked.
+    // Chained thenReturn (not varargs) to avoid the unchecked generic-array varargs warning.
+    when(jobOrderItemService.requiredMaterialIds(itemOrder))
+        .thenReturn(java.util.Set.of(keptMaterial, removedMaterial))
+        .thenReturn(java.util.Set.of(keptMaterial));
+    when(jobOrderMapper.toDto(itemOrder)).thenReturn(baseJobOrderDto);
+    when(jobOrderItemService.toItemDtos(itemOrder)).thenReturn(List.of());
+    when(jobOrderItemService.aggregateMaterials(itemOrder)).thenReturn(List.of());
+
+    de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemRequestDto dto =
+        new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemRequestDto(
+            null,
+            null,
+            "requester item note",
+            null,
+            List.of(
+                new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto(
+                    UUID.randomUUID(), UUID.randomUUID(), 1, List.of(), 1, null)),
+            1L);
+
+    jobOrderService.updateItemJobOrderAsRequester(orderId, dto);
+
+    org.mockito.InOrder inOrder =
+        org.mockito.Mockito.inOrder(jobOrderRepository, inventoryItemRepository);
+    inOrder.verify(jobOrderRepository).saveAndFlush(itemOrder);
+    inOrder.verify(inventoryItemRepository).unlinkJobOrderMaterial(orderId, removedMaterial);
+    verify(inventoryItemRepository, never()).unlinkJobOrderMaterial(orderId, keptMaterial);
+    verify(materialClaimService).withdrawOrphanedClaimsWithinTransaction(itemOrder);
+    verify(eventPublisher)
+        .publishEvent(
+            any(de.greluc.krt.profit.basetool.backend.event.JobOrderUpdatedByRequesterEvent.class));
+    verify(auditService)
+        .record(
+            eq(de.greluc.krt.profit.basetool.backend.model.AuditEventType.JOB_ORDER_ITEM_UPDATED),
+            eq(orderId),
+            any(),
+            any(),
+            any());
+  }
+
+  @Test
   void
       completeJobOrderWithinTransaction_ShouldFlushBeforeLockQuery_ToAvoidOptimisticLockConflict() {
     // Given — reproduces the root cause of the 409 bug:
@@ -1431,7 +1621,8 @@ class JobOrderServiceTest {
               List.of(),
               List.of(),
               Instant.now(),
-              1L);
+              1L,
+              false);
       when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(itemBase);
       when(jobOrderItemService.toItemDtos(any())).thenReturn(List.of());
       when(jobOrderItemService.aggregateMaterials(any()))
@@ -1504,7 +1695,8 @@ class JobOrderServiceTest {
                     List.of(),
                     List.of(),
                     Instant.now(),
-                    o.getVersion());
+                    o.getVersion(),
+                    false);
               });
     }
 

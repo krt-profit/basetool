@@ -65,6 +65,9 @@ public interface JobOrderMapper {
   @Mapping(target = "items", ignore = true)
   @Mapping(target = "aggregatedMaterials", ignore = true)
   @Mapping(target = "itemHandovers", ignore = true)
+  // Per-order redaction decision is not an entity property; it is stamped by the read path
+  // (JobOrderService.getJobOrderById) via JobOrderDto#withRedacted, so the mapper leaves it false.
+  @Mapping(target = "redacted", ignore = true)
   JobOrderDto toDto(JobOrder jobOrder);
 
   /**

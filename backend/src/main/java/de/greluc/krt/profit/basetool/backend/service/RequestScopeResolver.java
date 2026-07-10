@@ -424,6 +424,25 @@ public class RequestScopeResolver {
   }
 
   /**
+   * The org-unit ids the current caller is a <em>direct</em> member of (the raw {@code
+   * org_unit_membership} rows), <strong>without</strong> the leadership cascade that {@link
+   * #currentMemberOrgUnitIds()} adds. This is the "own placed orders" key for the requester-side
+   * job-order access (REQ-ORDERS-023): an order counts as the caller's own iff its requesting org
+   * unit is one the caller directly belongs to — deliberately NOT the cascade, so an OL/Bereich
+   * seat does not turn every unit's orders into "theirs". Empty for an anonymous caller.
+   *
+   * @return the caller's direct-membership org-unit ids, never {@code null}.
+   */
+  @NotNull
+  public Set<UUID> currentDirectMembershipOrgUnitIds() {
+    Set<UUID> ids = new LinkedHashSet<>();
+    for (OrgUnitMembership m : currentCallerMemberships()) {
+      ids.add(m.getId().getOrgUnitId());
+    }
+    return ids;
+  }
+
+  /**
    * {@code true} iff the current principal may enter the Job-Order area at all — i.e. see the order
    * list and order details. Only members of a <em>profit-eligible</em> org unit (Squadron or
    * Spezialkommando) participate in the order workflow: Kartell departments are split into Profit
@@ -473,6 +492,32 @@ public class RequestScopeResolver {
       return false;
     }
     return orgUnitRepository.countProfitEligibleByIdIn(memberOrgUnitIds) > 0;
+  }
+
+  /**
+   * {@code true} iff the current principal may view and limited-edit the job orders their own org
+   * unit <em>placed</em> (the requesting/Auftraggeber side) — the capability that drives the "Meine
+   * Auftr&auml;ge" menu entry and stops a non-profit requester from being redirected away from
+   * their own orders (REQ-ORDERS-023). Independent of the profit-eligibility gate {@link
+   * #canViewJobOrders()}: a member of a purely non-profit unit fails {@code canViewJobOrders} yet
+   * may still track the orders that unit requested.
+   *
+   * <ul>
+   *   <li>Admin &rarr; {@code true} (already covered by {@link #canViewJobOrders()}, kept true here
+   *       for consistency).
+   *   <li>Non-admin &rarr; {@code true} iff the caller is a member of at least one org unit (which
+   *       could therefore be the requesting org unit of some order).
+   *   <li>Anonymous / memberless &rarr; {@code false} — a guest may place an order but not track
+   *       it.
+   * </ul>
+   *
+   * @return {@code true} iff the caller may view the orders their own org unit requested.
+   */
+  public boolean canViewOwnJobOrders() {
+    if (authHelper.isAdmin()) {
+      return true;
+    }
+    return !currentMemberOrgUnitIds().isEmpty();
   }
 
   /**

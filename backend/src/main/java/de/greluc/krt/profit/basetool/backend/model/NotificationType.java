@@ -39,6 +39,15 @@ public enum NotificationType {
   JOB_ORDER_CREATED,
 
   /**
+   * The requesting owner (Auftraggeber) edited one of their own job orders (REQ-ORDERS-023).
+   * Recipients are resolved per the seeded default rule (the officers and leads of the processing
+   * (responsible) org unit; the editing actor is excluded). The frontend renders it under {@code
+   * notifications.type.JOB_ORDER_UPDATED_BY_REQUESTER} with the {@code displayId}, {@code orgUnit}
+   * (responsible shorthand) and {@code requester} (requesting shorthand) render parameters.
+   */
+  JOB_ORDER_UPDATED_BY_REQUESTER,
+
+  /**
    * An org-unit officer/lead raised a confirm-before-post bank deposit/withdrawal request (epic
    * #666 F2, REQ-BANK-026). Recipients are resolved per the seeded default rule (the bank
    * management plus every employee granted on the target account; the requester is excluded).

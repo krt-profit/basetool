@@ -63,10 +63,15 @@ class JobOrderViewProfitGateMvcTest {
   @BeforeEach
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    // Non-profit viewer: the backend capability says the caller may not enter the order area.
+    // Non-profit viewer with NO own placed orders (canViewJobOrders=false AND
+    // canViewOwnJobOrders=false): the caller may neither browse the queue nor track own orders, so
+    // both order pages route to the create form. A non-profit member WITH placed orders
+    // (canViewOwnJobOrders=true) instead sees their "Meine Auftraege" list (REQ-ORDERS-023),
+    // covered
+    // by the backend gate tests + e2e.
     when(backendApiClient.get(
             "/api/v1/me/capabilities", SquadronContextAdvice.CapabilitiesResponse.class))
-        .thenReturn(new SquadronContextAdvice.CapabilitiesResponse(false, false));
+        .thenReturn(new SquadronContextAdvice.CapabilitiesResponse(false, false, false));
   }
 
   @Test

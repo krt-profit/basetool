@@ -344,12 +344,16 @@ on Staffel or SK) are part of the job-order workflow: only they may **view** job
 reassign) and set/withdraw **material claims** — the profit gate
 (`canViewJobOrders`) is folded into `canSeeJobOrder` and `canEditJobOrder` and
 also applies to the role-only claim endpoints. Anyone who is exclusively in
-non-profit-eligible units can **only create** job orders — nothing else,
-analogous to anonymous guests. Admins always have access (`canViewJobOrders`
-is always true for them). In the frontend the „Aufträge" link is replaced by „Auftrag
-anlegen", and a direct call to `/orders` or `/orders/{id}` is redirected to the
-create form; the backend returns an empty list or `403` for non-profit members
-(also for write/claim endpoints).
+non-profit-eligible units cannot browse the order queue, but **can now view and
+edit their own placed orders within limits** — the requesting-owner escape
+(REQ-ORDERS-023, ADR-0091): they see the orders their own org unit requested under
+„Meine Aufträge", and may edit them (change quantities, add/remove not-yet-delivered
+items/materials, adjust min-quality, edit the comment) while the order is still fully
+undelivered, with the Bearbeiter section and the materials summary redacted. Admins
+always have full access (`canViewJobOrders` is always true for them). In the frontend
+a non-profit member with placed orders sees a „Meine Aufträge" link (otherwise
+„Auftrag anlegen"); the general order queue and the write/claim endpoints still return
+an empty list or `403` for them.
 ⁴ Stricter than `canSeeJobOrder` — **no** SK-public escape: the coverage view
 names members by name together with their blueprints and is therefore limited to members
 of the **responsible** org unit. Anyone who sees the SK job order only

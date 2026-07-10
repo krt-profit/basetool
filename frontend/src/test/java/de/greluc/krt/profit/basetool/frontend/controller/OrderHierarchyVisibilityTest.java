@@ -61,7 +61,7 @@ class OrderHierarchyVisibilityTest {
     // otherwise redirect to /orders/create. Stub the capability as a profit-eligible viewer.
     when(backendApiClient.get(
             "/api/v1/me/capabilities", SquadronContextAdvice.CapabilitiesResponse.class))
-        .thenReturn(new SquadronContextAdvice.CapabilitiesResponse(true, true));
+        .thenReturn(new SquadronContextAdvice.CapabilitiesResponse(true, true, true));
   }
 
   @Test
@@ -89,7 +89,8 @@ class OrderHierarchyVisibilityTest {
             java.util.List.of(),
             java.util.List.of(),
             java.time.Instant.now(),
-            1L);
+            1L,
+            false);
 
     when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
         .thenReturn(order);

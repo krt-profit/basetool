@@ -34,6 +34,14 @@ public enum NotificationEventType {
   JOB_ORDER_CREATED,
 
   /**
+   * The requesting owner (Auftraggeber) edited one of their own job orders — changed quantities,
+   * added/removed not-yet-delivered items or materials, or edited the comment (REQ-ORDERS-023). The
+   * default rule notifies the officers and leads of the processing (responsible) org unit; the
+   * editing actor is excluded.
+   */
+  JOB_ORDER_UPDATED_BY_REQUESTER,
+
+  /**
    * An org-unit officer/lead raised a confirm-before-post bank deposit/withdrawal request (epic
    * #666 F2, REQ-BANK-026). The default rule notifies the bank management and the employees granted
    * on the target account.

@@ -102,7 +102,7 @@ class JobOrderItemDetailRenderTest {
     // render path runs.
     when(backendApiClient.get(
             "/api/v1/me/capabilities", SquadronContextAdvice.CapabilitiesResponse.class))
-        .thenReturn(new SquadronContextAdvice.CapabilitiesResponse(true, true));
+        .thenReturn(new SquadronContextAdvice.CapabilitiesResponse(true, true, true));
   }
 
   private OAuth2AuthenticationToken logisticianToken(UUID userId) {
@@ -191,7 +191,8 @@ class JobOrderItemDetailRenderTest {
             List.of(),
             List.of(),
             Instant.now(),
-            1L);
+            1L,
+            false);
 
     when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
         .thenReturn(order);
@@ -299,7 +300,8 @@ class JobOrderItemDetailRenderTest {
             List.of(),
             List.of(),
             Instant.now(),
-            1L);
+            1L,
+            false);
     when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
         .thenReturn(order);
 
@@ -374,7 +376,8 @@ class JobOrderItemDetailRenderTest {
             List.of(),
             List.of(),
             Instant.now(),
-            1L);
+            1L,
+            false);
     when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
         .thenReturn(order);
 
@@ -456,7 +459,8 @@ class JobOrderItemDetailRenderTest {
             List.of(),
             List.of(handover),
             Instant.now(),
-            1L);
+            1L,
+            false);
 
     when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
         .thenReturn(order);
@@ -531,7 +535,8 @@ class JobOrderItemDetailRenderTest {
             List.of(),
             List.of(),
             Instant.now(),
-            1L);
+            1L,
+            false);
     when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
         .thenReturn(order);
 
@@ -580,7 +585,8 @@ class JobOrderItemDetailRenderTest {
             List.of(),
             List.of(),
             Instant.now(),
-            1L);
+            1L,
+            false);
     when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
         .thenReturn(order);
 
@@ -630,7 +636,8 @@ class JobOrderItemDetailRenderTest {
         List.of(),
         List.of(),
         Instant.now(),
-        1L);
+        1L,
+        false);
   }
 
   @Test

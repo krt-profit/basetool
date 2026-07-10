@@ -46,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.service.JobOrderHandoverReportServi
 import de.greluc.krt.profit.basetool.backend.service.JobOrderHandoverService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemBlueprintOwnersService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderService;
+import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -104,6 +105,7 @@ class JobOrderControllerTest {
   @Mock private JobOrderHandoverReportService jobOrderHandoverReportService;
   @Mock private UserService userService;
   @Mock private AuthHelperService authHelperService;
+  @Mock private OwnerScopeService ownerScopeService;
 
   @InjectMocks private JobOrderController controller;
 
@@ -134,7 +136,8 @@ class JobOrderControllerTest {
         List.of(),
         List.of(),
         Instant.parse("2026-01-01T00:00:00Z"),
-        1L);
+        1L,
+        false);
   }
 
   // ── POST /api/v1/orders (permitAll) ──────────────────────────────────
@@ -272,14 +275,85 @@ class JobOrderControllerTest {
   // ── GET /api/v1/orders/{id} ──────────────────────────────────────────
 
   @Test
-  void getJobOrderById_returnsServiceResultUnchanged() {
+  void getJobOrderById_fullViewerDtoPassesThroughUnredacted() {
     UUID id = UUID.randomUUID();
-    JobOrderDto dto = jobOrderDto(id);
+    // The service stamps the per-order redaction decision; a full viewer's DTO carries
+    // redacted=false, so the controller returns it verbatim without re-evaluating any gate.
+    JobOrderDto dto = jobOrderDto(id); // redacted=false
     when(jobOrderService.getJobOrderById(id)).thenReturn(dto);
 
     JobOrderDto result = controller.getJobOrderById(id);
 
     assertThat(result).isSameAs(dto);
+    verify(ownerScopeService, never()).canSeeJobOrder(any(UUID.class));
+  }
+
+  @Test
+  void getJobOrderById_requesterOnlyViewer_redactsProgressAssigneesAndAggregates() {
+    // REQ-ORDERS-023: the service stamps redacted=true on a requester-only viewer's DTO, so the
+    // controller redacts — Bearbeiter, aggregated materials and handovers/item-handovers emptied,
+    // each material line's collection progress (currentStock/claims/openAmount) stripped — while
+    // the
+    // ordered facts (line id/min-quality/amount/version, items, handle, comment, version) and the
+    // redacted flag survive in position (field-order guard).
+    UUID id = UUID.randomUUID();
+    UUID matLineId = UUID.randomUUID();
+    de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto matLine =
+        new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto(
+            matLineId, null, 650, 50.0, 999.0, java.util.Collections.singletonList(null), 12.0, 7L);
+    JobOrderDto full =
+        new JobOrderDto(
+            id,
+            42,
+            null,
+            null,
+            "alice",
+            "deliver to ArcCorp",
+            1,
+            JobOrderStatus.OPEN,
+            JobOrderType.MATERIAL,
+            true,
+            List.of(matLine),
+            java.util.Collections.singletonList(null), // items — pass through (own-order progress)
+            java.util.Collections.singletonList(null), // aggregatedMaterials — redacted
+            java.util.Collections.singletonList(null), // assignees (Bearbeiter/PII) — redacted
+            java.util.Collections.singletonList(null), // handovers — redacted
+            java.util.Collections.singletonList(null), // itemHandovers — redacted
+            Instant.parse("2026-01-01T00:00:00Z"),
+            9L,
+            true); // the service already decided this is a requester-only (redacted) view
+    when(jobOrderService.getJobOrderById(id)).thenReturn(full);
+
+    JobOrderDto result = controller.getJobOrderById(id);
+
+    // Member-identifying / processing-side collections are emptied ...
+    assertThat(result.assignees()).isEmpty();
+    assertThat(result.aggregatedMaterials()).isEmpty();
+    assertThat(result.handovers()).isEmpty();
+    assertThat(result.itemHandovers()).isEmpty();
+    // ... each material line keeps what was ordered but loses the fulfilment progress ...
+    assertThat(result.materials()).hasSize(1);
+    de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto redacted =
+        result.materials().get(0);
+    assertThat(redacted.id()).isEqualTo(matLineId);
+    assertThat(redacted.minQuality()).isEqualTo(650);
+    assertThat(redacted.amount()).isEqualTo(50.0);
+    assertThat(redacted.version()).isEqualTo(7L);
+    assertThat(redacted.currentStock()).isNull();
+    assertThat(redacted.openAmount()).isNull();
+    assertThat(redacted.claims()).isEmpty();
+    // ... items pass through (the Auftraggeber may see their own order's item fulfilment) ...
+    assertThat(result.items()).hasSize(1);
+    // ... and the ordered facts + version survive in the right positions.
+    assertThat(result.id()).isEqualTo(id);
+    assertThat(result.displayId()).isEqualTo(42);
+    assertThat(result.handle()).isEqualTo("alice");
+    assertThat(result.comment()).isEqualTo("deliver to ArcCorp");
+    assertThat(result.version()).isEqualTo(9L);
+    // The redacted flag is carried through so the client renders the limited template (finding 2).
+    assertThat(result.redacted()).isTrue();
+    // The controller keys off the DTO's flag; it does NOT re-evaluate the gate (finding 4).
+    verify(ownerScopeService, never()).canSeeJobOrder(any(UUID.class));
   }
 
   @Test

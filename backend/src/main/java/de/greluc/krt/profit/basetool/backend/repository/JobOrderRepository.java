@@ -176,6 +176,43 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
       Pageable pageable);
 
   /**
+   * Requester-side paged job-order list (REQ-ORDERS-023): every order whose {@code
+   * requestingOrgUnit} is one of {@code requesterOrgUnitIds} and whose status is in {@code
+   * statuses}. This is the deliberate counterpart to {@link #findScopedJobOrders}, which scopes
+   * only on the <em>responsible</em> side: here the match is purely on the <em>requesting</em>
+   * side, so a member of the ordering org unit sees the orders their unit placed even when a
+   * foreign squadron processes them and even when the caller is not profit-eligible. The service
+   * passes only the caller's own direct-membership org-unit ids, so this never leaks a foreign
+   * unit's placed orders. Uses the same eager-fetch graph as the main list so the stock projection
+   * has no N+1; the response is redacted for the requester at the controller boundary. Ordering is
+   * supplied by the {@link Pageable} (default {@code priority,asc}), matching the main queue.
+   *
+   * @param statuses status values to keep; pass the full enum set to disable status filtering
+   *     (never empty).
+   * @param requesterOrgUnitIds the caller's direct-membership org-unit ids; the service
+   *     short-circuits an empty set to an empty page before calling this.
+   * @param pageable page request (carries the sort).
+   * @return paged job-orders the caller's org unit(s) requested.
+   */
+  @EntityGraph(
+      attributePaths = {
+        "materials",
+        "assignees",
+        "assignees.user",
+        "handovers",
+        "handovers.items",
+        "responsibleOrgUnit",
+        "requestingOrgUnit"
+      })
+  @Query(
+      "SELECT o FROM JobOrder o WHERE o.requestingOrgUnit.id IN :requesterOrgUnitIds AND o.status"
+          + " IN :statuses")
+  Page<JobOrder> findRequestedOrders(
+      @Param("statuses") List<JobOrderStatus> statuses,
+      @Param("requesterOrgUnitIds") java.util.Collection<UUID> requesterOrgUnitIds,
+      Pageable pageable);
+
+  /**
    * Loads a single job order together with its ordered item lines and, for each line, the chosen
    * blueprint and the requested game item, in one query. Backs the item blueprint-coverage view
    * ({@code JobOrderItemBlueprintOwnersService}), which reads {@code item.blueprint.outputName}

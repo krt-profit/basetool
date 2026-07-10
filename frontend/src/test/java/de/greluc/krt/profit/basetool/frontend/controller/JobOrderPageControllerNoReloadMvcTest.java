@@ -95,7 +95,7 @@ class JobOrderPageControllerNoReloadMvcTest {
     // Profit-eligible viewer so the order-detail gate does not redirect to /orders/create.
     when(backendApiClient.get(
             "/api/v1/me/capabilities", SquadronContextAdvice.CapabilitiesResponse.class))
-        .thenReturn(new SquadronContextAdvice.CapabilitiesResponse(true, true));
+        .thenReturn(new SquadronContextAdvice.CapabilitiesResponse(true, true, true));
   }
 
   private OAuth2AuthenticationToken logisticianToken(UUID userId) {
@@ -129,7 +129,8 @@ class JobOrderPageControllerNoReloadMvcTest {
         List.of(),
         List.of(),
         Instant.now(),
-        version);
+        version,
+        false);
   }
 
   @Test

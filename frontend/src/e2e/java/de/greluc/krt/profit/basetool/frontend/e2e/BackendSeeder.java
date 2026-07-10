@@ -101,7 +101,13 @@ public final class BackendSeeder {
    * Ensures the given test user is a member of the IRIDIUM Squadron so staffel-scoped create
    * endpoints accept its requests. Idempotent: a no-op when the user already has a squadron.
    *
-   * @param username the Keycloak username of the test user
+   * <p><b>Requires an ADMIN caller.</b> This <em>self-assigns</em> — it logs {@code username} in
+   * and PATCHes that user's own membership with that user's token. The membership endpoint ({@code
+   * PATCH /api/v1/users/&#123;id&#125;/memberships}) is {@code ADMIN}-gated, so calling this for a
+   * non-admin who has no squadron yet 403s ("Membership seeding PATCH failed: HTTP 403"). To home a
+   * non-admin fixture user, use {@link #assignStaffelMembership} with admin credentials instead.
+   *
+   * @param username the Keycloak username of the test user; must be an ADMIN
    * @param password the Keycloak password of the test user
    */
   public void ensureIridiumMembership(String username, String password) {
@@ -1157,6 +1163,50 @@ public final class BackendSeeder {
             + orgUnitId
             + "\",\"requestingOrgUnitId\":\""
             + orgUnitId
+            + "\",\"handle\":\""
+            + handle
+            + "\",\"materials\":[{\"materialId\":\""
+            + materialId
+            + "\",\"minQuality\":"
+            + minQuality
+            + ",\"amount\":"
+            + amount
+            + "}]}";
+    return seedEntity(username, password, "/api/v1/orders", body);
+  }
+
+  /**
+   * Overload of {@link #createJobOrder(String, String, String, String, String, int, double)} that
+   * names <em>distinct</em> responsible (processing) and requesting (customer) org units — used to
+   * model an order a (possibly non-profit) ordering unit <em>placed</em> with a profit-eligible
+   * processing unit, so the requesting unit's members can exercise the requesting-owner escape
+   * (REQ-ORDERS-023). The responsible unit must be profit-eligible; the requesting unit may be any
+   * org unit.
+   *
+   * @param username the Keycloak username of the (admin) test user
+   * @param password the Keycloak password of the test user
+   * @param responsibleOrgUnitId the responsible (processing) org unit id; must be profit-eligible
+   * @param requestingOrgUnitId the requesting (customer / Auftraggeber) org unit id
+   * @param handle the free-text contact handle of the order
+   * @param materialId the id of the (job-order) material to request
+   * @param minQuality the minimum acceptable quality of the requested material ({@code >= 650})
+   * @param amount the requested amount of the material
+   * @return the created job order's id
+   */
+  public String createJobOrder(
+      String username,
+      String password,
+      String responsibleOrgUnitId,
+      String requestingOrgUnitId,
+      String handle,
+      String materialId,
+      int minQuality,
+      double amount) {
+    String body =
+        "{\"responsibleOrgUnitId\":\""
+            + responsibleOrgUnitId
+            + "\",\"requestingOrgUnitId\":\""
+            + requestingOrgUnitId
             + "\",\"handle\":\""
             + handle
             + "\",\"materials\":[{\"materialId\":\""
