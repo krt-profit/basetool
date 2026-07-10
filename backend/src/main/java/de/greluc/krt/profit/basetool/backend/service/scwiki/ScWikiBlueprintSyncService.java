@@ -207,7 +207,7 @@ public class ScWikiBlueprintSyncService {
             self.getObject().upsertBlueprintWithinTransaction(listDto.uuid(), dto, runId, now);
         processed++;
       } catch (Exception e) {
-        log.error("Failed to process SC Wiki blueprint dto: {}", listDto, e);
+        log.error("Failed to process SC Wiki blueprint dto: {}", listDto.uuid(), e);
       }
     }
 

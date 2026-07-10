@@ -314,7 +314,7 @@ public class ScWikiClient {
             .timeout(CALL_TIMEOUT)
             .onErrorResume(
                 e -> {
-                  log.error("Failed to fetch {} from SC Wiki API ({})", resourceLabel, uri, e);
+                  log.warn("Failed to fetch {} from SC Wiki API ({})", resourceLabel, uri, e);
                   recordFetchError();
                   return Mono.empty();
                 })
@@ -328,7 +328,7 @@ public class ScWikiClient {
       JsonNode payload = body.has("data") ? body.get("data") : body;
       return objectMapper.treeToValue(payload, type);
     } catch (Exception e) {
-      log.error("Failed to parse {} response from SC Wiki API ({})", resourceLabel, uri, e);
+      log.warn("Failed to parse {} response from SC Wiki API ({})", resourceLabel, uri, e);
       recordFetchError();
       return null;
     }
@@ -385,7 +385,7 @@ public class ScWikiClient {
         .timeout(CALL_TIMEOUT)
         .onErrorResume(
             e -> {
-              log.error("Failed to fetch {} from SC Wiki API ({})", resourceLabel, requestUri, e);
+              log.warn("Failed to fetch {} from SC Wiki API ({})", resourceLabel, requestUri, e);
               recordFetchError();
               return Mono.<ScWikiResponseDto<T>>empty();
             })

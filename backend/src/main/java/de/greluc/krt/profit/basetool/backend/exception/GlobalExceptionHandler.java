@@ -728,9 +728,11 @@ public class GlobalExceptionHandler {
     extra.put("contentType", String.valueOf(request.getContentType()));
     if (rootCause != null) {
       extra.put("rootCause", rootCause.getClass().getSimpleName());
-      // Cause message may be long but does NOT contain raw user values (Jackson masks them);
-      // it carries the JSON path/line/column needed for triage.
-      extra.put("causeMessage", rootCause.getMessage());
+      // REQ-OBS-004: an InvalidFormatException/MismatchedInputException message embeds the rejected
+      // value verbatim ("... from String \"<value>\": ...") and PiiMasker does not scrub it. Mask
+      // any double-quoted segment (the offending user value) while keeping the structural triage
+      // text (type, reason, path/line/column) a 400 report needs.
+      extra.put("causeMessage", maskQuotedValues(rootCause.getMessage()));
       if (rootCause instanceof tools.jackson.databind.DatabindException jme
           && jme.getPath() != null) {
         StringBuilder path = new StringBuilder();
@@ -753,6 +755,24 @@ public class GlobalExceptionHandler {
     }
     logProblem(request, pd, "Unreadable request body", extra);
     return toEntity(pd);
+  }
+
+  /**
+   * Masks every double-quoted segment in a Jackson parse-cause message. Jackson embeds the rejected
+   * user value in double quotes ({@code ... from String "<value>": ...}) while type names use
+   * backticks and field names surface separately as {@code jsonPath}, so replacing quoted runs with
+   * {@code "***"} strips the only PII-bearing part (REQ-OBS-004) yet keeps the structural "cannot
+   * deserialize type / not a valid X" text that makes a 400 triage-able.
+   *
+   * @param message the raw {@link Throwable#getMessage()} of the parse cause; may be {@code null}
+   * @return the message with quoted values masked, or {@code null} when {@code message} is {@code
+   *     null}
+   */
+  static String maskQuotedValues(String message) {
+    if (message == null) {
+      return null;
+    }
+    return message.replaceAll("\"[^\"]*\"", "\"***\"");
   }
 
   /**

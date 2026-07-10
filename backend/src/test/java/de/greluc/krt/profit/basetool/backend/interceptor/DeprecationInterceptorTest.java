@@ -21,11 +21,16 @@ package de.greluc.krt.profit.basetool.backend.interceptor;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation;
 import jakarta.servlet.http.HttpServletRequest;
 import java.lang.reflect.Method;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.method.HandlerMethod;
@@ -164,6 +169,36 @@ class DeprecationInterceptorTest {
     assertEquals("true", response.getHeader("Deprecation"));
     assertNull(response.getHeader("Sunset"));
     assertNull(response.getHeader("Link"));
+  }
+
+  /**
+   * A malformed {@code sunset} value warns at most once per handler, not on every request — {@code
+   * sunset()} is a compile-time constant, so re-warning per call would be pure noise.
+   */
+  @Test
+  void preHandle_withInvalidSunsetDate_warnsAtMostOncePerHandler() throws Exception {
+    Logger logger = (Logger) LoggerFactory.getLogger(DeprecationInterceptor.class);
+    Level original = logger.getLevel();
+    logger.setLevel(Level.WARN);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    try {
+      HandlerMethod handler = handlerMethodOf(SampleController.class, "badSunsetDate");
+      interceptor.preHandle(request, new MockHttpServletResponse(), handler);
+      interceptor.preHandle(request, new MockHttpServletResponse(), handler);
+      interceptor.preHandle(request, new MockHttpServletResponse(), handler);
+
+      long warnings =
+          appender.list.stream()
+              .filter(e -> e.getLevel() == Level.WARN)
+              .filter(e -> e.getFormattedMessage().contains("Invalid sunset date format"))
+              .count();
+      assertEquals(1, warnings);
+    } finally {
+      logger.detachAppender(appender);
+      logger.setLevel(original);
+    }
   }
 
   // ─── helpers ────────────────────────────────────────────────────────────────
