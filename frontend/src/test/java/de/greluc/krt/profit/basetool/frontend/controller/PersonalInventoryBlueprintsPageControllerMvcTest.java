@@ -177,6 +177,39 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
 
   @Test
   @WithMockUser
+  void view_rendersCraftableOnlyFilter_nextToRefineryToggle() throws Exception {
+    // covers REQ-INV-019 — the "show only craftable" view filter renders as a toggle inside the
+    // craftability toolbar, alongside the refinery fold-in toggle, so a user can narrow the list to
+    // the blueprints they can craft right now.
+    PersonalBlueprintDto bp =
+        new PersonalBlueprintDto(
+            UUID.randomUUID(),
+            "arclight pistol",
+            "Arclight Pistol",
+            null,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            null,
+            true,
+            0L,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2026-01-01T00:00:00Z"));
+    PageResponse<PersonalBlueprintDto> page =
+        new PageResponse<>(List.of(bp), 0, 200, 1, 1, List.of());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+
+    mockMvc
+        .perform(get("/personal-inventory/blueprints"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("id=\"krt-bp-refinery-toggle\"")))
+        .andExpect(content().string(containsString("id=\"krt-bp-craftable-toggle\"")))
+        .andExpect(
+            content()
+                .string(
+                    containsString("class=\"krt-bp-refinery-toggle krt-bp-craftable-toggle\"")));
+  }
+
+  @Test
+  @WithMockUser
   void view_fragmentList_rendersOnlyTheCollectionCardFragment() throws Exception {
     // The in-place swap target: GET /personal-inventory/blueprints?fragment=list returns just the
     // blueprintList fragment (the master/detail card) and NOT the surrounding page chrome (the add
