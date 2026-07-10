@@ -258,165 +258,31 @@ document.addEventListener('krt:swapped', function (ev) {
 // from echoing back into a loop. The data never travels over the socket: every peer re-pulls
 // through its own authenticated, authorization-checked fragment endpoint, so guest redaction and
 // the member-only finance gate still apply per viewer.
-(function () {
-    // Derived from the seam's MISSION_SECTIONS map (same file, top) so the receiver covers
-    // exactly the sections the write side broadcasts — a hand-maintained copy here once lost
-    // 'objectives' and 'frequencies', leaving peers' Ziele / Weitere Frequenzen stale until a
-    // manual reload.
-    const SECTION_CONTAINERS = {};
-    Object.keys(MISSION_SECTIONS).forEach(function (sectionKey) {
-        SECTION_CONTAINERS[sectionKey] = MISSION_SECTIONS[sectionKey].container;
-    });
-    const ALL_SECTIONS = Object.keys(SECTION_CONTAINERS);
-    const COALESCE_MS = 400;
-    const pendingNow = {}; // sections queued for the next debounce tick (Set-like map)
-    const deferred = {}; // sections held back because the user is editing (Set-like map)
-    let timer = null;
-
-    function anyModalOpen() {
-        return Array.prototype.some.call(
-            document.querySelectorAll('.krt-modal-overlay'),
-            function (o) {
-                return window.getComputedStyle(o).display !== 'none';
-            },
-        );
-    }
-
-    // Never yank a section out from under an active edit. A modal open anywhere means the user is
-    // mid-edit; focus inside the section's own container means inline editing there.
-    function sectionBusy(sectionKey) {
-        if (anyModalOpen()) {
-            return true;
-        }
-        const sel = SECTION_CONTAINERS[sectionKey];
-        const container = sel && document.querySelector(sel);
-        return !!(
-            container &&
-            document.activeElement &&
-            container.contains(document.activeElement)
-        );
-    }
-
-    function refresh(keys) {
-        if (keys.length && window.krtRefreshMissionSection) {
+// The coalescing / busy-guard / deferred-pill receiver now lives in the shared krt-live-sync.js
+// module (REQ-FE-015); mission uses events-source mode because mission-presence.js owns the socket
+// and re-dispatches 'krt:mission-changed' / 'krt:mission-resync'. The section map, the pill id /
+// class / i18n key and the {broadcast:false} refresh are all kept identical so the behaviour — and
+// the two-context e2e that pins it — is unchanged.
+window.krtLiveSync.createReceiver({
+    sections: MISSION_SECTIONS,
+    events: { changed: 'krt:mission-changed', resync: 'krt:mission-resync' },
+    refresh: function (keys) {
+        if (window.krtRefreshMissionSection) {
             window.krtRefreshMissionSection(keys, { broadcast: false });
         }
-    }
-
-    // Remove the pill once nothing is held back, so it never lingers for an already-current
-    // section.
-    function hidePillIfEmpty() {
-        if (Object.keys(deferred).length === 0) {
-            const pill = document.getElementById('mission-livesync-pill');
-            if (pill) {
-                pill.remove();
-            }
-        }
-    }
-
-    // The busy test is re-applied here, at flush time — not only when the signal first arrived.
-    // A section that became busy DURING the COALESCE_MS window (the user opened a modal or
-    // focused an inline edit on it) is moved to `deferred` + the pill instead of being swapped
-    // out from under the edit. Sections that are safe to refresh are dropped from `deferred` so
-    // the pill cannot keep claiming updates for a section that just refreshed in place.
-    function flushTimer() {
-        timer = null;
-        const keys = Object.keys(pendingNow);
-        keys.forEach(function (k) {
-            delete pendingNow[k];
-        });
-        const ready = [];
-        let nowDeferred = false;
-        keys.forEach(function (k) {
-            if (sectionBusy(k)) {
-                deferred[k] = true;
-                nowDeferred = true;
-            } else {
-                delete deferred[k];
-                ready.push(k);
-            }
-        });
-        refresh(ready);
-        if (nowDeferred) {
-            showPill();
-        }
-        hidePillIfEmpty();
-    }
-
-    function schedule(sectionKey) {
-        pendingNow[sectionKey] = true;
-        if (!timer) {
-            // #1125: full-jitter the coalesce window so peers that all received the same `changed`
-            // frame within microseconds do not fire their fragment refetches in one synchronized
-            // burst. Mirrors the reconnect path's decorrelation jitter (mission-presence.js); the
-            // debounce semantics are unchanged (worst case ~2x COALESCE_MS instead of COALESCE_MS).
-            timer = setTimeout(flushTimer, COALESCE_MS + Math.random() * COALESCE_MS);
-        }
-    }
-
-    function showPill() {
-        let pill = document.getElementById('mission-livesync-pill');
-        if (pill) {
-            return;
-        }
-        const dict = window.MISSION_LIVESYNC_I18N || {};
-        const label =
-            dict['mission.livesync.updates_available'] != null &&
-            dict['mission.livesync.updates_available'] !== ''
+    },
+    pill: {
+        id: 'mission-livesync-pill',
+        className: 'mission-livesync-pill',
+        label: function () {
+            const dict = window.MISSION_LIVESYNC_I18N || {};
+            return dict['mission.livesync.updates_available'] != null &&
+                dict['mission.livesync.updates_available'] !== ''
                 ? dict['mission.livesync.updates_available']
                 : 'Aktualisierungen verfügbar';
-        pill = document.createElement('button');
-        pill.id = 'mission-livesync-pill';
-        pill.type = 'button';
-        pill.className = 'mission-livesync-pill';
-        pill.textContent = label;
-        pill.addEventListener('click', function () {
-            // Apply only sections that are no longer busy — a still-open modal / focused edit on
-            // a section keeps it deferred (and the pill) rather than being clobbered by an
-            // explicit click. (Current fragments are display-oriented and their modals are
-            // separate overlays, so this is belt-and-suspenders, but it keeps the guard honest
-            // if a future fragment ever embeds an inline-edit field.)
-            const ready = [];
-            Object.keys(deferred).forEach(function (k) {
-                if (sectionBusy(k)) {
-                    return;
-                }
-                delete deferred[k];
-                ready.push(k);
-            });
-            refresh(ready);
-            hidePillIfEmpty();
-        });
-        document.body.appendChild(pill);
-    }
-
-    function apply(sections) {
-        const keys = Array.isArray(sections) && sections.length ? sections : ALL_SECTIONS;
-        let anyDeferred = false;
-        keys.forEach(function (sectionKey) {
-            const sel = SECTION_CONTAINERS[sectionKey];
-            if (!sel || !document.querySelector(sel)) {
-                return; // unknown key, or this viewer cannot see the section (e.g. no mgmt panel)
-            }
-            if (sectionBusy(sectionKey)) {
-                deferred[sectionKey] = true;
-                anyDeferred = true;
-            } else {
-                schedule(sectionKey);
-            }
-        });
-        if (anyDeferred) {
-            showPill();
-        }
-    }
-
-    document.addEventListener('krt:mission-changed', function (ev) {
-        apply(ev && ev.detail ? ev.detail.sections : null);
-    });
-    document.addEventListener('krt:mission-resync', function () {
-        apply(null); // refresh everything visible after a reconnect
-    });
-})();
+        },
+    },
+});
 
 // ---- Ablauf (procedure timeline): overview done-toggle + Verwaltung drag-editor -------------
 // Every mutation goes through krtMissionWrite (CSRF + retry-once-on-403 + the shared 409

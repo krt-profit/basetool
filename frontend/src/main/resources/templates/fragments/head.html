@@ -121,6 +121,14 @@
     -->
     <script th:src="@{/js/krt-fetch.js}" th:attr="nonce=${cspNonce}"></script>
     <!--
+      Shared tool-wide live-sync client (REQ-FE-015, ADR-0092): window.krtLiveSync.createReceiver,
+      the coalescing / busy-guard / deferred-pill receiver reused by every peer-synced surface
+      (mission, operation, orders, bank, materialboard). Loaded globally right after krt-fetch.js —
+      like it, a small non-deferred dependency page modules use at load — so a page's inline seam
+      setup can call it synchronously.
+    -->
+    <script th:src="@{/js/krt-live-sync.js}" th:attr="nonce=${cspNonce}"></script>
+    <!--
       Shared default labels for the searchable combobox (krt-searchable-select.js). Defined on a
       dedicated global, like `window.krtScuI18n` above, so they are localised in ONE place and the
       ~20 user-selection pickers across the app need only the `data-krt-combobox` marker (a single
