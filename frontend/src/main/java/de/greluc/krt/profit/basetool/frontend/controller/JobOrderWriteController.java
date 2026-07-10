@@ -680,9 +680,18 @@ public class JobOrderWriteController {
    * instead of a stack trace. The coarse {@code hasRole('LOGISTICIAN')} gate here is the same one
    * the backend carries; the fine per-squadron / responsible-SK matrix is enforced backend-side.
    *
+   * <p>The 409 branch is load-bearing: the backend upsert is a bounded-retry orchestrator over a
+   * find-or-create on a {@code @Version}ed, uniquely-indexed row, so a concurrent same-squadron
+   * first-claim race that outlasts the retry bound surfaces a truthful 409 ({@code OPTIMISTIC_LOCK}
+   * on the UPDATE race, {@code DATA_INTEGRITY_VIOLATION} on the INSERT race). {@link
+   * #propagateBackendError} mirrors that status <em>and</em> its RFC 7807 {@code code} verbatim —
+   * so {@code krt-fetch.js} still decides "stale data, reload?" vs. plain-toast from the code —
+   * rather than collapsing the conflict into a 500 (the trap the payout-toggle proxy hit in #1111).
+   *
    * @param id the order id.
    * @param dto the claim payload (material, quality bucket, claiming squadron, amount).
-   * @return the persisted claim on success, or the propagated backend error status.
+   * @return the persisted claim on success, or the propagated backend error status (incl. a 409 on
+   *     a surviving claim race).
    */
   @PostMapping("/{id}/claims")
   @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
@@ -696,6 +705,10 @@ public class JobOrderWriteController {
               org.springframework.http.HttpStatus.CREATED)
           .body(result);
     } catch (BackendServiceException bse) {
+      // Mirrors every backend status faithfully, including a 409 that survived the backend's
+      // bounded
+      // claim-upsert retry — its RFC 7807 code is preserved so the client toasts/reloads correctly
+      // instead of the race being collapsed into a 500.
       log.debug("Failed to upsert claim on order {}: {}", id, bse.getMessage());
       return propagateBackendError(bse);
     } catch (Exception e) {

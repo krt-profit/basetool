@@ -54,6 +54,9 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -94,6 +97,28 @@ public class MaterialClaimService {
   private final AuditService auditService;
   private final MaterialMapper materialMapper;
   private final SquadronMapper squadronMapper;
+
+  /**
+   * Self-reference used to invoke {@link #upsertClaimWithinTransaction} through the Spring proxy so
+   * each retry of {@link #upsertClaim} opens its OWN {@code REQUIRES_NEW} transaction. A direct
+   * {@code this} call would be self-invocation, skip the proxy and run every attempt in one
+   * transaction — fatal here, because a losing writer's {@link DataIntegrityViolationException} /
+   * {@link ObjectOptimisticLockingFailureException} poisons the whole transaction (Postgres marks
+   * it aborted), so no same-transaction retry could ever commit. An {@link ObjectProvider} defers
+   * the lookup, avoiding an eager self-injection cycle at construction. Mirrors {@code
+   * OperationService.setPayoutStatus} (#1111).
+   */
+  private final ObjectProvider<MaterialClaimService> self;
+
+  /**
+   * Total attempts (one initial + retries) {@link #upsertClaim} makes against a concurrent
+   * same-bucket writer before giving up and surfacing the conflict as a 409. Five gives ample
+   * head-room for the realistic case — a handful of a squadron's logisticians lodging the <em>first
+   * </em> claim on one bucket within the same instant: the round-one INSERT losers retry, find the
+   * winner's committed row and UPDATE it in place (last-writer-wins), so a genuine conflict only
+   * ever survives a pathological, never-winning race.
+   */
+  private static final int MAX_UPSERT_ATTEMPTS = 5;
 
   /**
    * Identity of one aggregated material bucket — a material at a single quality level. Shared key
@@ -214,6 +239,22 @@ public class MaterialClaimService {
    * squadron must itself be profit-eligible (only Profit-side squadrons take part in the order
    * workflow).
    *
+   * <p><b>Last-writer-wins under concurrency, for real.</b> The {@code material_claim} row carries
+   * a JPA {@code @Version} (via {@code AbstractEntity}) <em>and</em> a unique index {@code
+   * uq_material_claim_bucket_org_unit} on {@code (job_order_id, material_id, quality_requirement,
+   * claiming_org_unit_id)} (V131), so two logisticians of the same squadron lodging the
+   * <em>first</em> claim on one bucket at once do NOT both succeed: one loses the INSERT (unique
+   * constraint → {@link DataIntegrityViolationException}) or, on a repeat edit, the UPDATE
+   * ({@code @Version} → {@link ObjectOptimisticLockingFailureException}) race and its transaction
+   * is poisoned. This method is therefore a <b>non-transactional orchestrator</b> ({@code
+   * NOT_SUPPORTED}) that runs each attempt in its own {@code REQUIRES_NEW} transaction (via {@link
+   * #self}) and retries up to {@link #MAX_UPSERT_ATTEMPTS} times on either exception: by the retry
+   * the winner has committed the row, so the loser reloads it and UPDATEs in place. Unlike a
+   * boolean toggle the {@code @Version} is kept and echoed to the client through {@link ClaimDto} —
+   * a genuine concurrent same-squadron edit that outlasts the retry bound still surfaces a truthful
+   * 409, never a 500 (found in the optimistic-lock audit for #1186, pre-existing on the claim
+   * sign-up path).
+   *
    * @param jobOrderId the order.
    * @param dto the claim payload.
    * @return the persisted claim.
@@ -221,9 +262,57 @@ public class MaterialClaimService {
    * @throws BadRequestException when the order is not an open SK order, the bucket does not exist,
    *     the amount would overclaim, or a new claim names a non-profit-eligible squadron.
    * @throws AccessDeniedException when the caller may not act for the claiming squadron.
+   * @throws ObjectOptimisticLockingFailureException only if every attempt loses the race — a
+   *     persistent hot-bucket contention that still maps to a 409, never a 500.
    */
-  @Transactional
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public ClaimDto upsertClaim(@NotNull UUID jobOrderId, @NotNull CreateClaimDto dto) {
+    // Retry the upsert across FRESH transactions. Each attempt is REQUIRES_NEW (see self): a losing
+    // first-claim writer's unique-constraint / @Version violation poisons its own transaction, so
+    // the
+    // only correct retry is a brand-new one. All but the final attempt swallow the race and loop;
+    // the
+    // final attempt lets a persistent race propagate so it maps to a truthful 409, not a pretend
+    // success.
+    for (int attempt = 1; attempt < MAX_UPSERT_ATTEMPTS; attempt++) {
+      try {
+        return self.getObject().upsertClaimWithinTransaction(jobOrderId, dto);
+      } catch (DataIntegrityViolationException | ObjectOptimisticLockingFailureException race) {
+        log.debug(
+            "Concurrent material-claim upsert race (attempt {}/{}) for order {} material {} quality"
+                + " {} claimingOrgUnit {} — retrying",
+            attempt,
+            MAX_UPSERT_ATTEMPTS,
+            jobOrderId,
+            dto.materialId(),
+            dto.qualityRequirement(),
+            dto.claimingOrgUnitId());
+      }
+    }
+    return self.getObject().upsertClaimWithinTransaction(jobOrderId, dto);
+  }
+
+  /**
+   * Performs one attempt of the claim upsert inside its own {@code REQUIRES_NEW} transaction — the
+   * validate + find-or-create + save + audit body that {@link #upsertClaim} retries. Kept separate
+   * (and invoked through {@link #self}) precisely so a unique-constraint / {@code @Version}
+   * violation rolls back only this attempt's transaction and the orchestrator can retry in a clean
+   * one. Must never be called directly by application code — go through {@link #upsertClaim}.
+   *
+   * @param jobOrderId the order.
+   * @param dto the claim payload.
+   * @return the persisted claim.
+   * @throws NotFoundException when the order or material is unknown.
+   * @throws BadRequestException when the order is not an open SK order, the bucket does not exist,
+   *     the amount would overclaim, or a new claim names a non-profit-eligible squadron.
+   * @throws AccessDeniedException when the caller may not act for the claiming squadron.
+   * @throws DataIntegrityViolationException when a concurrent writer already inserted the row.
+   * @throws ObjectOptimisticLockingFailureException when a concurrent writer already updated the
+   *     row.
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public ClaimDto upsertClaimWithinTransaction(
+      @NotNull UUID jobOrderId, @NotNull CreateClaimDto dto) {
     JobOrder order = loadOrder(jobOrderId);
     assertClaimable(order);
     assertCanManage(order, dto.claimingOrgUnitId());

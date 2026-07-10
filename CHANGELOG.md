@@ -9,6 +9,8 @@
 
 ### Changed
 
+- **Fehler behoben: Kein Serverfehler mehr, wenn zwei Logistiker derselben Squadron gleichzeitig die erste Eintragung auf denselben Materialposten eines Spezialkommando-Auftrags vornehmen.** Bisher konnte der Verlierer dieses seltenen Wettlaufs einen internen Serverfehler (500) statt einer gespeicherten Eintragung erhalten. Die Eintragung wird jetzt automatisch in einer frischen Transaktion erneut versucht (der zuletzt Speichernde gewinnt); nur ein tatsächlich anhaltender Konflikt meldet weiterhin sauber „Konflikt" (409) statt eines Serverfehlers.
+
 - **Verbesserung: Nutzer-Auswahlfelder suchen jetzt serverseitig statt die ganze Mitgliederliste vorzuladen.** Die Auswahlfelder, die bisher alle Mitglieder komplett vorluden (u. a. in Lager, Raffinerie, Aufträgen, Missionen, Rollen-/Leitungsverwaltung und der Kartellbank), durchsuchen die Mitglieder jetzt erst bei der Eingabe über den Server — schneller und skalierbar für tausende Konten. Gäste-Felder und die Halter-Auswahl bleiben unverändert (#1193).
 
 - **Weniger Log-Rauschen, wenn das Backend kurz nicht erreichbar ist (z. B. bei einem Neustart/Deploy).** Ein durch den offenen Circuit-Breaker kurzgeschlossener Aufruf wurde bisher dreifach als `WARN` protokolliert und flutete bei jedem Backend-Neustart das Log, sodass ein erwarteter, sich selbst behebender Aussetzer kaum von einem echten Vorfall zu unterscheiden war. Solche kurzgeschlossenen Aufrufe werden jetzt auf `DEBUG` gestuft; das einmalige Öffnen des Breakers, die Metrik und der Alert bleiben als Signal erhalten (#1203).
