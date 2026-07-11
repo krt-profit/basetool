@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.ShipForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalogListLoader;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
@@ -86,6 +87,7 @@ public class HangarPageController {
 
   private final BackendApiClient backendApiClient;
   private final ParallelPageLoader parallelPageLoader;
+  private final CachedCatalogListLoader catalogListLoader;
 
   /**
    * Renders the personal hangar page, server-side paginated (REQ-HANGAR-002). Fetches one page of
@@ -150,54 +152,27 @@ public class HangarPageController {
                       List.of(), effectivePage, effectiveSize, 0L, 0, List.of());
                 });
 
+    // The three sortable reference catalogs share one degrade-to-empty loader
+    // (CachedCatalogListLoader); each fetch still runs on its own virtual thread and is sorted
+    // below
+    // after the join, so a single dead catalog never blanks the whole page.
     CompletableFuture<List<ShipTypeDto>> shipTypesFuture =
-        parallelPageLoader
-            .<List<ShipTypeDto>>loadAsync(
-                () -> {
-                  PageResponse<ShipTypeDto> p =
-                      backendApiClient.getCached(CachedCatalog.SHIP_TYPES, SHIP_TYPE_PAGE_TYPE);
-                  return p != null && p.content() != null
-                      ? new ArrayList<>(p.content())
-                      : new ArrayList<>();
-                })
-            .exceptionally(
-                e -> {
-                  log.error("Failed to fetch ship types", e);
-                  return new ArrayList<>();
-                });
+        parallelPageLoader.loadAsync(
+            () ->
+                catalogListLoader.loadPageContent(
+                    CachedCatalog.SHIP_TYPES, SHIP_TYPE_PAGE_TYPE, false, "ship types"));
 
     CompletableFuture<List<LocationDto>> locationsFuture =
-        parallelPageLoader
-            .<List<LocationDto>>loadAsync(
-                () -> {
-                  PageResponse<LocationDto> p =
-                      backendApiClient.getCached(CachedCatalog.LOCATIONS, LOCATION_PAGE_TYPE);
-                  return p != null && p.content() != null
-                      ? new ArrayList<>(p.content())
-                      : new ArrayList<>();
-                })
-            .exceptionally(
-                e -> {
-                  log.error("Failed to fetch locations", e);
-                  return new ArrayList<>();
-                });
+        parallelPageLoader.loadAsync(
+            () ->
+                catalogListLoader.loadPageContent(
+                    CachedCatalog.LOCATIONS, LOCATION_PAGE_TYPE, false, "locations"));
 
     CompletableFuture<List<ManufacturerDto>> manufacturersFuture =
-        parallelPageLoader
-            .<List<ManufacturerDto>>loadAsync(
-                () -> {
-                  PageResponse<ManufacturerDto> p =
-                      backendApiClient.getCached(
-                          CachedCatalog.MANUFACTURERS, MANUFACTURER_PAGE_TYPE);
-                  return p != null && p.content() != null
-                      ? new ArrayList<>(p.content())
-                      : new ArrayList<>();
-                })
-            .exceptionally(
-                e -> {
-                  log.error("Failed to fetch manufacturers", e);
-                  return new ArrayList<>();
-                });
+        parallelPageLoader.loadAsync(
+            () ->
+                catalogListLoader.loadPageContent(
+                    CachedCatalog.MANUFACTURERS, MANUFACTURER_PAGE_TYPE, false, "manufacturers"));
 
     CompletableFuture<List<LocationDto>> homeLocationsFuture =
         parallelPageLoader
