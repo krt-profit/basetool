@@ -26,7 +26,7 @@
 <main>
     <div class="greeting hud-box">
         <h1 th:text="#{admin.audit.title}">Audit-Logs</h1>
-        <p class="text-muted" style="margin: 0.25rem 0 0; font-size: 0.8rem;"
+        <p class="text-muted krtm-margin-0-25rem-0-0-font-size-0-8rem-cb15"
            th:text="#{admin.audit.subtitle}">Jede Aktivit&auml;t, l&uuml;ckenlos protokolliert.</p>
     </div>
 
@@ -42,7 +42,7 @@
            th:text="#{'admin.audit.domain.' + ${d}}">Bereich</a>
     </nav>
 
-    <div th:if="${error != null}" class="hud-box mt-2" style="border-color: var(--color-danger);"
+    <div th:if="${error != null}" class="hud-box mt-2 krtm-border-color-var-color-danger-b169"
          data-testid="audit-error">
         <p th:text="#{${error}}">Fehler beim Laden.</p>
     </div>
@@ -120,7 +120,7 @@
                         <td><span class="utc-time" th:text="${e.occurredAt()}">2026-06-12T18:30:00Z</span></td>
                         <td th:text="${e.actorHandle()}">greluc</td>
                         <td>
-                            <span class="chip" style="font-size: 0.55rem;"
+                            <span class="chip krtm-font-size-0-55rem-eff3"
                                   th:text="#{${e.eventLabelKey()}}">Ereignis</span>
                         </td>
                         <td th:text="${e.subject()}">&mdash;</td>
@@ -192,11 +192,10 @@
             <form class="audit-purge-form no-track"
                   th:attr="data-endpoint=${purgeEndpoint},data-period-required=#{admin.audit.purge.beforeRequired},data-delete-error=#{admin.audit.purge.error},data-success-template=#{admin.audit.purge.success}">
                 <div class="krt-modal-body">
-                    <div class="hud-box audit-purge-warning" role="alert"
-                         style="border-color: var(--color-warning); display: flex; gap: 0.6rem; align-items: flex-start;">
-                        <svg class="krt-icon" aria-hidden="true" style="flex: 0 0 auto; margin-top: 0.1rem;">
+                    <div class="hud-box audit-purge-warning krtm-border-color-var-color-warning-display-flex-1b12" role="alert">
+                        <svg class="krt-icon krtm-flex-0-0-auto-margin-top-0-1rem-f087" aria-hidden="true">
                             <use href="#krt-icon-warning"/></svg>
-                        <p style="margin: 0;" th:text="#{admin.audit.purge.warning}">Erstelle vorher eine Sicherungskopie als PDF oder JSON &ndash; gel&ouml;schte Eintr&auml;ge lassen sich nicht wiederherstellen.</p>
+                        <p class="krtm-margin-0-2a0c" th:text="#{admin.audit.purge.warning}">Erstelle vorher eine Sicherungskopie als PDF oder JSON &ndash; gel&ouml;schte Eintr&auml;ge lassen sich nicht wiederherstellen.</p>
                     </div>
                     <p class="bank-field-hint" th:text="#{admin.audit.purge.hint}">Alle Eintr&auml;ge dieses Logs, die &auml;lter als der gew&auml;hlte Zeitpunkt sind, werden unwiderruflich gel&ouml;scht.</p>
                     <div class="bank-form-row datetime-split-group" data-datetime-filter-role="start">
@@ -211,8 +210,7 @@
                         <span class="bank-field-error" data-error-for="before"></span>
                     </div>
                     <span class="bank-field-error" data-error-for="_global"></span>
-                    <p class="audit-purge-success" data-success-slot aria-live="polite"
-                       style="margin: 0.4rem 0 0; color: var(--color-success); font-size: 0.85rem;"></p>
+                    <p class="audit-purge-success krtm-margin-0-4rem-0-0-color-var-color-success-fo-b0f5" data-success-slot aria-live="polite"></p>
                 </div>
                 <div class="krt-modal-foot">
                     <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"

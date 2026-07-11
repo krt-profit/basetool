@@ -51,17 +51,17 @@
 
     <!-- Squadrons Section -->
     <div class="hud-box data-section mt-2" id="squadrons-box">
-        <div class="box-header" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; margin-bottom: 1rem;" data-trigger="mission-data-toggle-box" data-box-id="squadrons-box">
+        <div class="box-header krtm-display-flex-justify-content-space-between-a-c95b" data-trigger="mission-data-toggle-box" data-box-id="squadrons-box">
             <h2 th:text="#{admin.mission_data.squadrons}" class="m-0">Staffeln</h2>
-            <div style="display: flex; gap: 1rem; align-items: center;">
+            <div class="krtm-display-flex-gap-1rem-align-items-center-6529">
                 <form th:action="@{/admin/mission-data}" method="get" id="squadron-filter-form" class="no-track m-0 flex-gap-sm">
                     <input type="hidden" name="includeInactiveJobTypes" th:value="${includeInactiveJobTypes}">
                     <input type="hidden" name="includeInactiveFrequencyTypes" th:value="${includeInactiveFrequencyTypes}">
                     <input type="checkbox" id="includeInactiveSquadrons" name="includeInactiveSquadrons" th:checked="${includeInactiveSquadrons}">
-                    <label for="includeInactiveSquadrons" style="color: var(--color-gray-2); font-size: 0.9rem; cursor: pointer;" th:text="#{admin.squadron.show_inactive}">Inaktive anzeigen</label>
+                    <label for="includeInactiveSquadrons" class="krtm-color-var-color-gray-2-font-size-0-9rem-curs-0b43" th:text="#{admin.squadron.show_inactive}">Inaktive anzeigen</label>
                 </form>
                 <button id="add-squadron-btn" class="btn btn--cta" th:data-action="@{/admin/mission-data/squadrons}" th:text="#{admin.squadron.create}">Neue Staffel</button>
-                <span class="toggle-icon" style="font-size: 1.5rem; color: var(--color-primary); font-family: monospace; font-weight: bold; padding: 0 0.5rem; user-select: none;">-</span>
+                <span class="toggle-icon krtm-font-size-1-5rem-color-var-color-primary-fon-d51a">-</span>
             </div>
         </div>
         
@@ -82,7 +82,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr th:each="sq : ${squadrons}" th:style="${!sq.active} ? 'opacity: 0.6;' : ''">
+                    <tr th:each="sq : ${squadrons}" th:classappend="${!sq.active} ? 'krtm-opacity-06' : ''">
                         <td>
                             <span th:text="${sq.name}">Name</span>
                             <span th:if="${!sq.active}" class="badge-inactive" th:text="#{admin.squadron.inactive}">Inaktiv</span>
@@ -115,17 +115,17 @@
 
     <!-- JobTypes Section -->
     <div class="hud-box data-section mt-2" id="jobtypes-box">
-        <div class="box-header" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; margin-bottom: 1rem;" data-trigger="mission-data-toggle-box" data-box-id="jobtypes-box">
+        <div class="box-header krtm-display-flex-justify-content-space-between-a-c95b" data-trigger="mission-data-toggle-box" data-box-id="jobtypes-box">
             <h2 th:text="#{admin.mission_data.job_types}" class="m-0">Aufgabenwünsche</h2>
-            <div style="display: flex; gap: 1rem; align-items: center;">
+            <div class="krtm-display-flex-gap-1rem-align-items-center-6529">
                 <form th:action="@{/admin/mission-data}" method="get" id="filter-form" class="no-track m-0 flex-gap-sm">
                     <input type="hidden" name="includeInactiveSquadrons" th:value="${includeInactiveSquadrons}">
                     <input type="hidden" name="includeInactiveFrequencyTypes" th:value="${includeInactiveFrequencyTypes}">
                     <input type="checkbox" id="includeInactiveJobTypes" name="includeInactiveJobTypes" th:checked="${includeInactiveJobTypes}">
-                    <label for="includeInactiveJobTypes" style="color: var(--color-gray-2); font-size: 0.9rem; cursor: pointer;" th:text="#{admin.job_type.show_inactive}">Inaktive anzeigen</label>
+                    <label for="includeInactiveJobTypes" class="krtm-color-var-color-gray-2-font-size-0-9rem-curs-0b43" th:text="#{admin.job_type.show_inactive}">Inaktive anzeigen</label>
                 </form>
                 <button id="add-jobtype-btn" class="btn btn--cta" th:data-action="@{/admin/mission-data/job-types}" th:text="#{admin.job_type.create}">Neuer Job</button>
-                <span class="toggle-icon" style="font-size: 1.5rem; color: var(--color-primary); font-family: monospace; font-weight: bold; padding: 0 0.5rem; user-select: none;">-</span>
+                <span class="toggle-icon krtm-font-size-1-5rem-color-var-color-primary-fon-d51a">-</span>
             </div>
         </div>
 
@@ -144,7 +144,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr th:each="job : ${jobTypes}" th:style="${!job.active} ? 'opacity: 0.6;' : ''">
+                    <tr th:each="job : ${jobTypes}" th:classappend="${!job.active} ? 'krtm-opacity-06' : ''">
                         <td>
                             <span th:text="${job.name}">Name</span>
                             <span th:if="${!job.active}" class="badge-inactive" th:text="#{admin.job_type.inactive}">Inaktiv</span>
@@ -184,17 +184,17 @@
 
     <!-- FrequencyTypes Section -->
     <div class="hud-box data-section mt-2" id="freqtypes-box">
-        <div class="box-header" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; margin-bottom: 1rem;" data-trigger="mission-data-toggle-box" data-box-id="freqtypes-box">
+        <div class="box-header krtm-display-flex-justify-content-space-between-a-c95b" data-trigger="mission-data-toggle-box" data-box-id="freqtypes-box">
             <h2 th:text="#{admin.mission_data.frequency_types}" class="m-0">Frequenztypen</h2>
-            <div style="display: flex; gap: 1rem; align-items: center;">
+            <div class="krtm-display-flex-gap-1rem-align-items-center-6529">
                 <form th:action="@{/admin/mission-data}" method="get" id="freqtype-filter-form" class="no-track m-0 flex-gap-sm">
                     <input type="hidden" name="includeInactiveSquadrons" th:value="${includeInactiveSquadrons}">
                     <input type="hidden" name="includeInactiveJobTypes" th:value="${includeInactiveJobTypes}">
                     <input type="checkbox" id="includeInactiveFrequencyTypes" name="includeInactiveFrequencyTypes" th:checked="${includeInactiveFrequencyTypes}">
-                    <label for="includeInactiveFrequencyTypes" style="color: var(--color-gray-2); font-size: 0.9rem; cursor: pointer;" th:text="#{admin.job_type.show_inactive}">Inaktive anzeigen</label>
+                    <label for="includeInactiveFrequencyTypes" class="krtm-color-var-color-gray-2-font-size-0-9rem-curs-0b43" th:text="#{admin.job_type.show_inactive}">Inaktive anzeigen</label>
                 </form>
                 <button id="add-freqtype-btn" class="btn btn--cta" th:data-action="@{/admin/mission-data/frequency-types}" th:text="#{admin.frequency_type.create}">Neuer Frequenztyp</button>
-                <span class="toggle-icon" style="font-size: 1.5rem; color: var(--color-primary); font-family: monospace; font-weight: bold; padding: 0 0.5rem; user-select: none;">-</span>
+                <span class="toggle-icon krtm-font-size-1-5rem-color-var-color-primary-fon-d51a">-</span>
             </div>
         </div>
 
@@ -213,8 +213,8 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr th:each="freq : ${frequencyTypes}" th:style="${!freq.active} ? 'opacity: 0.6;' : ''"
-                        draggable="true" class="draggable-row" th:data-id="${freq.id}" style="cursor: grab;">
+                    <tr th:each="freq : ${frequencyTypes}" th:classappend="${!freq.active} ? 'krtm-opacity-06' : ''"
+                        draggable="true" class="draggable-row krtm-cursor-grab-c8dc" th:data-id="${freq.id}">
                         <td>
                             <span th:text="${freq.name}">Name</span>
                             <span th:if="${!freq.active}" class="badge-inactive" th:text="#{admin.job_type.inactive}">Inaktiv</span>
@@ -244,7 +244,7 @@
     </div>
 
     <!-- Squadron Modal -->
-    <div id="squadron-modal" class="modal" th:style="${openModal == 'squadron-modal' ? 'display:flex;' : 'display:none;'}">
+    <div id="squadron-modal" class="modal" th:classappend="${openModal == 'squadron-modal'} ? 'krtm-modal-open' : 'krtm-hidden'">
         <div class="modal-content hud-box">
             <span class="close-squadron-modal close-modal">&times;</span>
             <h2 id="squadron-modal-title" th:text="#{admin.squadron.create}">Staffel</h2>
@@ -271,7 +271,7 @@
     </div>
 
     <!-- JobType Modal -->
-    <div id="jobtype-modal" class="modal" th:style="${openModal == 'jobtype-modal' ? 'display:flex;' : 'display:none;'}">
+    <div id="jobtype-modal" class="modal" th:classappend="${openModal == 'jobtype-modal'} ? 'krtm-modal-open' : 'krtm-hidden'">
         <div class="modal-content hud-box">
             <span class="close-jobtype-modal close-modal">&times;</span>
             <h2 id="jobtype-modal-title" th:text="#{admin.job_type.create}">Job</h2>
@@ -291,15 +291,15 @@
                     <div th:if="${#fields.hasErrors('archetype')}" th:errors="*{archetype}" class="field-error"></div>
                 </div>
                 <div class="form-group" id="jt-leadership-group">
-                    <label style="display: flex; align-items: center; gap: 0.5rem; flex-direction: row; cursor: pointer;">
-                        <input type="checkbox" name="isLeadershipRole" id="jt-leadership" style="width: auto;" th:checked="*{isLeadershipRole}">
+                    <label class="krtm-display-flex-align-items-center-gap-0-5rem-f-8e71">
+                        <input type="checkbox" name="isLeadershipRole" id="jt-leadership" class="krtm-width-auto-7e37" th:checked="*{isLeadershipRole}">
                         <span th:text="#{admin.job_type.is_leadership_role}">Führungsposition</span>
                     </label>
                     <div th:if="${#fields.hasErrors('isLeadershipRole')}" th:errors="*{isLeadershipRole}" class="field-error"></div>
                 </div>
                 <div class="form-group" id="jt-missionlead-group">
-                    <label style="display: flex; align-items: center; gap: 0.5rem; flex-direction: row; cursor: pointer;">
-                        <input type="checkbox" name="isMissionLead" id="jt-missionlead" style="width: auto;" th:checked="*{isMissionLead}">
+                    <label class="krtm-display-flex-align-items-center-gap-0-5rem-f-8e71">
+                        <input type="checkbox" name="isMissionLead" id="jt-missionlead" class="krtm-width-auto-7e37" th:checked="*{isMissionLead}">
                         <span th:text="#{admin.job_type.is_mission_lead}">Einsatzleiter</span>
                     </label>
                     <small class="form-hint" th:text="#{admin.job_type.is_mission_lead.hint}">Nur eine Mission-F&uuml;hrungsposition kann der Einsatzleiter sein.</small>
@@ -316,7 +316,7 @@
     </div>
 
     <!-- FrequencyType Modal -->
-    <div id="frequency-type-modal" class="modal" th:style="${openModal == 'frequency-type-modal' ? 'display:flex;' : 'display:none;'}">
+    <div id="frequency-type-modal" class="modal" th:classappend="${openModal == 'frequency-type-modal'} ? 'krtm-modal-open' : 'krtm-hidden'">
         <div class="modal-content hud-box">
             <span class="close-freqtype-modal close-modal">&times;</span>
             <h2 id="freqtype-modal-title" th:text="#{admin.frequency_type.create}">Frequenztyp</h2>
@@ -338,8 +338,8 @@
     </div>
 
     <!-- Delete Confirmation Modal -->
-    <div id="delete-confirm-modal" class="modal" style="display:none; z-index: 3100;">
-        <div class="modal-content hud-box" style="max-width: 500px; text-align: center;">
+    <div id="delete-confirm-modal" class="modal krtm-display-none-z-index-3100-25fb">
+        <div class="modal-content hud-box krtm-max-width-500px-text-align-center-ff4b">
             <h2 th:text="#{info.delete.confirm.title}" class="mt-0">Löschen bestätigen</h2>
             <p th:text="#{info.delete.confirm.message}" class="mb-2">Wirklich löschen?</p>
             <div class="flex-center-gap">
