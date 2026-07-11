@@ -1083,14 +1083,14 @@ networks:
   # Backend ↔ Redis for the notification SSE cross-replica fan-out (ADR-0094). A dedicated network
   # (like net-redis-ingest) rather than widening net-redis-frontend, so no new lateral path opens.
   # Explicit `name:` for parity with the other pinned redis nets. Subnet continues the pinned
-  # 172.28.0.0/16 block (.11).
+  # 172.28.0.0/16 block (.12) — .10/.11 are already taken by net-monitoring-scrape/net-proxy-grafana.
   net-redis-backend:
     name: net-redis-backend
     driver: bridge
     ipam:
       config:
-        - subnet: 172.28.11.0/24
-          gateway: 172.28.11.1
+        - subnet: 172.28.12.0/24
+          gateway: 172.28.12.1
   # Monitoring plane — scrape/OTLP boundary (epic #936, ADR-0072). This is the ONE monitoring network
   # the app stack owns and creates: the three apps + the prod keycloak join it so Prometheus can scrape
   # their metrics (HTTPS for the apps, keycloak:9000 plain HTTP) and Alloy can receive their OTLP spans.

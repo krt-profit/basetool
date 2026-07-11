@@ -17,7 +17,7 @@ Almost all of #1102 is application code that ships through the ordinary `deploy.
 operator action. Two things do **not**:
 
 1. **A compose network-topology change.** The backend now joins a new dedicated network
-   **`net-redis-backend`** (subnet `172.28.11.0/24`) so it can reach the `redis` service for the
+   **`net-redis-backend`** (subnet `172.28.12.0/24`) so it can reach the `redis` service for the
    notification SSE cross-replica fan-out (the frontend live-sync fan-out reuses the existing
    `net-redis-frontend`, so it needs no topology change). `deploy.sh` reconciles the stack with an
    **in-place `up`**, which — on a network add against the pinned `172.28.0.0/16` block — strands
