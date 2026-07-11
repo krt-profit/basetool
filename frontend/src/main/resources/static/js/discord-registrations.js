@@ -142,7 +142,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
     document.addEventListener('keydown', function (event) {
-        if (event.key === 'Escape' && modal.style.display === 'flex') {
+        if (event.key === 'Escape' && window.getComputedStyle(modal).display === 'flex') {
             closeReject();
         }
     });

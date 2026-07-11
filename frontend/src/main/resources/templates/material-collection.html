@@ -21,13 +21,13 @@
 </header>
 
 <main>
-    <div class="greeting hud-box flex-between" style="flex-wrap: wrap; gap: 1rem;">
-        <h1 th:text="#{material.collection.title}" style="letter-spacing: 0.08em;">Materialsammelübersicht</h1>
-        <a th:href="@{/orders/{id}(id=${jobOrderId})}" class="btn btn-ghost" style="min-height: 44px; display: inline-flex; align-items: center;" th:text="#{material.collection.back}">Zurück zum Auftrag</a>
+    <div class="greeting hud-box flex-between krtm-flex-wrap-wrap-gap-1rem-659b">
+        <h1 th:text="#{material.collection.title}" class="krtm-letter-spacing-0-08em-0157">Materialsammelübersicht</h1>
+        <a th:href="@{/orders/{id}(id=${jobOrderId})}" class="btn btn-ghost krtm-min-height-44px-display-inline-flex-align-it-37c8" th:text="#{material.collection.back}">Zurück zum Auftrag</a>
     </div>
 
     <div class="hud-box mt-2">
-        <div th:if="${entries == null or entries.isEmpty()}" style="color: var(--color-gray-2); font-family: 'Lato', sans-serif; padding: 2rem 0; text-align: center;" th:text="#{material.collection.empty}">
+        <div th:if="${entries == null or entries.isEmpty()}" class="krtm-color-var-color-gray-2-font-family-lato-sans-9437" th:text="#{material.collection.empty}">
             Keine Lagereinträge für diesen Auftrag vorhanden.
         </div>
 
@@ -51,10 +51,9 @@
                     <td>
                         <!-- Server-side searchable combobox (remote-users, #1193): seed only this
                              entry's current owner; the roster is searched on demand. -->
-                        <select class="owner-select krt-select"
+                        <select class="owner-select krt-select krtm-min-height-44px-width-100-min-width-140px-ba-ded1"
                                 data-role="owner-select" data-krt-combobox="remote-users"
-                                th:data-inventory-id="${entry.inventoryEntryId}"
-                                style="min-height: 44px; width: 100%; min-width: 140px; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); padding: 0.4rem 0.5rem;">
+                                th:data-inventory-id="${entry.inventoryEntryId}">
                             <option th:if="${entry.ownerId != null}"
                                     th:value="${entry.ownerId}"
                                     th:selected="true"
@@ -62,24 +61,22 @@
                         </select>
                     </td>
                     <td>
-                        <select class="location-select krt-select"
-                                th:data-inventory-id="${entry.inventoryEntryId}"
-                                style="min-height: 44px; width: 100%; min-width: 140px; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); padding: 0.4rem 0.5rem;">
+                        <select class="location-select krt-select krtm-min-height-44px-width-100-min-width-140px-ba-ded1"
+                                th:data-inventory-id="${entry.inventoryEntryId}">
                             <option th:each="loc : ${locations}"
                                     th:value="${loc.id}"
                                     th:text="${loc.name}"
                                     th:selected="${loc.id == entry.locationId}"></option>
                         </select>
                     </td>
-                    <td th:text="${entry.materialName}" style="font-family: 'Lato', sans-serif;"></td>
-                    <td th:text="${entry.quality}" style="font-family: 'Lato', sans-serif;"></td>
-                    <td th:text="${entry.quantity}" style="font-family: 'Lato', sans-serif;"></td>
+                    <td th:text="${entry.materialName}" class="krtm-font-family-lato-sans-serif-437e"></td>
+                    <td th:text="${entry.quality}" class="krtm-font-family-lato-sans-serif-437e"></td>
+                    <td th:text="${entry.quantity}" class="krtm-font-family-lato-sans-serif-437e"></td>
                     <td class="text-center">
                         <input type="checkbox"
-                               class="delivered-checkbox"
+                               class="delivered-checkbox krtm-width-22px-height-22px-cursor-pointer-accent-b072"
                                th:data-inventory-id="${entry.inventoryEntryId}"
-                               th:checked="${entry.delivered}"
-                               style="width: 22px; height: 22px; cursor: pointer; accent-color: var(--color-primary);">
+                               th:checked="${entry.delivered}">
                     </td>
                 </tr>
                 </tbody>

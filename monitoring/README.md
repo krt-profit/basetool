@@ -209,9 +209,9 @@ can run these from the repo root:
 
 ```bash
 # Prometheus scrape config + alert rules
-docker run --rm -v "$PWD/monitoring/prometheus:/cfg" prom/prometheus:v3.13.0 \
+docker run --rm -v "$PWD/monitoring/prometheus:/cfg" prom/prometheus:v3.13.1 \
   promtool check config /cfg/prometheus.yml
-docker run --rm -v "$PWD/monitoring/prometheus:/cfg" prom/prometheus:v3.13.0 \
+docker run --rm -v "$PWD/monitoring/prometheus:/cfg" prom/prometheus:v3.13.1 \
   promtool check rules /cfg/alerts/*.yml
 
 # Alertmanager — check the RENDERED alertmanager.yml (after envsubst), not the .tmpl

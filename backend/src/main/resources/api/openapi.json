@@ -53628,11 +53628,11 @@
           "owner" : {
             "$ref" : "#/components/schemas/UserReferenceDto"
           },
-          "squadron" : {
-            "$ref" : "#/components/schemas/SquadronReferenceDto"
-          },
-          "foreign" : {
-            "type" : "boolean"
+          "ownerOrgUnits" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OrgUnitReferenceDto"
+            }
           },
           "mine" : {
             "type" : "boolean"

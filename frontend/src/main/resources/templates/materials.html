@@ -104,7 +104,7 @@
             <p th:text="#{__${error}__}">Fehler</p>
         </div>
 
-        <div class="form-group" style="position: relative;">
+        <div class="form-group krtm-position-relative-a8a9">
             <input type="text" id="materialFilter" th:placeholder="#{filter.material.placeholder}" data-trigger="materials-filter" autocomplete="off">
             <!--/*
               Material names for the custom krtAutocomplete dropdown. The names live in a datalist
@@ -133,12 +133,12 @@
 
         <div id="materialsGrouped">
             <div th:each="entry : ${materialsByKind}" class="kind-group mt-1-5">
-                <div class="hud-box kind-header" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; background-color: var(--color-surface-input); padding: 0.5rem 1rem;" data-trigger="materials-toggle-kind">
-                    <h2 style="margin: 0; font-family: var(--font-headline); font-size: 1.2rem; color: var(--color-primary);" th:text="${entry.key == 'Unsortiert' ? #messages.msg('material.category.unsorted') : entry.key}">Kategorie Name</h2>
-                    <span class="toggle-icon" style="color: var(--color-primary); font-weight: bold; font-size: 1.5rem;">+</span>
+                <div class="hud-box kind-header krtm-cursor-pointer-display-flex-justify-content-d016" data-trigger="materials-toggle-kind">
+                    <h2 class="krtm-margin-0-font-family-var-font-headline-font-d92f" th:text="${entry.key == 'Unsortiert' ? #messages.msg('material.category.unsorted') : entry.key}">Kategorie Name</h2>
+                    <span class="toggle-icon krtm-color-var-color-primary-font-weight-bold-fon-b57e">+</span>
                 </div>
 
-                <div class="grid-auto-cards materialsGrid" style="margin-top: 1rem; display: none;">
+                <div class="grid-auto-cards materialsGrid krtm-margin-top-1rem-display-none-c750">
                     <th:block th:each="mat : ${entry.value}">
                         <div th:replace="~{fragments/material-card :: materialCard(${mat})}"></div>
                     </th:block>
@@ -146,13 +146,13 @@
             </div>
         </div>
 
-        <div id="materialsFlat" class="grid-auto-cards mt-1-5" style="display: none;">
+        <div id="materialsFlat" class="grid-auto-cards mt-1-5 krtm-display-none-5790">
             <th:block th:each="mat : ${materials}">
                 <div th:replace="~{fragments/material-card :: materialCard(${mat})}"></div>
             </th:block>
         </div>
 
-        <div id="noResultsMsg" style="display: none; text-align: center; color: var(--color-gray-2); margin-top: 2rem;" th:text="#{materials.list.noResults}">
+        <div id="noResultsMsg" class="krtm-display-none-text-align-center-color-var-col-4c56" th:text="#{materials.list.noResults}">
             Keine Materialien gefunden.
         </div>
     </div>

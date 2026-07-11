@@ -19,7 +19,7 @@
     <div class="hud-box mt-2" th:if="${limits != null and limits.hasAny() and !limits.canEdit()}"
          data-testid="bank-approval-limits-display">
         <h3 class="sub-h" th:text="#{bank.approvalLimit.title}">Freigabe-Limits</h3>
-        <p class="text-muted" style="font-size: 0.8rem;" th:text="#{bank.approvalLimit.displayHint}">
+        <p class="text-muted krtm-font-size-0-8rem-0fed" th:text="#{bank.approvalLimit.displayHint}">
             Bis zu diesen Betr&auml;gen kann die jeweilige Stufe Buchungen ohne zus&auml;tzliche Freigabe beantragen.</p>
         <div class="vis-row" th:each="role : ${limits.availableRoleCodes()}"
              th:if="${limits.roleLimits().containsKey(role)}" data-testid="bank-approval-limit-display-role">
@@ -49,7 +49,7 @@
 <th:block th:fragment="limitsEditor(acct, limits, refresh)">
     <div th:if="${limits != null and limits.canEdit()}" data-testid="bank-approval-limit-settings">
         <h3 class="sub-h" th:text="#{bank.approvalLimit.title}">Freigabe-Limits</h3>
-        <p class="text-muted" style="font-size: 0.8rem;" th:text="#{bank.approvalLimit.hint}">
+        <p class="text-muted krtm-font-size-0-8rem-0fed" th:text="#{bank.approvalLimit.hint}">
             Bis zu diesem Betrag darf die Stufe ohne zus&auml;tzliche Freigabe buchen; dar&uuml;ber braucht es deine Freigabe.</p>
 
         <!-- Role buckets -->
@@ -58,7 +58,7 @@
                  th:with="current=${limits.roleLimits().get(role)}">
                 <span class="v-label" th:text="#{'bank.orgUnit.visibility.role.' + ${role}}">Kommandoleiter</span>
                 <span class="vis-state bank-limit-edit">
-                    <form class="bank-ajax-form no-track" style="display:inline;"
+                    <form class="bank-ajax-form no-track krtm-display-inline-2f87"
                           th:attr="data-refresh=${refresh},data-endpoint='/api/proxy/org-units/bank/accounts/{id}/approval-limit/role/' + ${role}"
                           data-method="PUT">
                         <input type="hidden" name="_id" th:value="${acct.id()}">
@@ -70,7 +70,7 @@
                                 th:text="#{bank.approvalLimit.save}">Setzen</button>
                         <span class="bank-field-error" data-error-for="limit"></span>
                     </form>
-                    <form th:if="${current != null}" class="bank-ajax-form no-track" style="display:inline;"
+                    <form th:if="${current != null}" class="bank-ajax-form no-track krtm-display-inline-2f87"
                           th:attr="data-refresh=${refresh},data-endpoint='/api/proxy/org-units/bank/accounts/{id}/approval-limit/role/' + ${role}"
                           data-method="DELETE">
                         <input type="hidden" name="_id" th:value="${acct.id()}">
@@ -85,7 +85,7 @@
         <div th:if="${limits.allMembersSupported()}" class="vis-row" th:with="current=${limits.allMembersLimit()}">
             <span class="v-label" th:text="#{bank.orgUnit.settings.visibility.allMembers}">Alle Mitglieder</span>
             <span class="vis-state bank-limit-edit">
-                <form class="bank-ajax-form no-track" style="display:inline;"
+                <form class="bank-ajax-form no-track krtm-display-inline-2f87"
                       th:attr="data-refresh=${refresh}"
                       data-endpoint="/api/proxy/org-units/bank/accounts/{id}/approval-limit/all-members"
                       data-method="PUT">
@@ -97,7 +97,7 @@
                             th:text="#{bank.approvalLimit.save}">Setzen</button>
                     <span class="bank-field-error" data-error-for="limit"></span>
                 </form>
-                <form th:if="${current != null}" class="bank-ajax-form no-track" style="display:inline;"
+                <form th:if="${current != null}" class="bank-ajax-form no-track krtm-display-inline-2f87"
                       th:attr="data-refresh=${refresh}"
                       data-endpoint="/api/proxy/org-units/bank/accounts/{id}/approval-limit/all-members"
                       data-method="DELETE">
@@ -112,7 +112,7 @@
         <div th:if="${limits.areaMembersSupported()}" class="vis-row" th:with="current=${limits.areaMembersLimit()}">
             <span class="v-label" th:text="#{bank.orgUnit.settings.visibility.areaMembers}">Mitglieder des Bereichs</span>
             <span class="vis-state bank-limit-edit">
-                <form class="bank-ajax-form no-track" style="display:inline;"
+                <form class="bank-ajax-form no-track krtm-display-inline-2f87"
                       th:attr="data-refresh=${refresh}"
                       data-endpoint="/api/proxy/org-units/bank/accounts/{id}/approval-limit/area-members"
                       data-method="PUT">
@@ -124,7 +124,7 @@
                             th:text="#{bank.approvalLimit.save}">Setzen</button>
                     <span class="bank-field-error" data-error-for="limit"></span>
                 </form>
-                <form th:if="${current != null}" class="bank-ajax-form no-track" style="display:inline;"
+                <form th:if="${current != null}" class="bank-ajax-form no-track krtm-display-inline-2f87"
                       th:attr="data-refresh=${refresh}"
                       data-endpoint="/api/proxy/org-units/bank/accounts/{id}/approval-limit/area-members"
                       data-method="DELETE">
@@ -145,7 +145,7 @@
                           th:text="' &middot; ' + ${#numbers.formatInteger(@moneyFormat.round(u.limitAmount()), 1, 'POINT')} + ' aUEC'"> &middot; 2.000.000 aUEC</span>
                 </span>
                 <span class="vis-state">
-                    <form class="bank-ajax-form no-track" style="display:inline;"
+                    <form class="bank-ajax-form no-track krtm-display-inline-2f87"
                           th:attr="data-refresh=${refresh},data-endpoint='/api/proxy/org-units/bank/accounts/{id}/approval-limit/user/' + ${u.userId()}"
                           data-method="DELETE">
                         <input type="hidden" name="_id" th:value="${acct.id()}">

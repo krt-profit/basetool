@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.OperationUpdateDto;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -135,7 +136,7 @@ public class OperationService {
             : status;
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     return operationRepository.searchOperations(
-        query,
+        LikePatterns.escapeNullable(query),
         start,
         end,
         effectiveStatus,

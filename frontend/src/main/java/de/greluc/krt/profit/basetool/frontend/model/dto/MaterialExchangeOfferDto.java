@@ -37,8 +37,9 @@ import java.util.UUID;
  * @param itemName the offered item's display name for an item offer, else {@code null}.
  * @param itemQuantity the offered whole-piece quantity for an item offer, else {@code null}.
  * @param owner the offering player (the Anbieter).
- * @param squadron the owner's squadron badge, or {@code null}.
- * @param foreign whether the offer's squadron differs from the viewer's.
+ * @param ownerOrgUnits every badge-kind org unit the Anbieter belongs to (Staffel(n) first, then
+ *     SK(s), then Bereich(e)), rendered as affiliation badges after the username; empty when the
+ *     Anbieter has none.
  * @param mine whether the viewer owns this offer.
  * @param quality the offered quality (0–1000) for a material offer, else {@code null}.
  * @param amount the offered quantity in SCU (clamped to current stock) for a material offer, else
@@ -60,8 +61,7 @@ public record MaterialExchangeOfferDto(
     String itemName,
     Integer itemQuantity,
     UserReferenceDto owner,
-    SquadronReferenceDto squadron,
-    boolean foreign,
+    List<OrgUnitReferenceDto> ownerOrgUnits,
     boolean mine,
     Integer quality,
     Double amount,

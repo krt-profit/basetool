@@ -48,11 +48,11 @@
         <p th:text="#{admin.syncReports.subtitle}">Ergebnisse der UEX- und SC-Wiki-Synchronisation.</p>
     </div>
 
-    <div th:if="${error}" class="hud-box mt-2" style="border-color: var(--color-danger);">
+    <div th:if="${error}" class="hud-box mt-2 krtm-border-color-var-color-danger-b169">
         <p th:text="#{${error}}">Fehler beim Laden.</p>
     </div>
 
-    <div th:if="${deletedCount != null}" class="hud-box mt-2" style="border-color: var(--color-success);">
+    <div th:if="${deletedCount != null}" class="hud-box mt-2 krtm-border-color-var-color-success-77db">
         <p th:text="#{admin.syncReports.delete.success(${deletedCount})}">Berichte gelöscht.</p>
     </div>
 
@@ -132,8 +132,8 @@
     </div>
 
     <!-- Delete Confirmation Modal -->
-    <div id="purge-confirm-modal" class="modal" style="display:none; z-index: 3100;">
-        <div class="modal-content hud-box" style="max-width: 520px; text-align: center;">
+    <div id="purge-confirm-modal" class="modal krtm-display-none-z-index-3100-25fb">
+        <div class="modal-content hud-box krtm-max-width-520px-text-align-center-b4d9">
             <h2 th:text="#{admin.syncReports.delete.confirm.title}" class="mt-0">Löschen bestätigen</h2>
             <p id="purge-confirm-message" class="mb-2"
                th:data-template="#{admin.syncReports.delete.confirm.message}">Wirklich löschen?</p>

@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceOverviewDto;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialPriceRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.List;
 import java.util.UUID;
@@ -115,7 +116,7 @@ public class MaterialService {
    */
   public Page<MaterialPriceOverviewDto> getMaterialPriceOverview(
       @NotNull String name, @NotNull Pageable pageable) {
-    return materialRepository.getMaterialPriceOverview(name, pageable);
+    return materialRepository.getMaterialPriceOverview(LikePatterns.escapeNullable(name), pageable);
   }
 
   /**

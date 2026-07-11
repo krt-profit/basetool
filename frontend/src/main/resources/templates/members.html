@@ -27,22 +27,21 @@
 
     <div class="hud-box mt-2">
 
-        <form id="members-filter-form" method="get" th:action="@{/members}" class="search-form no-track" style="display:flex; gap:0.5rem; align-items:center; margin-bottom:1rem;">
+        <form id="members-filter-form" method="get" th:action="@{/members}" class="search-form no-track krtm-display-flex-gap-0-5rem-align-items-center-m-f4c7">
             <label for="member-search" th:text="#{members.search}">Mitglied suchen</label>
-            <div style="flex:1; min-width: 12rem; position: relative;">
+            <div class="krtm-flex-1-min-width-12rem-position-relative-21fc">
                 <input type="text"
                        id="member-search"
                        name="search"
                        th:value="${search}"
                        th:placeholder="#{members.search.placeholder}"
                        autocomplete="off"
-                       style="width: 100%; box-sizing: border-box;">
+                       class="krtm-width-100-box-sizing-border-box-a87c">
             </div>
             <button type="submit" class="btn btn-ghost" th:text="#{general.search}">Suche</button>
         </form>
-        <div class="members-toolbar"
-             sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
-             style="display:flex; justify-content:flex-end; margin-bottom:1rem;">
+        <div class="members-toolbar krtm-display-flex-justify-content-flex-end-margin-63bc"
+             sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
             <button type="button" class="btn btn-ghost" data-trigger="members-sync"
                     th:title="#{members.sync.title}" th:text="#{members.sync.button}">Jetzt synchronisieren</button>
         </div>
@@ -101,8 +100,8 @@
                               th:title="#{members.discord.not_linked}" th:aria-label="#{members.discord.not_linked}">&mdash;</span>
                     </td>
                     <td>
-                        <span th:if="${user.inKeycloak}" style="color: var(--color-success); font-size: 0.8rem;" th:text="#{members.in_keycloak}">In Keycloak</span>
-                        <span th:if="${!user.inKeycloak}" style="color: var(--color-danger); font-size: 0.8rem;" th:text="#{members.not_in_keycloak}">Nicht in Keycloak</span>
+                        <span th:if="${user.inKeycloak}" class="krtm-color-var-color-success-font-size-0-8rem-65c1" th:text="#{members.in_keycloak}">In Keycloak</span>
+                        <span th:if="${!user.inKeycloak}" class="krtm-color-var-color-danger-font-size-0-8rem-4da5" th:text="#{members.not_in_keycloak}">Nicht in Keycloak</span>
                     </td>
                     <td>
                         <div class="flex-gap-xs">

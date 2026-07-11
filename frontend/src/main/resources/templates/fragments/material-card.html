@@ -12,7 +12,7 @@
 */-->
 <a th:fragment="materialCard(mat)" th:href="@{/materials/{id}(id=${mat.id})}" class="hud-box material-card">
     <h3 class="material-title">
-        <span th:if="${mat.isIllegal == true}" class="text-danger" style="margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_illegal}">&#9888;</span><span th:if="${mat.isVolatileQt == true}" class="text-warning" style="margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_qt}">&#9888;</span><span th:if="${mat.isVolatileTime == true}" class="text-warning" style="margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_time}">&#9888;</span><span th:text="${mat.name}">Material Name</span>
+        <span th:if="${mat.isIllegal == true}" class="text-danger krtm-margin-right-0-5rem-font-weight-bold-4522" th:title="#{material.is_illegal}">&#9888;</span><span th:if="${mat.isVolatileQt == true}" class="text-warning krtm-margin-right-0-5rem-font-weight-bold-4522" th:title="#{material.is_volatile_qt}">&#9888;</span><span th:if="${mat.isVolatileTime == true}" class="text-warning krtm-margin-right-0-5rem-font-weight-bold-4522" th:title="#{material.is_volatile_time}">&#9888;</span><span th:text="${mat.name}">Material Name</span>
     </h3>
 
     <div class="price-info">
@@ -20,7 +20,7 @@
             <div class="price-label" th:text="#{materials.minPriceBuy}">Min. Einkaufspreis</div>
             <div class="price-value" th:text="${mat.minPriceBuy != null ? #numbers.formatInteger(mat.minPriceBuy, 1, 'POINT') + ' aUEC' : '-'}">-</div>
         </div>
-        <div style="text-align: right;">
+        <div class="krtm-text-align-right-3048">
             <div class="price-label" th:text="#{materials.maxPriceSell}">Max. Verkaufspreis</div>
             <div class="price-value" th:text="${mat.maxPriceSell != null ? #numbers.formatInteger(mat.maxPriceSell, 1, 'POINT') + ' aUEC' : '-'}">-</div>
         </div>

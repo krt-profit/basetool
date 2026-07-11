@@ -129,6 +129,28 @@ public class MissionPresenceWebSocketHandler extends TextWebSocketHandler {
   private static final double CHANGED_REFILL_PER_SEC = 10.0;
 
   /**
+   * Hard cap on the accepted length of a client-supplied presence {@code sectionKey}. Legitimate
+   * section keys are short panel identifiers (a handful of characters, from {@code
+   * [data-panel-key]}); anything longer is a crafted client trying to inflate the per-mission
+   * presence map's memory footprint and is dropped.
+   */
+  private static final int MAX_SECTION_KEY_LENGTH = 64;
+
+  /**
+   * Token-bucket capacity for inbound presence control frames ({@code focus} / {@code heartbeat} /
+   * {@code blur}) per session. Legitimate presence traffic is sparse — a {@code focus} on entering
+   * a panel plus a {@code heartbeat} once per {@code HEARTBEAT_MS} (60s) — so this burst sits far
+   * above any human cadence and only bounds a crafted client emitting presence frames in a loop.
+   * Without it a single socket could drive unbounded per-mission section-map growth and O(N^2)
+   * snapshot-broadcast amplification: the {@code changed} relay is bounded by {@link
+   * #CHANGED_BURST} but the presence path was not. Package-private for the test.
+   */
+  static final int PRESENCE_BURST = 20;
+
+  /** Token-bucket refill rate for inbound presence control frames, in tokens per second. */
+  private static final double PRESENCE_REFILL_PER_SEC = 10.0;
+
+  /**
    * Max time (ms) a single presence send may block before the {@link
    * ConcurrentWebSocketSessionDecorator} TERMINATEs a wedged peer instead of parking the
    * broadcasting thread (#1149).
@@ -146,6 +168,7 @@ public class MissionPresenceWebSocketHandler extends TextWebSocketHandler {
   private static final String ATTR_USER_ID = "missionPresence.userId";
   private static final String ATTR_DISPLAY_NAME = "missionPresence.displayName";
   private static final String ATTR_CHANGED_RATE = "missionPresence.changedRate";
+  private static final String ATTR_PRESENCE_RATE = "missionPresence.presenceRate";
 
   /**
    * Session-attribute key holding the {@link ConcurrentWebSocketSessionDecorator} wrapping the raw
@@ -314,7 +337,20 @@ public class MissionPresenceWebSocketHandler extends TextWebSocketHandler {
       return;
     }
     String sectionKey = textValue(node, "sectionKey");
-    if (sectionKey == null || sectionKey.isBlank()) {
+    if (sectionKey == null
+        || sectionKey.isBlank()
+        || sectionKey.length() > MAX_SECTION_KEY_LENGTH) {
+      return;
+    }
+    // The focus/heartbeat/blur presence path is rate-limited per session exactly like the `changed`
+    // relay above. Without a bound a crafted client could loop `focus` frames carrying unique
+    // section keys, each of which (a) inserts a new entry into the per-mission presence map
+    // (unbounded memory until the TTL reap) and (b) forces a full-map snapshot rebuild + broadcast
+    // to every viewer of the mission — O(N^2) CPU/bandwidth amplification driven from a single
+    // authenticated socket. The MissionPresenceService distinct-section cap bounds absolute map
+    // size; this token bucket bounds the growth/broadcast rate.
+    if (!allowPresenceFrame(session)) {
+      droppedThrottled.increment();
       return;
     }
 
@@ -434,16 +470,51 @@ public class MissionPresenceWebSocketHandler extends TextWebSocketHandler {
    * @return {@code true} to relay the frame, {@code false} to drop it as throttled
    */
   private boolean allowChangedFrame(@NotNull WebSocketSession session) {
+    return allowFrame(session, ATTR_CHANGED_RATE, CHANGED_BURST, CHANGED_REFILL_PER_SEC);
+  }
+
+  /**
+   * Per-session token-bucket rate limit on inbound presence control frames ({@code focus} / {@code
+   * heartbeat} / {@code blur}), mirroring {@link #allowChangedFrame}. Bounds the per-mission
+   * presence-map growth rate and the snapshot-broadcast amplification a crafted client could
+   * otherwise drive by looping {@code focus} frames with unique section keys. Legitimate presence
+   * traffic (a focus on panel entry plus a 60s heartbeat) sits far below the limit.
+   *
+   * @param session the session that sent the frame
+   * @return {@code true} to process the frame, {@code false} to drop it as throttled
+   */
+  private boolean allowPresenceFrame(@NotNull WebSocketSession session) {
+    return allowFrame(session, ATTR_PRESENCE_RATE, PRESENCE_BURST, PRESENCE_REFILL_PER_SEC);
+  }
+
+  /**
+   * Shared token-bucket rate-limit primitive backing {@link #allowChangedFrame} and {@link
+   * #allowPresenceFrame}. Consumes and returns {@code true} when a token is available, or returns
+   * {@code false} once the session exceeds {@code burst} frames refilled at {@code refillPerSec}/s.
+   * The unsynchronised bucket state lives in the session attributes under {@code attrKey}; frames
+   * from one session are delivered serially by the container, so no locking is required.
+   *
+   * @param session the session that sent the frame
+   * @param attrKey the session-attribute key holding this bucket's state
+   * @param burst the bucket capacity (maximum tokens)
+   * @param refillPerSec the token refill rate per second
+   * @return {@code true} to process the frame, {@code false} to drop it as throttled
+   */
+  private boolean allowFrame(
+      @NotNull WebSocketSession session,
+      @NotNull String attrKey,
+      double burst,
+      double refillPerSec) {
     long now = System.nanoTime();
-    ChangedRateState state;
-    if (session.getAttributes().get(ATTR_CHANGED_RATE) instanceof ChangedRateState existing) {
+    RateState state;
+    if (session.getAttributes().get(attrKey) instanceof RateState existing) {
       state = existing;
     } else {
-      state = new ChangedRateState(CHANGED_BURST, now);
-      session.getAttributes().put(ATTR_CHANGED_RATE, state);
+      state = new RateState(burst, now);
+      session.getAttributes().put(attrKey, state);
     }
     double elapsedSeconds = (now - state.lastRefillNanos) / 1_000_000_000.0;
-    state.tokens = Math.min(CHANGED_BURST, state.tokens + elapsedSeconds * CHANGED_REFILL_PER_SEC);
+    state.tokens = Math.min(burst, state.tokens + elapsedSeconds * refillPerSec);
     state.lastRefillNanos = now;
     if (state.tokens >= 1.0) {
       state.tokens -= 1.0;
@@ -656,16 +727,16 @@ public class MissionPresenceWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Mutable per-session token-bucket state for the {@code changed}-frame rate limit: the current
-   * (fractional) token count and the {@link System#nanoTime()} reading at the last refill. Stored
-   * in the WebSocket session attributes and touched only from the single-threaded per-session
-   * message delivery, so it needs no synchronisation.
+   * Mutable token-bucket state for one session's inbound-frame rate limit — one instance per bucket
+   * ({@code changed} and presence) stored in the session attributes, holding the current
+   * (fractional) token count and the {@link System#nanoTime()} reading at the last refill. Not
+   * thread-safe; relies on the container delivering a single session's frames serially.
    */
-  private static final class ChangedRateState {
+  private static final class RateState {
     private double tokens;
     private long lastRefillNanos;
 
-    ChangedRateState(double tokens, long lastRefillNanos) {
+    RateState(double tokens, long lastRefillNanos) {
       this.tokens = tokens;
       this.lastRefillNanos = lastRefillNanos;
     }

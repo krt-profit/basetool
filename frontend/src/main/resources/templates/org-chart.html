@@ -29,7 +29,7 @@
     <div class="greeting hud-box oc-greeting">
         <div class="oc-greeting-text">
             <h1 th:text="#{orgChart.title}">Organigramm</h1>
-            <p style="color: var(--color-gray-2); margin-top: 0.5rem;" th:text="#{orgChart.subtitle}">
+            <p class="krtm-color-var-color-gray-2-margin-top-0-5rem-e129" th:text="#{orgChart.subtitle}">
                 Übersicht der Funktionsränge in Bereichsleitung, Staffeln und Spezialkommandos.
             </p>
         </div>
@@ -161,9 +161,8 @@
         </div>
         </th:block>
 
-        <div class="hud-box mt-2"
+        <div class="hud-box mt-2 krtm-color-var-color-gray-2-4fcb"
              th:if="${chartEmpty}"
-             style="color: var(--color-gray-2);"
              th:text="#{orgChart.empty}">
             Es sind noch keine Staffeln oder Spezialkommandos vorhanden.
         </div>
@@ -172,8 +171,8 @@
 </main>
 
 <!-- Assign / reassign / add-staff modal (admins only) -->
-<div id="oc-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="oc-modal-title"
-     style="display:none;" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+<div id="oc-modal" class="modal krtm-display-none-5790" role="dialog" aria-modal="true" aria-labelledby="oc-modal-title"
+     sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
     <div class="modal-content hud-box">
         <button type="button" class="oc-modal-close" data-trigger="oc-modal-cancel"
                 th:aria-label="#{general.cancel}">&times;</button>
@@ -207,7 +206,7 @@
                    th:placeholder="#{orgChart.modal.displayNamePlaceholder}">
             <p class="oc-modal-hint" th:text="#{orgChart.modal.accountHint}">Konten werden unter Leitung verwaltet.</p>
         </div>
-        <div style="display:flex; gap:0.75rem; justify-content:flex-end; margin-top:1rem;">
+        <div class="krtm-display-flex-gap-0-75rem-justify-content-fle-d079">
             <button type="button" class="btn btn-ghost" data-trigger="oc-modal-cancel"
                     th:text="#{general.cancel}">Abbrechen</button>
             <button type="button" class="btn btn--cta" data-trigger="oc-modal-submit"

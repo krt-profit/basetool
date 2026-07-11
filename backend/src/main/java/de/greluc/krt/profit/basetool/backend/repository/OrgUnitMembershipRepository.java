@@ -87,6 +87,24 @@ public interface OrgUnitMembershipRepository
   List<OrgUnitMembership> findAllByIdUserIdAndKind(UUID userId, OrgUnitKind kind);
 
   /**
+   * Batch variant of {@link #findAllByIdUserIdAndKind(UUID, OrgUnitKind)} for a set of users and a
+   * set of kinds in a single query — the N+1-free way to resolve "which Staffeln, Spezialkommandos
+   * and Bereiche does each of these users belong to?". Backs the Materialbörse board's anbieter
+   * affiliation badges (REQ-MARKET-001), which render every offering member's {@code SQUADRON} /
+   * {@code SPECIAL_COMMAND} / {@code BEREICH} memberships after the username without a per-offer
+   * membership lookup.
+   *
+   * @param userIds the users whose memberships to list; never {@code null}. An empty collection
+   *     yields an empty result.
+   * @param kinds the discriminator values to match; never {@code null}. An empty collection yields
+   *     an empty result.
+   * @return the matching membership rows across all requested users and kinds; never {@code null},
+   *     possibly empty.
+   */
+  List<OrgUnitMembership> findAllByIdUserIdInAndKindIn(
+      Collection<UUID> userIds, Collection<OrgUnitKind> kinds);
+
+  /**
    * Returns every membership belonging to the given org unit. Used by the admin roster page for an
    * SK ("list every member of SK ALPHA") and by the Lead-management endpoints to verify "is this
    * caller a Lead of SK ALPHA before letting them edit memberships there".

@@ -22,7 +22,7 @@
 
 <!-- ======================= personal Lager (/inventory/my) ======================= -->
 <th:block th:fragment="stackEntriesMy">
-    <div th:if="${error}" class="hud-box hud-box-error" style="margin: 0.5rem 2.5rem;">
+    <div th:if="${error}" class="hud-box hud-box-error krtm-margin-0-5rem-2-5rem-25ef">
         <p th:text="#{__${error}__}">Fehler</p>
     </div>
     <!-- Tree-table leaf rows injected into the stack's .stack-entries-content. No repeated
@@ -155,18 +155,17 @@
         </div>
     </th:block>
     <div class="tree-row" th:if="${#lists.isEmpty(entries)}">
-        <div class="tree-cell text-muted" style="grid-column: 1 / -1; padding-left: 3rem;" th:text="#{inventory.stack.entries.empty}">Keine Einträge vorhanden.</div>
+        <div class="tree-cell text-muted krtm-grid-column-1-1-padding-left-3rem-2793" th:text="#{inventory.stack.entries.empty}">Keine Einträge vorhanden.</div>
     </div>
-    <div th:if="${entriesPage != null and entriesPage.totalPages() > 1}" class="stack-entries-pagination"
-         style="display: flex; gap: 0.75rem; align-items: center; padding: 0.5rem 2.5rem;">
-        <button type="button" class="btn btn-ghost" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;"
+    <div th:if="${entriesPage != null and entriesPage.totalPages() > 1}" class="stack-entries-pagination krtm-display-flex-gap-0-75rem-align-items-center-c051">
+        <button type="button" class="btn btn-ghost krtm-padding-0-2rem-0-6rem-font-size-0-8rem-452c"
                 data-trigger="inv-my-stack-page"
                 th:data-page="${entriesPage.page() - 1}"
                 th:disabled="${entriesPage.page() <= 0}"
                 th:text="#{general.pagination.previous}">Zurück</button>
-        <span style="color: var(--color-gray-2); font-size: 0.85rem;"
+        <span class="krtm-color-var-color-gray-2-font-size-0-85rem-b3ad"
               th:text="|${entriesPage.page() + 1} / ${entriesPage.totalPages()}|">1 / 3</span>
-        <button type="button" class="btn btn-ghost" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;"
+        <button type="button" class="btn btn-ghost krtm-padding-0-2rem-0-6rem-font-size-0-8rem-452c"
                 data-trigger="inv-my-stack-page"
                 th:data-page="${entriesPage.page() + 1}"
                 th:disabled="${entriesPage.page() + 1 >= entriesPage.totalPages()}"
@@ -176,7 +175,7 @@
 
 <!-- ======================= global Lager (/inventory/all) ======================= -->
 <th:block th:fragment="stackEntriesAdmin">
-    <div th:if="${error}" class="hud-box hud-box-error" style="margin: 0.5rem 2.5rem;">
+    <div th:if="${error}" class="hud-box hud-box-error krtm-margin-0-5rem-2-5rem-25ef">
         <p th:text="#{__${error}__}">Fehler</p>
     </div>
     <!-- Tree-table leaf rows injected into the stack's .stack-entries-content. No repeated
@@ -296,18 +295,17 @@
         </div>
     </th:block>
     <div class="tree-row" th:if="${#lists.isEmpty(entries)}">
-        <div class="tree-cell text-muted" style="grid-column: 1 / -1; padding-left: 3rem;" th:text="#{inventory.stack.entries.empty}">Keine Einträge vorhanden.</div>
+        <div class="tree-cell text-muted krtm-grid-column-1-1-padding-left-3rem-2793" th:text="#{inventory.stack.entries.empty}">Keine Einträge vorhanden.</div>
     </div>
-    <div th:if="${entriesPage != null and entriesPage.totalPages() > 1}" class="stack-entries-pagination"
-         style="display: flex; gap: 0.75rem; align-items: center; padding: 0.5rem 2.5rem;">
-        <button type="button" class="btn btn-ghost" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;"
+    <div th:if="${entriesPage != null and entriesPage.totalPages() > 1}" class="stack-entries-pagination krtm-display-flex-gap-0-75rem-align-items-center-c051">
+        <button type="button" class="btn btn-ghost krtm-padding-0-2rem-0-6rem-font-size-0-8rem-452c"
                 data-trigger="inv-admin-stack-page"
                 th:data-page="${entriesPage.page() - 1}"
                 th:disabled="${entriesPage.page() <= 0}"
                 th:text="#{general.pagination.previous}">Zurück</button>
-        <span style="color: var(--color-gray-2); font-size: 0.85rem;"
+        <span class="krtm-color-var-color-gray-2-font-size-0-85rem-b3ad"
               th:text="|${entriesPage.page() + 1} / ${entriesPage.totalPages()}|">1 / 3</span>
-        <button type="button" class="btn btn-ghost" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;"
+        <button type="button" class="btn btn-ghost krtm-padding-0-2rem-0-6rem-font-size-0-8rem-452c"
                 data-trigger="inv-admin-stack-page"
                 th:data-page="${entriesPage.page() + 1}"
                 th:disabled="${entriesPage.page() + 1 >= entriesPage.totalPages()}"
