@@ -106,6 +106,7 @@ public class UserService {
   private final AuthHelperService authHelperService;
   private final OwnerScopeService ownerScopeService;
   private final OrgUnitMembershipService orgUnitMembershipService;
+  private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
 
   /**
    * The org-unit-aware bank seam, injected as an {@link ObjectProvider} to avoid a constructor
@@ -917,7 +918,7 @@ public class UserService {
         applySpecialCommandChange(userId, sk);
       }
     }
-    return orgUnitMembershipService.findAllMembershipsForUser(userId);
+    return orgUnitMembershipQueryService.findAllMembershipsForUser(userId);
   }
 
   /**

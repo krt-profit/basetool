@@ -30,7 +30,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserSyncResultDto;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipService;
+import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.service.UserSyncService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
@@ -85,7 +85,7 @@ public class UserController {
   private final UserService userService;
   private final UserMapper userMapper;
   private final AuthHelperService authHelperService;
-  private final OrgUnitMembershipService orgUnitMembershipService;
+  private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   private final UserSyncService userSyncService;
   private final TaskMetrics taskMetrics;
 
@@ -306,8 +306,8 @@ public class UserController {
       @PathVariable @NotNull UUID id,
       @RequestParam(required = false, defaultValue = "false") boolean allKinds) {
     return allKinds
-        ? orgUnitMembershipService.listDirectMembershipOptions(id)
-        : orgUnitMembershipService.listOptionsForUser(id);
+        ? orgUnitMembershipQueryService.listDirectMembershipOptions(id)
+        : orgUnitMembershipQueryService.listOptionsForUser(id);
   }
 
   /**
@@ -333,7 +333,7 @@ public class UserController {
     // Post-R9 D3 (V101): the user's home Staffel(n) are sourced from org_unit_membership — the
     // legacy User.squadron column was dropped.
     java.util.List<UUID> targetSquadronIds =
-        orgUnitMembershipService.findStaffelMembershipOrgUnitIds(user.getId());
+        orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(user.getId());
     if (targetSquadronIds.isEmpty()) {
       return true;
     }
@@ -379,7 +379,7 @@ public class UserController {
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public List<OrgUnitMembershipOptionDto> getMyPickableOrgUnits(@AuthenticationPrincipal Jwt jwt) {
-    return orgUnitMembershipService.listPickerOptionsWithDescendants(
+    return orgUnitMembershipQueryService.listPickerOptionsWithDescendants(
         userService.getUserIdFromJwt(jwt));
   }
 
@@ -399,7 +399,7 @@ public class UserController {
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public Set<UUID> getMyOrgUnitIds(@AuthenticationPrincipal Jwt jwt) {
-    return orgUnitMembershipService.findDirectMembershipOrgUnitIds(
+    return orgUnitMembershipQueryService.findDirectMembershipOrgUnitIds(
         userService.getUserIdFromJwt(jwt));
   }
 
@@ -570,7 +570,8 @@ public class UserController {
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid MembershipDeltaRequest request) {
     userService.applyMembershipDelta(id, request);
-    return new MembershipDeltaResponse(orgUnitMembershipService.findAllMembershipDtosForUser(id));
+    return new MembershipDeltaResponse(
+        orgUnitMembershipQueryService.findAllMembershipDtosForUser(id));
   }
 
   /**
@@ -588,7 +589,8 @@ public class UserController {
   @GetMapping("/{id}/memberships/detail")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public MembershipDeltaResponse getMembershipsDetail(@PathVariable @NotNull UUID id) {
-    return new MembershipDeltaResponse(orgUnitMembershipService.findAllMembershipDtosForUser(id));
+    return new MembershipDeltaResponse(
+        orgUnitMembershipQueryService.findAllMembershipDtosForUser(id));
   }
 
   /**

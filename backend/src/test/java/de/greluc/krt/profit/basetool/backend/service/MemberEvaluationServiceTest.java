@@ -57,7 +57,7 @@ class MemberEvaluationServiceTest {
 
   @Mock private OwnerScopeService ownerScopeService;
 
-  @Mock private OrgUnitMembershipService orgUnitMembershipService;
+  @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
 
   @Mock private AuthHelperService authHelperService;
 
@@ -272,7 +272,8 @@ class MemberEvaluationServiceTest {
 
     when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
     when(authHelperService.isAdmin()).thenReturn(false);
-    when(orgUnitMembershipService.findStaffelMembershipOrgUnitIds(UUID.fromString(foreignMemberId)))
+    when(orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(
+            UUID.fromString(foreignMemberId)))
         .thenReturn(java.util.List.of(foreignStaffelId));
     when(ownerScopeService.canEditSquadron(foreignStaffelId)).thenReturn(false);
 
@@ -313,7 +314,7 @@ class MemberEvaluationServiceTest {
 
     when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
     when(authHelperService.isAdmin()).thenReturn(false);
-    when(orgUnitMembershipService.findStaffelMembershipOrgUnitIds(UUID.fromString(memberId)))
+    when(orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(UUID.fromString(memberId)))
         .thenReturn(java.util.List.of(ownStaffelId));
     when(ownerScopeService.canEditSquadron(ownStaffelId)).thenReturn(true);
     when(repository.findByUserIdAndCategoryId(memberId, categoryId)).thenReturn(Optional.empty());

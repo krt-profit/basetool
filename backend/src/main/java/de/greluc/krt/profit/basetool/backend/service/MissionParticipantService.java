@@ -85,7 +85,7 @@ public class MissionParticipantService {
   private final GuestParticipantTokenService guestParticipantTokenService;
 
   /** Resolves a registered user's org-unit memberships to stamp on the participant row. */
-  private final OrgUnitMembershipService orgUnitMembershipService;
+  private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
 
   /** Polymorphic repository used to materialise org-unit affiliations by id. */
   private final OrgUnitRepository orgUnitRepository;
@@ -729,7 +729,7 @@ public class MissionParticipantService {
    */
   private java.util.List<OrgUnit> resolveMembershipOrgUnits(@NotNull UUID userId) {
     java.util.List<UUID> orgUnitIds =
-        orgUnitMembershipService.findAllMembershipsForUser(userId).stream()
+        orgUnitMembershipQueryService.findAllMembershipsForUser(userId).stream()
             .map(m -> m.getId().getOrgUnitId())
             .toList();
     if (orgUnitIds.isEmpty()) {

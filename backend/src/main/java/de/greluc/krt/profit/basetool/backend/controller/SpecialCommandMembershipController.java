@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.controller;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipLeadToggleRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipDto;
+import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
@@ -59,6 +60,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class SpecialCommandMembershipController {
 
   private final OrgUnitMembershipService membershipService;
+  private final OrgUnitMembershipQueryService membershipQueryService;
 
   /**
    * Lists every member of the given Spezialkommando. Used by the admin roster page; the response
@@ -83,7 +85,7 @@ public class SpecialCommandMembershipController {
     @ApiResponse(responseCode = "404", description = "No Spezialkommando matches the given id.")
   })
   public List<OrgUnitMembershipDto> listMembers(@PathVariable @NotNull UUID id) {
-    return membershipService.listMemberDtos(id);
+    return membershipQueryService.listMemberDtos(id);
   }
 
   /**

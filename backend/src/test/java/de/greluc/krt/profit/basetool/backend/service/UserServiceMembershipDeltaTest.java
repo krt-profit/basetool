@@ -86,6 +86,7 @@ class UserServiceMembershipDeltaTest {
   @Mock private AuthHelperService authHelperService;
   @Mock private OwnerScopeService ownerScopeService;
   @Mock private OrgUnitMembershipService orgUnitMembershipService;
+  @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
 
   @InjectMocks private UserService userService;
 
@@ -108,7 +109,7 @@ class UserServiceMembershipDeltaTest {
     UUID userId = UUID.randomUUID();
     User user = newUser(userId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(orgUnitMembershipService.findAllMembershipsForUser(userId)).thenReturn(List.of());
+    when(orgUnitMembershipQueryService.findAllMembershipsForUser(userId)).thenReturn(List.of());
 
     List<OrgUnitMembership> result =
         userService.applyMembershipDelta(userId, new MembershipDeltaRequest(null, null));
@@ -127,7 +128,7 @@ class UserServiceMembershipDeltaTest {
     UUID squadronB = UUID.randomUUID();
     User user = newUser(userId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(orgUnitMembershipService.findAllMembershipsForUser(userId)).thenReturn(List.of());
+    when(orgUnitMembershipQueryService.findAllMembershipsForUser(userId)).thenReturn(List.of());
 
     List<StaffelChange> staffeln =
         List.of(
@@ -142,7 +143,7 @@ class UserServiceMembershipDeltaTest {
     UUID userId = UUID.randomUUID();
     User user = newUser(userId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(orgUnitMembershipService.findAllMembershipsForUser(userId)).thenReturn(List.of());
+    when(orgUnitMembershipQueryService.findAllMembershipsForUser(userId)).thenReturn(List.of());
 
     userService.applyMembershipDelta(userId, new MembershipDeltaRequest(List.of(), null));
 
@@ -157,7 +158,8 @@ class UserServiceMembershipDeltaTest {
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     OrgUnitMembership freshRow = new OrgUnitMembership();
     when(orgUnitMembershipService.addMember(skId, userId)).thenReturn(freshRow);
-    when(orgUnitMembershipService.findAllMembershipsForUser(userId)).thenReturn(List.of(freshRow));
+    when(orgUnitMembershipQueryService.findAllMembershipsForUser(userId))
+        .thenReturn(List.of(freshRow));
 
     MembershipDeltaRequest delta =
         new MembershipDeltaRequest(
@@ -178,7 +180,8 @@ class UserServiceMembershipDeltaTest {
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     OrgUnitMembership freshRow = new OrgUnitMembership();
     when(orgUnitMembershipService.addMember(skId, userId)).thenReturn(freshRow);
-    when(orgUnitMembershipService.findAllMembershipsForUser(userId)).thenReturn(List.of(freshRow));
+    when(orgUnitMembershipQueryService.findAllMembershipsForUser(userId))
+        .thenReturn(List.of(freshRow));
 
     MembershipDeltaRequest delta =
         new MembershipDeltaRequest(
@@ -196,7 +199,7 @@ class UserServiceMembershipDeltaTest {
     UUID skId = UUID.randomUUID();
     User user = newUser(userId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(orgUnitMembershipService.findAllMembershipsForUser(userId)).thenReturn(List.of());
+    when(orgUnitMembershipQueryService.findAllMembershipsForUser(userId)).thenReturn(List.of());
 
     MembershipDeltaRequest delta =
         new MembershipDeltaRequest(
@@ -214,7 +217,7 @@ class UserServiceMembershipDeltaTest {
     UUID skId = UUID.randomUUID();
     User user = newUser(userId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(orgUnitMembershipService.findAllMembershipsForUser(userId)).thenReturn(List.of());
+    when(orgUnitMembershipQueryService.findAllMembershipsForUser(userId)).thenReturn(List.of());
 
     MembershipDeltaRequest delta =
         new MembershipDeltaRequest(
