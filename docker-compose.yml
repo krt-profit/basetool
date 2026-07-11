@@ -309,6 +309,13 @@ x-backend: &backend-template
     SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:?POSTGRES_USER must be set in .env}
     SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
     KEYCLOAK_ISSUER_URI: https://keycloak.profit-base.online/realms/iri
+    # JWT audience enforcement (security review, audit L-1). Empty by default so dev / e2e stay off
+    # (those realms do not stamp aud). Set IRI_BACKEND_EXPECTED_AUDIENCES=basetool-backend in the prod
+    # .env — together with IRI_INGEST_EXPECTED_AUDIENCES — ONLY after confirming the realm stamps
+    # aud=basetool-backend on frontend tokens (the `extractor-ingest` default client scope does).
+    # Enabling it before that rejects every token and breaks the app; set the var back to empty to
+    # disable instantly.
+    APP_SECURITY_JWT_EXPECTED_AUDIENCES: ${IRI_BACKEND_EXPECTED_AUDIENCES:-}
     # Internal admin / user-sync path: direct backend→Keycloak over the isolated
     # net-backend-keycloak network, now TLS because the prod Keycloak serves HTTPS only. Trust is
     # pinned to the shared self-signed cert via the `keycloak-trust` SSL bundle
@@ -522,9 +529,11 @@ x-ingest: &ingest-template
     REDIS_HOST: redis
     REDIS_PORT: 6379
     REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
-    # Audience enforcement stays OFF until the Keycloak runbook (#641, docs/INGEST_KEYCLOAK_SETUP.md)
-    # has BOTH the extractor and frontend tokens carrying aud=basetool-backend. Only then set this to
-    # basetool-backend — enabling it earlier rejects every frontend token and breaks the app.
+    # JWT audience enforcement (security review). Empty by default so dev / e2e stay off. Enforce in
+    # prod by setting IRI_INGEST_EXPECTED_AUDIENCES=basetool-backend — together with the backend's
+    # IRI_BACKEND_EXPECTED_AUDIENCES — ONLY after the realm stamps aud=basetool-backend on both the
+    # extractor and frontend tokens (#641, docs/INGEST_KEYCLOAK_SETUP.md); enabling it earlier rejects
+    # every token and breaks the app. Unset the var to disable instantly.
     APP_SECURITY_JWT_EXPECTED_AUDIENCES: ${IRI_INGEST_EXPECTED_AUDIENCES:-}
     # Monitoring plane (epic #936, REQ-OBS-005/-009) — see the backend template for the full
     # rationale. Everything defaults OFF/empty so dev/test/e2e stay inert; the prod .env supplies the

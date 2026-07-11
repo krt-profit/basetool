@@ -194,11 +194,11 @@
 
         <div th:each="topic : ${topics}" class="promotion-topic">
             <div class="promotion-topic-header" th:text="${topic.name}">Themenbereich</div>
-            <p th:if="${topic.description}" th:text="${topic.description}" style="color:var(--color-gray-2);margin-bottom:0.75rem;font-size:0.9rem;"></p>
+            <p th:if="${topic.description}" th:text="${topic.description}" class="krtm-color-var-color-gray-2-margin-bottom-0-75rem-a9f4"></p>
 
             <div th:each="category : ${topicCategoryMap[topic.id.toString()]}" class="promotion-category">
                 <div class="promotion-category-name" th:text="${category.name}">Kategorie</div>
-                <p th:if="${category.description}" th:text="${category.description}" style="color:var(--color-gray-2);margin-bottom:0.5rem;font-size:0.85rem;"></p>
+                <p th:if="${category.description}" th:text="${category.description}" class="krtm-color-var-color-gray-2-margin-bottom-0-5rem-4fdd"></p>
 
                 <div class="level-grid">
                     <div th:each="content : ${categoryContentMap[category.id.toString()]}" class="level-card">
@@ -227,9 +227,9 @@
         <div th:unless="${#lists.isEmpty(rankRequirements)}">
             <div class="ov-toolbar">
                 <span th:if="${currentUserRank != null}"
-                      style="color:var(--color-gray-2);font-size:0.85rem;">
+                      class="krtm-color-var-color-gray-2-font-size-0-85rem-b3ad">
                     <span th:text="#{promotion.overview.your.rank}">Dein Rang</span>:
-                    <strong th:text="${currentUserRank}" style="color:var(--data-fg);">20</strong>
+                    <strong th:text="${currentUserRank}" class="krtm-color-var-data-fg-3a2d">20</strong>
                 </span>
                 <div class="ov-spacer"></div>
                 <button type="button"
@@ -259,7 +259,7 @@
                           th:text="#{promotion.overview.you.are.here}">Du bist hier</span>
                 </summary>
                 <div class="rank-group-body">
-                    <div class="rank-table-wrapper" style="overflow-x:auto;">
+                    <div class="rank-table-wrapper krtm-overflow-x-auto-987e">
                         <table class="rank-subtable">
                             <thead>
                                 <tr>

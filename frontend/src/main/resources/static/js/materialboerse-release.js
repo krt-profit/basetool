@@ -60,7 +60,10 @@
      * not the hidden attribute.
      */
     function isModalOpen() {
-        return modal.style.display !== '' && modal.style.display !== 'none';
+        return (
+            window.getComputedStyle(modal).display !== '' &&
+            window.getComputedStyle(modal).display !== 'none'
+        );
     }
 
     function setText(sel, text) {

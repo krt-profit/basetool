@@ -29,8 +29,8 @@ import java.util.UUID;
  * Viewer-relative read projection of a {@link
  * de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOffer} for the Materialbörse board
  * and detail pane (REQ-MARKET-001…). Assembled in {@code MaterialExchangeService} rather than by a
- * MapStruct mapper because {@link #mine}, {@link #foreign}, {@link #interestCount}, {@link
- * #viewerInterested} and {@link #interestedHandles} all depend on the requesting member.
+ * MapStruct mapper because {@link #mine}, {@link #interestCount}, {@link #viewerInterested} and
+ * {@link #interestedHandles} all depend on the requesting member.
  *
  * <p>The projection carries both offer kinds (REQ-MARKET-012), discriminated by {@link #kind}. For
  * a {@link MaterialExchangeOfferKind#MATERIAL} offer, {@link #material} and {@link #quality} are
@@ -57,9 +57,11 @@ import java.util.UUID;
  * @param itemName the offered item's display name for an item offer, else {@code null}.
  * @param itemQuantity the offered whole-piece quantity for an item offer, else {@code null}.
  * @param owner the offering player (the Anbieter), shown to everyone as "von {Spieler}".
- * @param squadron the owner's squadron/org-unit badge, or {@code null} for an ownerless-personal
- *     offer.
- * @param foreign whether the offer's squadron differs from the viewer's (drives the foreign badge).
+ * @param ownerOrgUnits every badge-kind org unit the Anbieter currently belongs to — their
+ *     Staffel(n) first, then Spezialkommando(s), then Bereich(e), each name-sorted — so the board
+ *     renders <b>all</b> of the Anbieter's affiliation badges after the username (there is no
+ *     single "primary" Staffel; the Organisationsleitung is not surfaced). Independent of the
+ *     offer's stored owning org unit; empty when the Anbieter has no such membership.
  * @param mine whether the requesting member owns this offer.
  * @param quality the offered quality (0–1000) for a material offer, else {@code null}.
  * @param amount the offered quantity in SCU (clamped to current stock) for a material offer, else
@@ -81,8 +83,7 @@ public record MaterialExchangeOfferDto(
     String itemName,
     Integer itemQuantity,
     UserReferenceDto owner,
-    SquadronReferenceDto squadron,
-    boolean foreign,
+    List<OrgUnitReferenceDto> ownerOrgUnits,
     boolean mine,
     Integer quality,
     Double amount,

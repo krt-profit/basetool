@@ -114,7 +114,7 @@
         <div th:if="${error}" class="alert alert-danger" th:text="#{__${error}__}"></div>
         
         <div th:if="${org?.springframework?.validation?.BindingResult?.inventoryForm != null}" class="alert alert-danger">
-            <ul style="margin: 0; padding-left: 1.5rem;">
+            <ul class="krtm-margin-0-padding-left-1-5rem-09a6">
                 <li th:each="err : ${org.springframework.validation.BindingResult.inventoryForm.allErrors}" th:text="${err.defaultMessage}">Fehler</li>
             </ul>
         </div>
@@ -127,8 +127,8 @@
                     th:data-error-failed="#{inventory.deleteAll.error.failed}"
                     th:data-success="#{inventory.deleteAll.success}">Globales Lager leeren</button>
             
-            <div style="margin-left: auto; display: flex; gap: 1rem; align-items: center;">
-                <form th:action="@{/inventory/all}" method="get" id="globalFilterForm" class="no-track" style="margin: 0; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+            <div class="krtm-margin-left-auto-display-flex-gap-1rem-align-2424">
+                <form th:action="@{/inventory/all}" method="get" id="globalFilterForm" class="no-track krtm-margin-0-display-flex-gap-1rem-align-items-c-5700">
                     <div class="flex-gap-sm">
                         <label class="form-label-xs">Material:</label>
                         <div class="multi-select-container" id="materialFilterContainer">
@@ -149,7 +149,7 @@
                     </div>
                     <div class="flex-gap-sm">
                         <label for="minQuality" class="form-label-xs">Qualität &ge;:</label>
-                        <select id="minQuality" name="minQuality" style="padding: 0.375rem 2.5rem 0.375rem 0.75rem; min-height: 44px; min-width: 90px; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body);" data-trigger="inv-admin-filter">
+                        <select id="minQuality" name="minQuality" class="krtm-padding-0-375rem-2-5rem-0-375rem-0-75rem-min-caea" data-trigger="inv-admin-filter">
                             <option value="" th:text="#{filter.all}">-- Alle --</option>
                             <option th:each="q : ${#numbers.sequence(100, 1000, 100)}" th:value="${q}" th:text="${q}" th:selected="${selectedMinQuality != null and selectedMinQuality == q}"></option>
                         </select>
@@ -202,28 +202,28 @@
                  rails instead of three repeated <thead> sets. Stack-key data-attributes,
                  lazy-load hooks (data-stack-loaded / stack-entries-content) and the delegated
                  data-trigger handlers are preserved verbatim. -->
-            <div class="tree-table" id="inventoryTable" style="--tree-cols: minmax(200px, 1.4fr) minmax(220px, 1.7fr) 132px 124px 168px;" th:data-user-id="${#authentication.name}">
+            <div class="tree-table krtm-tree-cols-minmax-200px-1-4fr-minmax-220px-1-88e9" id="inventoryTable" th:data-user-id="${#authentication.name}">
                 <div class="tree-row tree-head">
                     <div class="tree-cell" th:text="#{inventory.tree.stock}">Bestand</div>
                     <div class="tree-cell" th:text="#{inventory.tree.context}">Kontext / Zuordnung</div>
                     <div class="tree-cell tree-cell--num" th:text="#{inventory.quality}">Qualität</div>
                     <div class="tree-cell tree-cell--num" th:text="#{inventory.amount}">Menge</div>
-                    <div class="tree-cell" style="text-align: right;" th:text="#{inventory.tree.action}">Aktion</div>
+                    <div class="tree-cell krtm-text-align-right-3048" th:text="#{inventory.tree.action}">Aktion</div>
                 </div>
 
                 <div class="tree-group" th:each="group : ${groupedItems}">
                     <!-- Material group row: orange accent bar, distinct-user + stack count, average/max gauge, total amount. -->
-                    <div class="tree-row tree-row--group" style="cursor: pointer;" data-trigger="inv-admin-toggle-group" th:data-material-id="${group.material.id}">
+                    <div class="tree-row tree-row--group krtm-cursor-pointer-74fa" data-trigger="inv-admin-toggle-group" th:data-material-id="${group.material.id}">
                         <div class="tree-cell tree-name">
                             <span class="tree-chevron toggle-icon">▶</span>
                             <span class="tree-label" th:text="${group.material.name}">Material</span>
                         </div>
-                        <div class="tree-cell" style="color: var(--color-gray-2);" th:text="#{inventory.tree.groupContext(${group.userCount()}, ${#lists.size(group.stacks)})}">3 Nutzer · 5 Stacks</div>
+                        <div class="tree-cell krtm-color-var-color-gray-2-4fcb" th:text="#{inventory.tree.groupContext(${group.userCount()}, ${#lists.size(group.stacks)})}">3 Nutzer · 5 Stacks</div>
                         <div class="tree-cell tree-cell--num">
                             <span class="tree-gauge">
                                 <span class="tree-gauge-val" th:if="${group.averageQuality != null}"><span th:text="${#numbers.formatInteger(group.averageQuality, 1)}">639</span> <span class="tree-gauge-max" th:text="|/ ${group.maxQuality}|">/ 796</span></span>
                                 <span class="tree-gauge-val" th:if="${group.averageQuality == null}">0</span>
-                                <span class="tree-gauge-track"><span th:style="|width: ${group.averageQuality != null ? group.averageQuality.intValue() / 10 : 0}%|"></span></span>
+                                <span class="tree-gauge-track"><span th:attr="data-krtm-width=${group.averageQuality != null ? group.averageQuality.intValue() / 10 : 0}"></span></span>
                             </span>
                         </div>
                         <div class="tree-cell tree-cell--num tree-amount" th:switch="${group.material.quantityType}">
@@ -233,10 +233,10 @@
                         <div class="tree-cell"></div>
                     </div>
 
-                    <div class="tree-group-items" style="display: none;">
+                    <div class="tree-group-items krtm-display-none-5790">
                         <div th:each="stack : ${group.stacks}">
                             <!-- Stack/Nutzer row (one stock identity); entries lazy-load on expand. -->
-                            <div class="tree-row tree-row--mid stack-header" style="cursor: pointer;" data-trigger="inv-admin-toggle-stack"
+                            <div class="tree-row tree-row--mid stack-header krtm-cursor-pointer-74fa" data-trigger="inv-admin-toggle-stack"
                                  data-stack-loaded="false"
                                  th:data-material-id="${group.material.id}"
                                  th:data-user-id="${stack.user.id}"
@@ -249,23 +249,23 @@
                                     <span class="tree-chevron toggle-icon stack-toggle-icon">▶</span>
                                     <span class="tree-label" th:text="${stack.user.effectiveName}" th:title="${stack.user.effectiveName}">User</span>
                                 </div>
-                                <div class="tree-cell" style="display: flex; gap: 0.5rem; align-items: center; min-width: 0;">
+                                <div class="tree-cell krtm-display-flex-gap-0-5rem-align-items-center-m-b7a7">
                                     <span th:if="${isAllSquadronsMode and stack.owningSquadron != null}" class="squadron-badge" th:title="${stack.owningSquadron.name()}" th:text="${stack.owningSquadron.shorthand()}">IRI</span>
                                     <span th:if="${isAllSquadronsMode and stack.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
                                     <span class="tree-label" th:text="${stack.location.name}" th:title="${stack.location.name}">Ort</span>
                                 </div>
                                 <div class="tree-cell tree-cell--num">
-                                    <span class="tree-gauge"><span class="tree-gauge-val" th:text="${stack.quality}">796</span><span class="tree-gauge-track"><span th:style="|width: ${stack.quality != null ? stack.quality / 10 : 0}%|"></span></span></span>
+                                    <span class="tree-gauge"><span class="tree-gauge-val" th:text="${stack.quality}">796</span><span class="tree-gauge-track"><span th:attr="data-krtm-width=${stack.quality != null ? stack.quality / 10 : 0}"></span></span></span>
                                 </div>
                                 <div class="tree-cell tree-cell--num tree-amount" th:switch="${group.material.quantityType}">
                                     <span th:case="'PIECE'"><span th:text="${stack.totalAmount != null ? #numbers.formatInteger(stack.totalAmount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">Stück</span></span>
                                     <span th:case="*"><span th:text="${stack.totalAmount != null ? #numbers.formatDecimal(stack.totalAmount, 1, 'NONE', 3, 'DEFAULT') : '0.000'}">10.500</span> <span class="tree-unit" th:text="#{material.quantity.scu}">SCU</span></span>
                                 </div>
-                                <div class="tree-cell tree-cell--num" style="color: var(--color-gray-2); font-size: 0.78rem;">
+                                <div class="tree-cell tree-cell--num krtm-color-var-color-gray-2-font-size-0-78rem-505c">
                                     <span class="stack-entry-count" th:text="${stack.entryCount == 1} ? #{inventory.tree.entryCount.one} : #{inventory.tree.entryCount.many(${stack.entryCount})}">1 Eintrag</span>
                                 </div>
                             </div>
-                            <div class="tree-stack-entries" style="display: none;">
+                            <div class="tree-stack-entries krtm-display-none-5790">
                                 <div class="stack-entries-content">
                                     <!-- entries lazily loaded on expand via /inventory/all/stack/entries (ADR-0003) -->
                                 </div>
@@ -275,7 +275,7 @@
                 </div>
 
                 <div class="tree-row" th:if="${#lists.isEmpty(groupedItems)}">
-                    <div class="tree-cell text-muted" style="grid-column: 1 / -1; text-align: center;" th:text="#{inventory.grouped.empty}">Keine Einträge gefunden.</div>
+                    <div class="tree-cell text-muted krtm-grid-column-1-1-text-align-center-26f2" th:text="#{inventory.grouped.empty}">Keine Einträge gefunden.</div>
                 </div>
             </div>
             </div>
@@ -283,7 +283,7 @@
     </div>
 </main>
 
-<div id="bookOutModal" class="modal" th:style="${showBookOutModal != null ? 'display:flex' : 'display:none'}">
+<div id="bookOutModal" class="modal" th:classappend="${showBookOutModal != null} ? 'krtm-modal-open' : 'krtm-hidden'">
     <div class="modal-content hud-box">
         <span class="close" data-trigger="inv-admin-close-bookout">&times;</span>
         <h2 class="mt-0" th:text="#{inventory.bookout.title}">Eintrag ausbuchen</h2>
@@ -311,24 +311,24 @@
                 </label>
                 <div class="flex-gap-sm">
                     <input type="text" inputmode="decimal" data-scu-decimal id="amount" th:field="*{amount}" step="0.001" min="0" required class="w-full" data-trigger="inv-admin-target-from-amount">
-                    <span id="amountOfText" style="white-space: nowrap; color: var(--color-gray-2);" th:data-template="#{inventory.bookout.amount.of('{0}')}" th:text="${inventoryBookOutForm.maxAmount != null ? #messages.msg('inventory.bookout.amount.of', inventoryBookOutForm.maxAmount) : ''}"></span>
+                    <span id="amountOfText" class="krtm-white-space-nowrap-color-var-color-gray-2-8309" th:data-template="#{inventory.bookout.amount.of('{0}')}" th:text="${inventoryBookOutForm.maxAmount != null ? #messages.msg('inventory.bookout.amount.of', inventoryBookOutForm.maxAmount) : ''}"></span>
                 </div>
             </div>
             
             <div class="form-group mb-1">
                 <label class="form-label" th:text="#{inventory.bookout.type}">Ausbuchungsart</label>
-                <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+                <div class="krtm-display-flex-gap-1-5rem-flex-wrap-wrap-82c0">
                     <label class="flex-gap-sm cursor-pointer">
                         <input type="radio" th:field="*{type}" value="DISCARD" checked data-trigger="inv-admin-toggle-bookout-type" class="m-0"> <span th:text="#{inventory.bookout.type.discard}">Einfache Ausbuchung</span>
                     </label>
                     <label class="flex-gap-sm cursor-pointer">
                         <input type="radio" th:field="*{type}" value="SELL" data-trigger="inv-admin-toggle-bookout-type" class="m-0"> <span th:text="#{inventory.bookout.type.sell}">Verkauf</span>
                     </label>
-                    <span id="sellNotPossibleReason" style="display:none; color: var(--color-warning); font-size: 0.8rem; align-self: center;" th:text="#{inventory.bookout.sellNotPossible}">Kein Verkauf möglich</span>
+                    <span id="sellNotPossibleReason" class="krtm-display-none-color-var-color-warning-font-si-b251" th:text="#{inventory.bookout.sellNotPossible}">Kein Verkauf möglich</span>
                 </div>
             </div>
             
-            <div id="sellFields" style="display:none; margin-bottom: 1rem;">
+            <div id="sellFields" class="krtm-display-none-margin-bottom-1rem-42ae">
                 <div class="form-group mb-1">
                     <label for="terminal" class="form-label" th:text="#{inventory.bookout.terminal}">Terminal</label>
                     <select id="terminal" th:field="*{terminal}" class="w-full">
@@ -355,7 +355,7 @@
 <!-- Umbuchen (rebooking) modal — the transfer (Ort/Nutzer) mode relocated out of the Ausbuchen
      dialog so the two share the Lager's Umbuchen concept. The squadron-wide /all view rebooks only
      between Ort/Nutzer/OrgUnit; the personal<->shared toggle lives on the owner-scoped /my view. -->
-<div id="umbuchenModal" class="modal" style="display:none;">
+<div id="umbuchenModal" class="modal krtm-display-none-5790">
     <div class="modal-content hud-box">
         <span class="close" data-trigger="inv-admin-close-umbuchen"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></span>
         <h2 class="mt-0" th:text="#{inventory.rebook.title}">Umbuchen</h2>
@@ -378,11 +378,11 @@
                 </label>
                 <div class="flex-gap-sm">
                     <input type="text" inputmode="decimal" data-scu-decimal id="umbuchenAmount" step="0.001" min="0" required class="w-full" data-trigger="inv-admin-umbuchen-target-from-amount">
-                    <span id="umbuchenAmountOfText" style="white-space: nowrap; color: var(--color-gray-2);" th:data-template="#{inventory.bookout.amount.of('{0}')}"></span>
+                    <span id="umbuchenAmountOfText" class="krtm-white-space-nowrap-color-var-color-gray-2-8309" th:data-template="#{inventory.bookout.amount.of('{0}')}"></span>
                 </div>
             </div>
 
-            <div id="umbuchenTransferFields" class="form-group" style="margin-bottom: 1rem;">
+            <div id="umbuchenTransferFields" class="form-group krtm-margin-bottom-1rem-c2c0">
                 <div class="flex-gap-md">
                     <div class="flex-1">
                         <label for="umbuchenTargetUserId" class="form-label" th:text="#{inventory.bookout.targetUser}">Umbuchen zu Nutzer</label>
@@ -398,7 +398,7 @@
                         </select>
                     </div>
                 </div>
-                <div id="umbuchenTargetOwningOrgUnitWrapper" style="display:none; margin-top: 0.75rem;">
+                <div id="umbuchenTargetOwningOrgUnitWrapper" class="krtm-display-none-margin-top-0-75rem-d00c">
                     <label for="umbuchenTargetOwningOrgUnitId" class="form-label" th:text="#{inventory.bookout.targetOrgUnit}">Buchen in OrgUnit</label>
                     <select id="umbuchenTargetOwningOrgUnitId" class="w-full">
                         <option value="" th:text="#{inventory.bookout.targetOrgUnit.placeholder}">Heim-Staffel des Ziels beibehalten</option>
@@ -414,7 +414,7 @@
     </div>
 </div>
 
-<div id="noteModal" class="modal" style="display:none;">
+<div id="noteModal" class="modal krtm-display-none-5790">
     <div class="modal-content hud-box">
         <span class="close" data-trigger="inv-admin-close-note">&times;</span>
         <h2 class="mt-0" th:text="#{inventory.note.label}">Notiz</h2>
@@ -424,18 +424,18 @@
                       th:placeholder="#{inventory.note.placeholder}"
                       data-trigger="inv-admin-update-note-counter"
                       class="w-full"></textarea>
-            <div id="noteModalCounter" style="text-align: right; color: var(--color-gray-2); font-size: 0.8rem;">0 / 1000</div>
+            <div id="noteModalCounter" class="krtm-text-align-right-color-var-color-gray-2-font-6d96">0 / 1000</div>
         </div>
-        <div style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+        <div class="krtm-margin-top-1-5rem-display-flex-gap-1rem-flex-767d">
             <button type="button" class="btn btn--cta" data-trigger="inv-admin-save-note"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{inventory.note.save}">Speichern</span></button>
             <button type="button" class="btn btn-quiet-danger" data-trigger="inv-admin-remove-note"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{inventory.note.remove}">Entfernen</span></button>
-            <button type="button" class="btn btn-ghost" style="min-height: 44px; margin-left: auto;" data-trigger="inv-admin-close-note" th:text="#{inventory.note.cancel}">Abbrechen</button>
+            <button type="button" class="btn btn-ghost krtm-min-height-44px-margin-left-auto-85bf" data-trigger="inv-admin-close-note" th:text="#{inventory.note.cancel}">Abbrechen</button>
         </div>
     </div>
 </div>
 
-<div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" id="delete-all-global-inventory-modal" class="modal" style="display:none; z-index: 3300;">
-    <div class="modal-content hud-box" style="max-width: 520px; text-align: center;">
+<div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" id="delete-all-global-inventory-modal" class="modal krtm-display-none-z-index-3300-c2c8">
+    <div class="modal-content hud-box krtm-max-width-520px-text-align-center-b4d9">
         <h2 th:text="#{inventory.deleteAll.modal.title}" class="mt-0">Globales Lager leeren</h2>
         <p th:text="#{inventory.deleteAll.modal.body}" class="mb-2">Alle globalen Lagereinträge wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden. Persönliche Lagereinträge bleiben erhalten.</p>
         <div class="flex-center-gap">

@@ -130,7 +130,7 @@
     </div>
 </main>
 
-<div id="krt-pi-modal" class="modal" th:style="${showItemModal != null ? 'display:flex' : 'display:none'}">
+<div id="krt-pi-modal" class="modal" th:classappend="${showItemModal != null} ? 'krtm-modal-open' : 'krtm-hidden'">
     <div class="modal-content hud-box">
         <span class="close" data-trigger="pi-close-modal">&times;</span>
         <h2 id="krt-pi-modal-title" th:text="#{personalInventory.modal.create.title}">Eintrag anlegen</h2>
@@ -177,7 +177,7 @@
     </div>
 </div>
 
-<div id="krt-pi-delete-modal" class="modal" style="display:none;">
+<div id="krt-pi-delete-modal" class="modal krtm-display-none-5790">
     <div class="modal-content hud-box">
         <span class="close" data-trigger="pi-close-delete">&times;</span>
         <h2 th:text="#{personalInventory.action.delete.confirm.title}">Eintrag loeschen</h2>

@@ -360,6 +360,38 @@ class ArchitectureTest {
   }
 
   @Test
+  void orgUnitBankSettingsMutationsMustCallAnAuthorizationHelper() {
+    // Security review (INFO regression guard): the org-unit bank settings mutations (balance
+    // target, view-visibility grants, per-tier approval limits) are authorized ONLY by an in-body
+    // require* helper — the controller and the frontend proxy both gate merely on
+    // isAuthenticated(),
+    // with no @PreAuthorize predicate and no annotation at the boundary. That is correct today
+    // (every mutation calls its requireCan* helper), but a future mutation that dropped the check
+    // would ship reachable by ANY authenticated member, with no failing gate to catch it. This rule
+    // pins the invariant: every public OrgUnitBankAccessService method that returns the settings
+    // DTO
+    // and mutates (set/add/remove/clear) MUST invoke a requireCan* authorization helper, so a
+    // dropped check fails the build instead of shipping fail-open.
+    methods()
+        .that()
+        .areDeclaredInClassesThat()
+        .haveSimpleName("OrgUnitBankAccessService")
+        .and()
+        .arePublic()
+        .and()
+        .haveNameMatching("(set|add|remove|clear).*")
+        .and()
+        .haveRawReturnType(
+            "de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitBankAccountSettingsDto")
+        .should(callARequireCanAuthorizationHelper())
+        .because(
+            "Every org-unit bank settings mutation must authorize via a requireCan* helper; a"
+                + " dropped check would be reachable by any authenticated member (the controller"
+                + " and proxy only require isAuthenticated()).")
+        .check(CLASSES);
+  }
+
+  @Test
   void controllerLayerShouldNotDependOnRepositoryLayer() {
     // Reasoning: CLAUDE.md prescribes a strict controller → service → repository layering.
     // A controller injecting a Spring Data repository directly skips the service layer where
@@ -1282,6 +1314,36 @@ class ArchitectureTest {
                                 + " mass-assignment of server-managed fields (id, version,"
                                 + " owningSquadron, …). Switch to a dedicated *Request record"
                                 + " from backend/.../dto/request/. See audit finding C-3.")));
+      }
+    };
+  }
+
+  /**
+   * Condition backing {@link #orgUnitBankSettingsMutationsMustCallAnAuthorizationHelper()}: the
+   * method body (or a method reference from it) must invoke a {@code requireCan*} authorization
+   * helper, which is what fails a mutation closed when the caller is not entitled.
+   *
+   * @return the ArchUnit condition
+   */
+  private static ArchCondition<JavaMethod> callARequireCanAuthorizationHelper() {
+    return new ArchCondition<JavaMethod>(
+        "call a requireCan* authorization helper from its own body") {
+      @Override
+      public void check(JavaMethod method, ConditionEvents events) {
+        boolean guarded =
+            method.getMethodCallsFromSelf().stream()
+                .map(call -> call.getTarget().getName())
+                .anyMatch(name -> name.startsWith("requireCan"));
+        if (guarded) {
+          return;
+        }
+        events.add(
+            SimpleConditionEvent.violated(
+                method,
+                method.getFullName()
+                    + " mutates org-unit bank settings but does not call a requireCan*"
+                    + " authorization helper — it would ship reachable by any authenticated member"
+                    + " (the controller and proxy only require isAuthenticated())."));
       }
     };
   }

@@ -27,8 +27,8 @@
     </div>
 
     <div class="hud-box mt-2">
-        <form id="orders-filter-form" class="no-track" method="get" th:action="@{/orders}" style="display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap;">
-            <span th:text="#{orders.index.filter.status}" style="font-weight: 700; font-size: 0.8rem; color: var(--color-gray-1);">Status:</span>
+        <form id="orders-filter-form" class="no-track krtm-display-flex-gap-1rem-margin-bottom-1rem-ali-e265" method="get" th:action="@{/orders}">
+            <span th:text="#{orders.index.filter.status}" class="krtm-font-weight-700-font-size-0-8rem-color-var-c-eed8">Status:</span>
             <label class="flex-gap-2xs">
                 <input type="checkbox" name="status" value="OPEN" th:checked="${selectedStatuses != null and selectedStatuses.contains('OPEN')}">
                 <span th:text="#{status.OPEN}">Offen</span>
@@ -51,7 +51,7 @@
                  (admins in "all squadrons" mode) — the backend filter is a display preference,
                  not an access-control gate. -->
             <th:block th:unless="${requesterView}">
-            <span th:text="#{orders.index.filter.scope}" style="font-weight: 700; font-size: 0.8rem; color: var(--color-gray-1); margin-left: 1rem;">Staffel:</span>
+            <span th:text="#{orders.index.filter.scope}" class="krtm-font-weight-700-font-size-0-8rem-color-var-c-372a">Staffel:</span>
             <label class="flex-gap-2xs">
                 <input type="radio" name="scope" value="mine" th:checked="${selectedScope == null or selectedScope == 'mine'}">
                 <span th:text="#{orders.index.filter.scope.mine}">Eigene Staffel</span>
@@ -61,7 +61,7 @@
                 <span th:text="#{orders.index.filter.scope.all}">Alle Staffeln</span>
             </label>
             </th:block>
-            <button type="submit" class="btn btn-ghost" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;" th:text="#{orders.index.filter.apply}">Filtern</button>
+            <button type="submit" class="btn btn-ghost krtm-padding-0-25rem-0-75rem-font-size-0-8rem-e5f2" th:text="#{orders.index.filter.apply}">Filtern</button>
         </form>
 
         <div th:if="${error}" class="hud-box hud-box-error">
@@ -116,7 +116,7 @@
                           th:title="#{orders.index.responsible}">—</span>
                 </td>
                 <td class="nowrap">
-                    <span sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)" th:if="${order.priority != null}" style="cursor: grab; margin-right: 0.5rem; color: var(--color-primary);" title="Drag & Drop zum Ändern der Priorität">☰</span>
+                    <span sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)" th:if="${order.priority != null}" class="krtm-cursor-grab-margin-right-0-5rem-color-var-co-df3c" title="Drag & Drop zum Ändern der Priorität">☰</span>
                     <span th:text="${order.priority != null ? order.priority : '-'}"></span>
                     <br>
                     <span th:text="#{__${'status.' + order.status}__}" th:class="'status-badge status-' + ${#strings.toLowerCase(order.status)}"></span>
@@ -136,7 +136,7 @@
                          aggregated material list derived from the ordered items' blueprints (#595),
                          so the column shows what materials must be gathered — not the item count. -->
                     <div th:if="${order.type != 'ITEM'}" class="table-responsive">
-                    <table class="data-table" style="margin: 0; background: transparent; border: none; box-shadow: none; width: 100%;">
+                    <table class="data-table krtm-margin-0-background-transparent-border-none-f884">
                         <colgroup>
                             <col class="w-full">
                             <col class="w-1">
@@ -144,25 +144,25 @@
                         </colgroup>
                         <thead>
                             <tr>
-                                <th th:text="#{orders.material.name}" style="background: transparent; padding-top: 0.75rem; white-space: nowrap;">Material</th>
-                                <th th:text="#{orders.material.amount}" style="background: transparent; padding-top: 0.75rem; white-space: nowrap;">Gefordert</th>
-                                <th th:unless="${requesterView}" th:text="#{orders.material.progress}" style="background: transparent; padding-top: 0.75rem; white-space: nowrap;">Fortschritt</th>
+                                <th th:text="#{orders.material.name}" class="krtm-background-transparent-padding-top-0-75rem-w-cb39">Material</th>
+                                <th th:text="#{orders.material.amount}" class="krtm-background-transparent-padding-top-0-75rem-w-cb39">Gefordert</th>
+                                <th th:unless="${requesterView}" th:text="#{orders.material.progress}" class="krtm-background-transparent-padding-top-0-75rem-w-cb39">Fortschritt</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr th:each="mat : ${order.materials}">
-                                <td th:text="${mat.material.name}" th:title="${mat.material.name}" style="border-bottom: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 1px;"></td>
-                                <td style="border-bottom: none; white-space: nowrap;" th:switch="${mat.material.quantityType}">
+                                <td th:text="${mat.material.name}" th:title="${mat.material.name}" class="krtm-border-bottom-none-white-space-nowrap-overfl-3755"></td>
+                                <td class="krtm-border-bottom-none-white-space-nowrap-d8ee" th:switch="${mat.material.quantityType}">
                                     <span th:case="'PIECE'" th:text="|${mat.amount != null ? #numbers.formatInteger(mat.amount, 1) : '0'} #{material.quantity.piece}|"></span>
                                     <span th:case="*" th:text="|${mat.amount != null ? #numbers.formatDecimal(mat.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
                                 </td>
-                                <td th:unless="${requesterView}" th:text="${#numbers.formatDecimal(mat.amount > 0 ? (mat.currentStock >= mat.amount ? 100.0 : (mat.currentStock * 100.0 / mat.amount)) : 0, 1, 0)} + ' %'" style="border-bottom: none; white-space: nowrap;"></td>
+                                <td th:unless="${requesterView}" th:text="${#numbers.formatDecimal(mat.amount > 0 ? (mat.currentStock >= mat.amount ? 100.0 : (mat.currentStock * 100.0 / mat.amount)) : 0, 1, 0)} + ' %'" class="krtm-border-bottom-none-white-space-nowrap-d8ee"></td>
                             </tr>
                         </tbody>
                     </table>
                     </div>
                     <div th:if="${order.type == 'ITEM'}" class="table-responsive">
-                    <table class="data-table" style="margin: 0; background: transparent; border: none; box-shadow: none; width: 100%;">
+                    <table class="data-table krtm-margin-0-background-transparent-border-none-f884">
                         <colgroup>
                             <col class="w-full">
                             <col class="w-1">
@@ -170,22 +170,22 @@
                         </colgroup>
                         <thead>
                             <tr>
-                                <th th:text="#{orders.material.name}" style="background: transparent; padding-top: 0.75rem; white-space: nowrap;">Material</th>
-                                <th th:text="#{orders.material.amount}" style="background: transparent; padding-top: 0.75rem; white-space: nowrap;">Gefordert</th>
-                                <th th:unless="${requesterView}" th:text="#{orders.material.progress}" style="background: transparent; padding-top: 0.75rem; white-space: nowrap;">Fortschritt</th>
+                                <th th:text="#{orders.material.name}" class="krtm-background-transparent-padding-top-0-75rem-w-cb39">Material</th>
+                                <th th:text="#{orders.material.amount}" class="krtm-background-transparent-padding-top-0-75rem-w-cb39">Gefordert</th>
+                                <th th:unless="${requesterView}" th:text="#{orders.material.progress}" class="krtm-background-transparent-padding-top-0-75rem-w-cb39">Fortschritt</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr th:each="agg : ${order.aggregatedMaterials}">
-                                <td th:text="${agg.material != null ? agg.material.name() : '-'}" th:title="${agg.material != null ? agg.material.name() : '-'}" style="border-bottom: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 1px;"></td>
-                                <td style="border-bottom: none; white-space: nowrap;" th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
+                                <td th:text="${agg.material != null ? agg.material.name() : '-'}" th:title="${agg.material != null ? agg.material.name() : '-'}" class="krtm-border-bottom-none-white-space-nowrap-overfl-3755"></td>
+                                <td class="krtm-border-bottom-none-white-space-nowrap-d8ee" th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
                                     <span th:case="'PIECE'" th:text="|${agg.totalQuantity != null ? #numbers.formatInteger(agg.totalQuantity, 1) : '0'} #{material.quantity.piece}|"></span>
                                     <span th:case="*" th:text="|${agg.totalQuantity != null ? #numbers.formatDecimal(agg.totalQuantity, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
                                 </td>
-                                <td th:unless="${requesterView}" th:text="${#numbers.formatDecimal((agg.totalQuantity != null and agg.totalQuantity > 0) ? ((agg.currentStock != null ? agg.currentStock : 0) >= agg.totalQuantity ? 100.0 : ((agg.currentStock != null ? agg.currentStock : 0) * 100.0 / agg.totalQuantity)) : 0, 1, 0)} + ' %'" style="border-bottom: none; white-space: nowrap;"></td>
+                                <td th:unless="${requesterView}" th:text="${#numbers.formatDecimal((agg.totalQuantity != null and agg.totalQuantity > 0) ? ((agg.currentStock != null ? agg.currentStock : 0) >= agg.totalQuantity ? 100.0 : ((agg.currentStock != null ? agg.currentStock : 0) * 100.0 / agg.totalQuantity)) : 0, 1, 0)} + ' %'" class="krtm-border-bottom-none-white-space-nowrap-d8ee"></td>
                             </tr>
                             <tr th:if="${order.aggregatedMaterials == null or order.aggregatedMaterials.isEmpty()}">
-                                <td colspan="3" class="text-muted" style="border-bottom: none;" th:text="#{orders.detail.aggregated.empty}">Keine Materialien abgeleitet.</td>
+                                <td colspan="3" class="text-muted krtm-border-bottom-none-30bb" th:text="#{orders.detail.aggregated.empty}">Keine Materialien abgeleitet.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -210,7 +210,7 @@
         </th:block>
         </div>
     </div>
-    <form id="priority-update-form" th:action="@{/orders/dummy}" method="post" style="display: none;">
+    <form id="priority-update-form" th:action="@{/orders/dummy}" method="post" class="krtm-display-none-5790">
         <input type="hidden" name="priority" id="priority-update-input" value="">
     </form>
 </main>

@@ -117,6 +117,14 @@ public final class MetricNames {
    */
   public static final String RATELIMIT_REQUESTS = "basetool.ratelimit.requests";
 
+  /**
+   * Counter {@code basetool_request_body_rejected_total} — incremented by {@code
+   * RequestBodySizeLimitFilter} each time a non-multipart request body on a capped import path is
+   * refused with 413 before Jackson binds it (security review, memory-DoS). Unlabelled: the capped
+   * path set is tiny and fixed.
+   */
+  public static final String REQUEST_BODY_REJECTED = "basetool.request.body.rejected";
+
   // --- Discord SPI precheck (DiscordAccountExistenceController) ---------------------------
 
   /**

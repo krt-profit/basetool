@@ -165,9 +165,14 @@ truststore, and a TLS failure simply fails open.
   ADR-0036), so linking Discord to an existing account is never denied against that account.
 - [x] The SPI calls the backend over HTTPS only, trusting it via a configured PKCS#12 truststore;
   certificate validation is never disabled. A blank backend shared secret disables the endpoint (503).
+- [x] A configured (non-blank) backend shared secret must be **at least 32 characters** — the endpoint
+  is `permitAll` and deliberately exempt from the `/api/**` rate limiter, so the shared secret is its
+  only credential and must not be a short, online-guessable value. A weaker value fails context
+  startup (`DiscordSpiPrecheckProperties#isSharedSecretBlankOrStrong` `@AssertTrue`), while a blank
+  value stays valid because it disables the endpoint.
 - [x] The two krt-theme login bundles (de/en) carry `discordAccountAlreadyExists`.
 
-**Enforced by:** `BackendAccountCheckerTest` (fail-open HTTP matrix) · `DiscordGuildRoleGateAuthenticatorTest` (deny-on-exists with the right message key, allow-on-not-exists, fail-open on unknown, skip on linking / unconfigured / non-HTTPS) · `DiscordAccountExistenceServiceTest` (candidate normalisation + name/e-mail split + empty-candidate short-circuit) · `DiscordAccountExistenceControllerTest` (shared-secret gate: 503 unconfigured / 401 bad / 200 exists) · **Code:** `DiscordGuildRoleGateAuthenticator`, `BackendAccountChecker`, `BackendTrustSupport`, `DiscordGuildRoleGateAuthenticatorFactory`, `DiscordAccountExistenceController`, `DiscordAccountExistenceService`, `DiscordSpiPrecheckProperties`, `UserRepository#existsByLowerUsernameOrDisplayNameIn` / `#existsByLowerEmail`, krt-theme `messages_*.properties` · **Decision:** ADR-0051
+**Enforced by:** `BackendAccountCheckerTest` (fail-open HTTP matrix) · `DiscordGuildRoleGateAuthenticatorTest` (deny-on-exists with the right message key, allow-on-not-exists, fail-open on unknown, skip on linking / unconfigured / non-HTTPS) · `DiscordAccountExistenceServiceTest` (candidate normalisation + name/e-mail split + empty-candidate short-circuit) · `DiscordAccountExistenceControllerTest` (shared-secret gate: 503 unconfigured / 401 bad / 200 exists) · `DiscordSpiPrecheckPropertiesTest` (blank secret valid, <32-char secret rejected, ≥32-char secret valid) · **Code:** `DiscordGuildRoleGateAuthenticator`, `BackendAccountChecker`, `BackendTrustSupport`, `DiscordGuildRoleGateAuthenticatorFactory`, `DiscordAccountExistenceController`, `DiscordAccountExistenceService`, `DiscordSpiPrecheckProperties`, `UserRepository#existsByLowerUsernameOrDisplayNameIn` / `#existsByLowerEmail`, krt-theme `messages_*.properties` · **Decision:** ADR-0051
 
 ### REQ-SEC-017 — PENDING approval withholds all authorities (fail-safe default)
 

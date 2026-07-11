@@ -71,25 +71,22 @@ public final class SecurityHeaders {
   //     cross-origin {@code end_session_endpoint}, and with {@code 'self'} alone Chromium blocks
   //     that redirect — the local session is cleared but the Keycloak SSO session stays alive, so
   //     the next login silently re-authenticates (the regression after logout became POST-only).
-  // Audit finding L-3 (2026-05-20): {@code style-src} no longer carries {@code 'unsafe-inline'}.
-  // Every {@code <style>} block in the templates ({@code grep} verified: 38 blocks across the
-  // page set) was patched to {@code <style th:attr="nonce=${cspNonce}">}, so {@code <style>}
-  // elements now load only with the per-request nonce — an injected {@code <style>} tag from a
-  // stored-XSS vector cannot be evaluated by the browser anymore. The {@code style=""}
-  // attributes on individual elements (859 across the templates) are a separate CSP3 directive
-  // and stay allowed via the explicit {@code style-src-attr 'unsafe-inline'} fallback: rewriting
-  // them out is a much larger refactor (many are dynamically computed via {@code th:style} —
-  // progress bars, color swatches, conditional visibility) and they cannot run JavaScript, so
-  // the residual attack surface is restricted to visual / CSS-injection harm. The directive is
-  // pinned explicitly so a future tightening can move from {@code 'unsafe-inline'} to a
-  // {@code 'unsafe-hashes' 'sha256-…'} allow-list incrementally without touching {@code
-  // style-src}.
+  // {@code style-src} no longer carries {@code 'unsafe-inline'} (audit finding L-3): every {@code
+  // <style>} block in the templates renders with {@code th:attr="nonce=${cspNonce}"}, so an
+  // injected {@code <style>} tag from a stored-XSS vector cannot be evaluated. The former {@code
+  // style-src-attr 'unsafe-inline'} fallback for inline {@code style=""} attributes has been
+  // dropped to {@code 'none'}: all inline style attributes were migrated out of the templates —
+  // static values to the generated {@code inline-migration.css} classes, and the data-driven ones
+  // (modal show/hide, opacity/colour toggles → {@code th:classappend} classes; progress-bar widths
+  // → a {@code data-krtm-width} attribute applied via the CSSOM in {@code inline-style-apply.js},
+  // which {@code style-src-attr} does not govern). With no {@code style=""} attribute remaining, an
+  // injected one is now blocked by the browser, closing the CSS-injection residual entirely.
   private static final String CSP_TEMPLATE =
       "default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; "
           + "form-action %2$s; upgrade-insecure-requests; "
           + "img-src 'self' data:; font-src 'self' data:; "
           + "style-src 'self' 'nonce-%1$s'; "
-          + "style-src-attr 'unsafe-inline'; "
+          + "style-src-attr 'none'; "
           + "script-src 'nonce-%1$s' 'strict-dynamic'";
 
   /**
