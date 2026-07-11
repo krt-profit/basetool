@@ -514,14 +514,15 @@ materialize an operation's whole finance / refinery ledger under a held Hikari c
 
 **Acceptance**: `OperationFinanceServiceTest` (grouped per-mission totals; lazy per-mission detail;
 404 for a foreign mission); `MissionFinanceEntryRepositoryIntegrationTest` (the grouped finance /
-refinery / picker JPQL execute against real Postgres); `OperationServiceTest` (the payout toggle
-validates the key via the participant graph and returns the slim status DTO without re-computing);
+refinery / picker JPQL execute against real Postgres); `OperationPayoutServiceTest` (the payout
+toggle validates the key via the participant graph and returns the slim status DTO without
+re-computing);
 `OperationPageControllerMvcTest` (the missions fragment issues no finance-summary / payout read; the
 per-mission finance fragment renders the breakdown and an error state).
 
 **Enforced by:** `OperationFinanceService.getOperationFinanceSummary` / `getMissionFinanceDetail`,
 `OperationController` (`/finance-summary`, `/finances/{missionId}`), `OperationPageController`
-(`ParallelPageLoader` + lazy `operationMissionFinance`), `OperationService.setPayoutStatus`
+(`ParallelPageLoader` + lazy `operationMissionFinance`), `OperationPayoutService.setPayoutStatus`
 (`OperationPayoutStatusDto`), `OperationRepository.findAllReferenceScoped` (status / recency bound),
 `JobOrderPageController.viewOrderDetail` (users gated to the full render). See ADR-0081.
 
