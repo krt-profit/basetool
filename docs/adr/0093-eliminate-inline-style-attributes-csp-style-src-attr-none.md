@@ -52,4 +52,15 @@ Remove every inline `style=""` attribute from the templates and pin the CSP to
   specificity; loading the sheet last covers equal-specificity ties, but a pre-existing
   higher-specificity or `!important` rule could now win. No such regression was found, and the full
   asset-lint + MockMvc render-test suite is green, but pixel-level review remains a manual/e2e concern.
+- **JS-side follow-up (post-migration fix).** The migration scoped to *templates*; it did not audit
+  the JavaScript modules, which have two ways to hit the same wall. First, a `style="…"` inside an
+  `innerHTML` string is a real inline style attribute and is blocked by `style-src-attr 'none'` just
+  like a template one — a script that needs a dynamic value must use the `data-krtm-*` → CSSOM path.
+  Second, once an element's hidden state moved from `style="display:none"` to a `krtm-display-none-*`
+  class, a script that revealed it with `el.style.display = ''` no longer works: clearing the (empty)
+  inline style leaves the class's `display:none` in force. Both bit `materials-matrix.js` on
+  `/materials/overview` (the spacer rows and the `#tableContainer`/`#matrixError` reveal), which
+  shipped in v1.3.2 as a blank price-overview and was fixed by moving the spacer height to the CSSOM
+  and toggling the visibility class. The rule in `ui-design-system.md` now states both traps
+  explicitly, and `MaterialsOverviewMatrixRendersE2eTest` guards the page.
 

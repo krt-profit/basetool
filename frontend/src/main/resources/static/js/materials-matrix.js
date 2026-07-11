@@ -28,6 +28,12 @@
         return;
     }
 
+    // Visibility is class-based (ADR-0093): the server skeleton hides #tableContainer / #matrixError
+    // with this generated `display:none` class. Under CSP `style-src-attr 'none'` you cannot reveal
+    // them by writing an inline `style="display:.."` (blocked), and clearing `element.style.display`
+    // is a no-op against the class. Toggle the class instead — a CSSOM class change is CSP-clean.
+    const HIDDEN_CLASS = 'krtm-display-none-5790';
+
     const DATA_URL = config.getAttribute('data-data-url');
     const I18N = {
         material: config.getAttribute('data-label-material') || 'Material',
@@ -87,18 +93,18 @@
                     groups: (data && data.groups) || [],
                 };
                 if (loading) {
-                    loading.style.display = 'none';
+                    loading.classList.add(HIDDEN_CLASS);
                 }
-                wrapper.style.display = '';
+                wrapper.classList.remove(HIDDEN_CLASS);
                 bindFilters();
                 applyFilters();
             })
             .catch(function () {
                 if (loading) {
-                    loading.style.display = 'none';
+                    loading.classList.add(HIDDEN_CLASS);
                 }
                 if (errorBox) {
-                    errorBox.style.display = '';
+                    errorBox.classList.remove(HIDDEN_CLASS);
                 }
             });
     }
@@ -328,6 +334,7 @@
             html.push(spacer((flat.length - end) * rh));
         }
         body.innerHTML = html.join('');
+        applySpacerHeights();
         renderedStart = start;
         renderedEnd = end;
 
@@ -337,13 +344,28 @@
     }
 
     function spacer(heightPx) {
+        // Spacer height is genuinely dynamic (row count x measured row height). Emit it as a
+        // `data-krtm-height` hint, NOT an inline `style="height:.."` attribute — the latter is
+        // injected via innerHTML and blocked by CSP `style-src-attr 'none'`. applySpacerHeights()
+        // then writes it to `style.height` through the CSSOM, which `style-src-attr` does not govern.
         return (
             '<tr class="row-spacer"><td colspan="' +
             (cols.length + 1) +
-            '" style="height:' +
+            '" data-krtm-height="' +
             heightPx +
-            'px"></td></tr>'
+            '"></td></tr>'
         );
+    }
+
+    // Applies the `data-krtm-height` hints to `style.height` via the CSSOM, mirroring the
+    // `data-krtm-width` pattern of inline-style-apply.js (ADR-0093). Must run after every
+    // body.innerHTML rewrite so freshly materialized spacer rows get their height.
+    function applySpacerHeights() {
+        const spacers = body.querySelectorAll('td[data-krtm-height]');
+        for (let i = 0; i < spacers.length; i++) {
+            const h = parseFloat(spacers[i].getAttribute('data-krtm-height'));
+            spacers[i].style.height = (isFinite(h) ? h : 0) + 'px';
+        }
     }
 
     function rowHtml(item) {
