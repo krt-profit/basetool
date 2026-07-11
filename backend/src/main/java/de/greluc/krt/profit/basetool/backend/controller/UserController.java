@@ -101,9 +101,9 @@ public class UserController {
    * 2xx to show the refreshed roster.
    *
    * <p>Runs {@code NOT_SUPPORTED} to opt out of the class-level {@link Transactional}: each {@code
-   * userService.syncUser} and the bank-holder reconcile must open their OWN transaction (exactly as
-   * on the scheduled path) rather than sharing one page-spanning transaction whose first failure
-   * would poison the rest.
+   * userReconciliationService.syncUser} and the bank-holder reconcile must open their OWN
+   * transaction (exactly as on the scheduled path) rather than sharing one page-spanning
+   * transaction whose first failure would poison the rest.
    *
    * @return the number of users reconciled this run
    */

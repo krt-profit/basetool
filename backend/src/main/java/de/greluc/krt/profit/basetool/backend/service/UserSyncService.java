@@ -41,13 +41,13 @@ import org.springframework.stereotype.Service;
  * <p>It pulls the full user list from Keycloak via {@link KeycloakService#fetchUsers} (which pages
  * internally so the set is complete, not just the first server-side page, and resolves roles
  * role-indexed with an incremental Discord back-fill), upserts each user via {@link
- * UserService#syncUser}, collects the Keycloak {@code id}s observed this run, and then asks the
- * service to mark every local user NOT in that set as missing — that is how deletions in Keycloak
- * get reflected locally without a hard {@code DELETE}. The completeness of the fetched set is a
- * hard prerequisite (REQ-SEC-018): a truncated list would soft-delete every real member beyond the
- * page cap, which is why {@code fetchUsers} pages and an empty result is treated as "skip" (never a
- * wipe) — including when a role-membership read fails transiently, so a degraded, role-stripped set
- * is never persisted as a successful run.
+ * UserReconciliationService#syncUser}, collects the Keycloak {@code id}s observed this run, and
+ * then asks the service to mark every local user NOT in that set as missing — that is how deletions
+ * in Keycloak get reflected locally without a hard {@code DELETE}. The completeness of the fetched
+ * set is a hard prerequisite (REQ-SEC-018): a truncated list would soft-delete every real member
+ * beyond the page cap, which is why {@code fetchUsers} pages and an empty result is treated as
+ * "skip" (never a wipe) — including when a role-membership read fails transiently, so a degraded,
+ * role-stripped set is never persisted as a successful run.
  */
 @Service
 @RequiredArgsConstructor
@@ -55,17 +55,17 @@ import org.springframework.stereotype.Service;
 public class UserSyncService {
 
   private final KeycloakService keycloakService;
-  private final UserService userService;
+  private final UserReconciliationService userReconciliationService;
   private final BankHolderReconciliationService bankHolderReconciliationService;
 
   /**
    * Fetches the current Keycloak user list and reconciles it into the local table.
    *
    * <p>Failures on individual users are logged and swallowed so a single bad row does not abort the
-   * batch. After the loop, {@link UserService#markMissingUsers(java.util.Set)} flags every local
-   * user whose Keycloak id did not appear in this run. An empty Keycloak fetch is a no-op skip
-   * (never a wipe). A batch-level failure (e.g. {@code markMissingUsers} hitting a DB error)
-   * propagates to the caller: the scheduled path wraps this in the failure-swallowing {@code
+   * batch. After the loop, {@link UserReconciliationService#markMissingUsers(java.util.Set)} flags
+   * every local user whose Keycloak id did not appear in this run. An empty Keycloak fetch is a
+   * no-op skip (never a wipe). A batch-level failure (e.g. {@code markMissingUsers} hitting a DB
+   * error) propagates to the caller: the scheduled path wraps this in the failure-swallowing {@code
    * TaskMetrics.recordCounting} so the scheduler thread survives; the manual endpoint wraps it in
    * {@code recordCountingRethrow} so the admin sees the failure as an RFC 7807 error rather than a
    * silent success.
@@ -79,8 +79,8 @@ public class UserSyncService {
     // the mappable role names bound the role-membership queries, and the already-linked ids let the
     // fetch skip the per-user federated-identity read for the linked majority (5000-account
     // hardening — see KeycloakService#fetchUsers).
-    Set<String> roleNames = userService.getMappableRoleNames();
-    Set<UUID> knownDiscordLinkedIds = userService.getKnownDiscordLinkedUserIds();
+    Set<String> roleNames = userReconciliationService.getMappableRoleNames();
+    Set<UUID> knownDiscordLinkedIds = userReconciliationService.getKnownDiscordLinkedUserIds();
     List<KeycloakUserDto> users = keycloakService.fetchUsers(roleNames, knownDiscordLinkedIds);
     if (users.isEmpty()) {
       log.info("No users fetched from Keycloak.");
@@ -91,7 +91,7 @@ public class UserSyncService {
     Set<UUID> keycloakUserIds = new HashSet<>();
     for (KeycloakUserDto user : users) {
       try {
-        userService.syncUser(user);
+        userReconciliationService.syncUser(user);
         keycloakUserIds.add(user.id());
         count++;
       } catch (Exception e) {
@@ -101,7 +101,7 @@ public class UserSyncService {
         log.error("Failed to sync user {}", user.id(), e);
       }
     }
-    userService.markMissingUsers(keycloakUserIds);
+    userReconciliationService.markMissingUsers(keycloakUserIds);
     log.info("User sync finished. Synced {} users.", count);
 
     // After the roster is reconciled, keep the bank-holder registry in sync (REQ-BANK-029): every

@@ -34,8 +34,6 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
-import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserApprovalEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.time.LocalDate;
 import java.util.HashSet;
@@ -64,7 +62,6 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
  *       joinDate / version-check), plus the rank-handling for users that are neither officer nor
  *       squadron member.
  *   <li>{@link UserService#updateReadAnnouncement}.
- *   <li>{@link UserService#markMissingUsers} — early-return on empty.
  *   <li>{@link UserService#isUsernameOrDisplayNameTaken} + {@link
  *       UserService#findMatchesByExactName} — blank-input short-circuit.
  *   <li>{@link UserService#searchByUsername} (both overloads), {@link
@@ -76,8 +73,6 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 class UserServiceAttributesTest {
 
   @Mock private UserRepository userRepository;
-  @Mock private RoleRepository roleRepository;
-  @Mock private UserApprovalEventRepository userApprovalEventRepository;
   @Mock private AuthHelperService authHelperService;
   @Mock private OwnerScopeService ownerScopeService;
   @Mock private OrgUnitMembershipService orgUnitMembershipService;
@@ -314,32 +309,6 @@ class UserServiceAttributesTest {
       userService.updateReadAnnouncement(USER_ID, announcementId);
 
       assertEquals(announcementId, user.getLastReadAnnouncementId());
-    }
-  }
-
-  // ---------------------------------------------------------------
-  // markMissingUsers
-  // ---------------------------------------------------------------
-
-  @Nested
-  class MarkMissingUsersTests {
-
-    @Test
-    void emptyInput_doesNotCallRepository() {
-      // Early-return guard: an empty input must NOT trigger a useless
-      // (and potentially expensive) bulk-update query.
-      userService.markMissingUsers(List.of());
-
-      verify(userRepository, never()).markMissingUsers(any());
-    }
-
-    @Test
-    void nonEmptyInput_delegatesToRepository() {
-      List<UUID> ids = List.of(USER_ID);
-
-      userService.markMissingUsers(ids);
-
-      verify(userRepository).markMissingUsers(ids);
     }
   }
 

@@ -64,7 +64,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 @ExtendWith(MockitoExtension.class)
 class CustomJwtGrantedAuthoritiesConverterTest {
 
-  @Mock private UserService userService;
+  @Mock private UserReconciliationService userReconciliationService;
   @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
   @Mock private OrgUnitCascadeService orgUnitCascadeService;
   @Mock private Jwt jwt;
@@ -95,14 +95,14 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     // and serve the second from the cache — no second syncUser / membership read.
     when(jwt.getSubject()).thenReturn("sub-1");
     when(jwt.getIssuedAt()).thenReturn(Instant.ofEpochSecond(1_700_000_000L));
-    when(userService.syncUser(jwt)).thenReturn(userWithNoRoles());
+    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
 
     Collection<GrantedAuthority> first = converter.convert(jwt);
     Collection<GrantedAuthority> second = converter.convert(jwt);
 
     assertEquals(first, second, "the memoised result must equal the freshly assembled one");
-    verify(userService, times(1)).syncUser(jwt);
+    verify(userReconciliationService, times(1)).syncUser(jwt);
     verify(orgUnitMembershipRepository, times(1)).findAllByIdUserId(USER_ID);
   }
 
@@ -113,13 +113,13 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     when(jwt.getSubject()).thenReturn("sub-1");
     when(jwt.getIssuedAt())
         .thenReturn(Instant.ofEpochSecond(1_700_000_000L), Instant.ofEpochSecond(1_700_000_300L));
-    when(userService.syncUser(jwt)).thenReturn(userWithNoRoles());
+    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
 
     converter.convert(jwt);
     converter.convert(jwt);
 
-    verify(userService, times(2)).syncUser(jwt);
+    verify(userReconciliationService, times(2)).syncUser(jwt);
   }
 
   @Test
@@ -127,18 +127,18 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     // An unkeyable token (missing issuedAt) must never be cached — always recompute, never risk
     // serving a stale result under a degenerate key (#1141).
     when(jwt.getSubject()).thenReturn("sub-1");
-    when(userService.syncUser(jwt)).thenReturn(userWithNoRoles());
+    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
 
     converter.convert(jwt);
     converter.convert(jwt);
 
-    verify(userService, times(2)).syncUser(jwt);
+    verify(userReconciliationService, times(2)).syncUser(jwt);
   }
 
   @Test
   void plainStaffelMember_getsNoLeadershipRolesAndNoCascade() {
-    when(userService.syncUser(jwt)).thenReturn(userWithNoRoles());
+    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
     OrgUnitMembership plain = membership(DESCENDANT_STAFFEL_ID, OrgUnitKind.SQUADRON);
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of(plain));
     when(orgUnitCascadeService.cascadedOfficerReach(any())).thenReturn(Set.of());
@@ -153,7 +153,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
   @Test
   void bereichsleiter_getsFlatRolesAndCascadedContextualAuthorities() {
-    when(userService.syncUser(jwt)).thenReturn(userWithNoRoles());
+    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
     OrgUnitMembership lead = membership(BEREICH_ID, OrgUnitKind.BEREICH);
     lead.setRole(MembershipRole.BEREICHSLEITER);
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of(lead));
@@ -174,7 +174,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
   @Test
   void olMember_getsFlatRolesAndContextualAuthoritiesForEveryReachedUnit() {
-    when(userService.syncUser(jwt)).thenReturn(userWithNoRoles());
+    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
     UUID olId = UUID.randomUUID();
     OrgUnitMembership ol = membership(olId, OrgUnitKind.ORGANISATIONSLEITUNG);
     ol.setRole(MembershipRole.OL_MEMBER);
@@ -199,7 +199,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     // unit. The cascade service yields nothing for a squadron rank (verified in
     // OrgUnitCascadeService
     // tests), so the only reach is the own-squadron contextual minted by the per-row loop.
-    when(userService.syncUser(jwt)).thenReturn(userWithNoRoles());
+    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
     UUID squadronId = UUID.randomUUID();
     OrgUnitMembership lead = membership(squadronId, OrgUnitKind.SQUADRON);
     lead.setRole(MembershipRole.STAFFELLEITER);
@@ -228,7 +228,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     // ROLE_GUEST is not carried.
     User pending = userWithNoRoles();
     pending.setApprovalStatus(ApprovalStatus.PENDING);
-    when(userService.syncUser(jwt)).thenReturn(pending);
+    when(userReconciliationService.syncUser(jwt)).thenReturn(pending);
 
     Collection<GrantedAuthority> authorities = converter.convert(jwt);
 
@@ -243,7 +243,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     // A REJECTED account is treated like PENDING — no authorities, routed to the waiting page.
     User rejected = userWithNoRoles();
     rejected.setApprovalStatus(ApprovalStatus.REJECTED);
-    when(userService.syncUser(jwt)).thenReturn(rejected);
+    when(userReconciliationService.syncUser(jwt)).thenReturn(rejected);
 
     Collection<GrantedAuthority> authorities = converter.convert(jwt);
 
@@ -254,7 +254,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
   @Test
   void memberlessUser_getsNoMembershipDerivedAuthorities() {
-    when(userService.syncUser(jwt)).thenReturn(userWithNoRoles());
+    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
     // No memberships → the converter short-circuits before consulting the cascade.
     lenient().when(orgUnitCascadeService.cascadedOfficerReach(any())).thenReturn(Set.of());
@@ -271,7 +271,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     // first-time logins by the same sub must NOT fail the authentication — the retry loop re-runs
     // syncUser and the second attempt succeeds, so the authorities resolve normally. A regression
     // that rethrew immediately (no retry) would deny a legitimate concurrent login.
-    when(userService.syncUser(jwt))
+    when(userReconciliationService.syncUser(jwt))
         .thenThrow(new ObjectOptimisticLockingFailureException(User.class, USER_ID))
         .thenReturn(userWithNoRoles());
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
@@ -279,7 +279,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     Collection<GrantedAuthority> authorities = converter.convert(jwt);
 
     assertNotNull(authorities, "the retried sync must resolve to a real authority collection");
-    verify(userService, times(2)).syncUser(jwt);
+    verify(userReconciliationService, times(2)).syncUser(jwt);
   }
 
   @Test
@@ -290,10 +290,10 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     // authorities (which would silently treat the caller as unauthenticated). Exactly three
     // attempts
     // are made before giving up.
-    when(userService.syncUser(jwt))
+    when(userReconciliationService.syncUser(jwt))
         .thenThrow(new ObjectOptimisticLockingFailureException(User.class, USER_ID));
 
     assertThrows(AuthenticationServiceException.class, () -> converter.convert(jwt));
-    verify(userService, times(3)).syncUser(jwt);
+    verify(userReconciliationService, times(3)).syncUser(jwt);
   }
 }

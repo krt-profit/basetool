@@ -19,32 +19,19 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.event.DiscordRegistrationPendingEvent;
-import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
-import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
-import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
-import java.time.Instant;
-import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -55,21 +42,22 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Manages the local {@code app_user} mirror of Keycloak users plus everything around them (roles,
- * logistician/mission-manager flags, rank, description, displayName, joinDate, read announcement
- * state).
+ * Manages the local {@code app_user} mirror of Keycloak users: the identity seam, the squadron-
+ * scoped user reads that back the pickers/lists, the self-service profile edits (rank, description,
+ * displayName, joinDate, payout preference, blueprint-sharing, read-announcement state) and the
+ * single-POST membership-delta orchestrator.
  *
- * <p>JWT-driven sync ({@link #syncUser(Jwt)}) runs on every authentication so the local record is
- * always in sync with Keycloak; periodic scheduled sync ({@link #syncUser(KeycloakUserDto)} +
- * {@link #markMissingUsers}) is driven by {@link UserSyncTask} and reconciles deletions. The
- * service is the architectural seam where the project's "every read filters by JWT sub" rule
- * (CLAUDE.md) is enforced — {@link #getCurrentUser()} is the canonical source for the calling
- * user's id and most other services delegate here rather than reaching for {@code
- * SecurityContextHolder} (which is forbidden outside this seam by the ArchUnit rule).
+ * <p>The service is the architectural seam where the project's "every read filters by JWT sub" rule
+ * (CLAUDE.md) is enforced — {@link #getUserIdFromJwt(Jwt)} / {@link #getCurrentUser()} are the
+ * canonical source for the calling user's id and most other services delegate here rather than
+ * reaching for {@code SecurityContextHolder} (which is forbidden outside this seam by the ArchUnit
+ * rule). JWT subject parsing is fail-closed: a missing {@code sub} or a non-UUID subject is
+ * rejected rather than falling back to a derived identifier — silently mapping different Keycloak
+ * realms onto the same local id is a worse failure mode than refusing the request.
  *
- * <p>JWT subject parsing is fail-closed: a missing {@code sub} or a non-UUID subject is rejected
- * rather than falling back to a derived identifier — silently mapping different Keycloak realms
- * onto the same local id is a worse failure mode than refusing the request.
+ * <p>The Keycloak reconciliation (per-login JWT sync + scheduled Admin-API sync + soft-delete
+ * reconcile) lives in {@link UserReconciliationService}, and the registration approval lifecycle in
+ * {@link UserRegistrationService}; both consult this seam for the JWT-subject resolution.
  */
 @Service
 @RequiredArgsConstructor
@@ -78,25 +66,10 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
   private final UserRepository userRepository;
-  private final RoleRepository roleRepository;
   private final AuthHelperService authHelperService;
   private final OwnerScopeService ownerScopeService;
   private final OrgUnitMembershipService orgUnitMembershipService;
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
-  private final DefaultBlueprintProvisioningService defaultBlueprintProvisioningService;
-  private final ApplicationEventPublisher eventPublisher;
-
-  /**
-   * Whether a brand-new non-admin registration must be approved by an admin before it is granted
-   * any authorities (REQ-SEC-017 fail-safe default). {@code true} in prod and by default. Set to
-   * {@code false} ONLY in controlled non-prod stacks (the Playwright e2e stack, via {@code
-   * APP_REGISTRATION_REQUIRE_APPROVAL=false}) where fixture users are provisioned on the fly and an
-   * interactive approval step would deadlock the seeder — there, a new non-admin keeps the {@code
-   * ACTIVE} entity default. Field-injected with a {@code true} initializer so Mockito unit tests
-   * (no Spring) exercise the secure default without extra wiring.
-   */
-  @Value("${app.registration.require-approval:true}")
-  private boolean requireApproval = true;
 
   /**
    * Convenience predicate: does any user have this exact name (case-insensitive) as either username
@@ -174,353 +147,6 @@ public class UserService {
       throw new org.springframework.security.authentication.AuthenticationServiceException(
           "JWT subject must be a UUID");
     }
-  }
-
-  /**
-   * Reconciles the local user record with the supplied JWT — creates the row on first login,
-   * updates username / email / displayName / roles when they have changed. Called by {@link
-   * CustomJwtGrantedAuthoritiesConverter} on every authentication.
-   *
-   * <p>Two-step lookup: first by id (the UUID-shaped subject), then by {@code preferred_username} —
-   * handles legacy rows where the local id pre-dated the Keycloak migration to UUID subjects. Roles
-   * default to "Guest" when the JWT carries none so an unconfigured Keycloak doesn't lock everyone
-   * out.
-   *
-   * @param jwt validated JWT from the resource server
-   * @return the managed (created or updated) user
-   */
-  @Transactional
-  @NotNull
-  public User syncUser(@NotNull Jwt jwt) {
-    final UUID finalUserId = getUserIdFromJwt(jwt);
-    String username = jwt.getClaimAsString("preferred_username");
-
-    // A Discord federated login is recognised ONLY by the Keycloak subject / discord_user_id link,
-    // never by username. Reading the claim up-front lets us suppress the legacy preferred_username
-    // fallback below for a Discord login (REQ-SEC-017 / REQ-DATA-006 hardening): the brokered
-    // Discord
-    // username is attacker-influenced, so matching a fresh Discord identity onto a pre-existing
-    // (possibly privileged, already-ACTIVE) row by username would both bypass the PENDING approval
-    // gate and silently link the attacker's Discord account to someone else's user. Track 1 does no
-    // auto-linking of an existing account to a Discord identity (spec open decision #2), so a
-    // Discord
-    // login that finds no row by subject is always treated as a brand-new registration.
-    final String discordUserId = jwt.getClaimAsString("discord_user_id");
-    final boolean viaDiscord = discordUserId != null && !discordUserId.isBlank();
-
-    Optional<User> existingUser = userRepository.findById(finalUserId);
-    if (existingUser.isEmpty() && username != null && !viaDiscord) {
-      existingUser = userRepository.findByUsername(username);
-      if (existingUser.isPresent()) {
-        // REQ-OBS-004: never log names/handles. preferred_username can be a real callsign that the
-        // PiiMasker cannot scrub (it only matches JWTs, e-mails and token keywords), so log the
-        // matched row's UUID instead — same non-PII fix already applied to UserSyncTask (M-4).
-        log.warn(
-            "User lookup by ID {} failed; matched an existing row by preferred_username (value"
-                + " omitted, PII). Associating session with existing user id {}.",
-            finalUserId,
-            existingUser.get().getId());
-      }
-    }
-
-    // A truly new user (no row by id and none by username) is provisioned for the first time; the
-    // post-save event grants their default blueprints after commit (REQ-INV-016).
-    final boolean created = existingUser.isEmpty();
-
-    User user =
-        existingUser.orElseGet(
-            () -> {
-              User u = new User();
-              u.setId(finalUserId);
-              return u;
-            });
-
-    boolean changed = false;
-
-    if (!Objects.equals(user.getUsername(), username)) {
-      user.setUsername(username);
-      changed = true;
-    }
-
-    // Privacy / data minimisation: given_name / family_name are intentionally NOT read or stored
-    // anymore (the columns were dropped from the entity). Only username, email and roles are
-    // mirrored locally.
-    String email = jwt.getClaimAsString("email");
-    if (!Objects.equals(user.getEmail(), email)) {
-      user.setEmail(email);
-      changed = true;
-    }
-
-    // Sync Roles
-    Set<String> keycloakRoles = extractRolesFromJwt(jwt);
-    Set<Role> localRoles = mapRoles(keycloakRoles);
-
-    if (!user.getRoles().equals(localRoles)) {
-      user.setRoles(localRoles);
-      changed = true;
-    }
-
-    // Persist the Discord account link (auto-link, REQ-DATA-006) from the IdP-mapped token claim.
-    // discordUserId / viaDiscord were resolved up-front (see the subject-only lookup above).
-    if (viaDiscord && !Objects.equals(user.getDiscordUserId(), discordUserId)) {
-      user.setDiscordUserId(discordUserId);
-      changed = true;
-    }
-
-    // Persist the per-guild Discord server nickname (REQ-DATA-008) from the optional IdP-mapped
-    // claim. Display-only — shown to admins in the registration-approval queue so a decision can be
-    // tied to a recognisable in-server identity. Captured best-effort, so it may be absent (no
-    // nickname set, non-Discord login, or capture mappers not configured); refreshes on every
-    // login.
-    String guildNickname = normalizeGuildNickname(jwt.getClaimAsString("discord_guild_nickname"));
-    if (!Objects.equals(user.getDiscordGuildNickname(), guildNickname)) {
-      user.setDiscordGuildNickname(guildNickname);
-      changed = true;
-    }
-
-    // Approval lifecycle (epic #720, Track 1 / REQ-SEC-017 — fail-safe default). EVERY brand-new
-    // non-admin registration lands PENDING and receives no authorities until an admin approves,
-    // regardless of whether the login arrived via Discord or credentials. This is deliberately
-    // decoupled from Discord detection: the PENDING decision must NOT depend on the optional
-    // discord_user_id claim/mapper, otherwise a misconfigured Keycloak (attribute/protocol mapper
-    // absent) would let a federated login inherit the ACTIVE entity-default and silently skip
-    // approval. Keycloak ADMIN-realm-role holders are auto-ACTIVE (bootstrap safety — the first
-    // admin
-    // can never be locked out), and the carve-out below also promotes an existing PENDING admin to
-    // ACTIVE. The admin notification (REQ-NOTIF-012) fires for EVERY such new PENDING registration,
-    // keyed off the PENDING transition itself and NOT off the discord_user_id claim: a missing
-    // claim
-    // mapper must never silence an approval notification any more than it may skip the gate. A
-    // credential registration therefore notifies too — at first login there is no reliable Discord
-    // signal without the claim, and the event carries no Discord id/PII anyway (only id +
-    // username).
-    boolean isAdmin = localRoles.stream().anyMatch(r -> Roles.ADMIN.equalsIgnoreCase(r.getCode()));
-    boolean newPendingRegistration = false;
-    if (created && !isAdmin && requireApproval) {
-      user.setApprovalStatus(ApprovalStatus.PENDING);
-      newPendingRegistration = true;
-      changed = true;
-    } else if (!created && isAdmin && user.getApprovalStatus() != ApprovalStatus.ACTIVE) {
-      user.setApprovalStatus(ApprovalStatus.ACTIVE);
-      user.setApprovedAt(Instant.now());
-      changed = true;
-    }
-
-    if (changed || user.isNew()) {
-      User saved = userRepository.save(user);
-      if (created) {
-        // Grant the default blueprints in THIS transaction so a brand-new user has them committed
-        // before the request returns (REQ-INV-016). The grant is an idempotent bulk INSERT … ON
-        // CONFLICT touching only personal_blueprint (never the app_user row), so it neither bumps
-        // the user's @Version nor collides with the converter's retry. The id is the Keycloak sub,
-        // set before the first save.
-        defaultBlueprintProvisioningService.grantDefaultsToUser(user.getId().toString());
-      }
-      if (newPendingRegistration) {
-        // After-commit listener notifies every admin of the new pending registration
-        // (REQ-NOTIF-012); the event carries no Discord id/PII (only user id + username).
-        eventPublisher.publishEvent(
-            new DiscordRegistrationPendingEvent(saved.getId(), saved.getUsername()));
-      }
-      return saved;
-    }
-
-    return user;
-  }
-
-  /**
-   * Reconciles the local user record from a Keycloak Admin API response (scheduled sync path).
-   * Mirrors {@link #syncUser(Jwt)} but reads the data from a {@code KeycloakUserDto} instead of a
-   * decoded JWT. Used by {@link UserSyncTask}.
-   *
-   * @param dto Keycloak admin DTO
-   */
-  @Transactional
-  public void syncUser(@NotNull KeycloakUserDto dto) {
-    if (dto.id() == null) {
-      return;
-    }
-
-    Optional<User> existingUser = userRepository.findById(dto.id());
-    final boolean created = existingUser.isEmpty();
-    User user =
-        existingUser.orElseGet(
-            () -> {
-              User u = new User();
-              u.setId(dto.id());
-              return u;
-            });
-
-    boolean changed = false;
-
-    if (!user.isInKeycloak()) {
-      user.setInKeycloak(true);
-      changed = true;
-    }
-
-    if (!Objects.equals(user.getUsername(), dto.username())) {
-      user.setUsername(dto.username());
-      changed = true;
-    }
-
-    // Privacy / data minimisation: first / last name are intentionally not mirrored (see
-    // syncUser(Jwt)).
-    if (!Objects.equals(user.getEmail(), dto.email())) {
-      user.setEmail(dto.email());
-      changed = true;
-    }
-
-    // Sync Roles
-    Set<Role> localRoles = mapRoles(dto.roles());
-    if (!user.getRoles().equals(localRoles)) {
-      user.setRoles(localRoles);
-      changed = true;
-    }
-
-    // Persist the Discord account link discovered out-of-band via the Keycloak Admin API
-    // (/federated-identity, see KeycloakService#fetchDiscordFederatedId). This is what surfaces the
-    // link for accounts that linked Discord AFTER creation — the import-time token claim only
-    // covers
-    // accounts that registered via Discord (REQ-DATA-006). Like syncUser(Jwt) this only SETS the
-    // link, never clears it: the federated-identity fetch is best-effort and returns null on any
-    // failure, so clearing on a null would wrongly wipe a real link on a transient Admin-API
-    // hiccup.
-    String discordUserId = dto.discordUserId();
-    if (discordUserId != null
-        && !discordUserId.isBlank()
-        && !Objects.equals(user.getDiscordUserId(), discordUserId)) {
-      user.setDiscordUserId(discordUserId);
-      changed = true;
-    }
-
-    // Fail-safe approval default (REQ-SEC-017), mirroring syncUser(Jwt). A brand-new non-admin user
-    // first discovered by the scheduled reconciliation lands PENDING, so the scheduler can never
-    // pre-create an ACTIVE row that a later interactive login would inherit (created == false) and
-    // thereby skip the approval gate. Admins stay ACTIVE (entity default, bootstrap safety). Only
-    // brand-new rows are touched — an existing user's approval state is never changed here.
-    boolean newPendingRegistration = false;
-    if (created
-        && requireApproval
-        && localRoles.stream().noneMatch(r -> Roles.ADMIN.equalsIgnoreCase(r.getCode()))) {
-      user.setApprovalStatus(ApprovalStatus.PENDING);
-      newPendingRegistration = true;
-      changed = true;
-    }
-
-    if (changed || user.isNew()) {
-      userRepository.save(user);
-      if (created) {
-        // Grant the default blueprints synchronously on first creation (REQ-INV-016); idempotent.
-        defaultBlueprintProvisioningService.grantDefaultsToUser(user.getId().toString());
-      }
-      if (newPendingRegistration) {
-        // A registration first materialised by the scheduled reconciler (rather than by the
-        // interactive login) must still notify the admins (REQ-NOTIF-012). Gating on `created`
-        // keeps it exactly-once across both paths: whichever path inserts the row has created ==
-        // true and publishes; every later call in either path sees created == false and stays
-        // silent, so no persisted "announced" flag is needed. The event carries no Discord id/PII.
-        eventPublisher.publishEvent(
-            new DiscordRegistrationPendingEvent(user.getId(), user.getUsername()));
-      }
-    }
-  }
-
-  /**
-   * Flags every local user whose id is NOT in {@code currentIds} as missing (soft-delete: kept as a
-   * row for FK integrity, but excluded from active lists). Called by {@link UserSyncTask} after the
-   * full Keycloak sync run; an empty {@code currentIds} short-circuits without marking anyone so a
-   * Keycloak outage doesn't soft-delete the entire user base.
-   *
-   * @param currentIds the set of user ids currently present in Keycloak
-   */
-  @Transactional
-  public void markMissingUsers(Collection<UUID> currentIds) {
-    if (currentIds.isEmpty()) {
-      return;
-    }
-    userRepository.markMissingUsers(currentIds);
-  }
-
-  /**
-   * Returns the realm role names the scheduled Keycloak sync should index against Keycloak — the
-   * display names of every role in the local catalog. {@code KeycloakService.fetchUsers} matches
-   * these case-insensitively against the realm's actual role names (as {@link
-   * #mapRoles(Collection)} joins them via {@code findByNameIgnoreCase}), so the role-indexed
-   * membership fetch queries only the roles the app actually maps — never the ubiquitous
-   * default/technical realm roles — and does so regardless of any casing difference between the
-   * catalog and Keycloak. Read-only.
-   *
-   * @return the mappable realm role names; never {@code null}, possibly empty.
-   */
-  @NotNull
-  public Set<String> getMappableRoleNames() {
-    return roleRepository.findAllNames();
-  }
-
-  /**
-   * Returns the ids of local users that already carry a Discord link, so the scheduled sync can
-   * skip the per-user federated-identity read for them (incremental back-fill). Read-only.
-   *
-   * @return the ids of users with a non-null Discord link; never {@code null}, possibly empty.
-   */
-  @NotNull
-  public Set<UUID> getKnownDiscordLinkedUserIds() {
-    return userRepository.findIdsWithDiscordLink();
-  }
-
-  private Set<Role> mapRoles(Collection<String> roleNames) {
-    Set<Role> localRoles = new HashSet<>();
-    if (roleNames != null) {
-      for (String roleName : roleNames) {
-        roleRepository.findByNameIgnoreCase(roleName).ifPresent(localRoles::add);
-      }
-    }
-
-    if (localRoles.isEmpty()) {
-      roleRepository.findByNameIgnoreCase("Guest").ifPresent(localRoles::add);
-    }
-    return localRoles;
-  }
-
-  /**
-   * Normalises a raw Discord guild-nickname claim for storage: trims it, maps blank/empty to {@code
-   * null}, and bounds it to the {@code discord_guild_nickname} column width (255 chars) so a
-   * pathologically long attribute can never fail the login save. The Keycloak SPI already caps the
-   * captured value, so this length bound is only a defensive backstop (REQ-DATA-008).
-   *
-   * @param raw the raw {@code discord_guild_nickname} claim value, possibly {@code null}
-   * @return the trimmed, length-bounded nickname, or {@code null} when the claim is absent or blank
-   */
-  @Nullable
-  private static String normalizeGuildNickname(@Nullable String raw) {
-    if (raw == null) {
-      return null;
-    }
-    String trimmed = raw.trim();
-    if (trimmed.isEmpty()) {
-      return null;
-    }
-    return trimmed.length() > 255 ? trimmed.substring(0, 255) : trimmed;
-  }
-
-  /**
-   * Extracts the set of realm-role names from a JWT. Reads the {@code realm_access.roles} claim —
-   * Keycloak's standard location. Resource-access roles are intentionally NOT included because this
-   * project's authorization model is realm-scoped.
-   *
-   * @param jwt validated JWT
-   * @return realm role names, possibly empty
-   */
-  @SuppressWarnings("unchecked")
-  @NotNull
-  public Set<String> extractRolesFromJwt(@NotNull Jwt jwt) {
-    Set<String> roles = new HashSet<>();
-    Map<String, Object> realmAccess = jwt.getClaim("realm_access");
-    if (realmAccess != null && realmAccess.containsKey("roles")) {
-      roles.addAll((List<String>) realmAccess.get("roles"));
-    }
-    // Also check resource_access if needed, but realm_access is standard for realm roles
-    return roles;
   }
 
   /**
