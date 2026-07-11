@@ -162,7 +162,7 @@ public class BankBookingRequestService {
     // REQ-BANK-045: a withdrawal/transfer request leaving a justification-mandating account
     // (CARTEL, CARTEL_BANK, SPECIAL) must carry a non-blank Begründung; a deposit never does.
     if (type == BankBookingRequestType.WITHDRAWAL || type == BankBookingRequestType.TRANSFER) {
-      BankLedgerService.requireDebitJustification(account, justification);
+      BankBookingGuards.requireDebitJustification(account, justification);
     }
 
     BankAccount targetAccount = null;
