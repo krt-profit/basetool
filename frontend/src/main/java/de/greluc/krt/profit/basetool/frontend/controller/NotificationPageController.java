@@ -412,7 +412,15 @@ public class NotificationPageController {
       }
       emitter.send(builder);
     } catch (IOException | RuntimeException e) {
-      emitter.completeWithError(e);
+      // REQ-OBS-001 / REQ-NOTIF-010: a send failure here is almost always a routine client
+      // disconnect (broken pipe when the viewer closes the tab mid-event). completeWithError()
+      // re-dispatches through the MVC @ExceptionHandler and logs a spurious ERROR per dropped
+      // stream — the dominant source of frontend ERROR-log noise during a backend/Keycloak blip.
+      // Complete cleanly instead (onCompletion disposes the upstream subscription), mirroring
+      // handleStreamError(); the poll fallback keeps the badge fresh.
+      log.debug(
+          "Notification stream send failed ({}); completing cleanly", e.getClass().getSimpleName());
+      emitter.complete();
     }
   }
 }

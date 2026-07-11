@@ -20,7 +20,9 @@
 package de.greluc.krt.profit.basetool.ingest.filter;
 
 import de.greluc.krt.profit.basetool.ingest.config.IngestProperties;
+import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.ingest.web.ProblemResponseWriter;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ReadListener;
 import jakarta.servlet.ServletException;
@@ -36,6 +38,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.core.Ordered;
@@ -59,6 +62,7 @@ import tools.jackson.databind.ObjectMapper;
  * (bounded by the cap) and re-served to the controller unchanged.
  */
 @Component
+@Slf4j
 @Order(PayloadSizeLimitFilter.ORDER)
 @RequiredArgsConstructor
 public class PayloadSizeLimitFilter extends OncePerRequestFilter {
@@ -68,6 +72,7 @@ public class PayloadSizeLimitFilter extends OncePerRequestFilter {
 
   private final IngestProperties ingestProperties;
   private final ObjectMapper objectMapper;
+  private final MeterRegistry meterRegistry;
 
   @Override
   protected void doFilterInternal(
@@ -106,6 +111,10 @@ public class PayloadSizeLimitFilter extends OncePerRequestFilter {
    * @throws IOException if writing the body fails
    */
   private void reject(@NotNull HttpServletResponse response) throws IOException {
+    // REQ-OBS-011: the DoS guard was silent (no log, no metric) unlike the sibling bot / rate-limit
+    // filters — count and DEBUG-log each 413 so a flood of oversized-body probes is detectable.
+    meterRegistry.counter(MetricNames.INGEST_PAYLOAD_REJECTED).increment();
+    log.debug("Ingest payload rejected: body exceeds the configured cap");
     ProblemResponseWriter.write(
         response,
         objectMapper,

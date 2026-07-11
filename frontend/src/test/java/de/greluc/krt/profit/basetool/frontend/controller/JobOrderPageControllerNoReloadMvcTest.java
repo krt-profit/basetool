@@ -39,6 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.config.SquadronContextAdvice;
+import de.greluc.krt.profit.basetool.frontend.model.dto.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
@@ -50,6 +51,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -59,6 +61,7 @@ import org.springframework.security.oauth2.core.oidc.IdTokenClaimNames;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.security.test.context.support.WithAnonymousUser;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -489,6 +492,158 @@ class JobOrderPageControllerNoReloadMvcTest {
 
     verify(backendApiClient)
         .post(eq("/api/v1/orders/items"), any(), eq(JobOrderDto.class), eq(true));
+  }
+
+  // ------------------------------------------------------------------------
+  // updateStatus — POST /orders/{id}/status (state-machine transition relay to the backend PUT).
+  // Untested before: no success relay, no illegal-transition 400 passthrough, no auth-gate. The
+  // endpoint is an audited (Auftraege) state-mutating activity, so a mis-pointed relay or a
+  // 400/409 swallowed into a 500 must be caught here.
+  // ------------------------------------------------------------------------
+
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER"})
+  void updateStatus_AsAuthenticated_RelaysAndReturnsOrder() throws Exception {
+    // The gate is isAuthenticated() — deliberately NOT LOGISTICIAN — so a plain member drives the
+    // transition; the backend enforces the fine per-order edit scope.
+    UUID orderId = UUID.randomUUID();
+    when(backendApiClient.put(
+            eq("/api/v1/orders/" + orderId + "/status"), any(), eq(JobOrderDto.class)))
+        .thenReturn(materialOrder(orderId, 8L));
+
+    mockMvc
+        .perform(
+            post("/orders/" + orderId + "/status")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"IN_PROGRESS\",\"version\":1}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.version").value(8));
+
+    verify(backendApiClient)
+        .put(eq("/api/v1/orders/" + orderId + "/status"), any(), eq(JobOrderDto.class));
+  }
+
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER"})
+  void updateStatus_WhenBackendRejectsIllegalTransition_Propagates400ProblemJson()
+      throws Exception {
+    // The backend state machine rejects an illegal transition (e.g. COMPLETED -> OPEN) with a 400.
+    // propagateBackendError must re-emit it as application/problem+json (not swallow it into a 500
+    // via the generic catch) so the detail-page JS shows the state-machine message, not a generic
+    // toast.
+    UUID orderId = UUID.randomUUID();
+    when(backendApiClient.put(
+            eq("/api/v1/orders/" + orderId + "/status"), any(), eq(JobOrderDto.class)))
+        .thenThrow(new BackendServiceException("illegal transition", null, 400));
+
+    mockMvc
+        .perform(
+            post("/orders/" + orderId + "/status")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"OPEN\",\"version\":1}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+  }
+
+  @Test
+  @WithAnonymousUser
+  void updateStatus_AsAnonymous_Returns403WithoutCallingBackend() throws Exception {
+    // /orders/** is permitAll at the URL layer, but the isAuthenticated() method gate still denies
+    // an anonymous principal: GlobalExceptionHandler maps the AuthorizationDeniedException to 403
+    // (not the SSO entry point), and the backend is never touched.
+    UUID orderId = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            post("/orders/" + orderId + "/status")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"IN_PROGRESS\",\"version\":1}"))
+        .andExpect(status().isForbidden());
+
+    verify(backendApiClient, never())
+        .put(eq("/api/v1/orders/" + orderId + "/status"), any(), eq(JobOrderDto.class));
+  }
+
+  // ------------------------------------------------------------------------
+  // updateOrderAsRequesterAjax — POST /orders/{id}/requested-update (JSON twin, REQ-ORDERS-023).
+  // The requester-side material edit relays to PUT /api/v1/orders/{id}/requested and deliberately
+  // carries NO hasRole('LOGISTICIAN') — the backend requester gate is the authorization. Only
+  // comment + materials + version reach the backend (org unit / handle / status are dropped).
+  // ------------------------------------------------------------------------
+
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER"})
+  void updateOrderAsRequesterAjax_RelaysToRequestedEndpointAndReturnsOrder() throws Exception {
+    // A plain member (no LOGISTICIAN) must pass — the requester path relays to /requested and only
+    // comment + materials + version cross the seam. The body carries a requestingOrgUnitId + handle
+    // to prove they are stripped (regression (b): a field leak would send them through).
+    UUID orderId = UUID.randomUUID();
+    when(backendApiClient.put(
+            eq("/api/v1/orders/" + orderId + "/requested"), any(), eq(JobOrderDto.class)))
+        .thenReturn(materialOrder(orderId, 4L));
+
+    mockMvc
+        .perform(
+            post("/orders/" + orderId + "/requested-update")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(editBody(UUID.randomUUID())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.version").value(4));
+
+    ArgumentCaptor<CreateJobOrderDto> captor = ArgumentCaptor.captor();
+    verify(backendApiClient)
+        .put(
+            eq("/api/v1/orders/" + orderId + "/requested"),
+            captor.capture(),
+            eq(JobOrderDto.class));
+    CreateJobOrderDto sent = captor.getValue();
+    assertThat(sent.responsibleOrgUnitId()).as("responsible org unit is never relayed").isNull();
+    assertThat(sent.requestingOrgUnitId()).as("requesting org unit is stripped").isNull();
+    assertThat(sent.handle()).as("handle is stripped").isNull();
+    assertThat(sent.comment()).isEqualTo("c");
+  }
+
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER"})
+  void updateOrderAsRequesterAjax_EmptyMaterials_Returns400WithoutBackendCall() throws Exception {
+    // The empty-materials short-circuit answers 400 before any backend relay.
+    UUID orderId = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            post("/orders/" + orderId + "/requested-update")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"comment\":\"c\",\"version\":1,\"materials\":[]}"))
+        .andExpect(status().isBadRequest());
+
+    verify(backendApiClient, never())
+        .put(eq("/api/v1/orders/" + orderId + "/requested"), any(), eq(JobOrderDto.class));
+  }
+
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER"})
+  void updateOrderAsRequesterAjax_FrozenAfterDelivery_Propagates400ProblemJson() throws Exception {
+    // The backend freezes a material after it has been (partly) delivered and rejects a requester
+    // edit that touches it with a 400. propagateBackendError must re-emit problem+json so the
+    // requester sees an actionable message instead of a generic 500.
+    UUID orderId = UUID.randomUUID();
+    when(backendApiClient.put(
+            eq("/api/v1/orders/" + orderId + "/requested"), any(), eq(JobOrderDto.class)))
+        .thenThrow(new BackendServiceException("frozen after delivery", null, 400));
+
+    mockMvc
+        .perform(
+            post("/orders/" + orderId + "/requested-update")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(editBody(UUID.randomUUID())))
+        .andExpect(status().isBadRequest())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
   }
 
   @Test

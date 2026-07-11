@@ -1911,6 +1911,79 @@ class HangarImportServiceTest {
         BadRequestException.class, () -> hangarImportService.importShips(UUID.randomUUID(), file));
   }
 
+  // -------------------------------------------------------------------------
+  // Org-unit stamping: a membershipless importer's picker resolver returns null
+  // (V132 made owning_org_unit nullable), so the ship must be created ownerless
+  // rather than NPE-ing or being rejected. Overrides the @BeforeEach stub that
+  // otherwise always returns a Squadron.
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importShips_membershiplessImporter_createsOwnerlessShip() {
+    // Given
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType type = shipTypeWithName("135c");
+
+    String json =
+        """
+        [{"name":"135c","shipname":"","type":"ship"}]
+        """;
+    MockMultipartFile file = multipartFile(json);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(type));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(0L);
+    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(any(), any())).thenReturn(null);
+    when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // When
+    FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
+
+    // Then: the ship is created ownerless (owningOrgUnit == null), not skipped.
+    assertThat(result.importedCount()).isEqualTo(1);
+    assertThat(result.skippedCount()).isEqualTo(0);
+    ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
+    verify(shipRepository).save(captor.capture());
+    assertThat(captor.getValue().getOwningOrgUnit()).isNull();
+  }
+
+  // -------------------------------------------------------------------------
+  // Org-unit stamping: a multi-membership importer's picker resolver throws a
+  // 400 (no per-import picker exists yet), which must fail the whole import
+  // rather than silently stamping the ship onto an arbitrary org unit — a
+  // multi-org tenancy-isolation guard. The resolver is invoked before
+  // shipRepository.save, so no ship is ever persisted.
+  // -------------------------------------------------------------------------
+
+  @Test
+  void importShips_multiMembershipImporter_surfacesBadRequest() {
+    // Given
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    ShipType type = shipTypeWithName("135c");
+
+    String json =
+        """
+        [{"name":"135c","shipname":"","type":"ship"}]
+        """;
+    MockMultipartFile file = multipartFile(json);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findAll()).thenReturn(List.of(type));
+    when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(0L);
+    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(any(), any()))
+        .thenThrow(new BadRequestException("multi-membership importer needs a picker"));
+
+    // When / Then: the resolver throws before shipRepository.save is ever reached.
+    assertThrows(BadRequestException.class, () -> hangarImportService.importShips(userId, file));
+    verify(shipRepository, never()).save(any(Ship.class));
+  }
+
   private static MockMultipartFile multipartFile(String json) {
     return new MockMultipartFile(
         "file", "fleetview.json", "application/json", json.getBytes(StandardCharsets.UTF_8));

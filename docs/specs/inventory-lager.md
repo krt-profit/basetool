@@ -232,6 +232,35 @@ personal↔shared toggle is owner-scoped and lives on `/my`).
 `InventoryItemPersonalRebookDto`, `inventory-my.html`, `inventory-admin.html`,
 `fragments/inventory-stack-entries.html` · **Issues:** —
 
+### REQ-INV-025 — Book-out validates the CheckoutType; a target-less TRANSFER is rejected
+
+Book-out (`POST /api/v1/inventory/{id}/book-out`) resolves the `CheckoutType` before mutating the
+row. An **absent** `type` is inferred — `TRANSFER` when the request carries a target user or
+location, otherwise `DISCARD`. An **explicit** `type = TRANSFER` is *not* re-inferred, so a
+`TRANSFER` carrying neither `targetUserId` nor `targetLocationId` has nowhere to move the stock to.
+Such a request is **rejected with HTTP 400** up front — before any decrement, delete or audit
+write. It must never fall through to the consume/discard tail: doing so would silently destroy the
+source stock and record it as `INVENTORY_ITEM_CONSUMED` with `type = TRANSFER`, an audit lie about
+a mutation the caller never requested. (The complementary no-op guard — a `TRANSFER` whose target
+resolves to the source's own user *and* location — likewise 400s; the append-only move of
+REQ-INV-001 is defined only for a target that actually differs.) A rejected book-out writes **no**
+audit event, consistent with the audit contract that only committed state mutations are logged
+(REQ-AUDIT-001).
+
+**Acceptance**
+
+- [ ] An explicit `type = TRANSFER` with both `targetUserId` and `targetLocationId` absent yields
+  HTTP 400; the source row's amount is unchanged, no new row is inserted, the source is not
+  deleted, and no audit event is recorded.
+- [ ] A `type = TRANSFER` carrying at least one target proceeds as the append-only move
+  (REQ-INV-001).
+- [ ] An absent `type` with no target is still inferred as `DISCARD` (unchanged) and consumes the
+  stock, logging `INVENTORY_ITEM_CONSUMED` with `type = DISCARD`.
+
+**Enforced by:** `InventoryItemServiceBookOutTest` · **Code:**
+`InventoryCheckoutService#bookOutInventoryItem` (public façade
+`InventoryItemService#bookOutInventoryItem`) · **Issues:** —
+
 ## Out of scope
 
 - Tenancy / visibility scope of inventory (strict-staffel Lager-View) is governed by

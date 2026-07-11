@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.Comparator;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -39,6 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
  * delete endpoint clears the whole table, which lets the next save start clean.
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class AnnouncementService {
@@ -99,7 +101,9 @@ public class AnnouncementService {
     OptimisticLock.checkOptionalClient(
         announcement.getVersion(), version, Announcement.class, announcement.getId());
     announcement.setContent(content);
-    return announcementRepository.save(announcement);
+    Announcement saved = announcementRepository.save(announcement);
+    log.info("Announcement updated id={} version={}", saved.getId(), saved.getVersion());
+    return saved;
   }
 
   /**
@@ -108,6 +112,8 @@ public class AnnouncementService {
    */
   @Transactional
   public void deleteAnnouncement() {
+    long removed = announcementRepository.count();
     announcementRepository.deleteAll();
+    log.info("Announcement banner cleared ({} row(s) removed)", removed);
   }
 }

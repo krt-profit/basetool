@@ -267,7 +267,13 @@ over existing data via `GET /api/v1/personal-blueprints/craftability?includeRefi
   blueprint craftable only thanks to the refinery is marked (`⟢`).
 - **UI.** The master-list row carries a craft-status badge (`×N` craftable / `fehlt` not craftable /
   `×N ⟢` refinery-only); the detail pane shows the craftable counter, the limiting material, and a
-  per-material consumption / shortfall breakdown. Follows the DAS KARTELL master-detail design
+  per-material consumption / shortfall breakdown. The craftability toolbar (which hosts the refinery
+  fold-in toggle) also carries a **"show only craftable" view filter** — a client-side toggle,
+  default OFF, that hides every master row not currently craftable. It is a pure view filter over the
+  already-fetched craftability data (no refetch), honours the refinery toggle (a refinery-only
+  craftable blueprint passes the filter iff the refinery toggle is on) and combines (AND) with the
+  master search filter; like the refinery toggle it lives outside the swapped list fragment, so its
+  state survives an add / import / remove re-render. Follows the DAS KARTELL master-detail design
   (status-green / warning-yellow / research-blue accents, orange reserved for the add CTA),
   responsive across all four device classes, all strings via i18n (de + en + fallback).
 
@@ -289,6 +295,10 @@ over existing data via `GET /api/v1/personal-blueprints/craftability?includeRefi
 - [ ] Given the refinery toggle is on, then the caller's `OPEN` + `IN_PROGRESS` refinery yield is
   added (quantity and quality), counts are recomputed, and a blueprint craftable only via refinery
   is marked `⟢`.
+- [ ] Given the "show only craftable" filter is on, then the list shows only rows currently craftable
+  (`×N` badge); rows shown as `fehlt` or not-evaluated are hidden, the filter combines with the
+  search text, and turning the refinery toggle on additionally reveals the refinery-only craftable
+  rows.
 - [ ] Given a recipe with a non-craftable PIECE-material ITEM ingredient (a hand-mined gem such as
   Hadanite or Beradom), then it is bridged to that material and evaluated like a RESOURCE PIECE
   requirement (required / available / missing in whole "Stück", and it can be the limiting material);

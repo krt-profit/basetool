@@ -3012,6 +3012,71 @@ class MissionPageControllerMvcTest {
         .andExpect(content().string(not(containsString("id=\"board-pool\""))));
   }
 
+  // --- REQ-FE-010: steps / objectives / frequencies live-sync section fragments ---
+  // These three section keys (fragmentValues in static/js/mission-detail.js MISSION_SECTIONS;
+  // switch cases at MissionPageController#missionDetail) are the exact class that already shipped
+  // the objectives/frequencies stale-peer defect. A peer's live-sync re-fetch of one of them must
+  // resolve to its OWN section fragment, not fall through the switch `default -> "mission-detail"`.
+  // If a case is renamed/dropped or its Thymeleaf fragment id drifts, the default arm silently
+  // (HTTP 200) swaps the ENTIRE mission page into the small section container (nested-page
+  // breakage). Each test pins the exact `mission-detail :: <fragment>` view name and a marker that
+  // proves the section body — not the page chrome — was rendered.
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void missionDetail_StepsEditorFragment_RendersStepsEditorOnly() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
+        .thenReturn(editableMission(missionId));
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/missions/" + missionId).param("fragment", "steps-editor"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("mission-detail :: stepsEditor"))
+        .andExpect(content().string(containsString("id=\"mission-step-list\"")))
+        // Section-sized: no page chrome, no sibling panes.
+        .andExpect(content().string(not(containsString("mission-head-sticky"))))
+        .andExpect(content().string(not(containsString("id=\"pane-fin\""))));
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void missionDetail_ObjectivesEditorFragment_RendersObjectivesEditorOnly() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
+        .thenReturn(editableMission(missionId));
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/missions/" + missionId).param("fragment", "objectives-editor"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("mission-detail :: objectivesEditor"))
+        .andExpect(content().string(containsString("id=\"mission-objective-list\"")))
+        .andExpect(content().string(not(containsString("mission-head-sticky"))))
+        .andExpect(content().string(not(containsString("id=\"pane-fin\""))));
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void missionDetail_FrequenciesEditorFragment_RendersFrequenciesEditorOnly() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
+        .thenReturn(editableMission(missionId));
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/missions/" + missionId).param("fragment", "frequencies-editor"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("mission-detail :: frequenciesEditor"))
+        .andExpect(content().string(containsString("id=\"mission-custom-freq-list\"")))
+        .andExpect(content().string(not(containsString("mission-head-sticky"))))
+        .andExpect(content().string(not(containsString("id=\"pane-fin\""))));
+  }
+
   @Test
   @WithMockUser(roles = "OFFICER")
   void missionDetail_OrganisationFragment_RendersPartyLeadAndTypedFrequenciesOnly()

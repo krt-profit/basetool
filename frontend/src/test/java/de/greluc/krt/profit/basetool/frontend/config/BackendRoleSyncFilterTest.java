@@ -19,15 +19,23 @@
 
 package de.greluc.krt.profit.basetool.frontend.config;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import de.greluc.krt.profit.basetool.frontend.model.dto.RegistrationStatusDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -38,6 +46,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
@@ -46,15 +55,25 @@ import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 
 /**
- * Unit tests for {@link BackendRoleSyncFilter}, focused on the "do not poison the session on a
- * failed sync" contract (REQ-SEC-013): the {@code BACKEND_ROLES_SYNCED} session flag must only be
- * set when the backend role read genuinely succeeded, so a transient backend outage on the first
- * request of a session is retried instead of leaving the principal under-privileged until re-login.
+ * Unit tests for {@link BackendRoleSyncFilter}, covering two behaviours.
+ *
+ * <ul>
+ *   <li>The "do not poison the session on a failed sync" contract (REQ-SEC-013): the {@code
+ *       BACKEND_ROLES_SYNCED} session flag must only be set when the backend role read genuinely
+ *       succeeded, so a transient backend outage on the first request of a session is retried
+ *       instead of leaving the principal under-privileged until re-login.
+ *   <li>The epic-#720 approval gate: a {@code PENDING}/{@code REJECTED} registration is redirected
+ *       to {@code /pending-approval} on guarded paths but allowed through on the {@code
+ *       isApprovalExempt} whitelist (e.g. {@code /logout}), and the resolved approval status is
+ *       cached once per session in {@code BACKEND_APPROVAL_STATE} so the backend is not re-hit.
+ * </ul>
  */
 class BackendRoleSyncFilterTest {
 
   private static final String SYNC_COMPLETE_FLAG = "BACKEND_ROLES_SYNCED";
+  private static final String APPROVAL_STATE_FLAG = "BACKEND_APPROVAL_STATE";
   private static final String USERS_ME = "/api/v1/users/me";
+  private static final String REGISTRATION_STATUS = "/api/v1/users/me/registration-status";
 
   private BackendApiClient backendApiClient;
   private BackendRoleSyncFilter filter;
@@ -147,6 +166,88 @@ class BackendRoleSyncFilterTest {
 
     // Then — successful read marks the session synced
     verify(session).setAttribute(SYNC_COMPLETE_FLAG, true);
+    verify(chain).doFilter(request, response);
+  }
+
+  @Test
+  void doFilterInternal_whenBackendServiceException_logsAtDebugNotError() throws Exception {
+    // REQ-OBS-001: a relayed BackendServiceException was already logged once at the
+    // BackendApiClient
+    // boundary. syncRoles re-runs on every request until it succeeds, so re-logging it at ERROR
+    // here
+    // would turn one backend outage into a per-request ERROR storm and trip LogbackErrorSpike.
+    Logger logger = (Logger) LoggerFactory.getLogger(BackendRoleSyncFilter.class);
+    Level original = logger.getLevel();
+    logger.setLevel(Level.DEBUG);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    try {
+      when(backendApiClient.get(USERS_ME, UserDto.class))
+          .thenThrow(new BackendServiceException("backend down", null, 503));
+
+      filter.doFilterInternal(request, response, chain);
+
+      assertThat(appender.list).noneMatch(e -> e.getLevel() == Level.ERROR);
+      assertThat(appender.list)
+          .anyMatch(
+              e ->
+                  e.getLevel() == Level.DEBUG
+                      && e.getFormattedMessage().contains("Backend role sync deferred"));
+      verify(session, never()).setAttribute(eq(SYNC_COMPLETE_FLAG), any());
+      verify(chain).doFilter(request, response);
+    } finally {
+      logger.detachAppender(appender);
+      logger.setLevel(original);
+    }
+  }
+
+  @Test
+  void pendingApproval_nonExemptPath_redirectsToWaitingPage() throws Exception {
+    // Given — the backend reports a PENDING registration and the request targets a guarded page
+    when(request.getContextPath()).thenReturn("");
+    when(request.getRequestURI()).thenReturn("/dashboard");
+    when(backendApiClient.get(REGISTRATION_STATUS, RegistrationStatusDto.class))
+        .thenReturn(new RegistrationStatusDto("PENDING"));
+
+    // When
+    filter.doFilterInternal(request, response, chain);
+
+    // Then — routed to the waiting page and the chain is short-circuited (never the guest surface,
+    // never the #720 403 storm), and the resolved status is cached for the rest of the session
+    verify(response).sendRedirect("/pending-approval");
+    verify(chain, never()).doFilter(request, response);
+    verify(session).setAttribute(APPROVAL_STATE_FLAG, "PENDING");
+  }
+
+  @Test
+  void pendingApproval_exemptPath_proceeds() throws Exception {
+    // Given — a PENDING user hitting an exempt path (/logout) must be able to leave, not be trapped
+    when(request.getContextPath()).thenReturn("");
+    when(request.getRequestURI()).thenReturn("/logout");
+    when(backendApiClient.get(REGISTRATION_STATUS, RegistrationStatusDto.class))
+        .thenReturn(new RegistrationStatusDto("PENDING"));
+
+    // When
+    filter.doFilterInternal(request, response, chain);
+
+    // Then — the chain proceeds and no redirect is issued
+    verify(chain).doFilter(request, response);
+    verify(response, never()).sendRedirect(anyString());
+  }
+
+  @Test
+  void approvalStatus_isCachedPerSession_skipsRegistrationStatusFetch() throws Exception {
+    // Given — a prior request already resolved and cached the approval status on the session, and
+    // roles are already synced (isolate the approval-cache behaviour from the role-sync branch)
+    when(session.getAttribute(APPROVAL_STATE_FLAG)).thenReturn("ACTIVE");
+    when(session.getAttribute(SYNC_COMPLETE_FLAG)).thenReturn(true);
+
+    // When
+    filter.doFilterInternal(request, response, chain);
+
+    // Then — the backend approval endpoint is NOT hit again (resolved once per session)
+    verify(backendApiClient, never()).get(REGISTRATION_STATUS, RegistrationStatusDto.class);
     verify(chain).doFilter(request, response);
   }
 }

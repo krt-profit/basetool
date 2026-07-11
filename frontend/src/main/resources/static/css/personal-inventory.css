@@ -1201,7 +1201,8 @@
     display: none;
 }
 
-.krt-bp-refinery-toggle {
+.krt-bp-refinery-toggle,
+.krt-bp-craftable-toggle {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
@@ -1211,7 +1212,8 @@
     font-size: 0.8rem;
 }
 
-.krt-bp-refinery-toggle input {
+.krt-bp-refinery-toggle input,
+.krt-bp-craftable-toggle input {
     flex: none;
 }
 

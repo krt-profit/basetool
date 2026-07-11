@@ -357,7 +357,7 @@ public class HangarImportService {
     } catch (IOException | JacksonException e) {
       // IOException covers the multipart stream; JacksonException (unchecked in Jackson 3) covers a
       // malformed JSON body — both must surface as a 400, not bubble up as a 500.
-      log.warn("Hangar import: failed to parse JSON — {}", e.getMessage());
+      log.debug("Hangar import: failed to parse JSON", e);
       throw new BadRequestException(
           "The uploaded file could not be parsed as a valid ship-list JSON.");
     }

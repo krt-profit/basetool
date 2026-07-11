@@ -21,13 +21,16 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.KeycloakSyncProperties;
 import de.greluc.krt.profit.basetool.backend.config.KeycloakTrustSupport;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -42,6 +45,7 @@ import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
@@ -98,6 +102,9 @@ public class KeycloakService {
 
   private final KeycloakSyncProperties properties;
 
+  /** Micrometer registry for the {@code basetool_keycloak_sync_fetch_failures_total} counter. */
+  private final MeterRegistry meterRegistry;
+
   /**
    * Pre-built request factory pinned (via {@link KeycloakTrustSupport}) to trust only the {@link
    * #KEYCLOAK_TRUST_BUNDLE} truststore, or {@code null} when that bundle is not configured for the
@@ -114,10 +121,14 @@ public class KeycloakService {
    * @param properties the {@code app.keycloak.sync.*} configuration (admin URL, realm, credentials)
    * @param sslBundles the registered Spring SSL bundles; consulted for {@link
    *     #KEYCLOAK_TRUST_BUNDLE} to pin the self-signed Keycloak certificate in production
+   * @param meterRegistry the Micrometer registry for the {@code
+   *     basetool_keycloak_sync_fetch_failures_total} counter
    */
-  public KeycloakService(KeycloakSyncProperties properties, SslBundles sslBundles) {
+  public KeycloakService(
+      KeycloakSyncProperties properties, SslBundles sslBundles, MeterRegistry meterRegistry) {
     this.properties = properties;
     this.trustedRequestFactory = buildTrustedRequestFactory(sslBundles);
+    this.meterRegistry = meterRegistry;
   }
 
   /**
@@ -147,8 +158,9 @@ public class KeycloakService {
   /**
    * Creates a {@link RestClient} bound to the configured admin base URL, using the
    * truststore-pinned request factory when one was resolved at construction. Callers guarantee the
-   * admin URL is non-null (see {@link #fetchUsers()}), so building the lightweight client per call
-   * is safe — the expensive TLS context lives in {@link #trustedRequestFactory} and is reused.
+   * admin URL is non-null (see {@link #fetchUsers(Collection, Set)}), so building the lightweight
+   * client per call is safe — the expensive TLS context lives in {@link #trustedRequestFactory} and
+   * is reused.
    *
    * @return a ready-to-use {@link RestClient} for the Keycloak Admin API
    */
@@ -177,9 +189,11 @@ public class KeycloakService {
    * (new members, or ones that never linked) — the linked majority is skipped entirely.
    *
    * @param appRoleNames the realm role names the app maps locally (from the local role catalog);
-   *     only these are indexed against Keycloak, so default/technical realm roles never trigger a
+   *     these are matched case-insensitively against the realm's actual role names and only the
+   *     matches are indexed against Keycloak, so default/technical realm roles never trigger a
    *     wasteful full-membership page. A role that exists locally but not in Keycloak (e.g. the
-   *     local-only {@code Guest} fallback) simply contributes no memberships. Never {@code null}.
+   *     local-only {@code Guest} fallback) is absent from the realm listing and simply contributes
+   *     no memberships. Never {@code null}.
    * @param knownDiscordLinkedIds ids of users who already carry a local Discord link and therefore
    *     do NOT need their federated identity re-read this run; every other roster user (including
    *     brand-new ones absent locally) gets the read. Never {@code null}.
@@ -218,6 +232,11 @@ public class KeycloakService {
 
     } catch (Exception e) {
       log.error("Failed to fetch users from Keycloak", e);
+      // REQ-OBS-011: the swallow returns an empty roster and the sync still records success, so
+      // without this counter a Keycloak Admin-API outage is indistinguishable from a legitimately
+      // empty roster (departed users would keep their local roles). KeycloakSyncFetchFailing
+      // alerts.
+      meterRegistry.counter(MetricNames.KEYCLOAK_SYNC_FETCH_FAILURES).increment();
       return Collections.emptyList();
     }
   }
@@ -274,48 +293,130 @@ public class KeycloakService {
    * /users/{id}/role-mappings/realm} fan-out (which cost one Admin-API call per user). Both views
    * report <em>directly-assigned</em> realm roles, so the reconstructed sets are equivalent to what
    * the per-user path returned — only far cheaper: the call count is bounded by the number of
-   * mappable roles (a handful) times their page count, not by the user count. Only the roles the
-   * local catalog maps are queried, so ubiquitous default/technical realm roles ({@code
-   * default-roles-*}, {@code offline_access}, {@code uma_authorization}) never trigger a
-   * full-membership page walk.
+   * mappable roles (a handful) times their page count, not by the user count.
+   *
+   * <p>The mappable role names come from the local catalog ({@link
+   * UserService#getMappableRoleNames()}); they are matched <em>case-insensitively</em> against the
+   * realm's actual role names (resolved once via {@link #fetchRealmRoleNames(String)}) and only the
+   * matches are queried, using Keycloak's own casing. This mirrors the interactive JWT path (which
+   * maps via {@code findByNameIgnoreCase}) and removes the scheduled-vs-interactive casing
+   * asymmetry: Keycloak's {@code /roles/{name}/users} lookup is case-sensitive, so passing a
+   * differently-cased local name straight through would silently miss the role. Local-only roles
+   * such as the {@code Guest} fallback, and ubiquitous default/technical realm roles ({@code
+   * default-roles-*}, {@code offline_access}, {@code uma_authorization}), are not in the app's
+   * mappable set and are therefore never queried (no wasteful full-membership page walk).
    *
    * @param appRoleNames the realm role names to index; never {@code null}.
    * @param token a valid admin access token.
-   * @return a mutable map of user id to the subset of {@code appRoleNames} each user holds; users
-   *     with none simply do not appear (the caller defaults them to the empty set, which {@link
-   *     UserService#syncUser(KeycloakUserDto)} maps to the {@code Guest} fallback).
+   * @return a mutable map of user id to the subset of {@code appRoleNames} each user holds (stored
+   *     under the local catalog's casing); users with none simply do not appear (the caller
+   *     defaults them to the empty set, which {@link UserService#syncUser(KeycloakUserDto)} maps to
+   *     the {@code Guest} fallback).
    */
   private Map<UUID, Set<String>> fetchRoleMemberships(
       Collection<String> appRoleNames, String token) {
     Map<UUID, Set<String>> byUser = new HashMap<>();
-    for (String roleName : appRoleNames) {
-      accumulateRoleMembers(roleName, token, byUser);
+    Map<String, String> canonicalByLower = new HashMap<>();
+    for (String appRoleName : appRoleNames) {
+      if (appRoleName != null && !appRoleName.isBlank()) {
+        canonicalByLower.put(appRoleName.toLowerCase(Locale.ROOT), appRoleName);
+      }
+    }
+    if (canonicalByLower.isEmpty()) {
+      return byUser;
+    }
+    for (String keycloakRoleName : fetchRealmRoleNames(token)) {
+      String canonical = canonicalByLower.get(keycloakRoleName.toLowerCase(Locale.ROOT));
+      if (canonical != null) {
+        accumulateRoleMembers(keycloakRoleName, canonical, token, byUser);
+      }
     }
     return byUser;
   }
 
   /**
-   * Pages through {@code GET /roles/{roleName}/users} and records the role against every member id
-   * in {@code byUser}. The endpoint caps each response at a server-side maximum, so this loops
-   * {@code first}/{@code max} (page size from {@link KeycloakSyncProperties#getPageSize()}) until a
-   * short or empty page signals the end — mirroring {@link #fetchAllUsers(String)}.
+   * Lists the realm's actual role names via the paged {@code GET /admin/realms/{realm}/roles}
+   * endpoint, so {@link #fetchRoleMemberships(Collection, String)} can match the local catalog
+   * against Keycloak's own casing rather than assuming the two agree. The endpoint caps each
+   * response at a server-side maximum, so this loops {@code first}/{@code max} (page size from
+   * {@link KeycloakSyncProperties#getPageSize()}) until a short or empty page signals the end —
+   * mirroring {@link #fetchAllUsers(String)}.
    *
-   * <p>Best-effort per role: any failure is logged (role name only — never PII) and the role simply
-   * contributes no memberships this run, exactly the degradation the per-user path had. A {@code
-   * 404} for a realm role that exists locally but not in Keycloak (the local-only {@code Guest}
-   * fallback) is the common, harmless case.
+   * <p>Not best-effort: any failure propagates to {@link #fetchUsers(Collection, Set)}'s top-level
+   * catch, which returns an empty roster so the run is <em>skipped</em> (never a wipe, never a
+   * degraded write) rather than proceeding with an unknown role set.
    *
-   * @param roleName the realm role whose members to enumerate.
+   * @param token a valid admin access token.
+   * @return every realm role name across all pages; never {@code null}, possibly empty.
+   */
+  private List<String> fetchRealmRoleNames(String token) {
+    int pageSize = properties.getPageSize();
+    List<String> names = new ArrayList<>();
+    int first = 0;
+    while (true) {
+      final int currentFirst = first;
+      List<Map<String, Object>> page =
+          adminClient()
+              .get()
+              .uri(
+                  uriBuilder ->
+                      uriBuilder
+                          .path("/admin/realms/{realm}/roles")
+                          .queryParam("first", currentFirst)
+                          .queryParam("max", pageSize)
+                          .build(properties.getRealm()))
+              .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
+              .retrieve()
+              .body(new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+
+      if (page == null || page.isEmpty()) {
+        break;
+      }
+      for (Map<String, Object> role : page) {
+        if (role.get("name") instanceof String name && !name.isBlank()) {
+          names.add(name);
+        }
+      }
+      if (page.size() < pageSize) {
+        break;
+      }
+      first += pageSize;
+    }
+    return names;
+  }
+
+  /**
+   * Pages through {@code GET /roles/{queryRoleName}/users} and records {@code storedRoleName}
+   * against every member id in {@code byUser}. The endpoint caps each response at a server-side
+   * maximum, so this loops {@code first}/{@code max} (page size from {@link
+   * KeycloakSyncProperties#getPageSize()}) until a short or empty page signals the end — mirroring
+   * {@link #fetchAllUsers(String)}.
+   *
+   * <p><strong>Fault isolation (issue #1202 audit).</strong> Only a {@code 404} — the role vanished
+   * between the realm-role listing and this member query (a benign TOCTOU) — is swallowed: the role
+   * contributes no members and the run continues. Every <em>other</em> failure (5xx, 401/403,
+   * timeout, connection reset, malformed body) is deliberately <em>not</em> caught here; it
+   * propagates to {@link #fetchUsers(Collection, Set)}'s top-level catch, which returns an empty
+   * roster so the whole run is <em>skipped</em>. This is a fail-safe: the earlier
+   * swallow-every-exception behaviour turned a transient single-role failure into a silent
+   * role-strip of every holder — mapping a brand-new admin to the {@code Guest} fallback and
+   * creating it {@code PENDING} instead of {@code ACTIVE}, and mass-downgrading existing admins —
+   * because the degraded role set was then persisted as a normal successful run.
+   *
+   * @param queryRoleName the realm role name as Keycloak spells it (used in the request path).
+   * @param storedRoleName the local catalog's canonical name to record for each member.
    * @param token a valid admin access token.
    * @param byUser the accumulator to populate (user id &#8594; role names).
    */
-  private void accumulateRoleMembers(String roleName, String token, Map<UUID, Set<String>> byUser) {
+  private void accumulateRoleMembers(
+      String queryRoleName, String storedRoleName, String token, Map<UUID, Set<String>> byUser) {
     int pageSize = properties.getPageSize();
     int first = 0;
-    try {
-      while (true) {
-        final int currentFirst = first;
-        List<Map<String, Object>> page =
+    while (true) {
+      final int currentFirst = first;
+      List<Map<String, Object>> page;
+      try {
+        page =
             adminClient()
                 .get()
                 .uri(
@@ -324,31 +425,39 @@ public class KeycloakService {
                             .path("/admin/realms/{realm}/roles/{roleName}/users")
                             .queryParam("first", currentFirst)
                             .queryParam("max", pageSize)
-                            .build(properties.getRealm(), roleName))
+                            .build(properties.getRealm(), queryRoleName))
                 .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
                 .retrieve()
                 .body(new ParameterizedTypeReference<List<Map<String, Object>>>() {});
-
-        if (page == null || page.isEmpty()) {
-          break;
-        }
-        for (Map<String, Object> member : page) {
-          if (member.get("id") instanceof String idText) {
-            try {
-              byUser.computeIfAbsent(UUID.fromString(idText), k -> new HashSet<>()).add(roleName);
-            } catch (IllegalArgumentException ignored) {
-              // A non-UUID member id is a Keycloak configuration deviation; skip it rather than
-              // aborting the whole role page (matches the fail-closed id handling elsewhere).
-            }
+      } catch (HttpClientErrorException.NotFound notFound) {
+        // Benign TOCTOU: the role disappeared after the realm-role listing named it. No members to
+        // contribute — skip this one role WITHOUT aborting the run (log the role name only, no
+        // PII).
+        log.debug("Realm role '{}' not found while reading members; skipping.", queryRoleName);
+        return;
+      }
+      // Any OTHER failure is intentionally uncaught: it propagates to fetchUsers()'s top-level
+      // catch
+      // so the run is skipped rather than persisting a degraded, role-stripped set (see Javadoc).
+      if (page == null || page.isEmpty()) {
+        break;
+      }
+      for (Map<String, Object> member : page) {
+        if (member.get("id") instanceof String idText) {
+          try {
+            byUser
+                .computeIfAbsent(UUID.fromString(idText), k -> new HashSet<>())
+                .add(storedRoleName);
+          } catch (IllegalArgumentException ignored) {
+            // A non-UUID member id is a Keycloak configuration deviation; skip it rather than
+            // aborting the whole role page (matches the fail-closed id handling elsewhere).
           }
         }
-        if (page.size() < pageSize) {
-          break;
-        }
-        first += pageSize;
       }
-    } catch (Exception e) {
-      log.warn("Failed to fetch members for realm role '{}'", roleName, e);
+      if (page.size() < pageSize) {
+        break;
+      }
+      first += pageSize;
     }
   }
 

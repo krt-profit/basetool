@@ -22,10 +22,12 @@ package de.greluc.krt.profit.basetool.backend.service.scwiki;
 import de.greluc.krt.profit.basetool.backend.config.AsyncConfig;
 import de.greluc.krt.profit.basetool.backend.config.ScWikiProperties;
 import de.greluc.krt.profit.basetool.backend.integration.scwiki.ScWikiClient;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.service.MasterDataCacheEvictionService;
 import de.greluc.krt.profit.basetool.backend.service.SyncCoordinator;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.function.IntSupplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -71,6 +73,7 @@ public class ScWikiScheduler {
   private final SyncCoordinator syncCoordinator;
   private final TaskMetrics taskMetrics;
   private final MasterDataCacheEvictionService masterDataCacheEvictionService;
+  private final MeterRegistry meterRegistry;
 
   /**
    * Periodic SC Wiki sync entry point. Runs on the {@link AsyncConfig#SCWIKI_EXECUTOR} pool so a
@@ -146,6 +149,18 @@ public class ScWikiScheduler {
       return step.getAsInt();
     } catch (Exception e) {
       log.error("Scheduled SC Wiki {} sync failed", label, e);
+      // REQ-OBS-011: the umbrella scwiki_sync run still records outcome=success (the other steps
+      // ran
+      // and produced rows), so a single reliably-failing step is invisible to the outcome / items /
+      // stale signals — count it so ScWikiStepFailing can alert on a persistent step break.
+      meterRegistry
+          .counter(
+              MetricNames.SCHEDULED_JOB_STEP_FAILURES,
+              MetricNames.TAG_JOB,
+              ScheduledJob.SCWIKI_SYNC.label(),
+              MetricNames.TAG_STEP,
+              label)
+          .increment();
       return 0;
     }
   }

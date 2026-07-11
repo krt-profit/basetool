@@ -28,7 +28,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.config.KeycloakSyncProperties;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.security.KeyStore;
 import java.util.List;
 import java.util.Set;
@@ -56,6 +58,8 @@ class KeycloakServiceTest {
 
   @Mock private SslBundles sslBundles;
 
+  private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+
   /**
    * When the {@code keycloak-trust} SSL bundle is present, the constructor must parse its
    * truststore and build the pinned request factory without error.
@@ -70,7 +74,8 @@ class KeycloakServiceTest {
     when(bundle.getStores()).thenReturn(stores);
     when(sslBundles.getBundle("keycloak-trust")).thenReturn(bundle);
 
-    assertDoesNotThrow(() -> new KeycloakService(new KeycloakSyncProperties(), sslBundles));
+    assertDoesNotThrow(
+        () -> new KeycloakService(new KeycloakSyncProperties(), sslBundles, meterRegistry));
     verify(sslBundles).getBundle("keycloak-trust");
   }
 
@@ -86,10 +91,41 @@ class KeycloakServiceTest {
     KeycloakSyncProperties properties = new KeycloakSyncProperties();
     properties.setEnabled(false);
 
-    KeycloakService service = new KeycloakService(properties, sslBundles);
+    KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
 
     assertTrue(service.fetchUsers(List.of(), Set.of()).isEmpty());
     verify(sslBundles).getBundle("keycloak-trust");
+  }
+
+  /**
+   * REQ-OBS-011: when the roster fetch throws (here the client-credentials token request returns
+   * 500), {@code fetchUsers} swallows it to an empty list and increments {@code
+   * basetool_keycloak_sync_fetch_failures_total} so a Keycloak outage is distinguishable from a
+   * legitimately empty roster (which returns empty <em>without</em> throwing).
+   */
+  @Test
+  void fetchUsers_onFetchFailure_incrementsFailureCounterAndReturnsEmpty() throws Exception {
+    when(sslBundles.getBundle("keycloak-trust"))
+        .thenThrow(new NoSuchSslBundleException("keycloak-trust", "no such bundle"));
+    MockWebServer server = new MockWebServer();
+    server.start();
+    try {
+      KeycloakSyncProperties properties = new KeycloakSyncProperties();
+      properties.setEnabled(true);
+      properties.setAdminUrl(server.url("/").toString().replaceAll("/+$", ""));
+      properties.setRealm("iri");
+      properties.setClientId("client");
+      properties.setClientSecret("secret");
+      // The client-credentials token request fails → getAccessToken throws → fetchUsers swallows.
+      server.enqueue(new MockResponse().setResponseCode(500));
+
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
+
+      assertTrue(service.fetchUsers(List.of(), Set.of()).isEmpty());
+      assertEquals(1.0, meterRegistry.counter(MetricNames.KEYCLOAK_SYNC_FETCH_FAILURES).count());
+    } finally {
+      server.shutdown();
+    }
   }
 
   /**
@@ -136,7 +172,7 @@ class KeycloakServiceTest {
       server.enqueue(jsonResponse("[]"));
       server.enqueue(jsonResponse("[]"));
 
-      KeycloakService service = new KeycloakService(properties, sslBundles);
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
 
       List<KeycloakUserDto> users = service.fetchUsers(List.of(), Set.of());
 
@@ -191,7 +227,7 @@ class KeycloakServiceTest {
               "[{\"identityProvider\":\"discord\",\"userId\":\"123456789012345678\","
                   + "\"userName\":\"a#1\"}]"));
 
-      KeycloakService service = new KeycloakService(properties, sslBundles);
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
 
       List<KeycloakUserDto> users = service.fetchUsers(List.of(), Set.of());
 
@@ -232,7 +268,7 @@ class KeycloakServiceTest {
       server.enqueue(
           jsonResponse("[{\"identityProvider\":\"github\",\"userId\":\"99\",\"userName\":\"a\"}]"));
 
-      KeycloakService service = new KeycloakService(properties, sslBundles);
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
 
       List<KeycloakUserDto> users = service.fetchUsers(List.of(), Set.of());
 
@@ -244,11 +280,11 @@ class KeycloakServiceTest {
   }
 
   /**
-   * Role membership is resolved role-indexed: for each mappable role name, {@code fetchUsers}
-   * queries {@code GET /roles/{name}/users} once and maps the role onto every returned member,
-   * rather than reading each user's role mapping individually. With role {@code ADMIN} listing user
-   * A as a member, A's DTO must carry {@code ADMIN}, and the request path must target the role's
-   * member endpoint.
+   * Role membership is resolved role-indexed: the realm's role names are listed once, then for each
+   * mappable role {@code fetchUsers} queries {@code GET /roles/{name}/users} and maps the role onto
+   * every returned member, rather than reading each user's role mapping individually. With role
+   * {@code ADMIN} in the realm listing and listing user A as a member, A's DTO must carry {@code
+   * ADMIN}, and the request path must target the role's member endpoint.
    *
    * @throws Exception if the mock server cannot be started or stopped.
    */
@@ -269,15 +305,16 @@ class KeycloakServiceTest {
 
       UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
 
-      // token, single short roster page (stop), one ADMIN member page (A, short → stop), then
-      // federated identities A (empty, A is not pre-known-linked).
+      // token, single short roster page (stop), the realm-role listing (ADMIN), one ADMIN member
+      // page (A, short → stop), then federated identities A (empty, A is not pre-known-linked).
       server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
       server.enqueue(
           jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
+      server.enqueue(jsonResponse("[{\"name\":\"ADMIN\"}]"));
       server.enqueue(jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\"}]"));
       server.enqueue(jsonResponse("[]"));
 
-      KeycloakService service = new KeycloakService(properties, sslBundles);
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
 
       List<KeycloakUserDto> users = service.fetchUsers(List.of("ADMIN"), Set.of());
 
@@ -286,10 +323,162 @@ class KeycloakServiceTest {
 
       server.takeRequest(); // token
       server.takeRequest(); // roster page
+      RecordedRequest rolesList = server.takeRequest();
+      assertTrue(
+          rolesList.getPath().contains("/roles?"),
+          "the realm role names must be listed before per-role member reads");
       RecordedRequest rolePage = server.takeRequest();
       assertTrue(
           rolePage.getPath().contains("/roles/ADMIN/users"),
           "role membership must be read from the role's member endpoint");
+    } finally {
+      server.shutdown();
+    }
+  }
+
+  /**
+   * Regression guard for issue #1202 finding 2: Keycloak's {@code /roles/{name}/users} lookup is
+   * case-sensitive, so the sync resolves the realm's actual role names and matches the local
+   * catalog against them case-insensitively. With the realm role spelled {@code admin} (lower case)
+   * but the app passing the canonical {@code ADMIN}, member A must still resolve — stored under the
+   * local casing — and the member query must use Keycloak's own casing.
+   *
+   * @throws Exception if the mock server cannot be started or stopped.
+   */
+  @Test
+  void fetchUsers_matchesRoleNameCaseInsensitively() throws Exception {
+    when(sslBundles.getBundle("keycloak-trust"))
+        .thenThrow(new NoSuchSslBundleException("keycloak-trust", "no such bundle"));
+    MockWebServer server = new MockWebServer();
+    server.start();
+    try {
+      KeycloakSyncProperties properties = new KeycloakSyncProperties();
+      properties.setEnabled(true);
+      properties.setAdminUrl(server.url("/").toString().replaceAll("/+$", ""));
+      properties.setRealm("iri");
+      properties.setClientId("client");
+      properties.setClientSecret("secret");
+      properties.setPageSize(100);
+
+      UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
+
+      // token, roster (A), realm-role listing names the role "admin" (lower case), member page for
+      // /roles/admin/users lists A, federated identities A (empty).
+      server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
+      server.enqueue(
+          jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
+      server.enqueue(jsonResponse("[{\"name\":\"admin\"}]"));
+      server.enqueue(jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\"}]"));
+      server.enqueue(jsonResponse("[]"));
+
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
+
+      List<KeycloakUserDto> users = service.fetchUsers(List.of("ADMIN"), Set.of());
+
+      assertEquals(1, users.size());
+      assertEquals(
+          Set.of("ADMIN"),
+          users.get(0).roles(),
+          "a case-mismatched realm role must still resolve, stored under the local casing");
+
+      server.takeRequest(); // token
+      server.takeRequest(); // roster page
+      server.takeRequest(); // realm-role listing
+      RecordedRequest rolePage = server.takeRequest();
+      assertTrue(
+          rolePage.getPath().contains("/roles/admin/users"),
+          "members must be queried under Keycloak's own casing");
+    } finally {
+      server.shutdown();
+    }
+  }
+
+  /**
+   * Regression guard for issue #1202 finding 1: a transient (non-404) failure while reading one
+   * role's members must SKIP the whole run (empty result → the scheduler treats it as "skip")
+   * rather than persisting a degraded, role-stripped set. Otherwise a 5xx on {@code
+   * /roles/ADMIN/users} would silently strip {@code ADMIN} from every holder — creating a brand-new
+   * admin {@code PENDING} instead of {@code ACTIVE} and mass-downgrading existing admins to the
+   * {@code Guest} fallback.
+   *
+   * @throws Exception if the mock server cannot be started or stopped.
+   */
+  @Test
+  void fetchUsers_roleMemberFetchServerError_skipsRun() throws Exception {
+    when(sslBundles.getBundle("keycloak-trust"))
+        .thenThrow(new NoSuchSslBundleException("keycloak-trust", "no such bundle"));
+    MockWebServer server = new MockWebServer();
+    server.start();
+    try {
+      KeycloakSyncProperties properties = new KeycloakSyncProperties();
+      properties.setEnabled(true);
+      properties.setAdminUrl(server.url("/").toString().replaceAll("/+$", ""));
+      properties.setRealm("iri");
+      properties.setClientId("client");
+      properties.setClientSecret("secret");
+      properties.setPageSize(100);
+
+      UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
+
+      // token, roster (A), realm-role listing (ADMIN), then a 500 on the member query.
+      server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
+      server.enqueue(
+          jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
+      server.enqueue(jsonResponse("[{\"name\":\"ADMIN\"}]"));
+      server.enqueue(errorResponse(500));
+
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
+
+      List<KeycloakUserDto> users = service.fetchUsers(List.of("ADMIN"), Set.of());
+
+      assertTrue(
+          users.isEmpty(),
+          "a transient role-member fetch failure must skip the run, not persist degraded roles");
+    } finally {
+      server.shutdown();
+    }
+  }
+
+  /**
+   * A benign {@code 404} on a single role's member read (the role vanished after the realm-role
+   * listing named it — a TOCTOU) must NOT abort the run: the roster survives and the affected user
+   * simply carries no role from that lookup. This distinguishes the harmless not-found case from
+   * the transient failures guarded by {@link #fetchUsers_roleMemberFetchServerError_skipsRun()}.
+   *
+   * @throws Exception if the mock server cannot be started or stopped.
+   */
+  @Test
+  void fetchUsers_roleMemberFetchNotFound_keepsRosterWithoutTheRole() throws Exception {
+    when(sslBundles.getBundle("keycloak-trust"))
+        .thenThrow(new NoSuchSslBundleException("keycloak-trust", "no such bundle"));
+    MockWebServer server = new MockWebServer();
+    server.start();
+    try {
+      KeycloakSyncProperties properties = new KeycloakSyncProperties();
+      properties.setEnabled(true);
+      properties.setAdminUrl(server.url("/").toString().replaceAll("/+$", ""));
+      properties.setRealm("iri");
+      properties.setClientId("client");
+      properties.setClientSecret("secret");
+      properties.setPageSize(100);
+
+      UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
+
+      // token, roster (A), realm-role listing (ADMIN), a 404 on the member query, then federated
+      // identities A (empty — A is not pre-known-linked, so the read still happens).
+      server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
+      server.enqueue(
+          jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
+      server.enqueue(jsonResponse("[{\"name\":\"ADMIN\"}]"));
+      server.enqueue(errorResponse(404));
+      server.enqueue(jsonResponse("[]"));
+
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
+
+      List<KeycloakUserDto> users = service.fetchUsers(List.of("ADMIN"), Set.of());
+
+      assertEquals(1, users.size(), "a benign 404 on one role must not skip the run");
+      assertTrue(users.get(0).roles().isEmpty(), "the not-found role contributes no membership");
     } finally {
       server.shutdown();
     }
@@ -324,7 +513,7 @@ class KeycloakServiceTest {
       server.enqueue(
           jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
 
-      KeycloakService service = new KeycloakService(properties, sslBundles);
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
 
       List<KeycloakUserDto> users = service.fetchUsers(List.of(), Set.of(userA));
 
@@ -350,5 +539,16 @@ class KeycloakServiceTest {
         .setResponseCode(200)
         .setHeader("Content-Type", "application/json")
         .setBody(body);
+  }
+
+  /**
+   * Builds a bodyless {@link MockResponse} with the given HTTP status code, for driving the sync's
+   * error paths (a 404 role skip vs. a 5xx run-skip).
+   *
+   * @param code the HTTP status code to return.
+   * @return the staged error response.
+   */
+  private static MockResponse errorResponse(int code) {
+    return new MockResponse().setResponseCode(code);
   }
 }

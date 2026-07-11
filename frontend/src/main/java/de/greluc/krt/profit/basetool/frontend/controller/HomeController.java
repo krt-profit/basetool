@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.MissionListDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import jakarta.servlet.http.HttpSession;
 import java.time.Instant;
@@ -110,6 +111,13 @@ public class HomeController {
               ? upcomingPage.content()
               : List.of();
       model.addAttribute("upcomingMissions", upcomingMissions);
+    } catch (BackendServiceException e) {
+      // REQ-OBS-001: the BackendApiClient boundary already logged this (4xx WARN / 5xx ERROR /
+      // circuit-open DEBUG). This is the anonymous landing page, so a routine backend restart must
+      // not re-log at ERROR on every load and trip LogbackErrorSpike.
+      log.debug("Could not fetch upcoming missions", e);
+      model.addAttribute("upcomingMissions", List.of());
+      model.addAttribute("error", "error.mission.fetch");
     } catch (Exception e) {
       log.error("Could not fetch upcoming missions", e);
       model.addAttribute("upcomingMissions", List.of());
@@ -182,8 +190,12 @@ public class HomeController {
           }
         }
         model.addAttribute("unreadAnnouncement", unread);
+      } catch (BackendServiceException e) {
+        // Fail-soft: the tiles/announcement are optional. The boundary already logged the backend
+        // error; keep a DEBUG breadcrumb (correlationId is in the MDC) rather than swallowing it.
+        log.debug("Could not load home user/announcement context", e);
       } catch (Exception e) {
-        // Ignore if no announcement or error
+        log.warn("Unexpected failure building home context", e);
       }
     }
     return "index";

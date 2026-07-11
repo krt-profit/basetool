@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
+import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ManufacturerDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
@@ -397,6 +398,9 @@ public class HangarPageController {
       if (res != null && res.content() != null) {
         overview = new ArrayList<>(res.content());
       }
+    } catch (BackendServiceException e) {
+      log.debug("Failed to fetch squadron overview", e);
+      model.addAttribute("error", "error.hangar.squadron.load");
     } catch (Exception e) {
       log.error("Failed to fetch squadron overview", e);
       model.addAttribute("error", "error.hangar.squadron.load");
@@ -461,9 +465,12 @@ public class HangarPageController {
               form.getOwningOrgUnitId());
       backendApiClient.post("/api/v1/hangar/ships", request, ShipDto.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.ship_add");
+    } catch (BackendServiceException e) {
+      BackendErrorLogging.warn(log, "POST /api/v1/hangar/ships", e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.hangar.ship.add");
+      redirectAttributes.addFlashAttribute("shipForm", form);
     } catch (Exception e) {
       log.error("Failed to add ship", e);
-      log.error("Error adding ship", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.hangar.ship.add");
       redirectAttributes.addFlashAttribute("shipForm", form);
     }
@@ -509,9 +516,11 @@ public class HangarPageController {
               null);
       backendApiClient.put("/api/v1/hangar/ships/" + id, request, ShipDto.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.ship_update");
+    } catch (BackendServiceException e) {
+      BackendErrorLogging.warn(log, "PUT /api/v1/hangar/ships", id, e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.hangar.ship.update");
     } catch (Exception e) {
       log.error("Failed to update ship", e);
-      log.error("Error updating ship", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.hangar.ship.update");
     }
     return "redirect:/hangar";
@@ -529,9 +538,11 @@ public class HangarPageController {
     try {
       backendApiClient.delete("/api/v1/hangar/ships/" + id, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.ship_delete");
+    } catch (BackendServiceException e) {
+      BackendErrorLogging.warn(log, "DELETE /api/v1/hangar/ships", id, e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.hangar.ship.delete");
     } catch (Exception e) {
       log.error("Failed to delete ship", e);
-      log.error("Error deleting ship", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.hangar.ship.delete");
     }
     return "redirect:/hangar";

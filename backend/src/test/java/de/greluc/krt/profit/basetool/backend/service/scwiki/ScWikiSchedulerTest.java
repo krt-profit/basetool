@@ -35,9 +35,9 @@ import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.service.MasterDataCacheEvictionService;
 import de.greluc.krt.profit.basetool.backend.service.SyncCoordinator;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -66,7 +66,28 @@ class ScWikiSchedulerTest {
   // A real TaskMetrics (spied) so the instrumentation wrapper genuinely runs the sweep body.
   @Spy private TaskMetrics taskMetrics = new TaskMetrics(meterRegistry);
 
-  @InjectMocks private ScWikiScheduler scheduler;
+  private ScWikiScheduler scheduler;
+
+  @BeforeEach
+  void setUp() {
+    // Construct explicitly (not @InjectMocks) so the scheduler and the spied TaskMetrics share the
+    // one real SimpleMeterRegistry the assertions read — @InjectMocks cannot wire the plain
+    // meterRegistry field, which would leave the new step-failure counter writing to a null
+    // registry.
+    scheduler =
+        new ScWikiScheduler(
+            scWikiClient,
+            properties,
+            commoditySyncService,
+            blueprintSyncService,
+            itemSyncService,
+            vehicleSyncService,
+            manufacturerSyncService,
+            syncCoordinator,
+            taskMetrics,
+            masterDataCacheEvictionService,
+            meterRegistry);
+  }
 
   @Test
   void schedule_isNoOp_whenMasterSwitchOff() {
@@ -155,6 +176,26 @@ class ScWikiSchedulerTest {
   }
 
   @Test
+  void schedule_continuesRemainingSteps_afterOneStepThrows() {
+    // Given — the master switch is on and the vehicle step (2nd in dependency order) throws.
+    when(properties.getSchedulerEnabled()).thenReturn(true);
+    when(vehicleSyncService.syncVehicles()).thenThrow(new RuntimeException("Wiki vehicle 500"));
+
+    // When — the sweep must not propagate the failure.
+    scheduler.scheduleScWikiSync();
+
+    // Then — each step is wrapped in its own try/catch (runStep), the deliberate opposite of
+    // UexScheduler's whole-block abort: the later item, blueprint and manufacturer syncs STILL run
+    // even though an earlier step threw. A whole-block-abort refactor would skip these and leave
+    // those catalogues stale for the daily tick.
+    verify(itemSyncService).syncItems();
+    verify(blueprintSyncService).syncBlueprints();
+    verify(manufacturerSyncService).syncManufacturers();
+    // And the finally-block eviction still runs after the partially-failing sweep.
+    verify(masterDataCacheEvictionService).evictScWikiSyncedMasterData();
+  }
+
+  @Test
   void schedule_skipsEntireSweep_whenAnotherSyncIsAlreadyRunning() {
     when(properties.getSchedulerEnabled()).thenReturn(true);
     // The shared gate denies entry (a UEX or SC Wiki sync is already in flight) → no step runs.
@@ -169,5 +210,28 @@ class ScWikiSchedulerTest {
         blueprintSyncService,
         manufacturerSyncService,
         masterDataCacheEvictionService);
+  }
+
+  @Test
+  void schedule_countsStepFailure_whenAStepThrows() {
+    // REQ-OBS-011: a single step throwing is swallowed so the other steps still run and the
+    // umbrella
+    // scwiki_sync records outcome=success — basetool_scheduled_job_step_failures_total{step} is the
+    // only signal a persistently-failing step leaves, feeding ScWikiStepFailing.
+    when(properties.getSchedulerEnabled()).thenReturn(true);
+    when(itemSyncService.syncItems()).thenThrow(new RuntimeException("Wiki 500"));
+
+    scheduler.scheduleScWikiSync();
+
+    assertEquals(
+        1.0,
+        meterRegistry
+            .get(MetricNames.SCHEDULED_JOB_STEP_FAILURES)
+            .tag(MetricNames.TAG_JOB, ScheduledJob.SCWIKI_SYNC.label())
+            .tag(MetricNames.TAG_STEP, "item")
+            .counter()
+            .count(),
+        "a failing SC-Wiki step must increment"
+            + " basetool_scheduled_job_step_failures_total{step=item}");
   }
 }

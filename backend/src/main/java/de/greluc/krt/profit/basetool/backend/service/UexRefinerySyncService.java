@@ -69,6 +69,8 @@ public class UexRefinerySyncService {
     log.info("Starting sync for Refining Methods...");
     List<UexRefiningMethodDto> dtos = uexClient.getRefineriesMethods();
     if (dtos.isEmpty()) {
+      log.warn(
+          "No refining methods received from UEX API. Aborting refining method synchronization.");
       return;
     }
 
@@ -125,6 +127,8 @@ public class UexRefinerySyncService {
     log.info("Starting sync for Refinery Yields...");
     List<UexRefineryYieldDto> dtos = uexClient.getRefineriesYields();
     if (dtos.isEmpty()) {
+      log.warn(
+          "No refinery yields received from UEX API. Aborting refinery yield synchronization.");
       return;
     }
 

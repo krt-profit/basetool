@@ -85,8 +85,13 @@ public class P4kImportJobRunner {
       }
       jobService.markSucceeded(jobId, objectMapper.writeValueAsString(result));
       log.info("P4K import job {} ({}) succeeded.", jobId, kind);
-    } catch (Exception e) {
+    } catch (BadRequestException e) {
+      // Expected bad-catalog input — the message is enough; a stacktrace would just be noise.
       log.warn("P4K import job {} ({}) failed: {}", jobId, kind, e.getMessage());
+      jobService.markFailed(jobId, describe(e));
+    } catch (Exception e) {
+      // Genuinely unexpected (parse NPE, DB constraint, ...): keep the stacktrace for root-causing.
+      log.warn("P4K import job {} ({}) failed", jobId, kind, e);
       jobService.markFailed(jobId, describe(e));
     } finally {
       if (kind == P4kImportJobKind.APPLY) {

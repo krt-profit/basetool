@@ -37,12 +37,14 @@ import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
+import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.RefineryGood;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.RefiningMethod;
 import de.greluc.krt.profit.basetool.backend.model.SpaceStation;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.model.projection.OwnedStockSlice;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
@@ -939,6 +941,111 @@ class RefineryOrderServiceLifecycleTest {
 
       assertEquals(RefineryOrderStatus.CANCELED, existing.getStatus());
       verify(refineryOrderRepository).save(existing);
+    }
+  }
+
+  // --------------------------------------------------------------
+  // getOwnedOpenRefineryYieldSlices (blueprint craftability fold-in, #781)
+  // --------------------------------------------------------------
+
+  @Nested
+  class OwnedOpenRefineryYieldSlicesTests {
+
+    private final UUID scuMaterialId = UUID.randomUUID();
+    private final UUID pieceMaterialId = UUID.randomUUID();
+
+    @Test
+    void poolsConvertsScuAndMergesAcrossOrders() {
+      // Regression guard for the /100 SCU conversion AND the per-(material, quality) merge that the
+      // craftability calculator relies on: a drift in either would silently over- or under-count
+      // owned open refinery yield.
+      Material scuMat = materialWithType(scuMaterialId, QuantityType.SCU);
+      Material pieceMat = materialWithType(pieceMaterialId, QuantityType.PIECE);
+
+      // Order 1: 250 units of an SCU commodity (-> 2.5 SCU) at quality 100, plus a 7-unit non-SCU
+      // (PIECE) output at quality 50 that must pass through unconverted.
+      RefineryOrder order1 = new RefineryOrder();
+      order1.setGoods(new HashSet<>(Set.of(good(scuMat, 100, 250), good(pieceMat, 50, 7))));
+
+      // Order 2: another 150 units of the same SCU commodity (-> 1.5 SCU) at the SAME (material,
+      // quality) key, so the two orders must pool into one 4.0-SCU slice.
+      RefineryOrder order2 = new RefineryOrder();
+      order2.setGoods(new HashSet<>(Set.of(good(scuMat, 100, 150))));
+
+      when(refineryOrderRepository.findOwnedWithGoodsByStatusIn(
+              OWNER_ID, List.of(RefineryOrderStatus.OPEN, RefineryOrderStatus.IN_PROGRESS)))
+          .thenReturn(List.of(order1, order2));
+
+      List<OwnedStockSlice> slices = service.getOwnedOpenRefineryYieldSlices(OWNER_ID);
+
+      assertEquals(2, slices.size(), "one slice per (material, quality) pair");
+      assertEquals(
+          4.0d,
+          totalScuFor(slices, scuMaterialId, 100),
+          1e-9,
+          "250+150 units at 100 units/SCU pool to 2.5+1.5 = 4.0 SCU");
+      assertEquals(
+          7.0d,
+          totalScuFor(slices, pieceMaterialId, 50),
+          1e-9,
+          "non-SCU output passes through unconverted");
+    }
+
+    @Test
+    void skipsNullMaterialNullQualityNullQuantityNonPositiveScuAndNullGoods() {
+      // Only the fully-populated, positive-SCU good must survive; every degenerate good is dropped
+      // and an order with a null goods collection must not NPE.
+      Material scuMat = materialWithType(scuMaterialId, QuantityType.SCU);
+
+      RefineryGood valid = good(scuMat, 100, 300); // 300 / 100 = 3.0 SCU -> kept
+      RefineryGood nullMaterial = good(null, 100, 200);
+      RefineryGood nullQuality = good(scuMat, null, 200);
+      RefineryGood nullQuantity = good(scuMat, 100, null);
+      RefineryGood zeroScu = good(scuMat, 100, 0); // 0 / 100 = 0.0 -> non-positive, dropped
+
+      RefineryOrder order = new RefineryOrder();
+      order.setGoods(
+          new HashSet<>(Set.of(valid, nullMaterial, nullQuality, nullQuantity, zeroScu)));
+
+      RefineryOrder nullGoodsOrder = new RefineryOrder();
+      nullGoodsOrder.setGoods(null);
+
+      when(refineryOrderRepository.findOwnedWithGoodsByStatusIn(
+              OWNER_ID, List.of(RefineryOrderStatus.OPEN, RefineryOrderStatus.IN_PROGRESS)))
+          .thenReturn(List.of(order, nullGoodsOrder));
+
+      List<OwnedStockSlice> slices = service.getOwnedOpenRefineryYieldSlices(OWNER_ID);
+
+      assertEquals(1, slices.size(), "only the fully-populated positive-SCU good yields a slice");
+      OwnedStockSlice only = slices.get(0);
+      assertEquals(scuMaterialId, only.materialId());
+      assertEquals(Integer.valueOf(100), only.quality());
+      assertEquals(3.0d, only.totalScu(), 1e-9);
+    }
+
+    private Material materialWithType(UUID id, QuantityType type) {
+      Material m = new Material();
+      m.setId(id);
+      m.setQuantityType(type);
+      return m;
+    }
+
+    private RefineryGood good(Material outputMaterial, Integer quality, Integer outputQuantity) {
+      RefineryGood g = new RefineryGood();
+      g.setOutputMaterial(outputMaterial);
+      g.setQuality(quality);
+      g.setOutputQuantity(outputQuantity);
+      return g;
+    }
+
+    private Double totalScuFor(List<OwnedStockSlice> slices, UUID materialId, int quality) {
+      for (OwnedStockSlice slice : slices) {
+        if (materialId.equals(slice.materialId())
+            && Integer.valueOf(quality).equals(slice.quality())) {
+          return slice.totalScu();
+        }
+      }
+      return null;
     }
   }
 

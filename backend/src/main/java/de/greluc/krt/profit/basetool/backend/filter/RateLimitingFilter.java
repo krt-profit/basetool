@@ -319,7 +319,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         // exists yet. Mint one here and thread it through both the log line and the response body
         // so a user reporting a 429 can be traced to this exact log entry.
         String correlationId = UUID.randomUUID().toString();
-        log.warn(
+        log.debug(
             "Rate limit exceeded: ip={}, slot={}, path={}, retryAfterSeconds={}, correlationId={}",
             clientIp,
             slot.key(),

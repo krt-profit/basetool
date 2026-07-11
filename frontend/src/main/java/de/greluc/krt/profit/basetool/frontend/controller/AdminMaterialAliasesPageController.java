@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
+import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExternalAliasDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExternalAliasWriteRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto;
@@ -167,6 +168,9 @@ public class AdminMaterialAliasesPageController {
               null);
       backendApiClient.post(BACKEND_BASE, body, MaterialExternalAliasDto.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
+    } catch (BackendServiceException e) {
+      BackendErrorLogging.warn(log, "POST /api/v1/material-external-aliases", e);
+      redirectAttributes.addFlashAttribute("errorToast", "notification.error.save");
     } catch (Exception e) {
       log.error("Create alias failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "notification.error.save");
@@ -215,6 +219,9 @@ public class AdminMaterialAliasesPageController {
               version);
       backendApiClient.put(BACKEND_BASE + "/" + id, body, MaterialExternalAliasDto.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
+    } catch (BackendServiceException e) {
+      BackendErrorLogging.warn(log, "PUT /api/v1/material-external-aliases", id, e);
+      redirectAttributes.addFlashAttribute("errorToast", "notification.error.save");
     } catch (Exception e) {
       log.error("Update alias {} failed", id, e);
       redirectAttributes.addFlashAttribute("errorToast", "notification.error.save");
@@ -234,6 +241,9 @@ public class AdminMaterialAliasesPageController {
     try {
       backendApiClient.delete(BACKEND_BASE + "/" + id, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
+    } catch (BackendServiceException e) {
+      BackendErrorLogging.warn(log, "DELETE /api/v1/material-external-aliases", id, e);
+      redirectAttributes.addFlashAttribute("errorToast", "notification.error.delete");
     } catch (Exception e) {
       log.error("Delete alias {} failed", id, e);
       redirectAttributes.addFlashAttribute("errorToast", "notification.error.delete");

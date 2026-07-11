@@ -22,11 +22,14 @@ package de.greluc.krt.profit.basetool.backend.interceptor;
 import de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.lang.reflect.Method;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Locale;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
@@ -51,6 +54,14 @@ public class DeprecationInterceptor implements HandlerInterceptor {
       DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'", Locale.US)
           .withZone(ZoneOffset.UTC);
 
+  /**
+   * Handler methods whose {@code @ApiDeprecation.sunset} value failed to parse, so the
+   * malformed-date WARN is emitted at most once per handler instead of on every request to that
+   * endpoint. {@code sunset()} is a compile-time constant, so a bad value would otherwise re-warn
+   * on every call.
+   */
+  private final Set<Method> warnedBadSunset = ConcurrentHashMap.newKeySet();
+
   @Override
   public boolean preHandle(
       HttpServletRequest request, HttpServletResponse response, Object handler) {
@@ -74,10 +85,14 @@ public class DeprecationInterceptor implements HandlerInterceptor {
               LocalDate sunsetDate = LocalDate.parse(deprecation.sunset());
               response.addHeader("Sunset", HTTP_DATE_FORMATTER.format(sunsetDate.atStartOfDay()));
             } catch (DateTimeParseException e) {
-              log.warn(
-                  "Invalid sunset date format on {}: {}. Expected YYYY-MM-DD",
-                  handlerMethod.getMethod().getName(),
-                  deprecation.sunset());
+              // Warn at most once per handler: sunset() is a compile-time constant, so a malformed
+              // value would otherwise WARN on every request to this still-live deprecated endpoint.
+              if (warnedBadSunset.add(handlerMethod.getMethod())) {
+                log.warn(
+                    "Invalid sunset date format on {}: {}. Expected YYYY-MM-DD",
+                    handlerMethod.getMethod().getName(),
+                    deprecation.sunset());
+              }
             }
           }
 

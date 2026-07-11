@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
@@ -47,6 +49,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -259,5 +263,37 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
     assertFalse(authorities.contains(new SimpleGrantedAuthority("ROLE_LOGISTICIAN")));
     assertFalse(authorities.contains(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
+  }
+
+  @Test
+  void convert_retriesOnOptimisticLockThenSucceeds() {
+    // Concurrency invariant: a transient ObjectOptimisticLockingFailureException from concurrent
+    // first-time logins by the same sub must NOT fail the authentication — the retry loop re-runs
+    // syncUser and the second attempt succeeds, so the authorities resolve normally. A regression
+    // that rethrew immediately (no retry) would deny a legitimate concurrent login.
+    when(userService.syncUser(jwt))
+        .thenThrow(new ObjectOptimisticLockingFailureException(User.class, USER_ID))
+        .thenReturn(userWithNoRoles());
+    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+
+    Collection<GrantedAuthority> authorities = converter.convert(jwt);
+
+    assertNotNull(authorities, "the retried sync must resolve to a real authority collection");
+    verify(userService, times(2)).syncUser(jwt);
+  }
+
+  @Test
+  void convert_exhaustsRetries_throwsAuthenticationServiceException() {
+    // After MAX_SYNC_ATTEMPTS (3) consecutive optimistic-lock failures the converter must reject
+    // the
+    // authentication with AuthenticationServiceException rather than fall through with null/empty
+    // authorities (which would silently treat the caller as unauthenticated). Exactly three
+    // attempts
+    // are made before giving up.
+    when(userService.syncUser(jwt))
+        .thenThrow(new ObjectOptimisticLockingFailureException(User.class, USER_ID));
+
+    assertThrows(AuthenticationServiceException.class, () -> converter.convert(jwt));
+    verify(userService, times(3)).syncUser(jwt);
   }
 }

@@ -41,6 +41,7 @@ import tools.jackson.databind.json.JsonMapper;
 class FiltersTest {
 
   private final JsonMapper objectMapper = JsonMapper.builder().build();
+  private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
 
   private static MockHttpServletRequest ingestRequestWithBody(int bodyLength) {
     MockHttpServletRequest request = new MockHttpServletRequest("POST", "/v1/refinery-extract");
@@ -76,7 +77,8 @@ class FiltersTest {
   void sizeFilterRejectsOversizedPayloadWith413() throws Exception {
     IngestProperties properties = new IngestProperties();
     properties.setMaxPayloadBytes(10);
-    PayloadSizeLimitFilter filter = new PayloadSizeLimitFilter(properties, objectMapper);
+    PayloadSizeLimitFilter filter =
+        new PayloadSizeLimitFilter(properties, objectMapper, meterRegistry);
     MockHttpServletResponse response = new MockHttpServletResponse();
     MockFilterChain chain = new MockFilterChain();
 
@@ -86,13 +88,16 @@ class FiltersTest {
     assertThat(response.getContentType()).startsWith(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
     assertThat(response.getContentAsString()).contains("PAYLOAD_TOO_LARGE");
     assertThat(chain.getRequest()).isNull();
+    // REQ-OBS-011: the 413 reject increments the (previously absent) detection counter.
+    assertThat(meterRegistry.counter(MetricNames.INGEST_PAYLOAD_REJECTED).count()).isEqualTo(1.0);
   }
 
   @Test
   void sizeFilterPassesPayloadWithinLimit() throws Exception {
     IngestProperties properties = new IngestProperties();
     properties.setMaxPayloadBytes(1024);
-    PayloadSizeLimitFilter filter = new PayloadSizeLimitFilter(properties, objectMapper);
+    PayloadSizeLimitFilter filter =
+        new PayloadSizeLimitFilter(properties, objectMapper, meterRegistry);
     MockHttpServletResponse response = new MockHttpServletResponse();
     MockFilterChain chain = new MockFilterChain();
 
@@ -106,7 +111,8 @@ class FiltersTest {
     // INGEST-DOS-1: a chunked body (no Content-Length) over the cap must still be rejected.
     IngestProperties properties = new IngestProperties();
     properties.setMaxPayloadBytes(10);
-    PayloadSizeLimitFilter filter = new PayloadSizeLimitFilter(properties, objectMapper);
+    PayloadSizeLimitFilter filter =
+        new PayloadSizeLimitFilter(properties, objectMapper, meterRegistry);
     MockHttpServletResponse response = new MockHttpServletResponse();
     MockFilterChain chain = new MockFilterChain();
 
@@ -121,7 +127,8 @@ class FiltersTest {
   void sizeFilterPassesChunkedPayloadWithinLimitAndReplaysBody() throws Exception {
     IngestProperties properties = new IngestProperties();
     properties.setMaxPayloadBytes(1024);
-    PayloadSizeLimitFilter filter = new PayloadSizeLimitFilter(properties, objectMapper);
+    PayloadSizeLimitFilter filter =
+        new PayloadSizeLimitFilter(properties, objectMapper, meterRegistry);
     MockHttpServletResponse response = new MockHttpServletResponse();
     MockFilterChain chain = new MockFilterChain();
 

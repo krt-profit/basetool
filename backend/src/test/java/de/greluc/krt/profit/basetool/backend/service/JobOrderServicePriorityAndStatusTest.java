@@ -620,6 +620,48 @@ class JobOrderServicePriorityAndStatusTest {
   }
 
   // ---------------------------------------------------------------
+  // normalizePriorities — deterministic re-pack with createdAt tie-break
+  // ---------------------------------------------------------------
+
+  @Nested
+  class NormalizePrioritiesTests {
+
+    @Test
+    void equalPriorities_breaksTieByCreatedAt() {
+      // Concurrent drag-and-drops can momentarily leave two active orders sharing the same
+      // priority. The re-pack sorts by priority THEN createdAt (JobOrderPriorityService:145-147),
+      // so the secondary createdAt comparator is the only thing that makes the outcome
+      // deterministic when the primary key ties. lockAllJobOrders returns the pair in
+      // reverse-createdAt order to prove the sort — not the repository's result order — decides:
+      // without thenComparing(createdAt) the re-pack would blindly assign later=1, earlier=2.
+      JobOrder earlier = new JobOrder();
+      earlier.setId(UUID.randomUUID());
+      earlier.setStatus(JobOrderStatus.OPEN);
+      earlier.setPriority(1);
+      earlier.setCreatedAt(Instant.parse("2026-07-10T00:00:00Z"));
+
+      JobOrder later = new JobOrder();
+      later.setId(UUID.randomUUID());
+      later.setStatus(JobOrderStatus.OPEN);
+      later.setPriority(1);
+      later.setCreatedAt(Instant.parse("2026-07-10T00:00:30Z"));
+
+      when(jobOrderRepository.lockAllJobOrders()).thenReturn(List.of(later, earlier));
+
+      jobOrderPriorityService.normalizePriorities();
+
+      assertEquals(
+          Integer.valueOf(1),
+          earlier.getPriority(),
+          "the earlier-createdAt order must win the contiguous slot 1");
+      assertEquals(
+          Integer.valueOf(2),
+          later.getPriority(),
+          "the later-createdAt order is re-packed to slot 2");
+    }
+  }
+
+  // ---------------------------------------------------------------
   // helpers
   // ---------------------------------------------------------------
 

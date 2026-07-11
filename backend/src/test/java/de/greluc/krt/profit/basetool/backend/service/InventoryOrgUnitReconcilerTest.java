@@ -23,10 +23,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
@@ -139,6 +142,63 @@ class InventoryOrgUnitReconcilerTest {
     reconciler.onUserLostLastOrgUnit(userId);
 
     verify(inventoryItemRepository, never()).delete(any());
+  }
+
+  @Test
+  void gainedFirstOrgUnit_recordsRestampAudit() {
+    // Given at least one ownerless-personal shared row that will actually be promoted.
+    UUID userId = UUID.randomUUID();
+    OrgUnit org = squadron();
+    InventoryItem row = sharedRow(null, 5.0, matA, 900);
+    when(inventoryItemRepository.findByUserIdAndPersonalFalse(userId)).thenReturn(List.of(row));
+
+    reconciler.onUserGainedFirstOrgUnit(userId, org);
+
+    // The re-stamp trail must be audited against the owner, with no subject id/label.
+    verify(auditService)
+        .record(eq(AuditEventType.INVENTORY_ORG_RESTAMPED), isNull(), isNull(), eq(userId), any());
+  }
+
+  @Test
+  void lostLastOrgUnit_recordsRestampAudit() {
+    // Given at least one org-stamped shared row that will actually be demoted.
+    UUID userId = UUID.randomUUID();
+    InventoryItem row = sharedRow(squadron(), 5.0, matA, 900);
+    when(inventoryItemRepository.findByUserIdAndPersonalFalse(userId)).thenReturn(List.of(row));
+
+    reconciler.onUserLostLastOrgUnit(userId);
+
+    verify(auditService)
+        .record(eq(AuditEventType.INVENTORY_ORG_RESTAMPED), isNull(), isNull(), eq(userId), any());
+  }
+
+  @Test
+  void gainedFirstOrgUnit_noSharedRows_recordsNoAudit() {
+    // Given a user who gains their first org unit but owns no ownerless shared rows: restamped == 0
+    // must suppress the INVENTORY_ORG_RESTAMPED event (guarded by the 'if (restamped > 0)' check).
+    UUID userId = UUID.randomUUID();
+    when(inventoryItemRepository.findByUserIdAndPersonalFalse(userId)).thenReturn(List.of());
+
+    reconciler.onUserGainedFirstOrgUnit(userId, squadron());
+
+    verify(auditService, never()).record(any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void lostLast_allAlreadyNull_recordsNoAudit() {
+    // Given shared rows that are all already ownerless (owning_org_unit IS NULL): losing the last
+    // membership re-stamps nothing (restamped == 0), so no audit event may fire.
+    UUID userId = UUID.randomUUID();
+    InventoryItem a = sharedRow(null, 4.0, matA, 900);
+    InventoryItem b = sharedRow(null, 6.0, matB, 900);
+    when(inventoryItemRepository.findByUserIdAndPersonalFalse(userId)).thenReturn(List.of(a, b));
+
+    reconciler.onUserLostLastOrgUnit(userId);
+
+    // Rows are untouched and no spurious rows=0 audit is emitted.
+    assertNull(a.getOwningOrgUnit());
+    assertNull(b.getOwningOrgUnit());
+    verify(auditService, never()).record(any(), any(), any(), any(), any());
   }
 
   // --- helpers --------------------------------------------------------------

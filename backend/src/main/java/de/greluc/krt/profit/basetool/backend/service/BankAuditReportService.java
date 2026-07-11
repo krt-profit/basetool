@@ -163,7 +163,7 @@ public class BankAuditReportService {
    */
   private void ensureWithinExportCap(long count) {
     if (count > MAX_EXPORT_ROWS) {
-      log.warn(
+      log.debug(
           "Bank audit export would load {} rows (> cap {}); rejecting", count, MAX_EXPORT_ROWS);
       throw new BadRequestException(
           "Audit export period is too large ("

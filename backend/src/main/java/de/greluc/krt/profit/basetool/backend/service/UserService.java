@@ -477,10 +477,12 @@ public class UserService {
 
   /**
    * Returns the realm role names the scheduled Keycloak sync should index against Keycloak — the
-   * display names of every role in the local catalog. The realm role name equals the local role
-   * name (the key {@link #mapRoles(Collection)} joins on), so passing exactly these to {@code
-   * KeycloakService.fetchUsers} makes the role-indexed membership fetch query only the roles the
-   * app actually maps, never the ubiquitous default/technical realm roles. Read-only.
+   * display names of every role in the local catalog. {@code KeycloakService.fetchUsers} matches
+   * these case-insensitively against the realm's actual role names (as {@link
+   * #mapRoles(Collection)} joins them via {@code findByNameIgnoreCase}), so the role-indexed
+   * membership fetch queries only the roles the app actually maps — never the ubiquitous
+   * default/technical realm roles — and does so regardless of any casing difference between the
+   * catalog and Keycloak. Read-only.
    *
    * @return the mappable realm role names; never {@code null}, possibly empty.
    */

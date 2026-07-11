@@ -715,6 +715,90 @@ class LiveSyncWebSocketHandlerTest {
     assertThat(sectionsOf(lastBroadcast(subscriber))).containsExactly("board");
   }
 
+  // ── Reaper + connect-time refusal (ported from the retired MissionPresenceWebSocketHandlerTest)
+  // ─
+
+  @Test
+  void tickReaper_broadcastsFreshSnapshotToAffectedRoom() throws Exception {
+    // The reaper tick must fan a fresh presence snapshot into every room that lost a TTL-expired
+    // entry; otherwise an editor who closes their tab without a blur lingers forever in every
+    // peer's
+    // "X is editing this section" indicator, defeating the collision-avoidance the feature exists
+    // for. Drive tickReaper() against a mocked presence service so the reap -> broadcastSnapshot
+    // wiring is exercised in isolation.
+    String topic = missionTopic();
+    SimpleMeterRegistry reaperRegistry = new SimpleMeterRegistry();
+    LiveSyncPresenceService mockService = mock(LiveSyncPresenceService.class);
+    when(mockService.snapshot(any(String.class), any(java.time.Instant.class)))
+        .thenReturn(Map.of());
+    when(mockService.reapExpired(any(java.time.Instant.class)))
+        .thenReturn(List.of(new LiveSyncPresenceService.TopicSectionRef(topic, "crew")));
+    LiveSyncWebSocketHandler reaperHandler =
+        new LiveSyncWebSocketHandler(
+            mockService, fanout, objectMapper, reaperRegistry, authorizer, Runnable::run);
+
+    FakeSession session = new FakeSession();
+    session.open = true;
+    session.uri =
+        URI.create(
+            "ws://localhost/ws/missions/" + topic.substring("mission:".length()) + "/presence");
+    session.attributes.put(LiveSyncWebSocketHandler.ATTR_TOPIC, topic);
+    session.principal =
+        new UsernamePasswordAuthenticationToken(
+            oidcUser("user-1", "Alice"), "n/a", List.of(new SimpleGrantedAuthority("ROLE_USER")));
+    reaperHandler.afterConnectionEstablished(session);
+    session.sent.clear();
+
+    reaperHandler.tickReaper();
+
+    // The reaper fans exactly one fresh presence snapshot to the affected room's socket.
+    assertThat(session.sent).hasSize(1);
+    JsonNode frame = objectMapper.readTree(((TextMessage) session.sent.get(0)).getPayload());
+    assertThat(frame.get("type").asString()).isEqualTo("presence");
+  }
+
+  @Test
+  void establishLegacySocket_withoutTopic_isRefused() throws Exception {
+    // Defense-in-depth: a legacy socket whose handshake bound no ATTR_TOPIC must be closed
+    // NOT_ACCEPTABLE and never registered — no room entry, no snapshot — so a mis-ordered guard or
+    // a
+    // misconfigured interceptor cannot let it register and receive presence snapshots (leaking
+    // editor identities).
+    FakeSession session = new FakeSession();
+    session.open = true;
+    session.uri = URI.create("ws://localhost/ws/missions/presence"); // no ATTR_TOPIC bound
+    session.principal =
+        new UsernamePasswordAuthenticationToken(
+            oidcUser("user-1", "Alice"), "n/a", List.of(new SimpleGrantedAuthority("ROLE_USER")));
+
+    handler.afterConnectionEstablished(session);
+
+    assertThat(session.closeStatus).isEqualTo(CloseStatus.NOT_ACCEPTABLE);
+    assertThat(presenceGauge()).isZero();
+    assertThat(session.sent).isEmpty();
+  }
+
+  @Test
+  void establishLegacySocket_withoutPrincipal_isRefused() throws Exception {
+    // A legacy socket that reaches the handler with no authenticated principal (Spring Security
+    // failed to attach one) must be refused NOT_ACCEPTABLE, not registered, and sent no snapshot —
+    // otherwise editor identities leak to an unauthenticated/malformed socket.
+    String topic = missionTopic();
+    FakeSession session = new FakeSession();
+    session.open = true;
+    session.uri =
+        URI.create(
+            "ws://localhost/ws/missions/" + topic.substring("mission:".length()) + "/presence");
+    session.attributes.put(LiveSyncWebSocketHandler.ATTR_TOPIC, topic);
+    session.principal = null;
+
+    handler.afterConnectionEstablished(session);
+
+    assertThat(session.closeStatus).isEqualTo(CloseStatus.NOT_ACCEPTABLE);
+    assertThat(presenceGauge()).isZero();
+    assertThat(session.sent).isEmpty();
+  }
+
   // ── helpers ────────────────────────────────────────────────────────────────────────────────
 
   private static String missionTopic() {
