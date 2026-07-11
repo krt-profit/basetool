@@ -166,4 +166,35 @@
     <cve>CVE-2025-67030</cve>
   </suppress>
 
+  <!--
+    CVE-2026-54399 (HTTP/1.1 message parser DoS) and CVE-2026-54428 (HTTP/2
+    HPACK decoder unbounded header-list DoS) are both filed against Apache
+    HttpComponents *Core 5.x* (httpcore5 / httpcore5-h2, groupId
+    `org.apache.hc.core5`), affected range "<= 5.4.2, plus 5.5-beta1". The NVD
+    matcher attributes them to our `org.apache.httpcomponents:httpcore` 4.4.14 /
+    4.4.16 jars purely because the two product lines share the CPE
+    `cpe:2.3:a:apache:httpcomponents_core` and 4.4.x sorts below the 5.4.2 upper
+    bound. The legacy 4.4.x line is a distinct codebase:
+      - it ships NO HTTP/2 support at all (HTTP/2 / HPACK lives only in the
+        5.x httpcore5-h2 artifact), so CVE-2026-54428 is structurally
+        inapplicable, and
+      - 4.4.16 is the terminal 4.x release - there is and will be no "fixed"
+        4.4.x version, because the 4.x parser is not the affected code.
+    Confirmed via `./gradlew :keycloak-spi:dependencies`: httpcore 4.4.x is
+    dragged in ONLY by `org.apache.httpcomponents:httpclient` on the
+    keycloak-spi module's `checkstyle`, `compileClasspath` and `test*`
+    configurations (Keycloak server SPI internals the module compiles/tests
+    against; container-provided at runtime). It is absent from every basetool
+    RUNTIME classpath, and no httpcore5 5.x jar exists anywhere in the build,
+    so nothing we ship can reach the vulnerable code. CVE-scoped (not
+    CPE-scoped) and pinned to the 4.x line so a genuinely-vulnerable httpcore5
+    5.x ever entering the build still fails the gate.
+  -->
+  <suppress>
+    <notes>False positive: CPE confusion + build-time-only. CVE-2026-54399/CVE-2026-54428 affect Apache HttpComponents Core 5.x (httpcore5/httpcore5-h2, HTTP/1.1 parser and HTTP/2 HPACK decoder); our httpcore 4.4.x jars are the legacy 4.x line (no HTTP/2 code path), present only on the keycloak-spi compile/checkstyle/test classpaths and on no basetool runtime classpath. No httpcore5 5.x is shipped.</notes>
+    <packageUrl regex="true">^pkg:maven/org\.apache\.httpcomponents/httpcore@4\..*$</packageUrl>
+    <cve>CVE-2026-54399</cve>
+    <cve>CVE-2026-54428</cve>
+  </suppress>
+
 </suppressions>
