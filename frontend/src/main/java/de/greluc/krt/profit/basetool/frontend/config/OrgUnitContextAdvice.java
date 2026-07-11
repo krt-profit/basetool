@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.frontend.config;
 
 import de.greluc.krt.profit.basetool.frontend.controller.MeFrontendController;
-import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationCountResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
@@ -31,23 +30,19 @@ import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import java.util.List;
-import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
 
 /**
- * Cross-cutting advice that injects the current squadron context into every rendered model so the
+ * Cross-cutting advice that injects the active OrgUnit context into every rendered model so the
  * sidebar switcher / context badge / squadron-aware columns can be rendered from the layout
  * fragments without each page controller having to load the data separately.
  *
- * <p>Populates the cross-cutting model attributes the layout fragments read. The core org-unit
- * context ones:
+ * <p>Populates the core org-unit model attributes the layout fragments read:
  *
  * <ul>
  *   <li>{@code activeSquadronId} — UUID of the squadron the backend currently scopes queries to, or
@@ -56,18 +51,21 @@ import org.springframework.web.bind.annotation.ModelAttribute;
  *   <li>{@code activeSquadron} — {@link SquadronDto} resolved from the id, or {@code null} when no
  *       context applies. Used by the templates to render the shorthand badge and the dropdown
  *       selection state.
+ *   <li>{@code activeOrgUnit} — the kind-tagged {@link OrgUnitMembershipOptionDto} for the active
+ *       pin (Staffel <em>or</em> SK), resolved from the merged {@code availableOrgUnits} catalogue.
  *   <li>{@code availableSquadrons} — the full {@link SquadronDto} list the admin can switch to.
  *       Empty for non-admin / anonymous callers (they never see the switcher control).
+ *   <li>{@code availableOrgUnits} — the merged Squadron + SpecialCommand switcher catalogue.
  *   <li>{@code isAllSquadronsMode} — {@code true} when an admin is currently viewing the
  *       cross-staffel union (no active selection). Members and guests never enter this mode and
  *       always see {@code false}.
  * </ul>
  *
- * <p>Beyond those it also exposes the merged OrgUnit switcher catalogue ({@code availableOrgUnits},
- * {@code activeOrgUnit}), the per-principal capability flags resolved once via {@code
- * meCapabilities} ({@code canSeeBlueprintOverview} / {@code canViewJobOrders}), the dynamic {@code
- * appTitle}, {@code promotionFeatureEnabled}, and {@code currentRequestUri} — each documented on
- * its own {@code @ModelAttribute} method below.
+ * <p>These attributes are consumed cross-bean: {@code appTitle} (in {@code LayoutMiscAdvice}) reads
+ * {@code activeOrgUnit} + {@code isAllSquadronsMode}, and {@code promotionFeatureEnabled} (in
+ * {@code CapabilityFlagsAdvice}) reads {@code activeSquadron}. Spring's {@code ModelFactory} orders
+ * {@code @ModelAttribute} methods by dependency across all advice beans, so those cross-references
+ * resolve regardless of the bean they live in.
  *
  * <p>Failures from the backend round-trip degrade gracefully: a non-resolvable active-org-unit call
  * leaves the badge empty; a non-resolvable squadron list leaves the dropdown empty. We never let an
@@ -77,7 +75,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 @ControllerAdvice
 @RequiredArgsConstructor
 @Slf4j
-public class SquadronContextAdvice {
+public class OrgUnitContextAdvice {
 
   /** Captured generic type for decoding the paged Squadron catalogue. */
   private static final ParameterizedTypeReference<PageResponse<SquadronDto>> SQUADRON_PAGE =
@@ -88,7 +86,6 @@ public class SquadronContextAdvice {
       ORG_UNIT_MEMBERSHIP_OPTION_LIST = new ParameterizedTypeReference<>() {};
 
   private final BackendApiClient backendApiClient;
-  private final MessageSource messageSource;
   private final FrontendAuthHelperService authHelper;
 
   /**
@@ -146,7 +143,7 @@ public class SquadronContextAdvice {
   public record ActiveOrgUnitResponse(UUID orgUnitId) {}
 
   /**
-   * Resolves the full {@link SquadronDto} that matches {@link #activeSquadronId()} so the template
+   * Resolves the full {@link SquadronDto} that matches {@link #activeSquadronId} so the template
    * can render the shorthand badge without doing a second lookup. {@code null} when no active
    * squadron applies.
    *
@@ -216,9 +213,9 @@ public class SquadronContextAdvice {
     // R5.e: kept identical to the pre-R5.e semantics — load the full Squadron catalogue for
     // every authenticated caller. The {@link #activeSquadron} dereference and the per-squadron
     // {@code promotionEnabled} gate downstream both read from this list, so a non-admin narrowing
-    // would break the {@code SquadronContextAdvice.activeSquadron} resolution for non-admin
-    // pages. The new sidebar switcher reads {@link #availableOrgUnits} instead — the two
-    // attributes coexist with disjoint purposes.
+    // would break the {@code activeSquadron} resolution for non-admin pages. The new sidebar
+    // switcher reads {@link #availableOrgUnits} instead — the two attributes coexist with disjoint
+    // purposes.
     try {
       // Slow-changing global catalogue, identical URI for every caller — route through the
       // 10-min STATIC_DATA_CACHE (same entry the page controllers already cache, evicted on admin
@@ -349,237 +346,5 @@ public class SquadronContextAdvice {
   @ModelAttribute("isAllSquadronsMode")
   public boolean isAllSquadronsMode(@ModelAttribute("activeSquadronId") UUID activeSquadronId) {
     return authHelper.isAdmin() && activeSquadronId == null;
-  }
-
-  /**
-   * Composes the dynamic application title rendered in the {@code <title>} tag and the sidebar
-   * brand logo — the single place the active OrgUnit context surfaces to the user (REQ-ORG-010; the
-   * previously-redundant top-right context chip was removed). Resolution:
-   *
-   * <ul>
-   *   <li>An active pin of <em>either</em> kind ({@code SQUADRON} or {@code SPECIAL_COMMAND}) →
-   *       "Profit Basetool – &lt;shorthand&gt;", falling back to the OrgUnit name when it carries
-   *       no shorthand. Reading from {@link #activeOrgUnit} (the merged Staffel + SK catalogue) —
-   *       rather than the Squadron-only {@link #activeSquadron} — is what lets an SK pin show in
-   *       the title at all; the chip used to be the only surface that did.
-   *   <li>Admin in all-OrgUnits mode (no pin) → "Profit Basetool – Alle Staffeln".
-   *   <li>No context (squadron-less non-admin, anonymous) → plain "Profit Basetool".
-   * </ul>
-   *
-   * <p>Resolution uses the request locale via {@link LocaleContextHolder} so the suffix is
-   * localised consistently with the rest of the page (the message-format pattern {@code {0}} is
-   * filled with the OrgUnit shorthand/name or the localised "all squadrons" label). The {@code
-   * app.title.with.squadron} key name predates SK support and is kept generic — it now serves any
-   * OrgUnit kind.
-   *
-   * @param activeOrgUnit resolved active OrgUnit (Staffel or SK), or {@code null}.
-   * @param isAllSquadronsMode whether the current viewer is an admin without a selection.
-   * @return the rendered title string, never {@code null}.
-   */
-  @ModelAttribute("appTitle")
-  public String appTitle(
-      @ModelAttribute("activeOrgUnit") OrgUnitMembershipOptionDto activeOrgUnit,
-      @ModelAttribute("isAllSquadronsMode") boolean isAllSquadronsMode) {
-    Locale locale = LocaleContextHolder.getLocale();
-    if (activeOrgUnit != null) {
-      String label =
-          activeOrgUnit.orgUnitShorthand() != null
-              ? activeOrgUnit.orgUnitShorthand()
-              : activeOrgUnit.orgUnitName();
-      return messageSource.getMessage("app.title.with.squadron", new Object[] {label}, locale);
-    }
-    if (isAllSquadronsMode) {
-      String allLabel = messageSource.getMessage("squadron.switcher.all", null, locale);
-      return messageSource.getMessage("app.title.all.squadrons", new Object[] {allLabel}, locale);
-    }
-    return messageSource.getMessage("app.title", null, locale);
-  }
-
-  /**
-   * Computes whether the promotion subsystem is exposed to the current caller. The active squadron
-   * (admin pin or non-admin home staffel) decides:
-   *
-   * <ul>
-   *   <li>Admin without an active pin — {@code activeSquadron} resolves to {@code null} (all-scopes
-   *       mode); the menu stays visible ({@code isAdmin()} is {@code true}) but the promotion pages
-   *       render a "pick a squadron" prompt instead of a cross-staffel merge, because a promotion
-   *       catalog is inherently per-staffel. The admin selects a staffel via the switcher to view
-   *       or manage its system (creating topics/requirements already requires a pin server-side).
-   *   <li>Admin pinned to a squadron — {@code activeSquadron} reflects the pin and its {@code
-   *       isPromotionEnabled()} flag drives the menu visibility. An admin who pinned a squadron
-   *       with promotion disabled now sees the same hidden-menu state as a member would — which
-   *       matches the pinned-view UX promise. To re-enable, the admin clears the pin (back to
-   *       all-scopes) or navigates directly to {@code /admin/settings} (not gated by this check).
-   *   <li>Non-admin with a home staffel — that staffel's flag decides, unchanged from previous
-   *       behaviour.
-   *   <li>Anonymous / squadron-less non-admin — {@code activeSquadron} is {@code null} and {@code
-   *       isAdmin()} is {@code false}, so the menu is hidden and {@code requirePromotionFeature}
-   *       blocks direct page access: such a caller has no promotion system of their own.
-   * </ul>
-   *
-   * <p>The sidebar's {@code Beförderung} section reads this attribute via {@code
-   * th:if="${promotionFeatureEnabled}"}, and every {@code PromotionPageController} {@code
-   * GetMapping} blocks the request with HTTP 403 when it resolves to {@code false}.
-   *
-   * <p>The earlier blanket admin bypass was dropped because it broke the pinned-view UX — see
-   * CLAUDE.md "Multi-squadron tenancy" for the updated semantics.
-   *
-   * @param activeSquadron previously-resolved squadron mini-record, or {@code null}.
-   * @return {@code true} when the promotion menu should be exposed; {@code false} when it must be
-   *     hidden / blocked.
-   */
-  @ModelAttribute("promotionFeatureEnabled")
-  public boolean promotionFeatureEnabled(
-      @ModelAttribute("activeSquadron") SquadronDto activeSquadron) {
-    if (activeSquadron == null) {
-      // No single active staffel: an admin in all-scopes mode keeps the menu (the pages then
-      // prompt to pick a staffel), while a squadron-less non-admin / anonymous caller has no
-      // promotion system, so the menu is hidden and direct page access is blocked.
-      return authHelper.isAdmin();
-    }
-    if (activeSquadron.isPromotionEnabled() == null) {
-      return true;
-    }
-    return activeSquadron.isPromotionEnabled();
-  }
-
-  /**
-   * Loads the per-principal UI capability flags once per request from {@code GET
-   * /api/v1/me/capabilities} so the derived {@code canSeeBlueprintOverview} and {@code
-   * canViewJobOrders} attributes share a single backend round-trip instead of one each. Admins
-   * receive every flag without a call (system-wide access); anonymous callers receive every flag
-   * off without a call.
-   *
-   * <p>Fails <em>closed</em>: any backend hiccup yields all-off rather than exposing a gated menu
-   * or page the caller may not be entitled to. The backend enforces the same gates (a forbidden API
-   * / empty list), so a hidden control and the API stay in lockstep.
-   *
-   * @return the caller's capability flags; never {@code null}.
-   */
-  @ModelAttribute("meCapabilities")
-  public CapabilitiesResponse meCapabilities() {
-    if (!authHelper.isAuthenticated()) {
-      return new CapabilitiesResponse(false, false, false);
-    }
-    if (authHelper.isAdmin()) {
-      return new CapabilitiesResponse(true, true, true);
-    }
-    try {
-      CapabilitiesResponse resp =
-          backendApiClient.get("/api/v1/me/capabilities", CapabilitiesResponse.class);
-      return resp != null ? resp : new CapabilitiesResponse(false, false, false);
-    } catch (Exception ex) {
-      log.debug("Failed to resolve me-capabilities", ex);
-      return new CapabilitiesResponse(false, false, false);
-    }
-  }
-
-  /**
-   * Whether the org-unit blueprint availability overview (#364) menu entry should be shown. The
-   * overview is restricted to admins, officers (their Staffel) and Spezialkommando leads (their SK)
-   * — but the frontend session flattens SK-lead into {@code ROLE_LOGISTICIAN}, so the lead bit is
-   * invisible here. We therefore reuse the backend's authoritative gate, resolved once per request
-   * by {@link #meCapabilities()}.
-   *
-   * @param caps the per-request capability flags resolved by {@link #meCapabilities()}.
-   * @return {@code true} iff the caller may open the blueprint availability overview.
-   */
-  @ModelAttribute("canSeeBlueprintOverview")
-  public boolean canSeeBlueprintOverview(
-      @ModelAttribute("meCapabilities") CapabilitiesResponse caps) {
-    return caps != null && caps.canSeeBlueprintOverview();
-  }
-
-  /**
-   * Whether the authenticated caller may enter the Job-Order area (the order list + order details).
-   * Drives the sidebar's "Aufträge" vs "Auftrag anlegen" link split and the {@code
-   * JobOrderPageController} redirect for non-viewers: only admins and members of a profit-eligible
-   * Staffel/SK may see orders, while a non-profit member keeps the create entry only — mirroring
-   * the anonymous "submit but don't track" flow. The backend gate ({@code
-   * OwnerScopeService.canViewJobOrders}) is authoritative; this attribute only steers the UI and
-   * fails closed via {@link #meCapabilities()}.
-   *
-   * @param caps the per-request capability flags resolved by {@link #meCapabilities()}.
-   * @return {@code true} iff the caller may view job orders.
-   */
-  @ModelAttribute("canViewJobOrders")
-  public boolean canViewJobOrders(@ModelAttribute("meCapabilities") CapabilitiesResponse caps) {
-    return caps != null && caps.canViewJobOrders();
-  }
-
-  /**
-   * Whether the authenticated caller may view the orders their own org unit requested — the "Meine
-   * Auftr&auml;ge" requester capability (REQ-ORDERS-023). Drives the sidebar link for a non-profit
-   * ordering-squad member (who fails {@link #canViewJobOrders(CapabilitiesResponse)}) and lets the
-   * {@code JobOrderPageController} render their own placed orders instead of redirecting them to
-   * the create form. The backend gate ({@code OwnerScopeService.canViewOwnJobOrders}) is
-   * authoritative; this attribute only steers the UI and fails closed via {@link
-   * #meCapabilities()}.
-   *
-   * @param caps the per-request capability flags resolved by {@link #meCapabilities()}.
-   * @return {@code true} iff the caller may view the orders their own org unit requested.
-   */
-  @ModelAttribute("canViewOwnJobOrders")
-  public boolean canViewOwnJobOrders(@ModelAttribute("meCapabilities") CapabilitiesResponse caps) {
-    return caps != null && caps.canViewOwnJobOrders();
-  }
-
-  /**
-   * The caller's unread-notification count, fed to the always-on bell badge rendered on every page
-   * (REQ-NOTIF-006). Resolved once per request; fails soft to zero so a backend hiccup hides the
-   * badge rather than breaking the chrome, and the bell's client-side polling keeps it fresh after
-   * the initial render.
-   *
-   * @return the unread count, or {@code 0} when unauthenticated or on a backend error.
-   */
-  @ModelAttribute("unreadNotificationCount")
-  public long unreadNotificationCount() {
-    if (!authHelper.isAuthenticated()) {
-      return 0L;
-    }
-    try {
-      NotificationCountResponse resp =
-          backendApiClient.get(
-              "/api/v1/notifications/unread-count", NotificationCountResponse.class);
-      return resp != null && resp.count() != null ? resp.count() : 0L;
-    } catch (Exception ex) {
-      log.debug("Failed to resolve unread notification count", ex);
-      return 0L;
-    }
-  }
-
-  /**
-   * Wire-shape mirror of the backend's {@code MeController.CapabilitiesResponse}. Kept local to
-   * avoid a frontend dependency on the backend module for one JSON envelope.
-   *
-   * @param canSeeBlueprintOverview {@code true} iff the caller may open the blueprint availability
-   *     overview.
-   * @param canViewJobOrders {@code true} iff the caller may enter the Job-Order area.
-   * @param canViewOwnJobOrders {@code true} iff the caller may view the orders their own org unit
-   *     requested (the "Meine Auftr&auml;ge" requester capability, REQ-ORDERS-023).
-   */
-  public record CapabilitiesResponse(
-      boolean canSeeBlueprintOverview, boolean canViewJobOrders, boolean canViewOwnJobOrders) {}
-
-  /**
-   * The request URI the sidebar switcher form posts back as {@code _referer} so the redirect after
-   * the squadron change lands the user on the same page they were on. We resolve it via a model
-   * attribute rather than the Thymeleaf {@code #httpServletRequest} utility because the latter is
-   * not exposed in every render context (MockMvc tests in particular).
-   *
-   * @param request the current HTTP servlet request injected by Spring; never {@code null}.
-   * @return the path + query of the current request, or {@code "/"} as a defensive fallback.
-   */
-  @ModelAttribute("currentRequestUri")
-  public String currentRequestUri(HttpServletRequest request) {
-    if (request == null) {
-      return "/";
-    }
-    String uri = request.getRequestURI();
-    String query = request.getQueryString();
-    if (uri == null || uri.isBlank()) {
-      return "/";
-    }
-    return query != null && !query.isBlank() ? uri + "?" + query : uri;
   }
 }

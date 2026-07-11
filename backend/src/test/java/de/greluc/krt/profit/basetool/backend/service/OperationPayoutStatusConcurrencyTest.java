@@ -68,15 +68,15 @@ import org.springframework.transaction.support.TransactionTemplate;
  * index {@code uk_operation_payout_status_operation_participant} (columns {@code operation_id},
  * {@code participant_key}), so the loser of the parallel INSERT hits a {@code
  * DataIntegrityViolationException} (or, on the repeat edit, an {@code
- * ObjectOptimisticLockingFailureException}). {@link OperationService#setPayoutStatus} is a
+ * ObjectOptimisticLockingFailureException}). {@link OperationPayoutService#setPayoutStatus} is a
  * non-transactional orchestrator that retries each attempt in its own {@code REQUIRES_NEW}
  * transaction (#1111), so the loser reloads the winner's committed row and UPDATEs it in place
  * instead of surfacing the conflict as an HTTP 500. This test is the dynamic regression guard for
  * that behaviour: were the unique index or the {@code @Version} ever dropped, two concurrent "mark
  * paid" clicks would each INSERT a row (duplicate payout-status rows, double audit trail) with no
  * exception — and only the {@code hasSize(1)} assertion below would catch it. The deterministic
- * retry-count contract lives in {@code OperationServiceTest.SetPayoutStatusConcurrencyTests}, which
- * fakes the collision with a spy; this test proves the schema actually raises it.
+ * retry-count contract lives in {@code OperationPayoutServiceTest.SetPayoutStatusConcurrencyTests},
+ * which fakes the collision with a spy; this test proves the schema actually raises it.
  *
  * <p>Deliberately <strong>not</strong> {@code @Transactional}: each worker runs in its own session
  * so the versions actually race, and the seed rows are removed via {@code @AfterEach}. The
@@ -95,7 +95,7 @@ class OperationPayoutStatusConcurrencyTest {
   private static final Instant ACTUAL_START = Instant.parse("2026-03-01T10:00:00Z");
   private static final Instant ACTUAL_END = ACTUAL_START.plus(60, ChronoUnit.MINUTES);
 
-  @Autowired private OperationService operationService;
+  @Autowired private OperationPayoutService operationPayoutService;
   @Autowired private OperationRepository operationRepository;
   @Autowired private OperationPayoutStatusRepository payoutStatusRepository;
   @Autowired private MissionRepository missionRepository;
@@ -175,7 +175,8 @@ class OperationPayoutStatusConcurrencyTest {
                       otherErrorCount.incrementAndGet();
                       return;
                     }
-                    operationService.setPayoutStatus(fixture.operationId(), participantKey, true);
+                    operationPayoutService.setPayoutStatus(
+                        fixture.operationId(), participantKey, true);
                     successCount.incrementAndGet();
                   } catch (Throwable t) {
                     otherErrorCount.incrementAndGet();

@@ -53,13 +53,13 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Real-Postgres regression coverage for {@code UserService.deleteUser} referential integrity: an
- * ex-member who owns a mission (and therefore a {@code mission_ownership} companion row) and who
- * has stamped a {@code material_claim} must be deletable without tripping a foreign-key violation
- * (SQLSTATE 23503) on the FK-less {@code mission_ownership.owner_id} (V63) and {@code
- * material_claim.claimed_by_user_id} (V131) columns. Guards against the latent gap where {@code
- * deleteUser} reassigned {@code mission.owner} but left its companion (and the audit stamp) pointed
- * at the now-deleted user.
+ * Real-Postgres regression coverage for {@code UserDeletionService.deleteUser} referential
+ * integrity: an ex-member who owns a mission (and therefore a {@code mission_ownership} companion
+ * row) and who has stamped a {@code material_claim} must be deletable without tripping a
+ * foreign-key violation (SQLSTATE 23503) on the FK-less {@code mission_ownership.owner_id} (V63)
+ * and {@code material_claim.claimed_by_user_id} (V131) columns. Guards against the latent gap where
+ * {@code deleteUser} reassigned {@code mission.owner} but left its companion (and the audit stamp)
+ * pointed at the now-deleted user.
  *
  * <p>Uses {@link Transactional} rollback plus an explicit {@link EntityManager#flush()} to force
  * the {@code DELETE FROM app_user} statement to execute: PostgreSQL checks the (non-deferrable) FKs
@@ -70,7 +70,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class UserDeletionForeignKeyIntegrityTest {
 
-  @Autowired private UserService userService;
+  @Autowired private UserDeletionService userDeletionService;
   @Autowired private MissionService missionService;
   @Autowired private UserRepository userRepository;
   @Autowired private RoleRepository roleRepository;
@@ -181,7 +181,7 @@ class UserDeletionForeignKeyIntegrityTest {
     assertThatNoException()
         .isThrownBy(
             () -> {
-              userService.deleteUser(exMemberId);
+              userDeletionService.deleteUser(exMemberId);
               entityManager.flush();
             });
     entityManager.clear();

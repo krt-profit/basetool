@@ -193,7 +193,7 @@ public class JobOrderPageController {
    * @param scope optional explicit squadron-scope filter ({@code mine}/{@code all})
    * @param cookieStatus previous persisted status filter from the cookie
    * @param cookieScope previous persisted squadron-scope filter from the cookie
-   * @param activeSquadronId active squadron context surfaced by {@code SquadronContextAdvice}; used
+   * @param activeSquadronId active squadron context surfaced by {@code OrgUnitContextAdvice}; used
    *     to translate {@code scope=mine} into a backend {@code squadronId} param.
    * @param page zero-based page index, defaulted/clamped to 0 (REQ-ORDERS-020)
    * @param size requested page size; only {@link #PAGE_SIZES} are honoured, else {@link

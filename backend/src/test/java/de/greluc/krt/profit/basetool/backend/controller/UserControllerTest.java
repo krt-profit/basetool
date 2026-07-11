@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserSyncResultDto;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryService;
+import de.greluc.krt.profit.basetool.backend.service.UserDeletionService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.service.UserSyncService;
 import java.time.LocalDate;
@@ -68,6 +69,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 class UserControllerTest {
 
   @Mock private UserService userService;
+  @Mock private UserDeletionService userDeletionService;
   @Mock private UserMapper userMapper;
   @Mock private de.greluc.krt.profit.basetool.backend.service.AuthHelperService authHelperService;
   @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
@@ -546,8 +548,8 @@ class UserControllerTest {
 
     controller.deleteUser(id);
 
-    verify(userService).deleteUser(id);
-    verifyNoMoreInteractions(userService, userMapper);
+    verify(userDeletionService).deleteUser(id);
+    verifyNoMoreInteractions(userService, userDeletionService, userMapper);
   }
 
   // ── GET /{id}/memberships ───────────────────────────────────────────────

@@ -64,12 +64,12 @@ import org.springframework.stereotype.Component;
  * scoping ("logistician of which OrgUnit") still happens at the {@code @PreAuthorize} call site
  * through {@link de.greluc.krt.profit.basetool.backend.service.OwnerScopeService}.
  *
- * <p>The converter calls {@link UserService#syncUser(Jwt)} on every authentication so the local row
- * is created or updated lazily — this is where new Keycloak users acquire their {@code app_user}
- * record. Optimistic-locking conflicts from concurrent first-time logins by the same user are
- * retried up to {@value #MAX_SYNC_ATTEMPTS} times with a short fixed backoff; after that the
- * authentication is rejected with {@link AuthenticationServiceException} to avoid a stuck client
- * retry loop.
+ * <p>The converter calls {@link UserReconciliationService#syncUser(Jwt)} on every authentication so
+ * the local row is created or updated lazily — this is where new Keycloak users acquire their
+ * {@code app_user} record. Optimistic-locking conflicts from concurrent first-time logins by the
+ * same user are retried up to {@value #MAX_SYNC_ATTEMPTS} times with a short fixed backoff; after
+ * that the authentication is rejected with {@link AuthenticationServiceException} to avoid a stuck
+ * client retry loop.
  */
 @Component
 @RequiredArgsConstructor
@@ -93,7 +93,7 @@ public class CustomJwtGrantedAuthoritiesConverter
   /** Upper bound on distinct cached {@code (sub, issuedAt)} entries. */
   private static final long AUTHORITIES_CACHE_MAX_SIZE = 10_000;
 
-  private final UserService userService;
+  private final UserReconciliationService userReconciliationService;
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
   private final OrgUnitCascadeService orgUnitCascadeService;
 
@@ -101,14 +101,14 @@ public class CustomJwtGrantedAuthoritiesConverter
    * Per-{@code (sub, token issued-at)} memoisation of the fully-assembled authority collection
    * (#1141). The resource-server authorities converter runs on <em>every</em> authenticated API
    * call — every fragment refetch, every live-sync coalesce burst, every check-in — and each miss
-   * pays {@link UserService#syncUser(Jwt)} (a write-capable transaction) plus ~5&ndash;8 SELECTs
-   * (user load, {@code user_roles}, one role lookup per realm role, and the membership read).
-   * Keying on the token's {@code issuedAt} means a fresh login always misses and re-reads, so a
-   * re-authentication picks up new authorities immediately; within one token's life the {@link
-   * #AUTHORITIES_CACHE_TTL} bounds staleness. Only successful results are cached (an exception
-   * propagates uncached), the cached value is an immutable copy so a downstream mutation cannot
-   * corrupt it, and a token missing {@code sub} or {@code issuedAt} bypasses the cache entirely
-   * (always recomputed).
+   * pays {@link UserReconciliationService#syncUser(Jwt)} (a write-capable transaction) plus
+   * ~5&ndash;8 SELECTs (user load, {@code user_roles}, one role lookup per realm role, and the
+   * membership read). Keying on the token's {@code issuedAt} means a fresh login always misses and
+   * re-reads, so a re-authentication picks up new authorities immediately; within one token's life
+   * the {@link #AUTHORITIES_CACHE_TTL} bounds staleness. Only successful results are cached (an
+   * exception propagates uncached), the cached value is an immutable copy so a downstream mutation
+   * cannot corrupt it, and a token missing {@code sub} or {@code issuedAt} bypasses the cache
+   * entirely (always recomputed).
    */
   private final Cache<String, Collection<GrantedAuthority>> authoritiesCache =
       Caffeine.newBuilder()
@@ -172,7 +172,7 @@ public class CustomJwtGrantedAuthoritiesConverter
     ObjectOptimisticLockingFailureException lastLockingFailure = null;
     for (int attempt = 1; attempt <= MAX_SYNC_ATTEMPTS; attempt++) {
       try {
-        User user = userService.syncUser(jwt);
+        User user = userReconciliationService.syncUser(jwt);
 
         // Epic #720, Track 1 / REQ-SEC-017: a PENDING (or REJECTED) registration is granted NO
         // authorities. The ENTIRE assembly below — realm roles, permissions, membership-derived
@@ -273,8 +273,8 @@ public class CustomJwtGrantedAuthoritiesConverter
    * membership-derived authority — admin / guest accounts never had a Staffel link to anchor a
    * Logistician / MissionManager flag on, so the empty-memberships branch is now a clean no-op.
    *
-   * @param user the local {@link User} record produced by {@link UserService#syncUser(Jwt)}; never
-   *     {@code null}.
+   * @param user the local {@link User} record produced by {@link
+   *     UserReconciliationService#syncUser(Jwt)}; never {@code null}.
    * @param authorities the mutable authority list being assembled by the converter; flags are
    *     appended in place.
    */

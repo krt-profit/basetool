@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationPayoutStatusDto;
-import de.greluc.krt.profit.basetool.backend.service.OperationService;
+import de.greluc.krt.profit.basetool.backend.service.OperationPayoutService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -60,7 +60,7 @@ class OperationPayoutPaidOutSecurityTest {
 
   private MockMvc mockMvc;
 
-  @MockitoBean private OperationService operationService;
+  @MockitoBean private OperationPayoutService operationPayoutService;
   @MockitoBean private OwnerScopeService ownerScopeService;
   @MockitoBean private JwtDecoder jwtDecoder;
 
@@ -94,7 +94,7 @@ class OperationPayoutPaidOutSecurityTest {
     UUID opId = UUID.randomUUID();
     String key = UUID.randomUUID().toString();
     when(ownerScopeService.canEditOperation(opId)).thenReturn(true);
-    when(operationService.setPayoutStatus(eq(opId), eq(key), eq(true)))
+    when(operationPayoutService.setPayoutStatus(eq(opId), eq(key), eq(true)))
         .thenReturn(refreshedRow(key));
 
     mockMvc
@@ -105,7 +105,7 @@ class OperationPayoutPaidOutSecurityTest {
                 .with(jwt().authorities(missionManager())))
         .andExpect(status().isOk());
 
-    verify(operationService).setPayoutStatus(opId, key, true);
+    verify(operationPayoutService).setPayoutStatus(opId, key, true);
   }
 
   @Test
@@ -125,7 +125,7 @@ class OperationPayoutPaidOutSecurityTest {
     // Service must not be invoked when the @PreAuthorize denies — the audit trail
     // would otherwise record a fake "this user toggled the flag" event the user
     // had no permission to trigger.
-    verify(operationService, never()).setPayoutStatus(any(), any(), any(Boolean.class));
+    verify(operationPayoutService, never()).setPayoutStatus(any(), any(), any(Boolean.class));
   }
 
   @Test
@@ -133,7 +133,7 @@ class OperationPayoutPaidOutSecurityTest {
     UUID opId = UUID.randomUUID();
     String key = UUID.randomUUID().toString();
     when(ownerScopeService.canEditOperation(opId)).thenReturn(true);
-    when(operationService.setPayoutStatus(eq(opId), eq(key), eq(false)))
+    when(operationPayoutService.setPayoutStatus(eq(opId), eq(key), eq(false)))
         .thenReturn(refreshedRow(key));
 
     mockMvc
@@ -144,7 +144,7 @@ class OperationPayoutPaidOutSecurityTest {
                 .with(jwt().authorities(officer())))
         .andExpect(status().isOk());
 
-    verify(operationService).setPayoutStatus(opId, key, false);
+    verify(operationPayoutService).setPayoutStatus(opId, key, false);
   }
 
   @Test
@@ -152,7 +152,7 @@ class OperationPayoutPaidOutSecurityTest {
     UUID opId = UUID.randomUUID();
     String key = UUID.randomUUID().toString();
     when(ownerScopeService.canEditOperation(opId)).thenReturn(true);
-    when(operationService.setPayoutStatus(eq(opId), eq(key), eq(false)))
+    when(operationPayoutService.setPayoutStatus(eq(opId), eq(key), eq(false)))
         .thenReturn(refreshedRow(key));
 
     mockMvc
@@ -163,7 +163,7 @@ class OperationPayoutPaidOutSecurityTest {
                 .with(jwt().authorities(admin())))
         .andExpect(status().isOk());
 
-    verify(operationService).setPayoutStatus(opId, key, false);
+    verify(operationPayoutService).setPayoutStatus(opId, key, false);
   }
 
   @Test
@@ -171,7 +171,7 @@ class OperationPayoutPaidOutSecurityTest {
     UUID opId = UUID.randomUUID();
     String key = UUID.randomUUID().toString();
     when(ownerScopeService.canEditOperation(opId)).thenReturn(true);
-    when(operationService.setPayoutStatus(eq(opId), eq(key), eq(true)))
+    when(operationPayoutService.setPayoutStatus(eq(opId), eq(key), eq(true)))
         .thenReturn(refreshedRow(key));
 
     mockMvc
@@ -182,6 +182,6 @@ class OperationPayoutPaidOutSecurityTest {
                 .with(jwt().authorities(officer())))
         .andExpect(status().isOk());
 
-    verify(operationService).setPayoutStatus(opId, key, true);
+    verify(operationPayoutService).setPayoutStatus(opId, key, true);
   }
 }

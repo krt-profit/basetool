@@ -23,35 +23,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.event.DiscordRegistrationPendingEvent;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
-import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
-import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.time.Instant;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -59,7 +39,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -67,17 +46,15 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
- * Unit tests for the under-tested halves of {@link UserService}:
+ * Unit tests for the identity-seam and self-service halves of {@link UserService} left in place
+ * after the Keycloak reconciliation moved to {@link UserReconciliationService} (audit Thema&nbsp;7,
+ * #1252):
  *
  * <ul>
- *   <li>{@link UserService#getUserIdFromJwt} — JWT sub/UUID validation.
- *   <li>{@link UserService#syncUser(Jwt)} — the JWT&nbsp;-&gt;&nbsp;local-user mapping invoked on
- *       every authenticated request via the JWT interceptor.
- *   <li>{@link UserService#syncUser(KeycloakUserDto)} — the scheduled Keycloak Admin API sync (the
- *       previously completely-uncovered {@code inKeycloak} flip + change-detection branches).
- *   <li>{@link UserService#extractRolesFromJwt} — null and missing-key {@code realm_access} paths.
+ *   <li>{@link UserService#getUserIdFromJwt} — JWT sub/UUID validation (fail-closed).
  *   <li>{@link UserService#updateUserDescription} — the version-check {@code
  *       ObjectOptimisticLockingFailureException} path.
+ *   <li>{@link UserService#updateUserDefaultPayoutPreference}.
  *   <li>{@link UserService#getCurrentUser} — null/anonymous/non-JWT principal short-circuits.
  *   <li>{@link UserService#findById} — not-found path.
  * </ul>
@@ -86,17 +63,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 class UserServiceSyncTest {
 
   @Mock private UserRepository userRepository;
-  @Mock private RoleRepository roleRepository;
-  @Mock private InventoryItemRepository inventoryItemRepository;
-  @Mock private ShipRepository shipRepository;
-  @Mock private RefineryOrderRepository refineryOrderRepository;
-  @Mock private MissionRepository missionRepository;
-  @Mock private JobOrderRepository jobOrderRepository;
-  @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private AuthHelperService authHelperService;
-  @Mock private OrgUnitMembershipService orgUnitMembershipService;
-  @Mock private DefaultBlueprintProvisioningService defaultBlueprintProvisioningService;
-  @Mock private ApplicationEventPublisher eventPublisher;
 
   @InjectMocks private UserService userService;
 
@@ -134,452 +101,6 @@ class UserServiceSyncTest {
               AuthenticationServiceException.class, () -> userService.getUserIdFromJwt(jwt));
       assertTrue(ex.getMessage().contains("must be a UUID"));
     }
-  }
-
-  // ---------------------------------------------------------------
-  // syncUser(Jwt) — the hot path on every authenticated request
-  // ---------------------------------------------------------------
-
-  @Nested
-  class SyncJwtUserTests {
-
-    @Test
-    void createsNewUser_whenIdAndUsernameUnknown() {
-      Jwt jwt =
-          newJwt(
-              USER_ID.toString(),
-              Map.of(
-                  "preferred_username", "alice",
-                  "email", "alice@example.com"));
-
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(userRepository.findByUsername("alice")).thenReturn(Optional.empty());
-      when(roleRepository.findByNameIgnoreCase("Guest"))
-          .thenReturn(Optional.of(role(99L, "Guest")));
-      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-
-      User result = userService.syncUser(jwt);
-
-      assertEquals(USER_ID, result.getId());
-      assertEquals("alice", result.getUsername());
-      assertEquals("alice@example.com", result.getEmail());
-      assertEquals(1, result.getRoles().size());
-      assertEquals("Guest", result.getRoles().iterator().next().getName());
-      verify(userRepository, times(1)).save(any(User.class));
-      // A brand-new user is granted the default blueprints synchronously (REQ-INV-016).
-      verify(defaultBlueprintProvisioningService).grantDefaultsToUser(USER_ID.toString());
-    }
-
-    @Test
-    void usesUsernameFallback_whenIdLookupFails_butUsernameMatches() {
-      // The "warn-and-recover" path: ID changed (rare, Keycloak realm import,
-      // imports, ...) but username still matches a legacy local row.
-      Jwt jwt = newJwt(USER_ID.toString(), Map.of("preferred_username", "alice"));
-      User existing = newUser(UUID.randomUUID(), "alice");
-      existing.setVersion(1L); // not new
-
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(userRepository.findByUsername("alice")).thenReturn(Optional.of(existing));
-      when(roleRepository.findByNameIgnoreCase("Guest"))
-          .thenReturn(Optional.of(role(99L, "Guest")));
-      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-
-      User result = userService.syncUser(jwt);
-
-      assertSame(existing, result, "must reuse the looked-up legacy user");
-    }
-
-    @Test
-    void noFieldChanged_andUserNotNew_skipsSave() {
-      // Every field already matches the JWT claims; the user has been seen
-      // before (version != null -> isNew() == false). The service must short-
-      // circuit and NOT call save().
-      Jwt jwt =
-          newJwt(
-              USER_ID.toString(),
-              Map.of(
-                  "preferred_username", "alice",
-                  "email", "alice@example.com"));
-
-      User existing = newUser(USER_ID, "alice");
-      existing.setEmail("alice@example.com");
-      existing.setVersion(2L);
-      Role guest = role(99L, "Guest");
-      existing.setRoles(new HashSet<>(Set.of(guest)));
-
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-      when(roleRepository.findByNameIgnoreCase("Guest")).thenReturn(Optional.of(guest));
-
-      User result = userService.syncUser(jwt);
-
-      assertSame(existing, result);
-      verify(userRepository, never()).save(any(User.class));
-      // An already-known user is never re-granted the defaults.
-      verify(defaultBlueprintProvisioningService, never()).grantDefaultsToUser(any());
-    }
-
-    @Test
-    void detectsChange_whenUsernameDiffers() {
-      assertSavedOnFieldChange(
-          "preferred_username", "new-username", User::setUsername, "old-username");
-    }
-
-    @Test
-    void detectsChange_whenEmailDiffers() {
-      assertSavedOnFieldChange("email", "new@example.com", User::setEmail, "old@example.com");
-    }
-
-    @Test
-    void detectsChange_whenRolesDiffer() {
-      Jwt jwt =
-          newJwt(
-              USER_ID.toString(),
-              Map.of(
-                  "preferred_username",
-                  "alice",
-                  "realm_access",
-                  Map.of("roles", List.of("ADMIN"))));
-
-      User existing = newUser(USER_ID, "alice");
-      existing.setVersion(1L);
-      Role guest = role(99L, "Guest");
-      existing.setRoles(new HashSet<>(Set.of(guest)));
-
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-      when(roleRepository.findByNameIgnoreCase("ADMIN")).thenReturn(Optional.of(role(1L, "ADMIN")));
-      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-
-      userService.syncUser(jwt);
-
-      verify(userRepository, times(1)).save(any(User.class));
-      assertEquals(1, existing.getRoles().size());
-      assertEquals("ADMIN", existing.getRoles().iterator().next().getName());
-    }
-
-    @Test
-    void newUserWithNoChangedFields_isStillSaved() {
-      // The "user.isNew()" branch triggers save() even when no detected
-      // changes happened — required because a brand-new entity has to be
-      // persisted to acquire an ID/version.
-      Jwt jwt = newJwt(USER_ID.toString(), Map.of()); // no claims at all
-
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(roleRepository.findByNameIgnoreCase("Guest"))
-          .thenReturn(Optional.of(role(99L, "Guest")));
-      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-
-      User result = userService.syncUser(jwt);
-
-      // Even though every JWT claim is null and every field stays null,
-      // changed==true via the role-sync block (empty Keycloak roles -> Guest)
-      // and additionally user.isNew()==true.
-      verify(userRepository, times(1)).save(result);
-    }
-
-    /**
-     * Builds a JWT where every field already matches an existing user, then flips the named claim
-     * to a different value and asserts that save is called.
-     */
-    private void assertSavedOnFieldChange(
-        String jwtClaim,
-        String newValue,
-        java.util.function.BiConsumer<User, String> oldFieldSetter,
-        String oldValue) {
-      Map<String, Object> claims =
-          new java.util.HashMap<>(
-              Map.of(
-                  "preferred_username", "alice",
-                  "email", "alice@example.com"));
-      claims.put(jwtClaim, newValue);
-      Jwt jwt = newJwt(USER_ID.toString(), claims);
-
-      User existing = newUser(USER_ID, "alice");
-      existing.setEmail("alice@example.com");
-      existing.setVersion(1L);
-      oldFieldSetter.accept(existing, oldValue);
-      Role guest = role(99L, "Guest");
-      existing.setRoles(new HashSet<>(Set.of(guest)));
-
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-      lenient().when(userRepository.findByUsername(any())).thenReturn(Optional.empty());
-      when(roleRepository.findByNameIgnoreCase("Guest")).thenReturn(Optional.of(guest));
-      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-
-      userService.syncUser(jwt);
-      verify(userRepository, times(1)).save(any(User.class));
-    }
-  }
-
-  // ---------------------------------------------------------------
-  // syncUser(KeycloakUserDto)
-  // ---------------------------------------------------------------
-
-  @Nested
-  class SyncKeycloakUserTests {
-
-    @Test
-    void returnsEarly_whenDtoIdIsNull() {
-      KeycloakUserDto dto =
-          new KeycloakUserDto(null, "alice", "alice@example.com", true, Set.of(), null);
-
-      userService.syncUser(dto);
-
-      verify(userRepository, never()).save(any());
-    }
-
-    @Test
-    void flipsInKeycloak_whenLocalUserPreviouslyMarkedAbsent() {
-      User existing = newUser(USER_ID, "alice");
-      existing.setInKeycloak(false);
-      existing.setVersion(1L);
-
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-      when(roleRepository.findByNameIgnoreCase("Guest"))
-          .thenReturn(Optional.of(role(99L, "Guest")));
-
-      userService.syncUser(new KeycloakUserDto(USER_ID, "alice", null, true, Set.of(), null));
-
-      assertTrue(existing.isInKeycloak(), "must flip back to true once seen again");
-      verify(userRepository, times(1)).save(existing);
-    }
-
-    @Test
-    void createsNewUser_whenIdUnknown() {
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(roleRepository.findByNameIgnoreCase("Guest"))
-          .thenReturn(Optional.of(role(99L, "Guest")));
-
-      userService.syncUser(
-          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, Set.of(), null));
-
-      verify(userRepository, times(1)).save(any(User.class));
-    }
-
-    @Test
-    void createsNewNonAdminUser_landsPending() {
-      // Fail-safe default (REQ-SEC-017): a brand-new non-admin user first discovered by the
-      // scheduled
-      // sync lands PENDING, so the scheduler can never pre-create an ACTIVE row that a later login
-      // would inherit (created == false) and use to skip the approval gate.
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(roleRepository.findByNameIgnoreCase("Guest"))
-          .thenReturn(Optional.of(role(99L, "Guest")));
-      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-
-      userService.syncUser(
-          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, Set.of(), null));
-
-      verify(userRepository).save(argThat(u -> u.getApprovalStatus() == ApprovalStatus.PENDING));
-    }
-
-    @Test
-    void createsNewAdminUser_landsActive() {
-      // ADMIN bootstrap carve-out applies to the scheduled sync too: a brand-new ADMIN stays
-      // ACTIVE.
-      Role adminRole = role(1L, "ADMIN");
-      adminRole.setCode("ADMIN");
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(roleRepository.findByNameIgnoreCase("ADMIN")).thenReturn(Optional.of(adminRole));
-      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-
-      userService.syncUser(new KeycloakUserDto(USER_ID, "root", null, true, Set.of("ADMIN"), null));
-
-      verify(userRepository).save(argThat(u -> u.getApprovalStatus() == ApprovalStatus.ACTIVE));
-    }
-
-    @Test
-    void createsNewNonAdminUser_notifiesAdmins() {
-      // REQ-NOTIF-012: a registration first materialised by the scheduled reconciler (not the
-      // interactive login) must also notify the admins, so a scheduler-first row — or a user who
-      // never interactively logs in while PENDING — is no longer silently missed. Gated on
-      // `created`, so it fires exactly once across the two sync paths.
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(roleRepository.findByNameIgnoreCase("Guest"))
-          .thenReturn(Optional.of(role(99L, "Guest")));
-      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-
-      userService.syncUser(
-          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, Set.of(), null));
-
-      verify(eventPublisher).publishEvent(any(DiscordRegistrationPendingEvent.class));
-    }
-
-    @Test
-    void createsNewAdminUser_doesNotNotify() {
-      // An admin lands ACTIVE (bootstrap carve-out), so no pending-approval notification is raised.
-      Role adminRole = role(1L, "ADMIN");
-      adminRole.setCode("ADMIN");
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(roleRepository.findByNameIgnoreCase("ADMIN")).thenReturn(Optional.of(adminRole));
-      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-
-      userService.syncUser(new KeycloakUserDto(USER_ID, "root", null, true, Set.of("ADMIN"), null));
-
-      verify(eventPublisher, never()).publishEvent(any());
-    }
-
-    @Test
-    void existingPendingUser_doesNotReNotify() {
-      // Exactly-once guard: an already-persisted user (created == false) — re-seen on a later
-      // reconciler pass, or after the interactive login already announced them — never
-      // re-publishes.
-      User existing = newUser(USER_ID, "alice");
-      existing.setEmail("alice@example.com");
-      existing.setInKeycloak(true);
-      existing.setApprovalStatus(ApprovalStatus.PENDING);
-      existing.setVersion(2L);
-      Role guest = role(99L, "Guest");
-      existing.setRoles(new HashSet<>(Set.of(guest)));
-
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-      when(roleRepository.findByNameIgnoreCase("Guest")).thenReturn(Optional.of(guest));
-
-      userService.syncUser(
-          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, Set.of(), null));
-
-      verify(eventPublisher, never()).publishEvent(any());
-    }
-
-    @Test
-    void noFieldChanged_andUserNotNew_skipsSave() {
-      User existing = newUser(USER_ID, "alice");
-      existing.setEmail("alice@example.com");
-      existing.setInKeycloak(true);
-      existing.setVersion(3L);
-      Role guest = role(99L, "Guest");
-      existing.setRoles(new HashSet<>(Set.of(guest)));
-
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-      when(roleRepository.findByNameIgnoreCase("Guest")).thenReturn(Optional.of(guest));
-
-      userService.syncUser(
-          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, Set.of(), null));
-
-      verify(userRepository, never()).save(any());
-    }
-
-    @Test
-    void backfillsDiscordLink_whenExistingUserLinkedLater() {
-      // The reported bug (REQ-DATA-006): a pre-existing credential account that linked Discord
-      // AFTER creation. The import-time token claim only covers accounts that registered via
-      // Discord, so this account showed no Discord indicator. The scheduled sync reads the Discord
-      // federated identity from the Admin API and back-fills the local link with no re-login.
-      User existing = newUser(USER_ID, "linkedlater");
-      existing.setEmail("l@example.com");
-      existing.setInKeycloak(true);
-      existing.setVersion(4L);
-      existing.setDiscordUserId(null);
-      Role guest = role(99L, "Guest");
-      existing.setRoles(new HashSet<>(Set.of(guest)));
-
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-      when(roleRepository.findByNameIgnoreCase("Guest")).thenReturn(Optional.of(guest));
-      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-
-      userService.syncUser(
-          new KeycloakUserDto(
-              USER_ID, "linkedlater", "l@example.com", true, Set.of(), "123456789012345678"));
-
-      assertEquals("123456789012345678", existing.getDiscordUserId());
-      verify(userRepository, times(1)).save(existing);
-    }
-
-    @Test
-    void leavesExistingDiscordLink_whenDtoCarriesNoFederatedId() {
-      // A null discordUserId means "the federated-identity lookup found nothing OR failed" — it is
-      // NOT a signal to unlink. An already-linked user must keep their link (and the run must not
-      // even save, since nothing changed), so a transient Admin-API hiccup can never wipe the link.
-      User existing = newUser(USER_ID, "linked");
-      existing.setEmail("l@example.com");
-      existing.setInKeycloak(true);
-      existing.setVersion(2L);
-      existing.setDiscordUserId("123456789012345678");
-      Role guest = role(99L, "Guest");
-      existing.setRoles(new HashSet<>(Set.of(guest)));
-
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-      when(roleRepository.findByNameIgnoreCase("Guest")).thenReturn(Optional.of(guest));
-
-      userService.syncUser(
-          new KeycloakUserDto(USER_ID, "linked", "l@example.com", true, Set.of(), null));
-
-      assertEquals("123456789012345678", existing.getDiscordUserId());
-      verify(userRepository, never()).save(any());
-    }
-  }
-
-  // ---------------------------------------------------------------
-  // extractRolesFromJwt
-  // ---------------------------------------------------------------
-
-  @Nested
-  class ExtractRolesFromJwtTests {
-
-    @Test
-    void returnsRoles_whenRealmAccessHasRolesKey() {
-      Jwt jwt =
-          newJwt(
-              USER_ID.toString(),
-              Map.of("realm_access", Map.of("roles", List.of("ADMIN", "KRT_MEMBER"))));
-
-      Set<String> roles = userService.extractRolesFromJwt(jwt);
-
-      assertEquals(Set.of("ADMIN", "KRT_MEMBER"), roles);
-    }
-
-    @Test
-    void returnsEmpty_whenRealmAccessClaimMissing() {
-      Jwt jwt = newJwt(USER_ID.toString(), Map.of());
-
-      assertTrue(userService.extractRolesFromJwt(jwt).isEmpty());
-    }
-
-    @Test
-    void returnsEmpty_whenRealmAccessLacksRolesKey() {
-      Jwt jwt =
-          newJwt(USER_ID.toString(), Map.of("realm_access", Map.of("something_else", "value")));
-
-      assertTrue(userService.extractRolesFromJwt(jwt).isEmpty());
-    }
-  }
-
-  // ---------------------------------------------------------------
-  // mapRoles (via syncUser) — Guest fallback when none match
-  // ---------------------------------------------------------------
-
-  @Test
-  void mapRoles_fallsBackToGuest_whenNoKeycloakRoleMatchesLocal() {
-    Jwt jwt =
-        newJwt(
-            USER_ID.toString(),
-            Map.of(
-                "preferred_username",
-                "alice",
-                "realm_access",
-                Map.of("roles", List.of("UNKNOWN_ROLE_FROM_OTHER_REALM"))));
-
-    when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-    when(userRepository.findByUsername("alice")).thenReturn(Optional.empty());
-    when(roleRepository.findByNameIgnoreCase("UNKNOWN_ROLE_FROM_OTHER_REALM"))
-        .thenReturn(Optional.empty());
-    when(roleRepository.findByNameIgnoreCase("Guest")).thenReturn(Optional.of(role(99L, "Guest")));
-    when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-
-    User result = userService.syncUser(jwt);
-
-    assertEquals(1, result.getRoles().size());
-    assertEquals("Guest", result.getRoles().iterator().next().getName());
-  }
-
-  @Test
-  void mapRoles_nullRoleNames_alsoFallsBackToGuest() {
-    // KeycloakUserDto.roles() == null is treated as empty.
-    when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-    when(roleRepository.findByNameIgnoreCase("Guest")).thenReturn(Optional.of(role(99L, "Guest")));
-
-    userService.syncUser(new KeycloakUserDto(USER_ID, "alice", null, true, null, null));
-
-    verify(roleRepository, times(1)).findByNameIgnoreCase("Guest");
   }
 
   // ---------------------------------------------------------------
@@ -799,12 +320,5 @@ class UserServiceSyncTest {
     u.setId(id);
     u.setUsername(username);
     return u;
-  }
-
-  private static Role role(long id, String name) {
-    Role r = new Role();
-    r.setId(id);
-    r.setName(name);
-    return r;
   }
 }

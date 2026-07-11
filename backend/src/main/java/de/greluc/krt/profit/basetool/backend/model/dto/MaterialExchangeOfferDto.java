@@ -28,9 +28,9 @@ import java.util.UUID;
 /**
  * Viewer-relative read projection of a {@link
  * de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOffer} for the Materialbörse board
- * and detail pane (REQ-MARKET-001…). Assembled in {@code MaterialExchangeService} rather than by a
- * MapStruct mapper because {@link #mine}, {@link #interestCount}, {@link #viewerInterested} and
- * {@link #interestedHandles} all depend on the requesting member.
+ * and detail pane (REQ-MARKET-001…). Assembled in {@code MaterialExchangeBoardService} rather than
+ * by a MapStruct mapper because {@link #mine}, {@link #interestCount}, {@link #viewerInterested}
+ * and {@link #interestedHandles} all depend on the requesting member.
  *
  * <p>The projection carries both offer kinds (REQ-MARKET-012), discriminated by {@link #kind}. For
  * a {@link MaterialExchangeOfferKind#MATERIAL} offer, {@link #material} and {@link #quality} are

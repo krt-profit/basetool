@@ -34,22 +34,10 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialClaimRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionOwnershipRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
-import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserApprovalEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -59,61 +47,35 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
  * Profile-attribute + simple-delegate tests for {@link UserService}. Covers the methods not
  * addressed by {@code UserServiceRankTest} (rank-validation only) / {@code UserServiceSortTest} /
- * {@code UserServiceDeleteTest} / {@code UserServiceSyncTest}:
+ * {@code UserDeletionServiceTest} / {@code UserServiceSyncTest}:
  *
  * <ul>
  *   <li>{@link UserService#updateUserAttributes} — the non-rank halves (description / displayName /
  *       joinDate / version-check), plus the rank-handling for users that are neither officer nor
  *       squadron member.
  *   <li>{@link UserService#updateReadAnnouncement}.
- *   <li>{@link UserService#markMissingUsers} — early-return on empty.
  *   <li>{@link UserService#isUsernameOrDisplayNameTaken} + {@link
  *       UserService#findMatchesByExactName} — blank-input short-circuit.
  *   <li>{@link UserService#searchByUsername} (both overloads), {@link
  *       UserService#findAll(org.springframework.data.domain.Pageable)}, {@link
  *       UserService#findAllReference} — straight repository delegates.
- *   <li>{@link UserService#deleteUser} fallback path — admin from {@code getCurrentUser()} when
- *       {@code findAllAdmins()} returns nothing usable.
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)
 class UserServiceAttributesTest {
 
   @Mock private UserRepository userRepository;
-  @Mock private RoleRepository roleRepository;
-  @Mock private InventoryItemRepository inventoryItemRepository;
-  @Mock private ShipRepository shipRepository;
-  @Mock private RefineryOrderRepository refineryOrderRepository;
-  @Mock private MissionRepository missionRepository;
-  @Mock private JobOrderRepository jobOrderRepository;
-  @Mock private MissionOwnershipRepository missionOwnershipRepository;
-  @Mock private MissionParticipantRepository missionParticipantRepository;
-  @Mock private MaterialClaimRepository materialClaimRepository;
-  @Mock private UserApprovalEventRepository userApprovalEventRepository;
-
-  @Mock
-  private de.greluc.krt.profit.basetool.backend.repository.SquadronRepository squadronRepository;
-
   @Mock private AuthHelperService authHelperService;
   @Mock private OwnerScopeService ownerScopeService;
   @Mock private OrgUnitMembershipService orgUnitMembershipService;
-
-  @Mock private AuditService auditService;
-
-  @Mock private ObjectProvider<OrgUnitBankAccessService> orgUnitBankAccessServiceProvider;
-  @Mock private OrgUnitBankAccessService orgUnitBankAccessService;
 
   @InjectMocks private UserService userService;
 
@@ -351,32 +313,6 @@ class UserServiceAttributesTest {
   }
 
   // ---------------------------------------------------------------
-  // markMissingUsers
-  // ---------------------------------------------------------------
-
-  @Nested
-  class MarkMissingUsersTests {
-
-    @Test
-    void emptyInput_doesNotCallRepository() {
-      // Early-return guard: an empty input must NOT trigger a useless
-      // (and potentially expensive) bulk-update query.
-      userService.markMissingUsers(List.of());
-
-      verify(userRepository, never()).markMissingUsers(any());
-    }
-
-    @Test
-    void nonEmptyInput_delegatesToRepository() {
-      List<UUID> ids = List.of(USER_ID);
-
-      userService.markMissingUsers(ids);
-
-      verify(userRepository).markMissingUsers(ids);
-    }
-  }
-
-  // ---------------------------------------------------------------
   // isUsernameOrDisplayNameTaken / findMatchesByExactName
   // ---------------------------------------------------------------
 
@@ -479,88 +415,6 @@ class UserServiceAttributesTest {
   }
 
   // ---------------------------------------------------------------
-  // deleteUser — fallback to getCurrentUser when findAllAdmins yields no usable admin
-  // ---------------------------------------------------------------
-
-  @Nested
-  class DeleteUserFallbackTests {
-
-    @Test
-    void fallsBackToCurrentUser_whenCurrentUserIsAdmin_andFindAllAdminsHasNoOther() {
-      // The user being deleted IS the only "admin" in findAllAdmins() — they
-      // get filtered out of that list. The fallback resolves to the current
-      // logged-in admin, which is a different user with the ADMIN role.
-      User toDelete = newUser(USER_ID);
-      toDelete.setInKeycloak(false);
-      // toDelete also has ADMIN role — that's the scenario being tested
-      toDelete.setRoles(new HashSet<>(Set.of(roleNamed("ADMIN"))));
-
-      UUID currentAdminId = UUID.randomUUID();
-      User currentAdmin = newUser(currentAdminId);
-      currentAdmin.setRoles(new HashSet<>(Set.of(roleNamed("ADMIN"))));
-
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(toDelete));
-      // findAllAdmins returns only the user being deleted -> filtered out.
-      when(userRepository.findAllAdmins()).thenReturn(List.of(toDelete));
-
-      // Stub getCurrentUser via AuthHelperService + the second findById call.
-      Jwt jwt = newJwt(currentAdminId.toString());
-      Authentication auth = new UsernamePasswordAuthenticationToken(jwt, "n/a", List.of());
-      when(authHelperService.rawAuthentication()).thenReturn(auth);
-      when(userRepository.findById(currentAdminId)).thenReturn(Optional.of(currentAdmin));
-      when(orgUnitBankAccessServiceProvider.getObject()).thenReturn(orgUnitBankAccessService);
-      when(orgUnitBankAccessService.snapshotResponsibleHoldersForUser(any())).thenReturn(Map.of());
-
-      userService.deleteUser(USER_ID);
-
-      verify(inventoryItemRepository).updateOwner(toDelete, currentAdmin);
-      verify(userRepository).delete(toDelete);
-    }
-
-    @Test
-    void throws_whenCurrentUserIsAlsoTheUserBeingDeleted() {
-      // The user trying to delete themselves can't be their own reassignment
-      // target — must throw.
-      User toDelete = newUser(USER_ID);
-      toDelete.setInKeycloak(false);
-      toDelete.setRoles(new HashSet<>(Set.of(roleNamed("ADMIN"))));
-
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(toDelete));
-      when(userRepository.findAllAdmins()).thenReturn(List.of(toDelete));
-
-      Jwt jwt = newJwt(USER_ID.toString());
-      Authentication auth = new UsernamePasswordAuthenticationToken(jwt, "n/a", List.of());
-      when(authHelperService.rawAuthentication()).thenReturn(auth);
-
-      assertThrows(IllegalStateException.class, () -> userService.deleteUser(USER_ID));
-      verify(userRepository, never()).delete(any());
-    }
-
-    @Test
-    void throws_whenCurrentUserIsNotAdmin() {
-      // findAllAdmins has only the user being deleted; current user is logged in
-      // but has no ADMIN role -> no fallback, throw.
-      User toDelete = newUser(USER_ID);
-      toDelete.setInKeycloak(false);
-
-      UUID currentId = UUID.randomUUID();
-      User current = newUser(currentId);
-      current.setRoles(new HashSet<>(Set.of(roleNamed("KRT_MEMBER"))));
-
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(toDelete));
-      when(userRepository.findAllAdmins()).thenReturn(List.of(toDelete));
-
-      Jwt jwt = newJwt(currentId.toString());
-      Authentication auth = new UsernamePasswordAuthenticationToken(jwt, "n/a", List.of());
-      when(authHelperService.rawAuthentication()).thenReturn(auth);
-      when(userRepository.findById(currentId)).thenReturn(Optional.of(current));
-
-      assertThrows(IllegalStateException.class, () -> userService.deleteUser(USER_ID));
-      verify(userRepository, never()).delete(any());
-    }
-  }
-
-  // ---------------------------------------------------------------
   // helpers
   // ---------------------------------------------------------------
 
@@ -576,15 +430,5 @@ class UserServiceAttributesTest {
     Role r = new Role();
     r.setName(name);
     return r;
-  }
-
-  private static Jwt newJwt(String subject) {
-    return Jwt.withTokenValue("token")
-        .header("alg", "RS256")
-        .subject(subject)
-        .issuedAt(Instant.now())
-        .expiresAt(Instant.now().plusSeconds(60))
-        .claims(c -> c.put("sub", subject))
-        .build();
   }
 }
