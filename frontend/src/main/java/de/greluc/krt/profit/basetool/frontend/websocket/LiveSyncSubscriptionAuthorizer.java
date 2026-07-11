@@ -38,10 +38,8 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  * Authorizes a {@code /ws/sync} <em>subscribe</em> to a resource-scoped live-sync topic
  * (REQ-FE-015, ADR-0094).
  *
- * <p>The legacy per-resource sockets authorize at handshake time, on the servlet thread, through
- * the ordinary {@code BackendApiClient} (see {@code LiveSyncLegacyHandshakeInterceptor}). The
- * multiplexed {@code /ws/sync} socket instead authorizes each topic when its {@code subscribe}
- * frame arrives — on a WebSocket message / auth-executor thread that has <b>no servlet request
+ * <p>The multiplexed {@code /ws/sync} socket authorizes each topic when its {@code subscribe} frame
+ * arrives — on a WebSocket message / auth-executor thread that has <b>no servlet request
  * context</b>, so the request-context-bound {@code
  * ServletOAuth2AuthorizedClientExchangeFilterFunction} of the normal client cannot resolve a bearer
  * there. This authorizer therefore replays the OAuth2 access token and the active-org-unit pin that

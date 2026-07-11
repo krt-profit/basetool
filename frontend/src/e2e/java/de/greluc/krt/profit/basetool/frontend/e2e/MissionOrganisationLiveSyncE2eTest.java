@@ -40,12 +40,14 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * another viewer's (default-tab) overview without a manual reload — the {@code organisation}/{@code
  * overview} section keys crossing the mission relay.
  *
- * <p>Mission detail rides the legacy per-mission presence socket (the {@code missionPresence}
- * adapter), so the deterministic pre-mutation wait is the same {@code missionPresence.socket
- * .readyState === 1} the shipped {@link MissionLiveSyncE2eTest} anchor uses. Two browser contexts
- * authenticated as the same test user are two distinct sockets — exactly what the relay fans out
- * between. A distinctive party-lead name resolves to no realm user, so the set stays on the guest
- * path (no second member needed), mirroring the anchor's guest-participant approach.
+ * <p>Mission detail rides the shared {@code /ws/sync} socket via the {@code missionPresence}
+ * adapter's {@code mission:{id}} subscription (the legacy per-mission socket was removed in #1236),
+ * so the deterministic pre-mutation wait is the same acked-subscription check ({@code
+ * window.krtLiveSync.subscribedTopics()} contains {@code mission:{id}}) the shipped {@link
+ * MissionLiveSyncE2eTest} anchor uses. Two browser contexts authenticated as the same test user are
+ * two distinct sockets — exactly what the relay fans out between. A distinctive party-lead name
+ * resolves to no realm user, so the set stays on the guest path (no second member needed),
+ * mirroring the anchor's guest-participant approach.
  */
 @Tag("e2e")
 class MissionOrganisationLiveSyncE2eTest {
@@ -121,14 +123,17 @@ class MissionOrganisationLiveSyncE2eTest {
         // A full reload on B would clear this marker; the live in-place swap leaves it intact.
         pageB.evaluate("window.__krtNoReload = true;");
 
-        // Deterministic handshake wait: an OPEN presence socket implies B is registered with the
-        // relay, so A's subsequent change frame cannot race past it (anchor semantics).
+        // Deterministic wait: an acked mission-room subscription on /ws/sync implies B is
+        // registered
+        // with the relay, so A's subsequent change frame cannot race past it (anchor semantics).
         pageB.waitForCondition(
             () ->
                 Boolean.TRUE.equals(
                     pageB.evaluate(
-                        "!!(window.missionPresence && window.missionPresence.socket"
-                            + " && window.missionPresence.socket.readyState === 1)")));
+                        "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
+                            + " && window.krtLiveSync.subscribedTopics().indexOf('mission:"
+                            + missionId
+                            + "') !== -1)")));
 
         // Context A sets a guest party lead through the Organisation panel form.
         pageA.locator("#party-lead-search-input").fill(GUEST_LEAD_NAME);

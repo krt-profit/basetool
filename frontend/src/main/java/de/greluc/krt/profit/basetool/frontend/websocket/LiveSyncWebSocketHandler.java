@@ -71,14 +71,16 @@ import tools.jackson.databind.node.ObjectNode;
  * fragment through its own authenticated, authorization-checked GET, so redaction and access gates
  * re-apply per viewer.
  *
- * <p><b>Topic binding — two modes.</b> A <em>legacy</em> per-resource socket ({@code
- * /ws/missions/{id}/presence}) is bound to exactly one topic, resolved at connect time from the
- * {@link #ATTR_TOPIC} attribute the handshake interceptor set from the path; every frame operates
- * on that implicit topic. A <em>multiplexed</em> {@code /ws/sync} socket ({@link
- * #ATTR_MULTIPLEXED}) instead binds no topic at connect and manages a set of rooms via {@code
- * subscribe} frames — each authorized asynchronously (off the container thread, on the {@code
- * authExecutor}) by {@link LiveSyncSubscriptionAuthorizer} — while {@code changed} and presence
- * frames carry their own {@code topic}. Publishing a {@code changed} frame needs <b>no</b>
+ * <p><b>Topic binding — two modes.</b> A <em>legacy</em> per-resource socket is bound to exactly
+ * one topic, resolved at connect time from the {@link #ATTR_TOPIC} attribute a handshake
+ * interceptor set from the path; every frame operates on that implicit topic. This mode is retained
+ * as a generic capability of the relay, but <b>no path registers it any more</b>: the one-release
+ * legacy aliases ({@code /ws/missions/{id}/presence}, {@code /ws/materialboerse/board}) were
+ * removed in #1236, so in production every socket is multiplexed. A <em>multiplexed</em> {@code
+ * /ws/sync} socket ({@link #ATTR_MULTIPLEXED}) binds no topic at connect and manages a set of rooms
+ * via {@code subscribe} frames — each authorized asynchronously (off the container thread, on the
+ * {@code authExecutor}) by {@link LiveSyncSubscriptionAuthorizer} — while {@code changed} and
+ * presence frames carry their own {@code topic}. Publishing a {@code changed} frame needs <b>no</b>
  * subscription (the cross-topic case: a requester notifies a staff queue it may not read), only an
  * authenticated socket, a known topic class and the per-session rate limit; a subscribe is what an
  * <em>inbound</em> relay requires. In both modes the frame's {@code sections} array is sanitised

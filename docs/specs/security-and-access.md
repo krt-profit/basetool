@@ -258,9 +258,9 @@ read). Finance-entry creation is therefore no longer anonymous.
 `SecurityConfig` · **Role matrix:** [`ROLES_AND_PERMISSIONS.md` §1](../../ROLES_AND_PERMISSIONS.md)
 
 **Live-sync WebSocket (`/ws/sync`; REQ-FE-015 / [ADR-0094](../adr/0094-tool-wide-topic-room-live-sync-relay.md)).**
-The tool-wide peer-sync transport is one multiplexed `/ws/sync` socket per tab (plus the
-one-release legacy aliases `/ws/missions/{id}/presence` and `/ws/materialboerse/board`).
-`SecurityConfig` gates all `/ws/**` to an **authenticated** principal, and every handshake is pinned
+The tool-wide peer-sync transport is one multiplexed `/ws/sync` socket per tab (the one-release
+legacy aliases `/ws/missions/{id}/presence` and `/ws/materialboerse/board` were removed in #1236).
+`SecurityConfig` gates `/ws/sync` to an **authenticated** principal, and every handshake is pinned
 to the explicit `app.websocket.allowed-origin-patterns` allowlist (never `*`) to prevent Cross-Site
 WebSocket Hijacking. **No new role or gate is introduced** (this spec's role matrix is unchanged): a
 `subscribe` to a topic is authorized per topic with the *same* check the page itself performs — the

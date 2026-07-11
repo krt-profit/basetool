@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-07-10
 - **Deciders:** @greluc
-- **Related:** REQ-FE-015 · REQ-FE-010 · REQ-NOTIF-006/-010 · REQ-OBS-011 · ADR-0031 (mission relay — generalized here) · ADR-0016 (notification SSE — its Redis deferral is discharged here) · ADR-0079 (Redis AOF/noeviction) · ADR-0084 (readiness excludes optional externals) · ADR-0085 (5000-account capacity) · #1102 · #1115 · #1120 · #1241 · #1243 (publish-amplification bounds)
+- **Related:** REQ-FE-015 · REQ-FE-010 · REQ-NOTIF-006/-010 · REQ-OBS-011 · ADR-0031 (mission relay — generalized here) · ADR-0016 (notification SSE — its Redis deferral is discharged here) · ADR-0079 (Redis AOF/noeviction) · ADR-0084 (readiness excludes optional externals) · ADR-0085 (5000-account capacity) · #1102 · #1115 · #1120 · #1241 · #1243 (publish-amplification bounds) · #1236 (legacy-alias removal)
 
 ## Context
 
@@ -90,8 +90,9 @@ no channel at all, and the bank surfaces would need 3–4 parallel sockets per a
   was already accepted on its originating replica. Both bounds degrade to a *bounded re-fetch
   rate* (a dropped `changed` frame → a peer reloads on its own cadence), never data loss; the
   per-topic map is reaped of idle buckets so it stays bounded to active rooms. The legacy
-  per-resource sockets stay outside the socket cap — they can only reach their single
-  bounded-audience room and are slated for removal.
+  per-resource sockets stayed outside the socket cap — they could only reach their single
+  bounded-audience room — and have since been removed (#1236), so every socket is now the
+  capped multiplexed one.
 - **Server-side publish hook** (`LiveSyncLocalBus.publish`, delegating to
   `LiveSyncWebSocketHandler.publishFromServer`) exists for mutations that reach the frontend
   without a client socket: first consumer is the job-order create path, whose anonymous-guest
@@ -128,11 +129,18 @@ no channel at all, and the bank surfaces would need 3–4 parallel sockets per a
   `LiveSyncPresenceService` with `String topic` keys; meter names stay unchanged
   (REQ-OBS-011 treats a rename that breaks a dashboard as incomplete) and gain a bounded
   `topic_class` label.
-- The legacy paths `/ws/missions/{id}/presence` and `/ws/materialboerse/board` stay
+- The legacy paths `/ws/missions/{id}/presence` and `/ws/materialboerse/board` were
   registered on the generic handler for **one release** (handshake stuffs an implicit topic;
-  frames without a `topic` field resolve against it) so tabs opened before the deploy keep
-  their live sync after reconnect instead of going silently stale. Removal is a tracked
-  follow-up.
+  frames without a `topic` field resolve against it) so tabs opened before the deploy kept
+  their live sync after reconnect instead of going silently stale. They were **removed in
+
+  # 1236**: the two handshake interceptors and their `addHandler` registrations are gone, the
+
+  `/ws/missions/**` and `/ws/materialboerse/**` `SecurityConfig` matchers dropped, and
+  `mission-presence.js` migrated fully onto the `mission:{id}` topic room of `/ws/sync`. The
+  generic handler keeps its per-resource (legacy-mode) branch as an internal capability
+  (exercised by tests) but no path registers it any more.
+
 - The per-frame section count is bounded by two independent gates: each class's section
   whitelist (a `changed` frame keeps only keys in `LiveSyncTopicClass.allowedSections()`, so
   the effective ceiling is that class's size — the order topic has the largest at 9) and a
@@ -200,8 +208,9 @@ concurrent) on both apps so a socket surge can never hit "too many open files".
   strands containers on network changes, plus an ACL pre-check that the `default` user's
   explicit `users.acl` entry retains `&*` channel permissions for the two channels).
 - **Presence dots are per-instance** until the tracked follow-up lands; the remaining
-  Phase-3 surfaces (Lager, Raffinerie, Rollen/Org-Struktur, `/missions` list), the legacy
-  alias removal and a baselined drop-rate alert are tracked follow-up issues as well.
+  Phase-3 surfaces (Lager, Raffinerie, Rollen/Org-Struktur, `/missions` list) and a baselined
+  drop-rate alert are tracked follow-up issues as well. The one-release legacy alias removal
+  has since landed (#1236).
 
 ## Alternatives considered
 

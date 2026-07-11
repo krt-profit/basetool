@@ -19,11 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.config;
 
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.LiveSyncPresenceService;
-import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncBoardLegacyHandshakeInterceptor;
 import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncFanout;
-import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncLegacyHandshakeInterceptor;
 import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncSubscriptionAuthorizer;
 import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncSyncHandshakeInterceptor;
 import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncWebSocketHandler;
@@ -45,18 +42,16 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Wires the live-sync WebSocket endpoints (REQ-FE-015, ADR-0094).
+ * Wires the live-sync WebSocket endpoint (REQ-FE-015, ADR-0094).
  *
- * <p>Registers the shared {@link LiveSyncWebSocketHandler} on three paths: the two legacy
- * per-surface aliases {@code /ws/missions/{missionId}/presence} (the {@link
- * LiveSyncLegacyHandshakeInterceptor} authorizes the handshake and binds the socket to its implicit
- * {@code mission:{id}} topic) and {@code /ws/materialboerse/board} (the {@link
- * LiveSyncBoardLegacyHandshakeInterceptor} binds the fixed global {@code materialboard} topic) —
- * both keeping tabs opened before the {@code /ws/sync} rollout working for one release — and the
- * multiplexed {@code /ws/sync} (the {@link LiveSyncSyncHandshakeInterceptor} captures the OAuth2
- * token + pin for per-subscribe authorization). The subscribe-authorization probes run on a
- * dedicated bounded {@link #liveSyncSubscribeAuthExecutor()} thread pool so the WebSocket container
- * threads never block on a backend read.
+ * <p>Registers the shared {@link LiveSyncWebSocketHandler} on the multiplexed {@code /ws/sync} path
+ * (the {@link LiveSyncSyncHandshakeInterceptor} captures the OAuth2 token + pin for per-subscribe
+ * authorization). The one-release legacy per-surface aliases {@code
+ * /ws/missions/{missionId}/presence} and {@code /ws/materialboerse/board} were removed in #1236 —
+ * every peer-synced surface now rides {@code /ws/sync} (mission presence via its {@code
+ * mission:{id}} topic room, the board via {@code materialboard}). The subscribe-authorization
+ * probes run on a dedicated bounded {@link #liveSyncSubscribeAuthExecutor()} thread pool so the
+ * WebSocket container threads never block on a backend read.
  *
  * <p>The handshake is gated by an explicit {@code setAllowedOriginPatterns} list (driven by {@code
  * app.websocket.allowed-origin-patterns}) — {@code setAllowedOriginPatterns("*")} would leave the
@@ -93,7 +88,6 @@ public class LiveSyncWebSocketConfig implements WebSocketConfigurer {
   private static final int SUBSCRIBE_AUTH_QUEUE = 2000;
 
   private final LiveSyncPresenceService presenceService;
-  private final BackendApiClient backendApiClient;
   private final MeterRegistry meterRegistry;
   private final ObjectProvider<LiveSyncFanout> fanoutProvider;
   private final LiveSyncSubscriptionAuthorizer subscriptionAuthorizer;
@@ -101,16 +95,14 @@ public class LiveSyncWebSocketConfig implements WebSocketConfigurer {
   private final List<String> allowedOriginPatterns;
 
   /**
-   * Constructor injection of the shared presence store, the backend client used by the legacy
-   * handshake gate, the Micrometer registry, the fan-out seam, the multiplexed subscribe
-   * authorizer, the authorized-client store (read at the {@code /ws/sync} handshake to capture the
-   * OAuth2 token) and the WebSocket origin allowlist. The fan-out is injected lazily via an {@link
-   * ObjectProvider} so a Redis binding (when present) is used and the no-op fallback is created
-   * only when none is registered — order-independent, no {@code @ConditionalOnMissingBean} and no
-   * self-referential cycle.
+   * Constructor injection of the shared presence store, the Micrometer registry, the fan-out seam,
+   * the multiplexed subscribe authorizer, the authorized-client store (read at the {@code /ws/sync}
+   * handshake to capture the OAuth2 token) and the WebSocket origin allowlist. The fan-out is
+   * injected lazily via an {@link ObjectProvider} so a Redis binding (when present) is used and the
+   * no-op fallback is created only when none is registered — order-independent, no
+   * {@code @ConditionalOnMissingBean} and no self-referential cycle.
    *
    * @param presenceService in-memory editor-presence store
-   * @param backendApiClient client used by the legacy handshake interceptor to authorize access
    * @param meterRegistry registry the handler binds its gauges and relay counters to
    * @param fanoutProvider lazy provider of the cross-replica fan-out (Redis when enabled)
    * @param subscriptionAuthorizer authorizes a multiplexed {@code /ws/sync} subscribe
@@ -121,7 +113,6 @@ public class LiveSyncWebSocketConfig implements WebSocketConfigurer {
    */
   public LiveSyncWebSocketConfig(
       LiveSyncPresenceService presenceService,
-      BackendApiClient backendApiClient,
       MeterRegistry meterRegistry,
       ObjectProvider<LiveSyncFanout> fanoutProvider,
       LiveSyncSubscriptionAuthorizer subscriptionAuthorizer,
@@ -130,7 +121,6 @@ public class LiveSyncWebSocketConfig implements WebSocketConfigurer {
               "${app.websocket.allowed-origin-patterns:https://profit-base.online,https://localhost:18081,http://localhost:18081}")
           List<String> allowedOriginPatterns) {
     this.presenceService = presenceService;
-    this.backendApiClient = backendApiClient;
     this.meterRegistry = meterRegistry;
     this.fanoutProvider = fanoutProvider;
     this.subscriptionAuthorizer = subscriptionAuthorizer;
@@ -187,14 +177,6 @@ public class LiveSyncWebSocketConfig implements WebSocketConfigurer {
   public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
     LiveSyncWebSocketHandler handler = liveSyncWebSocketHandler();
     String[] origins = allowedOriginPatterns.toArray(new String[0]);
-    registry
-        .addHandler(handler, "/ws/missions/{missionId}/presence")
-        .addInterceptors(new LiveSyncLegacyHandshakeInterceptor(backendApiClient))
-        .setAllowedOriginPatterns(origins);
-    registry
-        .addHandler(handler, "/ws/materialboerse/board")
-        .addInterceptors(new LiveSyncBoardLegacyHandshakeInterceptor())
-        .setAllowedOriginPatterns(origins);
     registry
         .addHandler(handler, "/ws/sync")
         .addInterceptors(new LiveSyncSyncHandshakeInterceptor(authorizedClientRepository))

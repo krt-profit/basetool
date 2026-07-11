@@ -194,18 +194,6 @@ public class SecurityConfig {
                     .requestMatchers("/missions/**")
                     .permitAll() // Still permitAll for general access, @PreAuthorize or logic
                     // inside handles details
-                    // Mission-detail presence WebSocket: only authenticated users can join the
-                    // awareness channel (anonymous guests browsing a mission detail page must
-                    // not appear as "editors" and must not see who is editing). The OIDC
-                    // session is reused by the WebSocket handshake.
-                    .requestMatchers("/ws/missions/**")
-                    .authenticated()
-                    // Materialbörse board live-sync WebSocket: authenticated members only. Only the
-                    // opaque "board" section key crosses the socket and each peer re-pulls its own
-                    // KRT_MEMBER-gated board fragment, so an authenticated guest learns nothing
-                    // here.
-                    .requestMatchers("/ws/materialboerse/**")
-                    .authenticated()
                     // Multiplexed tool-wide live-sync WebSocket (REQ-FE-015, ADR-0094): one socket
                     // per tab carrying every peer-sync topic. Authenticated only — anonymous guests
                     // get no socket (their order creates are relayed server-side instead), and both
