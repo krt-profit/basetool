@@ -494,11 +494,14 @@ class LiveSyncWebSocketHandlerTest {
   }
 
   @Test
-  void multiplexedSubscribe_unknownTopic_isDenied() throws Exception {
+  void multiplexedSubscribe_unknownTopic_isDeniedAndCounts() throws Exception {
     FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
     handler.handleTextMessage(
         bob, new TextMessage("{\"type\":\"subscribe\",\"topic\":\"bogus:not-a-thing\"}"));
     assertThat(lastBroadcast(bob).get("type").asString()).isEqualTo("denied");
+    // #1239: the unparseable-topic subscribe is counted on the unlabelled invalid-topic meter so a
+    // client/server topic-vocabulary skew is visible; no `topic_class` because it parsed to none.
+    assertThat(invalidTopicCounter()).isEqualTo(1.0);
   }
 
   @Test
@@ -1190,6 +1193,11 @@ class LiveSyncWebSocketHandlerTest {
             .find(MetricNames.LIVESYNC_SOCKET_REJECTED)
             .tag(MetricNames.TAG_REASON, reason)
             .counter();
+    return counter == null ? 0.0 : counter.count();
+  }
+
+  private double invalidTopicCounter() {
+    var counter = registry.find(MetricNames.LIVESYNC_INVALID_TOPIC).counter();
     return counter == null ? 0.0 : counter.count();
   }
 
