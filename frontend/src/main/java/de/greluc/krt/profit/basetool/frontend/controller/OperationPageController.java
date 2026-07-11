@@ -237,83 +237,197 @@ public class OperationPageController {
       @RequestParam(required = false) String fragment,
       Authentication authentication,
       Model model) {
-    if ("missions".equals(fragment)) {
-      return missionsFragment(id, page, size, model);
+    if (fragment != null) {
+      return operationFragment(id, page, size, fragment, authentication, model);
     }
     try {
-      // #1123: fetch the four independent reads concurrently on virtual threads (ParallelPageLoader
-      // replays the request-scoped context — auth, active-org-unit pin, correlation id, client IP)
-      // instead of blocking through them in series. The finance read is the cheap /finance-summary
-      // roll-up (#1121, the operation-side ADR-0078 gap); each mission's per-entry breakdown loads
-      // lazily via GET /operations/{id}/finance/{missionId} when its panel is expanded.
-      CompletableFuture<OperationDto> operationF =
-          parallelPageLoader.loadAsync(
-              () -> backendApiClient.get("/api/v1/operations/" + id, OperationDto.class, false));
-      CompletableFuture<PageResponse<MissionListDto>> missionsF =
-          parallelPageLoader.loadAsync(() -> fetchMissionsPage(id, page, size));
-      CompletableFuture<OperationFinanceSummaryDto> financeF =
-          parallelPageLoader.loadAsync(
-              () ->
-                  backendApiClient.get(
-                      "/api/v1/operations/" + id + "/finance-summary",
-                      OperationFinanceSummaryDto.class,
-                      false));
-      CompletableFuture<OperationPayoutSummaryDto> payoutsF =
-          parallelPageLoader.loadAsync(
-              () ->
-                  backendApiClient.get(
-                      "/api/v1/operations/" + id + "/payouts",
-                      OperationPayoutSummaryDto.class,
-                      false));
-      CompletableFuture.allOf(operationF, missionsF, financeF, payoutsF).join();
-
-      OperationDto operation = operationF.join();
-      model.addAttribute("operation", operation);
-
-      PageResponse<MissionListDto> missionsPage = missionsF.join();
-      model.addAttribute("missions", missionsPage.content());
-      model.addAttribute("missionsPage", missionsPage);
-
-      OperationFinanceSummaryDto operationFinance = financeF.join();
-      model.addAttribute("operationFinance", operationFinance);
-
-      OperationPayoutSummaryDto payoutSummary = payoutsF.join();
-      model.addAttribute("operationPayouts", payoutSummary.payouts());
-      model.addAttribute("operationDonationTotal", payoutSummary.totalDonations());
-
-      // Largest per-mission result, so the "Ergebnis je Einsatz" overview bars can be sized
-      // proportionally (BigDecimal.ZERO when there are no positive results — the template then
-      // renders zero-width bars rather than dividing by zero).
-      BigDecimal maxMissionResult =
-          operationFinance.missions() == null
-              ? BigDecimal.ZERO
-              : operationFinance.missions().stream()
-                  .map(OperationMissionFinanceDto::totalSum)
-                  .filter(Objects::nonNull)
-                  .max(BigDecimal::compareTo)
-                  .orElse(BigDecimal.ZERO);
-      model.addAttribute("operationMaxMissionResult", maxMissionResult);
-
-      // Resolved at the HTTP boundary so the template stays free of inline
-      // role-expression checks. The backend's PUT /api/v1/operations/{id}
-      // requires ROLE_MISSION_MANAGER (or any role that reaches it via the
-      // hierarchy — ADMIN, OFFICER) AND the same role is granted by the
-      // app_user.is_mission_manager flag through the JWT-converter, so the
-      // role check here matches what the backend enforces.
-      model.addAttribute("canEdit", hasMissionManagerRole(authentication));
-      // The "Bezahlt"-checkbox is asymmetric: any mission manager can set
-      // it to paid, but only an officer or admin may clear it back to
-      // unpaid. The template uses this flag to disable an already-checked
-      // checkbox for plain mission managers — mirrors the asymmetric
-      // @PreAuthorize on the backend's payouts/paid-out endpoint.
-      model.addAttribute("canUnsetPaidOut", hasOfficerOrAdminRole(authentication));
-
+      loadFullModel(id, page, size, authentication, model);
     } catch (Exception e) {
       log.error("Error loading operation details", e);
       model.addAttribute("error", "error.operation.load");
       return "redirect:/operations";
     }
     return "operation-detail";
+  }
+
+  /**
+   * Renders a single operation-detail section fragment for an AJAX swap — the missions pager
+   * (REQ-FE-002) and the live-sync peer-refresh targets overview/payout/finance (REQ-FE-015,
+   * ADR-0094). Each case loads only the backend reads its fragment needs (ADR-0078/ADR-0081
+   * fragment-gating); an unknown fragment name or a backend failure degrades to a section-sized
+   * inline error rather than a redirect, so one flaky peer-refresh never injects an unrelated
+   * redirect target into a swap container.
+   *
+   * @param id operation id
+   * @param page zero-based page index for the embedded missions table
+   * @param size page size for the embedded missions table
+   * @param fragment the requested fragment name ({@code overview}/{@code payout}/{@code
+   *     finance}/{@code missions})
+   * @param authentication current user's authentication (used for {@code canEdit} / {@code
+   *     canUnsetPaidOut})
+   * @param model Thymeleaf model populated with the fragment's data
+   * @return the {@code operation-detail :: <fragment>} view, or {@code :: fragmentError} on an
+   *     unknown fragment or a backend failure
+   */
+  private String operationFragment(
+      UUID id,
+      Integer page,
+      Integer size,
+      String fragment,
+      Authentication authentication,
+      Model model) {
+    if ("missions".equals(fragment)) {
+      // The missions fragment has its own empty-state degradation (never a redirect), kept as-is.
+      return missionsFragment(id, page, size, model);
+    }
+    try {
+      return switch (fragment.toLowerCase(java.util.Locale.ROOT)) {
+        case "overview" -> {
+          loadFullModel(id, page, size, authentication, model);
+          yield "operation-detail :: overviewSection";
+        }
+        case "payout" -> {
+          loadPayoutModel(id, authentication, model);
+          yield "operation-detail :: payoutSection";
+        }
+        case "finance" -> {
+          loadFinanceModel(id, page, size, model);
+          yield "operation-detail :: financeSection";
+        }
+        default -> "operation-detail :: fragmentError";
+      };
+    } catch (Exception e) {
+      log.error("Error loading operation fragment '{}' for {}", fragment, id, e);
+      return "operation-detail :: fragmentError";
+    }
+  }
+
+  /**
+   * Loads the full operation-detail model (the overview fragment needs all of it): the four
+   * independent reads fanned out on virtual threads via {@link ParallelPageLoader} plus the derived
+   * {@code operationMaxMissionResult}, {@code canEdit} and {@code canUnsetPaidOut}. Propagates a
+   * backend failure to the caller (the full page redirects, the overview fragment shows its inline
+   * error).
+   *
+   * @param id operation id
+   * @param page zero-based page index for the embedded missions table
+   * @param size page size for the embedded missions table
+   * @param authentication current user's authentication
+   * @param model Thymeleaf model to populate
+   */
+  private void loadFullModel(
+      UUID id, Integer page, Integer size, Authentication authentication, Model model) {
+    // #1123: fetch the four independent reads concurrently on virtual threads (ParallelPageLoader
+    // replays the request-scoped context — auth, active-org-unit pin, correlation id, client IP)
+    // instead of blocking through them in series. The finance read is the cheap /finance-summary
+    // roll-up (#1121, the operation-side ADR-0078 gap); each mission's per-entry breakdown loads
+    // lazily via GET /operations/{id}/finance/{missionId} when its panel is expanded.
+    CompletableFuture<OperationDto> operationF =
+        parallelPageLoader.loadAsync(
+            () -> backendApiClient.get("/api/v1/operations/" + id, OperationDto.class, false));
+    CompletableFuture<PageResponse<MissionListDto>> missionsF =
+        parallelPageLoader.loadAsync(() -> fetchMissionsPage(id, page, size));
+    CompletableFuture<OperationFinanceSummaryDto> financeF =
+        parallelPageLoader.loadAsync(
+            () ->
+                backendApiClient.get(
+                    "/api/v1/operations/" + id + "/finance-summary",
+                    OperationFinanceSummaryDto.class,
+                    false));
+    CompletableFuture<OperationPayoutSummaryDto> payoutsF =
+        parallelPageLoader.loadAsync(
+            () ->
+                backendApiClient.get(
+                    "/api/v1/operations/" + id + "/payouts",
+                    OperationPayoutSummaryDto.class,
+                    false));
+    CompletableFuture.allOf(operationF, missionsF, financeF, payoutsF).join();
+
+    model.addAttribute("operation", operationF.join());
+
+    PageResponse<MissionListDto> missionsPage = missionsF.join();
+    model.addAttribute("missions", missionsPage.content());
+    model.addAttribute("missionsPage", missionsPage);
+
+    OperationFinanceSummaryDto operationFinance = financeF.join();
+    model.addAttribute("operationFinance", operationFinance);
+
+    OperationPayoutSummaryDto payoutSummary = payoutsF.join();
+    model.addAttribute("operationPayouts", payoutSummary.payouts());
+    model.addAttribute("operationDonationTotal", payoutSummary.totalDonations());
+
+    // Largest per-mission result, so the "Ergebnis je Einsatz" overview bars can be sized
+    // proportionally (BigDecimal.ZERO when there are no positive results — the template then
+    // renders zero-width bars rather than dividing by zero).
+    BigDecimal maxMissionResult =
+        operationFinance.missions() == null
+            ? BigDecimal.ZERO
+            : operationFinance.missions().stream()
+                .map(OperationMissionFinanceDto::totalSum)
+                .filter(Objects::nonNull)
+                .max(BigDecimal::compareTo)
+                .orElse(BigDecimal.ZERO);
+    model.addAttribute("operationMaxMissionResult", maxMissionResult);
+
+    // Resolved at the HTTP boundary so the template stays free of inline
+    // role-expression checks. The backend's PUT /api/v1/operations/{id}
+    // requires ROLE_MISSION_MANAGER (or any role that reaches it via the
+    // hierarchy — ADMIN, OFFICER) AND the same role is granted by the
+    // app_user.is_mission_manager flag through the JWT-converter, so the
+    // role check here matches what the backend enforces.
+    model.addAttribute("canEdit", hasMissionManagerRole(authentication));
+    // The "Bezahlt"-checkbox is asymmetric: any mission manager can set
+    // it to paid, but only an officer or admin may clear it back to
+    // unpaid. The template uses this flag to disable an already-checked
+    // checkbox for plain mission managers — mirrors the asymmetric
+    // @PreAuthorize on the backend's payouts/paid-out endpoint.
+    model.addAttribute("canUnsetPaidOut", hasOfficerOrAdminRole(authentication));
+  }
+
+  /**
+   * Loads only the model the {@code payoutSection} fragment needs (fragment-gating): the operation
+   * (for the preliminary-values flag and the checkbox operation id), the payout summary (rows +
+   * donation total) and the two role flags. Deliberately issues neither the finance-summary nor the
+   * missions read.
+   *
+   * @param id operation id
+   * @param authentication current user's authentication
+   * @param model Thymeleaf model to populate
+   */
+  private void loadPayoutModel(UUID id, Authentication authentication, Model model) {
+    model.addAttribute(
+        "operation", backendApiClient.get("/api/v1/operations/" + id, OperationDto.class, false));
+    OperationPayoutSummaryDto payoutSummary =
+        backendApiClient.get(
+            "/api/v1/operations/" + id + "/payouts", OperationPayoutSummaryDto.class, false);
+    model.addAttribute("operationPayouts", payoutSummary.payouts());
+    model.addAttribute("operationDonationTotal", payoutSummary.totalDonations());
+    model.addAttribute("canEdit", hasMissionManagerRole(authentication));
+    model.addAttribute("canUnsetPaidOut", hasOfficerOrAdminRole(authentication));
+  }
+
+  /**
+   * Loads only the model the {@code financeSection} fragment needs (fragment-gating): the finance
+   * roll-up, the donation total (from the payout summary) and the missions page (its total feeds
+   * the sum-strip's per-operation count). Deliberately does not issue the operation-detail read.
+   *
+   * @param id operation id
+   * @param page zero-based page index for the embedded missions table
+   * @param size page size for the embedded missions table
+   * @param model Thymeleaf model to populate
+   */
+  private void loadFinanceModel(UUID id, Integer page, Integer size, Model model) {
+    model.addAttribute(
+        "operationFinance",
+        backendApiClient.get(
+            "/api/v1/operations/" + id + "/finance-summary",
+            OperationFinanceSummaryDto.class,
+            false));
+    OperationPayoutSummaryDto payoutSummary =
+        backendApiClient.get(
+            "/api/v1/operations/" + id + "/payouts", OperationPayoutSummaryDto.class, false);
+    model.addAttribute("operationDonationTotal", payoutSummary.totalDonations());
+    model.addAttribute("missionsPage", fetchMissionsPage(id, page, size));
   }
 
   /**

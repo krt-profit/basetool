@@ -221,6 +221,26 @@ public final class MetricNames {
    */
   public static final String SSE_SEND_FAILURES = "basetool.sse.send.failures";
 
+  /**
+   * Counter {@code basetool_sse_redis_published_total} — real-time notification signals this
+   * instance published to the cross-replica Redis channel (ADR-0094).
+   */
+  public static final String SSE_REDIS_PUBLISHED = "basetool.sse.redis.published";
+
+  /**
+   * Counter {@code basetool_sse_redis_consumed_total} — real-time notification signals this
+   * instance consumed from a peer replica (own-origin messages excluded).
+   */
+  public static final String SSE_REDIS_CONSUMED = "basetool.sse.redis.consumed";
+
+  /**
+   * Counter {@code basetool_sse_redis_errors_total} — tag {@code op} ({@link #OP_PUBLISH} / {@link
+   * #OP_CONSUME}); a Redis fan-out publish or consume that failed (swallowed — local delivery
+   * already happened, so the failure only degrades cross-replica push; polling remains the
+   * fallback, ADR-0094).
+   */
+  public static final String SSE_REDIS_ERRORS = "basetool.sse.redis.errors";
+
   // --- Tag keys --------------------------------------------------------------------------
 
   /**
@@ -278,7 +298,16 @@ public final class MetricNames {
   /** Tag key: the SSE event name that failed to send, on {@link #SSE_SEND_FAILURES}. */
   public static final String TAG_EVENT = "event";
 
+  /** Tag key: the notification Redis fan-out operation on {@link #SSE_REDIS_ERRORS}. */
+  public static final String TAG_OP = "op";
+
   // --- Bounded tag values (not an application enum) --------------------------------------
+
+  /** Notification Redis fan-out operation: publishing a signal to peer replicas. */
+  public static final String OP_PUBLISH = "publish";
+
+  /** Notification Redis fan-out operation: consuming a peer replica's signal. */
+  public static final String OP_CONSUME = "consume";
 
   /** Outcome tag value for a job run that completed without throwing. */
   public static final String OUTCOME_SUCCESS = "success";

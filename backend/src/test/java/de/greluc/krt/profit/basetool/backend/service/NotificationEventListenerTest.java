@@ -44,7 +44,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class NotificationEventListenerTest {
 
   @Mock private NotificationCreationService notificationCreationService;
-  @Mock private NotificationStreamService notificationStreamService;
+  @Mock private NotificationFanout notificationFanout;
   @InjectMocks private NotificationEventListener listener;
 
   private static NotificationEvent event() {
@@ -60,7 +60,7 @@ class NotificationEventListenerTest {
     listener.onNotificationEvent(event);
 
     // The push is the recipients createFromEvent returned — fired after it (its tx) has committed.
-    verify(notificationStreamService).publish(recipients);
+    verify(notificationFanout).publish(recipients);
   }
 
   @Test
@@ -70,7 +70,7 @@ class NotificationEventListenerTest {
 
     listener.onNotificationEvent(event);
 
-    verify(notificationStreamService, never()).publish(any());
+    verify(notificationFanout, never()).publish(any());
   }
 
   @Test
@@ -82,6 +82,6 @@ class NotificationEventListenerTest {
     // The business transaction has already committed; a notification hiccup must not surface.
     listener.onNotificationEvent(event);
 
-    verify(notificationStreamService, never()).publish(any());
+    verify(notificationFanout, never()).publish(any());
   }
 }

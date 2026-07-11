@@ -580,3 +580,23 @@ groups:
         annotations:
           summary: "Keycloak user-event metrics absent while Keycloak is up"
           description: "keycloak_user_events_total is not being exported while the Keycloak scrape is up — KeycloakLoginErrorSpike is blind. Check the Keycloak metrics/event listener config."
+
+      # (#1102, REQ-FE-015 / ADR-0094) Redis fan-out for cross-replica live delivery is erroring.
+      # Both the live-sync changed-relay (basetool_livesync_redis_errors_total, frontend) and the
+      # notification SSE fan-out (basetool_sse_redis_errors_total, backend) publish each locally-relayed
+      # signal onto a Redis pub/sub channel so peer replicas relay it to their own rooms. The publish is
+      # fire-and-forget AFTER the local relay, so a publish error does NOT drop same-replica delivery —
+      # it silently degrades to single-instance: a viewer on replica A stops seeing changes/notifications
+      # made on replica B, with no user-facing error and no 5xx. Only fires where the fan-out is enabled
+      # (prod): a disabled fan-out issues no publishes and therefore no errors, so this never trips in
+      # single-instance dev. Sustained publish errors mean the Redis channel is unreachable from a
+      # replica (Redis down, ACL/network drift) — check Redis and the basetool:livesync:changed /
+      # basetool:notify:published channels (the default user needs `&*` for PUBLISH/SUBSCRIBE).
+      - alert: LiveSyncRedisFanoutBroken
+        expr: sum(rate(basetool_livesync_redis_errors_total{op="publish"}[5m])) > 0 or sum(rate(basetool_sse_redis_errors_total{op="publish"}[5m])) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis live-sync/notification fan-out publish errors (cross-replica delivery degraded)"
+          description: "The live-sync and/or notification Redis fan-out has failed to publish for 10 minutes — cross-replica live delivery is silently degraded to single-instance (a viewer on one replica stops seeing another replica's changes/notifications; same-replica delivery still works, no user-facing error). Check Redis reachability from the app replicas and the basetool:livesync:changed / basetool:notify:published pub/sub channels (default-user ACL `&*`)."

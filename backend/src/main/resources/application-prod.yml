@@ -42,6 +42,9 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  # The Redis connection for the notification SSE fan-out (ADR-0094) now lives in the base
+  # application.yml (host from REDIS_HOST, which the compose anchor sets to the `redis` service). Prod
+  # only flips the fan-out and the Redis health indicator ON (below); the connection config is shared.
   lifecycle:
     timeout-per-shutdown-phase: 20s
   security:
@@ -76,7 +79,20 @@ springdoc:
   api-docs:
     enabled: false
 
+management:
+  # Prod turns the notification SSE Redis fan-out ON (ADR-0094), so a notification pushed on one
+  # backend replica reaches a user connected to another. The Redis health indicator is re-enabled
+  # for monitoring visibility of an outage; Redis stays OUT of the readiness group (base config), so
+  # a Redis blip surfaces in the root health aggregate + metrics without flipping the container
+  # unhealthy (ADR-0084).
+  health:
+    redis:
+      enabled: ${MANAGEMENT_HEALTH_REDIS_ENABLED:true}
+
 app:
+  notifications:
+    redis-fanout:
+      enabled: ${APP_NOTIFICATIONS_REDIS_FANOUT_ENABLED:true}
   logging:
     # Enables the JSON/LogstashEncoder appender defined in logback-spring.xml for the prod profile.
     structured-enabled: true

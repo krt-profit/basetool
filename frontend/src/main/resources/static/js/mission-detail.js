@@ -76,7 +76,46 @@ const MISSION_SECTIONS = {
         container: '#mission-frequencies-results',
         fragmentValue: 'frequencies-editor',
     },
+    // #1120: the Verwaltung "Organisation" panel (party lead + typed-frequency overview) used to
+    // sit outside every broadcastable fragment, so a peer's change left their view — and their
+    // #party-lead-version — stale (a needless 409 on their next edit). It is now its own section;
+    // custom "Weitere Frequenzen" stays the sibling `frequencies` section (not nested).
+    organisation: {
+        container: '#mission-organisation-results',
+        fragmentValue: 'organisation',
+    },
 };
+
+// #1241: a mission's core (name/status) and its finance also render on the PARENT OPERATION's
+// detail page — in the embedded missions table and the finance roll-up — which live on the
+// operation:{id} live-sync room, a different topic this page never subscribes to. When such a
+// section changes here, cross-publish the affected operation sections to that room (publishing
+// needs no subscription) so a peer viewing the operation refreshes them in place without a reload.
+// Mapping: mission 'overview' (the core: name/status) -> operation 'missions'; mission 'finance' ->
+// operation 'finance'. Only fires for a mission that belongs to an operation (missionOperationId
+// set); other mission sections (crew/steps/objectives/organisation/…) do not surface on the
+// operation and are not forwarded. Wiring tracked in #1241 (REQ-FE-015).
+function crossPublishToParentOperation(keys) {
+    const operationId = window.missionOperationId;
+    if (
+        !operationId ||
+        !window.krtLiveSync ||
+        typeof window.krtLiveSync.sendChanged !== 'function'
+    ) {
+        return;
+    }
+    const changed = Array.isArray(keys) ? keys : [keys];
+    const operationSections = [];
+    if (changed.indexOf('overview') !== -1) {
+        operationSections.push('missions');
+    }
+    if (changed.indexOf('finance') !== -1) {
+        operationSections.push('finance');
+    }
+    if (operationSections.length) {
+        window.krtLiveSync.sendChanged('operation:' + operationId, operationSections);
+    }
+}
 
 const missionSeam = window.krtFetch.sectionWrite({
     dict: function () {
@@ -113,6 +152,7 @@ const missionSeam = window.krtFetch.sectionWrite({
         if (window.missionPresence && typeof window.missionPresence.sendChanged === 'function') {
             window.missionPresence.sendChanged(keys);
         }
+        crossPublishToParentOperation(keys);
     },
 });
 window.krtMissionWrite = missionSeam.write;
@@ -258,165 +298,31 @@ document.addEventListener('krt:swapped', function (ev) {
 // from echoing back into a loop. The data never travels over the socket: every peer re-pulls
 // through its own authenticated, authorization-checked fragment endpoint, so guest redaction and
 // the member-only finance gate still apply per viewer.
-(function () {
-    // Derived from the seam's MISSION_SECTIONS map (same file, top) so the receiver covers
-    // exactly the sections the write side broadcasts — a hand-maintained copy here once lost
-    // 'objectives' and 'frequencies', leaving peers' Ziele / Weitere Frequenzen stale until a
-    // manual reload.
-    const SECTION_CONTAINERS = {};
-    Object.keys(MISSION_SECTIONS).forEach(function (sectionKey) {
-        SECTION_CONTAINERS[sectionKey] = MISSION_SECTIONS[sectionKey].container;
-    });
-    const ALL_SECTIONS = Object.keys(SECTION_CONTAINERS);
-    const COALESCE_MS = 400;
-    const pendingNow = {}; // sections queued for the next debounce tick (Set-like map)
-    const deferred = {}; // sections held back because the user is editing (Set-like map)
-    let timer = null;
-
-    function anyModalOpen() {
-        return Array.prototype.some.call(
-            document.querySelectorAll('.krt-modal-overlay'),
-            function (o) {
-                return window.getComputedStyle(o).display !== 'none';
-            },
-        );
-    }
-
-    // Never yank a section out from under an active edit. A modal open anywhere means the user is
-    // mid-edit; focus inside the section's own container means inline editing there.
-    function sectionBusy(sectionKey) {
-        if (anyModalOpen()) {
-            return true;
-        }
-        const sel = SECTION_CONTAINERS[sectionKey];
-        const container = sel && document.querySelector(sel);
-        return !!(
-            container &&
-            document.activeElement &&
-            container.contains(document.activeElement)
-        );
-    }
-
-    function refresh(keys) {
-        if (keys.length && window.krtRefreshMissionSection) {
+// The coalescing / busy-guard / deferred-pill receiver now lives in the shared krt-live-sync.js
+// module (REQ-FE-015); mission uses events-source mode because mission-presence.js owns the socket
+// and re-dispatches 'krt:mission-changed' / 'krt:mission-resync'. The section map, the pill id /
+// class / i18n key and the {broadcast:false} refresh are all kept identical so the behaviour — and
+// the two-context e2e that pins it — is unchanged.
+window.krtLiveSync.createReceiver({
+    sections: MISSION_SECTIONS,
+    events: { changed: 'krt:mission-changed', resync: 'krt:mission-resync' },
+    refresh: function (keys) {
+        if (window.krtRefreshMissionSection) {
             window.krtRefreshMissionSection(keys, { broadcast: false });
         }
-    }
-
-    // Remove the pill once nothing is held back, so it never lingers for an already-current
-    // section.
-    function hidePillIfEmpty() {
-        if (Object.keys(deferred).length === 0) {
-            const pill = document.getElementById('mission-livesync-pill');
-            if (pill) {
-                pill.remove();
-            }
-        }
-    }
-
-    // The busy test is re-applied here, at flush time — not only when the signal first arrived.
-    // A section that became busy DURING the COALESCE_MS window (the user opened a modal or
-    // focused an inline edit on it) is moved to `deferred` + the pill instead of being swapped
-    // out from under the edit. Sections that are safe to refresh are dropped from `deferred` so
-    // the pill cannot keep claiming updates for a section that just refreshed in place.
-    function flushTimer() {
-        timer = null;
-        const keys = Object.keys(pendingNow);
-        keys.forEach(function (k) {
-            delete pendingNow[k];
-        });
-        const ready = [];
-        let nowDeferred = false;
-        keys.forEach(function (k) {
-            if (sectionBusy(k)) {
-                deferred[k] = true;
-                nowDeferred = true;
-            } else {
-                delete deferred[k];
-                ready.push(k);
-            }
-        });
-        refresh(ready);
-        if (nowDeferred) {
-            showPill();
-        }
-        hidePillIfEmpty();
-    }
-
-    function schedule(sectionKey) {
-        pendingNow[sectionKey] = true;
-        if (!timer) {
-            // #1125: full-jitter the coalesce window so peers that all received the same `changed`
-            // frame within microseconds do not fire their fragment refetches in one synchronized
-            // burst. Mirrors the reconnect path's decorrelation jitter (mission-presence.js); the
-            // debounce semantics are unchanged (worst case ~2x COALESCE_MS instead of COALESCE_MS).
-            timer = setTimeout(flushTimer, COALESCE_MS + Math.random() * COALESCE_MS);
-        }
-    }
-
-    function showPill() {
-        let pill = document.getElementById('mission-livesync-pill');
-        if (pill) {
-            return;
-        }
-        const dict = window.MISSION_LIVESYNC_I18N || {};
-        const label =
-            dict['mission.livesync.updates_available'] != null &&
-            dict['mission.livesync.updates_available'] !== ''
+    },
+    pill: {
+        id: 'mission-livesync-pill',
+        className: 'mission-livesync-pill',
+        label: function () {
+            const dict = window.MISSION_LIVESYNC_I18N || {};
+            return dict['mission.livesync.updates_available'] != null &&
+                dict['mission.livesync.updates_available'] !== ''
                 ? dict['mission.livesync.updates_available']
                 : 'Aktualisierungen verfügbar';
-        pill = document.createElement('button');
-        pill.id = 'mission-livesync-pill';
-        pill.type = 'button';
-        pill.className = 'mission-livesync-pill';
-        pill.textContent = label;
-        pill.addEventListener('click', function () {
-            // Apply only sections that are no longer busy — a still-open modal / focused edit on
-            // a section keeps it deferred (and the pill) rather than being clobbered by an
-            // explicit click. (Current fragments are display-oriented and their modals are
-            // separate overlays, so this is belt-and-suspenders, but it keeps the guard honest
-            // if a future fragment ever embeds an inline-edit field.)
-            const ready = [];
-            Object.keys(deferred).forEach(function (k) {
-                if (sectionBusy(k)) {
-                    return;
-                }
-                delete deferred[k];
-                ready.push(k);
-            });
-            refresh(ready);
-            hidePillIfEmpty();
-        });
-        document.body.appendChild(pill);
-    }
-
-    function apply(sections) {
-        const keys = Array.isArray(sections) && sections.length ? sections : ALL_SECTIONS;
-        let anyDeferred = false;
-        keys.forEach(function (sectionKey) {
-            const sel = SECTION_CONTAINERS[sectionKey];
-            if (!sel || !document.querySelector(sel)) {
-                return; // unknown key, or this viewer cannot see the section (e.g. no mgmt panel)
-            }
-            if (sectionBusy(sectionKey)) {
-                deferred[sectionKey] = true;
-                anyDeferred = true;
-            } else {
-                schedule(sectionKey);
-            }
-        });
-        if (anyDeferred) {
-            showPill();
-        }
-    }
-
-    document.addEventListener('krt:mission-changed', function (ev) {
-        apply(ev && ev.detail ? ev.detail.sections : null);
-    });
-    document.addEventListener('krt:mission-resync', function () {
-        apply(null); // refresh everything visible after a reconnect
-    });
-})();
+        },
+    },
+});
 
 // ---- Ablauf (procedure timeline): overview done-toggle + Verwaltung drag-editor -------------
 // Every mutation goes through krtMissionWrite (CSRF + retry-once-on-403 + the shared 409
@@ -1377,16 +1283,20 @@ document.addEventListener('DOMContentLoaded', function () {
     const frequencyForm = document.getElementById('frequency-form');
 
     if (frequencyModal) {
-        document.querySelectorAll('.set-freq-btn').forEach((btn) => {
-            btn.addEventListener('click', function () {
-                // Paket 3B: AJAX submission via MissionSubresource
-                frequencyForm.setAttribute('data-action', this.getAttribute('data-action'));
-                const typeId = this.getAttribute('data-type-id');
-                document.getElementById('freq-type-id').value = typeId;
-                const current = this.getAttribute('data-current-value') || '';
-                document.getElementById('freq-value').value = current;
-                window.krtModalOpen(frequencyModal);
-            });
+        // #1120: document-delegated so the .set-freq-btn buttons survive a live-sync swap of the
+        // #mission-organisation-results fragment (REQ-FE-015). A per-button listener bound here
+        // would be dead the first time a peer's typed-frequency edit re-renders the panel.
+        document.addEventListener('click', function (event) {
+            const btn = event.target.closest && event.target.closest('.set-freq-btn');
+            if (!btn) {
+                return;
+            }
+            frequencyForm.setAttribute('data-action', btn.getAttribute('data-action'));
+            const typeId = btn.getAttribute('data-type-id');
+            document.getElementById('freq-type-id').value = typeId;
+            const current = btn.getAttribute('data-current-value') || '';
+            document.getElementById('freq-value').value = current;
+            window.krtModalOpen(frequencyModal);
         });
 
         // Paket 3B: intercept submit and call PUT /frequencies/ajax, then
@@ -1448,9 +1358,16 @@ document.addEventListener('DOMContentLoaded', function () {
                     // overview section in place. krtRefreshMissionSection also broadcasts 'overview'
                     // to peers (REQ-FE-010), replacing the prior notify.
                     if (window.krtRefreshMissionSection) {
+                        // Refresh + broadcast the overview mirror (a first-time value only renders
+                        // there, #816), and additionally broadcast `organisation` so peers re-render
+                        // the typed-frequency panel — the actor already patched it in place above
+                        // (#1120).
                         window.krtRefreshMissionSection('overview');
+                        if (window.krtNotifyMissionChanged) {
+                            window.krtNotifyMissionChanged('organisation');
+                        }
                     } else if (window.krtNotifyMissionChanged) {
-                        window.krtNotifyMissionChanged('overview');
+                        window.krtNotifyMissionChanged(['overview', 'organisation']);
                     }
                 }
             });
@@ -2251,141 +2168,168 @@ document.addEventListener('DOMContentLoaded', function () {
     // Party Lead autocomplete — same /users/search mechanic as the participant add: picking a
     // member fills the hidden userId, typing a free-text name clears it so the backend resolves
     // the name (unique member -> linked, unknown -> kept as a guest handle).
-    const partyLeadInput = document.getElementById('party-lead-search-input');
-    const partyLeadUserId = document.getElementById('party-lead-user-id');
-    const partyLeadResults = document.getElementById('party-lead-search-results');
-    const partyLeadClearBtn = document.getElementById('party-lead-clear-btn');
-    const partyLeadForm = document.getElementById('party-lead-form');
+    //
+    // #1120: every handler here is document-delegated (not bound to the elements at load) so the
+    // party-lead form + clear button survive a live-sync swap of the #mission-organisation-results
+    // fragment (REQ-FE-015). A peer's party-lead or typed-frequency change re-renders this panel,
+    // and a per-element listener would then be dead on the next edit; the elements are re-queried
+    // inside each handler.
+    let partyLeadDebounce;
 
-    if (partyLeadInput && partyLeadResults && partyLeadUserId) {
-        let partyLeadDebounce;
-
-        function partyLeadCloseLists() {
-            while (partyLeadResults.firstChild) {
-                partyLeadResults.removeChild(partyLeadResults.firstChild);
-            }
+    function partyLeadCloseLists() {
+        const results = document.getElementById('party-lead-search-results');
+        if (!results) {
+            return;
         }
+        while (results.firstChild) {
+            results.removeChild(results.firstChild);
+        }
+    }
 
-        partyLeadInput.addEventListener('input', function () {
-            const val = this.value;
-            // Any manual edit drops a previously resolved id; the backend re-resolves the name.
-            partyLeadUserId.value = '';
-            clearTimeout(partyLeadDebounce);
-            if (!val) {
-                partyLeadCloseLists();
-                return;
-            }
-            partyLeadDebounce = setTimeout(() => {
-                fetch('/users/search?query=' + encodeURIComponent(val))
-                    .then((response) => {
-                        if (!response.ok) throw new Error('Network response was not ok');
-                        return response.json();
-                    })
-                    .then((users) => {
-                        partyLeadCloseLists();
-                        if (!users || users.length === 0) return;
-                        users.forEach((user) => {
-                            const div = document.createElement('div');
-                            const regex = new RegExp(
-                                '(' + val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')',
-                                'gi',
-                            );
-                            const displayName = user.effectiveName || '';
-                            displayName.split(regex).forEach((part, i) => {
-                                if (i % 2 === 1) {
-                                    const strong = document.createElement('strong');
-                                    strong.textContent = part;
-                                    div.appendChild(strong);
-                                } else if (part) {
-                                    div.appendChild(document.createTextNode(part));
-                                }
-                            });
-                            div.addEventListener('click', function () {
-                                partyLeadInput.value = displayName;
-                                partyLeadUserId.value = user.id;
-                                partyLeadCloseLists();
-                            });
-                            partyLeadResults.appendChild(div);
+    document.addEventListener('input', function (e) {
+        if (!e.target || e.target.id !== 'party-lead-search-input') {
+            return;
+        }
+        const input = e.target;
+        const userIdEl = document.getElementById('party-lead-user-id');
+        const results = document.getElementById('party-lead-search-results');
+        if (!userIdEl || !results) {
+            return;
+        }
+        const val = input.value;
+        // Any manual edit drops a previously resolved id; the backend re-resolves the name.
+        userIdEl.value = '';
+        clearTimeout(partyLeadDebounce);
+        if (!val) {
+            partyLeadCloseLists();
+            return;
+        }
+        partyLeadDebounce = setTimeout(() => {
+            fetch('/users/search?query=' + encodeURIComponent(val))
+                .then((response) => {
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    return response.json();
+                })
+                .then((users) => {
+                    partyLeadCloseLists();
+                    if (!users || users.length === 0) return;
+                    users.forEach((user) => {
+                        const div = document.createElement('div');
+                        const regex = new RegExp(
+                            '(' + val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')',
+                            'gi',
+                        );
+                        const displayName = user.effectiveName || '';
+                        displayName.split(regex).forEach((part, i) => {
+                            if (i % 2 === 1) {
+                                const strong = document.createElement('strong');
+                                strong.textContent = part;
+                                div.appendChild(strong);
+                            } else if (part) {
+                                div.appendChild(document.createTextNode(part));
+                            }
                         });
-                    })
-                    .catch((err) => console.error('Error fetching users:', err));
-            }, 300);
-        });
+                        div.addEventListener('click', function () {
+                            input.value = displayName;
+                            userIdEl.value = user.id;
+                            partyLeadCloseLists();
+                        });
+                        results.appendChild(div);
+                    });
+                })
+                .catch((err) => console.error('Error fetching users:', err));
+        }, 300);
+    });
 
-        document.addEventListener('click', function (e) {
-            if (e.target !== partyLeadInput) {
-                partyLeadCloseLists();
-            }
-        });
-    }
+    document.addEventListener('click', function (e) {
+        // Close the autocomplete dropdown when clicking outside its input.
+        if (!e.target || e.target.id !== 'party-lead-search-input') {
+            partyLeadCloseLists();
+        }
+    });
 
-    if (partyLeadClearBtn && partyLeadForm && partyLeadInput && partyLeadUserId) {
-        partyLeadClearBtn.addEventListener('click', function () {
-            // Clear the inputs and submit empty userId + guestName so the backend clears the
-            // party lead. requestSubmit() fires the 'submit' event (unlike .submit()) so the
-            // in-place interceptor below handles it.
-            partyLeadInput.value = '';
-            partyLeadUserId.value = '';
-            partyLeadForm.requestSubmit();
-        });
-    }
+    document.addEventListener('click', function (e) {
+        const clearBtn = e.target.closest && e.target.closest('#party-lead-clear-btn');
+        if (!clearBtn) {
+            return;
+        }
+        const input = document.getElementById('party-lead-search-input');
+        const userIdEl = document.getElementById('party-lead-user-id');
+        const form = document.getElementById('party-lead-form');
+        if (!input || !userIdEl || !form) {
+            return;
+        }
+        // Clear the inputs and submit empty userId + guestName so the backend clears the party
+        // lead. requestSubmit() fires the 'submit' event (unlike .submit()) so the delegated submit
+        // handler below runs.
+        input.value = '';
+        userIdEl.value = '';
+        form.requestSubmit();
+    });
 
     // In-place party-lead set/clear (#574): patch the display + bumped partyLeadVersion without a
-    // reload. The autocomplete form is not re-rendered, so its per-element handlers stay valid.
-    if (partyLeadForm && partyLeadInput && partyLeadUserId) {
-        partyLeadForm.addEventListener('submit', async function (ev) {
-            ev.preventDefault();
-            const versionInput = document.getElementById('party-lead-version');
-            // Snapshot THIS submit's userId/guestName intent now, but read the version live at send
-            // time (#1143). A static payload baked in the pre-bump partyLeadVersion, so a set
-            // immediately followed by Clear queued a second write with a stale version that 409'd,
-            // leaving the wrong lead assigned. Only the version is re-read in the thunk — re-reading
-            // userId/guestName would let a queued Clear wipe a queued set's captured value.
-            const submittedUserId = partyLeadUserId.value || null;
-            const submittedGuestName = partyLeadInput.value || null;
-            const res = await window.krtMissionWrite({
-                method: 'PUT',
-                url: '/missions/' + window.missionId + '/party-lead/ajax',
-                payload: function () {
-                    return {
-                        userId: submittedUserId,
-                        guestName: submittedGuestName,
-                        version:
-                            versionInput && versionInput.value !== ''
-                                ? parseInt(versionInput.value, 10)
-                                : 0,
-                    };
-                },
-                sectionKey: 'party_lead',
-            });
-            if (!res.ok || !res.body) {
-                return;
-            }
-            const dto = res.body;
-            const display = document.getElementById('party-lead-display');
-            const overview = document.getElementById('overview-party-lead');
-            const noneLabel = (display && display.getAttribute('data-none-label')) || '';
-            const resolvedName = dto.partyLeadUser
-                ? dto.partyLeadUser.effectiveName || ''
-                : dto.partyLeadGuestName || noneLabel;
-            if (display) display.textContent = resolvedName;
-            if (overview) overview.textContent = resolvedName;
-            // The facts-bar "Leiter" now shows the Einsatzleiter (mission-lead participant), not
-            // the party lead, so a party-lead change no longer patches it here (REQ-MISSION-013).
-            if (versionInput && dto.partyLeadVersion != null) {
-                versionInput.value = dto.partyLeadVersion;
-            }
-            partyLeadUserId.value = dto.partyLeadUser ? dto.partyLeadUser.id || '' : '';
-            partyLeadInput.value = dto.partyLeadUser
-                ? dto.partyLeadUser.effectiveName || ''
-                : dto.partyLeadGuestName || '';
-            // Already patched in place above; just signal peers to re-render their overview
-            // (party lead is mirrored there) — live sync, REQ-FE-010.
-            if (window.krtNotifyMissionChanged) {
-                window.krtNotifyMissionChanged('overview');
-            }
+    // reload, then broadcast overview + organisation so peers re-render both the mirror and this
+    // panel — refreshing a peer's stale #party-lead-version that would otherwise 409 their next
+    // edit (#1120 / REQ-FE-010).
+    document.addEventListener('submit', async function (ev) {
+        if (!ev.target || ev.target.id !== 'party-lead-form') {
+            return;
+        }
+        ev.preventDefault();
+        const input = document.getElementById('party-lead-search-input');
+        const userIdEl = document.getElementById('party-lead-user-id');
+        const versionInput = document.getElementById('party-lead-version');
+        if (!input || !userIdEl) {
+            return;
+        }
+        // Snapshot THIS submit's userId/guestName intent now, but read the version live at send time
+        // (#1143). A static payload baked in the pre-bump partyLeadVersion, so a set immediately
+        // followed by Clear queued a second write with a stale version that 409'd, leaving the wrong
+        // lead assigned. Only the version is re-read in the thunk.
+        const submittedUserId = userIdEl.value || null;
+        const submittedGuestName = input.value || null;
+        const res = await window.krtMissionWrite({
+            method: 'PUT',
+            url: '/missions/' + window.missionId + '/party-lead/ajax',
+            payload: function () {
+                return {
+                    userId: submittedUserId,
+                    guestName: submittedGuestName,
+                    version:
+                        versionInput && versionInput.value !== ''
+                            ? parseInt(versionInput.value, 10)
+                            : 0,
+                };
+            },
+            sectionKey: 'party_lead',
         });
-    }
+        if (!res.ok || !res.body) {
+            return;
+        }
+        const dto = res.body;
+        const display = document.getElementById('party-lead-display');
+        const overview = document.getElementById('overview-party-lead');
+        const noneLabel = (display && display.getAttribute('data-none-label')) || '';
+        const resolvedName = dto.partyLeadUser
+            ? dto.partyLeadUser.effectiveName || ''
+            : dto.partyLeadGuestName || noneLabel;
+        if (display) display.textContent = resolvedName;
+        if (overview) overview.textContent = resolvedName;
+        // The facts-bar "Leiter" now shows the Einsatzleiter (mission-lead participant), not the
+        // party lead, so a party-lead change no longer patches it here (REQ-MISSION-013).
+        if (versionInput && dto.partyLeadVersion != null) {
+            versionInput.value = dto.partyLeadVersion;
+        }
+        userIdEl.value = dto.partyLeadUser ? dto.partyLeadUser.id || '' : '';
+        input.value = dto.partyLeadUser
+            ? dto.partyLeadUser.effectiveName || ''
+            : dto.partyLeadGuestName || '';
+        // Already patched in place above; signal peers to re-render their overview mirror AND their
+        // Organisation panel (fresh party-lead display + version) — live sync, #1120 / REQ-FE-010.
+        if (window.krtNotifyMissionChanged) {
+            window.krtNotifyMissionChanged(['overview', 'organisation']);
+        }
+    });
 });
 
 function setNowToInput(inputId) {

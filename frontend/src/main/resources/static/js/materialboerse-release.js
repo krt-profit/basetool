@@ -20,6 +20,9 @@
     }
 
     let SERIALIZE_KEY = 'materialboerse';
+    // REQ-FE-015 (ADR-0094): the global live-sync room a release/edit publishes to over the shared
+    // multiplexed /ws/sync socket (window.krtLiveSync), so board viewers re-pull the list.
+    let MATERIALBOARD_TOPIC = 'materialboard';
     let state = {
         mode: null,
         itemId: null,
@@ -605,8 +608,8 @@
     }
 
     function notifyPeers() {
-        if (window.krtMaterialboardPresence) {
-            window.krtMaterialboardPresence.sendChanged(['board']);
+        if (window.krtLiveSync) {
+            window.krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['board']);
         }
     }
 

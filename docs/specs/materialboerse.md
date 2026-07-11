@@ -194,17 +194,24 @@ Complies with `docs/specs/frontend-ajax-mutations.md` (REQ-FE-001…014).
 ### REQ-MARKET-010 — Live multi-user board sync
 
 Because the board is a surface several members see at once, a peer's release / deactivate / interest
-change propagates to other viewers without a manual reload, over a dedicated Materialbörse presence
-relay (ADR-0082, decision D4), mirroring the REQ-FE-010 three-mirror-point contract (acting-client
-broadcast ↔ server relay accept-list ↔ receiving-client apply map). Only opaque section keys cross
-the socket; each peer re-pulls its own authorization-checked fragment.
+change propagates to other viewers without a manual reload, over the shared tool-wide multiplexed
+live-sync relay — the global `materialboard` topic room on `/ws/sync` (REQ-FE-015, ADR-0094), into
+which the former dedicated Materialbörse presence relay (ADR-0082, decision D4) was folded so the
+board no longer forks its own single-instance socket. It mirrors the REQ-FE-010 three-mirror-point
+contract (acting-client broadcast ↔ server relay accept-list ↔ receiving-client apply map): the
+`board` section key is broadcast by `krtLiveSync.sendChanged('materialboard', ['board'])`, whitelisted
+by `LiveSyncTopicClass.MATERIALBOARD`, and applied by the `materialboerse.js` `krtLiveSync.subscribe`
+receiver. Only opaque section keys cross the socket; each peer re-pulls its own authorization-checked
+fragment. Behaviour is unchanged from the dedicated relay — the same debounced, modal-skipping list
+refresh (no deferred-refresh pill) — only the transport is now shared. The pre-rollout
+`/ws/materialboerse/board` alias stays one release for tabs opened before the migration.
 
 **Acceptance**
 - [ ] A release/deactivate/interest by one member refreshes the board of another member viewing it,
 with no location or interessent identity crossing the socket.
 
-**Enforced by:** code review, CI Playwright (e2e) · **Code:** the Materialbörse presence relay +
-`materialboerse.js` receiver
+**Enforced by:** code review, CI Playwright (e2e) · **Code:** the shared `LiveSyncWebSocketHandler`
+(topic `materialboard`) + `materialboerse.js` receiver (`window.krtLiveSync`)
 
 ### REQ-MARKET-011 — Notify the owner when a member registers interest
 

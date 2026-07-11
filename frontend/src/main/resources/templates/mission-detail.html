@@ -1231,6 +1231,13 @@
                     <div class="kpanel" th:if="${!isNew}">
                         <div class="kpanel-head" th:text="#{mission.organisation}">Organisation</div>
                         <div class="kpanel-body">
+                            <!-- #1120: party lead + typed-frequency overview are their own
+                                 broadcastable fragment (REQ-FE-015) so a peer's change re-renders
+                                 the panel — refreshing their #party-lead-version — instead of
+                                 leaving it stale. The custom "Weitere Frequenzen" block below stays
+                                 a SIBLING swap container (#mission-frequencies-results), never
+                                 nested inside this one (the krtFetch re-nesting trap). -->
+                            <div id="mission-organisation-results"><th:block th:fragment="organisationPanel">
                             <div class="form-group">
                                 <label th:text="#{mission.party_lead}">Partyleiter</label>
                                 <div class="krtm-display-flex-gap-0-5rem-flex-direction-colum-3289">
@@ -1280,6 +1287,7 @@
                                     </div>
                                 </div>
                             </div>
+                            </th:block></div>
 
                             <!-- Weitere Frequenzen (REQ-MISSION-014): mission-specific custom channels
                                  (free-text label + value). In-place AJAX swap container — a custom
@@ -2071,6 +2079,11 @@
     const missionId = /*[[${mission?.id?.toString()}]]*/ null;
     window.missionId = missionId;
     window.missionCanEdit = /*[[${!isNew and mission != null and mission.canEdit}]]*/ false;
+    // #1241: the parent operation id (or null when the mission belongs to no operation), so a
+    // mission core/finance edit can cross-publish to the operation:{id} live-sync room whose
+    // embedded missions table and finance roll-up render this mission.
+    window.missionOperationId =
+        /*[[${mission?.operation?.id?.toString()}]]*/ null;
 </script>
 <script th:src="@{/js/mission-detail.js}" th:attr="nonce=${cspNonce}"></script>
     <script th:inline="javascript" th:if="${!isNew}" th:attr="nonce=${cspNonce}">

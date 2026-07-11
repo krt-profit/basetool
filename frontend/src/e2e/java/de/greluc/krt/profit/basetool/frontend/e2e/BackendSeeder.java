@@ -947,6 +947,80 @@ public final class BackendSeeder {
   }
 
   /**
+   * Idempotently grants a user access to a bank account: creates the grant, tolerating a {@code
+   * 409} when the user already holds one on that account (an org-unit account auto-grants some
+   * members, so an explicit grant on top duplicates the unique {@code (user, account)} row). Either
+   * outcome leaves the grantee able to act on the account, which is all a test precondition needs.
+   *
+   * @param username the granting caller's Keycloak username
+   * @param password the granting caller's Keycloak password
+   * @param granteeUserId the user id being granted access
+   * @param accountId the bank account id
+   * @param canDeposit whether the grantee may deposit
+   * @param canWithdraw whether the grantee may withdraw
+   * @param canTransfer whether the grantee may transfer
+   */
+  public void ensureBankGrant(
+      String username,
+      String password,
+      String granteeUserId,
+      String accountId,
+      boolean canDeposit,
+      boolean canWithdraw,
+      boolean canTransfer) {
+    String body =
+        "{\"userId\":\""
+            + granteeUserId
+            + "\",\"accountId\":\""
+            + accountId
+            + "\",\"canDeposit\":"
+            + canDeposit
+            + ",\"canWithdraw\":"
+            + canWithdraw
+            + ",\"canTransfer\":"
+            + canTransfer
+            + "}";
+    try {
+      int status = postStatus(passwordGrant(username, password), "/api/v1/bank/grants", body);
+      if (status != 409 && (status < 200 || status >= 300)) {
+        throw new IllegalStateException("ensureBankGrant failed: HTTP " + status);
+      }
+    } catch (IllegalStateException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.ensureBankGrant failed", e);
+    }
+  }
+
+  /**
+   * Raises a confirm-before-post {@code DEPOSIT} booking request against the given account via
+   * {@code POST /api/v1/org-units/bank/requests} and returns the created request's id. The request
+   * is recorded {@code PENDING} and moves no money; a deposit may target any active account and is
+   * never approval-limited (REQ-BANK-042), so any authenticated caller may raise it. Used by the
+   * live-sync e2e to seed a pending request a staff decision then broadcasts to peer viewers.
+   *
+   * @param username the requester's Keycloak username
+   * @param password the password
+   * @param accountId the source (credited) account
+   * @param amount the whole-aUEC amount ({@code >= 1})
+   * @return the created pending request's id
+   */
+  public String raiseBankDepositRequest(
+      String username, String password, String accountId, long amount) {
+    String body =
+        "{\"sourceAccountId\":\""
+            + accountId
+            + "\",\"type\":\"DEPOSIT\",\"amount\":"
+            + amount
+            + ",\"note\":\"e2e live-sync\"}";
+    return JsonParser.parseString(
+            postBody(username, password, "/api/v1/org-units/bank/requests", body))
+        .getAsJsonObject()
+        .get("id")
+        .getAsString();
+  }
+
+  /**
    * Books a deposit via {@code POST /api/v1/bank/deposits}.
    *
    * @param username the booking user's Keycloak username
@@ -1320,6 +1394,37 @@ public final class BackendSeeder {
             + isInternal
             + ",\"plannedStartTime\":\""
             + plannedStart
+            + "\"}";
+    return seedEntity(username, password, "/api/v1/missions", body);
+  }
+
+  /**
+   * Creates a Mission that belongs to the given operation via {@code POST /api/v1/missions}, so the
+   * operation detail page's embedded missions table and finance roll-up render this mission — the
+   * setup the {@code operation:{id}} {@code missions}/{@code finance} cross-publish e2e (#1241)
+   * needs. Same auto-stamping and planned-start semantics as {@link #createMission(String, String,
+   * String, boolean)}, with {@code operationId} added to the request.
+   *
+   * @param username the Keycloak username of the creating user (a member of the owning Staffel)
+   * @param password the Keycloak password
+   * @param name the mission name
+   * @param isInternal {@code true} for an internal (staffel-private) mission, {@code false} for a
+   *     public one
+   * @param operationId the id of the parent operation the mission is linked to
+   * @return the created mission's id
+   */
+  public String createMissionInOperation(
+      String username, String password, String name, boolean isInternal, String operationId) {
+    String plannedStart = Instant.now().plus(Duration.ofDays(7)).toString();
+    String body =
+        "{\"name\":\""
+            + name
+            + "\",\"status\":\"PLANNED\",\"isInternal\":"
+            + isInternal
+            + ",\"plannedStartTime\":\""
+            + plannedStart
+            + "\",\"operationId\":\""
+            + operationId
             + "\"}";
     return seedEntity(username, password, "/api/v1/missions", body);
   }

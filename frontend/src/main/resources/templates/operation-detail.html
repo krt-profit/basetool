@@ -168,6 +168,15 @@
 
         <!-- ================= Tab 1: Übersicht ================= -->
         <section id="pane-op-ueb" class="tab-pane" role="tabpanel" aria-labelledby="optab-ueb">
+            <!-- AJAX live-sync fragment (REQ-FE-015): a peer's core save re-renders this block in
+                 place; the hidden #operation-head-meta span repaints the sticky header (title +
+                 status pill) that lives outside the fragment. -->
+            <div id="op-overview-results">
+            <th:block th:fragment="overviewSection">
+            <span id="operation-head-meta" hidden
+                  th:attr="data-name=${operation.name},
+                           data-status=${#strings.toLowerCase(operation.status)},
+                           data-status-label=#{__${'operation.status.' + #strings.toLowerCase(operation.status)}__}"></span>
             <div class="pane-grid-2">
                 <div class="pane-col">
                     <div class="kpanel">
@@ -236,6 +245,8 @@
                      th:with="descriptionHtml=${@markdown.render(operation.description)}"
                      th:utext="${descriptionHtml}">Beschreibung</div>
             </details>
+            </th:block>
+            </div>
         </section>
 
         <!-- ================= Tab 2: Einsätze ================= -->
@@ -281,6 +292,11 @@
         <!-- ================= Tab 3: Auszahlung ================= -->
         <section id="pane-op-payout" class="tab-pane" role="tabpanel" aria-labelledby="optab-payout"
                  th:attr="data-operation-id=${operation.id}, data-can-unset-paid-out=${canUnsetPaidOut}">
+            <!-- AJAX live-sync fragment (REQ-FE-015): a peer's paid-out toggle re-renders this block
+                 in place. data-operation-id / data-can-unset-paid-out stay on the outer section so
+                 they survive the swap. -->
+            <div id="op-payout-results">
+            <th:block th:fragment="payoutSection">
             <div th:if="${operation.payoutPreliminary != null and operation.payoutPreliminary}"
                  class="alert alert-warning" role="status" th:attr="aria-label=#{operation.payout.preliminary.title}">
                 <strong th:text="#{operation.payout.preliminary.title}">Vorl&auml;ufige Werte</strong>
@@ -341,10 +357,17 @@
                     <p th:if="${operationPayouts == null or operationPayouts.isEmpty()}" class="desc" th:text="#{mission.empty}">Keine Teilnehmer.</p>
                 </div>
             </div>
+            </th:block>
+            </div>
         </section>
 
         <!-- ================= Tab 4: Finanzen ================= -->
         <section id="pane-op-fin" class="tab-pane" role="tabpanel" aria-labelledby="optab-fin" sec:authorize="isAuthenticated()">
+            <!-- AJAX live-sync fragment (REQ-FE-015): re-renders the operation finance roll-up in
+                 place. The nested financeDetail fragment below emits nothing on a section render (its
+                 guards are unset) and is still served on its own lazy per-mission GET. -->
+            <div id="op-finance-results">
+            <th:block th:fragment="financeSection">
             <div class="sumstrip" th:if="${operationFinance != null}">
                 <div class="sum is-total"><div class="sk" th:text="#{operation.finances.total}">Gesamtergebnis</div><div class="sv" th:classappend="${operationFinance.totalSum != null and operationFinance.totalSum.signum() >= 0 ? 'pos' : 'neg'}" th:text="${operationFinance.totalSum != null ? #numbers.formatInteger(@moneyFormat.round(operationFinance.totalSum), 1, 'POINT') : '0'}">0</div><div class="sd" th:text="|aUEC &middot; ${missionsPage != null ? missionsPage.totalElements : 0} ${#messages.msg('operation.facts.missions')}|">aUEC</div></div>
                 <div class="sum"><div class="sk" th:text="#{operation.finances.donations}">Gespendet</div><div class="sv donate" th:text="${operationDonationTotal != null ? #numbers.formatInteger(@moneyFormat.round(operationDonationTotal), 1, 'POINT') : '0'}">0</div><div class="sd">aUEC</div></div>
@@ -410,6 +433,8 @@
                     <p th:if="${(financeDetail.entries == null or financeDetail.entries.isEmpty()) and (financeDetail.refineryOrders == null or financeDetail.refineryOrders.isEmpty())}" class="desc krtm-padding-top-8px-bd36" th:text="#{mission.finance.empty}">Keine Eintr&auml;ge.</p>
                 </th:block>
             </th:block>
+            </th:block>
+            </div>
         </section>
 
         <!-- ================= Tab 5: Verwaltung (editor-only) ================= -->
@@ -468,6 +493,11 @@
             </div>
         </section>
 
+        <!-- Section-sized inline error returned when an AJAX fragment (overview/payout/finance) fails
+             to load, so one flaky peer-refresh never injects a redirect into a swap target. -->
+        <p th:fragment="fragmentError" class="desc" style="color: var(--color-danger-text);"
+           th:text="#{operation.section.refresh.error}">Abschnitt konnte nicht geladen werden.</p>
+
     </div> <!-- End tab-panes -->
 </div> <!-- End page-wrapper -->
 
@@ -499,7 +529,9 @@
         conflictDetail: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Geaendert.',
         conflictReload: /*[[#{frontend.ajax.conflict.reload}]]*/ 'Neu laden',
         conflictDismiss: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
-        conflictQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
+        conflictQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?',
+        livesyncUpdates: /*[[#{livesync.updates_available}]]*/ 'Aktualisierungen verfuegbar',
+        sectionRefreshError: /*[[#{operation.section.refresh.error}]]*/ 'Abschnitt konnte nicht geladen werden.'
     };
 
     const MSG_PAYOUT_PAID_ERROR = /*[[#{operation.payout.paid.error}]]*/ 'Auszahlungsstatus konnte nicht aktualisiert werden.';

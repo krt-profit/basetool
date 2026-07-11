@@ -29,7 +29,72 @@
  * orders-index.html, which executes immediately before this classic script.
  */
 
-/* global KRT_ORDERS_AGE_YELLOW, KRT_ORDERS_AGE_RED */
+/* global KRT_ORDERS_AGE_YELLOW, KRT_ORDERS_AGE_RED, KRT_ORDERS_LIVESYNC_UPDATES, KRT_ORDERS_SECTION_REFRESH_ERROR */
+
+// ---- Live multi-user sync — the staff queue (REQ-FE-010 / REQ-FE-015, ADR-0094) -------------
+// When anyone creates / reorders / completes an order, every other viewer's queue re-fetches its
+// OWN filter/page in place over the shared /ws/sync `orders` room. Only the opaque `queue` key
+// crosses the wire; each viewer re-pulls its own authorization-checked list fragment (a non-profit
+// requester is denied the room entirely — canViewJobOrders). ORDERS_SECTIONS mirrors the server
+// LiveSyncTopicClass.ORDERS_QUEUE whitelist (the three-mirror-points rule).
+const ORDERS_SECTIONS = {
+    queue: { container: '#orders-results', fragmentValue: 'results' },
+};
+
+(function () {
+    if (!window.krtFetch || typeof window.krtFetch.sectionWrite !== 'function') {
+        return; // no-JS / no-foundation: the classic GET filter form runs.
+    }
+    const ordersQueueSeam = window.krtFetch.sectionWrite({
+        dict: function () {
+            return {
+                'orders.section.refresh.error':
+                    typeof KRT_ORDERS_SECTION_REFRESH_ERROR !== 'undefined'
+                        ? KRT_ORDERS_SECTION_REFRESH_ERROR
+                        : '',
+            };
+        },
+        keys: { refreshErrorKey: 'orders.section.refresh.error' },
+        sections: ORDERS_SECTIONS,
+        // Each peer re-fetches ITS OWN current filter + page, not the actor's.
+        pageUrl: function () {
+            return window.location.pathname + window.location.search;
+        },
+        broadcast: function (keys) {
+            if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
+                window.krtLiveSync.sendChanged('orders', keys);
+            }
+        },
+    });
+    // Exposed so the LOGISTICIAN-only reorder module can re-render + broadcast the queue in one call.
+    window.krtRefreshOrdersQueue = ordersQueueSeam.refresh;
+
+    if (window.krtLiveSync && window.krtLiveSync.createReceiver) {
+        window.krtLiveSync.createReceiver({
+            topic: 'orders',
+            sections: ORDERS_SECTIONS,
+            // Global room: coalesce longer (#1125) to flatten the refetch herd when many viewers get
+            // the same signal at once.
+            coalesceMs: 1500,
+            refresh: function (keys) {
+                if (window.krtRefreshOrdersQueue) {
+                    window.krtRefreshOrdersQueue(keys, { broadcast: false });
+                }
+            },
+            // Never yank the queue out from under an in-flight drag-reorder.
+            busyTest: function () {
+                return window.__ordersDragging === true;
+            },
+            pill: {
+                label: function () {
+                    return typeof KRT_ORDERS_LIVESYNC_UPDATES !== 'undefined'
+                        ? KRT_ORDERS_LIVESYNC_UPDATES
+                        : undefined;
+                },
+            },
+        });
+    }
+})();
 
 // Age-colour the order ids. Extracted so it can re-run on `krt:swapped` — the row colours are
 // otherwise only applied on the initial load and would be lost on a fragment swap (#573).

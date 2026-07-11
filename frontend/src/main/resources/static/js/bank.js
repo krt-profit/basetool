@@ -102,6 +102,194 @@
         canTransfer: 'data-can-transfer',
     };
 
+    // ---- Live multi-user sync — the Kartellbank rooms (REQ-FE-010 / REQ-FE-015, ADR-0094) --------
+    // A peer's booking / request / grant / settings change re-renders the affected bank fragment in
+    // place for every other viewer of the same room, over the shared /ws/sync socket. Only opaque
+    // section keys cross the wire; each viewer re-pulls its OWN authorization-checked fragment (its
+    // own filter/page). The four section maps below are the single source of truth shared with the
+    // server LiveSyncTopicClass whitelists (the three-mirror-points rule, build-enforced by
+    // LiveSyncSectionMapParityTest). Both sides ship together: the RECEIVE side (these maps + the
+    // receivers wired below) and the publish side (publishBankLiveSync, driven by the per-form
+    // data-livesync matrix, called from handleBankSuccess).
+
+    // bank:{id} on the STAFF account-detail page: the balance chart + booking history are NESTED
+    // inside #bank-account-results (the accountBody fragment), so re-rendering any of the three keys
+    // re-renders all of them — hence the shared container. makeBankReceiverRefresh dedupes by
+    // container so three inbound keys collapse to a single accountBody swap.
+    const BANK_ACCOUNT_SECTIONS = {
+        account: { container: '#bank-account-results', fragmentValue: 'accountBody' },
+        bookings: { container: '#bank-account-results', fragmentValue: 'accountBody' },
+        chart: { container: '#bank-account-results', fragmentValue: 'accountBody' },
+    };
+
+    // bank:{id} on the ORG-UNIT account-detail page: separate sibling containers for the
+    // facts/settings region, the booking history and the balance chart.
+    const ORGUNIT_ACCOUNT_SECTIONS = {
+        account: {
+            container: '#org-unit-bank-settings-results',
+            fragmentValue: 'orgUnitBankSettings',
+        },
+        bookings: {
+            container: '#org-unit-bank-bookings-results',
+            fragmentValue: 'orgUnitBankBookings',
+        },
+        chart: {
+            container: '#org-unit-bank-chart-results',
+            fragmentValue: 'orgUnitBalanceChart',
+        },
+    };
+
+    // bank (staff-global): the dashboard grid, the confirmation queue, the management tab and the
+    // grants matrix — one per staff page, so each page renders only its own container (the receiver
+    // silently skips the absent ones).
+    const BANK_STAFF_SECTIONS = {
+        grid: { container: '#bank-grid-results', fragmentValue: 'bankGrid' },
+        requestQueue: { container: '#bank-request-queue-results', fragmentValue: 'requestQueue' },
+        manage: { container: '#bank-manage-results', fragmentValue: 'manageBody' },
+        grants: { container: '#bank-grants-results', fragmentValue: 'grantsMatrix' },
+    };
+
+    // orgunit-bank (global): the officer/lead overview and the account-detail settings region.
+    const ORGUNIT_BANK_SECTIONS = {
+        orgUnitBank: { container: '#org-unit-bank-results', fragmentValue: 'orgUnitBank' },
+        orgUnitBankSettings: {
+            container: '#org-unit-bank-settings-results',
+            fragmentValue: 'orgUnitBankSettings',
+        },
+    };
+
+    /**
+     * Reads the localized "updates available" pill label from `<main data-bank-livesync-updates>` so
+     * this file stays i18n-free; undefined falls back to the shared receiver default.
+     *
+     * @returns {string|undefined} the pill label, or undefined
+     */
+    function bankLiveSyncUpdates() {
+        const main = document.querySelector('main[data-bank-livesync-updates]');
+        return main ? main.getAttribute('data-bank-livesync-updates') : undefined;
+    }
+
+    /**
+     * The account id of an account-detail page, read from `<main data-bank-account-id>`, or null on a
+     * list/overview page that has no single account.
+     *
+     * @returns {string|null} the account id, or null
+     */
+    function bankAccountId() {
+        const main = document.querySelector('main[data-bank-account-id]');
+        const id = main ? main.getAttribute('data-bank-account-id') : null;
+        return id || null;
+    }
+
+    /**
+     * The dedicated "saved, but reload" refresh-error message (NOT the generic "action failed" text):
+     * a peer's follow-up refresh that bounces must tell the user to reload, never that an action
+     * failed.
+     *
+     * @returns {string} the refresh-error message
+     */
+    function bankRefreshError() {
+        const main = document.querySelector('main[data-bank-refresh-error]');
+        return main ? main.getAttribute('data-bank-refresh-error') : genericError();
+    }
+
+    /**
+     * Builds a live-sync receiver refresh closure for one section map: on an inbound peer change it
+     * re-renders each present container ONCE (deduped by container, since the staff account-detail
+     * collapses account/bookings/chart into a single accountBody swap), re-fetching each viewer's OWN
+     * pathname+query so a peer keeps its filter/page rather than adopting the actor's.
+     *
+     * @param {Object} sectionMap the section → {container, fragmentValue} map for the room
+     * @returns {function(string[]): void} the refresh handler passed to createReceiver
+     */
+    function makeBankReceiverRefresh(sectionMap) {
+        return function (keys) {
+            if (!window.krtFetch || typeof window.krtFetch.swap !== 'function') {
+                return;
+            }
+            const url = window.location.pathname + window.location.search;
+            const errorMessage = bankRefreshError();
+            const done = {};
+            keys.forEach(function (key) {
+                const cfg = sectionMap[key];
+                if (!cfg || done[cfg.container] || !document.querySelector(cfg.container)) {
+                    return;
+                }
+                done[cfg.container] = true;
+                window.krtFetch.swap({
+                    url: url,
+                    container: cfg.container,
+                    fragmentValue: cfg.fragmentValue,
+                    errorMessage: errorMessage,
+                });
+            });
+        };
+    }
+
+    // Subscribe each bank page to the rooms it participates in and re-render present containers on an
+    // inbound peer change. A page subscribes to `bank` when it renders any staff container, to
+    // `orgunit-bank` when it renders an org-unit container, and to `bank:{id}` on an account-detail
+    // page (its section map picked by whether it is the staff or the org-unit account view). All bank
+    // receivers share the default pill; each re-fetches only the containers it actually renders.
+    (function () {
+        if (
+            !window.krtLiveSync ||
+            typeof window.krtLiveSync.createReceiver !== 'function' ||
+            !window.krtFetch ||
+            typeof window.krtFetch.swap !== 'function'
+        ) {
+            return; // no-JS / no-foundation: the classic in-place swaps still run for the actor.
+        }
+        function pill() {
+            return { label: bankLiveSyncUpdates };
+        }
+
+        const hasStaffRoom =
+            document.querySelector('#bank-grid-results') ||
+            document.querySelector('#bank-request-queue-results') ||
+            document.querySelector('#bank-manage-results') ||
+            document.querySelector('#bank-grants-results');
+        if (hasStaffRoom) {
+            window.krtLiveSync.createReceiver({
+                topic: 'bank',
+                sections: BANK_STAFF_SECTIONS,
+                // Global room: coalesce longer to flatten the refetch herd when many staffers get the
+                // same signal at once (#1125).
+                coalesceMs: 1500,
+                refresh: makeBankReceiverRefresh(BANK_STAFF_SECTIONS),
+                pill: pill(),
+            });
+        }
+
+        const hasOrgUnitRoom =
+            document.querySelector('#org-unit-bank-results') ||
+            document.querySelector('#org-unit-bank-settings-results');
+        if (hasOrgUnitRoom) {
+            window.krtLiveSync.createReceiver({
+                topic: 'orgunit-bank',
+                sections: ORGUNIT_BANK_SECTIONS,
+                coalesceMs: 1500,
+                refresh: makeBankReceiverRefresh(ORGUNIT_BANK_SECTIONS),
+                pill: pill(),
+            });
+        }
+
+        const accountId = bankAccountId();
+        if (accountId) {
+            // The staff detail renders #bank-account-results; the org-unit detail its
+            // settings/bookings/chart siblings — pick the section map accordingly.
+            const sectionMap = document.querySelector('#bank-account-results')
+                ? BANK_ACCOUNT_SECTIONS
+                : ORGUNIT_ACCOUNT_SECTIONS;
+            window.krtLiveSync.createReceiver({
+                topic: 'bank:' + accountId,
+                sections: sectionMap,
+                refresh: makeBankReceiverRefresh(sectionMap),
+                pill: pill(),
+            });
+        }
+    })();
+
     /**
      * Builds the JSON + CSRF request headers via the shared window.krtCsrf (#579 migration; replaces
      * bank.js's former bespoke meta-tag reader). Degrades to a minimal meta-tag read only if
@@ -525,6 +713,92 @@
     }
 
     /**
+     * Resolves a bank live-sync account placeholder to a concrete account id. `account`: the form's
+     * dedicated publish-only `data-livesync-account`, else its submitted `data-account-id` (the
+     * movement modal), else a primed `_livesyncAccount` field (the confirm modal, filled per-row by
+     * primeModal). `destination`: an enabled non-empty submitted `destinationAccountId` (a movement
+     * transfer target), else a primed `_livesyncDestination` field (a confirm of a transfer
+     * request). Returns null when the form has no such account (e.g. a deposit / a non-transfer
+     * confirm has no destination) so the entry is skipped. None of these are read into the submit
+     * body (`data-livesync-account` is an attribute; the `_livesync*` fields are `_`-prefixed, so
+     * submitBankForm treats them as unused endpoint placeholders), so tagging a form for publishing
+     * never changes its money write.
+     *
+     * @param {HTMLFormElement} form the form whose write just succeeded
+     * @param {string} ref the placeholder name (`account` or `destination`)
+     * @returns {string|null} the resolved account id, or null
+     */
+    function resolveBankLiveSyncAccount(form, ref) {
+        if (ref === 'account') {
+            const primed = form.querySelector('[name="_livesyncAccount"]');
+            return (
+                form.getAttribute('data-livesync-account') ||
+                form.getAttribute('data-account-id') ||
+                (primed && primed.value ? primed.value : null)
+            );
+        }
+        if (ref === 'destination') {
+            const el =
+                form.querySelector('[name="destinationAccountId"]') ||
+                form.querySelector('[name="_livesyncDestination"]');
+            return el && !el.disabled && el.value ? el.value : null;
+        }
+        return null;
+    }
+
+    /**
+     * Broadcasts a bank form's live-sync publish matrix after a successful write (REQ-FE-015): the
+     * form's `data-livesync` attribute is a space-separated list of `topic/section,section` entries,
+     * where a `bank:@account` / `bank:@destination` topic resolves its placeholder to the form's
+     * account. Publishing needs no subscription (the sanctioned cross-topic case) — the acting page
+     * is not subscribed to most of these rooms, yet their viewers must still update. Fully additive
+     * and fire-and-forget: it never touches the write or the local swap, duplicate topics are
+     * collapsed, and an unresolvable-account entry is simply skipped.
+     *
+     * @param {HTMLFormElement} form the form whose write just succeeded
+     */
+    function publishBankLiveSync(form) {
+        if (!window.krtLiveSync || typeof window.krtLiveSync.sendChanged !== 'function') {
+            return;
+        }
+        const spec = form.getAttribute('data-livesync');
+        if (!spec) {
+            return;
+        }
+        const sent = {};
+        spec.trim()
+            .split(/\s+/)
+            .forEach(function (entry) {
+                const slash = entry.indexOf('/');
+                if (slash < 0) {
+                    return;
+                }
+                let topic = entry.slice(0, slash);
+                const sections = entry
+                    .slice(slash + 1)
+                    .split(',')
+                    .filter(Boolean);
+                if (!sections.length) {
+                    return;
+                }
+                const at = topic.indexOf(':@');
+                if (at >= 0) {
+                    const id = resolveBankLiveSyncAccount(form, topic.slice(at + 2));
+                    if (!id) {
+                        return; // no such account on this form — skip this entry.
+                    }
+                    topic = topic.slice(0, at) + ':' + id;
+                }
+                const key = topic + '|' + sections.join(',');
+                if (sent[key]) {
+                    return;
+                }
+                sent[key] = true;
+                window.krtLiveSync.sendChanged(topic, sections);
+            });
+    }
+
+    /**
      * The in-place success path for a bank AJAX form (#579, REQ-FE-005): closes the form's modal,
      * shows the localized success toast and re-renders the server fragment named by the form's
      * `data-refresh` attribute (accountBody / manageBody / grantsMatrix). Re-rendering server-side
@@ -547,6 +821,10 @@
         if (savedMessage && typeof window.showFrontendSuccessToast === 'function') {
             window.showFrontendSuccessToast(savedMessage);
         }
+        // Tell peers viewing the affected rooms that these sections changed (REQ-FE-015), read from
+        // the form's data-livesync matrix. Done before the local swap and independent of it —
+        // additive and fire-and-forget, so it never affects the actor's own re-render below.
+        publishBankLiveSync(form);
         const spec = REFRESH_TARGETS[form.getAttribute('data-refresh')];
         if (!spec || !window.krtFetch || typeof window.krtFetch.swap !== 'function') {
             window.location.reload();
@@ -1011,6 +1289,11 @@
             errorMessage: genericError(),
             onSuccess: function (payload) {
                 applyGrantFlagResult(flagButton, row, flag, newValue, payload);
+                // The grants matrix changed for every other viewer (REQ-FE-015). This isolated
+                // DOM-patch write does not go through handleBankSuccess, so broadcast here.
+                if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
+                    window.krtLiveSync.sendChanged('bank', ['grants']);
+                }
             },
             onError: function (status, payload) {
                 const message = payload && payload.message ? payload.message : genericError();

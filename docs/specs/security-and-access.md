@@ -257,6 +257,27 @@ read). Finance-entry creation is therefore no longer anonymous.
 `MissionController`, `MissionFinanceEntryController`, `AuthHelperService`,
 `SecurityConfig` · **Role matrix:** [`ROLES_AND_PERMISSIONS.md` §1](../../ROLES_AND_PERMISSIONS.md)
 
+**Live-sync WebSocket (`/ws/sync`; REQ-FE-015 / [ADR-0094](../adr/0094-tool-wide-topic-room-live-sync-relay.md)).**
+The tool-wide peer-sync transport is one multiplexed `/ws/sync` socket per tab (plus the
+one-release legacy aliases `/ws/missions/{id}/presence` and `/ws/materialboerse/board`).
+`SecurityConfig` gates all `/ws/**` to an **authenticated** principal, and every handshake is pinned
+to the explicit `app.websocket.allowed-origin-patterns` allowlist (never `*`) to prevent Cross-Site
+WebSocket Hijacking. **No new role or gate is introduced** (this spec's role matrix is unchanged): a
+`subscribe` to a topic is authorized per topic with the *same* check the page itself performs — the
+per-resource backend read (mission / operation / order / bank-account, including the requester-escape
+redaction of REQ-ORDERS-023), a capability probe (`canViewJobOrders` for the global `orders` queue),
+or a local role match against the handshake-captured authorities (the bank-staff, org-unit-bank and
+member-or-above global rooms). Publishing a `changed` frame needs **no** subscription (the cross-topic
+case — a requester poking the staff queue it may not read), only an authenticated socket, a known
+topic class, the class's section whitelist and a per-session rate limit. Only opaque section keys ever
+cross the socket; every fragment a peer then re-pulls is independently authorized per viewer through
+the servlet path, so a transient subscribe fail-open (a backend blip during the probe) leaks at most
+"some section of resource X changed", never its contents. The one exception is the presence-enabled
+`mission` class: an allowed subscribe there immediately returns an editor-presence snapshot
+(pseudonymous ids + callsigns), which is cross-user identity data rather than an opaque key, so that
+class **fails closed** on any indeterminate verdict (lapsed token / transient error / executor
+saturation) — an unverified presence subscribe is refused, not admitted.
+
 ### REQ-SEC-008 — Frontend bot protection & silent re-auth
 
 The frontend's `BotProtectionFilter` returns 404 directly for known scanner paths;

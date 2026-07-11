@@ -1531,6 +1531,15 @@
             "type": "prometheus",
             "uid": "prometheus"
           }
+        },
+        {
+          "expr": "sum by (reason) (rate(basetool_livesync_socket_rejected_total[1h])) * 3600",
+          "refId": "B",
+          "legendFormat": "socket:{{reason}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ]
     },
@@ -1872,6 +1881,247 @@
           "expr": "basetool_mission_presence_missions",
           "refId": "A",
           "legendFormat": "missions w/ live editor",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 37,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 128
+      },
+      "type": "timeseries",
+      "title": "Live-sync subscribe outcomes/hour by topic class",
+      "description": "Multiplexed /ws/sync subscribe-authorization verdicts per topic class (REQ-FE-015, ADR-0094). A rising `denied` rate on a room every viewer should reach hints at an auth/gate regression; `allowed` includes transient fail-open.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (topic_class, outcome) (rate(basetool_livesync_subscribe_total[1h])) * 3600",
+          "refId": "A",
+          "legendFormat": "{{topic_class}} {{outcome}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 38,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 128
+      },
+      "type": "timeseries",
+      "title": "Live-sync subscriptions (live) by topic class",
+      "description": "Open /ws/sync topic subscriptions per topic class on this instance (basetool_livesync_subscriptions). The concurrent live-sync load denominator per surface; a flatline while sessions are active hints the socket or a room's subscribe is broken.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (topic_class) (basetool_livesync_subscriptions)",
+          "refId": "A",
+          "legendFormat": "{{topic_class}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 39,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 136
+      },
+      "type": "timeseries",
+      "title": "Live-sync changed relay/hour by topic class",
+      "description": "Peer-forwarded `changed` frames per topic class (the per-surface breakdown of panel 28). A `changed` flatline on a surface whose viewers keep editing is the early indicator of the REQ-FE-010 stale-peer defect class.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (topic_class) (rate(basetool_presence_relay_frames_total{type=\"changed\"}[1h])) * 3600",
+          "refId": "A",
+          "legendFormat": "{{topic_class}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 136
+      },
+      "type": "timeseries",
+      "title": "Redis fan-out pub/sub & errors/hour",
+      "description": "Cross-replica Redis fan-out for live delivery (ADR-0094): the live-sync changed-relay (basetool_livesync_redis_*) and the notification SSE fan-out (basetool_sse_redis_*). Publishing is fire-and-forget after the local relay, so a rising `errors` stream means cross-replica delivery is silently degraded to single-instance — watched by the LiveSyncRedisFanoutBroken alert.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(basetool_livesync_redis_published_total[1h])) * 3600",
+          "refId": "A",
+          "legendFormat": "livesync published",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(basetool_livesync_redis_consumed_total[1h])) * 3600",
+          "refId": "B",
+          "legendFormat": "livesync consumed",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(basetool_livesync_redis_errors_total[1h])) * 3600",
+          "refId": "C",
+          "legendFormat": "livesync errors",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(basetool_sse_redis_published_total[1h])) * 3600",
+          "refId": "D",
+          "legendFormat": "notification published",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(basetool_sse_redis_consumed_total[1h])) * 3600",
+          "refId": "E",
+          "legendFormat": "notification consumed",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(basetool_sse_redis_errors_total[1h])) * 3600",
+          "refId": "F",
+          "legendFormat": "notification errors",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"

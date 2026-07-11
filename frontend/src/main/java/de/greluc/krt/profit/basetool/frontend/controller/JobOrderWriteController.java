@@ -49,6 +49,7 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.support.MutationResponseHelper;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
+import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncLocalBus;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -120,6 +121,17 @@ public class JobOrderWriteController {
   private final FrontendAuthHelperService authHelper;
 
   /**
+   * Server-side live-sync publish seam (REQ-FE-015, ADR-0094). An order create pokes the staff
+   * {@code orders} queue room from here rather than the client, because an <b>anonymous guest</b>
+   * create has no {@code /ws/sync} socket to publish from — yet every logged-in queue viewer must
+   * still see the new order appear in place.
+   */
+  private final LiveSyncLocalBus liveSyncLocalBus;
+
+  /** The single {@code orders} queue section a create/mutation pokes. */
+  private static final List<String> ORDERS_QUEUE_SECTION = List.of("queue");
+
+  /**
    * Response type for the user-list pull backing the assignee picker ({@code GET /api/v1/users}).
    * Mirrors the read-side {@code JobOrderPageController} original (#924 split — duplicated with the
    * {@link #fetchUsers} leaf helper).
@@ -185,6 +197,9 @@ public class JobOrderWriteController {
               lines,
               form.getVersion());
       backendApiClient.post("/api/v1/orders/items", dto, JobOrderDto.class, true);
+      // Server-side queue poke (REQ-FE-015): a guest create has no socket, so the queue room is
+      // notified here rather than from the (possibly anonymous) client.
+      liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
 
       // Anonymous guests and non-profit members cannot browse the queue, so keep them on the create
@@ -270,6 +285,7 @@ public class JobOrderWriteController {
                   lines,
                   form.getVersion());
           backendApiClient.post("/api/v1/orders/items", dto, JobOrderDto.class, true);
+          liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
           return org.springframework.http.ResponseEntity.ok(
               java.util.Map.of(
                   "targetUrl", postCreateTarget(principal, canViewJobOrders, form.getSource())));
@@ -415,6 +431,9 @@ public class JobOrderWriteController {
               materials,
               form.getVersion());
       backendApiClient.post("/api/v1/orders", dto, JobOrderDto.class, true);
+      // Server-side queue poke (REQ-FE-015): a guest create has no socket, so the queue room is
+      // notified here rather than from the (possibly anonymous) client.
+      liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
 
       // Anonymous guests and non-profit members cannot browse the queue, so keep them on the create
@@ -506,6 +525,7 @@ public class JobOrderWriteController {
                   materials,
                   form.getVersion());
           backendApiClient.post("/api/v1/orders", dto, JobOrderDto.class, true);
+          liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
           return org.springframework.http.ResponseEntity.ok(
               java.util.Map.of(
                   "targetUrl", postCreateTarget(principal, canViewJobOrders, form.getSource())));

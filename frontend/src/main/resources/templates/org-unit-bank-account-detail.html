@@ -33,7 +33,7 @@
 
 <main class="bank-detail" th:if="${detail != null}"
       th:with="d=${detail.detail()}, acct=${detail.detail().account()}, hasSettingsTab=${settings != null}"
-      th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-user-id=${#authentication.name}">
+      th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-bank-livesync-updates=#{livesync.updates_available},data-bank-account-id=${acct.id()},data-user-id=${#authentication.name}">
 
     <!-- Read-only account drill-in for org-unit viewers (REQ-BANK-038): history + Halter-redacted
          Kontoauszug; no deposit/withdraw/transfer. The responsible holder / OL additionally manages
@@ -188,7 +188,7 @@
                         <span class="vis-state">
                             <span th:if="${granted}" class="chip chip--success"
                                   th:text="#{bank.orgUnit.settings.visibility.granted}">Freigegeben</span>
-                            <form class="bank-ajax-form no-track krtm-display-inline-2f87" data-refresh="orgUnitBankSettings"
+                            <form class="bank-ajax-form no-track krtm-display-inline-2f87" data-refresh="orgUnitBankSettings" data-livesync="bank:@account/account orgunit-bank/orgUnitBankSettings" th:data-livesync-account="${acct.id()}"
                                   th:attr="data-endpoint='/api/proxy/org-units/bank/accounts/{id}/visibility/role/' + ${role},data-method=${granted ? 'DELETE' : 'POST'}">
                                 <input type="hidden" name="_id" th:value="${acct.id()}">
                                 <button type="submit" class="btn btn-xs"
@@ -206,7 +206,7 @@
                     <span class="vis-state">
                         <span th:if="${settings.allMembersGranted()}" class="chip chip--success"
                               th:text="#{bank.orgUnit.settings.visibility.granted}">Freigegeben</span>
-                        <form class="bank-ajax-form no-track krtm-display-inline-2f87" data-refresh="orgUnitBankSettings"
+                        <form class="bank-ajax-form no-track krtm-display-inline-2f87" data-refresh="orgUnitBankSettings" data-livesync="bank:@account/account orgunit-bank/orgUnitBankSettings" th:data-livesync-account="${acct.id()}"
                               th:attr="data-endpoint='/api/proxy/org-units/bank/accounts/{id}/visibility/all-members/' + ${!settings.allMembersGranted()}"
                               data-method="PUT">
                             <input type="hidden" name="_id" th:value="${acct.id()}">
@@ -224,7 +224,7 @@
                     <span class="vis-state">
                         <span th:if="${settings.areaMembersGranted()}" class="chip chip--success"
                               th:text="#{bank.orgUnit.settings.visibility.granted}">Freigegeben</span>
-                        <form class="bank-ajax-form no-track krtm-display-inline-2f87" data-refresh="orgUnitBankSettings"
+                        <form class="bank-ajax-form no-track krtm-display-inline-2f87" data-refresh="orgUnitBankSettings" data-livesync="bank:@account/account orgunit-bank/orgUnitBankSettings" th:data-livesync-account="${acct.id()}"
                               th:attr="data-endpoint='/api/proxy/org-units/bank/accounts/{id}/visibility/area-members/' + ${!settings.areaMembersGranted()}"
                               data-method="PUT">
                             <input type="hidden" name="_id" th:value="${acct.id()}">
@@ -241,7 +241,7 @@
                 <div th:if="${!#lists.isEmpty(settings.grantedUsers())}">
                     <div class="vis-row" th:each="u : ${settings.grantedUsers()}" data-testid="org-unit-vis-user-row">
                         <span class="v-label" th:text="${u.displayName()}">greluc</span>
-                        <form class="bank-ajax-form no-track krtm-display-inline-2f87" data-refresh="orgUnitBankSettings"
+                        <form class="bank-ajax-form no-track krtm-display-inline-2f87" data-refresh="orgUnitBankSettings" data-livesync="bank:@account/account orgunit-bank/orgUnitBankSettings" th:data-livesync-account="${acct.id()}"
                               th:attr="data-endpoint='/api/proxy/org-units/bank/accounts/{id}/visibility/user/' + ${u.userId()}"
                               data-method="DELETE">
                             <input type="hidden" name="_id" th:value="${acct.id()}">
@@ -250,7 +250,7 @@
                         </form>
                     </div>
                 </div>
-                <form class="bank-ajax-form no-track mt-2" data-refresh="orgUnitBankSettings"
+                <form class="bank-ajax-form no-track mt-2" data-refresh="orgUnitBankSettings" data-livesync="bank:@account/account orgunit-bank/orgUnitBankSettings" th:data-livesync-account="${acct.id()}"
                       data-endpoint="/api/proxy/org-units/bank/accounts/{id}/visibility/user/{userId}" data-method="POST">
                     <input type="hidden" name="_id" th:value="${acct.id()}">
                     <div class="field-row">
@@ -288,7 +288,7 @@
                 <h3 class="sub-h" th:text="#{bank.orgUnit.settings.target.title}">Kontostandsziel</h3>
                 <p class="text-muted krtm-font-size-0-8rem-0fed" th:text="#{bank.orgUnit.settings.target.hint}">
                     Ziel, bis zu dem das Konto gef&uuml;llt werden soll. Wird allen Berechtigten angezeigt.</p>
-                <form class="bank-ajax-form no-track" data-refresh="orgUnitBankSettings"
+                <form class="bank-ajax-form no-track" data-refresh="orgUnitBankSettings" data-livesync="bank:@account/account orgunit-bank/orgUnitBankSettings" th:data-livesync-account="${acct.id()}"
                       data-endpoint="/api/proxy/org-units/bank/accounts/{id}/balance-target" data-method="PUT">
                     <input type="hidden" name="_id" th:value="${acct.id()}">
                     <input type="hidden" name="version" th:value="${settings.version()}">

@@ -42,12 +42,13 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * In-memory registry of live Server-Sent-Event subscribers, keyed by recipient {@code sub}
  * (REQ-NOTIF-010).
  *
- * <p>Single-backend-instance only — multi-instance fan-out via Redis pub/sub is a noted follow-up
- * (ADR-0016). Push is strictly best-effort: a failed send simply drops that emitter, and the
- * frontend's polling (REQ-NOTIF-006) remains the guaranteed fallback. A periodic named {@code
- * heartbeat} event keeps idle connections alive across proxies and doubles as a browser-visible
- * liveness signal so the client can detect a half-open stream (TCP up, stream dead) and fall back
- * to the fast poll (REQ-NOTIF-010, REQ-SEC-012).
+ * <p>This registry delivers to <em>this</em> instance's emitters only; cross-replica fan-out is
+ * layered on top by {@link NotificationFanout} (local-first, then Redis pub/sub — ADR-0094,
+ * discharging the ADR-0016 follow-up), not by this class. Push is strictly best-effort: a failed
+ * send simply drops that emitter, and the frontend's polling (REQ-NOTIF-006) remains the guaranteed
+ * fallback. A periodic named {@code heartbeat} event keeps idle connections alive across proxies
+ * and doubles as a browser-visible liveness signal so the client can detect a half-open stream (TCP
+ * up, stream dead) and fall back to the fast poll (REQ-NOTIF-010, REQ-SEC-012).
  */
 @Service
 @Slf4j

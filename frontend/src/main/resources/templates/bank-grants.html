@@ -23,7 +23,7 @@
     </nav>
 </header>
 
-<main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed}">
+<main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-bank-livesync-updates=#{livesync.updates_available}">
     <div class="greeting hud-box flex-between">
         <div>
             <h1 th:text="#{bank.grants.title}">Berechtigungen</h1>
@@ -152,6 +152,7 @@
                         data-modal-id="bank-grant-create-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
             </div>
             <form class="bank-ajax-form no-track" data-refresh="grantsMatrix"
+                  data-livesync="bank/grants"
                   data-endpoint="/api/proxy/bank/grants" data-method="POST">
                 <div class="krt-modal-body">
                     <p class="bank-field-hint" th:text="#{bank.modal.grant.hint}">Der Nutzer braucht die Keycloak-Rolle &quot;Bank Employee&quot;, damit die Berechtigung wirkt.</p>
@@ -211,6 +212,7 @@
                         data-modal-id="bank-grant-revoke-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
             </div>
             <form class="bank-ajax-form no-track" data-refresh="grantsMatrix"
+                  data-livesync="bank/grants"
                   data-endpoint="/api/proxy/bank/grants/{userId}/{accountId}" data-method="DELETE">
                 <input type="hidden" name="_userId">
                 <input type="hidden" name="_accountId">

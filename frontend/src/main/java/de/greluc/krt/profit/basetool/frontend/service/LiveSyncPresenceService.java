@@ -29,7 +29,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -37,94 +36,96 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
 /**
- * In-memory presence store for the mission detail page (Stufe 3 / awareness).
+ * In-memory editor-presence store for live-sync topics that carry presence dots (REQ-FE-015,
+ * ADR-0094) — today only the mission surface.
  *
- * <p>Tracks, per mission and per section key, which users are currently editing that section.
- * Entries decay after {@link #ENTRY_TTL} since the last heartbeat — a client that closes its tab or
+ * <p>Tracks, per topic and per section key, which users are currently editing that section. Entries
+ * decay after {@link #ENTRY_TTL} since the last heartbeat — a client that closes its tab or
  * navigates away without sending a {@code blur} message is therefore reaped within the TTL window
- * by the scheduled cleanup in {@code MissionPresenceWebSocketHandler}.
+ * by the scheduled cleanup in {@code LiveSyncWebSocketHandler}.
  *
- * <p><b>Single-instance only.</b> The state lives in a {@link ConcurrentHashMap} local to this JVM.
- * If the frontend is ever scaled out to multiple replicas, this needs to move behind a Redis
- * pub/sub fan-out (the project already runs Redis for Spring Session, so the dependency is in
- * place). The minimal swap-out point is this class: every call site already goes through it.
+ * <p><b>Per-instance only.</b> The state lives in a {@link ConcurrentHashMap} local to this JVM.
+ * Unlike the {@code changed} relay — which fans out across replicas via Redis pub/sub (ADR-0094) —
+ * presence dots are deliberately <em>not</em> mirrored across instances: they are a best-effort
+ * awareness cue, and cross-replica dots would need shared TTL state or presence-frame mirroring for
+ * a cosmetic feature. Consequence: viewers on different replicas may see different dot sets. This
+ * class stays the single swap-out point if that follow-up is ever taken.
  *
  * <p>Awareness, not locking: this service only <em>describes</em> who is editing where. It never
- * blocks a write or rejects a save. The optimistic-lock counters introduced in Stufe 1 remain the
- * single source of truth for conflict resolution; this is just a UX-layer hint so two users notice
- * the overlap before they collide on a 409.
+ * blocks a write or rejects a save. The optimistic-lock counters remain the single source of truth
+ * for conflict resolution; this is just a UX-layer hint so two users notice the overlap before they
+ * collide on a 409.
  */
 @Service
 @Slf4j
-public class MissionPresenceService {
+public class LiveSyncPresenceService {
 
   /**
    * Time after the last heartbeat at which a presence entry is considered stale and removed.
    * Heartbeats arrive every ~60s from the client (see {@code HEARTBEAT_MS} in {@code
-   * mission-presence.js}); 120s gives two missed beats of slack before the indicator disappears.
+   * krt-live-sync.js}); 120s gives two missed beats of slack before the indicator disappears.
    *
-   * <p>L-7 from the performance audit raised both this value and the client-side heartbeat from 30s
-   * / 10s to keep the two-missed-beats safety ratio. Per-editor WebSocket frame traffic drops by 6×
-   * as a result; the UX cost is that a peer sees "user stopped editing" up to ~120s after the
-   * editor navigates away (was ~30s before). Tune both values together — lowering this in isolation
-   * would reap editors that are still actively heartbeating.
+   * <p>Tune this together with the client-side heartbeat: the 120s / 60s pairing keeps a
+   * two-missed-beats safety ratio. Lowering this in isolation would reap editors that are still
+   * actively heartbeating.
    */
   public static final Duration ENTRY_TTL = Duration.ofSeconds(120);
 
   /**
-   * Upper bound on the number of distinct section keys tracked per mission. A mission detail page
-   * exposes roughly a dozen editable panels, so this cap sits well above legitimate use while
-   * bounding the per-mission presence-map memory a crafted client could otherwise grow by looping
-   * {@code focus} frames with unique section keys. The WebSocket handler's per-session token bucket
-   * bounds the growth <em>rate</em>; this bounds the absolute <em>size</em>. Package-private for
-   * the test.
+   * Upper bound on the number of distinct section keys tracked per topic. A detail page exposes
+   * roughly a dozen editable panels, so this cap sits well above legitimate use while bounding the
+   * per-topic presence-map memory a crafted client could otherwise grow by looping {@code focus}
+   * frames with unique section keys. The WebSocket handler's per-session token bucket bounds the
+   * growth <em>rate</em>; this bounds the absolute <em>size</em>. Package-private for the test.
    */
-  static final int MAX_SECTIONS_PER_MISSION = 64;
+  static final int MAX_SECTIONS_PER_TOPIC = 64;
 
-  private final Map<UUID, Map<String, Map<String, Entry>>> byMission = new ConcurrentHashMap<>();
+  private final Map<String, Map<String, Map<String, Entry>>> byTopic = new ConcurrentHashMap<>();
 
   /**
    * Binds the {@code basetool_mission_presence_missions} gauge to the live presence map
-   * (REQ-OBS-011) — the count of missions currently tracked with at least one live editor in this
-   * instance. The gauge is unlabelled: mission id, section key and user id are all unbounded and
-   * PII-adjacent, so none is used as a tag. Single-JVM edit-awareness (see the class note), not a
-   * global online-user roster; the closest online-user proxy is {@code basetool_active_sessions}.
+   * (REQ-OBS-011) — the count of topics currently tracked with at least one live editor in this
+   * instance. The gauge is unlabelled and its name is legacy-pinned (presence is mission-only at
+   * ship time, so the value is unchanged and the dashboard panel keeps meaning); topic id, section
+   * key and user id are all unbounded and PII-adjacent, so none is used as a tag. Per-instance
+   * edit-awareness (see the class note), not a global online-user roster; the closest online-user
+   * proxy is {@code basetool_active_sessions}.
    *
    * @param meterRegistry the Micrometer registry the presence gauge is bound to
    */
-  public MissionPresenceService(@NotNull MeterRegistry meterRegistry) {
-    Gauge.builder(MetricNames.MISSION_PRESENCE_MISSIONS, byMission, Map::size)
-        .description("Missions with at least one live editor tracked in this frontend instance.")
+  public LiveSyncPresenceService(@NotNull MeterRegistry meterRegistry) {
+    Gauge.builder(MetricNames.MISSION_PRESENCE_MISSIONS, byTopic, Map::size)
+        .description("Live-sync topics with at least one live editor tracked in this instance.")
         .register(meterRegistry);
   }
 
   /**
-   * Record an editor's heartbeat (or initial focus) on a section of a mission. Replaces any
-   * previous entry for the same {@code (missionId, sectionKey, userId)} triple so the heartbeat
-   * timestamp moves forward.
+   * Record an editor's heartbeat (or initial focus) on a section of a topic. Replaces any previous
+   * entry for the same {@code (topic, sectionKey, userId)} triple so the heartbeat timestamp moves
+   * forward.
    *
-   * @param missionId mission this presence belongs to
-   * @param sectionKey panel key (e.g. {@code "details"}, {@code "participants"})
+   * @param topic canonical topic this presence belongs to
+   * @param sectionKey panel key (e.g. {@code "crew"}, {@code "overview"})
    * @param userId stable identifier of the editing user (JWT {@code sub} via OIDC)
    * @param displayName name to show in the UI (already redacted for guests by the caller)
    * @return {@code true} if this is a new editor for that section (the caller may want to broadcast
    *     a state update only then; in practice we broadcast on every change anyway)
    */
   public boolean touch(
-      @NotNull UUID missionId,
+      @NotNull String topic,
       @NotNull String sectionKey,
       @NotNull String userId,
       @NotNull String displayName) {
     Map<String, Map<String, Entry>> sections =
-        byMission.computeIfAbsent(missionId, ignored -> new ConcurrentHashMap<>());
+        byTopic.computeIfAbsent(topic, ignored -> new ConcurrentHashMap<>());
     Map<String, Entry> editors = sections.get(sectionKey);
     if (editors == null) {
-      // Refuse a first-seen section once the mission is already at the distinct-section cap, rather
+      // Refuse a first-seen section once the topic is already at the distinct-section cap, rather
       // than growing the map. Guards against a crafted client looping focus frames with unique
       // section keys to exhaust memory (the handler additionally rate-limits and length-caps the
       // key). A concurrent pair of first-sightings may overshoot the cap by a small constant, which
       // is harmless — the bound is a memory ceiling, not an exact count.
-      if (sections.size() >= MAX_SECTIONS_PER_MISSION) {
+      if (sections.size() >= MAX_SECTIONS_PER_TOPIC) {
         return false;
       }
       editors = sections.computeIfAbsent(sectionKey, ignored -> new ConcurrentHashMap<>());
@@ -135,14 +136,16 @@ public class MissionPresenceService {
   }
 
   /**
-   * Drop the explicit presence entry for {@code (missionId, sectionKey, userId)} — invoked on blur,
-   * on socket close, or when the user submits a save. Idempotent.
+   * Drop the explicit presence entry for {@code (topic, sectionKey, userId)} — invoked on blur, on
+   * socket close, or when the user submits a save. Idempotent.
    *
+   * @param topic canonical topic the entry belongs to
+   * @param sectionKey section key
+   * @param userId user id
    * @return {@code true} if an entry was actually removed
    */
-  public boolean clear(
-      @NotNull UUID missionId, @NotNull String sectionKey, @NotNull String userId) {
-    Map<String, Map<String, Entry>> sections = byMission.get(missionId);
+  public boolean clear(@NotNull String topic, @NotNull String sectionKey, @NotNull String userId) {
+    Map<String, Map<String, Entry>> sections = byTopic.get(topic);
     if (sections == null) {
       return false;
     }
@@ -155,19 +158,21 @@ public class MissionPresenceService {
       sections.remove(sectionKey, editors);
     }
     if (sections.isEmpty()) {
-      byMission.remove(missionId, sections);
+      byTopic.remove(topic, sections);
     }
     return removed;
   }
 
   /**
-   * Drop every presence entry for {@code userId} on {@code missionId} across all sections — invoked
-   * when the user's WebSocket closes. Idempotent.
+   * Drop every presence entry for {@code userId} on {@code topic} across all sections — invoked
+   * when the user's last session on the topic closes. Idempotent.
    *
+   * @param topic canonical topic
+   * @param userId user id
    * @return list of section keys from which the user was actually removed
    */
-  public List<String> clearAll(@NotNull UUID missionId, @NotNull String userId) {
-    Map<String, Map<String, Entry>> sections = byMission.get(missionId);
+  public List<String> clearAll(@NotNull String topic, @NotNull String userId) {
+    Map<String, Map<String, Entry>> sections = byTopic.get(topic);
     if (sections == null) {
       return List.of();
     }
@@ -179,49 +184,49 @@ public class MissionPresenceService {
     }
     sections.entrySet().removeIf(e -> e.getValue().isEmpty());
     if (sections.isEmpty()) {
-      byMission.remove(missionId, sections);
+      byTopic.remove(topic, sections);
     }
     return affected;
   }
 
   /**
    * Reap entries older than {@link #ENTRY_TTL}. Called by the WebSocket handler's scheduled task;
-   * returns the set of {@code (missionId, sectionKey)} pairs that lost at least one entry so the
+   * returns the set of {@code (topic, sectionKey)} pairs that lost at least one entry so the
    * handler can decide whether to broadcast updated state to those rooms.
    *
    * @param now reference instant — pass {@link Instant#now()} in production; tests pass a frozen
    *     value
-   * @return list of affected mission/section pairs (empty if nothing expired)
+   * @return list of affected topic/section pairs (empty if nothing expired)
    */
-  public List<MissionSectionRef> reapExpired(@NotNull Instant now) {
+  public List<TopicSectionRef> reapExpired(@NotNull Instant now) {
     Instant cutoff = now.minus(ENTRY_TTL);
-    List<MissionSectionRef> affected = new ArrayList<>();
-    for (Map.Entry<UUID, Map<String, Map<String, Entry>>> missionEntry : byMission.entrySet()) {
-      UUID missionId = missionEntry.getKey();
-      Map<String, Map<String, Entry>> sections = missionEntry.getValue();
+    List<TopicSectionRef> affected = new ArrayList<>();
+    for (Map.Entry<String, Map<String, Map<String, Entry>>> topicEntry : byTopic.entrySet()) {
+      String topic = topicEntry.getKey();
+      Map<String, Map<String, Entry>> sections = topicEntry.getValue();
       for (Map.Entry<String, Map<String, Entry>> sectionEntry : sections.entrySet()) {
         Map<String, Entry> editors = sectionEntry.getValue();
         boolean changed = editors.values().removeIf(e -> e.lastHeartbeat().isBefore(cutoff));
         if (changed) {
-          affected.add(new MissionSectionRef(missionId, sectionEntry.getKey()));
+          affected.add(new TopicSectionRef(topic, sectionEntry.getKey()));
         }
       }
       sections.entrySet().removeIf(e -> e.getValue().isEmpty());
     }
-    byMission.entrySet().removeIf(e -> e.getValue().isEmpty());
+    byTopic.entrySet().removeIf(e -> e.getValue().isEmpty());
     return affected;
   }
 
   /**
-   * Snapshot of the current presence state for one mission, keyed by section. Returns an immutable
+   * Snapshot of the current presence state for one topic, keyed by section. Returns an immutable
    * view; modification of the returned map throws.
    *
-   * @param missionId mission id
+   * @param topic canonical topic
    * @param now reference instant for filtering out entries that would expire on the next reap
    * @return map from section key to the list of editors currently active on that section
    */
-  public Map<String, List<Entry>> snapshot(@NotNull UUID missionId, @NotNull Instant now) {
-    Map<String, Map<String, Entry>> sections = byMission.get(missionId);
+  public Map<String, List<Entry>> snapshot(@NotNull String topic, @NotNull Instant now) {
+    Map<String, Map<String, Entry>> sections = byTopic.get(topic);
     if (sections == null) {
       return Map.of();
     }
@@ -242,27 +247,27 @@ public class MissionPresenceService {
   }
 
   /**
-   * Returns the list of mission ids currently tracked. Used by the scheduled cleanup loop to know
-   * which rooms to broadcast state into after a reap.
+   * Returns the list of topics currently tracked. Used by the scheduled cleanup loop to know which
+   * rooms to broadcast state into after a reap.
    *
-   * @return immutable snapshot of mission ids with at least one tracked editor
+   * @return immutable snapshot of topics with at least one tracked editor
    */
-  public List<UUID> trackedMissions() {
-    return List.copyOf(byMission.keySet());
+  public List<String> trackedTopics() {
+    return List.copyOf(byTopic.keySet());
   }
 
   /**
-   * Returns the {@link Entry} for {@code userId} on {@code (missionId, sectionKey)}, or {@code
-   * null}. Intended for tests.
+   * Returns the {@link Entry} for {@code userId} on {@code (topic, sectionKey)}, or {@code null}.
+   * Intended for tests.
    *
-   * @param missionId mission id
+   * @param topic canonical topic
    * @param sectionKey section key
    * @param userId user id
    * @return the entry, or {@code null} if absent
    */
   @Nullable
-  public Entry get(@NotNull UUID missionId, @NotNull String sectionKey, @NotNull String userId) {
-    Map<String, Map<String, Entry>> sections = byMission.get(missionId);
+  public Entry get(@NotNull String topic, @NotNull String sectionKey, @NotNull String userId) {
+    Map<String, Map<String, Entry>> sections = byTopic.get(topic);
     if (sections == null) {
       return null;
     }
@@ -284,11 +289,11 @@ public class MissionPresenceService {
   public record Entry(String userId, String displayName, Instant lastHeartbeat) {}
 
   /**
-   * Lightweight key pair referencing a single section of a single mission. Used to communicate
-   * which rooms changed after a reap.
+   * Lightweight key pair referencing a single section of a single topic. Used to communicate which
+   * rooms changed after a reap.
    *
-   * @param missionId mission id
+   * @param topic canonical topic
    * @param sectionKey section key
    */
-  public record MissionSectionRef(UUID missionId, String sectionKey) {}
+  public record TopicSectionRef(String topic, String sectionKey) {}
 }

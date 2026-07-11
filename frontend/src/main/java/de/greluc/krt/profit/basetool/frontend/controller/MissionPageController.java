@@ -669,6 +669,10 @@ public class MissionPageController {
         case "steps-editor" -> "mission-detail :: stepsEditor";
         case "objectives-editor" -> "mission-detail :: objectivesEditor";
         case "frequencies-editor" -> "mission-detail :: frequenciesEditor";
+        // #1120: the Verwaltung "Organisation" panel (party lead + typed-frequency overview). Its
+        // model — mission, frequencyTypes, frequencyByTypeId — is built unconditionally above, so a
+        // live-sync `organisation` refetch renders with exactly the data it references.
+        case "organisation" -> "mission-detail :: organisationPanel";
         default -> "mission-detail";
       };
     }

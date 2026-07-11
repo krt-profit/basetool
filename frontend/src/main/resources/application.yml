@@ -142,6 +142,14 @@ app:
     response-timeout: 5s
     read-timeout: 3s
     write-timeout: 3s
+  livesync:
+    # Cross-replica live-sync fan-out (REQ-FE-015, ADR-0094). Reuses the Redis the frontend already
+    # runs for Spring Session: the changed relay publishes to a pub/sub channel and every instance
+    # relays it to its own local WebSocket rooms. On by default (and disabled entirely under the
+    # test profile, which runs no Redis). Set false to force purely local, single-instance relay.
+    redis:
+      enabled: ${APP_LIVESYNC_REDIS_ENABLED:true}
+      channel: ${APP_LIVESYNC_REDIS_CHANNEL:basetool:livesync:changed}
   session:
     # Two-tier session idle timeout (REQ-SEC-025, ADR-0088). Every NEW session starts with the short
     # ANONYMOUS window; a successful login promotes it to the long AUTHENTICATED window (in

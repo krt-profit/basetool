@@ -34,10 +34,109 @@
  * synchronous script at the same end-of-body position, never with defer.
  */
 
-/* global MSG_HANDOVER_SUCCESS, MSG_HANDOVER_FAILED, MSG_HANDOVER_NOITEMS, labelPiece, labelScu, scuHintText, labelMenge, ORDER_AGE_YELLOW, ORDER_AGE_RED, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_STATUS_SUCCESS, MSG_STATUS_ERROR, ORDER_CONFLICT, MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL, MSG_DELETE_ERROR, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_MATERIAL_INVALID, MSG_CLAIM_TITLE_ADD, MSG_CLAIM_TITLE_EDIT, MSG_CLAIM_MAX_HINT, MSG_QUALITY_GOOD, MSG_QUALITY_NONE, MSG_CLAIM_SUCCESS, MSG_CLAIM_WITHDRAW_SUCCESS, MSG_CLAIM_ERROR, MSG_CLAIM_VALIDATION_SQUADRON, MSG_CLAIM_VALIDATION_AMOUNT, MSG_CLAIM_VALIDATION_OVERCLAIM, MSG_BP_COUNTING_SUCCESS, MSG_BP_COUNTING_ERROR, MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_OWNER, MSG_LOCATION, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_UNLINK_TOOLTIP, MSG_INVENTORY_UNLINK_SUCCESS, MSG_INVENTORY_UNLINK_ERROR, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, I18N_ADDED, I18N_REMOVED, I18N_NOTE_SAVED, I18N_NOTE_DELETED, I18N_ADD_ERROR, I18N_REMOVE_ERROR, I18N_NOTE_ERROR, I18N_NOTE_CONFLICT, I18N_NOTE_FORBIDDEN, I18N_NOTE_FOR, showFrontendErrorToast, showFrontendSuccessToast */
+/* global MSG_HANDOVER_SUCCESS, MSG_HANDOVER_FAILED, MSG_HANDOVER_NOITEMS, labelPiece, labelScu, scuHintText, labelMenge, ORDER_AGE_YELLOW, ORDER_AGE_RED, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_STATUS_SUCCESS, MSG_STATUS_ERROR, ORDER_CONFLICT, MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL, MSG_DELETE_ERROR, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_MATERIAL_INVALID, MSG_CLAIM_TITLE_ADD, MSG_CLAIM_TITLE_EDIT, MSG_CLAIM_MAX_HINT, MSG_QUALITY_GOOD, MSG_QUALITY_NONE, MSG_CLAIM_SUCCESS, MSG_CLAIM_WITHDRAW_SUCCESS, MSG_CLAIM_ERROR, MSG_CLAIM_VALIDATION_SQUADRON, MSG_CLAIM_VALIDATION_AMOUNT, MSG_CLAIM_VALIDATION_OVERCLAIM, MSG_BP_COUNTING_SUCCESS, MSG_BP_COUNTING_ERROR, MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_OWNER, MSG_LOCATION, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_UNLINK_TOOLTIP, MSG_INVENTORY_UNLINK_SUCCESS, MSG_INVENTORY_UNLINK_ERROR, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, I18N_ADDED, I18N_REMOVED, I18N_NOTE_SAVED, I18N_NOTE_DELETED, I18N_ADD_ERROR, I18N_REMOVE_ERROR, I18N_NOTE_ERROR, I18N_NOTE_CONFLICT, I18N_NOTE_FORBIDDEN, I18N_NOTE_FOR, showFrontendErrorToast, showFrontendSuccessToast, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR */
 
 let cachedInventoryItems = [];
 let isInventoryCached = false;
+
+// ---- Live multi-user sync — the order detail page (REQ-FE-010 / REQ-FE-015, ADR-0094) ---------
+// A peer's status / edit / handover / claim / assignee change re-renders the affected order-detail
+// section fragment in place for every other viewer of the SAME order, over the shared /ws/sync
+// order room. Only opaque section keys cross the wire; each viewer re-pulls its own
+// authorization-checked (and, for a requesting owner, redacted) fragment. Its keys mirror the server
+// LiveSyncTopicClass.ORDER whitelist, and the same map drives both the write-side broadcast and the
+// receive-side refresh (the three-mirror-points rule). ORDER_SECTIONS is that single source of truth.
+const ORDER_SECTIONS = {
+    header: { container: '#order-header-results', fragmentValue: 'header' },
+    materials: { container: '#order-materials-results', fragmentValue: 'materials' },
+    aggregated: { container: '#order-aggregated-results', fragmentValue: 'aggregated' },
+    items: { container: '#order-items-results', fragmentValue: 'items' },
+    handovers: { container: '#order-handovers-results', fragmentValue: 'handovers' },
+    'item-handovers': {
+        container: '#order-item-handovers-results',
+        fragmentValue: 'item-handovers',
+    },
+    'item-handover-lines': {
+        container: '#item-handover-lines',
+        fragmentValue: 'item-handover-lines',
+    },
+    'blueprint-owners': {
+        container: '#blueprint-owners-section',
+        fragmentValue: 'blueprint-owners',
+    },
+    assignees: { container: '#order-assignees-results', fragmentValue: 'assignees' },
+};
+
+(function () {
+    if (!window.krtFetch || typeof window.krtFetch.sectionWrite !== 'function') {
+        return; // no-JS / no-foundation: the classic forms + the bespoke swaps below run unchanged.
+    }
+    const orderSeam = window.krtFetch.sectionWrite({
+        dict: function () {
+            return {
+                'orders.section.refresh.error':
+                    typeof KRT_ORDER_SECTION_REFRESH_ERROR !== 'undefined'
+                        ? KRT_ORDER_SECTION_REFRESH_ERROR
+                        : '',
+            };
+        },
+        keys: { refreshErrorKey: 'orders.section.refresh.error' },
+        sections: ORDER_SECTIONS,
+        pageUrl: function () {
+            return window.orderId ? '/orders/' + window.orderId : null;
+        },
+        // Tell other users viewing THIS order that these sections changed (REQ-FE-015).
+        broadcast: function (keys) {
+            if (
+                window.orderId &&
+                window.krtLiveSync &&
+                typeof window.krtLiveSync.sendChanged === 'function'
+            ) {
+                window.krtLiveSync.sendChanged('order:' + window.orderId, keys);
+            }
+        },
+    });
+    // krtRefreshOrderSection re-renders one or more sections in place (and broadcasts unless
+    // {broadcast:false}); krtNotifyOrderChanged broadcasts only (for handlers that already swapped
+    // their own DOM, e.g. the assignee section's bespoke outerHTML swap in oaSend).
+    window.krtRefreshOrderSection = orderSeam.refresh;
+    window.krtNotifyOrderChanged = orderSeam.notify;
+
+    // Inbound peer changes: subscribe to order:{id} on /ws/sync and re-fetch the affected section
+    // fragments locally with {broadcast:false} so an applied peer change never echoes back. The
+    // receiver's default busy-guard holds a refresh while any of this page's modals is open (edit,
+    // handover, claim, note, status-warning) and shows the deferred-refresh pill instead of yanking
+    // the DOM; a missing container (order-kind- or requesterView-gated) is silently skipped.
+    if (window.orderId && window.krtLiveSync && window.krtLiveSync.createReceiver) {
+        window.krtLiveSync.createReceiver({
+            topic: 'order:' + window.orderId,
+            sections: ORDER_SECTIONS,
+            refresh: function (keys) {
+                if (window.krtRefreshOrderSection) {
+                    window.krtRefreshOrderSection(keys, { broadcast: false });
+                }
+            },
+            pill: {
+                label: function () {
+                    return typeof KRT_ORDER_LIVESYNC_UPDATES !== 'undefined'
+                        ? KRT_ORDER_LIVESYNC_UPDATES
+                        : undefined;
+                },
+            },
+        });
+    }
+})();
+
+// Cross-publish the staff order queue (the `orders` global room) after a mutation that changes an
+// order's queue-visible fields — status, edit, delete. Publishing needs no subscription (the
+// sanctioned cross-topic case): the detail page subscribes to order:{id}, not to `orders`, yet every
+// queue viewer must still see the change. A non-profit requester is refused the room server-side, so
+// the key reaches only viewers who may read the queue.
+function _publishOrdersQueue() {
+    if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
+        window.krtLiveSync.sendChanged('orders', ['queue']);
+    }
+}
 
 // Serialize the material-handover modal form to the JSON its AJAX twin binds (#575).
 function _serializeHandoverForm() {
@@ -256,10 +355,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (itemsContainer) itemsContainer.innerHTML = '';
                     showFrontendSuccessToast(MSG_HANDOVER_SUCCESS);
                     // Re-render the requirement table (stock/status), the handover history (new
-                    // row) and the header (status select + version, if the order auto-completed).
+                    // row) and the header (status select + version, if the order auto-completed);
+                    // each swap also broadcasts its section to peers viewing this order (REQ-FE-015).
                     _refreshMaterialsSection(orderId);
                     _swapOrderSection(orderId, 'order-handovers-results', 'handovers');
                     _swapOrderSection(orderId, 'order-header-results', 'header');
+                    // A handover that auto-completes the order removes it from the staff queue's
+                    // default filter — tell peers viewing the queue to re-fetch (REQ-FE-015).
+                    if (order && (order.status === 'COMPLETED' || order.status === 'REJECTED')) {
+                        _publishOrdersQueue();
+                    }
                 },
             });
         });
@@ -299,6 +404,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     _swapOrderSection(orderId, 'order-item-handovers-results', 'item-handovers');
                     _swapOrderSection(orderId, 'item-handover-lines', 'item-handover-lines');
                     _swapOrderSection(orderId, 'order-header-results', 'header');
+                    // A delivery that auto-completes the order removes it from the staff queue's
+                    // default filter — tell peers viewing the queue to re-fetch (REQ-FE-015).
+                    if (order && (order.status === 'COMPLETED' || order.status === 'REJECTED')) {
+                        _publishOrdersQueue();
+                    }
                 },
             });
         });
@@ -543,6 +653,9 @@ function krtOrderWrite(opts) {
             errorMessage: MSG_DELETE_ERROR,
         });
         if (res.ok) {
+            // The order left the queue — tell peers viewing the staff queue to re-fetch (REQ-FE-015)
+            // before we navigate away from this page.
+            _publishOrdersQueue();
             window.location.assign('/orders');
         }
     });
@@ -615,17 +728,12 @@ function _serializeEditForm() {
                 const modal = document.getElementById('edit-modal');
                 if (modal) modal.style.display = 'none';
                 showFrontendSuccessToast(MSG_UPDATE_SUCCESS);
-                const header = document.getElementById('order-header-results');
-                if (header && window.krtFetch.swap) {
-                    window.krtFetch.swap({
-                        url: '/orders/' + orderId,
-                        container: header,
-                        fragmentValue: 'header',
-                        history: false,
-                        preserveScroll: true,
-                    });
-                }
+                // Re-render the header (handle / status / priority) and the material requirement
+                // section in place and broadcast both to peers viewing this order (REQ-FE-015).
+                _swapOrderSection(orderId, 'order-header-results', 'header');
                 _refreshMaterialsSection(orderId);
+                // The edit can change the handle shown in the staff queue — refresh peers' queues too.
+                _publishOrdersQueue();
             },
         });
     });
@@ -636,8 +744,17 @@ function _serializeEditForm() {
 // and not returned per write, so a partial DOM patch would desync them — re-pull the whole table
 // fragment instead. MATERIAL orders render the requirement table on #order-materials-results,
 // ITEM orders the aggregated table on #order-aggregated-results; swap whichever exists.
-function _refreshMaterialsSection(orderId) {
-    orderId = orderId || (document.getElementById('claim-order-id') || {}).value;
+function _refreshMaterialsSection(orderId, broadcastOpts) {
+    // Route through the order live-sync seam so a local claim/edit/unlink re-render also broadcasts
+    // materials/aggregated to peers viewing this order (REQ-FE-015). The seam swaps whichever of the
+    // two containers this order actually renders (MATERIAL -> materials, ITEM -> aggregated) and
+    // skips the absent one; broadcastOpts lets a receiver-applied refresh pass {broadcast:false} so
+    // an inbound peer change is not echoed back.
+    if (window.krtRefreshOrderSection) {
+        return window.krtRefreshOrderSection(['materials', 'aggregated'], broadcastOpts);
+    }
+    // Fallback (foundation present but the section seam unavailable): the former direct swap.
+    orderId = orderId || window.orderId || (document.getElementById('claim-order-id') || {}).value;
     const mat = document.getElementById('order-materials-results');
     const agg = document.getElementById('order-aggregated-results');
     const container = mat || agg;
@@ -654,8 +771,14 @@ function _refreshMaterialsSection(orderId) {
 
 // Swap one order-detail section by container id + fragment value (#575). Used by the handover
 // flow to re-render the handover history + the header (status select carrying the fresh
-// @Version) in place.
-function _swapOrderSection(orderId, containerId, fragmentValue) {
+// @Version) in place. Routed through the order live-sync seam so the local re-render also
+// broadcasts the section to peers (REQ-FE-015): the section key equals the fragment value, and the
+// seam resolves the container from ORDER_SECTIONS — containerId is kept only for the fallback path.
+// broadcastOpts lets a receiver-applied refresh pass {broadcast:false} to avoid an echo loop.
+function _swapOrderSection(orderId, containerId, fragmentValue, broadcastOpts) {
+    if (window.krtRefreshOrderSection) {
+        return window.krtRefreshOrderSection(fragmentValue, broadcastOpts);
+    }
     const c = document.getElementById(containerId);
     if (!c || !orderId || !window.krtFetch || !window.krtFetch.swap) return Promise.resolve(false);
     return window.krtFetch.swap({
@@ -893,18 +1016,9 @@ function _doStatusUpdate(orderId, status, selectElement) {
             // status nulls the priority, and reactivating a terminal order assigns a fresh one
             // (JobOrderService.updateJobOrderStatus). Re-pull the header on EVERY status change so
             // the priority cell matches the server instead of going stale on the reactivate path
-            // (mirrors the edit flow). The swap also re-renders the delegated status select with a
-            // fresh @Version.
-            const header = document.getElementById('order-header-results');
-            if (header && window.krtFetch.swap) {
-                window.krtFetch.swap({
-                    url: '/orders/' + orderId,
-                    container: header,
-                    fragmentValue: 'header',
-                    history: false,
-                    preserveScroll: true,
-                });
-            }
+            // (mirrors the edit flow), and broadcast it to peers viewing this order (REQ-FE-015). The
+            // swap also re-renders the delegated status select with a fresh @Version.
+            _swapOrderSection(orderId, 'order-header-results', 'header');
             // COMPLETED/REJECTED additionally detach linked inventory server-side (lowering the
             // per-material stock + fulfilment cells); re-pull the materials section and drop any
             // open inventory drill-down (lazily re-fetched on the next row click).
@@ -914,6 +1028,9 @@ function _doStatusUpdate(orderId, status, selectElement) {
                 });
                 _refreshMaterialsSection(orderId);
             }
+            // A status change moves the order in/out of the staff queue's default OPEN+IN_PROGRESS
+            // filter — tell peers viewing the queue to re-fetch their own list (REQ-FE-015).
+            _publishOrdersQueue();
             showFrontendSuccessToast(MSG_STATUS_SUCCESS);
         },
     }).then(function (res) {
@@ -1494,6 +1611,12 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             );
         }
         if (opts.successMsg) showFrontendSuccessToast(opts.successMsg);
+        // Broadcast the assignee change to peers viewing this order — their order:{id} receiver
+        // re-fetches the assignees fragment into #order-assignees-results (REQ-FE-015). The actor
+        // already applied its own outerHTML swap above, so notify (broadcast-only), not refresh.
+        if (window.krtNotifyOrderChanged) {
+            window.krtNotifyOrderChanged(['assignees']);
+        }
         return true;
     }
 

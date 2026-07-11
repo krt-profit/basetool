@@ -60,7 +60,12 @@ async function persistOrderReorder(orderId, targetPriority) {
             },
         });
     }
-    if (container && window.krtFetch && window.krtFetch.swap) {
+    // Re-render the whole queue in place AND broadcast the change to peers on success (REQ-FE-015);
+    // on a failed persist re-render only (broadcast:false) so a reverted optimistic move never pokes
+    // peers. Falls back to the bespoke swap when the live-sync seam is unavailable.
+    if (window.krtRefreshOrdersQueue) {
+        await window.krtRefreshOrdersQueue(['queue'], res.ok ? undefined : { broadcast: false });
+    } else if (container && window.krtFetch && window.krtFetch.swap) {
         await window.krtFetch.swap({
             url: window.location.pathname + window.location.search,
             container: container,
@@ -85,6 +90,9 @@ document.addEventListener('DOMContentLoaded', () => {
         draggedRow = e.target.closest('tr.draggable-row');
         if (!draggedRow) return;
 
+        // Flag an in-flight drag so a peer's live-sync `queue` refresh holds back (busyTest in
+        // orders-index.js) instead of yanking the rows out from under the drag (REQ-FE-015).
+        window.__ordersDragging = true;
         draggedRow.style.opacity = '0.5';
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', draggedRow.dataset.id);
@@ -94,6 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     container.addEventListener('dragend', function (_e) {
+        window.__ordersDragging = false;
         if (!draggedRow) return;
         draggedRow.style.opacity = '1';
         draggedRow = null;

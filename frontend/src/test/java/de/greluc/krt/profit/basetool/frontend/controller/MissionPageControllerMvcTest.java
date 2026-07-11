@@ -3079,6 +3079,45 @@ class MissionPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = "OFFICER")
+  void missionDetail_OrganisationFragment_RendersPartyLeadAndTypedFrequenciesOnly()
+      throws Exception {
+    // #1120: the Verwaltung "Organisation" panel is its own broadcastable fragment so a peer's
+    // party-lead / typed-frequency change re-renders it in place (REQ-FE-015). The fragment carries
+    // the party-lead display + typed-frequency editor, but NOT the page chrome and NOT the sibling
+    // "Weitere Frequenzen" swap container (which is its own `frequencies` section, never nested).
+    UUID missionId = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
+        .thenReturn(editableMission(missionId));
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/missions/" + missionId).param("fragment", "organisation"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("mission-detail :: organisationPanel"))
+        .andExpect(content().string(containsString("id=\"party-lead-display\"")))
+        .andExpect(content().string(not(containsString("mission-head-sticky"))))
+        .andExpect(content().string(not(containsString("id=\"mission-custom-freq-list\""))));
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void missionDetail_OrganisationFragment_ErrorPathRendersSectionSizedAlert() throws Exception {
+    // A backend failure on the fragment refetch must answer a section-sized inline error, never a
+    // redirect a live-sync swap would paint whole into the container.
+    UUID missionId = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
+        .thenThrow(new RuntimeException("boom"));
+
+    mockMvc
+        .perform(get("/missions/" + missionId).param("fragment", "organisation"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("mission-detail :: fragmentError"))
+        .andExpect(content().string(not(containsString("mission-head-sticky"))));
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
   void missionDetail_FragmentBackendError_RendersInlineErrorFragmentNotRedirect() throws Exception {
     UUID missionId = UUID.randomUUID();
     // The backend read fails mid-swap (circuit-breaker open / timeout / 5xx). The fragment path

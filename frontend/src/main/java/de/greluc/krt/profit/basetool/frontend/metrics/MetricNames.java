@@ -31,8 +31,53 @@ package de.greluc.krt.profit.basetool.frontend.metrics;
  */
 public final class MetricNames {
 
-  /** Gauge {@code basetool_mission_presence_missions} — missions with a live editor (frontend). */
+  /**
+   * Gauge {@code basetool_mission_presence_missions} — live-sync topics with a live editor
+   * (frontend). Name legacy-pinned: presence is mission-only at ship time, so the value is
+   * unchanged and the existing dashboard panel keeps meaning (REQ-OBS-011 forbids a rename that
+   * breaks a dashboard).
+   */
   public static final String MISSION_PRESENCE_MISSIONS = "basetool.mission.presence.missions";
+
+  /**
+   * Gauge {@code basetool_livesync_subscriptions} — tag {@code topic_class}; live live-sync topic
+   * subscriptions per topic class in {@code LiveSyncWebSocketHandler} (REQ-FE-015, ADR-0094).
+   */
+  public static final String LIVESYNC_SUBSCRIPTIONS = "basetool.livesync.subscriptions";
+
+  /**
+   * Counter {@code basetool_livesync_subscribe_total} — tags {@code topic_class}, {@code outcome}
+   * ({@link #OUTCOME_ALLOWED} / {@link #OUTCOME_DENIED}); the verdict of a multiplexed {@code
+   * /ws/sync} subscribe-authorization check (REQ-FE-015, ADR-0094). A saturated-executor fail-open
+   * is instead counted as a {@link #DROPPED_AUTHORIZE_SATURATED} relay drop.
+   */
+  public static final String LIVESYNC_SUBSCRIBE = "basetool.livesync.subscribe";
+
+  /**
+   * Counter {@code basetool_livesync_socket_rejected_total} — tag {@code reason} ({@link
+   * #SOCKET_REJECTED_USER_CAP}); a multiplexed {@code /ws/sync} socket refused at connect. Carries
+   * no {@code topic_class} — a rejected socket has bound no topic yet (F2 / #1243, ADR-0094).
+   */
+  public static final String LIVESYNC_SOCKET_REJECTED = "basetool.livesync.socket.rejected";
+
+  /**
+   * Counter {@code basetool_livesync_redis_published_total} — tag {@code topic_class}; {@code
+   * changed} signals this instance published to the cross-replica Redis channel (ADR-0094).
+   */
+  public static final String LIVESYNC_REDIS_PUBLISHED = "basetool.livesync.redis.published";
+
+  /**
+   * Counter {@code basetool_livesync_redis_consumed_total} — tag {@code topic_class}; {@code
+   * changed} signals this instance consumed from a peer replica (own-origin messages excluded).
+   */
+  public static final String LIVESYNC_REDIS_CONSUMED = "basetool.livesync.redis.consumed";
+
+  /**
+   * Counter {@code basetool_livesync_redis_errors_total} — tag {@code op} ({@link #OP_PUBLISH} /
+   * {@link #OP_CONSUME}); a Redis fan-out publish or consume that failed (swallowed — local relay
+   * already happened, so the failure only degrades cross-replica delivery, ADR-0094).
+   */
+  public static final String LIVESYNC_REDIS_ERRORS = "basetool.livesync.redis.errors";
 
   /** Gauge {@code basetool_active_sessions} — active Spring Session sessions (frontend). */
   public static final String ACTIVE_SESSIONS = "basetool.active.sessions";
@@ -48,22 +93,23 @@ public final class MetricNames {
       "basetool.notification.relay.connections";
 
   /**
-   * Gauge {@code basetool_presence_ws_sessions} — live mission-presence WebSocket sessions summed
-   * across all missions in {@code MissionPresenceWebSocketHandler} (#1041 item 17).
+   * Gauge {@code basetool_presence_ws_sessions} — live live-sync WebSocket sessions summed across
+   * all topic rooms in {@code LiveSyncWebSocketHandler} (#1041 item 17, REQ-FE-015).
    */
   public static final String PRESENCE_WS_SESSIONS = "basetool.presence.ws.sessions";
 
   /**
-   * Counter {@code basetool_presence_relay_frames_total} — tag {@code type} ({@link #FRAME_CHANGED}
-   * / {@link #FRAME_SNAPSHOT}). A {@code changed}-frame flatline while {@code snapshot} frames keep
-   * flowing is the early indicator for the REQ-FE-010 live-multi-user-sync defect class.
+   * Counter {@code basetool_presence_relay_frames_total} — tags {@code type} ({@link
+   * #FRAME_CHANGED} / {@link #FRAME_SNAPSHOT}) and {@code topic_class} (REQ-FE-015). A {@code
+   * changed}-frame flatline while {@code snapshot} frames keep flowing is the early indicator for
+   * the REQ-FE-010 live-multi-user-sync defect class.
    */
   public static final String PRESENCE_RELAY_FRAMES = "basetool.presence.relay.frames";
 
   /**
-   * Counter {@code basetool_presence_relay_dropped_total} — tag {@code reason} ({@link
-   * #DROPPED_THROTTLED} / {@link #DROPPED_SEND_FAILED}) at the currently-silent throttle and
-   * send-failure branches of the presence relay (#1041 item 17).
+   * Counter {@code basetool_presence_relay_dropped_total} — tags {@code reason} ({@link
+   * #DROPPED_THROTTLED} / {@link #DROPPED_SEND_FAILED}) and {@code topic_class} at the throttle and
+   * send-failure branches of the relay (#1041 item 17, REQ-FE-015).
    */
   public static final String PRESENCE_RELAY_DROPPED = "basetool.presence.relay.dropped";
 
@@ -100,6 +146,21 @@ public final class MetricNames {
 
   /** Tag key: the presence-relay frame type on {@link #PRESENCE_RELAY_FRAMES}. */
   public static final String TAG_TYPE = "type";
+
+  /**
+   * Tag key: the bounded live-sync {@code topic_class} on the relay counters and {@link
+   * #LIVESYNC_SUBSCRIPTIONS} — one of the {@code LiveSyncTopicClass} metric labels (REQ-OBS-011).
+   */
+  public static final String TAG_TOPIC_CLASS = "topic_class";
+
+  /** Tag key: the Redis fan-out operation on {@link #LIVESYNC_REDIS_ERRORS}. */
+  public static final String TAG_OP = "op";
+
+  /** Redis fan-out operation: publishing a {@code changed} signal to peers. */
+  public static final String OP_PUBLISH = "publish";
+
+  /** Redis fan-out operation: consuming a peer's {@code changed} signal. */
+  public static final String OP_CONSUME = "consume";
 
   /** Tag key: the login outcome on {@link #LOGIN}. */
   public static final String TAG_OUTCOME = "outcome";
@@ -145,6 +206,34 @@ public final class MetricNames {
 
   /** Presence drop reason: a frame that failed to write to a closed/broken session. */
   public static final String DROPPED_SEND_FAILED = "send_failed";
+
+  /** Presence drop reason: a subscribe refused because the socket hit its per-session topic cap. */
+  public static final String DROPPED_TOPIC_CAP = "topic_cap";
+
+  /**
+   * Presence drop reason: a {@code changed} frame rejected by the per-<em>topic</em> token bucket —
+   * the room's aggregate publish rate exceeded its bound regardless of the per-session limit (F2 /
+   * #1243).
+   */
+  public static final String DROPPED_TOPIC_THROTTLED = "topic_throttled";
+
+  /**
+   * Presence drop reason: a subscribe that failed open because the subscribe-authorization executor
+   * was saturated (the probe could not be scheduled).
+   */
+  public static final String DROPPED_AUTHORIZE_SATURATED = "authorize_saturated";
+
+  /** Live-sync subscribe outcome: the subscribe was authorized (or failed open on a transient). */
+  public static final String OUTCOME_ALLOWED = "allowed";
+
+  /** Live-sync subscribe outcome: the subscribe was refused by an explicit backend 403/404. */
+  public static final String OUTCOME_DENIED = "denied";
+
+  /**
+   * Socket-rejected reason ({@link #LIVESYNC_SOCKET_REJECTED}): a {@code /ws/sync} socket refused
+   * because the user already holds the maximum concurrent sockets (F2 / #1243).
+   */
+  public static final String SOCKET_REJECTED_USER_CAP = "user_cap";
 
   /** Reason: the backend returned a 4xx problem response. */
   public static final String REASON_BACKEND_4XX = "backend_4xx";

@@ -6,8 +6,9 @@
  * Materialbörse board interactions (Flotte & Logistik). Tabs / filters / sort and
  * row selection re-render server fragments through window.krtFetch.swap; interest /
  * deactivate writes go through window.krtFetch.write; the release / edit dialog is the
- * shared window.krtMaterialRelease modal (materialboerse-release.js). No hand-rolled
- * fetch, no full-page reload, no native dialogs. REQ-MARKET-*, REQ-FE-001..014.
+ * shared window.krtMaterialRelease modal (materialboerse-release.js). Board changes
+ * peer-sync over the shared multiplexed window.krtLiveSync `materialboard` room. No
+ * hand-rolled fetch, no full-page reload, no native dialogs. REQ-MARKET-*, REQ-FE-001..015.
  */
 (function () {
     'use strict';
@@ -18,6 +19,10 @@
     }
 
     let SERIALIZE_KEY = 'materialboerse';
+    // REQ-FE-015 (ADR-0094): the global live-sync room the board publishes to / subscribes from,
+    // multiplexed over the shared /ws/sync socket (window.krtLiveSync). Replaces the retired
+    // per-board materialboerse-presence.js socket.
+    let MATERIALBOARD_TOPIC = 'materialboard';
     let selectedId = readSelectedId();
     let searchTimer = null;
 
@@ -181,8 +186,8 @@
     }
 
     function notifyPeers() {
-        if (window.krtMaterialboardPresence) {
-            window.krtMaterialboardPresence.sendChanged(['board']);
+        if (window.krtLiveSync) {
+            window.krtLiveSync.sendChanged(MATERIALBOARD_TOPIC, ['board']);
         }
     }
 
@@ -309,10 +314,13 @@
         }
     });
 
-    // REQ-MARKET-010: a peer released / deactivated / registered interest — re-pull the board list.
-    // Debounced; skipped while the release modal is open so an in-progress dialog is not disrupted.
+    // REQ-MARKET-010 / REQ-FE-015: a peer released / deactivated / registered interest — re-pull the
+    // board list. Debounced; skipped while the release modal is open so an in-progress dialog is not
+    // disrupted. Behaviour is pinned to the pre-migration board relay (no deferred-refresh pill);
+    // only the transport moved from the retired materialboerse-presence.js socket to the shared
+    // multiplexed window.krtLiveSync `materialboard` room.
     let peerTimer = null;
-    document.addEventListener('krt:materialboerse-changed', function () {
+    function onPeerChanged() {
         if (peerTimer) {
             clearTimeout(peerTimer);
         }
@@ -330,7 +338,10 @@
             }
             swapList();
         }, 400);
-    });
+    }
+    if (window.krtLiveSync) {
+        window.krtLiveSync.subscribe(MATERIALBOARD_TOPIC, { onChanged: onPeerChanged });
+    }
 
     document.addEventListener('krt:swapped', function () {
         applyAgo(document);
