@@ -65,6 +65,15 @@ repeated per-level header, right-aligned tabular numbers with a 0-1000 quality g
 rendered only when an entry has one. The
 per-material aggregate page (`/inventory`, `AggregatedInventoryDto`) is unchanged.
 
+Both tree levels are collapsible, and their expand/collapse state is **persisted per user**
+(`localStorage`, keyed by the viewer's id — `expanded_rows_lager_*` for material groups,
+`expanded_stacks_lager_*` for location stacks) and re-applied on initial load **and after every
+in-place grouped-table re-swap** — a filter change or a modal write (book-out, Umbuchen and
+bulk-checkout all re-swap `#inventoryTable` on success, REQ-INV-003/REQ-INV-007). A fragment swap
+does not re-fire `DOMContentLoaded`, so the expansion is restored explicitly after the swap; a
+restored stack re-fetches its (now up-to-date) entries. A modal mutation therefore never collapses
+the tree the user was working in.
+
 **Acceptance**
 
 - [ ] Rows sharing the stock identity appear as one stack row with the correct summed amount,
@@ -75,12 +84,16 @@ per-material aggregate page (`/inventory`, `AggregatedInventoryDto`) is unchange
   grouped view; a `null` in a nullable dimension never hides the stack.
 - [ ] The grouped response contains no per-entry rows (entries are lazy — REQ-INV-005).
 - [ ] Both grouped pages render the collapsed stack rows without error.
+- [ ] After an in-place grouped-table re-swap (filter change or modal write), the material groups
+  and location stacks the user had expanded stay expanded and a restored stack re-loads its
+  entries; a modal mutation never collapses the tree.
 
 **Enforced by:** `InventoryItemServiceAggregateTest`, `InventoryItemStackQueryTest`,
-`InventoryItemStackQueryDataTest`, `InventoryPageControllerMvcTest` · **Code:**
-`InventoryItemService#buildGroupedFromStacks`,
+`InventoryItemStackQueryDataTest`, `InventoryPageControllerMvcTest`, `InventoryOperationsE2eTest`
+· **Code:** `InventoryItemService#buildGroupedFromStacks`,
 `InventoryItemRepository#findUserStacks` / `#findGlobalStacks`, `InventoryStackAggregate`,
-`InventoryStackDto`, `GroupedInventoryDto`, `inventory-my.html`, `inventory-admin.html` ·
+`InventoryStackDto`, `GroupedInventoryDto`, `inventory-my.html`, `inventory-admin.html`,
+`static/js/inventory-my.js`, `static/js/inventory-admin.js` (tree expand/collapse persistence) ·
 **Issues:** #466
 
 ### REQ-INV-003 — Actions operate per entry
