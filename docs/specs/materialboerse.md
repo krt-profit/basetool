@@ -31,12 +31,23 @@ Every `ACTIVE` offer is visible to every real member (`KRT_MEMBER`) regardless o
 org unit — the board is a single org-wide marketplace, not staffel-scoped. Authenticated-but-roleless
 guests do **not** see the board. The board shows per offer: material, quality (0–1000), quantity in
 the material's own unit (SCU for bulk materials, Stück/piece for `PIECE` materials — never a
-hardcoded SCU), the anbieter (username) + squadron badge, when it was released, and the interessenten
-count.
+hardcoded SCU), the anbieter (username) followed by their org-unit affiliation badges, when it was
+released, and the interessenten count.
+
+The affiliation badges are derived from the **anbieter's own memberships**, not from the offer's
+stored owning org unit (which is `null` for an ownerless-personal Lager row and would leave the
+badge blank): there is **no "primary" Staffel** — a member who belongs to several Staffeln and/or
+Spezialkommandos surfaces **all** of them, rendered **after** the username, Staffel(n) first (brand
+badge) then Spezialkommando(s) (neutral `squadron-badge-sk` badge), each group name-sorted.
+The badges are batch-resolved (one membership query + one org-unit query per board page) so the
+board stays free of the per-offer N+1 (REQ-DATA-003).
 
 **Acceptance**
 - [ ] A `KRT_MEMBER` sees offers from every squadron; a `GUEST` gets 403 on `/materialboerse`.
 - [ ] The board read applies no OrgUnit scope filter.
+- [ ] The anbieter's every Staffel and Spezialkommando membership renders as a badge after the
+username (Staffel first, then SK, each name-sorted); an anbieter with no membership shows no badge,
+and a legacy/ownerless-stamped offer still shows the anbieter's badges.
 - [ ] A `PIECE` material's quantity renders as an integer count in the piece unit, an SCU material's
 with the SCU unit — the amount unit follows `Material.quantityType`, matching the Lager
 (#1182).

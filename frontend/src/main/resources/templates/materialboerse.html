@@ -113,10 +113,13 @@
                                 <span th:if="${offer.kind() == 'ITEM'}" class="mb-kind-tag" th:text="#{materialboerse.kind.item}">Item</span>
                             </span>
                             <span class="mb-mrow-sub">
-                                <span th:if="${offer.squadron() != null}" class="squadron-badge"
-                                      th:classappend="${offer.foreign()} ? 'squadron-badge-foreign' : ''"
-                                      th:text="${offer.squadron().shorthand()}">IRI</span>
                                 <span class="mb-mrow-owner" th:text="${offer.owner().effectiveName()}">Spieler</span>
+                                <span th:if="${offer.ownerOrgUnits() != null and !offer.ownerOrgUnits().isEmpty()}" class="squadron-badge-group">
+                                    <span th:each="unit : ${offer.ownerOrgUnits()}" class="squadron-badge"
+                                          th:classappend="${unit.kind() == 'SPECIAL_COMMAND'} ? 'squadron-badge-sk'"
+                                          th:text="${unit.shorthand() != null ? unit.shorthand() : unit.name()}"
+                                          th:title="${unit.name()}">IRI</span>
+                                </span>
                             </span>
                             <span class="mb-mrow-meta">
                                 <th:block th:if="${offer.kind() == 'ITEM'}">
@@ -159,9 +162,12 @@
                                     <span class="mb-dp-owner">
                                         <span th:text="#{materialboerse.detail.from}">von</span>
                                         <span class="mb-dp-owner-name" th:text="${offer.owner().effectiveName()}">Spieler</span>
-                                        <span th:if="${offer.squadron() != null}" class="squadron-badge"
-                                              th:classappend="${offer.foreign()} ? 'squadron-badge-foreign' : ''"
-                                              th:text="${offer.squadron().shorthand()}">IRI</span>
+                                        <span th:if="${offer.ownerOrgUnits() != null and !offer.ownerOrgUnits().isEmpty()}" class="squadron-badge-group">
+                                            <span th:each="unit : ${offer.ownerOrgUnits()}" class="squadron-badge"
+                                                  th:classappend="${unit.kind() == 'SPECIAL_COMMAND'} ? 'squadron-badge-sk'"
+                                                  th:text="${unit.shorthand() != null ? unit.shorthand() : unit.name()}"
+                                                  th:title="${unit.name()}">IRI</span>
+                                        </span>
                                     </span>
                                     <div th:if="${offer.mine()}" class="mb-dp-mine">
                                         <span class="chip chip--primary" th:text="#{materialboerse.detail.mine}">Dein Angebot</span>
