@@ -31,11 +31,14 @@ never consults `OwnerScopeService`, pinned by `bankClassesMustNotConsultOrgUnitS
 ## Decision
 
 1. **Derived responsible holder (REQ-BANK-034).** The responsible person is **not** stored or assigned;
-   it is a function of org-unit leadership, resolved at request time inside the
-   `OrgUnitBankAccessService` seam: Staffel→`STAFFELLEITER`, SK→`SK_LEAD`, Bereich→`BEREICHSLEITER`,
-   `CARTEL`→every `OL_MEMBER` (collegial), `CARTEL_BANK`→`BEREICHSLEITER` of a `Department.PROFIT`
-   Bereich, `SPECIAL`→none. Code never calls it "holder" (it is `responsible` / "Kontoverantwortliche/r"
-   in the UI) to avoid the `BankHolder` collision.
+   it is a function of org-unit leadership. It is resolved interactively for the caller ("am I
+   responsible?") inside the `OrgUnitBankAccessService` seam and — with no principal — reverse-resolved
+   for the notification engine and the leadership-change audit in the OwnerScope-free
+   `OrgUnitBankResponsibilityService` (split out under audit Thema 7, #1254). The mapping is the same in
+   both: Staffel→`STAFFELLEITER`, SK→`SK_LEAD`, Bereich→`BEREICHSLEITER`, `CARTEL`→every `OL_MEMBER`
+   (collegial), `CARTEL_BANK`→`BEREICHSLEITER` of a `Department.PROFIT` Bereich, `SPECIAL`→none. Code
+   never calls it "holder" (it is `responsible` / "Kontoverantwortliche/r" in the UI) to avoid the
+   `BankHolder` collision.
 
 2. **Configurable visibility (REQ-BANK-035) as additive view grants.** A new `bank_account_view_grant`
    table (V189) holds *additional* read access, polymorphic on `grantee_kind`
