@@ -71,20 +71,17 @@ import tools.jackson.databind.node.ObjectNode;
  * fragment through its own authenticated, authorization-checked GET, so redaction and access gates
  * re-apply per viewer.
  *
- * <p><b>Topic binding — two modes.</b> A <em>legacy</em> per-resource socket is bound to exactly
- * one topic, resolved at connect time from the {@link #ATTR_TOPIC} attribute a handshake
- * interceptor set from the path; every frame operates on that implicit topic. This mode is retained
- * as a generic capability of the relay, but <b>no path registers it any more</b>: the one-release
- * legacy aliases ({@code /ws/missions/{id}/presence}, {@code /ws/materialboerse/board}) were
- * removed in #1236, so in production every socket is multiplexed. A <em>multiplexed</em> {@code
- * /ws/sync} socket ({@link #ATTR_MULTIPLEXED}) binds no topic at connect and manages a set of rooms
- * via {@code subscribe} frames — each authorized asynchronously (off the container thread, on the
- * {@code authExecutor}) by {@link LiveSyncSubscriptionAuthorizer} — while {@code changed} and
- * presence frames carry their own {@code topic}. Publishing a {@code changed} frame needs <b>no</b>
- * subscription (the cross-topic case: a requester notifies a staff queue it may not read), only an
- * authenticated socket, a known topic class and the per-session rate limit; a subscribe is what an
- * <em>inbound</em> relay requires. In both modes the frame's {@code sections} array is sanitised
- * against the topic class's whitelist before it is relayed.
+ * <p><b>Topic binding.</b> Every socket is a multiplexed {@code /ws/sync} socket ({@link
+ * #ATTR_MULTIPLEXED}): it binds no topic at connect and manages a set of rooms via {@code
+ * subscribe} frames — each authorized asynchronously (off the container thread, on the {@code
+ * authExecutor}) by {@link LiveSyncSubscriptionAuthorizer} — while {@code changed} and presence
+ * frames carry their own {@code topic}. (The one-release per-resource legacy aliases {@code
+ * /ws/missions/{id}/presence} and {@code /ws/materialboerse/board}, and the single-topic connect
+ * binding they used, were removed in #1236/#1182.) Publishing a {@code changed} frame needs
+ * <b>no</b> subscription (the cross-topic case: a requester notifies a staff queue it may not
+ * read), only an authenticated socket, a known topic class and the per-session rate limit; a
+ * subscribe is what an <em>inbound</em> relay requires. The frame's {@code sections} array is
+ * sanitised against the topic class's whitelist before it is relayed.
  *
  * <p><b>Cross-replica fan-out.</b> An accepted {@code changed} frame is relayed to this instance's
  * local room first, then handed to {@link LiveSyncFanout#publish(String, List)} so peer replicas
@@ -187,17 +184,8 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   private static final int SEND_BUFFER_SIZE_LIMIT = 512 * 1024;
 
   /**
-   * Session-attribute key holding the canonical topic string a socket is bound to. Set by the
-   * handshake interceptor from the request path (the legacy per-resource endpoints) and read here
-   * to resolve the socket's room, section whitelist and presence flag. Public so the interceptor
-   * can populate it.
-   */
-  public static final String ATTR_TOPIC = "livesync.topic";
-
-  /**
-   * Session-attribute key ({@link Boolean}) marking a multiplexed {@code /ws/sync} socket, as
-   * opposed to a legacy per-resource socket (which instead carries {@link #ATTR_TOPIC}). Set by the
-   * {@code /ws/sync} handshake interceptor. Public so the interceptor can populate it.
+   * Session-attribute key ({@link Boolean}) marking a multiplexed {@code /ws/sync} socket. Set by
+   * the {@code /ws/sync} handshake interceptor. Public so the interceptor can populate it.
    */
   public static final String ATTR_MULTIPLEXED = "livesync.multiplexed";
 
@@ -227,7 +215,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   /**
    * Session-attribute key holding a multiplexed socket's set of subscribed canonical topics (a
    * {@code Set<String>}). Drives the per-session topic cap, idempotent re-subscribe and close-time
-   * room cleanup. Absent on legacy sockets, which clean up their single {@link #ATTR_TOPIC} room.
+   * room cleanup.
    */
   private static final String ATTR_SUBSCRIPTIONS = "livesync.subscriptions";
 
@@ -244,9 +232,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    * krt-live-sync.js}), so this sits far above any legitimate multi-tab use — with headroom for the
    * brief overlap while a reconnecting tab's old socket is still closing — yet bounds the {@code K}
    * in the {@code K sockets × publish-rate × room-viewers} amplification lever. A refused socket is
-   * closed with {@link #SOCKET_CAP_EXCEEDED}. Only the multiplexed socket is capped: legacy
-   * per-resource sockets can only reach their single bounded-audience room and are slated for
-   * removal. Package-private for the test.
+   * closed with {@link #SOCKET_CAP_EXCEEDED}. Package-private for the test.
    */
   static final int MAX_SOCKETS_PER_USER = 20;
 
@@ -382,66 +368,16 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Registers a freshly connected socket. A legacy per-resource socket ({@link #ATTR_TOPIC} set)
-   * joins its single implicit room; a multiplexed {@code /ws/sync} socket ({@link
-   * #ATTR_MULTIPLEXED}) joins no room and waits for {@code subscribe} frames.
+   * Registers a freshly connected multiplexed {@code /ws/sync} socket. It joins no room at connect
+   * — its rooms are built by later {@code subscribe} frames — so this only resolves the principal,
+   * enforces the per-user socket cap (F2 / #1243), wraps the socket in its backpressure decorator
+   * and seeds an empty subscription set. A socket with no resolvable principal, or one that would
+   * put the user over {@link #MAX_SOCKETS_PER_USER}, is refused.
    *
    * @param session the freshly opened session
    */
   @Override
   public void afterConnectionEstablished(@NotNull WebSocketSession session) throws Exception {
-    if (Boolean.TRUE.equals(session.getAttributes().get(ATTR_MULTIPLEXED))) {
-      establishMultiplexed(session);
-    } else {
-      establishLegacy(session);
-    }
-  }
-
-  /**
-   * Registers a legacy per-resource socket into the room named by its bound topic. The topic is
-   * resolved from the {@link #ATTR_TOPIC} attribute the handshake interceptor set (and already
-   * authorized) from the request path; a socket with no valid bound topic or no principal is
-   * refused. Behaviour is unchanged from the original mission-presence relay.
-   *
-   * @param session the freshly opened legacy session
-   */
-  private void establishLegacy(@NotNull WebSocketSession session) throws Exception {
-    LiveSyncTopic topic = LiveSyncTopic.parse((String) session.getAttributes().get(ATTR_TOPIC));
-    Principal principal = session.getPrincipal();
-    if (topic == null || principal == null) {
-      log.debug("Live-sync socket refused (topic={}, hasPrincipal={})", topic, principal != null);
-      session.close(CloseStatus.NOT_ACCEPTABLE);
-      return;
-    }
-    String userId = resolveUserId(principal);
-    if (userId == null) {
-      session.close(CloseStatus.NOT_ACCEPTABLE);
-      return;
-    }
-    // Store the canonical topic so subsequent frames resolve their room, whitelist and presence
-    // flag
-    // from the parsed value without re-parsing.
-    session.getAttributes().put(ATTR_TOPIC, topic.canonical());
-    session.getAttributes().put(ATTR_USER_ID, userId);
-    session.getAttributes().put(ATTR_DISPLAY_NAME, resolveDisplayName(principal));
-    WebSocketSession decorated = wrap(session);
-    session.getAttributes().put(ATTR_DECORATED, decorated);
-    joinRoom(decorated, topic);
-    if (topic.topicClass().presenceEnabled()) {
-      sendSnapshot(decorated, topic);
-    }
-  }
-
-  /**
-   * Registers a multiplexed {@code /ws/sync} socket. It joins no room at connect — its rooms are
-   * built by later {@code subscribe} frames — so this only resolves the principal, enforces the
-   * per-user socket cap (F2 / #1243), wraps the socket in its backpressure decorator and seeds an
-   * empty subscription set. A socket with no resolvable principal, or one that would put the user
-   * over {@link #MAX_SOCKETS_PER_USER}, is refused.
-   *
-   * @param session the freshly opened multiplexed session
-   */
-  private void establishMultiplexed(@NotNull WebSocketSession session) throws Exception {
     Principal principal = session.getPrincipal();
     String userId = principal == null ? null : resolveUserId(principal);
     if (userId == null) {
@@ -504,9 +440,10 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Dispatches one client message by socket mode: a multiplexed {@code /ws/sync} socket resolves
-   * the topic per frame, a legacy socket applies every frame to its single bound topic. Unknown
-   * types are silently ignored to keep the wire format forward-compatible.
+   * Dispatches one client message on a multiplexed {@code /ws/sync} socket, resolving the topic per
+   * frame: {@code subscribe} joins an authorized room, {@code changed} publishes to a topic (no
+   * subscription required), and presence frames touch a subscribed presence room. Unknown types are
+   * silently ignored to keep the wire format forward-compatible.
    *
    * @param session the session that produced the message
    * @param message the text payload
@@ -514,158 +451,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   @Override
   protected void handleTextMessage(@NotNull WebSocketSession session, @NotNull TextMessage message)
       throws Exception {
-    if (Boolean.TRUE.equals(session.getAttributes().get(ATTR_MULTIPLEXED))) {
-      handleMultiplexedMessage(session, message);
-    } else {
-      handleLegacyMessage(session, message);
-    }
-  }
-
-  /**
-   * Applies a message on a legacy per-resource socket: every frame operates on the socket's single
-   * bound {@link #ATTR_TOPIC}. Behaviour is unchanged from the original mission-presence relay.
-   *
-   * @param session the legacy session that produced the message
-   * @param message the text payload
-   */
-  private void handleLegacyMessage(
-      @NotNull WebSocketSession session, @NotNull TextMessage message) {
-    LiveSyncTopic topic = LiveSyncTopic.parse((String) session.getAttributes().get(ATTR_TOPIC));
-    String userId = (String) session.getAttributes().get(ATTR_USER_ID);
-    if (topic == null || userId == null) {
-      return;
-    }
-    JsonNode node;
-    try {
-      node = objectMapper.readTree(message.getPayload());
-    } catch (JacksonException e) {
-      log.debug("Discarding malformed live-sync message", e);
-      return;
-    }
-    String type = textValue(node, "type");
-    if (type == null) {
-      return;
-    }
-    // Live multi-user sync: relay the mutating client's "section changed" signal to its peers.
-    // Handled before the presence path because the frame carries a "sections" array, not the
-    // "sectionKey" the focus/blur/heartbeat messages use.
-    if ("changed".equals(type)) {
-      if (allowChangedFrame(session)) {
-        // Exclude the acting socket by its registered decorator (what the room holds), not the raw
-        // session Spring handed us — otherwise origin exclusion misses and echoes back (#1149).
-        List<String> sections = sanitiseSections(node.get("sections"), topic.topicClass());
-        if (!sections.isEmpty()) {
-          relayChangedThrottled(topic, sections, decorated(session));
-        }
-      } else {
-        droppedCounter(topic, MetricNames.DROPPED_THROTTLED).increment();
-      }
-      return;
-    }
-    if (!topic.topicClass().presenceEnabled()) {
-      return;
-    }
-    String sectionKey = textValue(node, "sectionKey");
-    if (sectionKey == null
-        || sectionKey.isBlank()
-        || sectionKey.length() > MAX_SECTION_KEY_LENGTH) {
-      return;
-    }
-    // Rate-limit the presence path per session (#1245): a crafted client looping focus frames with
-    // unique section keys would otherwise insert an entry per frame and force a full-map snapshot
-    // rebuild + broadcast to every viewer (O(N²) amplification). The service's distinct-section cap
-    // bounds absolute map size; this bounds the rate.
-    if (!allowPresenceFrame(session)) {
-      droppedCounter(topic, MetricNames.DROPPED_THROTTLED).increment();
-      return;
-    }
-    boolean mutated;
-    switch (type) {
-      case "focus", "heartbeat" -> {
-        String displayName = (String) session.getAttributes().get(ATTR_DISPLAY_NAME);
-        mutated = presenceService.touch(topic.canonical(), sectionKey, userId, displayName);
-      }
-      case "blur" -> mutated = presenceService.clear(topic.canonical(), sectionKey, userId);
-      default -> {
-        return;
-      }
-    }
-    // Always broadcast on focus/blur (state changes); on heartbeat broadcast only when this is the
-    // FIRST sighting of the editor — otherwise the snapshot is identical and the broadcast is
-    // noise.
-    if (mutated || "blur".equals(type) || "focus".equals(type)) {
-      broadcastSnapshot(topic);
-    }
-  }
-
-  /**
-   * Cleans up a closed session by socket mode: a legacy socket leaves its single bound room; a
-   * multiplexed socket leaves every room it subscribed to.
-   *
-   * @param session the closing session
-   * @param status close reason (unused; logged for diagnostics)
-   */
-  @Override
-  public void afterConnectionClosed(
-      @NotNull WebSocketSession session, @NotNull CloseStatus status) {
-    if (Boolean.TRUE.equals(session.getAttributes().get(ATTR_MULTIPLEXED))) {
-      closeMultiplexed(session);
-    } else {
-      closeLegacy(session);
-    }
-  }
-
-  /**
-   * Cleans up a closed legacy socket — removes it from its single bound room and, if the user has
-   * no other live session on the same topic, drops their presence and broadcasts the resulting
-   * state. Behaviour is unchanged from the original mission-presence relay.
-   *
-   * @param session the closing legacy session
-   */
-  private void closeLegacy(@NotNull WebSocketSession session) {
-    LiveSyncTopic topic = LiveSyncTopic.parse((String) session.getAttributes().get(ATTR_TOPIC));
-    String userId = (String) session.getAttributes().get(ATTR_USER_ID);
-    if (topic == null || userId == null) {
-      return;
-    }
-    // #1150: remove-and-maybe-unmap in one atomic remapping under the entry's bin lock, so the "set
-    // became empty -> drop the entry" decision cannot race a concurrent registration into an
-    // orphaned set. Deregister the DECORATOR (what was registered), resolved from the raw session.
-    WebSocketSession decorated = decorated(session);
-    Set<WebSocketSession> mates =
-        sessionsByTopic.computeIfPresent(
-            topic.canonical(),
-            (ignored, set) -> {
-              set.remove(decorated);
-              return set.isEmpty() ? null : set;
-            });
-    if (!topic.topicClass().presenceEnabled()) {
-      return;
-    }
-    // Only clear the user from presence if they have no OTHER live session on the same topic
-    // (multiple tabs from the same browser would otherwise wipe each other's heartbeats). A null
-    // mates means the set is now empty (last session closed), so there is no other session.
-    boolean hasOtherSession =
-        mates != null
-            && mates.stream().anyMatch(s -> userId.equals(s.getAttributes().get(ATTR_USER_ID)));
-    if (!hasOtherSession) {
-      List<String> cleared = presenceService.clearAll(topic.canonical(), userId);
-      if (!cleared.isEmpty()) {
-        broadcastSnapshot(topic);
-      }
-    }
-  }
-
-  /**
-   * Applies a message on a multiplexed {@code /ws/sync} socket, resolving the topic per frame:
-   * {@code subscribe} joins an authorized room, {@code changed} publishes to a topic (no
-   * subscription required), and presence frames touch a subscribed presence room.
-   *
-   * @param session the multiplexed session that produced the message
-   * @param message the text payload
-   */
-  private void handleMultiplexedMessage(
-      @NotNull WebSocketSession session, @NotNull TextMessage message) {
     String userId = (String) session.getAttributes().get(ATTR_USER_ID);
     if (userId == null) {
       return;
@@ -687,6 +472,57 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       case "focus", "blur", "heartbeat" -> handleMultiplexedPresence(session, node, type, userId);
       default -> {
         // Unknown type: ignore to keep the wire format forward-compatible.
+      }
+    }
+  }
+
+  /**
+   * Cleans up a closed multiplexed socket — leaves every room it subscribed to and, for a
+   * presence-enabled room where the user has no other live session, drops their presence and
+   * broadcasts the resulting snapshot.
+   *
+   * @param session the closing session
+   * @param status close reason (unused; logged for diagnostics)
+   */
+  @Override
+  public void afterConnectionClosed(
+      @NotNull WebSocketSession session, @NotNull CloseStatus status) {
+    String userId = (String) session.getAttributes().get(ATTR_USER_ID);
+    // Release the per-user socket slot exactly once (F2 / #1243) — only for a socket that actually
+    // acquired one (a cap-refused socket already released it inline and left ATTR_USER_COUNTED
+    // unset). Done before the subscription-set check so it runs even for a socket closed between
+    // establish and its first subscribe.
+    if (userId != null && Boolean.TRUE.equals(session.getAttributes().get(ATTR_USER_COUNTED))) {
+      releaseUserSocket(userId);
+    }
+    WebSocketSession decorated = decorated(session);
+    Set<String> subs = subscriptions(session);
+    if (subs == null) {
+      return;
+    }
+    for (String canonical : List.copyOf(subs)) {
+      LiveSyncTopic topic = LiveSyncTopic.parse(canonical);
+      if (topic == null) {
+        continue;
+      }
+      Set<WebSocketSession> mates =
+          sessionsByTopic.computeIfPresent(
+              canonical,
+              (ignored, set) -> {
+                set.remove(decorated);
+                return set.isEmpty() ? null : set;
+              });
+      if (userId == null || !topic.topicClass().presenceEnabled()) {
+        continue;
+      }
+      boolean hasOtherSession =
+          mates != null
+              && mates.stream().anyMatch(s -> userId.equals(s.getAttributes().get(ATTR_USER_ID)));
+      if (!hasOtherSession) {
+        List<String> cleared = presenceService.clearAll(canonical, userId);
+        if (!cleared.isEmpty()) {
+          broadcastSnapshot(topic);
+        }
       }
     }
   }
@@ -852,7 +688,8 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   /**
    * Handles a presence frame ({@code focus}/{@code blur}/{@code heartbeat}) on a multiplexed
    * socket. Presence is only tracked for a presence-enabled class and only for a room the socket is
-   * actually subscribed to; the touch/clear + broadcast logic mirrors the legacy path.
+   * actually subscribed to; a {@code focus}/{@code heartbeat} touches the editor entry and a {@code
+   * blur} clears it, and any state change fans a fresh snapshot to the room.
    *
    * @param session the session
    * @param node the parsed presence frame
@@ -878,7 +715,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
         || sectionKey.length() > MAX_SECTION_KEY_LENGTH) {
       return;
     }
-    // Rate-limit the presence path per session (#1245) — see handleLegacyMessage for the rationale.
+    // Rate-limit the presence path per session (#1245) — see allowPresenceFrame for the rationale.
     if (!allowPresenceFrame(session)) {
       droppedCounter(topic, MetricNames.DROPPED_THROTTLED).increment();
       return;
@@ -896,54 +733,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     }
     if (mutated || "blur".equals(type) || "focus".equals(type)) {
       broadcastSnapshot(topic);
-    }
-  }
-
-  /**
-   * Cleans up a closed multiplexed socket — leaves every room it subscribed to and, for a
-   * presence-enabled room where the user has no other live session, drops their presence and
-   * broadcasts the resulting snapshot.
-   *
-   * @param session the closing multiplexed session
-   */
-  private void closeMultiplexed(@NotNull WebSocketSession session) {
-    String userId = (String) session.getAttributes().get(ATTR_USER_ID);
-    // Release the per-user socket slot exactly once (F2 / #1243) — only for a socket that actually
-    // acquired one (a cap-refused socket already released it inline and left ATTR_USER_COUNTED
-    // unset). Done before the subscription-set check so it runs even for a socket closed between
-    // establish and its first subscribe.
-    if (userId != null && Boolean.TRUE.equals(session.getAttributes().get(ATTR_USER_COUNTED))) {
-      releaseUserSocket(userId);
-    }
-    WebSocketSession decorated = decorated(session);
-    Set<String> subs = subscriptions(session);
-    if (subs == null) {
-      return;
-    }
-    for (String canonical : List.copyOf(subs)) {
-      LiveSyncTopic topic = LiveSyncTopic.parse(canonical);
-      if (topic == null) {
-        continue;
-      }
-      Set<WebSocketSession> mates =
-          sessionsByTopic.computeIfPresent(
-              canonical,
-              (ignored, set) -> {
-                set.remove(decorated);
-                return set.isEmpty() ? null : set;
-              });
-      if (userId == null || !topic.topicClass().presenceEnabled()) {
-        continue;
-      }
-      boolean hasOtherSession =
-          mates != null
-              && mates.stream().anyMatch(s -> userId.equals(s.getAttributes().get(ATTR_USER_ID)));
-      if (!hasOtherSession) {
-        List<String> cleared = presenceService.clearAll(canonical, userId);
-        if (!cleared.isEmpty()) {
-          broadcastSnapshot(topic);
-        }
-      }
     }
   }
 
@@ -1000,7 +789,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
 
   /**
    * Resolves a multiplexed socket's subscription set (its subscribed canonical topics), or {@code
-   * null} on a socket without one (a legacy socket, or before the set is seeded).
+   * null} on a socket without one (a refused socket, or before the set is seeded at connect).
    *
    * @param session the session
    * @return the subscription set, or {@code null}
@@ -1060,9 +849,8 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    * <p>The section keys are re-validated against the topic class's whitelist here too. The
    * publishing replica already sanitised them before it put the frame on Redis, so this is
    * defense-in-depth — it keeps the relay robust to a malformed or older-version peer, or a
-   * tampered Redis payload, matching the whitelist-on-ingest posture of the three client/server
-   * publish paths ({@link #handleMultiplexedChanged}, {@link #handleLegacyMessage}, {@link
-   * #publishFromServer}).
+   * tampered Redis payload, matching the whitelist-on-ingest posture of the two client/server
+   * publish paths ({@link #handleMultiplexedChanged}, {@link #publishFromServer}).
    *
    * @param canonicalTopic the canonical topic string
    * @param sections the section keys from the peer replica (re-filtered to the class whitelist)

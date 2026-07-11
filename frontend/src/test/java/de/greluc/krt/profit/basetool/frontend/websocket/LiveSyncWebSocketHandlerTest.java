@@ -57,15 +57,14 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Tests for {@link LiveSyncWebSocketHandler} (ported from {@code
- * MissionPresenceWebSocketHandlerTest} with the mission topic driving the generic relay; every
- * original assertion is preserved).
+ * Tests for {@link LiveSyncWebSocketHandler} — the multiplexed {@code /ws/sync} relay.
  *
  * <p>Drives the handler through a hand-rolled {@link FakeSession} that records outbound messages so
  * the JSON wire format, room membership, principal-resolution and broadcast behaviour can be
- * verified without a real servlet container. Each session is bound to a {@code mission:{id}} topic
- * via the {@link LiveSyncWebSocketHandler#ATTR_TOPIC} attribute the handshake interceptor would
- * set.
+ * verified without a real servlet container. Every socket is a multiplexed {@code /ws/sync} socket
+ * (marked by the {@link LiveSyncWebSocketHandler#ATTR_MULTIPLEXED} attribute the {@code /ws/sync}
+ * handshake interceptor sets); a socket joins a room by sending a {@code subscribe} frame, and its
+ * {@code changed} / presence frames carry their own {@code topic}.
  */
 class LiveSyncWebSocketHandlerTest {
 
@@ -94,35 +93,13 @@ class LiveSyncWebSocketHandlerTest {
   }
 
   @Test
-  void focusMessage_recordsPresence_andBroadcastsSnapshot() throws Exception {
-    String topic = missionTopic();
-    FakeSession session = openSession(topic, oidcUser("user-1", "Alice"));
-
-    session.sent.clear();
-    handler.handleTextMessage(
-        session, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"crew\"}"));
-
-    assertThat(service.get(topic, "crew", "user-1")).isNotNull();
-    assertThat(service.get(topic, "crew", "user-1").displayName()).isEqualTo("Alice");
-
-    JsonNode broadcast = lastBroadcast(session);
-    assertThat(broadcast.get("type").asString()).isEqualTo("presence");
-    JsonNode editors = broadcast.get("sections").get("crew");
-    assertThat(editors).isNotNull();
-    assertThat(editors.get(0).get("userId").asString()).isEqualTo("user-1");
-    assertThat(editors.get(0).get("displayName").asString()).isEqualTo("Alice");
-  }
-
-  @Test
   void blurMessage_clearsPresence_andBroadcastsEmptySection() throws Exception {
     String topic = missionTopic();
-    FakeSession session = openSession(topic, oidcUser("user-1", "Alice"));
-    handler.handleTextMessage(
-        session, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"crew\"}"));
+    FakeSession session = openSubscribed(topic, oidcUser("user-1", "Alice"));
+    handler.handleTextMessage(session, presenceFrame("focus", topic, "crew"));
 
     session.sent.clear();
-    handler.handleTextMessage(
-        session, new TextMessage("{\"type\":\"blur\",\"sectionKey\":\"crew\"}"));
+    handler.handleTextMessage(session, presenceFrame("blur", topic, "crew"));
 
     assertThat(service.get(topic, "crew", "user-1")).isNull();
     JsonNode broadcast = lastBroadcast(session);
@@ -134,13 +111,11 @@ class LiveSyncWebSocketHandlerTest {
   @Test
   void heartbeat_doesNotBroadcast_whenUserAlreadyKnown() throws Exception {
     String topic = missionTopic();
-    FakeSession session = openSession(topic, oidcUser("user-1", "Alice"));
-    handler.handleTextMessage(
-        session, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"crew\"}"));
+    FakeSession session = openSubscribed(topic, oidcUser("user-1", "Alice"));
+    handler.handleTextMessage(session, presenceFrame("focus", topic, "crew"));
 
     int countAfterFocus = session.sent.size();
-    handler.handleTextMessage(
-        session, new TextMessage("{\"type\":\"heartbeat\",\"sectionKey\":\"crew\"}"));
+    handler.handleTextMessage(session, presenceFrame("heartbeat", topic, "crew"));
 
     // Heartbeat from an already-known editor must NOT trigger a broadcast — generating one frame
     // per
@@ -151,8 +126,7 @@ class LiveSyncWebSocketHandlerTest {
 
   @Test
   void malformedPayload_isSilentlyDropped() throws Exception {
-    String topic = missionTopic();
-    FakeSession session = openSession(topic, oidcUser("user-1", "Alice"));
+    FakeSession session = openMultiplexedSession(oidcUser("user-1", "Alice"));
     session.sent.clear();
 
     handler.handleTextMessage(session, new TextMessage("{this is not json"));
@@ -168,12 +142,10 @@ class LiveSyncWebSocketHandlerTest {
   @Test
   void connectionClosed_clearsAllPresence_andBroadcastsToRemainingClients() throws Exception {
     String topic = missionTopic();
-    FakeSession aliceSession = openSession(topic, oidcUser("user-1", "Alice"));
-    FakeSession bobSession = openSession(topic, oidcUser("user-2", "Bob"));
-    handler.handleTextMessage(
-        aliceSession, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"crew\"}"));
-    handler.handleTextMessage(
-        bobSession, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"steps\"}"));
+    FakeSession aliceSession = openSubscribed(topic, oidcUser("user-1", "Alice"));
+    FakeSession bobSession = openSubscribed(topic, oidcUser("user-2", "Bob"));
+    handler.handleTextMessage(aliceSession, presenceFrame("focus", topic, "crew"));
+    handler.handleTextMessage(bobSession, presenceFrame("focus", topic, "steps"));
 
     bobSession.sent.clear();
     aliceSession.open = false;
@@ -193,10 +165,9 @@ class LiveSyncWebSocketHandlerTest {
   @Test
   void connectionClosed_keepsPresence_whenSameUserHasAnotherOpenTab() throws Exception {
     String topic = missionTopic();
-    FakeSession tabA = openSession(topic, oidcUser("user-1", "Alice"));
-    FakeSession tabB = openSession(topic, oidcUser("user-1", "Alice"));
-    handler.handleTextMessage(
-        tabA, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"crew\"}"));
+    FakeSession tabA = openSubscribed(topic, oidcUser("user-1", "Alice"));
+    FakeSession tabB = openSubscribed(topic, oidcUser("user-1", "Alice"));
+    handler.handleTextMessage(tabA, presenceFrame("focus", topic, "crew"));
 
     tabA.open = false;
     handler.afterConnectionClosed(tabA, CloseStatus.NORMAL);
@@ -207,36 +178,18 @@ class LiveSyncWebSocketHandlerTest {
   }
 
   @Test
-  void changedSignal_isRelayedToOtherSessions_butNotToOrigin() throws Exception {
-    String topic = missionTopic();
-    FakeSession alice = openSession(topic, oidcUser("user-1", "Alice"));
-    FakeSession bob = openSession(topic, oidcUser("user-2", "Bob"));
-    alice.sent.clear();
-    bob.sent.clear();
-
-    handler.handleTextMessage(
-        alice, new TextMessage("{\"type\":\"changed\",\"sections\":[\"crew\",\"finance\"]}"));
-
-    // The originator already applied its own change locally — it must not receive the echo.
-    assertThat(alice.sent).isEmpty();
-    // Every other socket in the same room gets the section keys (and nothing else).
-    JsonNode relayed = lastBroadcast(bob);
-    assertThat(relayed.get("type").asString()).isEqualTo("changed");
-    assertThat(relayed.get("topic").asString()).isEqualTo(topic);
-    assertThat(sectionsOf(relayed)).containsExactly("crew", "finance");
-  }
-
-  @Test
   void changedSignal_dropsUnknownKeysAndDeduplicates() throws Exception {
     String topic = missionTopic();
-    FakeSession alice = openSession(topic, oidcUser("user-1", "Alice"));
-    FakeSession bob = openSession(topic, oidcUser("user-2", "Bob"));
+    FakeSession bob = openSubscribed(topic, oidcUser("user-2", "Bob"));
     bob.sent.clear();
+    FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
 
     handler.handleTextMessage(
         alice,
         new TextMessage(
-            "{\"type\":\"changed\",\"sections\":[\"crew\",\"bogus\",\"crew\",\"mgmt\",42]}"));
+            "{\"type\":\"changed\",\"topic\":\""
+                + topic
+                + "\",\"sections\":[\"crew\",\"bogus\",\"crew\",\"mgmt\",42]}"));
 
     JsonNode relayed = lastBroadcast(bob);
     // "bogus" and the non-string 42 are dropped; the duplicate "crew" appears once.
@@ -246,9 +199,9 @@ class LiveSyncWebSocketHandlerTest {
   @Test
   void changedSignal_relaysEverySectionOfTheMissionSeamMap() throws Exception {
     String topic = missionTopic();
-    FakeSession alice = openSession(topic, oidcUser("user-1", "Alice"));
-    FakeSession bob = openSession(topic, oidcUser("user-2", "Bob"));
+    FakeSession bob = openSubscribed(topic, oidcUser("user-2", "Bob"));
     bob.sent.clear();
+    FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
 
     // Every key of the MISSION_SECTIONS seam map in mission-detail.js must pass the relay whitelist
     // — steps/objectives/frequencies were once dropped here, leaving peers' Verwaltung editors
@@ -256,9 +209,16 @@ class LiveSyncWebSocketHandlerTest {
     // until a manual reload (REQ-FE-010).
     handler.handleTextMessage(
         alice,
-        new TextMessage(
-            "{\"type\":\"changed\",\"sections\":[\"crew\",\"finance\",\"mgmt\",\"overview\","
-                + "\"steps\",\"objectives\",\"frequencies\",\"organisation\"]}"));
+        changedFrame(
+            topic,
+            "crew",
+            "finance",
+            "mgmt",
+            "overview",
+            "steps",
+            "objectives",
+            "frequencies",
+            "organisation"));
 
     JsonNode relayed = lastBroadcast(bob);
     assertThat(sectionsOf(relayed))
@@ -276,14 +236,19 @@ class LiveSyncWebSocketHandlerTest {
   @Test
   void changedSignal_withNoValidSections_relaysNothing() throws Exception {
     String topic = missionTopic();
-    FakeSession alice = openSession(topic, oidcUser("user-1", "Alice"));
-    FakeSession bob = openSession(topic, oidcUser("user-2", "Bob"));
+    FakeSession bob = openSubscribed(topic, oidcUser("user-2", "Bob"));
     bob.sent.clear();
+    FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
 
     handler.handleTextMessage(
-        alice, new TextMessage("{\"type\":\"changed\",\"sections\":[\"bogus\"]}"));
-    handler.handleTextMessage(alice, new TextMessage("{\"type\":\"changed\",\"sections\":[]}"));
-    handler.handleTextMessage(alice, new TextMessage("{\"type\":\"changed\"}"));
+        alice,
+        new TextMessage(
+            "{\"type\":\"changed\",\"topic\":\"" + topic + "\",\"sections\":[\"bogus\"]}"));
+    handler.handleTextMessage(
+        alice,
+        new TextMessage("{\"type\":\"changed\",\"topic\":\"" + topic + "\",\"sections\":[]}"));
+    handler.handleTextMessage(
+        alice, new TextMessage("{\"type\":\"changed\",\"topic\":\"" + topic + "\"}"));
 
     // Nothing valid to relay — peers receive no frame, presence is untouched, and nothing fans out.
     assertThat(bob.sent).isEmpty();
@@ -294,16 +259,15 @@ class LiveSyncWebSocketHandlerTest {
   @Test
   void changedSignal_isRateLimitedPerSession() throws Exception {
     String topic = missionTopic();
-    FakeSession alice = openSession(topic, oidcUser("user-1", "Alice"));
-    FakeSession bob = openSession(topic, oidcUser("user-2", "Bob"));
+    FakeSession bob = openSubscribed(topic, oidcUser("user-2", "Bob"));
     bob.sent.clear();
+    FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
 
     // Emit far more than the per-session burst in a tight synchronous loop (well under one token's
     // refill interval), simulating a crafted flooding client.
     int emitted = LiveSyncWebSocketHandler.CHANGED_BURST + 40;
     for (int i = 0; i < emitted; i++) {
-      handler.handleTextMessage(
-          alice, new TextMessage("{\"type\":\"changed\",\"sections\":[\"crew\"]}"));
+      handler.handleTextMessage(alice, changedFrame(topic, "crew"));
     }
 
     // The token bucket caps relayed frames at the burst (a negligible refill may add at most ~1),
@@ -318,11 +282,10 @@ class LiveSyncWebSocketHandlerTest {
   @Test
   void changedSignal_isPublishedToTheFanoutAfterLocalRelay() throws Exception {
     String topic = missionTopic();
-    FakeSession alice = openSession(topic, oidcUser("user-1", "Alice"));
-    openSession(topic, oidcUser("user-2", "Bob"));
+    openSubscribed(topic, oidcUser("user-2", "Bob"));
+    FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
 
-    handler.handleTextMessage(
-        alice, new TextMessage("{\"type\":\"changed\",\"sections\":[\"crew\",\"finance\"]}"));
+    handler.handleTextMessage(alice, changedFrame(topic, "crew", "finance"));
 
     // A cross-replica fan-out publish carries the canonical topic and the sanitised sections.
     assertThat(fanout.publishedTopics).containsExactly(topic);
@@ -330,25 +293,10 @@ class LiveSyncWebSocketHandlerTest {
   }
 
   @Test
-  void changedSignal_staysWithinItsOwnRoom() throws Exception {
-    String topicA = missionTopic();
-    String topicB = missionTopic();
-    FakeSession alice = openSession(topicA, oidcUser("user-1", "Alice"));
-    FakeSession carol = openSession(topicB, oidcUser("user-3", "Carol"));
-    carol.sent.clear();
-
-    handler.handleTextMessage(
-        alice, new TextMessage("{\"type\":\"changed\",\"sections\":[\"crew\"]}"));
-
-    // A change in room A never reaches a viewer of room B (cross-room isolation).
-    assertThat(carol.sent).isEmpty();
-  }
-
-  @Test
   void deliverFromFanout_relaysToLocalRoom_withoutOriginExclusion() throws Exception {
     String topic = missionTopic();
-    FakeSession alice = openSession(topic, oidcUser("user-1", "Alice"));
-    FakeSession bob = openSession(topic, oidcUser("user-2", "Bob"));
+    FakeSession alice = openSubscribed(topic, oidcUser("user-1", "Alice"));
+    FakeSession bob = openSubscribed(topic, oidcUser("user-2", "Bob"));
     alice.sent.clear();
     bob.sent.clear();
 
@@ -362,30 +310,14 @@ class LiveSyncWebSocketHandlerTest {
   }
 
   @Test
-  void openSessions_areCountedInPresenceWsSessionsGauge() throws Exception {
-    String topic = missionTopic();
-    assertThat(presenceGauge()).isZero();
-
-    FakeSession alice = openSession(topic, oidcUser("user-1", "Alice"));
-    FakeSession bob = openSession(topic, oidcUser("user-2", "Bob"));
-    assertThat(presenceGauge()).isEqualTo(2.0);
-
-    alice.open = false;
-    handler.afterConnectionClosed(alice, CloseStatus.NORMAL);
-    assertThat(presenceGauge()).isEqualTo(1.0);
-    assertThat(bob.isOpen()).isTrue();
-  }
-
-  @Test
   void broadcasts_countSnapshotAndChangedRelayFrames() throws Exception {
     String topic = missionTopic();
-    FakeSession alice = openSession(topic, oidcUser("user-1", "Alice"));
-    openSession(topic, oidcUser("user-2", "Bob"));
+    openSubscribed(topic, oidcUser("user-2", "Bob"));
+    FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
 
-    handler.handleTextMessage(
-        alice, new TextMessage("{\"type\":\"changed\",\"sections\":[\"crew\"]}"));
+    handler.handleTextMessage(alice, changedFrame(topic, "crew"));
 
-    // The relayed change is one changed frame; the per-connect snapshots are snapshot frames.
+    // The relayed change is one changed frame; the per-subscribe snapshots are snapshot frames.
     assertThat(frameCounter(MetricNames.FRAME_CHANGED)).isEqualTo(1.0);
     assertThat(frameCounter(MetricNames.FRAME_SNAPSHOT)).isGreaterThan(0.0);
   }
@@ -393,13 +325,12 @@ class LiveSyncWebSocketHandlerTest {
   @Test
   void throttledChangedFrames_areCountedAsDroppedThrottled() throws Exception {
     String topic = missionTopic();
-    FakeSession alice = openSession(topic, oidcUser("user-1", "Alice"));
-    openSession(topic, oidcUser("user-2", "Bob"));
+    openSubscribed(topic, oidcUser("user-2", "Bob"));
+    FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
 
     int emitted = LiveSyncWebSocketHandler.CHANGED_BURST + 40;
     for (int i = 0; i < emitted; i++) {
-      handler.handleTextMessage(
-          alice, new TextMessage("{\"type\":\"changed\",\"sections\":[\"crew\"]}"));
+      handler.handleTextMessage(alice, changedFrame(topic, "crew"));
     }
 
     // Every frame past the per-session token bucket is now counted (previously a silent drop).
@@ -409,13 +340,14 @@ class LiveSyncWebSocketHandlerTest {
   @Test
   void sendFailureToBrokenPeer_isCountedAsDroppedSendFailed() throws Exception {
     String topic = missionTopic();
-    FakeSession alice = openSession(topic, oidcUser("user-1", "Alice"));
-    FakeSession bob = openSession(topic, oidcUser("user-2", "Bob"));
-    // Bob's socket reports open but every write throws (a half-broken connection).
+    FakeSession bob = openSubscribed(topic, oidcUser("user-2", "Bob"));
+    // Bob's socket reports open but every write throws (a half-broken connection). Set only after
+    // the subscribe snapshot has been delivered, so the send_failed / changed counts below observe
+    // the changed relay alone.
     bob.failSend = true;
+    FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
 
-    handler.handleTextMessage(
-        alice, new TextMessage("{\"type\":\"changed\",\"sections\":[\"crew\"]}"));
+    handler.handleTextMessage(alice, changedFrame(topic, "crew"));
 
     // The failed write is a send_failed drop and must NOT also count as a delivered changed frame.
     assertThat(dropCounter(MetricNames.DROPPED_SEND_FAILED)).isGreaterThanOrEqualTo(1.0);
@@ -925,16 +857,15 @@ class LiveSyncWebSocketHandlerTest {
   @Test
   void presenceFrames_areRateLimitedPerSession() throws Exception {
     String topic = missionTopic();
-    FakeSession alice = openSession(topic, oidcUser("user-1", "Alice"));
-    openSession(topic, oidcUser("user-2", "Bob"));
+    FakeSession alice = openSubscribed(topic, oidcUser("user-1", "Alice"));
+    openSubscribed(topic, oidcUser("user-2", "Bob"));
 
     // Flood focus frames (distinct section keys, under the section cap) far past the presence
     // burst,
     // simulating a crafted client looping presence frames.
     int emitted = LiveSyncWebSocketHandler.PRESENCE_BURST + 20;
     for (int i = 0; i < emitted; i++) {
-      handler.handleTextMessage(
-          alice, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"sec-" + i + "\"}"));
+      handler.handleTextMessage(alice, presenceFrame("focus", topic, "sec-" + i));
     }
 
     // Every presence frame past the per-session token bucket is counted as a throttled drop.
@@ -944,52 +875,29 @@ class LiveSyncWebSocketHandlerTest {
   @Test
   void presenceFrame_withOverLongSectionKey_isDropped() throws Exception {
     String topic = missionTopic();
-    FakeSession alice = openSession(topic, oidcUser("user-1", "Alice"));
+    FakeSession alice = openSubscribed(topic, oidcUser("user-1", "Alice"));
 
     // A section key longer than MAX_SECTION_KEY_LENGTH (64) is a crafted memory-bloat attempt and
     // is
     // dropped before it can insert a presence entry.
     String longKey = "x".repeat(65);
-    handler.handleTextMessage(
-        alice, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"" + longKey + "\"}"));
+    handler.handleTextMessage(alice, presenceFrame("focus", topic, longKey));
 
     assertThat(service.get(topic, longKey, "user-1")).isNull();
   }
 
-  // ── Materialbörse board (legacy /ws/materialboerse/board alias + multiplexed materialboard) ───
+  // ── Materialbörse board (global multiplexed materialboard room) ──────────────────────────────
 
   @Test
-  void boardChanged_overLegacyAlias_isRelayedToOtherSessionsOnly() throws Exception {
-    // Migrated from the deleted MaterialboardPresenceWebSocketHandlerTest: a legacy board socket
-    // sends a topic-less `changed` frame (its implicit ATTR_TOPIC binds it to the materialboard
-    // room) — the path the pre-rollout materialboerse-presence.js uses — and it relays to peers
-    // (carrying the canonical topic) but not back to the origin.
-    FakeSession origin = openBoardLegacySession(oidcUser("user-1", "Alice"));
-    FakeSession peer = openBoardLegacySession(oidcUser("user-2", "Bob"));
-    origin.sent.clear();
-    peer.sent.clear();
+  void multiplexedChanged_materialboardRoom_dropsSectionsOutsideWhitelist() throws Exception {
+    FakeSession subscriber = openSubscribed("materialboard", oidcUser("user-2", "Bob"));
+    subscriber.sent.clear();
+    FakeSession publisher = openMultiplexedSession(oidcUser("user-1", "Alice"));
 
-    handler.handleTextMessage(
-        origin, new TextMessage("{\"type\":\"changed\",\"sections\":[\"board\"]}"));
-
-    JsonNode relayed = lastBroadcast(peer);
-    assertThat(relayed.get("type").asString()).isEqualTo("changed");
-    assertThat(relayed.get("topic").asString()).isEqualTo("materialboard");
-    assertThat(sectionsOf(relayed)).containsExactly("board");
-    assertThat(origin.sent).isEmpty();
-  }
-
-  @Test
-  void boardChanged_dropsSectionsOutsideTheMaterialboardWhitelist() throws Exception {
-    FakeSession origin = openBoardLegacySession(oidcUser("user-1", "Alice"));
-    FakeSession peer = openBoardLegacySession(oidcUser("user-2", "Bob"));
-    peer.sent.clear();
-
-    handler.handleTextMessage(
-        origin, new TextMessage("{\"type\":\"changed\",\"sections\":[\"secret\"]}"));
+    handler.handleTextMessage(publisher, changedFrame("materialboard", "secret"));
 
     // Only `board` is accept-listed for the materialboard class; anything else is dropped.
-    assertThat(peer.sent).isEmpty();
+    assertThat(subscriber.sent).isEmpty();
   }
 
   @Test
@@ -1006,8 +914,7 @@ class LiveSyncWebSocketHandlerTest {
     assertThat(sectionsOf(lastBroadcast(subscriber))).containsExactly("board");
   }
 
-  // ── Reaper + connect-time refusal (ported from the retired MissionPresenceWebSocketHandlerTest)
-  // ─
+  // ── Reaper + connect-time refusal ────────────────────────────────────────────────────────────
 
   @Test
   void tickReaper_broadcastsFreshSnapshotToAffectedRoom() throws Exception {
@@ -1028,16 +935,9 @@ class LiveSyncWebSocketHandlerTest {
         new LiveSyncWebSocketHandler(
             mockService, fanout, objectMapper, reaperRegistry, authorizer, Runnable::run);
 
-    FakeSession session = new FakeSession();
-    session.open = true;
-    session.uri =
-        URI.create(
-            "ws://localhost/ws/missions/" + topic.substring("mission:".length()) + "/presence");
-    session.attributes.put(LiveSyncWebSocketHandler.ATTR_TOPIC, topic);
-    session.principal =
-        new UsernamePasswordAuthenticationToken(
-            oidcUser("user-1", "Alice"), "n/a", List.of(new SimpleGrantedAuthority("ROLE_USER")));
+    FakeSession session = multiplexedSession(oidcUser("user-1", "Alice"));
     reaperHandler.afterConnectionEstablished(session);
+    reaperHandler.handleTextMessage(session, subscribeFrame(topic));
     session.sent.clear();
 
     reaperHandler.tickReaper();
@@ -1049,38 +949,14 @@ class LiveSyncWebSocketHandlerTest {
   }
 
   @Test
-  void establishLegacySocket_withoutTopic_isRefused() throws Exception {
-    // Defense-in-depth: a legacy socket whose handshake bound no ATTR_TOPIC must be closed
-    // NOT_ACCEPTABLE and never registered — no room entry, no snapshot — so a mis-ordered guard or
-    // a
-    // misconfigured interceptor cannot let it register and receive presence snapshots (leaking
-    // editor identities).
-    FakeSession session = new FakeSession();
-    session.open = true;
-    session.uri = URI.create("ws://localhost/ws/missions/presence"); // no ATTR_TOPIC bound
-    session.principal =
-        new UsernamePasswordAuthenticationToken(
-            oidcUser("user-1", "Alice"), "n/a", List.of(new SimpleGrantedAuthority("ROLE_USER")));
-
-    handler.afterConnectionEstablished(session);
-
-    assertThat(session.closeStatus).isEqualTo(CloseStatus.NOT_ACCEPTABLE);
-    assertThat(presenceGauge()).isZero();
-    assertThat(session.sent).isEmpty();
-  }
-
-  @Test
-  void establishLegacySocket_withoutPrincipal_isRefused() throws Exception {
-    // A legacy socket that reaches the handler with no authenticated principal (Spring Security
+  void establishSocket_withoutPrincipal_isRefused() throws Exception {
+    // A /ws/sync socket that reaches the handler with no authenticated principal (Spring Security
     // failed to attach one) must be refused NOT_ACCEPTABLE, not registered, and sent no snapshot —
     // otherwise editor identities leak to an unauthenticated/malformed socket.
-    String topic = missionTopic();
     FakeSession session = new FakeSession();
     session.open = true;
-    session.uri =
-        URI.create(
-            "ws://localhost/ws/missions/" + topic.substring("mission:".length()) + "/presence");
-    session.attributes.put(LiveSyncWebSocketHandler.ATTR_TOPIC, topic);
+    session.uri = URI.create("ws://localhost/ws/sync");
+    session.attributes.put(LiveSyncWebSocketHandler.ATTR_MULTIPLEXED, Boolean.TRUE);
     session.principal = null;
 
     handler.afterConnectionEstablished(session);
@@ -1100,9 +976,28 @@ class LiveSyncWebSocketHandlerTest {
     return "operation:" + UUID.randomUUID();
   }
 
-  private static TextMessage changedFrame(String topic, String section) {
+  private static TextMessage changedFrame(String topic, String... sections) {
+    StringBuilder json = new StringBuilder("{\"type\":\"changed\",\"topic\":\"").append(topic);
+    json.append("\",\"sections\":[");
+    for (int i = 0; i < sections.length; i++) {
+      if (i > 0) {
+        json.append(',');
+      }
+      json.append('"').append(sections[i]).append('"');
+    }
+    json.append("]}");
+    return new TextMessage(json.toString());
+  }
+
+  private static TextMessage presenceFrame(String type, String topic, String sectionKey) {
     return new TextMessage(
-        "{\"type\":\"changed\",\"topic\":\"" + topic + "\",\"sections\":[\"" + section + "\"]}");
+        "{\"type\":\""
+            + type
+            + "\",\"topic\":\""
+            + topic
+            + "\",\"sectionKey\":\""
+            + sectionKey
+            + "\"}");
   }
 
   private static TextMessage subscribeFrame(String topic) {
@@ -1117,6 +1012,21 @@ class LiveSyncWebSocketHandlerTest {
   private FakeSession openMultiplexedSession(OidcUser user) throws Exception {
     FakeSession session = multiplexedSession(user);
     handler.afterConnectionEstablished(session);
+    return session;
+  }
+
+  /**
+   * Opens a multiplexed {@code /ws/sync} socket and subscribes it to {@code topic}, so it joins
+   * that room and receives its relays — the multiplexed equivalent of the old per-resource connect
+   * that auto-joined a single implicit room.
+   *
+   * @param topic the canonical topic to subscribe to
+   * @param user the socket owner
+   * @return the established, subscribed session
+   */
+  private FakeSession openSubscribed(String topic, OidcUser user) throws Exception {
+    FakeSession session = openMultiplexedSession(user);
+    subscribe(session, topic);
     return session;
   }
 
@@ -1199,41 +1109,6 @@ class LiveSyncWebSocketHandlerTest {
   private double invalidTopicCounter() {
     var counter = registry.find(MetricNames.LIVESYNC_INVALID_TOPIC).counter();
     return counter == null ? 0.0 : counter.count();
-  }
-
-  private FakeSession openSession(String topic, OidcUser user) throws Exception {
-    FakeSession session = new FakeSession();
-    session.open = true;
-    session.uri =
-        URI.create(
-            "ws://localhost/ws/missions/" + topic.substring("mission:".length()) + "/presence");
-    session.attributes.put(LiveSyncWebSocketHandler.ATTR_TOPIC, topic);
-    session.principal =
-        new UsernamePasswordAuthenticationToken(
-            user, "n/a", List.of(new SimpleGrantedAuthority("ROLE_USER")));
-    handler.afterConnectionEstablished(session);
-    return session;
-  }
-
-  /**
-   * Opens a legacy board socket bound to the fixed global {@code materialboard} topic, as the
-   * {@code /ws/materialboerse/board} handshake interceptor binds it via {@link
-   * LiveSyncWebSocketHandler#ATTR_TOPIC}.
-   *
-   * @param user the socket owner
-   * @return the established fake session
-   * @throws Exception if the handler's connect callback throws
-   */
-  private FakeSession openBoardLegacySession(OidcUser user) throws Exception {
-    FakeSession session = new FakeSession();
-    session.open = true;
-    session.uri = URI.create("ws://localhost/ws/materialboerse/board");
-    session.attributes.put(LiveSyncWebSocketHandler.ATTR_TOPIC, "materialboard");
-    session.principal =
-        new UsernamePasswordAuthenticationToken(
-            user, "n/a", List.of(new SimpleGrantedAuthority("ROLE_USER")));
-    handler.afterConnectionEstablished(session);
-    return session;
   }
 
   private static OidcUser oidcUser(String sub, String preferredUsername) {
