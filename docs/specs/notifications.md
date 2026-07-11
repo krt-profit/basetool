@@ -116,7 +116,7 @@ design-system `showKrtConfirm` modal, since it removes many rows at once.
 
 A bell sits top-right on **every** authenticated page; whenever the caller has unread
 notifications a badge / attention cue is shown. The initial count is rendered server-side
-(`SquadronContextAdvice#unreadNotificationCount`, fail-soft to 0) and kept fresh by a
+(`LayoutMiscAdvice#unreadNotificationCount`, fail-soft to 0) and kept fresh by a
 client-side poll and after every mutation, always sourced from the server count (so it cannot
 go stale). This is **in-app only** — OS / browser push notifications are out of scope.
 
@@ -127,7 +127,7 @@ go stale). This is **in-app only** — OS / browser push notifications are out o
   clear-read without a full reload.
 
 **Enforced by:** `MessageBundleConsistencyTest`, frontend lint gate · **Code:**
-`fragments/sidebar.html`, `static/js/notifications.js`, frontend `config/SquadronContextAdvice`
+`fragments/sidebar.html`, `static/js/notifications.js`, frontend `config/LayoutMiscAdvice`
 
 ### REQ-NOTIF-007 — Data-driven recipient rule engine
 

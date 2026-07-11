@@ -47,7 +47,7 @@ class FrontendApplicationTests {
    * DataWebAutoConfiguration} because this module does no Spring Data web binding, so its {@link
    * ProxyingHandlerMethodArgumentResolver} must be absent from the MVC resolver chain. That
    * resolver is what logged the "not annotated with @ProjectedPayload" WARN for {@code
-   * SquadronContextAdvice}'s interface-typed {@code @ModelAttribute} catalogue parameters; with it
+   * OrgUnitContextAdvice}'s interface-typed {@code @ModelAttribute} catalogue parameters; with it
    * gone the false positive can no longer be raised. Asserting on the live resolver list (rather
    * than the exclude annotation) proves the exclusion actually took effect end-to-end.
    */

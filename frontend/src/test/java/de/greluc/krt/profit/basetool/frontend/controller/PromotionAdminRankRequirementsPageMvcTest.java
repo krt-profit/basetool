@@ -29,7 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.frontend.config.SquadronContextAdvice;
+import de.greluc.krt.profit.basetool.frontend.config.OrgUnitContextAdvice;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionCategoryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionTopicDto;
@@ -111,7 +111,7 @@ class PromotionAdminRankRequirementsPageMvcTest {
             null,
             null);
 
-    // SquadronContextAdvice fan-out: squadrons list + non-admin /me/active-org-unit lookup.
+    // OrgUnitContextAdvice fan-out: squadrons list + non-admin /me/active-org-unit lookup.
     PageResponse<SquadronDto> squadronPage =
         new PageResponse<>(
             List.of(new SquadronDto(squadronId, "IRIDIUM", "IRI", null, true, true, false, 0L)),
@@ -127,9 +127,8 @@ class PromotionAdminRankRequirementsPageMvcTest {
     when(backendApiClient.getCached(eq(CachedCatalog.SQUADRONS), anyTypeRef()))
         .thenReturn(squadronPage);
     when(backendApiClient.get(
-            eq("/api/v1/me/active-org-unit"),
-            eq(SquadronContextAdvice.ActiveOrgUnitResponse.class)))
-        .thenReturn(new SquadronContextAdvice.ActiveOrgUnitResponse(squadronId));
+            eq("/api/v1/me/active-org-unit"), eq(OrgUnitContextAdvice.ActiveOrgUnitResponse.class)))
+        .thenReturn(new OrgUnitContextAdvice.ActiveOrgUnitResponse(squadronId));
 
     when(backendApiClient.get(contains("/api/v1/promotion/rank-requirements"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(req), 0, 1000, 1, 1, List.of()));

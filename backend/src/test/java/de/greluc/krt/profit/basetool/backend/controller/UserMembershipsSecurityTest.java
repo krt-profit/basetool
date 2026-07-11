@@ -45,7 +45,7 @@ import org.springframework.web.context.WebApplicationContext;
  * the SecurityConfig fix the URL fell into the {@code /api/v1/users/**} catch-all which is gated on
  * {@code hasRole('ADMIN')} — every non-admin (Officer, KRT Member) got a 403 from the URL filter
  * before the {@link UserController#getUserMemberships} method-level {@code @PreAuthorize} was even
- * evaluated. The frontend's {@code SquadronContextAdvice} then silently swallowed the 403 and
+ * evaluated. The frontend's {@code OrgUnitContextAdvice} then silently swallowed the 403 and
  * rendered an empty {@code availableOrgUnits} list, surfacing as "Kein Bereichskontext" in the
  * sidebar chip for any non-admin user.
  *

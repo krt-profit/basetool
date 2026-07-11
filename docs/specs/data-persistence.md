@@ -199,7 +199,7 @@ a sort while keeping the index name.
 A backend list that is **global** (no per-principal variance) and **slow-changing** is fetched through
 `BackendApiClient.getCached(...)` — a per-domain Caffeine cache — not a plain `get(...)` on every render.
 The canonical case is the **squadron catalogue** (`GET /api/v1/squadrons?size=1000&sort=name,asc`): it is
-read on **every** authenticated render by `SquadronContextAdvice` (`availableSquadrons()` plus the admin
+read on **every** authenticated render by `OrgUnitContextAdvice` (`availableSquadrons()` plus the admin
 switcher's `loadAdminOrgUnitCatalogue()`) and by the page controllers that cache the identical catalogue,
 so it is fetched at most once per TTL app-wide.
 
@@ -250,7 +250,7 @@ Invariants that must hold:
   mutation evicts `STATIC_DATA_CACHE`: `AdminSpecialCommandsPageController`'s
   create / update / soft-delete / re-activate (classic **and** AJAX twins) and
   `SpecialCommandAdminProxyController`'s profit-eligible flip all call `clearStaticDataCache()`.
-  `SquadronContextAdvice`'s admin switcher therefore reads the SK catalogue through `getCached`, at most
+  `OrgUnitContextAdvice`'s admin switcher therefore reads the SK catalogue through `getCached`, at most
   once per TTL app-wide instead of on every admin render. Member-roster mutations (add / remove / flags /
   lead) do not change the catalogue's name / shorthand / active / profit-eligible fields, so they
   deliberately do **not** evict.
@@ -292,7 +292,7 @@ Invariants that must hold:
   [ADR-0074](../adr/0074-cache-invalidation-per-instance-caffeine.md), deferred and **not** built while
   the topology is single-instance.
 
-**Acceptance** (`SquadronContextAdviceTest`): both `availableSquadrons()` and the admin switcher route
+**Acceptance** (`OrgUnitContextAdviceTest`): both `availableSquadrons()` and the admin switcher route
 the squadron catalogue through `getCached`, never a plain `get`; the admin switcher also routes the
 SpecialCommand catalogue through `getCached`. (`AdminSpecialCommandsPageControllerMvcTest`,
 `SpecialCommandAdminProxyControllerTest`): every SK lifecycle mutation — create / update / delete /
