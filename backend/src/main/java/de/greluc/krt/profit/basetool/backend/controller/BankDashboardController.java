@@ -55,7 +55,7 @@ public class BankDashboardController {
    */
   @Operation(summary = "Read the bank dashboard for the caller")
   @GetMapping
-  @PreAuthorize("hasRole('" + Roles.BANK_EMPLOYEE + "')")
+  @PreAuthorize(Roles.HAS_ROLE_BANK_EMPLOYEE)
   @Transactional(readOnly = true)
   public BankDashboardDto getDashboard() {
     UUID userId =

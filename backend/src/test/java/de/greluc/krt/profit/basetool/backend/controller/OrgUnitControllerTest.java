@@ -27,7 +27,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
-import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipService;
+import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryService;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -38,16 +38,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * Thin delegation tests for {@link OrgUnitController}. Each endpoint is a single-line passthrough
- * to {@link OrgUnitMembershipService} — the resolver / sort behaviour is pinned by {@link
- * de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipServiceTest}, so this class only
- * verifies the wiring (handlers exist, response shape preserved, no surprise filtering). The
+ * to {@link OrgUnitMembershipQueryService} — the resolver / sort behaviour is pinned by {@link
+ * de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryServiceTest}, so this class
+ * only verifies the wiring (handlers exist, response shape preserved, no surprise filtering). The
  * declarative {@code @PreAuthorize} gates (public {@code /active} vs authenticated {@code
  * /active-all-kinds}) are enforced by Spring Security, not asserted here.
  */
 @ExtendWith(MockitoExtension.class)
 class OrgUnitControllerTest {
 
-  @Mock private OrgUnitMembershipService orgUnitMembershipService;
+  @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
 
   @InjectMocks private OrgUnitController controller;
 
@@ -56,18 +56,18 @@ class OrgUnitControllerTest {
     OrgUnitMembershipOptionDto option =
         new OrgUnitMembershipOptionDto(
             UUID.randomUUID(), "IRIDIUM", "IRI", OrgUnitKind.SQUADRON, true);
-    when(orgUnitMembershipService.listAllActiveOptions()).thenReturn(List.of(option));
+    when(orgUnitMembershipQueryService.listAllActiveOptions()).thenReturn(List.of(option));
 
     List<OrgUnitMembershipOptionDto> result = controller.listActiveOrgUnits();
 
     assertEquals(1, result.size());
     assertSame(option, result.getFirst());
-    verify(orgUnitMembershipService).listAllActiveOptions();
+    verify(orgUnitMembershipQueryService).listAllActiveOptions();
   }
 
   @Test
   void listActiveOrgUnits_emptyService_returnsEmptyList() {
-    when(orgUnitMembershipService.listAllActiveOptions()).thenReturn(List.of());
+    when(orgUnitMembershipQueryService.listAllActiveOptions()).thenReturn(List.of());
 
     assertTrue(controller.listActiveOrgUnits().isEmpty());
   }
@@ -80,13 +80,13 @@ class OrgUnitControllerTest {
     OrgUnitMembershipOptionDto bereich =
         new OrgUnitMembershipOptionDto(
             UUID.randomUUID(), "Profit", "PRF", OrgUnitKind.BEREICH, false);
-    when(orgUnitMembershipService.listAllActiveOrgUnitOptionsAllKinds())
+    when(orgUnitMembershipQueryService.listAllActiveOrgUnitOptionsAllKinds())
         .thenReturn(List.of(bereich));
 
     List<OrgUnitMembershipOptionDto> result = controller.listActiveOrgUnitsAllKinds();
 
     assertEquals(1, result.size());
     assertSame(bereich, result.getFirst());
-    verify(orgUnitMembershipService).listAllActiveOrgUnitOptionsAllKinds();
+    verify(orgUnitMembershipQueryService).listAllActiveOrgUnitOptionsAllKinds();
   }
 }

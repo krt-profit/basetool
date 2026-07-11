@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
-import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipService;
+import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -59,7 +59,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "org-unit-controller", description = "Read-only org-unit hierarchy endpoints")
 public class OrgUnitController {
 
-  private final OrgUnitMembershipService orgUnitMembershipService;
+  private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
 
   /**
    * Lists every active org unit (Staffel + Spezialkommando) as picker options, each carrying its
@@ -87,7 +87,7 @@ public class OrgUnitController {
   @ApiResponses(
       value = {@ApiResponse(responseCode = "200", description = "Active org-unit options")})
   public List<OrgUnitMembershipOptionDto> listActiveOrgUnits() {
-    return orgUnitMembershipService.listAllActiveOptions();
+    return orgUnitMembershipQueryService.listAllActiveOptions();
   }
 
   /**
@@ -113,6 +113,6 @@ public class OrgUnitController {
   @ApiResponses(
       value = {@ApiResponse(responseCode = "200", description = "Active org-unit options")})
   public List<OrgUnitMembershipOptionDto> listActiveOrgUnitsAllKinds() {
-    return orgUnitMembershipService.listAllActiveOrgUnitOptionsAllKinds();
+    return orgUnitMembershipQueryService.listAllActiveOrgUnitOptionsAllKinds();
   }
 }

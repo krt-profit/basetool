@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderHandoverReportService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderHandoverService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemBlueprintOwnersService;
+import de.greluc.krt.profit.basetool.backend.service.JobOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
@@ -100,6 +101,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 class JobOrderControllerTest {
 
   @Mock private JobOrderService jobOrderService;
+  @Mock private JobOrderQueryService jobOrderQueryService;
   @Mock private JobOrderItemBlueprintOwnersService jobOrderItemBlueprintOwnersService;
   @Mock private JobOrderHandoverService jobOrderHandoverService;
   @Mock private JobOrderHandoverReportService jobOrderHandoverReportService;
@@ -208,7 +210,7 @@ class JobOrderControllerTest {
             List.of(dto),
             PageRequest.of(0, 20, org.springframework.data.domain.Sort.by("priority")),
             1);
-    when(jobOrderService.getAllJobOrders(
+    when(jobOrderQueryService.getAllJobOrders(
             eq(List.of(JobOrderStatus.OPEN)), eq(null), any(Pageable.class)))
         .thenReturn(page);
 
@@ -217,7 +219,7 @@ class JobOrderControllerTest {
 
     assertThat(result.content()).containsExactly(dto);
     assertThat(result.sort()).isNotEmpty();
-    verify(jobOrderService)
+    verify(jobOrderQueryService)
         .getAllJobOrders(eq(List.of(JobOrderStatus.OPEN)), eq(null), any(Pageable.class));
   }
 
@@ -225,7 +227,8 @@ class JobOrderControllerTest {
   void getAllJobOrders_nullStatusFilter_reachesServiceAsNullNotEmptyList() {
     JobOrderDto dto = jobOrderDto(UUID.randomUUID());
     Page<JobOrderDto> page = new PageImpl<>(List.of(dto), PageRequest.of(0, 20), 1);
-    when(jobOrderService.getAllJobOrders(eq(null), eq(null), any(Pageable.class))).thenReturn(page);
+    when(jobOrderQueryService.getAllJobOrders(eq(null), eq(null), any(Pageable.class)))
+        .thenReturn(page);
 
     PageResponse<JobOrderDto> result =
         controller.getAllJobOrders(null, null, 0, 20, "priority,asc");
@@ -234,7 +237,7 @@ class JobOrderControllerTest {
     // here would produce SQL "WHERE status IN ()" which never matches any row, leaving the queue
     // page perpetually empty. Pin the verbatim null pass-through.
     assertThat(result.content()).containsExactly(dto);
-    verify(jobOrderService).getAllJobOrders(eq(null), eq(null), any(Pageable.class));
+    verify(jobOrderQueryService).getAllJobOrders(eq(null), eq(null), any(Pageable.class));
   }
 
   @Test
@@ -242,7 +245,7 @@ class JobOrderControllerTest {
     JobOrderDto dto = jobOrderDto(UUID.randomUUID());
     UUID squadronId = UUID.randomUUID();
     Page<JobOrderDto> page = new PageImpl<>(List.of(dto), PageRequest.of(0, 20), 1);
-    when(jobOrderService.getAllJobOrders(
+    when(jobOrderQueryService.getAllJobOrders(
             eq(List.of(JobOrderStatus.OPEN)), eq(squadronId), any(Pageable.class)))
         .thenReturn(page);
 
@@ -253,7 +256,7 @@ class JobOrderControllerTest {
     // toggle (MULTI_SQUADRON_PLAN.md §5.3) relies on this pass-through to short-circuit the
     // cross-staffel union to the caller's own squadron on creating- or requesting-side match.
     assertThat(result.content()).containsExactly(dto);
-    verify(jobOrderService)
+    verify(jobOrderQueryService)
         .getAllJobOrders(eq(List.of(JobOrderStatus.OPEN)), eq(squadronId), any(Pageable.class));
   }
 
@@ -264,12 +267,12 @@ class JobOrderControllerTest {
     JobOrderReferenceDto ref =
         new JobOrderReferenceDto(
             UUID.randomUUID(), 42, "alice", JobOrderStatus.OPEN, null, List.of(), List.of());
-    when(jobOrderService.findAllActiveReference()).thenReturn(List.of(ref));
+    when(jobOrderQueryService.findAllActiveReference()).thenReturn(List.of(ref));
 
     List<JobOrderReferenceDto> result = controller.lookupJobOrders();
 
     assertThat(result).containsExactly(ref);
-    verify(jobOrderService).findAllActiveReference();
+    verify(jobOrderQueryService).findAllActiveReference();
   }
 
   // ── GET /api/v1/orders/{id} ──────────────────────────────────────────
@@ -280,7 +283,7 @@ class JobOrderControllerTest {
     // The service stamps the per-order redaction decision; a full viewer's DTO carries
     // redacted=false, so the controller returns it verbatim without re-evaluating any gate.
     JobOrderDto dto = jobOrderDto(id); // redacted=false
-    when(jobOrderService.getJobOrderById(id)).thenReturn(dto);
+    when(jobOrderQueryService.getJobOrderById(id)).thenReturn(dto);
 
     JobOrderDto result = controller.getJobOrderById(id);
 
@@ -322,7 +325,7 @@ class JobOrderControllerTest {
             Instant.parse("2026-01-01T00:00:00Z"),
             9L,
             true); // the service already decided this is a requester-only (redacted) view
-    when(jobOrderService.getJobOrderById(id)).thenReturn(full);
+    when(jobOrderQueryService.getJobOrderById(id)).thenReturn(full);
 
     JobOrderDto result = controller.getJobOrderById(id);
 
@@ -377,7 +380,7 @@ class JobOrderControllerTest {
             null,
             1L,
             null);
-    when(jobOrderService.getInventoryItemsForJobOrderMaterial(jobOrderId, materialId))
+    when(jobOrderQueryService.getInventoryItemsForJobOrderMaterial(jobOrderId, materialId))
         .thenReturn(List.of(inv));
 
     List<InventoryItemDto> result =

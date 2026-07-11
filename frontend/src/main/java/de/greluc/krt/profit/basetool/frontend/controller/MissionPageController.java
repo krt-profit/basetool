@@ -19,16 +19,13 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.JobTypeDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MissionCrewDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceEntryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceTotalsDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFrequencyDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionListDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MissionUnitDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
@@ -387,189 +384,25 @@ public class MissionPageController {
       final boolean needCrewBoard = fullRender || "crew-board".equals(frag);
       final boolean needFinance = fullRender || "finance".equals(frag);
 
-      // Sort participants and build groupings
-      List<MissionParticipantDto> participants = new java.util.ArrayList<>(mission.participants());
-      participants.sort(
-          (p1, p2) -> {
-            String name1 = extractParticipantName(p1);
-            String name2 = extractParticipantName(p2);
-            return name1.compareToIgnoreCase(name2);
-          });
-
-      Map<String, List<MissionParticipantDto>> participantsByLeadType = new java.util.HashMap<>();
-      List<JobTypeDto> missionLeadTypes = new java.util.ArrayList<>();
-      java.util.Set<UUID> addedLeadTypes = new java.util.HashSet<>();
-      for (MissionParticipantDto p : participants) {
-        JobTypeDto job = p.plannedMissionJobType();
-        if (job != null && job.isLeadershipRole()) {
-          UUID jobId = job.id();
-          participantsByLeadType
-              .computeIfAbsent(jobId.toString(), k -> new java.util.ArrayList<>())
-              .add(p);
-          if (addedLeadTypes.add(jobId)) {
-            missionLeadTypes.add(job);
-          }
-        }
-      }
+      // Every attribute below is a pure function of the fetched mission (participant sort +
+      // groupings, facts-bar leader, unit-assignment lookups, participation percentages,
+      // frequency split); MissionDetailModelBuilder computes them so this handler keeps only
+      // the orchestration (fragment-gating, catalog reads, the finance fan-out below).
+      MissionDetailModelBuilder.MissionDetailViewModel detail =
+          MissionDetailModelBuilder.build(mission);
       model.addAttribute("mission", mission);
-      model.addAttribute("participants", participants);
-      model.addAttribute("participantsByLeadType", participantsByLeadType);
-      model.addAttribute("missionLeadTypes", missionLeadTypes);
-
-      // Facts-bar "Leiter" (REQ-MISSION-013): the participant designated as Einsatzleiter — the one
-      // whose planned mission job type is the single mission-lead designation
-      // (JobType.isMissionLead)
-      // — else the mission owner, else "none". The owner is redacted for outsiders, so a guest with
-      // no Einsatzleiter assigned sees "none". A mission can have only one Einsatzleiter, so the
-      // first
-      // match is authoritative.
-      String factLeaderName = null;
-      for (MissionParticipantDto p : participants) {
-        JobTypeDto job = p.plannedMissionJobType();
-        if (job != null && Boolean.TRUE.equals(job.isMissionLead())) {
-          if (p.user() != null) {
-            factLeaderName = p.user().effectiveName();
-          } else if (p.guestName() != null && !p.guestName().isBlank()) {
-            factLeaderName = p.guestName();
-          }
-          break;
-        }
-      }
-      if (factLeaderName == null && mission.owner() != null) {
-        factLeaderName = mission.owner().effectiveName();
-      }
-      model.addAttribute("factLeaderName", factLeaderName);
-
-      // User ids of every account-backed participant (guests have no account and thus no hangar
-      // ships). The unit ADD modal offers only ships owned by these users; the EDIT modal also
-      // keeps already-assigned ships (see assignedUnitShipIds) so a unit can only be crewed with a
-      // ship brought by someone registered for the mission, without dropping an existing one.
-      java.util.Set<UUID> participantUserIds = new java.util.HashSet<>();
-      for (MissionParticipantDto p : participants) {
-        if (p.user() != null && p.user().id() != null) {
-          participantUserIds.add(p.user().id());
-        }
-      }
-      model.addAttribute("participantUserIds", participantUserIds);
-
-      // Sort crew members and build groupings
-      Map<UUID, String> assignedUnitByParticipantId = new java.util.HashMap<>();
-      // Ids of ships already pinned to a unit of this mission. The unit EDIT modal keeps offering
-      // these even when the owner is no longer a participant, so editing an unrelated field on such
-      // a unit doesn't silently drop the ship — the client-side picker pre-selects the current ship
-      // by value and needs the <option> to exist.
-      java.util.Set<UUID> assignedUnitShipIds = new java.util.HashSet<>();
-      if (mission.assignedUnits() != null) {
-        for (MissionUnitDto unit : mission.assignedUnits()) {
-          if (unit.ship() != null && unit.ship().id() != null) {
-            assignedUnitShipIds.add(unit.ship().id());
-          }
-          String unitName = unit.name() != null ? unit.name() : "";
-          if (unit.crew() != null) {
-            for (MissionCrewDto c : unit.crew()) {
-              if (c.participantId() != null) {
-                assignedUnitByParticipantId.merge(
-                    c.participantId(), unitName, (oldVal, newVal) -> oldVal + " " + newVal);
-              }
-            }
-          }
-        }
-      }
-      model.addAttribute("assignedUnitByParticipantId", assignedUnitByParticipantId);
-      model.addAttribute("assignedUnitShipIds", assignedUnitShipIds);
-
-      // "Crew zuweisen"-Dropdown zeigt nur Teilnehmer, die noch keiner Einheit zugewiesen sind.
-      // Sortierung wird aus `participants` (oben bereits alphabetisch nach extractParticipantName)
-      // geerbt — ein assignment-Status-Filter ändert die Reihenfolge der verbleibenden Einträge
-      // nicht. Der server-seitige Filter ist authoritativ; nach einer Crew-Zuweisung lädt der
-      // AJAX-Pfad die ganze Seite neu, sodass das Dropdown auf dem aktuellen Stand bleibt.
-      List<MissionParticipantDto> unassignedParticipants =
-          participants.stream()
-              .filter(p -> p.id() != null && !assignedUnitByParticipantId.containsKey(p.id()))
-              .toList();
-      model.addAttribute("unassignedParticipants", unassignedParticipants);
-
-      // Crew board (tab layout, Variante B): unit crew lists carry only
-      // participantId/participantName, so the board's person rows resolve the full participant
-      // payload (org units, desired job, comment, check-in state, version) via this id lookup.
-      Map<UUID, MissionParticipantDto> participantsById = new java.util.HashMap<>();
-      for (MissionParticipantDto p : participants) {
-        if (p.id() != null) {
-          participantsById.put(p.id(), p);
-        }
-      }
-      model.addAttribute("participantsById", participantsById);
-
-      // Calculate participation percentages
-      Map<UUID, Double> participationPercentages = new java.util.HashMap<>();
-      for (MissionParticipantDto p : participants) {
-        participationPercentages.put(p.id(), 0.0);
-      }
-
-      java.time.Instant missionStart = mission.actualStartTime();
-      java.time.Instant missionEnd = mission.actualEndTime();
-
-      if (missionStart != null) {
-        long totalDurationSeconds = 0;
-
-        Map<UUID, Long> participantDurations = new java.util.HashMap<>();
-
-        for (MissionParticipantDto p : participants) {
-          java.time.Instant participantStart = p.startTime();
-          java.time.Instant participantEnd = p.endTime();
-
-          if (participantStart != null) {
-            java.time.Instant effectiveStart =
-                participantStart.isBefore(missionStart) ? missionStart : participantStart;
-            java.time.Instant effectiveEnd;
-            if (participantEnd != null) {
-              effectiveEnd =
-                  (missionEnd != null && participantEnd.isAfter(missionEnd))
-                      ? missionEnd
-                      : participantEnd;
-            } else {
-              effectiveEnd = (missionEnd != null) ? missionEnd : java.time.Instant.now();
-            }
-
-            if (effectiveEnd.isAfter(effectiveStart)) {
-              long duration = java.time.Duration.between(effectiveStart, effectiveEnd).getSeconds();
-              participantDurations.put(p.id(), duration);
-              totalDurationSeconds += duration;
-            }
-          }
-        }
-
-        if (totalDurationSeconds > 0) {
-          for (MissionParticipantDto p : participants) {
-            Long duration = participantDurations.get(p.id());
-            if (duration != null) {
-              double percentage = (double) duration / totalDurationSeconds * 100.0;
-              participationPercentages.put(p.id(), percentage);
-            }
-          }
-        }
-      }
-      model.addAttribute("participationPercentages", participationPercentages);
-
-      // Build frequency lookup for the typed (global) channels, plus the ordered list of custom
-      // (mission-specific) channels (REQ-MISSION-014) rendered in the "Weitere Frequenzen" editor
-      // and the overview Funk panel. Custom rows carry a free-text name and no frequencyType; they
-      // are sorted case-insensitively by label for a stable, reload-independent order.
-      Map<String, MissionFrequencyDto> frequencyByTypeId = new java.util.HashMap<>();
-      List<MissionFrequencyDto> customFrequencies = new java.util.ArrayList<>();
-      if (mission.frequencies() != null) {
-        for (MissionFrequencyDto f : mission.frequencies()) {
-          if (f.frequencyTypeId() != null) {
-            frequencyByTypeId.put(f.frequencyTypeId().toString(), f);
-          } else if (f.name() != null) {
-            customFrequencies.add(f);
-          }
-        }
-      }
-      customFrequencies.sort(
-          java.util.Comparator.comparing(MissionFrequencyDto::name, String.CASE_INSENSITIVE_ORDER));
-      model.addAttribute("frequencyByTypeId", frequencyByTypeId);
-      model.addAttribute("customFrequencies", customFrequencies);
+      model.addAttribute("participants", detail.participants());
+      model.addAttribute("participantsByLeadType", detail.participantsByLeadType());
+      model.addAttribute("missionLeadTypes", detail.missionLeadTypes());
+      model.addAttribute("factLeaderName", detail.factLeaderName());
+      model.addAttribute("participantUserIds", detail.participantUserIds());
+      model.addAttribute("assignedUnitByParticipantId", detail.assignedUnitByParticipantId());
+      model.addAttribute("assignedUnitShipIds", detail.assignedUnitShipIds());
+      model.addAttribute("unassignedParticipants", detail.unassignedParticipants());
+      model.addAttribute("participantsById", detail.participantsById());
+      model.addAttribute("participationPercentages", detail.participationPercentages());
+      model.addAttribute("frequencyByTypeId", detail.frequencyByTypeId());
+      model.addAttribute("customFrequencies", detail.customFrequencies());
 
       // Fetch the owner/manager org-unit options for the Verwaltung (mgmt) panel ONLY — the
       // owning-org-unit select lives in the mgmtPanels fragment, so a crew/finance/overview/...
@@ -994,58 +827,6 @@ public class MissionPageController {
       log.error("UNEXPECTED ERROR in getUnassignedParticipantsAjax for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
     }
-  }
-
-  /**
-   * Re-emits a backend {@link
-   * de.greluc.krt.profit.basetool.frontend.service.BackendServiceException} as an {@code
-   * application/problem+json} response that preserves the stable {@code code} and human-readable
-   * {@code detail} from the upstream RFC 7807 body.
-   *
-   * <p>The mission-detail AJAX layer (see {@code krt-fetch.js}) reads {@code code} to decide
-   * between a "stale data, reload?" prompt (only for {@code OPTIMISTIC_LOCK} / {@code
-   * PESSIMISTIC_LOCK}) and a plain error toast for domain conflicts ({@code DUPLICATE_ENTITY},
-   * {@code BUSINESS_CONFLICT}, …). Returning {@code .build()} with only the status code stripped
-   * that signal and made every 409 look like an optimistic-lock conflict.
-   *
-   * @param e parsed backend exception with status + RFC 7807 fields
-   * @return problem+json response mirroring the upstream status and body
-   */
-  // Package-private so the sibling MissionFinancePageController's /ajax handlers reuse the same
-  // RFC 7807 passthrough instead of duplicating it.
-  static org.springframework.http.ResponseEntity<Object> propagateBackendError(
-      @NotNull de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
-    Map<String, Object> body = new java.util.LinkedHashMap<>();
-    body.put("status", e.getStatusCode());
-    body.put("code", e.getProblemCode());
-    if (e.getProblemDetail() != null && !e.getProblemDetail().isBlank()) {
-      body.put("detail", e.getProblemDetail());
-    }
-    if (e.getCorrelationId() != null && !e.getCorrelationId().isBlank()) {
-      body.put("correlationId", e.getCorrelationId());
-    }
-    return org.springframework.http.ResponseEntity.status(e.getStatusCode())
-        .contentType(org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON)
-        .body(body);
-  }
-
-  private String extractParticipantName(MissionParticipantDto participant) {
-    if (participant == null) {
-      return "";
-    }
-    if (participant.user() != null) {
-      if (participant.user().effectiveName() != null
-          && !participant.user().effectiveName().isBlank()) {
-        return participant.user().effectiveName();
-      }
-      if (participant.user().displayName() != null && !participant.user().displayName().isBlank()) {
-        return participant.user().displayName();
-      }
-      if (participant.user().username() != null && !participant.user().username().isBlank()) {
-        return participant.user().username();
-      }
-    }
-    return participant.guestName() != null ? participant.guestName() : "";
   }
 
   private String fetchRoundingMode(boolean isPublic) {

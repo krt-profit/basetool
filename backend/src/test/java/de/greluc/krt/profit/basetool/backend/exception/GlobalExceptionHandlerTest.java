@@ -32,6 +32,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.persistence.EntityNotFoundException;
@@ -93,7 +94,9 @@ class GlobalExceptionHandlerTest {
     messageSource.setDefaultEncoding("UTF-8");
     messageSource.setFallbackToSystemLocale(false);
     LocaleContextHolder.setLocale(Locale.ENGLISH);
-    handler = new GlobalExceptionHandler(props, messageSource, meterRegistry);
+    handler =
+        new GlobalExceptionHandler(
+            props, new ProblemResponseFactory(props), messageSource, meterRegistry);
     request = mock(HttpServletRequest.class);
     when(request.getRequestURI()).thenReturn("/api/v1/test");
   }

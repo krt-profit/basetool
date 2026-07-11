@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BulkCheckoutRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemBookOutDto;
@@ -232,33 +234,6 @@ public class InventoryWriteController {
     body.put("status", 422);
     body.put("code", code);
     return org.springframework.http.ResponseEntity.unprocessableContent()
-        .contentType(org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON)
-        .body(body);
-  }
-
-  /**
-   * Translates a {@link de.greluc.krt.profit.basetool.frontend.service.BackendServiceException}
-   * into an RFC 7807 {@code problem+json} {@link org.springframework.http.ResponseEntity},
-   * preserving the backend status, {@code code} (e.g. {@code OPTIMISTIC_LOCK}), {@code detail} and
-   * correlation id so the client's {@code krtFetch.handleProblem} can drive the conflict
-   * reload-confirm or an error toast. Mirrors the helper in the mission / job-order / operation
-   * controllers.
-   *
-   * @param e the backend failure to relay
-   * @return a {@code problem+json} response carrying the backend status and code
-   */
-  private static org.springframework.http.ResponseEntity<Object> propagateBackendError(
-      de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
-    java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
-    body.put("status", e.getStatusCode());
-    body.put("code", e.getProblemCode());
-    if (e.getProblemDetail() != null && !e.getProblemDetail().isBlank()) {
-      body.put("detail", e.getProblemDetail());
-    }
-    if (e.getCorrelationId() != null && !e.getCorrelationId().isBlank()) {
-      body.put("correlationId", e.getCorrelationId());
-    }
-    return org.springframework.http.ResponseEntity.status(e.getStatusCode())
         .contentType(org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON)
         .body(body);
   }

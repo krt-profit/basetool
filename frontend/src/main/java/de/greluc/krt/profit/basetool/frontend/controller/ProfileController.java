@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.ProfileDescriptionForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ProfilePayoutPreferenceForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
+import de.greluc.krt.profit.basetool.frontend.support.MapPayloadValues;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -121,7 +122,7 @@ public class ProfileController {
           model.addAttribute("displayName", user.get("displayName"));
         }
         if (user.containsKey("version")) {
-          model.addAttribute("version", parseLong(user.get("version")));
+          model.addAttribute("version", MapPayloadValues.longOrZero(user.get("version")));
         }
         if (user.containsKey("joinDate") && user.get("joinDate") != null) {
           try {
@@ -591,7 +592,7 @@ public class ProfileController {
     try {
       Map<String, Object> me = backendApiClient.get("/api/v1/users/me", STRING_OBJECT_MAP_TYPE);
       if (me != null && me.get("version") != null) {
-        return parseLong(me.get("version"));
+        return MapPayloadValues.longOrZero(me.get("version"));
       }
     } catch (Exception ignored) {
       // Re-fetch failed — fall through to the best-effort increment below.
@@ -651,20 +652,6 @@ public class ProfileController {
             ? String.valueOf(tokens[0].charAt(0)) + tokens[1].charAt(0)
             : base.substring(0, Math.min(2, base.length()));
     return initials.toUpperCase(Locale.ROOT);
-  }
-
-  private static Long parseLong(Object o) {
-    if (o == null) {
-      return 0L;
-    }
-    if (o instanceof Number n) {
-      return n.longValue();
-    }
-    try {
-      return Long.parseLong(String.valueOf(o));
-    } catch (Exception ignored) {
-      return 0L;
-    }
   }
 
   private Object getSingleClaim(OidcUser principal, String claim) {

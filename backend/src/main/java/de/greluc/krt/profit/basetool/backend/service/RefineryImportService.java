@@ -32,7 +32,6 @@ import de.greluc.krt.profit.basetool.backend.model.MaterialExternalAliasSource;
 import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.RefiningMethod;
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportSuggestionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ImportIssueCode;
 import de.greluc.krt.profit.basetool.backend.model.dto.ImportIssueDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ImportIssueSeverity;
@@ -50,7 +49,6 @@ import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -446,9 +444,7 @@ public class RefineryImportService {
   private MatchContext prepareMatchContext() {
     List<Material> candidates = materialRepository.findRefineryInputCandidates(MaterialType.RAW);
     Map<String, List<Material>> canonicalIndex = new HashMap<>();
-    Map<String, Material> byName = new HashMap<>();
     for (Material candidate : candidates) {
-      byName.put(candidate.getName(), candidate);
       String canonical = MaterialNameCanonicalizer.canonicalCore(candidate.getName());
       if (canonical != null && !canonical.isEmpty()) {
         canonicalIndex.computeIfAbsent(canonical, k -> new ArrayList<>()).add(candidate);
@@ -475,7 +471,7 @@ public class RefineryImportService {
       }
       aliasCanonicalIndex.computeIfAbsent(aliasCanonical, k -> new ArrayList<>()).add(target);
     }
-    return new MatchContext(candidates, canonicalIndex, byName, candidateIds, aliasCanonicalIndex);
+    return new MatchContext(candidates, canonicalIndex, candidateIds, aliasCanonicalIndex);
   }
 
   /**
@@ -541,33 +537,28 @@ public class RefineryImportService {
     if (fuzzyKey == null || fuzzyKey.isEmpty()) {
       return MaterialMatch.unmatched(null);
     }
-    List<ResolvedProduct> wrapped =
-        context.candidates().stream()
-            .map(
-                c ->
-                    new ResolvedProduct(
-                        MaterialNameCanonicalizer.fuzzyKey(c.getName()), c.getName(), null))
-            .filter(p -> p.productKey() != null && !p.productKey().isEmpty())
-            .toList();
-    List<BlueprintImportSuggestionDto> ranked =
-        fuzzyMatcher.topSuggestions(
-            fuzzyKey, wrapped, properties.getSuggestionLimit(), properties.getSuggestionFloor());
+    // Rank the candidate materials directly through the generic fuzzy matcher (keyed on each
+    // material's fuzzyKey) — no throwaway ResolvedProduct wrappers, and the Match carries the
+    // Material itself, so there is no name round-trip back through byName.
+    List<BlueprintFuzzyMatcher.Scored<Material>> ranked =
+        fuzzyMatcher.topMatches(
+            fuzzyKey,
+            context.candidates(),
+            c -> MaterialNameCanonicalizer.fuzzyKey(c.getName()),
+            Comparator.comparing(
+                Material::getName, Comparator.nullsLast(String::compareToIgnoreCase)),
+            properties.getSuggestionLimit(),
+            properties.getSuggestionFloor());
     List<ImportSuggestionDto> suggestions =
         ranked.stream()
             .map(
-                s -> {
-                  Material candidate = context.byName().get(s.productName());
-                  return candidate == null
-                      ? null
-                      : new ImportSuggestionDto(candidate.getId(), candidate.getName(), s.score());
-                })
-            .filter(s -> s != null)
+                s ->
+                    new ImportSuggestionDto(
+                        s.candidate().getId(), s.candidate().getName(), s.score()))
             .toList();
     if (!ranked.isEmpty() && ranked.getFirst().score() >= properties.getFuzzyAcceptThreshold()) {
-      Material best = context.byName().get(ranked.getFirst().productName());
-      if (best != null) {
-        return MaterialMatch.fuzzy(best, ranked.getFirst().score(), suggestions);
-      }
+      return MaterialMatch.fuzzy(
+          ranked.getFirst().candidate(), ranked.getFirst().score(), suggestions);
     }
     return MaterialMatch.unmatched(suggestions.isEmpty() ? null : suggestions);
   }
@@ -650,7 +641,6 @@ public class RefineryImportService {
    *
    * @param candidates visible {@code RAW || isManualRawMaterial} materials
    * @param canonicalIndex canonical core → candidates sharing it
-   * @param byName exact display name → candidate (names are unique)
    * @param candidateIds candidate primary keys — the alias stage validates its hit against this set
    *     so a mis-curated alias can never bypass the create-path gate
    * @param aliasCanonicalIndex canonicalized {@code REFINERY_SCREEN} alias name → gate-passing
@@ -659,7 +649,6 @@ public class RefineryImportService {
   private record MatchContext(
       List<Material> candidates,
       Map<String, List<Material>> canonicalIndex,
-      Map<String, Material> byName,
       Set<UUID> candidateIds,
       Map<String, List<Material>> aliasCanonicalIndex) {}
 

@@ -70,7 +70,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/v1/admin/personal-blueprints")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+@PreAuthorize(Roles.HAS_ROLE_ADMIN)
 @Tag(
     name = "Admin – Personal Blueprints",
     description = "Administrator endpoints for managing any user's acquired blueprints (#327).")

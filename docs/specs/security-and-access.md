@@ -218,7 +218,7 @@ What a mission outsider (anonymous OR GUEST) **may** do — and nothing more:
   guest entry) via `MissionSecurityService.canAccessParticipant`. Internal and past
   (`COMPLETED`/`CANCELLED`) missions are not visible to outsiders.
 
-The outsider mission detail (`MissionController.cleanupOutsiderMissionForGuest`) applies the
+The outsider mission detail (`MissionGuestRedactor.cleanupOutsiderMissionForGuest`) applies the
 member-peer redaction (participant PII stripped to the public callsign tuple
 username/displayName/rank; owner and managers cleared) and **additionally hides only the free-text
 `description`**. The mission **economy** (inventory entries / refinery orders) is no longer part of
@@ -767,7 +767,7 @@ sensitivity:
 - the free-text **`comment`** — uncontrolled text that may carry incidental PII.
 
 Both fields stay on the authenticated member-peer view; only the outsider paths strip them, via
-`MissionController.stripOutsiderParticipantFields` applied in `cleanupOutsiderMissionForGuest` (the
+`MissionGuestRedactor.stripOutsiderParticipantFields` applied in `cleanupOutsiderMissionForGuest` (the
 pass every outsider full-mission response routes through — `getMissionById` and the participant write
 endpoints) and the `addParticipantSlim` outsider branch. The shared `cleanupParticipantForGuest` is
 deliberately unchanged. The full residual decision (and the rejected alternatives) is recorded in

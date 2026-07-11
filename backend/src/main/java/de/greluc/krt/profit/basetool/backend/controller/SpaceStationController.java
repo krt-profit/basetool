@@ -26,7 +26,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.SpaceStationDto;
 import de.greluc.krt.profit.basetool.backend.service.SpaceStationService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -52,7 +51,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/space-stations")
 @RequiredArgsConstructor
 @Transactional
-@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+@PreAuthorize(Roles.HAS_ROLE_ADMIN)
 public class SpaceStationController {
 
   private final SpaceStationService spaceStationService;
@@ -75,14 +74,7 @@ public class SpaceStationController {
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("name", "id", "starSystemName"), "name");
     Page<SpaceStation> p = spaceStationService.getAllSpaceStations(pageable);
-    List<SpaceStationDto> content = p.getContent().stream().map(spaceStationMapper::toDto).toList();
-    return new PageResponse<>(
-        content,
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p.map(spaceStationMapper::toDto));
   }
 
   /**
@@ -105,7 +97,7 @@ public class SpaceStationController {
    * @return the persisted space-station DTO
    */
   @PatchMapping("/{id}/loading-dock")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public SpaceStationDto setLoadingDockOverride(
       @PathVariable @NotNull UUID id, @RequestParam boolean value) {
     return spaceStationMapper.toDto(spaceStationService.setLoadingDockOverride(id, value));
@@ -119,7 +111,7 @@ public class SpaceStationController {
    * @return the persisted space-station DTO
    */
   @DeleteMapping("/{id}/loading-dock-override")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public SpaceStationDto clearLoadingDockOverride(@PathVariable @NotNull UUID id) {
     return spaceStationMapper.toDto(spaceStationService.clearLoadingDockOverride(id));
   }

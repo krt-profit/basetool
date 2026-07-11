@@ -104,6 +104,10 @@ class JobOrderServiceAssigneeAndListTest {
 
   @InjectMocks private JobOrderService service;
 
+  // Read/write split (#14): the list/reference/detail reads moved to JobOrderQueryService, built
+  // from the same mocks with the real stock projection wired in below.
+  @InjectMocks private JobOrderQueryService queryService;
+
   private static final UUID JOB_ORDER_ID = UUID.randomUUID();
   private static final UUID USER_ID = UUID.randomUUID();
 
@@ -114,6 +118,8 @@ class JobOrderServiceAssigneeAndListTest {
     ReflectionTestUtils.setField(
         jobOrderAssigneeService, "jobOrderStockProjectionService", jobOrderStockProjectionService);
     ReflectionTestUtils.setField(service, "jobOrderAssigneeService", jobOrderAssigneeService);
+    ReflectionTestUtils.setField(
+        queryService, "jobOrderStockProjectionService", jobOrderStockProjectionService);
     // The service routes nearly every return through mapToDtoWithStock(),
     // which calls jobOrderMapper.toDto(...) and then iterates the result's
     // materials. Return an empty materials list so we don't have to stub
@@ -187,7 +193,7 @@ class JobOrderServiceAssigneeAndListTest {
               allStatuses, null, true, null, Set.of(), pageable))
           .thenReturn(page);
 
-      Page<JobOrderDto> result = service.getAllJobOrders(null, pageable);
+      Page<JobOrderDto> result = queryService.getAllJobOrders(null, pageable);
 
       assertEquals(1, result.getTotalElements());
       verify(jobOrderRepository)
@@ -201,7 +207,7 @@ class JobOrderServiceAssigneeAndListTest {
               allStatuses, null, true, null, Set.of(), pageable))
           .thenReturn(page);
 
-      service.getAllJobOrders(List.of(), pageable);
+      queryService.getAllJobOrders(List.of(), pageable);
 
       verify(jobOrderRepository)
           .findScopedJobOrders(allStatuses, null, true, null, Set.of(), pageable);
@@ -214,7 +220,7 @@ class JobOrderServiceAssigneeAndListTest {
               List.of(JobOrderStatus.OPEN), null, true, null, Set.of(), pageable))
           .thenReturn(page);
 
-      service.getAllJobOrders(List.of(JobOrderStatus.OPEN), pageable);
+      queryService.getAllJobOrders(List.of(JobOrderStatus.OPEN), pageable);
 
       verify(jobOrderRepository)
           .findScopedJobOrders(List.of(JobOrderStatus.OPEN), null, true, null, Set.of(), pageable);
@@ -228,7 +234,7 @@ class JobOrderServiceAssigneeAndListTest {
               List.of(JobOrderStatus.OPEN), squadronId, true, null, Set.of(), pageable))
           .thenReturn(page);
 
-      service.getAllJobOrders(List.of(JobOrderStatus.OPEN), squadronId, pageable);
+      queryService.getAllJobOrders(List.of(JobOrderStatus.OPEN), squadronId, pageable);
 
       verify(jobOrderRepository)
           .findScopedJobOrders(
@@ -243,7 +249,7 @@ class JobOrderServiceAssigneeAndListTest {
               allStatuses, squadronId, true, null, Set.of(), pageable))
           .thenReturn(page);
 
-      service.getAllJobOrders(List.of(), squadronId, pageable);
+      queryService.getAllJobOrders(List.of(), squadronId, pageable);
 
       verify(jobOrderRepository)
           .findScopedJobOrders(allStatuses, squadronId, true, null, Set.of(), pageable);
@@ -262,7 +268,7 @@ class JobOrderServiceAssigneeAndListTest {
       when(jobOrderRepository.findScopedJobOrders(allStatuses, null, false, null, union, pageable))
           .thenReturn(page);
 
-      service.getAllJobOrders(null, pageable);
+      queryService.getAllJobOrders(null, pageable);
 
       verify(jobOrderRepository)
           .findScopedJobOrders(allStatuses, null, false, null, union, pageable);
@@ -281,7 +287,7 @@ class JobOrderServiceAssigneeAndListTest {
               allStatuses, null, true, null, Set.of(), pageable))
           .thenReturn(page);
 
-      service.getAllJobOrders(null, pageable);
+      queryService.getAllJobOrders(null, pageable);
 
       verify(inventoryItemRepository, times(1)).findMaterialStockRowsByJobOrderIds(any());
       verify(inventoryItemRepository, never())
@@ -322,7 +328,7 @@ class JobOrderServiceAssigneeAndListTest {
                   new JobOrderMaterialStockRow(orderId, matFloor650, 900, 4.0), // above floor: in
                   new JobOrderMaterialStockRow(orderId, matFloor650, null, 99.0))); // null q: out
 
-      Page<JobOrderDto> result = service.getAllJobOrders(null, pageable);
+      Page<JobOrderDto> result = queryService.getAllJobOrders(null, pageable);
 
       Map<UUID, Double> stockByMaterial =
           result.getContent().get(0).materials().stream()
@@ -351,7 +357,7 @@ class JobOrderServiceAssigneeAndListTest {
       when(ownerScopeService.canViewJobOrders()).thenReturn(true);
       when(jobOrderRepository.findAllActiveWithMaterials()).thenReturn(List.of());
 
-      assertTrue(service.findAllActiveReference().isEmpty());
+      assertTrue(queryService.findAllActiveReference().isEmpty());
     }
 
     @Test
@@ -359,7 +365,7 @@ class JobOrderServiceAssigneeAndListTest {
       // M-2: the viewer-side profit gate short-circuits before the repository is even touched.
       when(ownerScopeService.canViewJobOrders()).thenReturn(false);
 
-      assertTrue(service.findAllActiveReference().isEmpty());
+      assertTrue(queryService.findAllActiveReference().isEmpty());
       verify(jobOrderRepository, never()).findAllActiveWithMaterials();
     }
 
@@ -372,7 +378,7 @@ class JobOrderServiceAssigneeAndListTest {
       when(ownerScopeService.canSeeJobOrder(any(JobOrder.class))).thenReturn(false);
       when(jobOrderRepository.findAllActiveWithMaterials()).thenReturn(List.of(o));
 
-      assertTrue(service.findAllActiveReference().isEmpty());
+      assertTrue(queryService.findAllActiveReference().isEmpty());
     }
 
     @Test
@@ -383,7 +389,7 @@ class JobOrderServiceAssigneeAndListTest {
       when(ownerScopeService.canSeeJobOrder(any(JobOrder.class))).thenReturn(true);
       when(jobOrderRepository.findAllActiveWithMaterials()).thenReturn(List.of(o));
 
-      List<JobOrderReferenceDto> result = service.findAllActiveReference();
+      List<JobOrderReferenceDto> result = queryService.findAllActiveReference();
 
       assertEquals(1, result.size());
       assertTrue(
@@ -406,7 +412,7 @@ class JobOrderServiceAssigneeAndListTest {
               new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto(
                   mat.getId(), null, 100, 1.0, 0.0, List.of(), null, 0L));
 
-      List<JobOrderReferenceDto> result = service.findAllActiveReference();
+      List<JobOrderReferenceDto> result = queryService.findAllActiveReference();
 
       assertEquals(1, result.size());
       assertEquals(1, result.get(0).materials().size());
@@ -425,7 +431,7 @@ class JobOrderServiceAssigneeAndListTest {
       JobOrder order = newJobOrder(JobOrderStatus.OPEN);
       when(jobOrderRepository.findById(JOB_ORDER_ID)).thenReturn(Optional.of(order));
 
-      JobOrderDto dto = service.getJobOrderById(JOB_ORDER_ID);
+      JobOrderDto dto = queryService.getJobOrderById(JOB_ORDER_ID);
 
       assertEquals(JOB_ORDER_ID, dto.id());
     }
@@ -435,7 +441,7 @@ class JobOrderServiceAssigneeAndListTest {
       when(jobOrderRepository.findById(JOB_ORDER_ID)).thenReturn(Optional.empty());
 
       NotFoundException ex =
-          assertThrows(NotFoundException.class, () -> service.getJobOrderById(JOB_ORDER_ID));
+          assertThrows(NotFoundException.class, () -> queryService.getJobOrderById(JOB_ORDER_ID));
       assertTrue(
           ex.getMessage().contains(JOB_ORDER_ID.toString()),
           "the missing id must be part of the message for diagnostics");

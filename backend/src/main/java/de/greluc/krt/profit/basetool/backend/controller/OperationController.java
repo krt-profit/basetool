@@ -127,13 +127,7 @@ public class OperationController {
         PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "createdAt");
     Page<OperationDto> dtoPage =
         operationService.getAllOperations(pageable).map(operationMapper::toDto);
-    return new PageResponse<>(
-        dtoPage.getContent(),
-        dtoPage.getNumber(),
-        dtoPage.getSize(),
-        dtoPage.getTotalElements(),
-        dtoPage.getTotalPages(),
-        PaginationUtil.toSortStrings(dtoPage.getSort()));
+    return PageResponse.of(dtoPage);
   }
 
   /**
@@ -188,13 +182,7 @@ public class OperationController {
         operationService
             .searchOperations(query, start, end, status, pageable)
             .map(operationMapper::toDto);
-    return new PageResponse<>(
-        dtoPage.getContent(),
-        dtoPage.getNumber(),
-        dtoPage.getSize(),
-        dtoPage.getTotalElements(),
-        dtoPage.getTotalPages(),
-        PaginationUtil.toSortStrings(dtoPage.getSort()));
+    return PageResponse.of(dtoPage);
   }
 
   /**
@@ -449,7 +437,7 @@ public class OperationController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
+  @PreAuthorize(Roles.HAS_ROLE_MISSION_MANAGER)
   @Operation(summary = "Create a new operation")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Operation created."),

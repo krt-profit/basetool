@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.SquadronForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.support.MapPayloadValues;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
@@ -212,15 +213,15 @@ public class AdminMissionDataPageController {
             .map(
                 m ->
                     new JobTypeDto(
-                        parseUuid(m.get("id")),
-                        parseString(m.get("name")),
-                        parseString(m.get("description")),
-                        parseString(m.get("archetype")),
-                        parseUuid(m.get("parentId")),
-                        parseBoolean(m.get("active")),
-                        parseBoolean(m.get("isLeadershipRole")),
-                        parseBoolean(m.get("isMissionLead")),
-                        parseLong(m.get("version"))))
+                        MapPayloadValues.uuidOrNull(m.get("id")),
+                        MapPayloadValues.stringOrNull(m.get("name")),
+                        MapPayloadValues.stringOrNull(m.get("description")),
+                        MapPayloadValues.stringOrNull(m.get("archetype")),
+                        MapPayloadValues.uuidOrNull(m.get("parentId")),
+                        MapPayloadValues.booleanOrFalse(m.get("active")),
+                        MapPayloadValues.booleanOrFalse(m.get("isLeadershipRole")),
+                        MapPayloadValues.booleanOrFalse(m.get("isMissionLead")),
+                        MapPayloadValues.longOrZero(m.get("version"))))
             .collect(Collectors.toCollection(ArrayList::new));
     jobTypes.sort(
         Comparator.comparing(j -> j.name() == null ? "" : j.name(), String.CASE_INSENSITIVE_ORDER));
@@ -246,14 +247,14 @@ public class AdminMissionDataPageController {
             .map(
                 m ->
                     new SquadronDto(
-                        parseUuid(m.get("id")),
-                        parseString(m.get("name")),
-                        parseString(m.get("shorthand")),
-                        parseString(m.get("description")),
-                        parseBoolean(m.get("active")),
-                        parseBoolean(m.get("isPromotionEnabled")),
-                        parseBoolean(m.get("isProfitEligible")),
-                        parseLong(m.get("version"))))
+                        MapPayloadValues.uuidOrNull(m.get("id")),
+                        MapPayloadValues.stringOrNull(m.get("name")),
+                        MapPayloadValues.stringOrNull(m.get("shorthand")),
+                        MapPayloadValues.stringOrNull(m.get("description")),
+                        MapPayloadValues.booleanOrFalse(m.get("active")),
+                        MapPayloadValues.booleanOrFalse(m.get("isPromotionEnabled")),
+                        MapPayloadValues.booleanOrFalse(m.get("isProfitEligible")),
+                        MapPayloadValues.longOrZero(m.get("version"))))
             .collect(Collectors.toCollection(ArrayList::new));
     squadrons.sort(
         Comparator.comparing(s -> s.name() == null ? "" : s.name(), String.CASE_INSENSITIVE_ORDER));
@@ -1033,45 +1034,6 @@ public class AdminMissionDataPageController {
     } catch (Exception e) {
       log.error("Mission-data write (ajax) failed", e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
-  }
-
-  private static String parseString(Object o) {
-    return o == null ? null : String.valueOf(o);
-  }
-
-  private static UUID parseUuid(Object o) {
-    if (o == null) {
-      return null;
-    }
-    try {
-      return UUID.fromString(String.valueOf(o));
-    } catch (Exception ignored) {
-      return null;
-    }
-  }
-
-  private static boolean parseBoolean(Object o) {
-    if (o == null) {
-      return false;
-    }
-    if (o instanceof Boolean b) {
-      return b;
-    }
-    return Boolean.parseBoolean(String.valueOf(o));
-  }
-
-  private static Long parseLong(Object o) {
-    if (o == null) {
-      return 0L;
-    }
-    if (o instanceof Number n) {
-      return n.longValue();
-    }
-    try {
-      return Long.parseLong(String.valueOf(o));
-    } catch (Exception ignored) {
-      return 0L;
     }
   }
 }

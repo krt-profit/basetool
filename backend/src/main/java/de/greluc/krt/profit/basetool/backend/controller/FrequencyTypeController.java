@@ -74,15 +74,7 @@ public class FrequencyTypeController {
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("name", "id", "active", "sortIndex"), "sortIndex");
     Page<FrequencyType> p = frequencyTypeService.getAllFrequencyTypes(active, pageable);
-    List<FrequencyTypeDto> content =
-        p.getContent().stream().map(frequencyTypeMapper::toDto).toList();
-    return new PageResponse<>(
-        content,
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p.map(frequencyTypeMapper::toDto));
   }
 
   /**
@@ -103,7 +95,7 @@ public class FrequencyTypeController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public FrequencyTypeDto createFrequencyType(
       @RequestBody @NotNull FrequencyTypeDto frequencyType) {
     var toCreate = frequencyTypeMapper.toEntity(frequencyType);
@@ -123,7 +115,7 @@ public class FrequencyTypeController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public FrequencyTypeDto updateFrequencyType(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull FrequencyTypeDto frequencyType) {
     return frequencyTypeMapper.toDto(
@@ -136,7 +128,7 @@ public class FrequencyTypeController {
    * @param id frequency type id
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public void deleteFrequencyType(@PathVariable @NotNull UUID id) {
     frequencyTypeService.deleteFrequencyType(id);
   }
@@ -147,7 +139,7 @@ public class FrequencyTypeController {
    * @param id frequency type id
    */
   @PostMapping("/{id}/activate")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public void activateFrequencyType(@PathVariable @NotNull UUID id) {
     frequencyTypeService.activateFrequencyType(id);
   }
@@ -159,7 +151,7 @@ public class FrequencyTypeController {
    * @param ids ids in the desired new order
    */
   @PostMapping("/reorder")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public void reorderFrequencyTypes(@RequestBody @NotNull List<UUID> ids) {
     frequencyTypeService.reorderFrequencyTypes(ids);
   }

@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.service.JobOrderItemBlueprintOwners
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemHandoverReportService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemHandoverService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
+import de.greluc.krt.profit.basetool.backend.service.JobOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
@@ -106,6 +107,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Orders", description = "Operations related to job orders")
 public class JobOrderController {
   private final JobOrderService jobOrderService;
+  private final JobOrderQueryService jobOrderQueryService;
   private final OwnerScopeService ownerScopeService;
   private final JobOrderItemService jobOrderItemService;
   private final JobOrderItemBlueprintOwnersService jobOrderItemBlueprintOwnersService;
@@ -383,13 +385,7 @@ public class JobOrderController {
       @RequestParam(required = false, defaultValue = "name,asc") String sort) {
     Pageable pageable = PaginationUtil.createPageRequest(page, size, sort, Set.of("name"), "name");
     Page<GameItemReferenceDto> p = jobOrderItemService.findOrderableItems(search, pageable);
-    return new PageResponse<>(
-        p.getContent(),
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p);
   }
 
   /**
@@ -573,14 +569,8 @@ public class JobOrderController {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("priority", "createdAt"), "priority");
-    Page<JobOrderDto> p = jobOrderService.getAllJobOrders(status, squadronId, pageable);
-    return new PageResponse<>(
-        p.getContent(),
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    Page<JobOrderDto> p = jobOrderQueryService.getAllJobOrders(status, squadronId, pageable);
+    return PageResponse.of(p);
   }
 
   /**
@@ -612,16 +602,8 @@ public class JobOrderController {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("priority", "createdAt"), "priority");
-    Page<JobOrderDto> p = jobOrderService.getRequestedJobOrders(status, pageable);
-    List<JobOrderDto> redacted =
-        p.getContent().stream().map(this::cleanupJobOrderForRequester).toList();
-    return new PageResponse<>(
-        redacted,
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    Page<JobOrderDto> p = jobOrderQueryService.getRequestedJobOrders(status, pageable);
+    return PageResponse.of(p.map(this::cleanupJobOrderForRequester));
   }
 
   /**
@@ -638,7 +620,7 @@ public class JobOrderController {
   @Transactional(readOnly = true)
   public List<de.greluc.krt.profit.basetool.backend.model.dto.JobOrderReferenceDto>
       lookupJobOrders() {
-    return jobOrderService.findAllActiveReference();
+    return jobOrderQueryService.findAllActiveReference();
   }
 
   /**
@@ -657,7 +639,7 @@ public class JobOrderController {
           + " @ownerScopeService.canSeeJobOrderAsRequester(#id))")
   @Transactional(readOnly = true)
   public JobOrderDto getJobOrderById(@PathVariable UUID id) {
-    JobOrderDto dto = jobOrderService.getJobOrderById(id);
+    JobOrderDto dto = jobOrderQueryService.getJobOrderById(id);
     // The service already stamped the per-order redaction decision (computed from the loaded
     // entity,
     // so no second canSeeJobOrder load here — review finding 4). A requester-only viewer's DTO
@@ -713,7 +695,7 @@ public class JobOrderController {
   @Transactional(readOnly = true)
   public List<de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto>
       getInventoryItemsForJobOrderMaterial(@PathVariable UUID id, @PathVariable UUID matId) {
-    return jobOrderService.getInventoryItemsForJobOrderMaterial(id, matId);
+    return jobOrderQueryService.getInventoryItemsForJobOrderMaterial(id, matId);
   }
 
   /**
@@ -734,7 +716,7 @@ public class JobOrderController {
   @Transactional(readOnly = true)
   public List<de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto>
       getOrphanedLinkedInventory(@PathVariable UUID id) {
-    return jobOrderService.getOrphanedLinkedInventory(id);
+    return jobOrderQueryService.getOrphanedLinkedInventory(id);
   }
 
   /**
@@ -1011,7 +993,7 @@ public class JobOrderController {
   @Operation(
       summary = "Delete a job order",
       description = "Deletes a job order and shifts priorities.")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public void deleteJobOrder(@PathVariable UUID id) {
     jobOrderService.deleteJobOrder(id);
   }

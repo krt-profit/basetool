@@ -66,6 +66,12 @@ class MissionFinanceEntryControllerTest {
 
   @Mock private MissionFinanceEntryService service;
 
+  // Real redactor (not a mock) so the participant-PII assertions exercise the actual
+  // MissionGuestRedactor logic; @Spy makes @InjectMocks wire it into the controller.
+  @org.mockito.Spy
+  private de.greluc.krt.profit.basetool.backend.support.MissionGuestRedactor missionGuestRedactor =
+      new de.greluc.krt.profit.basetool.backend.support.MissionGuestRedactor();
+
   @InjectMocks private MissionFinanceEntryController controller;
 
   private static MissionFinanceEntryDto entry(UUID missionId, FinanceType type, BigDecimal amount) {

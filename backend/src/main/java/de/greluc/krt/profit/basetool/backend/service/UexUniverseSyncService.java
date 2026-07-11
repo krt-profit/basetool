@@ -52,6 +52,7 @@ import de.greluc.krt.profit.basetool.backend.repository.PlanetRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PoiRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SpaceStationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.TerminalRepository;
+import de.greluc.krt.profit.basetool.backend.support.UexValues;
 import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -133,30 +134,29 @@ public class UexUniverseSyncService {
       entity.setName(dto.name());
       entity.setCode(dto.code());
       entity.setIsAvailableLive(dto.checkIsAvailableLive());
-      entity.setIsAvailable(dto.isAvailable() != null && dto.isAvailable() == 1);
-      entity.setIsVisible(dto.isVisible() != null && dto.isVisible() == 1);
-      entity.setIsDefault(dto.isDefault() != null && dto.isDefault() == 1);
-      entity.setIsMonitored(dto.isMonitored() != null && dto.isMonitored() == 1);
-      entity.setIsArmistice(dto.isArmistice() != null && dto.isArmistice() == 1);
-      entity.setIsLandable(dto.isLandable() != null && dto.isLandable() == 1);
-      entity.setIsDecommissioned(dto.isDecommissioned() != null && dto.isDecommissioned() == 1);
-      entity.setHasQuantumMarker(dto.hasQuantumMarker() != null && dto.hasQuantumMarker() == 1);
-      entity.setHasTradeTerminal(dto.hasTradeTerminal() != null && dto.hasTradeTerminal() == 1);
-      entity.setHasHabitation(dto.hasHabitation() != null && dto.hasHabitation() == 1);
-      entity.setHasRefinery(dto.hasRefinery() != null && dto.hasRefinery() == 1);
-      entity.setHasCargoCenter(dto.hasCargoCenter() != null && dto.hasCargoCenter() == 1);
-      entity.setHasClinic(dto.hasClinic() != null && dto.hasClinic() == 1);
-      entity.setHasFood(dto.hasFood() != null && dto.hasFood() == 1);
-      entity.setHasShops(dto.hasShops() != null && dto.hasShops() == 1);
-      entity.setHasRefuel(dto.hasRefuel() != null && dto.hasRefuel() == 1);
-      entity.setHasRepair(dto.hasRepair() != null && dto.hasRepair() == 1);
-      entity.setHasGravity(dto.hasGravity() != null && dto.hasGravity() == 1);
+      entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
+      entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
+      entity.setIsDefault(UexValues.asBooleanOrFalse(dto.isDefault()));
+      entity.setIsMonitored(UexValues.asBooleanOrFalse(dto.isMonitored()));
+      entity.setIsArmistice(UexValues.asBooleanOrFalse(dto.isArmistice()));
+      entity.setIsLandable(UexValues.asBooleanOrFalse(dto.isLandable()));
+      entity.setIsDecommissioned(UexValues.asBooleanOrFalse(dto.isDecommissioned()));
+      entity.setHasQuantumMarker(UexValues.asBooleanOrFalse(dto.hasQuantumMarker()));
+      entity.setHasTradeTerminal(UexValues.asBooleanOrFalse(dto.hasTradeTerminal()));
+      entity.setHasHabitation(UexValues.asBooleanOrFalse(dto.hasHabitation()));
+      entity.setHasRefinery(UexValues.asBooleanOrFalse(dto.hasRefinery()));
+      entity.setHasCargoCenter(UexValues.asBooleanOrFalse(dto.hasCargoCenter()));
+      entity.setHasClinic(UexValues.asBooleanOrFalse(dto.hasClinic()));
+      entity.setHasFood(UexValues.asBooleanOrFalse(dto.hasFood()));
+      entity.setHasShops(UexValues.asBooleanOrFalse(dto.hasShops()));
+      entity.setHasRefuel(UexValues.asBooleanOrFalse(dto.hasRefuel()));
+      entity.setHasRepair(UexValues.asBooleanOrFalse(dto.hasRepair()));
+      entity.setHasGravity(UexValues.asBooleanOrFalse(dto.hasGravity()));
       if (!Boolean.TRUE.equals(entity.getHasLoadingDockOverridden())) {
-        entity.setHasLoadingDock(dto.hasLoadingDock() != null && dto.hasLoadingDock() == 1);
+        entity.setHasLoadingDock(UexValues.asBooleanOrFalse(dto.hasLoadingDock()));
       }
-      entity.setHasDockingPort(dto.hasDockingPort() != null && dto.hasDockingPort() == 1);
-      entity.setHasFreightElevator(
-          dto.hasFreightElevator() != null && dto.hasFreightElevator() == 1);
+      entity.setHasDockingPort(UexValues.asBooleanOrFalse(dto.hasDockingPort()));
+      entity.setHasFreightElevator(UexValues.asBooleanOrFalse(dto.hasFreightElevator()));
       entity.setPadTypes(dto.padTypes());
       entity.setStarSystemName(dto.starSystemName());
       entity.setPlanetName(dto.planetName());
@@ -322,9 +322,9 @@ public class UexUniverseSyncService {
       entity.setName(dto.name());
       entity.setCode(dto.code());
       entity.setIsAvailableLive(dto.checkIsAvailableLive());
-      entity.setIsAvailable(dto.isAvailable() != null && dto.isAvailable() == 1);
-      entity.setIsVisible(dto.isVisible() != null && dto.isVisible() == 1);
-      entity.setIsDefault(dto.isDefault() != null && dto.isDefault() == 1);
+      entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
+      entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
+      entity.setIsDefault(UexValues.asBooleanOrFalse(dto.isDefault()));
       entity.setStarSystemName(dto.starSystemName());
       entity.setPlanetName(dto.planetName());
       entity.setOrbitName(dto.orbitName());
@@ -417,30 +417,29 @@ public class UexUniverseSyncService {
       entity.setName(dto.name());
       entity.setCode(dto.code());
       entity.setIsAvailableLive(dto.checkIsAvailableLive());
-      entity.setIsAvailable(dto.isAvailable() != null && dto.isAvailable() == 1);
-      entity.setIsVisible(dto.isVisible() != null && dto.isVisible() == 1);
-      entity.setIsDefault(dto.isDefault() != null && dto.isDefault() == 1);
-      entity.setIsMonitored(dto.isMonitored() != null && dto.isMonitored() == 1);
-      entity.setIsArmistice(dto.isArmistice() != null && dto.isArmistice() == 1);
-      entity.setIsLandable(dto.isLandable() != null && dto.isLandable() == 1);
-      entity.setIsDecommissioned(dto.isDecommissioned() != null && dto.isDecommissioned() == 1);
-      entity.setHasQuantumMarker(dto.hasQuantumMarker() != null && dto.hasQuantumMarker() == 1);
-      entity.setHasTradeTerminal(dto.hasTradeTerminal() != null && dto.hasTradeTerminal() == 1);
-      entity.setHasHabitation(dto.hasHabitation() != null && dto.hasHabitation() == 1);
-      entity.setHasRefinery(dto.hasRefinery() != null && dto.hasRefinery() == 1);
-      entity.setHasCargoCenter(dto.hasCargoCenter() != null && dto.hasCargoCenter() == 1);
-      entity.setHasClinic(dto.hasClinic() != null && dto.hasClinic() == 1);
-      entity.setHasFood(dto.hasFood() != null && dto.hasFood() == 1);
-      entity.setHasShops(dto.hasShops() != null && dto.hasShops() == 1);
-      entity.setHasRefuel(dto.hasRefuel() != null && dto.hasRefuel() == 1);
-      entity.setHasRepair(dto.hasRepair() != null && dto.hasRepair() == 1);
-      entity.setHasGravity(dto.hasGravity() != null && dto.hasGravity() == 1);
+      entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
+      entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
+      entity.setIsDefault(UexValues.asBooleanOrFalse(dto.isDefault()));
+      entity.setIsMonitored(UexValues.asBooleanOrFalse(dto.isMonitored()));
+      entity.setIsArmistice(UexValues.asBooleanOrFalse(dto.isArmistice()));
+      entity.setIsLandable(UexValues.asBooleanOrFalse(dto.isLandable()));
+      entity.setIsDecommissioned(UexValues.asBooleanOrFalse(dto.isDecommissioned()));
+      entity.setHasQuantumMarker(UexValues.asBooleanOrFalse(dto.hasQuantumMarker()));
+      entity.setHasTradeTerminal(UexValues.asBooleanOrFalse(dto.hasTradeTerminal()));
+      entity.setHasHabitation(UexValues.asBooleanOrFalse(dto.hasHabitation()));
+      entity.setHasRefinery(UexValues.asBooleanOrFalse(dto.hasRefinery()));
+      entity.setHasCargoCenter(UexValues.asBooleanOrFalse(dto.hasCargoCenter()));
+      entity.setHasClinic(UexValues.asBooleanOrFalse(dto.hasClinic()));
+      entity.setHasFood(UexValues.asBooleanOrFalse(dto.hasFood()));
+      entity.setHasShops(UexValues.asBooleanOrFalse(dto.hasShops()));
+      entity.setHasRefuel(UexValues.asBooleanOrFalse(dto.hasRefuel()));
+      entity.setHasRepair(UexValues.asBooleanOrFalse(dto.hasRepair()));
+      entity.setHasGravity(UexValues.asBooleanOrFalse(dto.hasGravity()));
       if (!Boolean.TRUE.equals(entity.getHasLoadingDockOverridden())) {
-        entity.setHasLoadingDock(dto.hasLoadingDock() != null && dto.hasLoadingDock() == 1);
+        entity.setHasLoadingDock(UexValues.asBooleanOrFalse(dto.hasLoadingDock()));
       }
-      entity.setHasDockingPort(dto.hasDockingPort() != null && dto.hasDockingPort() == 1);
-      entity.setHasFreightElevator(
-          dto.hasFreightElevator() != null && dto.hasFreightElevator() == 1);
+      entity.setHasDockingPort(UexValues.asBooleanOrFalse(dto.hasDockingPort()));
+      entity.setHasFreightElevator(UexValues.asBooleanOrFalse(dto.hasFreightElevator()));
       entity.setPadTypes(dto.padTypes());
       entity.setNickname(dto.nickname());
       entity.setStarSystemName(dto.starSystemName());
@@ -492,9 +491,9 @@ public class UexUniverseSyncService {
       entity.setName(dto.name());
       entity.setCode(dto.code());
       entity.setIsAvailableLive(dto.checkIsAvailableLive());
-      entity.setIsAvailable(dto.isAvailable() != null && dto.isAvailable() == 1);
-      entity.setIsVisible(dto.isVisible() != null && dto.isVisible() == 1);
-      entity.setIsDefault(dto.isDefault() != null && dto.isDefault() == 1);
+      entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
+      entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
+      entity.setIsDefault(UexValues.asBooleanOrFalse(dto.isDefault()));
       entity.setStarSystemName(dto.starSystemName());
       entity.setFactionName(dto.factionName());
       entity.setJurisdictionName(dto.jurisdictionName());
@@ -541,30 +540,29 @@ public class UexUniverseSyncService {
       entity.setName(dto.name());
       entity.setCode(dto.code());
       entity.setIsAvailableLive(dto.checkIsAvailableLive());
-      entity.setIsAvailable(dto.isAvailable() != null && dto.isAvailable() == 1);
-      entity.setIsVisible(dto.isVisible() != null && dto.isVisible() == 1);
-      entity.setIsDefault(dto.isDefault() != null && dto.isDefault() == 1);
-      entity.setIsMonitored(dto.isMonitored() != null && dto.isMonitored() == 1);
-      entity.setIsArmistice(dto.isArmistice() != null && dto.isArmistice() == 1);
-      entity.setIsLandable(dto.isLandable() != null && dto.isLandable() == 1);
-      entity.setIsDecommissioned(dto.isDecommissioned() != null && dto.isDecommissioned() == 1);
-      entity.setHasQuantumMarker(dto.hasQuantumMarker() != null && dto.hasQuantumMarker() == 1);
-      entity.setHasTradeTerminal(dto.hasTradeTerminal() != null && dto.hasTradeTerminal() == 1);
-      entity.setHasHabitation(dto.hasHabitation() != null && dto.hasHabitation() == 1);
-      entity.setHasRefinery(dto.hasRefinery() != null && dto.hasRefinery() == 1);
-      entity.setHasCargoCenter(dto.hasCargoCenter() != null && dto.hasCargoCenter() == 1);
-      entity.setHasClinic(dto.hasClinic() != null && dto.hasClinic() == 1);
-      entity.setHasFood(dto.hasFood() != null && dto.hasFood() == 1);
-      entity.setHasShops(dto.hasShops() != null && dto.hasShops() == 1);
-      entity.setHasRefuel(dto.hasRefuel() != null && dto.hasRefuel() == 1);
-      entity.setHasRepair(dto.hasRepair() != null && dto.hasRepair() == 1);
-      entity.setHasGravity(dto.hasGravity() != null && dto.hasGravity() == 1);
+      entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
+      entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
+      entity.setIsDefault(UexValues.asBooleanOrFalse(dto.isDefault()));
+      entity.setIsMonitored(UexValues.asBooleanOrFalse(dto.isMonitored()));
+      entity.setIsArmistice(UexValues.asBooleanOrFalse(dto.isArmistice()));
+      entity.setIsLandable(UexValues.asBooleanOrFalse(dto.isLandable()));
+      entity.setIsDecommissioned(UexValues.asBooleanOrFalse(dto.isDecommissioned()));
+      entity.setHasQuantumMarker(UexValues.asBooleanOrFalse(dto.hasQuantumMarker()));
+      entity.setHasTradeTerminal(UexValues.asBooleanOrFalse(dto.hasTradeTerminal()));
+      entity.setHasHabitation(UexValues.asBooleanOrFalse(dto.hasHabitation()));
+      entity.setHasRefinery(UexValues.asBooleanOrFalse(dto.hasRefinery()));
+      entity.setHasCargoCenter(UexValues.asBooleanOrFalse(dto.hasCargoCenter()));
+      entity.setHasClinic(UexValues.asBooleanOrFalse(dto.hasClinic()));
+      entity.setHasFood(UexValues.asBooleanOrFalse(dto.hasFood()));
+      entity.setHasShops(UexValues.asBooleanOrFalse(dto.hasShops()));
+      entity.setHasRefuel(UexValues.asBooleanOrFalse(dto.hasRefuel()));
+      entity.setHasRepair(UexValues.asBooleanOrFalse(dto.hasRepair()));
+      entity.setHasGravity(UexValues.asBooleanOrFalse(dto.hasGravity()));
       if (!Boolean.TRUE.equals(entity.getHasLoadingDockOverridden())) {
-        entity.setHasLoadingDock(dto.hasLoadingDock() != null && dto.hasLoadingDock() == 1);
+        entity.setHasLoadingDock(UexValues.asBooleanOrFalse(dto.hasLoadingDock()));
       }
-      entity.setHasDockingPort(dto.hasDockingPort() != null && dto.hasDockingPort() == 1);
-      entity.setHasFreightElevator(
-          dto.hasFreightElevator() != null && dto.hasFreightElevator() == 1);
+      entity.setHasDockingPort(UexValues.asBooleanOrFalse(dto.hasDockingPort()));
+      entity.setHasFreightElevator(UexValues.asBooleanOrFalse(dto.hasFreightElevator()));
       entity.setPadTypes(dto.padTypes());
       entity.setNickname(dto.nickname());
       entity.setStarSystemName(dto.starSystemName());
@@ -619,32 +617,31 @@ public class UexUniverseSyncService {
       entity.setName(dto.name());
       entity.setCode(dto.code());
       entity.setIsAvailableLive(dto.checkIsAvailableLive());
-      entity.setIsAvailable(dto.isAvailable() != null && dto.isAvailable() == 1);
-      entity.setIsVisible(dto.isVisible() != null && dto.isVisible() == 1);
-      entity.setIsDefault(dto.isDefault() != null && dto.isDefault() == 1);
-      entity.setIsMonitored(dto.isMonitored() != null && dto.isMonitored() == 1);
-      entity.setIsArmistice(dto.isArmistice() != null && dto.isArmistice() == 1);
-      entity.setIsLandable(dto.isLandable() != null && dto.isLandable() == 1);
-      entity.setIsDecommissioned(dto.isDecommissioned() != null && dto.isDecommissioned() == 1);
-      entity.setIsLagrange(dto.isLagrange() != null && dto.isLagrange() == 1);
-      entity.setIsJumpPoint(dto.isJumpPoint() != null && dto.isJumpPoint() == 1);
-      entity.setHasQuantumMarker(dto.hasQuantumMarker() != null && dto.hasQuantumMarker() == 1);
-      entity.setHasTradeTerminal(dto.hasTradeTerminal() != null && dto.hasTradeTerminal() == 1);
-      entity.setHasHabitation(dto.hasHabitation() != null && dto.hasHabitation() == 1);
-      entity.setHasRefinery(dto.hasRefinery() != null && dto.hasRefinery() == 1);
-      entity.setHasCargoCenter(dto.hasCargoCenter() != null && dto.hasCargoCenter() == 1);
-      entity.setHasClinic(dto.hasClinic() != null && dto.hasClinic() == 1);
-      entity.setHasFood(dto.hasFood() != null && dto.hasFood() == 1);
-      entity.setHasShops(dto.hasShops() != null && dto.hasShops() == 1);
-      entity.setHasRefuel(dto.hasRefuel() != null && dto.hasRefuel() == 1);
-      entity.setHasRepair(dto.hasRepair() != null && dto.hasRepair() == 1);
-      entity.setHasGravity(dto.hasGravity() != null && dto.hasGravity() == 1);
+      entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
+      entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
+      entity.setIsDefault(UexValues.asBooleanOrFalse(dto.isDefault()));
+      entity.setIsMonitored(UexValues.asBooleanOrFalse(dto.isMonitored()));
+      entity.setIsArmistice(UexValues.asBooleanOrFalse(dto.isArmistice()));
+      entity.setIsLandable(UexValues.asBooleanOrFalse(dto.isLandable()));
+      entity.setIsDecommissioned(UexValues.asBooleanOrFalse(dto.isDecommissioned()));
+      entity.setIsLagrange(UexValues.asBooleanOrFalse(dto.isLagrange()));
+      entity.setIsJumpPoint(UexValues.asBooleanOrFalse(dto.isJumpPoint()));
+      entity.setHasQuantumMarker(UexValues.asBooleanOrFalse(dto.hasQuantumMarker()));
+      entity.setHasTradeTerminal(UexValues.asBooleanOrFalse(dto.hasTradeTerminal()));
+      entity.setHasHabitation(UexValues.asBooleanOrFalse(dto.hasHabitation()));
+      entity.setHasRefinery(UexValues.asBooleanOrFalse(dto.hasRefinery()));
+      entity.setHasCargoCenter(UexValues.asBooleanOrFalse(dto.hasCargoCenter()));
+      entity.setHasClinic(UexValues.asBooleanOrFalse(dto.hasClinic()));
+      entity.setHasFood(UexValues.asBooleanOrFalse(dto.hasFood()));
+      entity.setHasShops(UexValues.asBooleanOrFalse(dto.hasShops()));
+      entity.setHasRefuel(UexValues.asBooleanOrFalse(dto.hasRefuel()));
+      entity.setHasRepair(UexValues.asBooleanOrFalse(dto.hasRepair()));
+      entity.setHasGravity(UexValues.asBooleanOrFalse(dto.hasGravity()));
       if (!Boolean.TRUE.equals(entity.getHasLoadingDockOverridden())) {
-        entity.setHasLoadingDock(dto.hasLoadingDock() != null && dto.hasLoadingDock() == 1);
+        entity.setHasLoadingDock(UexValues.asBooleanOrFalse(dto.hasLoadingDock()));
       }
-      entity.setHasDockingPort(dto.hasDockingPort() != null && dto.hasDockingPort() == 1);
-      entity.setHasFreightElevator(
-          dto.hasFreightElevator() != null && dto.hasFreightElevator() == 1);
+      entity.setHasDockingPort(UexValues.asBooleanOrFalse(dto.hasDockingPort()));
+      entity.setHasFreightElevator(UexValues.asBooleanOrFalse(dto.hasFreightElevator()));
       entity.setPadTypes(dto.padTypes());
       entity.setNickname(dto.nickname());
       entity.setStarSystemName(dto.starSystemName());
@@ -724,9 +721,9 @@ public class UexUniverseSyncService {
       entity.setName(dto.name());
       entity.setCode(dto.code());
       entity.setIsAvailableLive(dto.checkIsAvailableLive());
-      entity.setIsAvailable(dto.isAvailable() != null && dto.isAvailable() == 1);
-      entity.setIsVisible(dto.isVisible() != null && dto.isVisible() == 1);
-      entity.setIsJumpPoint(dto.isJumpPoint() != null && dto.isJumpPoint() == 1);
+      entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
+      entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
+      entity.setIsJumpPoint(UexValues.asBooleanOrFalse(dto.isJumpPoint()));
       // The raw UEX state is recorded on every sweep, regardless of the override flags,
       // so the admin UI can show what UEX currently claims even while a pin is active.
       Boolean uexLoadingDock = dto.hasLoadingDock() == null ? null : dto.hasLoadingDock() == 1;
@@ -737,9 +734,8 @@ public class UexUniverseSyncService {
       if (!Boolean.TRUE.equals(entity.getHasLoadingDockOverridden())) {
         entity.setHasLoadingDock(Boolean.TRUE.equals(uexLoadingDock));
       }
-      entity.setHasDockingPort(dto.hasDockingPort() != null && dto.hasDockingPort() == 1);
-      entity.setHasFreightElevator(
-          dto.hasFreightElevator() != null && dto.hasFreightElevator() == 1);
+      entity.setHasDockingPort(UexValues.asBooleanOrFalse(dto.hasDockingPort()));
+      entity.setHasFreightElevator(UexValues.asBooleanOrFalse(dto.hasFreightElevator()));
       if (!Boolean.TRUE.equals(entity.getIsAutoLoadOverridden())) {
         entity.setIsAutoLoad(Boolean.TRUE.equals(uexAutoLoad));
       }

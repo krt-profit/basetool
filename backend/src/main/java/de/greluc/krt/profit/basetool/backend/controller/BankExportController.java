@@ -58,7 +58,7 @@ public class BankExportController {
    */
   @Operation(summary = "Download the management three-month report PDF")
   @GetMapping("/three-month-report")
-  @PreAuthorize("hasRole('" + Roles.BANK_MANAGEMENT + "')")
+  @PreAuthorize(Roles.HAS_ROLE_BANK_MANAGEMENT)
   @Parameter(
       name = "X-User-Time-Zone",
       in = ParameterIn.HEADER,

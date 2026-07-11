@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerUexCompanyRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
+import de.greluc.krt.profit.basetool.backend.support.UexValues;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -176,7 +177,7 @@ public class UexItemSyncService {
             // permanent steady state for a base item + its skins (REQ-DATA-005). Tally these so
             // the run summary reports one aggregate count instead of a per-row WARN on every sync
             // (issue #1205).
-            if (item.getExternalUuid() == null && parseUuid(dto.uuid()) != null) {
+            if (item.getExternalUuid() == null && UexValues.parseUuid(dto.uuid()) != null) {
               sharedUuidDeclined++;
             }
           }
@@ -263,7 +264,7 @@ public class UexItemSyncService {
       item.setSourceSystems(GameItemSourceSystem.UEX_ONLY);
     }
 
-    UUID externalUuid = parseUuid(dto.uuid());
+    UUID externalUuid = UexValues.parseUuid(dto.uuid());
     if (item.getExternalUuid() == null && externalUuid != null) {
       // R2 first write for a row UEX exposes with a UUID (R3 slug-fallback may later backfill rows
       // where UEX returned an empty uuid — the ~30% case). Claim the uuid only if no other row
@@ -322,11 +323,11 @@ public class UexItemSyncService {
     item.setUexQuality(dto.quality());
     item.setUexUrlStore(dto.urlStore());
     item.setUexScreenshot(dto.screenshot());
-    item.setIsExclusivePledge(asBoolean(dto.isExclusivePledge()));
-    item.setIsExclusiveSubscriber(asBoolean(dto.isExclusiveSubscriber()));
-    item.setIsExclusiveConcierge(asBoolean(dto.isExclusiveConcierge()));
-    item.setUexIsCommodity(asBoolean(dto.isCommodity()));
-    item.setUexIsHarvestable(asBoolean(dto.isHarvestable()));
+    item.setIsExclusivePledge(UexValues.asBooleanOrNull(dto.isExclusivePledge()));
+    item.setIsExclusiveSubscriber(UexValues.asBooleanOrNull(dto.isExclusiveSubscriber()));
+    item.setIsExclusiveConcierge(UexValues.asBooleanOrNull(dto.isExclusiveConcierge()));
+    item.setUexIsCommodity(UexValues.asBooleanOrNull(dto.isCommodity()));
+    item.setUexIsHarvestable(UexValues.asBooleanOrNull(dto.isHarvestable()));
     item.setUexNotification(dto.notification());
     item.setUexSyncedAt(now);
     item.setUexDeletedAt(null);
@@ -355,7 +356,7 @@ public class UexItemSyncService {
         return byUex.orElseThrow();
       }
     }
-    UUID externalUuid = parseUuid(dto.uuid());
+    UUID externalUuid = UexValues.parseUuid(dto.uuid());
     if (externalUuid != null) {
       Optional<GameItem> byUuid = gameItemRepository.findByExternalUuid(externalUuid);
       if (byUuid.isPresent()) {
@@ -428,37 +429,5 @@ public class UexItemSyncService {
           GameItemKind.VEHICLE_ITEM;
       default -> GameItemKind.GENERIC;
     };
-  }
-
-  /**
-   * Parses a UEX-emitted UUID string. UEX returns an empty string for ~30% of rows (Avionics,
-   * Decorations, Liveries, Armor); this method returns {@code null} for those instead of throwing.
-   *
-   * @param raw raw UUID string from the DTO
-   * @return parsed UUID, or {@code null} for empty / blank / malformed input
-   */
-  private static UUID parseUuid(String raw) {
-    if (!StringUtils.hasText(raw)) {
-      return null;
-    }
-    try {
-      return UUID.fromString(raw.trim());
-    } catch (IllegalArgumentException e) {
-      log.debug("Skipping malformed UEX uuid '{}': {}", raw, e.getMessage());
-      return null;
-    }
-  }
-
-  /**
-   * Normalises UEX's integer 0/1 flag into a {@link Boolean}.
-   *
-   * @param flag UEX-style 0/1 integer
-   * @return {@code true} iff {@code flag} equals 1; {@code null} when input is {@code null}
-   */
-  private static Boolean asBoolean(Integer flag) {
-    if (flag == null) {
-      return null;
-    }
-    return flag == 1;
   }
 }

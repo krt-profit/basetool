@@ -394,7 +394,7 @@ class HangarImportServiceTest {
     // Then
     ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
     verify(shipRepository).save(captor.capture());
-    assertThat(captor.getValue().getInsurance()).isEqualTo(HangarImportService.DEFAULT_INSURANCE);
+    assertThat(captor.getValue().getInsurance()).isEqualTo(FleetExportParser.DEFAULT_INSURANCE);
   }
 
   // -------------------------------------------------------------------------
@@ -1082,7 +1082,7 @@ class HangarImportServiceTest {
     // Then
     ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
     verify(shipRepository).save(captor.capture());
-    assertThat(captor.getValue().getInsurance()).isEqualTo(HangarImportService.LTI_INSURANCE);
+    assertThat(captor.getValue().getInsurance()).isEqualTo(FleetExportParser.LTI_INSURANCE);
   }
 
   // -------------------------------------------------------------------------
@@ -1124,7 +1124,7 @@ class HangarImportServiceTest {
     // Then
     ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
     verify(shipRepository).save(captor.capture());
-    assertThat(captor.getValue().getInsurance()).isEqualTo(HangarImportService.DEFAULT_INSURANCE);
+    assertThat(captor.getValue().getInsurance()).isEqualTo(FleetExportParser.DEFAULT_INSURANCE);
   }
 
   // -------------------------------------------------------------------------
@@ -1746,7 +1746,7 @@ class HangarImportServiceTest {
     ArgumentCaptor<Ship> captor = ArgumentCaptor.forClass(Ship.class);
     verify(shipRepository).save(captor.capture());
     assertThat(captor.getValue().getName()).isEqualTo("Valenza");
-    assertThat(captor.getValue().getInsurance()).isEqualTo(HangarImportService.DEFAULT_INSURANCE);
+    assertThat(captor.getValue().getInsurance()).isEqualTo(FleetExportParser.DEFAULT_INSURANCE);
   }
 
   // -------------------------------------------------------------------------

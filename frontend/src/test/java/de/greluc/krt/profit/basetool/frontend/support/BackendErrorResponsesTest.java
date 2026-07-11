@@ -20,18 +20,26 @@
 package de.greluc.krt.profit.basetool.frontend.support;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
+import org.slf4j.Logger;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 /**
- * Unit tests for {@link BackendErrorResponses#propagateBackendError(BackendServiceException)},
- * pinning the {@code problem+json} relay shape (status, code, optional detail/correlationId) shared
- * by the 18 AJAX page controllers whose private copies it replaced.
+ * Unit tests for {@link BackendErrorResponses}, pinning both the {@code problem+json} relay shape
+ * shared by the AJAX page controllers whose private {@code propagateBackendError} copies it
+ * replaced and the {@link BackendErrorResponses#relay(Logger, String,
+ * BackendErrorResponses.BackendCall)} try/catch wrapper's success / {@code BackendServiceException}
+ * / generic-exception branches (including their DEBUG-vs-ERROR log level contract).
  */
 class BackendErrorResponsesTest {
 
@@ -66,5 +74,69 @@ class BackendErrorResponsesTest {
     assertThat(response.getStatusCode().value()).isEqualTo(500);
     Map<String, Object> body = (Map<String, Object>) response.getBody();
     assertThat(body).containsOnlyKeys("status", "code");
+  }
+
+  @Test
+  void relay_returnsActionResponseOnSuccessWithoutLogging() {
+    Logger log = mock(Logger.class);
+
+    ResponseEntity<Object> ok = ResponseEntity.ok("payload");
+    ResponseEntity<Object> response = BackendErrorResponses.relay(log, "do thing", () -> ok);
+
+    assertThat(response).isSameAs(ok);
+    verifyNoInteractions(log);
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void relay_propagatesBackendServiceExceptionAsProblemJsonAtDebug() {
+    Logger log = mock(Logger.class);
+    BackendServiceException e =
+        new BackendServiceException(
+            "conflict", null, 409, "OPTIMISTIC_LOCK", "corr-9", List.of(), "row changed");
+
+    ResponseEntity<Object> response =
+        BackendErrorResponses.relay(
+            log,
+            "update thing",
+            () -> {
+              throw e;
+            });
+
+    assertThat(response.getStatusCode().value()).isEqualTo(409);
+    assertThat(response.getHeaders().getContentType())
+        .isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
+    Map<String, Object> body = (Map<String, Object>) response.getBody();
+    assertThat(body)
+        .containsEntry("code", "OPTIMISTIC_LOCK")
+        .containsEntry("correlationId", "corr-9");
+    verify(log)
+        .debug(
+            ArgumentMatchers.anyString(),
+            ArgumentMatchers.eq("update thing"),
+            ArgumentMatchers.eq(HttpStatus.CONFLICT.value()),
+            ArgumentMatchers.eq("conflict"));
+  }
+
+  @Test
+  void relay_mapsGenericExceptionToEmpty500AtError() {
+    Logger log = mock(Logger.class);
+    RuntimeException boom = new IllegalStateException("boom");
+
+    ResponseEntity<Object> response =
+        BackendErrorResponses.relay(
+            log,
+            "risky thing",
+            () -> {
+              throw boom;
+            });
+
+    assertThat(response.getStatusCode().value()).isEqualTo(500);
+    assertThat(response.getBody()).isNull();
+    verify(log)
+        .error(
+            ArgumentMatchers.anyString(),
+            ArgumentMatchers.eq("risky thing"),
+            ArgumentMatchers.eq(boom));
   }
 }

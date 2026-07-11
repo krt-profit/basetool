@@ -71,7 +71,7 @@ public class MemberEvaluationService {
   private final PromotionCategoryRepository categoryRepository;
   private final MemberEvaluationMapper mapper;
   private final OwnerScopeService ownerScopeService;
-  private final OrgUnitMembershipService orgUnitMembershipService;
+  private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   private final AuthHelperService authHelperService;
   private final AuditService auditService;
 
@@ -255,7 +255,7 @@ public class MemberEvaluationService {
       throw new AccessDeniedException("Evaluated member id is not a valid identifier");
     }
     java.util.List<UUID> staffelIds =
-        orgUnitMembershipService.findStaffelMembershipOrgUnitIds(targetUserId);
+        orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(targetUserId);
     if (staffelIds.stream().noneMatch(ownerScopeService::canEditSquadron)) {
       throw new AccessDeniedException(
           "Caller's squadron context does not allow evaluating this member");

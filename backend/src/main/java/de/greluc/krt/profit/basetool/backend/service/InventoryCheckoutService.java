@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepos
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.ArrayList;
 import java.util.List;
@@ -164,12 +165,12 @@ public class InventoryCheckoutService {
       throw new BadRequestException("Transfer requires a target user or location");
     }
 
-    double remainingAmount = roundAmount(item.getAmount() - dto.amount());
+    double remainingAmount = InventoryItem.roundToScuScale(item.getAmount() - dto.amount());
 
     // Snapshot the source row's scalar identity BEFORE any decrement/delete so the audit row stays
     // accurate even when the source is depleted to zero and removed (bulk-clear landmine rules).
     final UUID sourceId = item.getId();
-    final String sourceLabel = inventoryLabel(item);
+    final String sourceLabel = InventoryAuditLabels.label(item);
     final String materialName = item.getMaterial() != null ? item.getMaterial().getName() : "—";
     final UUID sourceOwnerId = item.getUser().getId();
     final boolean depleted = remainingAmount <= QUANTITY_EPSILON;
@@ -276,7 +277,7 @@ public class InventoryCheckoutService {
     newItem.setMaterial(item.getMaterial());
     newItem.setLocation(targetLocation);
     newItem.setQuality(item.getQuality());
-    newItem.setAmount(roundAmount(dto.amount()));
+    newItem.setAmount(InventoryItem.roundToScuScale(dto.amount()));
     newItem.setPersonal(item.getPersonal());
     newItem.setJobOrder(item.getJobOrder());
     newItem.setMission(item.getMission());
@@ -457,13 +458,13 @@ public class InventoryCheckoutService {
             : ownerScopeService.resolveOrgUnitForPickerOutputNullable(
                 item.getUser(), dto.targetOwningOrgUnitId());
 
-    final double remainingAmount = roundAmount(item.getAmount() - dto.amount());
+    final double remainingAmount = InventoryItem.roundToScuScale(item.getAmount() - dto.amount());
     final boolean depleted = remainingAmount <= QUANTITY_EPSILON;
 
     // Snapshot the source row's scalar identity before any decrement/delete so the audit row stays
     // accurate even when the source is depleted to zero and removed.
     final UUID sourceId = item.getId();
-    final String sourceLabel = inventoryLabel(item);
+    final String sourceLabel = InventoryAuditLabels.label(item);
     final String materialName = item.getMaterial() != null ? item.getMaterial().getName() : "—";
     final UUID ownerId = item.getUser().getId();
 
@@ -477,7 +478,7 @@ public class InventoryCheckoutService {
     newItem.setMaterial(item.getMaterial());
     newItem.setLocation(item.getLocation());
     newItem.setQuality(item.getQuality());
-    newItem.setAmount(roundAmount(dto.amount()));
+    newItem.setAmount(InventoryItem.roundToScuScale(dto.amount()));
     newItem.setPersonal(targetPersonal);
     newItem.setJobOrder(targetPersonal ? null : item.getJobOrder());
     newItem.setMission(targetPersonal ? null : item.getMission());
@@ -634,48 +635,10 @@ public class InventoryCheckoutService {
     auditService.record(
         AuditEventType.INVENTORY_ITEM_DELIVERY_TOGGLED,
         item.getId(),
-        inventoryLabel(item),
+        InventoryAuditLabels.label(item),
         item.getUser().getId(),
-        AuditDetails.of("delivered", request.delivered()).with("jobOrder", jobOrderRef(saved)));
+        AuditDetails.of("delivered", request.delivered())
+            .with("jobOrder", InventoryAuditLabels.jobOrderRef(saved)));
     return inventoryItemMapper.toDto(saved);
-  }
-
-  /**
-   * Composes the audit subject label for an inventory row — {@code material @ location}, the
-   * deletion-proof identity snapshot stored on each audit event (REQ-AUDIT-001).
-   *
-   * @param item the inventory row (associations may be lazily loaded but are within the tx)
-   * @return the {@code material @ location} label
-   */
-  private static String inventoryLabel(InventoryItem item) {
-    String mat = item.getMaterial() != null ? item.getMaterial().getName() : "—";
-    String loc = item.getLocation() != null ? item.getLocation().getName() : "—";
-    return mat + " @ " + loc;
-  }
-
-  /**
-   * Renders an inventory row's job-order reference for an audit details payload.
-   *
-   * @param item the inventory row
-   * @return {@code #<displayId>} when linked, {@code -} otherwise
-   */
-  private static String jobOrderRef(InventoryItem item) {
-    return item.getJobOrder() != null ? "#" + item.getJobOrder().getDisplayId() : "-";
-  }
-
-  /**
-   * Rounds a user-supplied inventory amount to three decimals (HALF_UP), the storage precision of
-   * the {@code amount} column. Returns {@code null} unchanged so an absent quantity stays absent.
-   *
-   * @param amount the raw amount, or {@code null}
-   * @return the amount rounded to three decimals, or {@code null}
-   */
-  private Double roundAmount(Double amount) {
-    if (amount == null) {
-      return null;
-    }
-    return java.math.BigDecimal.valueOf(amount)
-        .setScale(3, java.math.RoundingMode.HALF_UP)
-        .doubleValue();
   }
 }

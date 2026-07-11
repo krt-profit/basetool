@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -143,28 +144,10 @@ public class MaterialExternalAliasService {
             .orElseThrow(
                 () ->
                     new NotFoundException("Material " + request.materialId() + " does not exist."));
-    repository
-        .findBySourceSystemAndExternalNameIgnoreCase(source, request.externalName())
-        .ifPresent(
-            existing -> {
-              throw new DuplicateEntityException(
-                  "Alias '"
-                      + request.externalName()
-                      + "' already exists for source "
-                      + source
-                      + " (case-insensitive match: '"
-                      + existing.getExternalName()
-                      + "').");
-            });
+    assertNoAliasConflict(source, request.externalName(), null);
 
     MaterialExternalAlias alias = new MaterialExternalAlias();
-    alias.setMaterial(material);
-    alias.setSourceSystem(source);
-    alias.setExternalName(request.externalName());
-    alias.setExternalKey(request.externalKey());
-    alias.setExternalUuid(request.externalUuid());
-    alias.setExternalCode(request.externalCode());
-    alias.setNote(request.note());
+    applyWritableFields(alias, material, source, request);
     alias.setCreatedBy(currentPrincipalNameOrSystem());
     MaterialExternalAlias saved = repository.save(alias);
     log.info(
@@ -200,28 +183,9 @@ public class MaterialExternalAliasService {
             .orElseThrow(
                 () ->
                     new NotFoundException("Material " + request.materialId() + " does not exist."));
-    repository
-        .findBySourceSystemAndExternalNameIgnoreCase(source, request.externalName())
-        .filter(other -> !other.getId().equals(id))
-        .ifPresent(
-            other -> {
-              throw new DuplicateEntityException(
-                  "Alias '"
-                      + request.externalName()
-                      + "' already exists for source "
-                      + source
-                      + " (case-insensitive match: '"
-                      + other.getExternalName()
-                      + "').");
-            });
+    assertNoAliasConflict(source, request.externalName(), id);
 
-    alias.setMaterial(material);
-    alias.setSourceSystem(source);
-    alias.setExternalName(request.externalName());
-    alias.setExternalKey(request.externalKey());
-    alias.setExternalUuid(request.externalUuid());
-    alias.setExternalCode(request.externalCode());
-    alias.setNote(request.note());
+    applyWritableFields(alias, material, source, request);
     // saveAndFlush so the returned entity carries the flushed @Version — the alias edit form writes
     // it back into its hidden version input in place (no reload), so a stale save version would 409
     // the next consecutive edit of the same alias.
@@ -242,6 +206,60 @@ public class MaterialExternalAliasService {
     MaterialExternalAlias alias = findById(id);
     repository.delete(alias);
     log.info("Admin alias deleted: id={} by={}", id, currentPrincipalNameOrSystem());
+  }
+
+  /**
+   * Guards the case-insensitive {@code (sourceSystem, externalName)} uniqueness (REQ-REFINERY-010)
+   * before a create / update flushes, so the caller gets a clean {@link DuplicateEntityException} →
+   * 409 rather than the DB unique index's generic {@code DataIntegrityViolationException}.
+   *
+   * @param source the alias source system
+   * @param externalName the external name to check (matched case-insensitively)
+   * @param excludeId the row being updated, excluded from the collision check, or {@code null} on a
+   *     create so every existing row counts
+   * @throws DuplicateEntityException if a different row already holds the same source / external
+   *     name
+   */
+  private void assertNoAliasConflict(
+      MaterialExternalAliasSource source, String externalName, @Nullable UUID excludeId) {
+    repository
+        .findBySourceSystemAndExternalNameIgnoreCase(source, externalName)
+        .filter(existing -> excludeId == null || !existing.getId().equals(excludeId))
+        .ifPresent(
+            existing -> {
+              throw new DuplicateEntityException(
+                  "Alias '"
+                      + externalName
+                      + "' already exists for source "
+                      + source
+                      + " (case-insensitive match: '"
+                      + existing.getExternalName()
+                      + "').");
+            });
+  }
+
+  /**
+   * Copies the writable fields of a create / update request onto an alias entity — the material
+   * reference, source system, external name / key / uuid / code and note. The {@code createdBy}
+   * stamp is intentionally not touched here so it stays create-only.
+   *
+   * @param alias the target entity (new or managed)
+   * @param material the resolved material reference
+   * @param source the resolved source system
+   * @param request the validated write payload
+   */
+  private void applyWritableFields(
+      MaterialExternalAlias alias,
+      Material material,
+      MaterialExternalAliasSource source,
+      MaterialExternalAliasWriteRequest request) {
+    alias.setMaterial(material);
+    alias.setSourceSystem(source);
+    alias.setExternalName(request.externalName());
+    alias.setExternalKey(request.externalKey());
+    alias.setExternalUuid(request.externalUuid());
+    alias.setExternalCode(request.externalCode());
+    alias.setNote(request.note());
   }
 
   /**

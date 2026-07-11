@@ -27,7 +27,6 @@ import de.greluc.krt.profit.basetool.backend.service.SquadronService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -86,14 +85,7 @@ public class SquadronController {
     }
     Pageable pageable = PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "name");
     Page<Squadron> p = squadronService.getAllSquadrons(pageable, includeInactive);
-    List<SquadronDto> content = p.getContent().stream().map(squadronMapper::toDto).toList();
-    return new PageResponse<>(
-        content,
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p.map(squadronMapper::toDto));
   }
 
   /**
@@ -103,7 +95,7 @@ public class SquadronController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public SquadronDto createSquadron(@RequestBody @Valid SquadronDto squadron) {
     var toCreate = squadronMapper.toEntity(squadron);
     // L-7: strip client-supplied id/version so create cannot become a merge()-UPSERT of another
@@ -121,7 +113,7 @@ public class SquadronController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public SquadronDto updateSquadron(
       @PathVariable @NotNull UUID id, @RequestBody @Valid SquadronDto squadron) {
     return squadronMapper.toDto(squadronService.updateSquadron(id, squadron));
@@ -133,7 +125,7 @@ public class SquadronController {
    * @param id squadron id
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public void deleteSquadron(@PathVariable @NotNull UUID id) {
     squadronService.deleteSquadron(id);
   }
@@ -144,7 +136,7 @@ public class SquadronController {
    * @param id squadron id
    */
   @PostMapping("/{id}/activate")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public void activateSquadron(@PathVariable @NotNull UUID id) {
     squadronService.activateSquadron(id);
   }
@@ -160,7 +152,7 @@ public class SquadronController {
    * @return the updated squadron DTO with the new flag value
    */
   @PatchMapping("/{id}/promotion-enabled")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public SquadronDto setPromotionEnabled(
       @PathVariable @NotNull UUID id, @RequestBody @Valid SquadronPromotionToggleRequest body) {
     return squadronMapper.toDto(squadronService.setPromotionEnabled(id, body.enabled()));
@@ -177,7 +169,7 @@ public class SquadronController {
    * @return the updated squadron DTO with the new flag value
    */
   @PatchMapping("/{id}/profit-eligible")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public SquadronDto setProfitEligible(
       @PathVariable @NotNull UUID id,
       @RequestBody @Valid SquadronProfitEligibleToggleRequest body) {

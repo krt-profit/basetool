@@ -28,7 +28,6 @@ import de.greluc.krt.profit.basetool.backend.service.JobTypeService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -77,14 +76,7 @@ public class JobTypeController {
       @RequestParam(required = false, defaultValue = "false") boolean includeInactive) {
     Pageable pageable = PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "name");
     Page<JobType> p = jobTypeService.getJobTypes(archetype, pageable, includeInactive);
-    List<JobTypeDto> content = p.getContent().stream().map(jobTypeMapper::toDto).toList();
-    return new PageResponse<>(
-        content,
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p.map(jobTypeMapper::toDto));
   }
 
   /**
@@ -94,7 +86,7 @@ public class JobTypeController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public JobTypeDto createJobType(@RequestBody @Valid JobTypeDto jobTypeDto) {
     JobType toCreate = jobTypeMapper.toEntity(jobTypeDto);
     // L-7: strip client-supplied id/version so create cannot become a merge()-UPSERT of another
@@ -112,7 +104,7 @@ public class JobTypeController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public JobTypeDto updateJobType(
       @PathVariable @NotNull UUID id, @RequestBody @Valid JobTypeDto jobTypeDto) {
     return jobTypeMapper.toDto(jobTypeService.updateJobType(id, jobTypeDto));
@@ -125,7 +117,7 @@ public class JobTypeController {
    * @param id job type id
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public void deleteJobType(@PathVariable @NotNull UUID id) {
     jobTypeService.deleteJobType(id);
   }
@@ -136,7 +128,7 @@ public class JobTypeController {
    * @param id job type id
    */
   @PostMapping("/{id}/activate")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public void activateJobType(@PathVariable @NotNull UUID id) {
     jobTypeService.activateJobType(id);
   }

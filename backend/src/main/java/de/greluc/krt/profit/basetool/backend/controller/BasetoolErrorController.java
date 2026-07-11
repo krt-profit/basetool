@@ -19,10 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
-import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
-import java.net.URI;
 import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -70,7 +69,7 @@ public class BasetoolErrorController implements ErrorController {
   /** MDC key the correlation-id filter populates; read here to reuse an already-assigned id. */
   private static final String MDC_CORRELATION_ID = "correlationId";
 
-  private final AppProblemProperties problemProperties;
+  private final ProblemResponseFactory problemResponseFactory;
   private final MessageSource messageSource;
 
   /**
@@ -87,16 +86,18 @@ public class BasetoolErrorController implements ErrorController {
     ProblemMapping mapping = mappingFor(status);
     Locale locale = LocaleContextHolder.getLocale();
 
-    ProblemDetail body = ProblemDetail.forStatusAndDetail(status, tr(mapping.detailKey(), locale));
-    body.setTitle(tr(mapping.titleKey(), locale));
-    body.setType(URI.create(problemProperties.getBaseUri() + mapping.typeSuffix()));
     Object originalUri = request.getAttribute(RequestDispatcher.ERROR_REQUEST_URI);
-    if (originalUri instanceof String uri && !uri.isBlank()) {
-      body.setInstance(URI.create(uri));
-    }
+    String instanceUri = originalUri instanceof String uri && !uri.isBlank() ? uri : null;
     String correlationId = correlationId();
-    body.setProperty("code", mapping.code());
-    body.setProperty("correlationId", correlationId);
+    ProblemDetail body =
+        problemResponseFactory.problem(
+            status,
+            tr(mapping.titleKey(), locale),
+            tr(mapping.detailKey(), locale),
+            instanceUri,
+            mapping.typeSuffix(),
+            mapping.code(),
+            correlationId);
 
     log.warn(
         "Container error dispatch [status={}, code={}, uri={}, correlationId={}]",

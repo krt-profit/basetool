@@ -26,7 +26,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipService;
+import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryService;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,13 +61,13 @@ class UserMembershipsSecurityTest {
 
   private MockMvc mockMvc;
 
-  @MockitoBean private OrgUnitMembershipService orgUnitMembershipService;
+  @MockitoBean private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   @MockitoBean private JwtDecoder jwtDecoder;
 
   @BeforeEach
   void setUp() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    when(orgUnitMembershipService.listOptionsForUser(any(UUID.class))).thenReturn(List.of());
+    when(orgUnitMembershipQueryService.listOptionsForUser(any(UUID.class))).thenReturn(List.of());
   }
 
   /**
