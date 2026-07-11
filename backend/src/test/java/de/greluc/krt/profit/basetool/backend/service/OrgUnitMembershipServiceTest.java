@@ -93,13 +93,15 @@ class OrgUnitMembershipServiceTest {
   @Mock private AuditService auditService;
   @Mock private OrgChartService orgChartService;
 
-  // The bank seam is injected as an ObjectProvider to break the DI cycle (ADR-0070); the leadership
+  // The responsible-holder audit seam is injected as an ObjectProvider (ADR-0070); the leadership
   // mutations resolve it to snapshot/record a responsible-holder change. Stubbed lenient below so
   // the
   // non-leadership tests do not trip strict-stubs; the seam mock's default (null snapshot, no-op
   // record) leaves those flows unaffected.
-  @Mock private ObjectProvider<OrgUnitBankAccessService> orgUnitBankAccessServiceProvider;
-  @Mock private OrgUnitBankAccessService orgUnitBankAccessService;
+  @Mock
+  private ObjectProvider<OrgUnitBankResponsibilityService> orgUnitBankResponsibilityServiceProvider;
+
+  @Mock private OrgUnitBankResponsibilityService orgUnitBankResponsibilityService;
 
   // Real MapStruct implementation (not a mock): the …Dto projection tests below assert the actual
   // entity→DTO mapping the controllers ship to the client, incl. the user.effectiveName read and
@@ -136,11 +138,13 @@ class OrgUnitMembershipServiceTest {
     // the
     // many non-leadership tests do not trip strict-stubs; the seam mock no-ops the snapshot/record.
     lenient()
-        .when(orgUnitBankAccessServiceProvider.getObject())
-        .thenReturn(orgUnitBankAccessService);
+        .when(orgUnitBankResponsibilityServiceProvider.getObject())
+        .thenReturn(orgUnitBankResponsibilityService);
     // The membership-removal paths (removeMember, reconcileStaffelMemberships) merge the seam's
     // per-org-unit snapshot; a non-null map keeps the reconcile putAll from NPE-ing on the mock.
-    lenient().when(orgUnitBankAccessService.snapshotResponsibleHolders(any())).thenReturn(Map.of());
+    lenient()
+        .when(orgUnitBankResponsibilityService.snapshotResponsibleHolders(any()))
+        .thenReturn(Map.of());
   }
 
   // --- addMember ------------------------------------------------------------

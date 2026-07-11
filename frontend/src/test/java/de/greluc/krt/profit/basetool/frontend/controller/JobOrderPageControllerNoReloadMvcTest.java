@@ -38,7 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.frontend.config.SquadronContextAdvice;
+import de.greluc.krt.profit.basetool.frontend.config.CapabilityFlagsAdvice;
 import de.greluc.krt.profit.basetool.frontend.model.dto.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -97,8 +97,8 @@ class JobOrderPageControllerNoReloadMvcTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     // Profit-eligible viewer so the order-detail gate does not redirect to /orders/create.
     when(backendApiClient.get(
-            "/api/v1/me/capabilities", SquadronContextAdvice.CapabilitiesResponse.class))
-        .thenReturn(new SquadronContextAdvice.CapabilitiesResponse(true, true, true));
+            "/api/v1/me/capabilities", CapabilityFlagsAdvice.CapabilitiesResponse.class))
+        .thenReturn(new CapabilityFlagsAdvice.CapabilitiesResponse(true, true, true));
   }
 
   private OAuth2AuthenticationToken logisticianToken(UUID userId) {

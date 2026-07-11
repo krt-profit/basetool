@@ -27,7 +27,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.frontend.config.SquadronContextAdvice;
+import de.greluc.krt.profit.basetool.frontend.config.OrgUnitContextAdvice;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -52,7 +52,7 @@ import org.springframework.web.context.WebApplicationContext;
  * though the regular {@code @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")} on the admin- subpath
  * is satisfied. The gate runs inside the page-controller method body, layered on top of the role
  * check, by reading the {@code promotionFeatureEnabled} model attribute populated by {@link
- * SquadronContextAdvice}.
+ * OrgUnitContextAdvice}.
  *
  * <p>Sidebar visibility is enforced by a single {@code th:if="${promotionFeatureEnabled}"} on the
  * fragments/sidebar.html group; the model attribute that drives it is the same one the controller
@@ -81,15 +81,14 @@ class PromotionFeatureFlagPageGateTest {
         new SquadronDto(squadronId, "IRIDIUM", "IRI", null, true, promotionEnabled, false, 0L);
     when(backendApiClient.get(contains("/api/v1/squadrons"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(squadron), 0, 1000, 1, 1, List.of()));
-    // SquadronContextAdvice.availableSquadrons() now reads the catalogue from the STATIC_DATA_CACHE
+    // OrgUnitContextAdvice.availableSquadrons() now reads the catalogue from the STATIC_DATA_CACHE
     // (getCached) rather than a plain get (REQ-DATA-007), so the promotion gate's flag lookup goes
     // through getCached — stub it too or the squadron list is empty and the gate misreads the flag.
     when(backendApiClient.getCached(eq(CachedCatalog.SQUADRONS), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(squadron), 0, 1000, 1, 1, List.of()));
     when(backendApiClient.get(
-            eq("/api/v1/me/active-org-unit"),
-            eq(SquadronContextAdvice.ActiveOrgUnitResponse.class)))
-        .thenReturn(new SquadronContextAdvice.ActiveOrgUnitResponse(squadronId));
+            eq("/api/v1/me/active-org-unit"), eq(OrgUnitContextAdvice.ActiveOrgUnitResponse.class)))
+        .thenReturn(new OrgUnitContextAdvice.ActiveOrgUnitResponse(squadronId));
   }
 
   @Test
@@ -130,7 +129,7 @@ class PromotionFeatureFlagPageGateTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void adminPinnedToFlagOffSquadron_overviewIsForbidden() throws Exception {
-    // Regression: previously the admin bypass on SquadronContextAdvice.promotionFeatureEnabled
+    // Regression: previously the admin bypass on OrgUnitContextAdvice.promotionFeatureEnabled
     // returned true unconditionally for admins, so an admin pinned to a flag-off squadron still
     // saw the menu. After fix/promotion-gate-honor-admin-pin the pinned squadron's flag drives
     // visibility for admins too.
@@ -160,9 +159,8 @@ class PromotionFeatureFlagPageGateTest {
     // no promotion system of their own: the menu is hidden and direct page access is blocked, so a
     // squadron-less caller never sees the cross-staffel union.
     when(backendApiClient.get(
-            eq("/api/v1/me/active-org-unit"),
-            eq(SquadronContextAdvice.ActiveOrgUnitResponse.class)))
-        .thenReturn(new SquadronContextAdvice.ActiveOrgUnitResponse(null));
+            eq("/api/v1/me/active-org-unit"), eq(OrgUnitContextAdvice.ActiveOrgUnitResponse.class)))
+        .thenReturn(new OrgUnitContextAdvice.ActiveOrgUnitResponse(null));
     mockMvc.perform(get("/promotion/overview")).andExpect(status().isForbidden());
   }
 

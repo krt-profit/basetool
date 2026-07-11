@@ -27,7 +27,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.frontend.config.SquadronContextAdvice;
+import de.greluc.krt.profit.basetool.frontend.config.CapabilityFlagsAdvice;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.time.Instant;
@@ -84,8 +84,8 @@ class JobOrderHandoverButtonLayoutTest {
     // The logistician caller is a non-admin, so the order-detail profit gate would otherwise
     // redirect to /orders/create. Stub the capability as a profit-eligible viewer.
     when(backendApiClient.get(
-            "/api/v1/me/capabilities", SquadronContextAdvice.CapabilitiesResponse.class))
-        .thenReturn(new SquadronContextAdvice.CapabilitiesResponse(true, true, true));
+            "/api/v1/me/capabilities", CapabilityFlagsAdvice.CapabilitiesResponse.class))
+        .thenReturn(new CapabilityFlagsAdvice.CapabilitiesResponse(true, true, true));
   }
 
   private OAuth2AuthenticationToken logisticianToken(UUID userId) {

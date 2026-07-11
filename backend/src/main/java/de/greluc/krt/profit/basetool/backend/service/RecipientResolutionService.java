@@ -52,7 +52,7 @@ public class RecipientResolutionService {
   private final UserRepository userRepository;
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
   private final BankAccountGrantRepository bankAccountGrantRepository;
-  private final OrgUnitBankAccessService orgUnitBankAccessService;
+  private final OrgUnitBankResponsibilityService orgUnitBankResponsibilityService;
 
   /**
    * Resolves every holder of a global role by its stable code.
@@ -105,10 +105,9 @@ public class RecipientResolutionService {
   /**
    * Resolves the <em>responsible holder(s)</em> (Kontoverantwortliche, REQ-BANK-034) of the given
    * bank account — the {@code ACCOUNT_RESPONSIBLE} selector's recipients (REQ-BANK-026). The
-   * org-unit-aware derivation (account → owning org unit → role holders) lives in the {@code
-   * OrgUnitBankAccessService} seam, the single class allowed to bridge the bank and the org-unit
-   * scope; this method only forwards to it so the {@code Bank*} classes stay org-unit-blind
-   * (REQ-BANK-008).
+   * org-unit-aware derivation (account → owning org unit → role holders) lives in the
+   * OwnerScope-free {@code OrgUnitBankResponsibilityService} seam; this method only forwards to it
+   * so the {@code Bank*} classes stay org-unit-blind (REQ-BANK-008).
    *
    * @param accountId the bank account whose responsible holder(s) to notify
    * @return the responsible holders' user subs; never {@code null}, empty for a Sonderkonto or an
@@ -116,6 +115,6 @@ public class RecipientResolutionService {
    */
   @NotNull
   public Set<UUID> resolveAccountResponsibleHolders(@NotNull UUID accountId) {
-    return orgUnitBankAccessService.resolveResponsibleHolderUserIds(accountId);
+    return orgUnitBankResponsibilityService.resolveResponsibleHolderUserIds(accountId);
   }
 }

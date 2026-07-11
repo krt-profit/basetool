@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.OperationCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.OperationFinanceService;
+import de.greluc.krt.profit.basetool.backend.service.OperationPayoutService;
 import de.greluc.krt.profit.basetool.backend.service.OperationService;
 import java.time.Instant;
 import java.util.List;
@@ -52,6 +53,8 @@ import org.springframework.data.domain.Sort;
 class OperationControllerTest {
 
   @Mock private OperationService operationService;
+
+  @Mock private OperationPayoutService operationPayoutService;
 
   @Mock private OperationMapper operationMapper;
 

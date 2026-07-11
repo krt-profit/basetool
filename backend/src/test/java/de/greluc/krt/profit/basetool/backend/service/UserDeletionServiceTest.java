@@ -74,8 +74,10 @@ class UserDeletionServiceTest {
   // The bank seam is injected as an ObjectProvider (ADR-0070); deleteUser resolves it to audit a
   // responsible-holder change when a deleted user was a leader. Stubbed lenient so the early-throw
   // tests (which never reach the delete) do not trip strict-stubs; the seam mock no-ops.
-  @Mock private ObjectProvider<OrgUnitBankAccessService> orgUnitBankAccessServiceProvider;
-  @Mock private OrgUnitBankAccessService orgUnitBankAccessService;
+  @Mock
+  private ObjectProvider<OrgUnitBankResponsibilityService> orgUnitBankResponsibilityServiceProvider;
+
+  @Mock private OrgUnitBankResponsibilityService orgUnitBankResponsibilityService;
 
   @InjectMocks private UserDeletionService userDeletionService;
 
@@ -98,10 +100,10 @@ class UserDeletionServiceTest {
     admin.setInKeycloak(true);
 
     lenient()
-        .when(orgUnitBankAccessServiceProvider.getObject())
-        .thenReturn(orgUnitBankAccessService);
+        .when(orgUnitBankResponsibilityServiceProvider.getObject())
+        .thenReturn(orgUnitBankResponsibilityService);
     lenient()
-        .when(orgUnitBankAccessService.snapshotResponsibleHoldersForUser(any()))
+        .when(orgUnitBankResponsibilityService.snapshotResponsibleHoldersForUser(any()))
         .thenReturn(Map.of());
   }
 

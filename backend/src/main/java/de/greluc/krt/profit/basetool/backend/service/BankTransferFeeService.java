@@ -48,8 +48,8 @@ import org.springframework.transaction.annotation.Transactional;
  * the operation payout uses ({@code operation.transfer_fee_rate} in {@code system_setting}, default
  * {@code 0.005} = 0.5%, editable at {@code /admin/settings}); the bank deliberately reuses it so
  * one knob governs every fee calculation (the requester chose "same rate as operations"). The
- * resolution logic mirrors {@code OperationService#resolveTransferFeeRate} on purpose — both read
- * the identical key and fall back to the identical default — so the two stay in lock-step.
+ * resolution logic mirrors {@code OperationPayoutService#resolveTransferFeeRate} on purpose — both
+ * read the identical key and fall back to the identical default — so the two stay in lock-step.
  *
  * <p>The bank rounds the fee to <strong>whole aUEC</strong> (mobiGlas transfers carry no fractional
  * aUEC), unlike the operation payout which keeps the fee at scale 2 inside its own breakdown.
@@ -110,7 +110,7 @@ public class BankTransferFeeService {
    * Loads and validates the runtime-editable in-game transfer-fee rate from {@code system_setting}.
    * Falls back to {@link #DEFAULT_TRANSFER_FEE_RATE} when the row is absent, blank, not a number,
    * negative or {@code >= 1}; the fallback is logged at WARN so an operator sees the
-   * misconfiguration. Mirrors {@code OperationService#resolveTransferFeeRate} (same key, same
+   * misconfiguration. Mirrors {@code OperationPayoutService#resolveTransferFeeRate} (same key, same
    * default) so the bank and operations always compute off the identical rate.
    *
    * @return a non-null, validated rate in {@code [0, 1)}

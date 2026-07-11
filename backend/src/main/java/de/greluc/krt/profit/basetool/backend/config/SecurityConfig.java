@@ -553,7 +553,7 @@ public class SecurityConfig {
                     .hasRole(Roles.ADMIN)
                     // GET .../memberships ist die Picker-Read-Variante (SPEZIALKOMMANDO_PLAN.md
                     // §7.4) — gibt nur OrgUnit-Names + Shorthands zurueck, keine PII. Wird vom
-                    // Frontend SquadronContextAdvice (Sidebar-Switcher + Bereichskontext-Chip)
+                    // Frontend OrgUnitContextAdvice (Sidebar-Switcher + Bereichskontext-Chip)
                     // sowie von den R5.d Owner-Picker-Fragments fuer jeden authenticated Caller
                     // gelesen. Ohne diese explizite Regel faellt die URL in die catch-all
                     // `/api/v1/users/**` darunter — die ist `hasRole("ADMIN")` und verursachte
