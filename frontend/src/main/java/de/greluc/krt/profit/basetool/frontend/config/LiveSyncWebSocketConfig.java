@@ -75,17 +75,22 @@ import tools.jackson.databind.json.JsonMapper;
 public class LiveSyncWebSocketConfig implements WebSocketConfigurer {
 
   /**
-   * Subscribe-authorization executor sizing: {@value} worker threads. Kept modest because each
-   * probe is a single short backend read; the deploy-time reconnect storm (~600 subscribes spread
-   * over the client's 1–30 s reconnect jitter) stays well within this pool plus its queue, and any
-   * overflow fails the subscribe open rather than blocking (ADR-0093 capacity model).
+   * Subscribe-authorization executor sizing: {@value} worker threads. Each probe is a single short
+   * backend read; sized with generous headroom (F2/#1243) so a deploy-time reconnect storm at ≥200
+   * concurrent users (~600 subscribes spread over the client's 1–30 s reconnect jitter) stays well
+   * within this pool plus its queue and never saturates — saturation is an indeterminate verdict
+   * that would fail a presence-class subscribe <em>closed</em> (F1), so keeping the pool from ever
+   * filling is what stops a legitimate mission viewer being briefly denied their presence dots
+   * (ADR-0093 capacity model).
    */
-  private static final int SUBSCRIBE_AUTH_THREADS = 8;
+  private static final int SUBSCRIBE_AUTH_THREADS = 16;
 
   /**
-   * Bounded queue depth for pending subscribe-authorization probes before saturation fails open.
+   * Bounded queue depth for pending subscribe-authorization probes before saturation is reached.
+   * Sized well above a full reconnect-storm's worth of queued probes so it is not reached at ≥200
+   * concurrent users (F2/#1243).
    */
-  private static final int SUBSCRIBE_AUTH_QUEUE = 500;
+  private static final int SUBSCRIBE_AUTH_QUEUE = 2000;
 
   private final LiveSyncPresenceService presenceService;
   private final BackendApiClient backendApiClient;

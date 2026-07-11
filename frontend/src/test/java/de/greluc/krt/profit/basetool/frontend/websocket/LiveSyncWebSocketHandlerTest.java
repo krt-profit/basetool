@@ -880,9 +880,11 @@ class LiveSyncWebSocketHandlerTest {
 
     // Several distinct publishers, each staying within its own per-session burst, together exceed
     // the per-topic burst. The per-session bucket alone cannot bound the room's aggregate rate; the
-    // per-topic bucket does. 4 × CHANGED_BURST(20) = 80 attempts > TOPIC_CHANGED_BURST(60).
-    int publishers = 4;
+    // per-topic bucket does. Deriving the publisher count from the two constants keeps the test
+    // valid whatever the tuned values are: (TOPIC_CHANGED_BURST / CHANGED_BURST) + 2 publishers,
+    // each emitting a full per-session burst, always overshoots the per-topic burst.
     int perPublisher = LiveSyncWebSocketHandler.CHANGED_BURST;
+    int publishers = (LiveSyncWebSocketHandler.TOPIC_CHANGED_BURST / perPublisher) + 2;
     for (int p = 0; p < publishers; p++) {
       FakeSession pub = openMultiplexedSession(oidcUser("pub-" + p, "P" + p));
       for (int i = 0; i < perPublisher; i++) {

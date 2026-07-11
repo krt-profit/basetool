@@ -122,10 +122,10 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    * rapid-editing viewer never trips it; it only bounds a crafted client emitting {@code changed}
    * frames in a loop. Package-private for the test.
    */
-  static final int CHANGED_BURST = 20;
+  static final int CHANGED_BURST = 40;
 
   /** Token-bucket refill rate for inbound {@code changed} frames, in tokens per second. */
-  private static final double CHANGED_REFILL_PER_SEC = 10.0;
+  private static final double CHANGED_REFILL_PER_SEC = 20.0;
 
   /**
    * Per-<em>topic</em> token-bucket capacity for accepted {@code changed} frames (F2 / #1243). The
@@ -136,10 +136,10 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    * sees a handful of writes/s, well under this — so a legitimate 200-user room never trips it; it
    * only clamps a crafted flood. Package-private for the test.
    */
-  static final int TOPIC_CHANGED_BURST = 60;
+  static final int TOPIC_CHANGED_BURST = 200;
 
   /** Per-topic refill rate for accepted {@code changed} frames, in tokens per second (F2/#1243). */
-  private static final double TOPIC_CHANGED_REFILL_PER_SEC = 30.0;
+  private static final double TOPIC_CHANGED_REFILL_PER_SEC = 100.0;
 
   /**
    * Idle age past which the reaper drops a per-topic {@code changed} bucket (F2/#1243). A bucket
@@ -225,7 +225,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    * per-resource sockets can only reach their single bounded-audience room and are slated for
    * removal. Package-private for the test.
    */
-  static final int MAX_SOCKETS_PER_USER = 12;
+  static final int MAX_SOCKETS_PER_USER = 20;
 
   /**
    * Application-defined WebSocket close status ({@code 4029}) for a socket refused by the per-user

@@ -57,7 +57,7 @@ no channel at all, and the bank surfaces would need 3–4 parallel sockets per a
   `GET /api/v1/missions/{id}`, `GET /api/v1/operations/{id}`, `GET /api/v1/orders/{id}`,
   capabilities `canViewJobOrders` for the queue, the bank staff/org-unit account reads with
   a try-both fallback, local role checks for the global staff/member rooms). Checks run
-  **asynchronously** on a dedicated bounded executor (8 threads, queue 500) — never on the
+  **asynchronously** on a dedicated bounded executor (16 threads, queue 2000) — never on the
   WS container thread — answering `subscribed` / `denied`. Explicit 403/404 denies; an
   indeterminate verdict (a lapsed captured token, a transient backend error, executor
   saturation, a probe that threw) resolves in the class's fail direction: **open** for a
@@ -67,7 +67,7 @@ no channel at all, and the bank surfaces would need 3–4 parallel sockets per a
   snapshot (pseudonymous ids + callsigns) — cross-user identity data the opaque-keys argument
   does not cover, so an unverified presence subscribe is refused (F1).
 - **Publish** (`changed`) requires only an authenticated socket, a known topic, the topic
-  class's section whitelist and the per-session token bucket (burst 20, refill 10/s) — **no
+  class's section whitelist and the per-session token bucket (burst 40, refill 20/s) — **no
   subscription**. This widens ADR-0031's trust delta from "viewers of the resource can emit
   spoofed signals" to "any authenticated member can emit them for any topic". We accept it:
   the signal still carries no data and can only trigger re-fetches each receiver is
@@ -78,10 +78,10 @@ no channel at all, and the bank surfaces would need 3–4 parallel sockets per a
 - **Two amplification bounds cap the publish-without-subscription lever** (F2 / #1243): the
   amplification factor is `K sockets × publish-rate × room-viewers`, so beyond the per-session
   bucket (which bounds one socket's rate) we bound the other two multipliers. A **per-user
-  socket cap** (`MAX_SOCKETS_PER_USER = 12`, on the multiplexed `/ws/sync` socket — one per tab,
+  socket cap** (`MAX_SOCKETS_PER_USER = 20`, on the multiplexed `/ws/sync` socket — one per tab,
   so far above any legitimate multi-tab use) bounds `K`; a refused socket is closed with an
   application close code (`4029`) the client recognises to back its reconnect off rather than
-  hammer. A **per-topic token bucket** (`TOPIC_CHANGED_BURST = 60`, refill 30/s, on top of the
+  hammer. A **per-topic token bucket** (`TOPIC_CHANGED_BURST = 200`, refill 100/s, on top of the
   per-session one) bounds a room's *aggregate* accepted-frame rate across all publishers, so no
   set of sockets can amplify one (chiefly global) room's fragment-refetch fan-out — it is the
   bound that holds when many publishers each stay under their own per-session limit. Server-side
@@ -144,19 +144,24 @@ no channel at all, and the bank surfaces would need 3–4 parallel sockets per a
 
 Assume ~300 open tabs per instance (200 users × ~1.5 tabs), 1–3 subscriptions each.
 Sockets: ~300 — trivial for Tomcat NIO; decorator buffers only under backpressure
-(worst case 150 MB, TERMINATE evicts). The per-user socket cap (12) sits ~8× above that
+(worst case 150 MB, TERMINATE evicts). The per-user socket cap (20) sits ~13× above that
 expected per-user tab count, so it never clips a real user at 200 concurrent, only a crafted
 fan-out of sockets. Relay fan-out: largest (global) room ≤ 200
 subscribers → ≤ 200 sends of ~60 B per frame; a single hostile publisher is per-session
-bucket-capped at 10 frames/s, and the whole room is per-topic bucket-capped at 30 accepted
-frames/s regardless of how many sockets publish (F2/#1243) → ≤ 6000 sends/s worst case per
-instance, independent of publisher count. The binding path is the **re-fetch herd**: one frame into a
+bucket-capped at 20 frames/s, and the whole room is per-topic bucket-capped at 100 accepted
+frames/s regardless of how many sockets publish (F2/#1243) → ≤ 20000 sends/s worst case per
+instance (~1.2 MB/s of 60 B frames, trivial), independent of publisher count. These bounds are
+deliberately generous — sized to never clip a real 200-user room, only a crafted flood — because
+the binding path is not the relay send but the **re-fetch herd**: one frame into a
 200-viewer global room triggers per-viewer fragment GETs, so global-room receivers use a
-**1500 ms coalesce window** (detail topics keep 400 ms), both full-jittered (#1125), bounding
-the worst case at ~130 GETs/s and the realistic case at ≤ 30/s against reads already
-slimmed by ADR-0081/#1170; `FrontendBackendFanoutHigh` stays the amplification watchdog.
-Deploy reconnect storms (~600 subscribe auths spread over the 1–30 s jitter ≈ ≤ 20/s) sit
-well under the 8-thread authorize executor's capacity; saturation fails open. SSE stays
+**1500 ms coalesce window** (detail topics keep 400 ms), both full-jittered (#1125), which clamps
+the GET herd to ~130/s worst case / ≤ 30/s realistic *independent of the relay rate* (a room
+flooded at the full 100/s still coalesces to one refetch per viewer per window) against reads
+already slimmed by ADR-0081/#1170; `FrontendBackendFanoutHigh` stays the amplification watchdog.
+Deploy reconnect storms (~600 subscribe auths spread over the 1–30 s jitter ≈ ≤ 20/s) sit far
+under the 16-thread / 2000-deep authorize executor's capacity, so saturation is not reached at
+200 concurrent; if it ever were, the verdict resolves in the class's fail direction (open for a
+non-presence class, closed for `mission` presence, F1). SSE stays
 within the existing 1000-slot relay pool (~300 emitters expected). Redis pub/sub adds no
 keys, so the ADR-0079 384 MB/noeviction budget is untouched; the worst-case recipient
 payload (all 5000 subs) is ~180 KB.

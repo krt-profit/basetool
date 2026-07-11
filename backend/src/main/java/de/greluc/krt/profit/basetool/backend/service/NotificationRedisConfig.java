@@ -96,16 +96,19 @@ public class NotificationRedisConfig {
    * caps concurrency; when the queue is full the dispatch runs on the container's own thread
    * ({@link ThreadPoolExecutor.CallerRunsPolicy}) — backpressure rather than an unbounded spawn. A
    * dropped notification would only delay a badge until the REQ-NOTIF-006 polling fallback corrects
-   * it, but backpressure avoids even that.
+   * it, but backpressure avoids even that. Sized with generous headroom (F2/#1243) so the blocking
+   * per-subscriber sends keep up at ≥200 concurrent users without falling back to container-thread
+   * backpressure that would delay live notifications, while the bound still caps the pool far below
+   * the native-thread-OOM shape.
    *
    * @return the bounded listener dispatch executor (shut down with the context)
    */
   @Bean(destroyMethod = "shutdown")
   public ThreadPoolTaskExecutor notificationRedisListenerExecutor() {
     ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-    executor.setCorePoolSize(2);
-    executor.setMaxPoolSize(8);
-    executor.setQueueCapacity(1000);
+    executor.setCorePoolSize(4);
+    executor.setMaxPoolSize(16);
+    executor.setQueueCapacity(2000);
     executor.setThreadNamePrefix("notify-redis-");
     executor.setDaemon(true);
     executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());

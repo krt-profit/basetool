@@ -88,19 +88,21 @@ public class LiveSyncRedisConfig {
    * Bounded dispatch executor for consumed {@code changed} messages (F3). Without an explicit
    * executor a {@link RedisMessageListenerContainer} defaults to a {@code SimpleAsyncTaskExecutor}
    * — a <b>new, unbounded thread per dispatched message</b> — so a cross-replica burst could spawn
-   * threads without limit (the native-thread-OOM shape). This caps concurrency and, when the small
-   * queue is full, runs the dispatch on the container's own thread ({@link
+   * threads without limit (the native-thread-OOM shape). This caps concurrency and, when the queue
+   * is full, runs the dispatch on the container's own thread ({@link
    * ThreadPoolExecutor.CallerRunsPolicy}) — backpressure, never an unbounded spawn and never a
-   * dropped frame (a dropped relay would leave a peer stale until the next change).
+   * dropped frame (a dropped relay would leave a peer stale until the next change). Sized with
+   * generous headroom (F2/#1243) so cross-replica relay keeps up at ≥200 concurrent users without
+   * ever falling back to the container-thread backpressure that would slow peers' live updates.
    *
    * @return the bounded listener dispatch executor (shut down with the context)
    */
   @Bean(destroyMethod = "shutdown")
   public ThreadPoolTaskExecutor liveSyncRedisListenerExecutor() {
     ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-    executor.setCorePoolSize(2);
-    executor.setMaxPoolSize(8);
-    executor.setQueueCapacity(1000);
+    executor.setCorePoolSize(4);
+    executor.setMaxPoolSize(16);
+    executor.setQueueCapacity(2000);
     executor.setThreadNamePrefix("livesync-redis-");
     executor.setDaemon(true);
     executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());

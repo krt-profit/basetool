@@ -979,13 +979,16 @@ all (the anonymous job-order create form) publish **server-side** through the sa
 relay uses. The worst a malicious authenticated client can achieve is bounded re-fetch
 amplification: whitelisted keys only, bucket-capped frames, and every receiver clamps via its
 coalesce window regardless of publish rate. The `K sockets × rate × viewers` amplification lever is
-bounded on all three multipliers (F2 / #1243): a **per-user socket cap** (12 concurrent `/ws/sync`
+bounded on all three multipliers (F2 / #1243): a **per-user socket cap** (20 concurrent `/ws/sync`
 sockets — one per tab, far above real multi-tab use) bounds `K`; the **per-session token bucket**
-bounds one socket's rate; and a **per-topic token bucket** (60 burst / 30 accepted frames/s, keyed
+bounds one socket's rate; and a **per-topic token bucket** (200 burst / 100 accepted frames/s, keyed
 by room, on top of the per-session one) bounds a room's *aggregate* accepted-frame rate no matter
-how many sockets publish to it. Server-side and cross-replica deliveries bypass the per-topic bucket
-(trusted / already accepted). A refused socket is closed with an app close code the client backs
-off on; every bound degrades to a bounded re-fetch rate, never data loss.
+how many sockets publish to it. All three are sized deliberately generously — never to clip a real
+200-user room, only a crafted flood — since the real backend protection is each receiver's coalesce
+window (which clamps the fragment-refetch herd independent of the relay rate), not the relay bound.
+Server-side and cross-replica deliveries bypass the per-topic bucket (trusted / already accepted). A
+refused socket is closed with an app close code the client backs off on; every bound degrades to a
+bounded re-fetch rate, never data loss.
 
 **Pill, coalescing and resync follow REQ-FE-010 unchanged**, with one sizing addition (5000
 accounts / ≥200 concurrent, ADR-0093): detail-topic receivers keep the 400 ms jittered coalesce
