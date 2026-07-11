@@ -319,8 +319,14 @@ DOS-1 collapse re-introduced on a code path the request-scoped filters do not re
   frontend ignores it unless it arrives from a trusted proxy and always takes the proxy-appended peer.
 - [x] A backend read fired through `ParallelPageLoader`'s virtual-thread worker, and the notification
   SSE relay, both carry the real client IP rather than the frontend-container IP (#1130 / #1110).
+- [x] Both anonymous order-create variants — `POST /api/v1/orders` and the heavier item-order
+  `POST /api/v1/orders/items` (which derives materials from blueprints and takes a table-wide
+  pessimistic lock) — share the tight per-endpoint `order-create` budget. The rule lists both paths
+  explicitly because `RateLimitingFilter`'s `PathPattern` uses exact-segment matching, so the parent
+  `/api/v1/orders` alone does not cover the `/items` child.
 
-**Enforced by:** `ClientIpRelayFilterTest`, `ClientIpContextFilterTest`, `ParallelPageLoaderTest`
+**Enforced by:** `ClientIpRelayFilterTest`, `ClientIpContextFilterTest`, `ParallelPageLoaderTest`,
+`RateLimitingFilterTest` (`order-create` rule covers the `/orders/items` child path)
 · **Code:** `ClientIpRelayFilter` / `ClientIpContextFilter` / `ClientIpProperties` /
 `ForwardedHeaderConfig` / `RateLimitingFilter.resolveClientIp` / `ParallelPageLoader` /
 `WebClientConfig.sseWebClient` · **Issues:** security audit DOS-1, SEC-02, #1130, #1110

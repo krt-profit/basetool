@@ -241,10 +241,12 @@ app:
     # the legitimate user with comfortable headroom while flagging programmatic abuse.
     rules:
       - name: mission-create
-        # Anonymous can create missions via POST /api/v1/missions. The endpoint runs a Mission
-        # row insert + index update. Raised 10 -> 100/min/IP so legitimate high-volume submission
-        # (e.g. an operator seeding many missions back-to-back) is not throttled; the edge limiter
-        # (20 r/s per IP, REQ-SEC-023) and the global budget still bound outright flooding.
+        # POST /api/v1/missions is permitAll at the URL layer but the method gate
+        # (MissionController#createMission @PreAuthorize("isAuthenticated()")) requires an
+        # authenticated caller — anonymous creation is NOT possible. The endpoint runs a Mission
+        # row insert + index update. 100/min/IP so legitimate high-volume submission (an operator
+        # seeding many missions back-to-back) is not throttled; the edge limiter (20 r/s per IP,
+        # REQ-SEC-023) and the global budget still bound outright flooding.
         methods: [POST]
         paths:
           - /api/v1/missions
@@ -252,19 +254,28 @@ app:
         refillTokens: 100
         refillPeriod: 1m
       - name: order-create
-        # Anonymous can create job orders via POST /api/v1/orders (CLAUDE.md: gewollt). Same
-        # write-heavy profile as the mission create, same cap. Raised 10 -> 100/min/IP.
+        # Anonymous can create job orders via POST /api/v1/orders AND item job orders via POST
+        # /api/v1/orders/items (both permitAll, CLAUDE.md: gewollt). The item-order create is the
+        # heavier of the two (it derives each ordered item's materials from its blueprint and, like
+        # the material create, opens with a table-wide pessimistic lock over job_orders), so it MUST
+        # share this tight budget. Both paths are listed explicitly: the matcher uses Spring
+        # PathPattern exact-segment matching, so `/api/v1/orders` alone does NOT cover the
+        # `/api/v1/orders/items` child segment (the gap that let the item create ride only the loose
+        # global /api/** umbrella). The rule is methods:[POST], so the GET /api/v1/orders/item-catalog
+        # catalog reads are unaffected. Same write-heavy profile as the mission create, same cap.
         methods: [POST]
         paths:
           - /api/v1/orders
+          - /api/v1/orders/items
         capacity: 100
         refillTokens: 100
         refillPeriod: 1m
       - name: finance-entry-create
-        # Anonymous guest participants can record their own payouts via POST /api/v1/finance-entries.
-        # A mission may legitimately accrue many finance entries across its lifecycle, all created by
-        # the same guest IP. Raised 20 -> 200/min/IP; the edge limiter (20 r/s per IP, REQ-SEC-023)
-        # and the global budget still bound outright flooding.
+        # POST /api/v1/finance-entries requires an authenticated member: it is .authenticated() in
+        # SecurityConfig and gated by isMemberOrAbove at the method layer (no longer anonymous). A
+        # mission may legitimately accrue many finance entries across its lifecycle from the same
+        # member IP. 200/min/IP; the edge limiter (20 r/s per IP, REQ-SEC-023) and the global budget
+        # still bound outright flooding.
         methods: [POST]
         paths:
           - /api/v1/finance-entries

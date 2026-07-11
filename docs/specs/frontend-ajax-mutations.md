@@ -628,13 +628,19 @@ the write seam but not the receiver or the whitelist. The
 `overview` fragment (Tab-1 + a `#overview-head-meta` carrier that patches the sticky header title /
 status pill / facts) is added by this requirement so core/schedule/status edits propagate too.
 
-Two server-side guards bound the abuse surface the socket adds. The handshake is **authorized against
+Three server-side guards bound the abuse surface the socket adds. The handshake is **authorized against
 mission access** — `MissionPresenceHandshakeAuthInterceptor` issues the same authenticated
 `GET /api/v1/missions/{id}` the page does, so an authenticated user cannot join the presence room of a
 mission they may not see (an explicit backend 403/404 refuses the handshake; a transient backend error
 fails open so a blip never kills presence). Inbound `changed` frames are **rate-limited per session**
 (a token bucket sized far above any human edit cadence), so a crafted client cannot drive sustained
-re-fetch amplification even within a mission it can see.
+re-fetch amplification even within a mission it can see. The **presence control frames** (`focus` /
+`heartbeat` / `blur`) carry the same bounds: an over-length `sectionKey` is dropped, the frames share
+an equivalent per-session token bucket, and `MissionPresenceService` caps the number of distinct
+sections tracked per mission — so a single authenticated socket cannot grow the per-mission presence
+map without limit, nor force the O(N²) full-map snapshot rebuild-and-broadcast blow-up that looping
+`focus` frames with unique section keys would otherwise drive (the presence path previously lacked the
+allowlist/rate-limit hardening its `changed` sibling already had).
 
 An incoming refresh must **never yank a section out from under an active edit**: while a modal is open
 (or focus sits inside the target section's container) the refresh is deferred behind a DS-styled
@@ -675,6 +681,9 @@ notification SSE registry carries the same two fixes (#1157 / #1156, see REQ-NOT
   does not refresh twice.
 - [ ] An authenticated user cannot open the presence socket for a mission the backend forbids
   (handshake refused), and a flood of `changed` frames from one session is rate-limited.
+- [ ] A flood of presence `focus`/`heartbeat` frames from one session — including frames carrying
+  unique or over-length `sectionKey`s — is rate-limited and cannot grow the per-mission presence map
+  beyond its distinct-section cap.
 
 Coverage note: `MissionLiveSyncE2eTest` exercises the representative path end-to-end twice — a
 participant add propagating to a second viewer in place (no reload), and a Ziele-objective add
@@ -686,12 +695,16 @@ authenticated fragment GET (covered by the mission fragment/redaction tests) rat
 live-sync case.
 
 **Enforced by:** `MissionPresenceWebSocketHandlerTest` (relay to peers, origin exclusion, key
-sanitising/dedup, full seam-map whitelist relay, no-op on empty, per-session rate limit) ·
+sanitising/dedup, full seam-map whitelist relay, no-op on empty, per-session `changed` rate limit,
+per-session presence-frame rate limit bounding the section map, over-length `sectionKey` dropped) ·
+`MissionPresenceServiceTest` (distinct-section-per-mission cap) ·
 `MissionPresenceHandshakeAuthInterceptorTest`
 (handshake allowed on authorized read, refused on 403/404, fail-open on transient, 400 on a malformed
 path) · `MissionLiveSyncE2eTest` (two-context live participant-add propagation + no-reload assertion) ·
-**Code:** `MissionPresenceWebSocketHandler.broadcastChanged` / `allowChangedFrame`,
-`MissionPresenceHandshakeAuthInterceptor`, `mission-presence.js` (`sendChanged` / `krt:mission-changed`
+**Code:** `MissionPresenceWebSocketHandler.broadcastChanged` / `allowChangedFrame` /
+`allowPresenceFrame` / `MAX_SECTION_KEY_LENGTH`, `MissionPresenceService`
+(`MAX_SECTIONS_PER_MISSION`), `MissionPresenceHandshakeAuthInterceptor`, `mission-presence.js`
+(`sendChanged` / `krt:mission-changed`
 / `krt:mission-resync`), `mission-detail.js` (`krtRefreshMissionSection` broadcast + live-sync
 receiver — its container map derived from the `MISSION_SECTIONS` seam map — with flush-time busy
 re-check + finance-badge `krt:swapped` listener), `mission-detail.html` (`overviewSection` fragment),

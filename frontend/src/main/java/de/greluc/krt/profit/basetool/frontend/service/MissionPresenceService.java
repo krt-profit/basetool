@@ -71,6 +71,16 @@ public class MissionPresenceService {
    */
   public static final Duration ENTRY_TTL = Duration.ofSeconds(120);
 
+  /**
+   * Upper bound on the number of distinct section keys tracked per mission. A mission detail page
+   * exposes roughly a dozen editable panels, so this cap sits well above legitimate use while
+   * bounding the per-mission presence-map memory a crafted client could otherwise grow by looping
+   * {@code focus} frames with unique section keys. The WebSocket handler's per-session token bucket
+   * bounds the growth <em>rate</em>; this bounds the absolute <em>size</em>. Package-private for
+   * the test.
+   */
+  static final int MAX_SECTIONS_PER_MISSION = 64;
+
   private final Map<UUID, Map<String, Map<String, Entry>>> byMission = new ConcurrentHashMap<>();
 
   /**
@@ -107,8 +117,18 @@ public class MissionPresenceService {
       @NotNull String displayName) {
     Map<String, Map<String, Entry>> sections =
         byMission.computeIfAbsent(missionId, ignored -> new ConcurrentHashMap<>());
-    Map<String, Entry> editors =
-        sections.computeIfAbsent(sectionKey, ignored -> new ConcurrentHashMap<>());
+    Map<String, Entry> editors = sections.get(sectionKey);
+    if (editors == null) {
+      // Refuse a first-seen section once the mission is already at the distinct-section cap, rather
+      // than growing the map. Guards against a crafted client looping focus frames with unique
+      // section keys to exhaust memory (the handler additionally rate-limits and length-caps the
+      // key). A concurrent pair of first-sightings may overshoot the cap by a small constant, which
+      // is harmless — the bound is a memory ceiling, not an exact count.
+      if (sections.size() >= MAX_SECTIONS_PER_MISSION) {
+        return false;
+      }
+      editors = sections.computeIfAbsent(sectionKey, ignored -> new ConcurrentHashMap<>());
+    }
     Instant now = Instant.now();
     Entry prev = editors.put(userId, new Entry(userId, displayName, now));
     return prev == null;

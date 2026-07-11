@@ -136,8 +136,10 @@ public class RateLimitingFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Resolves the client key for bucketing — the servlet remote address, which Spring resolves from
-   * the forwarded headers under {@code forward-headers-strategy=framework}.
+   * Resolves the client key for bucketing — the servlet remote address, which the servlet container
+   * resolves from the forwarded headers under {@code server.forward-headers-strategy=native} (the
+   * strategy this module's {@code application.yml} configures; Tomcat's RemoteIpValve applies the
+   * trusted-proxy X-Forwarded-For before the request reaches this filter).
    *
    * @param request the current request
    * @return a non-null IP string usable as a map key
