@@ -90,6 +90,15 @@ import tools.jackson.databind.node.ObjectNode;
  * a Redis subscriber calls. Because local relay happens first, a fan-out outage degrades to
  * single-instance behaviour, never worse (ADR-0093).
  *
+ * <p><b>Abuse bounds</b> (F2 / #1243). Publishing needs no subscription, so two levers are capped
+ * independently: a <b>per-user socket cap</b> ({@link #MAX_SOCKETS_PER_USER}) bounds how many
+ * multiplexed sockets one user may hold (a refused socket is closed with {@link
+ * #SOCKET_CAP_EXCEEDED}), and a <b>per-topic token bucket</b> ({@link #TOPIC_CHANGED_BURST} burst /
+ * {@code TOPIC_CHANGED_REFILL_PER_SEC}/s, on top of the per-session bucket) bounds a room's
+ * aggregate relay + fan-out rate regardless of how many sockets publish to it. Both sit far above
+ * any legitimate use, so they only clamp a crafted flood; both degrade to a bounded re-fetch rate,
+ * never data loss.
+ *
  * <p><b>Concurrency &amp; backpressure</b> (preserved verbatim from the mission relay,
  * #1149/#1150): the per-topic session map is a {@link ConcurrentHashMap} whose sets are mutated
  * atomically under the entry's bin lock ({@code compute}/{@code computeIfPresent}), so a concurrent
@@ -117,6 +126,29 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
 
   /** Token-bucket refill rate for inbound {@code changed} frames, in tokens per second. */
   private static final double CHANGED_REFILL_PER_SEC = 10.0;
+
+  /**
+   * Per-<em>topic</em> token-bucket capacity for accepted {@code changed} frames (F2 / #1243). The
+   * per-session bucket ({@link #CHANGED_BURST}) bounds one socket; this second bucket, keyed by the
+   * canonical topic, bounds a room's <em>aggregate</em> relay + fan-out rate across <b>all</b>
+   * publishers, so no set of sockets can amplify one (chiefly global) room's fragment-refetch
+   * fan-out. Sized far above any realistic mutation cadence for a room — even a busy queue or bank
+   * sees a handful of writes/s, well under this — so a legitimate 200-user room never trips it; it
+   * only clamps a crafted flood. Package-private for the test.
+   */
+  static final int TOPIC_CHANGED_BURST = 60;
+
+  /** Per-topic refill rate for accepted {@code changed} frames, in tokens per second (F2/#1243). */
+  private static final double TOPIC_CHANGED_REFILL_PER_SEC = 30.0;
+
+  /**
+   * Idle age past which the reaper drops a per-topic {@code changed} bucket (F2/#1243). A bucket
+   * untouched this long has fully refilled (30/s ≫ 60 in 60 s), so dropping it and recreating a
+   * fresh full bucket on the next publish is behaviourally identical — this just bounds the
+   * per-topic map to the set of recently-active rooms instead of accreting one entry per distinct
+   * mission/operation/order ever edited. Package-private for the test.
+   */
+  static final long TOPIC_BUCKET_IDLE_REAP_NANOS = TimeUnit.SECONDS.toNanos(60);
 
   /**
    * Max time (ms) a single send may block before the {@link ConcurrentWebSocketSessionDecorator}
@@ -183,7 +215,36 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    */
   private static final int MAX_TOPICS_PER_SESSION = 16;
 
+  /**
+   * Hard cap on concurrent multiplexed {@code /ws/sync} sockets one user (Keycloak {@code sub}) may
+   * hold (F2 / #1243). One tab opens exactly one such socket (the lazy singleton in {@code
+   * krt-live-sync.js}), so this sits far above any legitimate multi-tab use — with headroom for the
+   * brief overlap while a reconnecting tab's old socket is still closing — yet bounds the {@code K}
+   * in the {@code K sockets × publish-rate × room-viewers} amplification lever. A refused socket is
+   * closed with {@link #SOCKET_CAP_EXCEEDED}. Only the multiplexed socket is capped: legacy
+   * per-resource sockets can only reach their single bounded-audience room and are slated for
+   * removal. Package-private for the test.
+   */
+  static final int MAX_SOCKETS_PER_USER = 12;
+
+  /**
+   * Application-defined WebSocket close status ({@code 4029}) for a socket refused by the per-user
+   * cap ({@link #MAX_SOCKETS_PER_USER}). The client ({@code krt-live-sync.js}) recognises this code
+   * and backs its reconnect off to the maximum interval rather than hammering, recovering quietly
+   * once another tab closes and frees a slot.
+   */
+  static final CloseStatus SOCKET_CAP_EXCEEDED = new CloseStatus(4029, "socket cap exceeded");
+
   private static final String ATTR_USER_ID = "livesync.userId";
+
+  /**
+   * Session-attribute key ({@link Boolean}) marking a socket that incremented its user's
+   * live-socket count, so the close path decrements exactly once. A socket refused by the per-user
+   * cap never sets it (it decrements inline), so its later {@code afterConnectionClosed} does not
+   * double-decrement.
+   */
+  private static final String ATTR_USER_COUNTED = "livesync.userCounted";
+
   private static final String ATTR_DISPLAY_NAME = "livesync.displayName";
   private static final String ATTR_CHANGED_RATE = "livesync.changedRate";
 
@@ -204,6 +265,21 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   private final Executor authExecutor;
 
   private final Map<String, Set<WebSocketSession>> sessionsByTopic = new ConcurrentHashMap<>();
+
+  /**
+   * Live multiplexed-socket count per user (Keycloak {@code sub}), backing the per-user socket cap
+   * (F2 / #1243). Incremented atomically at connect, decremented at close; an entry is removed when
+   * it reaches zero, so the map is bounded by the number of currently connected users.
+   */
+  private final Map<String, Integer> socketsByUser = new ConcurrentHashMap<>();
+
+  /**
+   * Per-topic {@code changed}-frame token buckets, backing the per-topic publish throttle (F2 /
+   * #1243). Keyed by canonical topic; each bucket serialises its own token math under its instance
+   * monitor. Buckets are reaped by {@link #reapIdleTopicBuckets(long)} so the map stays bounded to
+   * recently-active rooms.
+   */
+  private final Map<String, TopicRateState> changedRateByTopic = new ConcurrentHashMap<>();
 
   /**
    * Builds the handler. Binds the {@code basetool_presence_ws_sessions} gauge (live sockets summed
@@ -334,9 +410,10 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
 
   /**
    * Registers a multiplexed {@code /ws/sync} socket. It joins no room at connect — its rooms are
-   * built by later {@code subscribe} frames — so this only resolves the principal, wraps the socket
-   * in its backpressure decorator and seeds an empty subscription set. A socket with no resolvable
-   * principal is refused.
+   * built by later {@code subscribe} frames — so this only resolves the principal, enforces the
+   * per-user socket cap (F2 / #1243), wraps the socket in its backpressure decorator and seeds an
+   * empty subscription set. A socket with no resolvable principal, or one that would put the user
+   * over {@link #MAX_SOCKETS_PER_USER}, is refused.
    *
    * @param session the freshly opened multiplexed session
    */
@@ -348,6 +425,17 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       session.close(CloseStatus.NOT_ACCEPTABLE);
       return;
     }
+    if (!tryAcquireUserSocket(userId)) {
+      // Per-user socket cap: bound the number of concurrent /ws/sync sockets one user holds so the
+      // K in the changed-publish amplification lever (K sockets × rate × room viewers) is bounded.
+      // The count was undone in tryAcquireUserSocket, and ATTR_USER_COUNTED is left unset so
+      // the ensuing afterConnectionClosed does not decrement again.
+      log.debug("Live-sync /ws/sync socket refused (per-user cap {})", MAX_SOCKETS_PER_USER);
+      socketRejectedCounter(MetricNames.SOCKET_REJECTED_USER_CAP).increment();
+      session.close(SOCKET_CAP_EXCEEDED);
+      return;
+    }
+    session.getAttributes().put(ATTR_USER_COUNTED, Boolean.TRUE);
     session.getAttributes().put(ATTR_USER_ID, userId);
     session.getAttributes().put(ATTR_DISPLAY_NAME, resolveDisplayName(principal));
     session.getAttributes().put(ATTR_SUBSCRIPTIONS, ConcurrentHashMap.<String>newKeySet());
@@ -443,8 +531,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
         // session Spring handed us — otherwise origin exclusion misses and echoes back (#1149).
         List<String> sections = sanitiseSections(node.get("sections"), topic.topicClass());
         if (!sections.isEmpty()) {
-          relayLocal(topic, sections, decorated(session));
-          fanout.publish(topic.canonical(), sections);
+          relayChangedThrottled(topic, sections, decorated(session));
         }
       } else {
         droppedCounter(topic, MetricNames.DROPPED_THROTTLED).increment();
@@ -720,8 +807,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     if (sections.isEmpty()) {
       return;
     }
-    relayLocal(topic, sections, decorated(session));
-    fanout.publish(topic.canonical(), sections);
+    relayChangedThrottled(topic, sections, decorated(session));
   }
 
   /**
@@ -776,6 +862,13 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    */
   private void closeMultiplexed(@NotNull WebSocketSession session) {
     String userId = (String) session.getAttributes().get(ATTR_USER_ID);
+    // Release the per-user socket slot exactly once (F2 / #1243) — only for a socket that actually
+    // acquired one (a cap-refused socket already released it inline and left ATTR_USER_COUNTED
+    // unset). Done before the subscription-set check so it runs even for a socket closed between
+    // establish and its first subscribe.
+    if (userId != null && Boolean.TRUE.equals(session.getAttributes().get(ATTR_USER_COUNTED))) {
+      releaseUserSocket(userId);
+    }
     WebSocketSession decorated = decorated(session);
     Set<String> subs = subscriptions(session);
     if (subs == null) {
@@ -995,6 +1088,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    */
   void tickReaper() {
     try {
+      reapIdleTopicBuckets(System.nanoTime());
       List<LiveSyncPresenceService.TopicSectionRef> affected =
           presenceService.reapExpired(Instant.now());
       if (affected.isEmpty()) {
@@ -1135,6 +1229,136 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       return true;
     }
     return false;
+  }
+
+  /**
+   * Relays a sanitised {@code changed} frame through the per-<em>topic</em> throttle (F2 / #1243):
+   * consumes a token from the topic's bucket and, on success, relays to the local room (excluding
+   * {@code origin}) and hands the frame to the cross-replica fan-out; on exhaustion counts a {@link
+   * MetricNames#DROPPED_TOPIC_THROTTLED} drop and relays nothing. This is the second, room-scoped
+   * gate after the per-session bucket: it bounds a room's aggregate relay + fan-out rate across all
+   * publishers, so no set of sockets can amplify one room's fragment-refetch fan-out. Server-side
+   * publishes ({@link #publishFromServer}) and peer-replica deliveries ({@link #deliverFromFanout})
+   * deliberately bypass this gate — the former is trusted and request-rate-limited upstream, the
+   * latter was already accepted (and throttled) on its originating replica.
+   *
+   * @param topic the topic being published to
+   * @param sections the sanitised, non-empty section keys
+   * @param origin the local originating session to exclude from the relay
+   */
+  private void relayChangedThrottled(
+      @NotNull LiveSyncTopic topic,
+      @NotNull List<String> sections,
+      @NotNull WebSocketSession origin) {
+    if (!allowTopicChanged(topic)) {
+      droppedCounter(topic, MetricNames.DROPPED_TOPIC_THROTTLED).increment();
+      return;
+    }
+    relayLocal(topic, sections, origin);
+    fanout.publish(topic.canonical(), sections);
+  }
+
+  /**
+   * Per-topic token-bucket rate limit on accepted {@code changed} frames (F2 / #1243). Unlike the
+   * per-session bucket in {@link #allowChangedFrame} (touched only by that session's delivery
+   * thread), one topic bucket is hit concurrently by every session publishing to the room, so its
+   * token math runs under the bucket instance's monitor; {@code computeIfAbsent} atomically
+   * gets-or-creates the shared instance. A bucket the reaper drops while idle simply gets recreated
+   * full on the next publish — the correct idle state — so the reap never mis-throttles.
+   *
+   * @param topic the topic the frame targets
+   * @return {@code true} to relay the frame, {@code false} to drop it as per-topic throttled
+   */
+  private boolean allowTopicChanged(@NotNull LiveSyncTopic topic) {
+    long now = System.nanoTime();
+    TopicRateState state =
+        changedRateByTopic.computeIfAbsent(
+            topic.canonical(), ignored -> new TopicRateState(TOPIC_CHANGED_BURST, now));
+    synchronized (state) {
+      double elapsedSeconds = (now - state.lastRefillNanos) / 1_000_000_000.0;
+      state.tokens =
+          Math.min(
+              TOPIC_CHANGED_BURST, state.tokens + elapsedSeconds * TOPIC_CHANGED_REFILL_PER_SEC);
+      state.lastRefillNanos = now;
+      if (state.tokens >= 1.0) {
+        state.tokens -= 1.0;
+        return true;
+      }
+      return false;
+    }
+  }
+
+  /**
+   * Drops per-topic {@code changed} buckets untouched for at least {@link
+   * #TOPIC_BUCKET_IDLE_REAP_NANOS}, keeping {@link #changedRateByTopic} bounded to recently-active
+   * rooms rather than accreting one entry per distinct topic ever published to. An idle bucket has
+   * fully refilled, so removing it (and recreating it full on the next publish) is behaviourally
+   * identical; an actively-used bucket's monitor serialises against the token math, so its
+   * just-updated {@code lastRefillNanos} keeps it. Package-private and clock-parameterised so the
+   * test can force reaping deterministically.
+   *
+   * @param nowNanos the current {@link System#nanoTime()} reading
+   */
+  void reapIdleTopicBuckets(long nowNanos) {
+    long cutoff = nowNanos - TOPIC_BUCKET_IDLE_REAP_NANOS;
+    changedRateByTopic
+        .entrySet()
+        .removeIf(
+            entry -> {
+              synchronized (entry.getValue()) {
+                return entry.getValue().lastRefillNanos <= cutoff;
+              }
+            });
+  }
+
+  /**
+   * The number of live per-topic {@code changed} buckets (test seam for the reaper: proves an idle
+   * bucket is dropped).
+   *
+   * @return the size of {@link #changedRateByTopic}
+   */
+  int topicBucketCount() {
+    return changedRateByTopic.size();
+  }
+
+  /**
+   * Atomically claims a per-user socket slot (F2 / #1243): increments the user's live-socket count
+   * and, if that would exceed {@link #MAX_SOCKETS_PER_USER}, undoes the increment and refuses.
+   *
+   * @param userId the connecting user's stable id (Keycloak {@code sub})
+   * @return {@code true} if a slot was claimed, {@code false} if the user is already at the cap
+   */
+  private boolean tryAcquireUserSocket(@NotNull String userId) {
+    int count = socketsByUser.merge(userId, 1, Integer::sum);
+    if (count > MAX_SOCKETS_PER_USER) {
+      releaseUserSocket(userId);
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Releases a per-user socket slot (F2 / #1243), removing the entry when the user's last socket
+   * closes so the map stays bounded to currently-connected users.
+   *
+   * @param userId the closing socket owner's stable id
+   */
+  private void releaseUserSocket(@NotNull String userId) {
+    socketsByUser.compute(
+        userId, (ignored, count) -> (count == null || count <= 1) ? null : count - 1);
+  }
+
+  /**
+   * Counter {@code basetool_livesync_socket_rejected_total{reason}} for a {@code /ws/sync} socket
+   * refused at connect. Carries no {@code topic_class} — no topic at socket-establish time.
+   *
+   * @param reason the refusal reason (a bounded literal, e.g. {@link
+   *     MetricNames#SOCKET_REJECTED_USER_CAP})
+   * @return the counter to increment
+   */
+  private Counter socketRejectedCounter(@NotNull String reason) {
+    return meterRegistry.counter(
+        MetricNames.LIVESYNC_SOCKET_REJECTED, MetricNames.TAG_REASON, reason);
   }
 
   private void sendSnapshot(@NotNull WebSocketSession session, @NotNull LiveSyncTopic topic) {
@@ -1281,6 +1505,23 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     private long lastRefillNanos;
 
     ChangedRateState(double tokens, long lastRefillNanos) {
+      this.tokens = tokens;
+      this.lastRefillNanos = lastRefillNanos;
+    }
+  }
+
+  /**
+   * Mutable per-topic token-bucket state for the per-topic {@code changed}-frame throttle (F2 /
+   * #1243). Distinct from {@link ChangedRateState} because one instance is shared across every
+   * session publishing to the room and is therefore mutated under its own monitor (see {@link
+   * #allowTopicChanged} / {@link #reapIdleTopicBuckets}) — a separate type keeps guarded-access
+   * discipline uniform and self-documenting.
+   */
+  private static final class TopicRateState {
+    private double tokens;
+    private long lastRefillNanos;
+
+    TopicRateState(double tokens, long lastRefillNanos) {
       this.tokens = tokens;
       this.lastRefillNanos = lastRefillNanos;
     }

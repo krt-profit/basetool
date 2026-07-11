@@ -508,19 +508,25 @@ is the HTTP verb. The push-channel surfaces (#1041 item 17) add `basetool_notifi
 `basetool_presence_ws_sessions` (live live-sync WebSocket sessions summed across all topic rooms,
 `LiveSyncWebSocketHandler`) gauges, plus the `basetool_presence_relay_frames_total{type,topic_class}`
 (`type` = `changed` / `snapshot`) and `basetool_presence_relay_dropped_total{reason,topic_class}`
-(`reason` = `throttled` / `send_failed` / `topic_cap` / `authorize_saturated`) counters at the
-previously-silent throttle, send-failure, topic-cap and subscribe-saturation branches of the relay —
+(`reason` = `throttled` / `send_failed` / `topic_cap` / `authorize_saturated` / `topic_throttled`)
+counters at the previously-silent throttle, send-failure, topic-cap, subscribe-saturation and
+per-topic-throttle branches of the relay — the `topic_throttled` reason (F2/#1243) fires when a
+room's *aggregate* publish rate exceeds its per-topic token bucket regardless of the per-session
+limit —
 the component that shipped the REQ-FE-010 staleness defect. Since #1102 (REQ-FE-015 / ADR-0093) both
 counters carry a bounded `topic_class` label (one of the eight `LiveSyncTopicClass` labels: `mission`,
 `operation`, `order`, `orders`, `bank_account`, `bank_staff`, `orgunit_bank`, `materialboard`), and
 the meter names stay put — a rename would break the `07` panels and this alert set. A `changed`-frame
 flatline (overall on panel 28, or per surface on the `topic_class` breakdown) while `snapshot` frames
 keep flowing is the early indicator for that defect class (panels only, baselined before alerting).
-The tool-wide live-sync relay adds three more meters: `basetool_livesync_subscriptions{topic_class}`
+The tool-wide live-sync relay adds four more meters: `basetool_livesync_subscriptions{topic_class}`
 (open `/ws/sync` subscriptions per topic class — the live per-surface load denominator),
 `basetool_livesync_subscribe_total{topic_class,outcome}` (`outcome` = `allowed` / `denied`, the
 subscribe-authorization verdict; a saturated-executor fail-open is instead a `authorize_saturated`
-relay drop), and the cross-replica fan-out counters
+relay drop), `basetool_livesync_socket_rejected_total{reason}` (`reason` = `user_cap`; a `/ws/sync`
+socket refused at connect because the user is already at the per-user socket cap — F2/#1243, no
+`topic_class` because a rejected socket has bound no topic; plotted alongside the relay drops on the
+`07` "Presence relay drops/hour" panel), and the cross-replica fan-out counters
 `basetool_livesync_redis_published_total{topic_class}` / `basetool_livesync_redis_consumed_total{topic_class}`
 (`changed` signals published to / consumed from the `basetool:livesync:changed` Redis channel;
 own-origin excluded) plus `basetool_livesync_redis_errors_total{op}` (`publish` / `consume`, a

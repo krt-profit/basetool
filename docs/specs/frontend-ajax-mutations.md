@@ -978,7 +978,14 @@ approval must reach the bank-staff rooms. Mutations that can happen with no auth
 all (the anonymous job-order create form) publish **server-side** through the same local bus the
 relay uses. The worst a malicious authenticated client can achieve is bounded re-fetch
 amplification: whitelisted keys only, bucket-capped frames, and every receiver clamps via its
-coalesce window regardless of publish rate.
+coalesce window regardless of publish rate. The `K sockets × rate × viewers` amplification lever is
+bounded on all three multipliers (F2 / #1243): a **per-user socket cap** (12 concurrent `/ws/sync`
+sockets — one per tab, far above real multi-tab use) bounds `K`; the **per-session token bucket**
+bounds one socket's rate; and a **per-topic token bucket** (60 burst / 30 accepted frames/s, keyed
+by room, on top of the per-session one) bounds a room's *aggregate* accepted-frame rate no matter
+how many sockets publish to it. Server-side and cross-replica deliveries bypass the per-topic bucket
+(trusted / already accepted). A refused socket is closed with an app close code the client backs
+off on; every bound degrades to a bounded re-fetch rate, never data loss.
 
 **Pill, coalescing and resync follow REQ-FE-010 unchanged**, with one sizing addition (5000
 accounts / ≥200 concurrent, ADR-0093): detail-topic receivers keep the 400 ms jittered coalesce
@@ -1009,7 +1016,9 @@ pattern on `basetool:notify:published` (REQ-NOTIF-006 polling stays the correctn
   `:frontend:test`.
 
 **Enforced by:** `LiveSyncWebSocketHandlerTest` (topic parsing, cross-room isolation, per-topic
-whitelists, publish-without-subscription, per-session rate limit, topic cap, close cleanup) ·
+whitelists, publish-without-subscription, per-session rate limit, topic cap, close cleanup, plus the
+F2/#1243 abuse bounds: per-user socket cap accept/refuse/decrement/per-user, per-topic publish
+throttle across publishers, idle-bucket reaping) ·
 `LiveSyncTopicTest` + `LiveSyncSectionMapParityTest` (topic-class parsing/exhaustiveness + seam-map
 parity) · `LiveSyncSubscriptionAuthorizerTest` (per-topic allow/deny/fail-open incl.
 requester-refused queue + bank dual-auth matrix) · `RedisLiveSyncFanoutTest` +

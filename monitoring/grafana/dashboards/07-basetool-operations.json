@@ -1531,6 +1531,15 @@
             "type": "prometheus",
             "uid": "prometheus"
           }
+        },
+        {
+          "expr": "sum by (reason) (rate(basetool_livesync_socket_rejected_total[1h])) * 3600",
+          "refId": "B",
+          "legendFormat": "socket:{{reason}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ]
     },

@@ -821,6 +821,100 @@ class LiveSyncWebSocketHandlerTest {
     assertThat(fanout.publishedTopics).isEmpty();
   }
 
+  // ── Abuse bounds (F2 / #1243): per-user socket cap + per-topic publish throttle ───────────────
+
+  @Test
+  void perUserSocketCap_refusesBeyondTheCap_andCounts() throws Exception {
+    OidcUser bob = oidcUser("user-2", "Bob");
+    for (int i = 0; i < LiveSyncWebSocketHandler.MAX_SOCKETS_PER_USER; i++) {
+      // Every socket up to the cap is accepted (not closed).
+      assertThat(openMultiplexedSession(bob).closeStatus).isNull();
+    }
+
+    // The one past the cap is refused with the dedicated cap close status and counted.
+    FakeSession overCap = openMultiplexedSession(bob);
+    assertThat(overCap.closeStatus).isEqualTo(LiveSyncWebSocketHandler.SOCKET_CAP_EXCEEDED);
+    assertThat(socketRejectedCounter(MetricNames.SOCKET_REJECTED_USER_CAP)).isEqualTo(1.0);
+  }
+
+  @Test
+  void perUserSocketCap_decrementsOnClose_allowingANewSocket() throws Exception {
+    OidcUser bob = oidcUser("user-2", "Bob");
+    List<FakeSession> sockets = new ArrayList<>();
+    for (int i = 0; i < LiveSyncWebSocketHandler.MAX_SOCKETS_PER_USER; i++) {
+      sockets.add(openMultiplexedSession(bob));
+    }
+    // At the cap: a further socket is refused.
+    assertThat(openMultiplexedSession(bob).closeStatus)
+        .isEqualTo(LiveSyncWebSocketHandler.SOCKET_CAP_EXCEEDED);
+
+    // Closing one frees a slot (the close path decrements the per-user count exactly once)...
+    FakeSession first = sockets.get(0);
+    first.open = false;
+    handler.afterConnectionClosed(first, CloseStatus.NORMAL);
+
+    // ...so the next socket now fits.
+    assertThat(openMultiplexedSession(bob).closeStatus).isNull();
+  }
+
+  @Test
+  void perUserSocketCap_isPerUser_soAnotherUserIsUnaffected() throws Exception {
+    OidcUser bob = oidcUser("user-2", "Bob");
+    for (int i = 0; i < LiveSyncWebSocketHandler.MAX_SOCKETS_PER_USER; i++) {
+      openMultiplexedSession(bob);
+    }
+    assertThat(openMultiplexedSession(bob).closeStatus)
+        .isEqualTo(LiveSyncWebSocketHandler.SOCKET_CAP_EXCEEDED);
+
+    // A different user's socket is unaffected by Bob's saturation — the cap is per-user, not
+    // global.
+    assertThat(openMultiplexedSession(oidcUser("user-1", "Alice")).closeStatus).isNull();
+  }
+
+  @Test
+  void perTopicThrottle_boundsAggregateRelayAcrossPublishers() throws Exception {
+    String topic = operationTopic();
+    FakeSession subscriber = openMultiplexedSession(oidcUser("sub", "Sub"));
+    subscribe(subscriber, topic);
+    subscriber.sent.clear();
+
+    // Several distinct publishers, each staying within its own per-session burst, together exceed
+    // the per-topic burst. The per-session bucket alone cannot bound the room's aggregate rate; the
+    // per-topic bucket does. 4 × CHANGED_BURST(20) = 80 attempts > TOPIC_CHANGED_BURST(60).
+    int publishers = 4;
+    int perPublisher = LiveSyncWebSocketHandler.CHANGED_BURST;
+    for (int p = 0; p < publishers; p++) {
+      FakeSession pub = openMultiplexedSession(oidcUser("pub-" + p, "P" + p));
+      for (int i = 0; i < perPublisher; i++) {
+        handler.handleTextMessage(pub, changedFrame(topic, "overview"));
+      }
+    }
+    int emitted = publishers * perPublisher;
+
+    // The room's relayed frames are capped near the per-topic burst (a negligible refill may add a
+    // few), far below the total emitted; the overflow is counted as topic_throttled.
+    assertThat(subscriber.sent.size())
+        .isGreaterThan(0)
+        .isLessThanOrEqualTo(LiveSyncWebSocketHandler.TOPIC_CHANGED_BURST + 5)
+        .isLessThan(emitted);
+    assertThat(dropCounter(MetricNames.DROPPED_TOPIC_THROTTLED, "operation")).isGreaterThan(0.0);
+  }
+
+  @Test
+  void perTopicBuckets_areReapedWhenIdle() throws Exception {
+    String topic = operationTopic();
+    FakeSession pub = openMultiplexedSession(oidcUser("user-1", "Alice"));
+    // A single accepted publish creates the topic's bucket (relay to the empty room is a no-op).
+    handler.handleTextMessage(pub, changedFrame(topic, "overview"));
+    assertThat(handler.topicBucketCount()).isEqualTo(1);
+
+    // Reaping with a clock well past the idle window drops the idle bucket; recreating it full on
+    // the next publish is behaviourally identical, so the map stays bounded to active rooms.
+    handler.reapIdleTopicBuckets(
+        System.nanoTime() + LiveSyncWebSocketHandler.TOPIC_BUCKET_IDLE_REAP_NANOS * 3);
+    assertThat(handler.topicBucketCount()).isZero();
+  }
+
   // ── Materialbörse board (legacy /ws/materialboerse/board alias + multiplexed materialboard) ───
 
   @Test
@@ -1048,6 +1142,15 @@ class LiveSyncWebSocketHandlerTest {
             .find(MetricNames.PRESENCE_RELAY_DROPPED)
             .tag(MetricNames.TAG_REASON, reason)
             .tag(MetricNames.TAG_TOPIC_CLASS, topicClass)
+            .counter();
+    return counter == null ? 0.0 : counter.count();
+  }
+
+  private double socketRejectedCounter(String reason) {
+    var counter =
+        registry
+            .find(MetricNames.LIVESYNC_SOCKET_REJECTED)
+            .tag(MetricNames.TAG_REASON, reason)
             .counter();
     return counter == null ? 0.0 : counter.count();
   }

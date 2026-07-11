@@ -54,6 +54,13 @@ public final class MetricNames {
   public static final String LIVESYNC_SUBSCRIBE = "basetool.livesync.subscribe";
 
   /**
+   * Counter {@code basetool_livesync_socket_rejected_total} — tag {@code reason} ({@link
+   * #SOCKET_REJECTED_USER_CAP}); a multiplexed {@code /ws/sync} socket refused at connect. Carries
+   * no {@code topic_class} — a rejected socket has bound no topic yet (F2 / #1243, ADR-0093).
+   */
+  public static final String LIVESYNC_SOCKET_REJECTED = "basetool.livesync.socket.rejected";
+
+  /**
    * Counter {@code basetool_livesync_redis_published_total} — tag {@code topic_class}; {@code
    * changed} signals this instance published to the cross-replica Redis channel (ADR-0093).
    */
@@ -204,6 +211,13 @@ public final class MetricNames {
   public static final String DROPPED_TOPIC_CAP = "topic_cap";
 
   /**
+   * Presence drop reason: a {@code changed} frame rejected by the per-<em>topic</em> token bucket —
+   * the room's aggregate publish rate exceeded its bound regardless of the per-session limit (F2 /
+   * #1243).
+   */
+  public static final String DROPPED_TOPIC_THROTTLED = "topic_throttled";
+
+  /**
    * Presence drop reason: a subscribe that failed open because the subscribe-authorization executor
    * was saturated (the probe could not be scheduled).
    */
@@ -214,6 +228,12 @@ public final class MetricNames {
 
   /** Live-sync subscribe outcome: the subscribe was refused by an explicit backend 403/404. */
   public static final String OUTCOME_DENIED = "denied";
+
+  /**
+   * Socket-rejected reason ({@link #LIVESYNC_SOCKET_REJECTED}): a {@code /ws/sync} socket refused
+   * because the user already holds the maximum concurrent sockets (F2 / #1243).
+   */
+  public static final String SOCKET_REJECTED_USER_CAP = "user_cap";
 
   /** Reason: the backend returned a 4xx problem response. */
   public static final String REASON_BACKEND_4XX = "backend_4xx";

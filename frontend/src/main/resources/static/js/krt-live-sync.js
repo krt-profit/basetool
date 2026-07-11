@@ -55,6 +55,10 @@
     const syncSocket = (function () {
         const RECONNECT_BASE_MS = 1000;
         const RECONNECT_MAX_MS = 30000;
+        // Server close code for a per-user socket-cap refusal (F2/#1243, mirrors HTTP 429). This tab
+        // is beyond the generous multi-tab cap; don't hammer — back off to the max interval and let
+        // it recover quietly once another tab closes and frees a slot.
+        const SOCKET_CAP_CLOSE_CODE = 4029;
         // topic -> { handlers, state: 'idle'|'pending'|'subscribed'|'denied', ackedOnce }
         const topics = Object.create(null);
         const publishBuffer = []; // { topic, sections } queued until the socket is open
@@ -155,8 +159,13 @@
             }
         }
 
-        function onClose() {
+        function onClose(ev) {
             ws = null;
+            // A per-user socket-cap refusal (F2/#1243): skip the fast retry ramp and go straight to
+            // the max backoff so this over-cap tab probes only occasionally for a freed slot.
+            if (ev && ev.code === SOCKET_CAP_CLOSE_CODE) {
+                reconnectDelay = RECONNECT_MAX_MS;
+            }
             // Mark every non-denied topic pending so it re-subscribes on the next open.
             Object.keys(topics).forEach(function (t) {
                 if (topics[t].state !== 'denied') {
