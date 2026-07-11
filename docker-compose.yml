@@ -287,6 +287,15 @@ x-backend: &backend-template
     - no-new-privileges:true
   cap_drop: [ALL]
   stop_grace_period: 30s
+  # File-descriptor ceiling (see the frontend template for the full rationale). The backend holds one
+  # long-lived notification-SSE emitter per subscribed viewer plus the Hikari pool, the Redis fan-out
+  # connection and the Keycloak-admin client — a few hundred fds at the ≥200-concurrent target.
+  # Pinned explicitly and generously (65536) rather than left to the inherited daemon default; the
+  # value only ever lowers a large default to a still-ample one, so it cannot fail the container start.
+  ulimits:
+    nofile:
+      soft: 65536
+      hard: 65536
   # Biggest workload on the host: every API call goes through this JVM, Flyway
   # runs at startup, and Hibernate caches L1/L2 + Caffeine caches live here.
   # MaxRAMPercentage=75 (set further down in JAVA_TOOL_OPTIONS) maps to roughly
@@ -458,6 +467,18 @@ x-frontend: &frontend-template
     - no-new-privileges:true
   cap_drop: [ALL]
   stop_grace_period: 30s
+  # File-descriptor ceiling. Since the tool-wide live-sync epic (REQ-FE-015 / ADR-0093) the frontend
+  # holds many long-lived sockets per instance — one /ws/sync WebSocket per tab plus a browser→backend
+  # notification SSE relay per viewer — and each is an fd, on top of the inbound HTTP keep-alives and
+  # the WebClient pool. At the ≥200-concurrent target that is only ~2-3k fds, but the limit was
+  # previously left to inherit the daemon default; pin it explicitly and generously (65536, ~25× the
+  # expected peak) so a socket surge can never hit "too many open files" and silently drop live-sync
+  # connections. 65536 sits at/below any realistic dockerd hard limit, so it only ever lowers a large
+  # inherited default to a still-ample value — it cannot fail the container start by trying to raise.
+  ulimits:
+    nofile:
+      soft: 65536
+      hard: 65536
   # Thymeleaf SSR + WebClient proxy to the backend; no JPA, no business logic,
   # so the working set is well below the backend's. 1024 MB → ~768 MB heap with
   # MaxRAMPercentage=75 covers Tomcat, the Spring Session client cache and the

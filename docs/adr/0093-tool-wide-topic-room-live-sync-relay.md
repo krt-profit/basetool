@@ -166,6 +166,20 @@ within the existing 1000-slot relay pool (~300 emitters expected). Redis pub/sub
 keys, so the ADR-0079 384 MB/noeviction budget is untouched; the worst-case recipient
 payload (all 5000 subs) is ~180 KB.
 
+The **container envelope** holds at this scale. Both apps run Tomcat on **virtual threads**, so
+the ~300 concurrent WS sockets and ~300 SSE emitters are not platform threads and do not count
+toward the `pids: 2048` cap — that cap now bounds only the fixed platform-thread pools (Tomcat
+carriers, NIO pollers, the bounded subscribe-auth / Redis-listener executors, GC/JIT), a few
+hundred threads with the F2/#1243 widening still leaving generous headroom; the July
+native-thread-OOM (unbounded per-message spawn) is structurally gone. Frontend heap (~768 MB of
+the 1024 MB limit) absorbs the ADR-0093 150 MB decorator-backpressure worst case; backend heap
+and `db-backend`'s `max_connections=150` (over the 100-slot Hikari pool) are unchanged by
+live-sync (the socket carries no data; refetches hit existing, coalesce-bounded endpoints). The
+one envelope gap the epic introduces is **file descriptors**: the frontend now holds one
+`/ws/sync` socket per tab plus a notification-SSE relay per viewer, so the previously-inherited
+default `nofile` is pinned explicitly and generously (65536, ~25× the ~2-3 k fds expected at 200
+concurrent) on both apps so a socket surge can never hit "too many open files".
+
 ## Consequences
 
 - **One stack instead of three.** The mission and Materialbörse forks are deleted; new

@@ -149,6 +149,14 @@ docker compose --profile prod logs frontend | grep -iE 'redis.*fan|livesync.*fan
 docker compose --profile prod exec backend  sh -c 'wget -qO- http://localhost:11261/actuator/health || true' ; echo
 docker compose --profile prod exec frontend sh -c 'wget -qO- http://localhost:18081/actuator/health || true' ; echo
 # Expect {"status":"UP"} on both.
+
+# 4. File-descriptor ceiling: the epic pins nofile=65536 on both apps (they now hold one /ws/sync
+#    socket per tab + a notification-SSE relay per viewer). Confirm the pin took effect — a value far
+#    below 65536 would mean the dockerd hard limit clamped it, in which case raise LimitNOFILE in the
+#    host's docker.service before relying on live-sync at scale.
+docker compose --profile prod exec backend  sh -c 'ulimit -n' ; echo
+docker compose --profile prod exec frontend sh -c 'ulimit -n' ; echo
+# Expect 65536 on both.
 ```
 
 **Grafana (dashboard `07 Basetool operations`):**
