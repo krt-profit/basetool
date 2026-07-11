@@ -26,7 +26,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.ManufacturerService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -72,14 +71,7 @@ public class ManufacturerController {
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("name", "abbreviation", "id"), "name");
     Page<Manufacturer> p = manufacturerService.getAllManufacturers(pageable, includeHidden);
-    List<ManufacturerDto> content = p.getContent().stream().map(manufacturerMapper::toDto).toList();
-    return new PageResponse<>(
-        content,
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p.map(manufacturerMapper::toDto));
   }
 
   /**

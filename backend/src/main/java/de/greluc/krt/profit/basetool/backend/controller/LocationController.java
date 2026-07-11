@@ -77,14 +77,7 @@ public class LocationController {
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, sort, Set.of("name", "id"), "name");
     Page<Location> p = locationService.getAllLocations(pageable, includeHidden);
-    List<LocationDto> content = p.getContent().stream().map(locationMapper::toDto).toList();
-    return new PageResponse<>(
-        content,
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p.map(locationMapper::toDto));
   }
 
   /**

@@ -74,15 +74,7 @@ public class FrequencyTypeController {
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("name", "id", "active", "sortIndex"), "sortIndex");
     Page<FrequencyType> p = frequencyTypeService.getAllFrequencyTypes(active, pageable);
-    List<FrequencyTypeDto> content =
-        p.getContent().stream().map(frequencyTypeMapper::toDto).toList();
-    return new PageResponse<>(
-        content,
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p.map(frequencyTypeMapper::toDto));
   }
 
   /**

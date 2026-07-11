@@ -28,7 +28,6 @@ import de.greluc.krt.profit.basetool.backend.service.JobTypeService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -77,14 +76,7 @@ public class JobTypeController {
       @RequestParam(required = false, defaultValue = "false") boolean includeInactive) {
     Pageable pageable = PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "name");
     Page<JobType> p = jobTypeService.getJobTypes(archetype, pageable, includeInactive);
-    List<JobTypeDto> content = p.getContent().stream().map(jobTypeMapper::toDto).toList();
-    return new PageResponse<>(
-        content,
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p.map(jobTypeMapper::toDto));
   }
 
   /**

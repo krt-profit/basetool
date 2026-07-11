@@ -383,13 +383,7 @@ public class JobOrderController {
       @RequestParam(required = false, defaultValue = "name,asc") String sort) {
     Pageable pageable = PaginationUtil.createPageRequest(page, size, sort, Set.of("name"), "name");
     Page<GameItemReferenceDto> p = jobOrderItemService.findOrderableItems(search, pageable);
-    return new PageResponse<>(
-        p.getContent(),
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p);
   }
 
   /**
@@ -574,13 +568,7 @@ public class JobOrderController {
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("priority", "createdAt"), "priority");
     Page<JobOrderDto> p = jobOrderService.getAllJobOrders(status, squadronId, pageable);
-    return new PageResponse<>(
-        p.getContent(),
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p);
   }
 
   /**
@@ -613,15 +601,7 @@ public class JobOrderController {
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("priority", "createdAt"), "priority");
     Page<JobOrderDto> p = jobOrderService.getRequestedJobOrders(status, pageable);
-    List<JobOrderDto> redacted =
-        p.getContent().stream().map(this::cleanupJobOrderForRequester).toList();
-    return new PageResponse<>(
-        redacted,
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p.map(this::cleanupJobOrderForRequester));
   }
 
   /**

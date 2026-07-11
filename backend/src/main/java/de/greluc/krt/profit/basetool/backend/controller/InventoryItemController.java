@@ -103,13 +103,7 @@ public class InventoryItemController {
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("amount", "quality", "material.name"), "material.name");
     Page<AggregatedInventoryDto> p = inventoryItemService.getAggregatedInventory(pageable);
-    return new PageResponse<>(
-        p.getContent(),
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p);
   }
 
   /**
@@ -130,13 +124,7 @@ public class InventoryItemController {
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("amount", "quality", "id", "location.name"), "quality");
     Page<InventoryItemDto> p = inventoryItemService.getInventoryByMaterial(materialId, pageable);
-    return new PageResponse<>(
-        p.getContent(),
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p);
   }
 
   /**
@@ -157,13 +145,7 @@ public class InventoryItemController {
             page, size, sort, Set.of("amount", "quality", "id", "material.name"), "quality");
     Page<InventoryItemDto> p =
         inventoryItemService.getUserInventory(userService.getUserIdFromJwt(jwt), pageable);
-    return new PageResponse<>(
-        p.getContent(),
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p);
   }
 
   /**
@@ -216,13 +198,7 @@ public class InventoryItemController {
     Page<InventoryItemDto> p =
         inventoryItemService.getAllInventory(
             materialIds, minQuality, jobOrderIds, missionIds, pageable);
-    return new PageResponse<>(
-        p.getContent(),
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p);
   }
 
   /**
@@ -296,13 +272,7 @@ public class InventoryItemController {
             personal,
             owningOrgUnitId,
             stackEntriesPageRequest(page, size));
-    return new PageResponse<>(
-        p.getContent(),
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p);
   }
 
   /**
@@ -336,13 +306,7 @@ public class InventoryItemController {
             missionId,
             owningOrgUnitId,
             stackEntriesPageRequest(page, size));
-    return new PageResponse<>(
-        p.getContent(),
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p);
   }
 
   /**

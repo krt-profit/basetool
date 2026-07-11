@@ -27,7 +27,6 @@ import de.greluc.krt.profit.basetool.backend.service.SquadronService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -86,14 +85,7 @@ public class SquadronController {
     }
     Pageable pageable = PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "name");
     Page<Squadron> p = squadronService.getAllSquadrons(pageable, includeInactive);
-    List<SquadronDto> content = p.getContent().stream().map(squadronMapper::toDto).toList();
-    return new PageResponse<>(
-        content,
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p.map(squadronMapper::toDto));
   }
 
   /**

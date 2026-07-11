@@ -123,13 +123,7 @@ public class BankHolderController {
         PaginationUtil.createPageRequest(
             page, size, effectiveSort, BOOKING_SORT_FIELDS, "createdAt");
     Page<BankHolderBookingDto> result = bankHolderService.getHolderBookings(id, pageable);
-    return new PageResponse<>(
-        result.getContent(),
-        result.getNumber(),
-        result.getSize(),
-        result.getTotalElements(),
-        result.getTotalPages(),
-        PaginationUtil.toSortStrings(result.getSort()));
+    return PageResponse.of(result);
   }
 
   /**

@@ -86,12 +86,6 @@ public class BlueprintController {
             Set.of("outputName", "craftTimeSeconds", "scwikiKey", "id"),
             "outputName");
     Page<BlueprintDto> p = blueprintService.getBlueprints(search, pageable);
-    return new PageResponse<>(
-        p.getContent(),
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p);
   }
 }

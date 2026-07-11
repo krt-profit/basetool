@@ -118,13 +118,7 @@ public class BankAdminController {
             page, size, effectiveSort, AUDIT_SORT_FIELDS, "occurredAt");
     Page<BankAuditEventDto> result =
         bankAuditService.getEvents(from, to, actorUserId, accountId, eventType, pageable);
-    return new PageResponse<>(
-        result.getContent(),
-        result.getNumber(),
-        result.getSize(),
-        result.getTotalElements(),
-        result.getTotalPages(),
-        PaginationUtil.toSortStrings(result.getSort()));
+    return PageResponse.of(result);
   }
 
   /**
