@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.MissionSection;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -180,7 +181,7 @@ public class MissionService {
     }
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     return missionRepository.searchMissions(
-        query,
+        LikePatterns.escapeNullable(query),
         start,
         end,
         status,

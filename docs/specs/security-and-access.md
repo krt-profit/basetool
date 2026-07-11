@@ -118,6 +118,13 @@ The following must always hold and are enforced as ArchUnit rules in
 - No controller depends on `OrgUnitMembershipMapper` — the membership entity→DTO projection runs
   inside `OrgUnitMembershipService`'s own transactions, never controller-side after commit
   (`controllersMustNotInjectTheLazyMembershipMapper`, ADR-0067).
+- Every org-unit bank **settings mutation** (`OrgUnitBankAccessService` public `set*`/`add*`/`remove*`/
+  `clear*` method returning `OrgUnitBankAccountSettingsDto` — balance target, view-visibility grants,
+  per-tier approval limits) invokes a `requireCan*` authorization helper
+  (`orgUnitBankSettingsMutationsMustCallAnAuthorizationHelper`). Those mutations are gated only in-body
+  (the controller and frontend proxy require merely `isAuthenticated()`), so this rule fails a future
+  mutation that drops the check — which would otherwise ship reachable by any authenticated member —
+  at build time rather than in production (security review, INFO regression guard).
 - The frontend does not depend on Spring Data JPA.
 
 ### REQ-SEC-004 — Roles & hierarchy
@@ -319,8 +326,14 @@ DOS-1 collapse re-introduced on a code path the request-scoped filters do not re
   frontend ignores it unless it arrives from a trusted proxy and always takes the proxy-appended peer.
 - [x] A backend read fired through `ParallelPageLoader`'s virtual-thread worker, and the notification
   SSE relay, both carry the real client IP rather than the frontend-container IP (#1130 / #1110).
+- [x] Both anonymous order-create variants — `POST /api/v1/orders` and the heavier item-order
+  `POST /api/v1/orders/items` (which derives materials from blueprints and takes a table-wide
+  pessimistic lock) — share the tight per-endpoint `order-create` budget. The rule lists both paths
+  explicitly because `RateLimitingFilter`'s `PathPattern` uses exact-segment matching, so the parent
+  `/api/v1/orders` alone does not cover the `/items` child.
 
-**Enforced by:** `ClientIpRelayFilterTest`, `ClientIpContextFilterTest`, `ParallelPageLoaderTest`
+**Enforced by:** `ClientIpRelayFilterTest`, `ClientIpContextFilterTest`, `ParallelPageLoaderTest`,
+`RateLimitingFilterTest` (`order-create` rule covers the `/orders/items` child path)
 · **Code:** `ClientIpRelayFilter` / `ClientIpContextFilter` / `ClientIpProperties` /
 `ForwardedHeaderConfig` / `RateLimitingFilter.resolveClientIp` / `ParallelPageLoader` /
 `WebClientConfig.sseWebClient` · **Issues:** security audit DOS-1, SEC-02, #1130, #1110
@@ -832,6 +845,12 @@ from masquerading as an application outage (the failure mode that drove the fron
   and counted on `basetool_http_error_total{code="SERVICE_UNAVAILABLE"}`.
 - [ ] An expired/invalid bearer token still yields `401`; a caller lacking the required role still
   yields `403` (the 503 re-map never swallows an auth decision).
+- [ ] Optional `aud` enforcement (audit L-1) is available on both resource servers via
+  `app.security.jwt.expected-audiences` (wired to `IRI_BACKEND_EXPECTED_AUDIENCES` /
+  `IRI_INGEST_EXPECTED_AUDIENCES`), sharing the same `resourceServerJwtDecoder` bean. It is **empty
+  by default** (off) so dev / e2e realms — which do not stamp the audience — are unaffected;
+  enabling it in prod requires the realm to stamp `aud=basetool-backend` (the `extractor-ingest`
+  default client scope), or every token is rejected.
 
 **Enforced by (both resource servers):** backend `SecurityConfig#resourceServerJwtDecoder` +
 `KeycloakTrustSupport` + `IdentityProviderUnavailableFilter` (tests:

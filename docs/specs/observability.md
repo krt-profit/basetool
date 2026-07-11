@@ -545,7 +545,11 @@ item 19 with `basetool_ratelimit_requests_total{bucket}` on the per-IP filter an
 limiter, feeding the same `RateLimitRejectionRatioHigh` ratio alert.
 `basetool_ingest_payload_rejected_total` (untagged, `PayloadSizeLimitFilter`) counts each
 oversized-body 413 the INGEST-DOS-1 guard refuses — previously silent (no log, no metric) unlike the
-sibling bot / rate-limit filters — and backs `IngestPayloadRejectedSpike` (logging audit). The
+sibling bot / rate-limit filters — and backs `IngestPayloadRejectedSpike` (logging audit). Its
+backend twin `basetool_request_body_rejected_total` (untagged, `RequestBodySizeLimitFilter`) counts
+each oversized non-multipart JSON body the backend refuses with 413 on a capped import path (the
+refinery `import-extract`, before Jackson binds it — security review, memory-DoS) and backs
+`RequestBodyRejectedSpike`. The
 gateway also now emits one INFO access-log line per `/v1` request (`RequestLoggingFilter`; method /
 path / status / duration), matching the backend/frontend one-line-per-request contract
 (REQ-OBS-001).

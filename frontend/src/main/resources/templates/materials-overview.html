@@ -76,13 +76,13 @@
                     </div>
                 </div>
             </div>
-            <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; max-width: max-content;">
+            <div class="form-group krtm-display-flex-align-items-center-gap-0-5rem-m-dd56">
                 <input type="checkbox" id="filterLoadingDock" class="mtx-bool-filter">
-                <label for="filterLoadingDock" style="margin-bottom: 0; margin-top: 0;" th:text="#{filter.hasLoadingDock}">Hat Loading Dock</label>
+                <label for="filterLoadingDock" class="krtm-margin-bottom-0-margin-top-0-acac" th:text="#{filter.hasLoadingDock}">Hat Loading Dock</label>
             </div>
-            <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; max-width: max-content;">
+            <div class="form-group krtm-display-flex-align-items-center-gap-0-5rem-m-dd56">
                 <input type="checkbox" id="filterAutoLoad" class="mtx-bool-filter">
-                <label for="filterAutoLoad" style="margin-bottom: 0; margin-top: 0;" th:text="#{filter.hasAutoLoad}">Hat Auto Load</label>
+                <label for="filterAutoLoad" class="krtm-margin-bottom-0-margin-top-0-acac" th:text="#{filter.hasAutoLoad}">Hat Auto Load</label>
             </div>
             <!--
               Category-grouping toggle. Checked (default) groups material rows under the
@@ -90,9 +90,9 @@
               material in one flat, alphabetically sorted list. Handled entirely in
               /js/materials-matrix.js and persisted per browser in localStorage.
             -->
-            <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; max-width: max-content;">
+            <div class="form-group krtm-display-flex-align-items-center-gap-0-5rem-m-dd56">
                 <input type="checkbox" id="filterGroupByCategory" checked>
-                <label for="filterGroupByCategory" style="margin-bottom: 0; margin-top: 0;" th:text="#{filter.groupByCategory}">Nach Kategorie gruppieren</label>
+                <label for="filterGroupByCategory" class="krtm-margin-bottom-0-margin-top-0-acac" th:text="#{filter.groupByCategory}">Nach Kategorie gruppieren</label>
             </div>
         </div>
 
@@ -114,11 +114,11 @@
 
         <div id="matrixLoading" class="matrix-loading" th:text="#{materials.matrix.loading}">Lade Matrix...</div>
 
-        <div id="matrixError" class="hud-box hud-box-error" style="display: none;">
+        <div id="matrixError" class="hud-box hud-box-error krtm-display-none-5790">
             <p th:text="#{error.materials.matrix.load}">Fehler</p>
         </div>
 
-        <div class="table-wrapper" id="tableContainer" style="display: none;">
+        <div class="table-wrapper krtm-display-none-5790" id="tableContainer">
             <table class="matrix-table" id="matrixTable">
                 <colgroup id="matrixColgroup"></colgroup>
                 <thead id="matrixHead"></thead>

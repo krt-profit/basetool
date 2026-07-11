@@ -122,7 +122,7 @@
 <!-- Create / Edit modal (KRT modal frame, no native dialogs) -->
 <div id="krt-pi-modal" class="krt-modal-overlay" role="dialog" aria-modal="true"
      aria-labelledby="krt-pi-modal-title"
-     th:style="${showItemModal != null ? 'display:flex' : 'display:none'}">
+     th:classappend="${showItemModal != null} ? 'krtm-modal-open' : 'krtm-hidden'">
     <div class="krt-modal krt-modal--wide">
         <div class="krt-modal-head">
             <h2 id="krt-pi-modal-title" th:text="#{personalInventory.modal.create.title}">Eintrag anlegen</h2>
@@ -165,7 +165,7 @@
                     <div id="krt-pi-location-results" class="krt-pi-typeahead-results" hidden></div>
                 </div>
 
-                <div class="form-group" style="margin-bottom: 0;">
+                <div class="form-group krtm-margin-bottom-0-5043">
                     <label for="krt-pi-note" th:text="#{personalInventory.field.note}">Notiz</label>
                     <textarea id="krt-pi-note" maxlength="2000" rows="4" th:field="*{note}"></textarea>
                 </div>
@@ -179,14 +179,14 @@
 </div>
 
 <!-- Delete confirmation modal (KRT danger frame; the body names what is deleted) -->
-<div id="krt-pi-delete-modal" class="krt-modal-overlay" style="display:none;" role="dialog" aria-modal="true" th:aria-label="#{personalInventory.action.delete.confirm.title}">
+<div id="krt-pi-delete-modal" class="krt-modal-overlay krtm-display-none-5790" role="dialog" aria-modal="true" th:aria-label="#{personalInventory.action.delete.confirm.title}">
     <div class="krt-modal krt-modal--danger">
         <div class="krt-modal-head">
             <h2 th:text="#{personalInventory.action.delete.confirm.title}">Eintrag loeschen</h2>
             <button type="button" class="btn btn-ghost btn-icon close" data-trigger="pi-close-delete" th:title="#{personalInventory.action.cancel}" th:aria-label="#{personalInventory.action.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
         </div>
         <div class="krt-modal-body">
-            <p id="krt-pi-delete-message" style="margin: 0;" th:text="#{personalInventory.action.delete.confirm.body}">Wirklich loeschen?</p>
+            <p id="krt-pi-delete-message" class="krtm-margin-0-2a0c" th:text="#{personalInventory.action.delete.confirm.body}">Wirklich loeschen?</p>
         </div>
         <form id="krt-pi-delete-form" method="post">
             <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />

@@ -47,9 +47,9 @@
             <p th:text="#{__${error}__}">Fehler</p>
         </div>
 
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
-            <h3 style="font-family: 'Lato', sans-serif; font-weight: 700; margin: 0;" th:text="#{inventory.overview.aggregated}">Aggregiertes Staffellager</h3>
-            <div class="actions-bar" style="margin-bottom: 0;">
+        <div class="krtm-display-flex-justify-content-space-between-a-3a17">
+            <h3 class="krtm-font-family-lato-sans-serif-font-weight-700-957b" th:text="#{inventory.overview.aggregated}">Aggregiertes Staffellager</h3>
+            <div class="actions-bar krtm-margin-bottom-0-5043">
                 <a th:href="@{/inventory/my}" class="btn btn-outline" th:text="#{inventory.overview.my}">Mein Lager</a>
                 <a th:href="@{/inventory/all}" class="btn btn-outline" th:text="#{inventory.overview.global}">Globales Lager</a>
             </div>
@@ -58,8 +58,7 @@
              squadron context. In admin "all squadrons" mode the bucket merges items from
              every staffel - the row is per-material, not per-squadron-per-material - so
              tell the admin the totals span all staffeln. Members never enter this mode. -->
-        <div th:if="${isAllSquadronsMode}" class="squadron-badge squadron-badge-muted"
-             style="display: block; padding: 0.6rem 0.9rem; margin-bottom: 1rem; border-radius: var(--radius-none); white-space: normal; text-align: left;"
+        <div th:if="${isAllSquadronsMode}" class="squadron-badge squadron-badge-muted krtm-display-block-padding-0-6rem-0-9rem-margin-b-3373"
              th:text="#{inventory.index.all_squadrons_notice}">
             Aggregation across all squadrons. Select a single squadron to filter.
         </div>
@@ -79,8 +78,8 @@
                     <tr th:each="item : ${aggregated}"
                         th:data-href="@{/inventory/all(materialIds=${item.material.id})}"
                         data-trigger="navigate-href"
-                        style="cursor: pointer;" class="clickable-row">
-                        <td th:text="${item.material.name}" style="color: var(--color-white);">Material</td>
+                        class="clickable-row krtm-cursor-pointer-74fa">
+                        <td th:text="${item.material.name}" class="krtm-color-var-color-white-c482">Material</td>
                         <td th:text="${item.quality != null ? #numbers.formatDecimal(item.quality, 1, 'NONE', 2, 'DEFAULT') : '0.00'}">100.00</td>
                         <td th:switch="${item.material.quantityType}">
                             <span th:case="'PIECE'" th:text="|${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'} #{material.quantity.piece}|">10 Stück</span>

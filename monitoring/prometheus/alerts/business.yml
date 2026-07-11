@@ -548,6 +548,17 @@ groups:
           summary: "Ingest oversized-payload rejections spiking"
           description: "The ingest gateway is refusing oversized /v1 request bodies (413) at an elevated rate — likely an oversized-body probing / DoS attempt against the public ingest surface, or a misconfigured client. Check the NPM edge and the fail2ban jails."
 
+      # Backend oversized-JSON-body rejections (RequestBodySizeLimitFilter) on the capped import
+      # endpoints (refinery import-extract). baseline-tune: >0.2/s sustained is a probing/DoS pattern.
+      - alert: RequestBodyRejectedSpike
+        expr: rate(basetool_request_body_rejected_total[5m]) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Backend oversized request-body rejections spiking"
+          description: "The backend is refusing oversized non-multipart JSON request bodies (413) on a capped import path at an elevated rate — likely a memory-DoS probing attempt against the refinery import-extract endpoint, or a misconfigured client bypassing the frontend proxy cap."
+
       # Keycloak login errors / Discord IdP broker error spike (primary login path).
       - alert: KeycloakLoginErrorSpike
         expr: rate(keycloak_user_events_total{event=~"login_error|identity_provider_login_error"}[5m]) > 0.2

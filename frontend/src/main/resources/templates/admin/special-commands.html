@@ -45,7 +45,7 @@
 <main>
     <div class="greeting hud-box">
         <h1 th:text="#{admin.specialcommands.title}">Spezialkommandos verwalten</h1>
-        <p style="color: var(--color-gray-2); margin-top: 0.5rem;" th:text="#{admin.specialcommands.subtitle}">
+        <p class="krtm-color-var-color-gray-2-margin-top-0-5rem-e129" th:text="#{admin.specialcommands.subtitle}">
             Spezialkommandos sind eine zweite Tenant-Art neben Staffeln. Mitglieder können zusätzlich
             zu ihrer Staffel beliebig vielen Spezialkommandos angehören.
         </p>
@@ -56,15 +56,15 @@
 
     <!-- SK List Section -->
     <div class="hud-box data-section mt-2" id="specialcommands-box">
-        <div class="box-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <div class="box-header krtm-display-flex-justify-content-space-between-a-1321">
             <h2 th:text="#{admin.specialcommands.title}" class="m-0">Spezialkommandos</h2>
-            <div style="display: flex; gap: 1rem; align-items: center;">
+            <div class="krtm-display-flex-gap-1rem-align-items-center-6529">
                 <!-- The include-inactive toggle swaps the SK list in place via the inline script
                      below (krtFetch); it already required JS (the old data-trigger="submit-form-
                      by-id" was a JS-driven reload), so the no-JS baseline is unchanged. -->
                 <form th:action="@{/admin/special-commands}" method="get" id="sc-filter-form" class="no-track m-0 flex-gap-sm">
                     <input type="checkbox" id="includeInactive" name="includeInactive" th:checked="${includeInactive}">
-                    <label for="includeInactive" style="color: var(--color-gray-2); font-size: 0.9rem; cursor: pointer;" th:text="#{admin.specialcommands.show_inactive}">Inaktive anzeigen</label>
+                    <label for="includeInactive" class="krtm-color-var-color-gray-2-font-size-0-9rem-curs-0b43" th:text="#{admin.specialcommands.show_inactive}">Inaktive anzeigen</label>
                 </form>
                 <button id="add-sc-btn" class="btn btn--cta" th:data-action="@{/admin/special-commands}" th:text="#{admin.specialcommands.create}">Neues Spezialkommando</button>
             </div>
@@ -75,7 +75,7 @@
              rows survive with no re-init. The toggle is JS-driven (it was already JS-only). -->
         <div class="box-content" id="sc-results">
             <th:block th:fragment="results">
-            <div th:if="${specialCommands == null or #lists.isEmpty(specialCommands)}" style="color: var(--color-gray-2); padding: 1rem 0;" th:text="#{admin.specialcommands.empty}">
+            <div th:if="${specialCommands == null or #lists.isEmpty(specialCommands)}" class="krtm-color-var-color-gray-2-padding-1rem-0-5444" th:text="#{admin.specialcommands.empty}">
                 Noch keine Spezialkommandos angelegt.
             </div>
             <div th:if="${specialCommands != null and !#lists.isEmpty(specialCommands)}" class="table-responsive">
@@ -89,7 +89,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr th:each="sc : ${specialCommands}" th:style="${!sc.active} ? 'opacity: 0.6;' : ''">
+                        <tr th:each="sc : ${specialCommands}" th:classappend="${!sc.active} ? 'krtm-opacity-06' : ''">
                             <td>
                                 <span th:text="${sc.name}">Name</span>
                                 <span th:if="${!sc.active}" class="badge-inactive" th:text="#{admin.specialcommands.inactive}">Inaktiv</span>
@@ -125,7 +125,7 @@
 </main>
 
 <!-- SpecialCommand Modal (create + edit, action URL toggled by JS) -->
-<div id="specialcommand-modal" class="modal" th:style="${openModal == 'specialcommand-modal' ? 'display:flex;' : 'display:none;'}">
+<div id="specialcommand-modal" class="modal" th:classappend="${openModal == 'specialcommand-modal'} ? 'krtm-modal-open' : 'krtm-hidden'">
     <div class="modal-content hud-box">
         <span class="close-sc-modal close-modal">&times;</span>
         <h2 id="sc-modal-title" th:text="#{admin.specialcommands.create}">Spezialkommando</h2>
@@ -154,11 +154,11 @@
 <!-- Delete confirmation modal — the per-row trash button is a soft-delete (deactivate, reversible
      via "Aktivieren"); the form action is set to the clicked SK's delete URL by the script below.
      No native confirm() per the design system's "no native browser dialogs" rule. -->
-<div id="sc-delete-modal" class="modal" style="display:none;">
-    <div class="modal-content hud-box" style="max-width: 500px; text-align: center;">
+<div id="sc-delete-modal" class="modal krtm-display-none-5790">
+    <div class="modal-content hud-box krtm-max-width-500px-text-align-center-ff4b">
         <h2 th:text="#{info.delete.confirm.title}" class="mt-0">Löschen bestätigen</h2>
         <p th:text="#{admin.specialcommands.delete.confirm}" class="mb-2">Möchten Sie dieses Spezialkommando wirklich löschen?</p>
-        <p class="mb-2"><strong id="sc-delete-name" style="color: var(--color-primary);"></strong></p>
+        <p class="mb-2"><strong id="sc-delete-name" class="krtm-color-var-color-primary-473b"></strong></p>
         <div class="flex-center-gap">
             <button type="button" class="btn btn-ghost close-sc-delete-modal" th:text="#{general.cancel}">Abbrechen</button>
             <form id="sc-delete-form" th:action="@{/admin/special-commands}" method="post" class="m-0">

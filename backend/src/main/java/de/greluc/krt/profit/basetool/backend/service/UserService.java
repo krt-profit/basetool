@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserApprovalEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.time.Instant;
@@ -816,7 +817,7 @@ public class UserService {
    */
   public List<User> searchByUsername(@NotNull String query) {
     java.util.Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
-    return userRepository.searchScopedList(query, scope);
+    return userRepository.searchScopedList(LikePatterns.escapeNullable(query), scope);
   }
 
   /**
@@ -829,7 +830,7 @@ public class UserService {
    */
   public Page<User> searchByUsername(@NotNull String query, @NotNull Pageable pageable) {
     java.util.Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
-    return userRepository.searchScoped(query, scope, pageable);
+    return userRepository.searchScoped(LikePatterns.escapeNullable(query), scope, pageable);
   }
 
   /**

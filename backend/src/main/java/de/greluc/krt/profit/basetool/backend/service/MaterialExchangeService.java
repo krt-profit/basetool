@@ -48,6 +48,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRep
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.time.Instant;
 import java.util.Collection;
@@ -869,7 +870,7 @@ public class MaterialExchangeService {
     if (query == null || query.isBlank()) {
       return null;
     }
-    return "%" + query.trim().toLowerCase(Locale.ROOT) + "%";
+    return LikePatterns.contains(query.trim().toLowerCase(Locale.ROOT));
   }
 
   /**

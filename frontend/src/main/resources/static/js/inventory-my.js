@@ -414,7 +414,7 @@ function toggleGroup(row) {
 
     const key = groupStorageKey();
     const expandedRows = readExpanded(key);
-    if (nextRow.style.display === 'none') {
+    if (window.getComputedStyle(nextRow).display === 'none') {
         nextRow.style.display = 'block';
         if (icon) icon.textContent = '▼';
         if (materialId && !expandedRows.includes(materialId)) {
@@ -440,7 +440,7 @@ function toggleStack(row) {
     const key = stackStorageKey();
     const expandedStacks = readExpanded(key);
     const id = stackKey(row);
-    if (nextRow.style.display === 'none') {
+    if (window.getComputedStyle(nextRow).display === 'none') {
         nextRow.style.display = 'block';
         if (icon) icon.textContent = '▼';
         // Persist so a later in-place re-swap (filter change or modal write) re-opens this stack.
@@ -823,7 +823,7 @@ function submitUmbuchen(event) {
         const orgWrapper = document.getElementById('umbuchenPersonalOrgUnitWrapper');
         const orgSelect = document.getElementById('umbuchenPersonalOrgUnitId');
         const orgUnitId =
-            orgWrapper && orgWrapper.style.display !== 'none' && orgSelect
+            orgWrapper && window.getComputedStyle(orgWrapper).display !== 'none' && orgSelect
                 ? orgSelect.value || null
                 : null;
         payload = { amount: amount, version: version, targetOwningOrgUnitId: orgUnitId };
