@@ -24,24 +24,14 @@ import de.greluc.krt.profit.basetool.backend.event.UserApprovalDecidedEvent;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalDecision;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.UserApprovalEvent;
 import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MaterialClaimRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionOwnershipRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
-import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserApprovalEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.time.Instant;
@@ -58,7 +48,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -95,30 +84,12 @@ public class UserService {
 
   private final UserRepository userRepository;
   private final RoleRepository roleRepository;
-  private final InventoryItemRepository inventoryItemRepository;
-  private final ShipRepository shipRepository;
-  private final RefineryOrderRepository refineryOrderRepository;
-  private final MissionRepository missionRepository;
-  private final MissionOwnershipRepository missionOwnershipRepository;
-  private final JobOrderRepository jobOrderRepository;
-  private final MissionParticipantRepository missionParticipantRepository;
-  private final MaterialClaimRepository materialClaimRepository;
   private final AuthHelperService authHelperService;
   private final OwnerScopeService ownerScopeService;
   private final OrgUnitMembershipService orgUnitMembershipService;
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
-
-  /**
-   * The org-unit-aware bank seam, injected as an {@link ObjectProvider} to avoid a constructor
-   * cycle. Used only by {@link #deleteUser(UUID)} to audit a change of a bank account's derived
-   * responsible holder when the deleted user was a leader whose membership the DB cascade removes
-   * (REQ-BANK-034, ADR-0070). All bank access stays inside the seam.
-   */
-  private final ObjectProvider<OrgUnitBankAccessService> orgUnitBankAccessServiceProvider;
-
   private final DefaultBlueprintProvisioningService defaultBlueprintProvisioningService;
   private final UserApprovalEventRepository userApprovalEventRepository;
-  private final AuditService auditService;
   private final ApplicationEventPublisher eventPublisher;
 
   /**
@@ -965,132 +936,6 @@ public class UserService {
           throw new IllegalArgumentException(
               "Unsupported SpecialCommandChange action: " + change.action());
     }
-  }
-
-  /**
-   * Deletes a user account along with all owned data (ships, inventory, refinery orders, mission
-   * memberships) and its Discord-approval audit trail (epic #720 / V173). Used by admins to remove
-   * ex-members; only a user no longer present in Keycloak may be deleted. The cascade is explicit
-   * (per-table delete / reassign calls) so the order matches the FK constraints; auto-cascading
-   * would surface confusing FK errors when the table order changes. References whose FK declares
-   * {@code ON DELETE SET NULL} / {@code CASCADE} (bank tables, org-unit membership, org-chart, …)
-   * are left to the database; the no-{@code ON DELETE} references — the owner columns (reassigned
-   * to an admin) and the V173 approval audit (cleaned up here) — must be resolved explicitly first.
-   *
-   * <p>Every {@code app_user} foreign key that carries no {@code ON DELETE} clause is resolved here
-   * before the final {@link UserRepository#delete} — reassigned to the fallback admin (owned
-   * aggregates: inventory, ships, refinery orders, missions and the {@code mission_ownership}
-   * companion) or unlinked (managers, job-order assignees, mission participants, and the audit-only
-   * {@code material_claim.claimed_by_user_id} stamp). The {@code mission_ownership.owner_id}
-   * reassignment must stay paired with {@code missionRepository.updateOwner}: the parent mission
-   * survives the delete (its owner having been moved to the admin), so the {@code ON DELETE
-   * CASCADE} on {@code mission_id} never fires to clear the row, and the FK-less {@code owner_id}
-   * would otherwise dangle and FK-fail (SQLSTATE 23503).
-   *
-   * @param userId user to delete
-   * @throws NoSuchElementException when the user id is unknown
-   * @throws IllegalStateException when the user is still present in Keycloak, or when no other
-   *     admin exists to receive the reassigned owner references
-   */
-  @Transactional
-  public void deleteUser(UUID userId) {
-    User user =
-        userRepository
-            .findById(userId)
-            .orElseThrow(() -> new NoSuchElementException("User not found"));
-
-    if (user.isInKeycloak()) {
-      throw new IllegalStateException("Cannot delete user that is still in Keycloak");
-    }
-
-    User admin =
-        userRepository.findAllAdmins().stream()
-            .filter(u -> !u.getId().equals(userId))
-            .findFirst()
-            .orElseGet(
-                () ->
-                    getCurrentUser()
-                        .filter(u -> !u.getId().equals(userId))
-                        .filter(
-                            u ->
-                                u.getRoles().stream()
-                                    .anyMatch(r -> r.getName().equalsIgnoreCase(Roles.ADMIN)))
-                        .orElseThrow(
-                            () ->
-                                new IllegalStateException("No admin user found to reassign data")));
-
-    // Reassign mandatory fields
-    int inventoryReassigned = inventoryItemRepository.updateOwner(user, admin);
-    shipRepository.updateOwner(user, admin);
-    int refineryReassigned = refineryOrderRepository.updateOwner(user, admin);
-    missionRepository.updateOwner(user, admin);
-    // System/cascade audit: a deleted user's warehouse rows and refinery orders are bulk-reassigned
-    // to the fallback admin. Summary events only (set-based UPDATEs expose no per-row ids); the
-    // deleted user is the target, the acting admin is the actor. Recorded only when rows actually
-    // moved and carrying the affected-row count, mirroring InventoryOrgUnitReconciler's >0 guard.
-    if (inventoryReassigned > 0) {
-      auditService.record(
-          AuditEventType.INVENTORY_OWNER_REASSIGNED,
-          null,
-          null,
-          userId,
-          AuditDetails.of("reason", "user-deletion")
-              .with("rows", inventoryReassigned)
-              .with("fromUser", userId)
-              .with("toAdmin", admin.getId()));
-    }
-    if (refineryReassigned > 0) {
-      auditService.record(
-          AuditEventType.REFINERY_ORDERS_REASSIGNED,
-          null,
-          null,
-          userId,
-          AuditDetails.of("reason", "user-deletion")
-              .with("rows", refineryReassigned)
-              .with("fromUser", userId)
-              .with("toAdmin", admin.getId()));
-    }
-    // The mission_ownership companion (1:1 with mission, owner_id FK has no ON DELETE clause) must
-    // be reassigned in lock-step with mission.owner above; otherwise its dangling owner_id FK-fails
-    // (23503) on the final delete, because the parent mission survives so its mission_id cascade
-    // never clears the row.
-    missionOwnershipRepository.updateOwner(user, admin);
-
-    // Remove ManyToMany and nullable references
-    missionRepository.removeManager(userId);
-    jobOrderRepository.removeAssignee(userId);
-    missionParticipantRepository.unlinkUser(userId);
-    // material_claim.claimed_by_user_id (V131) is an audit-only FK with no ON DELETE clause; null
-    // it
-    // so an ex-logistician who ever filed a claim does not FK-fail (23503) on the delete below.
-    materialClaimRepository.unlinkClaimedByUser(userId);
-
-    // Discord-approval audit cleanup (epic #720 / REQ-SEC-017, V173). These three references into
-    // app_user declare no ON DELETE clause (Postgres NO ACTION), so without explicit cleanup a
-    // decided-on or deciding account cannot be hard-deleted. This is the reported regression: an
-    // approved, since-removed Discord registration could not be deleted because of FK
-    // user_approval_event_user_id_fkey (409). The subject's own audit rows are deleted (user_id is
-    // NOT NULL, so they cannot be orphaned); rows the deleted account decided keep the audit but
-    // lose their now-gone decider link; and the denormalised app_user.approved_by_id back-pointer
-    // on other users is nulled. The approval audit of OTHER users survives. Must run before the
-    // app_user delete below so the FK is satisfied at flush.
-    userApprovalEventRepository.deleteByUserId(userId);
-    userApprovalEventRepository.clearDecidedBy(userId);
-    userRepository.clearApprovedBy(userId);
-
-    // Snapshot the responsible holders of every account tied to the user's org units BEFORE the
-    // delete: a leader (Staffelleiter / SK-Lead / Bereichsleiter / OL member) being deleted changes
-    // the derived Kontoverantwortliche/r of the affected account(s) (REQ-BANK-034, ADR-0070). The
-    // org-unit membership rows go via the DB ON DELETE CASCADE, so the delete is flushed before the
-    // re-diff so the recompute observes the post-cascade state.
-    final Map<UUID, Set<UUID>> responsibleBefore =
-        orgUnitBankAccessServiceProvider.getObject().snapshotResponsibleHoldersForUser(userId);
-
-    // Delete the user
-    userRepository.delete(user);
-    userRepository.flush();
-    orgUnitBankAccessServiceProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
-    log.info("User {} deleted and references reassigned to admin {}", userId, admin.getId());
   }
 
   /**

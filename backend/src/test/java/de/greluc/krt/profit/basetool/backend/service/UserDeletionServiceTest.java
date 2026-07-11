@@ -23,15 +23,19 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.*;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
@@ -40,8 +44,15 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
 
+/**
+ * Mockito unit tests for {@link UserDeletionService#deleteUser} — the FK-ordered hard-delete
+ * cascade extracted out of {@code UserService} (audit Thema&nbsp;7, #1252). Covers the reassignment
+ * / unlink / audit-cleanup ordering that keeps the {@code app_user} delete from tripping a
+ * foreign-key violation, plus the fallback-admin resolution through {@link
+ * UserService#getCurrentUser()}.
+ */
 @ExtendWith(MockitoExtension.class)
-class UserServiceDeleteTest {
+class UserDeletionServiceTest {
 
   @Mock private UserRepository userRepository;
   @Mock private InventoryItemRepository inventoryItemRepository;
@@ -53,17 +64,12 @@ class UserServiceDeleteTest {
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private MaterialClaimRepository materialClaimRepository;
   @Mock private UserApprovalEventRepository userApprovalEventRepository;
-  @Mock private RoleRepository roleRepository;
-  // Required so the AuthHelperService constructor parameter of UserService is
-  // satisfied. shouldThrowExceptionIfNoAdminFound exercises the deleteUser
-  // fallback path through getCurrentUser(), which dereferences authHelperService —
-  // a null mock would surface as a NullPointerException instead of the expected
-  // IllegalStateException. Other tests in this class never reach getCurrentUser()
-  // so they do not need any stubbing on the mock.
-  @Mock private AuthHelperService authHelperService;
-  @Mock private OrgUnitMembershipService orgUnitMembershipService;
-
   @Mock private AuditService auditService;
+
+  // The identity seam. deleteUser borrows getCurrentUser() for the fallback-admin path; the
+  // reassign/delete tests never trigger the fallback (findAllAdmins returns a usable admin) so they
+  // leave this mock untouched.
+  @Mock private UserService userService;
 
   // The bank seam is injected as an ObjectProvider (ADR-0070); deleteUser resolves it to audit a
   // responsible-holder change when a deleted user was a leader. Stubbed lenient so the early-throw
@@ -71,7 +77,7 @@ class UserServiceDeleteTest {
   @Mock private ObjectProvider<OrgUnitBankAccessService> orgUnitBankAccessServiceProvider;
   @Mock private OrgUnitBankAccessService orgUnitBankAccessService;
 
-  @InjectMocks private UserService userService;
+  @InjectMocks private UserDeletionService userDeletionService;
 
   private User user;
   private User admin;
@@ -106,7 +112,7 @@ class UserServiceDeleteTest {
     when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
 
     // When
-    userService.deleteUser(userId);
+    userDeletionService.deleteUser(userId);
 
     // Then
     verify(inventoryItemRepository).updateOwner(user, admin);
@@ -133,7 +139,7 @@ class UserServiceDeleteTest {
     when(refineryOrderRepository.updateOwner(user, admin)).thenReturn(2);
 
     // When
-    userService.deleteUser(userId);
+    userDeletionService.deleteUser(userId);
 
     // Then both summary events fire, carrying the affected-row count.
     verify(auditService)
@@ -159,7 +165,7 @@ class UserServiceDeleteTest {
     when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
 
     // When
-    userService.deleteUser(userId);
+    userDeletionService.deleteUser(userId);
 
     // Then no inventory/refinery reassignment noise is recorded.
     verify(auditService, never())
@@ -177,7 +183,7 @@ class UserServiceDeleteTest {
     when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
 
     // When
-    userService.deleteUser(userId);
+    userDeletionService.deleteUser(userId);
 
     // Then the companion is reassigned alongside the mission owner, the audit-only material-claim
     // stamp is cleared, and all of that happens strictly before the app_user row is removed.
@@ -199,7 +205,7 @@ class UserServiceDeleteTest {
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
 
-    userService.deleteUser(userId);
+    userDeletionService.deleteUser(userId);
 
     InOrder inOrder = inOrder(userApprovalEventRepository, userRepository);
     inOrder.verify(userApprovalEventRepository).deleteByUserId(userId);
@@ -215,18 +221,18 @@ class UserServiceDeleteTest {
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 
     // When & Then
-    assertThrows(IllegalStateException.class, () -> userService.deleteUser(userId));
+    assertThrows(IllegalStateException.class, () -> userDeletionService.deleteUser(userId));
     verify(userRepository, never()).delete(any());
   }
 
   @Test
   void shouldThrowExceptionIfNoAdminFound() {
-    // Given
+    // Given findAllAdmins yields nobody and getCurrentUser() is empty (default Optional mock).
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(userRepository.findAllAdmins()).thenReturn(Collections.emptyList());
 
     // When & Then
-    assertThrows(IllegalStateException.class, () -> userService.deleteUser(userId));
+    assertThrows(IllegalStateException.class, () -> userDeletionService.deleteUser(userId));
     verify(userRepository, never()).delete(any());
   }
 
@@ -236,6 +242,89 @@ class UserServiceDeleteTest {
     when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
     // When & Then
-    assertThrows(NoSuchElementException.class, () -> userService.deleteUser(userId));
+    assertThrows(NoSuchElementException.class, () -> userDeletionService.deleteUser(userId));
+  }
+
+  /**
+   * deleteUser's fallback-admin path: when {@code findAllAdmins()} yields no <em>other</em> usable
+   * admin, the reassignment target is resolved from {@link UserService#getCurrentUser()} — the
+   * currently authenticated admin, provided it is a different user carrying the ADMIN role.
+   */
+  @Nested
+  class DeleteUserFallbackTests {
+
+    @Test
+    void fallsBackToCurrentUser_whenCurrentUserIsAdmin_andFindAllAdminsHasNoOther() {
+      // The user being deleted IS the only "admin" in findAllAdmins() — they
+      // get filtered out of that list. The fallback resolves to the current
+      // logged-in admin, which is a different user with the ADMIN role.
+      User toDelete = newUser(userId);
+      toDelete.setInKeycloak(false);
+      // toDelete also has ADMIN role — that's the scenario being tested
+      toDelete.setRoles(new HashSet<>(Set.of(roleNamed("ADMIN"))));
+
+      UUID currentAdminId = UUID.randomUUID();
+      User currentAdmin = newUser(currentAdminId);
+      currentAdmin.setRoles(new HashSet<>(Set.of(roleNamed("ADMIN"))));
+
+      when(userRepository.findById(userId)).thenReturn(Optional.of(toDelete));
+      // findAllAdmins returns only the user being deleted -> filtered out.
+      when(userRepository.findAllAdmins()).thenReturn(List.of(toDelete));
+      when(userService.getCurrentUser()).thenReturn(Optional.of(currentAdmin));
+
+      userDeletionService.deleteUser(userId);
+
+      verify(inventoryItemRepository).updateOwner(toDelete, currentAdmin);
+      verify(userRepository).delete(toDelete);
+    }
+
+    @Test
+    void throws_whenCurrentUserIsAlsoTheUserBeingDeleted() {
+      // The user trying to delete themselves can't be their own reassignment
+      // target — must throw.
+      User toDelete = newUser(userId);
+      toDelete.setInKeycloak(false);
+      toDelete.setRoles(new HashSet<>(Set.of(roleNamed("ADMIN"))));
+
+      when(userRepository.findById(userId)).thenReturn(Optional.of(toDelete));
+      when(userRepository.findAllAdmins()).thenReturn(List.of(toDelete));
+      when(userService.getCurrentUser()).thenReturn(Optional.of(toDelete));
+
+      assertThrows(IllegalStateException.class, () -> userDeletionService.deleteUser(userId));
+      verify(userRepository, never()).delete(any());
+    }
+
+    @Test
+    void throws_whenCurrentUserIsNotAdmin() {
+      // findAllAdmins has only the user being deleted; current user is logged in
+      // but has no ADMIN role -> no fallback, throw.
+      User toDelete = newUser(userId);
+      toDelete.setInKeycloak(false);
+
+      UUID currentId = UUID.randomUUID();
+      User current = newUser(currentId);
+      current.setRoles(new HashSet<>(Set.of(roleNamed("KRT_MEMBER"))));
+
+      when(userRepository.findById(userId)).thenReturn(Optional.of(toDelete));
+      when(userRepository.findAllAdmins()).thenReturn(List.of(toDelete));
+      when(userService.getCurrentUser()).thenReturn(Optional.of(current));
+
+      assertThrows(IllegalStateException.class, () -> userDeletionService.deleteUser(userId));
+      verify(userRepository, never()).delete(any());
+    }
+  }
+
+  private static User newUser(UUID id) {
+    User u = new User();
+    u.setId(id);
+    u.setUsername("user-" + id);
+    u.setRoles(new HashSet<>());
+    return u;
+  }
+
+  private static Role roleNamed(String name) {
+    Role r = new Role();
+    r.setName(name);
+    return r;
   }
 }

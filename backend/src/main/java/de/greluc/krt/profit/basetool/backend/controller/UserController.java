@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserSyncResultDto;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryService;
+import de.greluc.krt.profit.basetool.backend.service.UserDeletionService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.service.UserSyncService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
@@ -83,6 +84,7 @@ public class UserController {
   private static final Set<String> ALLOWED_SORT = Set.of("username", "email", "rank", "id");
 
   private final UserService userService;
+  private final UserDeletionService userDeletionService;
   private final UserMapper userMapper;
   private final AuthHelperService authHelperService;
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
@@ -602,7 +604,7 @@ public class UserController {
   @DeleteMapping("/{id}")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public void deleteUser(@PathVariable @NotNull UUID id) {
-    userService.deleteUser(id);
+    userDeletionService.deleteUser(id);
   }
 
   /** Body for {@link #updateUserAttributes}. */
