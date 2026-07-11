@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleaseRe
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
+import de.greluc.krt.profit.basetool.backend.service.MaterialExchangeBoardService;
 import de.greluc.krt.profit.basetool.backend.service.MaterialExchangeService;
 import java.time.Instant;
 import java.util.List;
@@ -47,13 +48,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * Delegation coverage for {@link MaterialExchangeController}: each endpoint forwards its arguments
- * to {@link MaterialExchangeService} and returns the service result unchanged (the security gate
- * and validation are framework-enforced by the {@code @PreAuthorize}/{@code @Valid} annotations).
+ * to its collaborator — the read endpoints to {@link MaterialExchangeBoardService}, the write
+ * endpoints to {@link MaterialExchangeService} — and returns the result unchanged (the security
+ * gate and validation are framework-enforced by the {@code @PreAuthorize}/{@code @Valid}
+ * annotations).
  */
 @ExtendWith(MockitoExtension.class)
 class MaterialExchangeControllerTest {
 
   @Mock private MaterialExchangeService service;
+  @Mock private MaterialExchangeBoardService boardService;
 
   @InjectMocks private MaterialExchangeController controller;
 
@@ -63,19 +67,19 @@ class MaterialExchangeControllerTest {
   void boardDelegatesFiltersAndSort() {
     PageResponse<MaterialExchangeOfferDto> page =
         new PageResponse<>(List.of(sampleDto()), 0, 50, 1, 1, List.of());
-    when(service.board("mein", "agri", 600, 100.0, "menge", 0, 50)).thenReturn(page);
+    when(boardService.board("mein", "agri", 600, 100.0, "menge", 0, 50)).thenReturn(page);
 
     PageResponse<MaterialExchangeOfferDto> result =
         controller.board("mein", "agri", 600, 100.0, "menge", 0, 50);
 
     assertThat(result).isSameAs(page);
-    verify(service).board("mein", "agri", 600, 100.0, "menge", 0, 50);
+    verify(boardService).board("mein", "agri", 600, 100.0, "menge", 0, 50);
   }
 
   @Test
   void countsDelegates() {
     MaterialExchangeCountsDto counts = new MaterialExchangeCountsDto(5, 2);
-    when(service.counts()).thenReturn(counts);
+    when(boardService.counts()).thenReturn(counts);
 
     assertThat(controller.counts()).isSameAs(counts);
   }
@@ -83,7 +87,7 @@ class MaterialExchangeControllerTest {
   @Test
   void detailDelegates() {
     MaterialExchangeOfferDto dto = sampleDto();
-    when(service.detail(offerId)).thenReturn(dto);
+    when(boardService.detail(offerId)).thenReturn(dto);
 
     assertThat(controller.detail(offerId)).isSameAs(dto);
   }
@@ -162,7 +166,7 @@ class MaterialExchangeControllerTest {
   void releasedItemIdsDelegates() {
     UUID a = UUID.randomUUID();
     UUID b = UUID.randomUUID();
-    when(service.releasedInventoryItemIds(List.of(a, b))).thenReturn(java.util.Set.of(a));
+    when(boardService.releasedInventoryItemIds(List.of(a, b))).thenReturn(java.util.Set.of(a));
 
     assertThat(controller.releasedItemIds(List.of(a, b))).containsExactly(a);
   }
@@ -173,7 +177,7 @@ class MaterialExchangeControllerTest {
         List.of(
             new MaterialExchangeReleasableItemDto(
                 UUID.randomUUID(), "Agricium", QuantityType.SCU, 796, 340.0, "Lorville", false));
-    when(service.myReleasableItems("agri")).thenReturn(items);
+    when(boardService.myReleasableItems("agri")).thenReturn(items);
 
     assertThat(controller.releasableItems("agri")).isSameAs(items);
   }
