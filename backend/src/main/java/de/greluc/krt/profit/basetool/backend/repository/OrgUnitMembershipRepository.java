@@ -88,10 +88,11 @@ public interface OrgUnitMembershipRepository
 
   /**
    * Batch variant of {@link #findAllByIdUserIdAndKind(UUID, OrgUnitKind)} for a set of users and a
-   * set of kinds in a single query — the N+1-free way to resolve "which Staffeln and
-   * Spezialkommandos does each of these users belong to?". Backs the Materialbörse board's anbieter
-   * affiliation badges (REQ-MARKET-001), which render every offering member's {@code SQUADRON} +
-   * {@code SPECIAL_COMMAND} memberships after the username without a per-offer membership lookup.
+   * set of kinds in a single query — the N+1-free way to resolve "which Staffeln, Spezialkommandos
+   * and Bereiche does each of these users belong to?". Backs the Materialbörse board's anbieter
+   * affiliation badges (REQ-MARKET-001), which render every offering member's {@code SQUADRON} /
+   * {@code SPECIAL_COMMAND} / {@code BEREICH} memberships after the username without a per-offer
+   * membership lookup.
    *
    * @param userIds the users whose memberships to list; never {@code null}. An empty collection
    *     yields an empty result.

@@ -116,7 +116,7 @@
                                 <span class="mb-mrow-owner" th:text="${offer.owner().effectiveName()}">Spieler</span>
                                 <span th:if="${offer.ownerOrgUnits() != null and !offer.ownerOrgUnits().isEmpty()}" class="squadron-badge-group">
                                     <span th:each="unit : ${offer.ownerOrgUnits()}" class="squadron-badge"
-                                          th:classappend="${unit.kind() == 'SPECIAL_COMMAND'} ? 'squadron-badge-sk'"
+                                          th:classappend="${unit.kind() != 'SQUADRON'} ? 'squadron-badge-sk'"
                                           th:text="${unit.shorthand() != null ? unit.shorthand() : unit.name()}"
                                           th:title="${unit.name()}">IRI</span>
                                 </span>
@@ -164,7 +164,7 @@
                                         <span class="mb-dp-owner-name" th:text="${offer.owner().effectiveName()}">Spieler</span>
                                         <span th:if="${offer.ownerOrgUnits() != null and !offer.ownerOrgUnits().isEmpty()}" class="squadron-badge-group">
                                             <span th:each="unit : ${offer.ownerOrgUnits()}" class="squadron-badge"
-                                                  th:classappend="${unit.kind() == 'SPECIAL_COMMAND'} ? 'squadron-badge-sk'"
+                                                  th:classappend="${unit.kind() != 'SQUADRON'} ? 'squadron-badge-sk'"
                                                   th:text="${unit.shorthand() != null ? unit.shorthand() : unit.name()}"
                                                   th:title="${unit.name()}">IRI</span>
                                         </span>

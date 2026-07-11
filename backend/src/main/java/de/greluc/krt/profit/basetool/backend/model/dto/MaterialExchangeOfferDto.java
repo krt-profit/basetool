@@ -57,10 +57,11 @@ import java.util.UUID;
  * @param itemName the offered item's display name for an item offer, else {@code null}.
  * @param itemQuantity the offered whole-piece quantity for an item offer, else {@code null}.
  * @param owner the offering player (the Anbieter), shown to everyone as "von {Spieler}".
- * @param ownerOrgUnits every org unit the Anbieter currently belongs to — their Staffel(n) first,
- *     then their Spezialkommando(s), each name-sorted — so the board renders <b>all</b> of the
- *     Anbieter's affiliation badges after the username (there is no single "primary" Staffel).
- *     Independent of the offer's stored owning org unit; empty when the Anbieter has no membership.
+ * @param ownerOrgUnits every badge-kind org unit the Anbieter currently belongs to — their
+ *     Staffel(n) first, then Spezialkommando(s), then Bereich(e), each name-sorted — so the board
+ *     renders <b>all</b> of the Anbieter's affiliation badges after the username (there is no
+ *     single "primary" Staffel; the Organisationsleitung is not surfaced). Independent of the
+ *     offer's stored owning org unit; empty when the Anbieter has no such membership.
  * @param mine whether the requesting member owns this offer.
  * @param quality the offered quality (0–1000) for a material offer, else {@code null}.
  * @param amount the offered quantity in SCU (clamped to current stock) for a material offer, else

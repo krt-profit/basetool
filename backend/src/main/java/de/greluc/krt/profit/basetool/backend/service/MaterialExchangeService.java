@@ -112,13 +112,20 @@ public class MaterialExchangeService {
   private static final int PICKER_LIMIT = 50;
 
   /**
-   * Display order of an Anbieter's affiliation badges: Staffel(n) first ({@code SQUADRON} → 0, else
-   * 1), then each group name-sorted case-insensitively — the same ordering the mission roster
-   * badges and the membership pickers use, so the same member's badges read identically across the
-   * app.
+   * Org-unit kinds surfaced as an Anbieter's affiliation badges (REQ-MARKET-001): the member's
+   * Staffeln, Spezialkommandos and Bereiche. The Organisationsleitung is deliberately excluded — a
+   * leadership-only affiliation carries no board badge.
+   */
+  private static final List<OrgUnitKind> BADGE_KINDS =
+      List.of(OrgUnitKind.SQUADRON, OrgUnitKind.SPECIAL_COMMAND, OrgUnitKind.BEREICH);
+
+  /**
+   * Display order of an Anbieter's affiliation badges: Staffel(n) first, then Spezialkommando(s),
+   * then Bereich(e) (see {@link #badgeRank(OrgUnitKind)}), each group name-sorted
+   * case-insensitively — so the same member's badges read in a stable order across the board.
    */
   private static final Comparator<OrgUnit> ORG_UNIT_BADGE_ORDER =
-      Comparator.<OrgUnit, Integer>comparing(ou -> ou.getKind() == OrgUnitKind.SQUADRON ? 0 : 1)
+      Comparator.<OrgUnit>comparingInt(ou -> badgeRank(ou.getKind()))
           .thenComparing(
               ou -> ou.getName() == null ? "" : ou.getName(), String.CASE_INSENSITIVE_ORDER);
 
@@ -131,9 +138,9 @@ public class MaterialExchangeService {
   private final UserMapper userMapper;
 
   /**
-   * Reads each offering member's {@code SQUADRON} + {@code SPECIAL_COMMAND} memberships so the
-   * board can render <b>all</b> of the Anbieter's affiliation badges after the username
-   * (REQ-MARKET-001) — batch-loaded via {@link
+   * Reads each offering member's badge-kind memberships ({@link #BADGE_KINDS}: {@code SQUADRON} /
+   * {@code SPECIAL_COMMAND} / {@code BEREICH}) so the board can render <b>all</b> of the Anbieter's
+   * affiliation badges after the username (REQ-MARKET-001) — batch-loaded via {@link
    * OrgUnitMembershipRepository#findAllByIdUserIdInAndKindIn} to stay N+1-free across a board page.
    */
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
@@ -755,13 +762,14 @@ public class MaterialExchangeService {
   }
 
   /**
-   * Batch-resolves each given member's org-unit affiliation badges for the board — every {@code
-   * SQUADRON} and {@code SPECIAL_COMMAND} membership the member holds, ordered by {@link
-   * #ORG_UNIT_BADGE_ORDER} (Staffel(n) first, then Spezialkommando(s), each name-sorted). There is
-   * deliberately no "primary" Staffel: a member in several Staffeln and/or SKs surfaces <b>all</b>
-   * of their badges (REQ-MARKET-001). Two queries total regardless of page size — one membership
-   * batch, one org-unit batch — so the board stays free of the per-offer N+1 (REQ-DATA-003). A
-   * dangling membership whose org unit no longer resolves is dropped.
+   * Batch-resolves each given member's org-unit affiliation badges for the board — every {@link
+   * #BADGE_KINDS} ({@code SQUADRON} / {@code SPECIAL_COMMAND} / {@code BEREICH}) membership the
+   * member holds, ordered by {@link #ORG_UNIT_BADGE_ORDER} (Staffel(n), then Spezialkommando(s),
+   * then Bereich(e), each name-sorted). There is deliberately no "primary" Staffel: a member in
+   * several Staffeln and/or SKs and/or Bereiche surfaces <b>all</b> of their badges
+   * (REQ-MARKET-001). Two queries total regardless of page size — one membership batch, one
+   * org-unit batch — so the board stays free of the per-offer N+1 (REQ-DATA-003). A dangling
+   * membership whose org unit no longer resolves is dropped.
    *
    * @param ownerIds the offering members whose affiliations to resolve; an empty set yields an
    *     empty map.
@@ -772,8 +780,7 @@ public class MaterialExchangeService {
       return Map.of();
     }
     List<OrgUnitMembership> rows =
-        orgUnitMembershipRepository.findAllByIdUserIdInAndKindIn(
-            ownerIds, List.of(OrgUnitKind.SQUADRON, OrgUnitKind.SPECIAL_COMMAND));
+        orgUnitMembershipRepository.findAllByIdUserIdInAndKindIn(ownerIds, BADGE_KINDS);
     if (rows.isEmpty()) {
       return Map.of();
     }
@@ -799,6 +806,24 @@ public class MaterialExchangeService {
                                     ou.getId(), ou.getName(), ou.getShorthand(), ou.getKind()))
                         .toList()));
     return byOwner;
+  }
+
+  /**
+   * Sort rank of an org-unit kind for the affiliation-badge order: Staffel (0) before
+   * Spezialkommando (1) before Bereich (2). The Organisationsleitung (3) is never queried into a
+   * badge (it is absent from {@link #BADGE_KINDS}); it is ranked last only to keep the switch
+   * exhaustive.
+   *
+   * @param kind the org-unit kind.
+   * @return the badge sort rank (lower sorts first).
+   */
+  private static int badgeRank(OrgUnitKind kind) {
+    return switch (kind) {
+      case SQUADRON -> 0;
+      case SPECIAL_COMMAND -> 1;
+      case BEREICH -> 2;
+      case ORGANISATIONSLEITUNG -> 3;
+    };
   }
 
   /**

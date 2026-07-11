@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.model.Bereich;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeInterest;
@@ -162,15 +163,17 @@ class MaterialExchangeServiceTest {
   }
 
   /**
-   * The offer carries <b>every</b> org unit the Anbieter belongs to (no "primary" Staffel):
-   * Staffel(n) first, then Spezialkommando(s), each name-sorted (REQ-MARKET-001). A member of two
-   * Staffeln and one SK surfaces all three affiliation badges to any viewer.
+   * The offer carries <b>every</b> badge-kind org unit the Anbieter belongs to (no "primary"
+   * Staffel): Staffel(n) first, then Spezialkommando(s), then Bereich(e), each name-sorted
+   * (REQ-MARKET-001). A member of two Staffeln, one SK and one Bereich surfaces all four
+   * affiliation badges — in that kind order — to any viewer.
    */
   @Test
-  void detail_ownerOrgUnits_listsAllStaffelnThenSksNameSorted() {
+  void detail_ownerOrgUnits_listsStaffelnThenSksThenBereicheNameSorted() {
     UUID staffelBravoId = UUID.randomUUID();
     UUID staffelAlphaId = UUID.randomUUID();
     UUID skId = UUID.randomUUID();
+    UUID bereichId = UUID.randomUUID();
     when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
     when(offerRepository.findWithDetailById(offerId)).thenReturn(Optional.of(offer));
     when(interestRepository.countByOfferId(offerId)).thenReturn(0L);
@@ -178,12 +181,14 @@ class MaterialExchangeServiceTest {
     when(orgUnitMembershipRepository.findAllByIdUserIdInAndKindIn(any(), any()))
         .thenReturn(
             List.of(
+                membership(ownerId, bereichId, OrgUnitKind.BEREICH),
                 membership(ownerId, staffelBravoId, OrgUnitKind.SQUADRON),
                 membership(ownerId, skId, OrgUnitKind.SPECIAL_COMMAND),
                 membership(ownerId, staffelAlphaId, OrgUnitKind.SQUADRON)));
     when(orgUnitRepository.findAllById(any()))
         .thenReturn(
             List.of(
+                bereich(bereichId, "Profit", "PROFIT"),
                 squadron(staffelBravoId, "Bravo", "BRV"),
                 specialCommand(skId, "Zulu Kommando", "ZK"),
                 squadron(staffelAlphaId, "Alpha", "ALP")));
@@ -192,10 +197,14 @@ class MaterialExchangeServiceTest {
 
     assertThat(dto.ownerOrgUnits())
         .extracting(OrgUnitReferenceDto::shorthand)
-        .containsExactly("ALP", "BRV", "ZK");
+        .containsExactly("ALP", "BRV", "ZK", "PROFIT");
     assertThat(dto.ownerOrgUnits())
         .extracting(OrgUnitReferenceDto::kind)
-        .containsExactly(OrgUnitKind.SQUADRON, OrgUnitKind.SQUADRON, OrgUnitKind.SPECIAL_COMMAND);
+        .containsExactly(
+            OrgUnitKind.SQUADRON,
+            OrgUnitKind.SQUADRON,
+            OrgUnitKind.SPECIAL_COMMAND,
+            OrgUnitKind.BEREICH);
   }
 
   /** An Anbieter with no org-unit membership surfaces no affiliation badges (empty, never null). */
@@ -733,5 +742,13 @@ class MaterialExchangeServiceTest {
     specialCommand.setName(name);
     specialCommand.setShorthand(shorthand);
     return specialCommand;
+  }
+
+  private static Bereich bereich(UUID id, String name, String shorthand) {
+    Bereich bereich = new Bereich();
+    bereich.setId(id);
+    bereich.setName(name);
+    bereich.setShorthand(shorthand);
+    return bereich;
   }
 }
