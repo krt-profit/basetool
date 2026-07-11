@@ -911,15 +911,26 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    * this instance's local room. No origin session is excluded — the originator lives on another
    * replica — and nothing is re-published (that would loop).
    *
+   * <p>The section keys are re-validated against the topic class's whitelist here too. The
+   * publishing replica already sanitised them before it put the frame on Redis, so this is
+   * defense-in-depth — it keeps the relay robust to a malformed or older-version peer, or a
+   * tampered Redis payload, matching the whitelist-on-ingest posture of the three client/server
+   * publish paths ({@link #handleMultiplexedChanged}, {@link #handleLegacyMessage}, {@link
+   * #publishFromServer}).
+   *
    * @param canonicalTopic the canonical topic string
-   * @param sections the already-sanitised section keys
+   * @param sections the section keys from the peer replica (re-filtered to the class whitelist)
    */
   public void deliverFromFanout(@NotNull String canonicalTopic, @NotNull List<String> sections) {
     LiveSyncTopic topic = LiveSyncTopic.parse(canonicalTopic);
-    if (topic == null || sections.isEmpty()) {
+    if (topic == null) {
       return;
     }
-    relayLocal(topic, sections, null);
+    List<String> allowed = retainAllowed(sections, topic.topicClass());
+    if (allowed.isEmpty()) {
+      return;
+    }
+    relayLocal(topic, allowed, null);
   }
 
   /**

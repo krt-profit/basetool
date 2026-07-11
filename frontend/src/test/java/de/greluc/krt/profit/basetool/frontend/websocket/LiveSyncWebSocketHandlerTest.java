@@ -481,15 +481,17 @@ class LiveSyncWebSocketHandlerTest {
     bob.sent.clear();
     FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
 
-    // "crew" is a mission section, not an operation section — dropped; "overview"/"finance" kept.
+    // "crew" is a mission section, not an operation section — dropped; the two operation-surface
+    // sections "overview"/"payout" are kept ("missions"/"finance" are not in the OPERATION
+    // whitelist — see #1241).
     handler.handleTextMessage(
         alice,
         new TextMessage(
             "{\"type\":\"changed\",\"topic\":\""
                 + topic
-                + "\",\"sections\":[\"overview\",\"crew\",\"finance\"]}"));
+                + "\",\"sections\":[\"overview\",\"crew\",\"payout\"]}"));
 
-    assertThat(sectionsOf(lastBroadcast(bob))).containsExactly("overview", "finance");
+    assertThat(sectionsOf(lastBroadcast(bob))).containsExactly("overview", "payout");
   }
 
   @Test
@@ -568,6 +570,110 @@ class LiveSyncWebSocketHandlerTest {
             .counter();
     assertThat(counter).isNotNull();
     assertThat(counter.count()).isEqualTo(1.0);
+  }
+
+  @Test
+  void multiplexedSubscribe_denied_receivesNoSubsequentPeerChange() throws Exception {
+    // Beyond the `denied` ack + counter (multiplexedSubscribe_denied_refusesAndCounts): prove via
+    // observed traffic that a refused socket is NOT in the room — a later peer `changed` frame for
+    // the same topic must reach it with nothing (the "subscribe refused ⇒ no inbound relay"
+    // contract).
+    when(authorizer.authorize(any(), any(), any(), any()))
+        .thenReturn(LiveSyncSubscriptionAuthorizer.Decision.DENY);
+    String topic = operationTopic();
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    subscribe(bob, topic);
+    assertThat(lastBroadcast(bob).get("type").asString()).isEqualTo("denied");
+    bob.sent.clear();
+
+    // A peer publishes (publishing needs no subscription); the denied socket receives nothing.
+    FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
+    handler.handleTextMessage(alice, changedFrame(topic, "overview"));
+
+    assertThat(bob.sent).isEmpty();
+  }
+
+  @Test
+  void multiplexedSubscribe_authorizerThrows_failsOpen() throws Exception {
+    // authorizeAndRegister catches a RuntimeException from the probe and downgrades to ALLOW — the
+    // same availability-over-strictness posture as the executor-saturation path (safe: only opaque
+    // keys cross the socket, every fragment re-fetch re-authorizes per viewer).
+    LiveSyncSubscriptionAuthorizer throwing = mock(LiveSyncSubscriptionAuthorizer.class);
+    when(throwing.authorize(any(), any(), any(), any()))
+        .thenThrow(new IllegalStateException("probe blew up"));
+    SimpleMeterRegistry reg = new SimpleMeterRegistry();
+    LiveSyncPresenceService svc = new LiveSyncPresenceService(reg);
+    LiveSyncWebSocketHandler h =
+        new LiveSyncWebSocketHandler(svc, fanout, objectMapper, reg, throwing, Runnable::run);
+
+    String topic = operationTopic();
+    FakeSession bob = multiplexedSession(oidcUser("user-2", "Bob"));
+    h.afterConnectionEstablished(bob);
+    h.handleTextMessage(bob, subscribeFrame(topic));
+
+    // Fail-open: acked `subscribed` despite the throwing probe, and actually joined the room.
+    assertThat(lastBroadcast(bob).get("type").asString()).isEqualTo("subscribed");
+    bob.sent.clear();
+    FakeSession alice = multiplexedSession(oidcUser("user-1", "Alice"));
+    h.afterConnectionEstablished(alice);
+    h.handleTextMessage(alice, changedFrame(topic, "overview"));
+    assertThat(sectionsOf(lastBroadcast(bob))).containsExactly("overview");
+  }
+
+  @Test
+  void multiplexedSubscribe_socketClosedDuringProbe_dropsAndDoesNotJoin() throws Exception {
+    // Close-during-probe race branch (a): the async probe returns ALLOW, but the socket closed
+    // while it ran. The slot was reserved synchronously at subscribe time; completeSubscribe must
+    // drop it and NOT join the room (a closed decorator lingering in a room would leak frames to a
+    // dead socket). A deferred executor holds the probe so the close can be interleaved
+    // deterministically.
+    List<Runnable> deferred = new ArrayList<>();
+    SimpleMeterRegistry reg = new SimpleMeterRegistry();
+    LiveSyncPresenceService svc = new LiveSyncPresenceService(reg);
+    LiveSyncWebSocketHandler h =
+        new LiveSyncWebSocketHandler(svc, fanout, objectMapper, reg, authorizer, deferred::add);
+
+    String topic = operationTopic();
+    FakeSession bob = multiplexedSession(oidcUser("user-2", "Bob"));
+    h.afterConnectionEstablished(bob);
+    h.handleTextMessage(bob, subscribeFrame(topic)); // reserves the slot, defers the probe
+    assertThat(deferred).hasSize(1);
+
+    // The socket closes before the probe completes.
+    bob.open = false;
+    h.afterConnectionClosed(bob, CloseStatus.NORMAL);
+    bob.sent.clear();
+
+    deferred.get(0).run(); // probe completes ALLOW against a now-closed socket
+
+    // No `subscribed` ack to the dead socket, and the room stays empty (never joined).
+    assertThat(bob.sent).isEmpty();
+    assertThat(presenceGauge(reg)).isZero();
+  }
+
+  @Test
+  void multiplexedSubscribe_socketClosesBetweenJoinAndAck_leavesRoom() throws Exception {
+    // Close-during-probe race branch (b): the socket is open when completeSubscribe checks, joins
+    // the room, then loses the race with a concurrent close before the ack. The handler must
+    // leaveRoom so no closed decorator lingers. The FakeSession reports open once (the pre-join
+    // check) then closed (the post-join check), reproducing that interleaving deterministically.
+    List<Runnable> deferred = new ArrayList<>();
+    SimpleMeterRegistry reg = new SimpleMeterRegistry();
+    LiveSyncPresenceService svc = new LiveSyncPresenceService(reg);
+    LiveSyncWebSocketHandler h =
+        new LiveSyncWebSocketHandler(svc, fanout, objectMapper, reg, authorizer, deferred::add);
+
+    String topic = operationTopic();
+    FakeSession bob = multiplexedSession(oidcUser("user-2", "Bob"));
+    h.afterConnectionEstablished(bob);
+    h.handleTextMessage(bob, subscribeFrame(topic)); // reserves the slot, defers the probe
+    bob.flipOpenAfter = 1; // open at the pre-join check, closed at the post-join check
+
+    deferred.get(0).run();
+
+    // Joined then immediately left: the room is empty (no lingering decorator) and no ack was sent.
+    assertThat(presenceGauge(reg)).isZero();
+    assertThat(bob.sent).isEmpty();
   }
 
   @Test
@@ -814,12 +920,30 @@ class LiveSyncWebSocketHandlerTest {
         "{\"type\":\"changed\",\"topic\":\"" + topic + "\",\"sections\":[\"" + section + "\"]}");
   }
 
+  private static TextMessage subscribeFrame(String topic) {
+    return new TextMessage("{\"type\":\"subscribe\",\"topic\":\"" + topic + "\"}");
+  }
+
   private void subscribe(FakeSession session, String topic) throws Exception {
     handler.handleTextMessage(
         session, new TextMessage("{\"type\":\"subscribe\",\"topic\":\"" + topic + "\"}"));
   }
 
   private FakeSession openMultiplexedSession(OidcUser user) throws Exception {
+    FakeSession session = multiplexedSession(user);
+    handler.afterConnectionEstablished(session);
+    return session;
+  }
+
+  /**
+   * Builds — but does not establish — a multiplexed {@code /ws/sync} {@link FakeSession}, so a test
+   * driving a non-default handler (its own executor / authorizer) can call {@code
+   * afterConnectionEstablished} on that handler itself.
+   *
+   * @param user the socket owner
+   * @return the un-established multiplexed session
+   */
+  private static FakeSession multiplexedSession(OidcUser user) {
     FakeSession session = new FakeSession();
     session.open = true;
     session.uri = URI.create("ws://localhost/ws/sync");
@@ -827,7 +951,6 @@ class LiveSyncWebSocketHandlerTest {
     session.principal =
         new UsernamePasswordAuthenticationToken(
             user, "n/a", List.of(new SimpleGrantedAuthority("ROLE_USER")));
-    handler.afterConnectionEstablished(session);
     return session;
   }
 
@@ -848,7 +971,11 @@ class LiveSyncWebSocketHandlerTest {
   }
 
   private double presenceGauge() {
-    return registry.get(MetricNames.PRESENCE_WS_SESSIONS).gauge().value();
+    return presenceGauge(registry);
+  }
+
+  private static double presenceGauge(SimpleMeterRegistry reg) {
+    return reg.get(MetricNames.PRESENCE_WS_SESSIONS).gauge().value();
   }
 
   private double frameCounter(String type) {
@@ -956,6 +1083,16 @@ class LiveSyncWebSocketHandlerTest {
     Principal principal;
     CloseStatus closeStatus;
 
+    /**
+     * When {@code >= 0}, {@link #isOpen()} reports {@code true} for the first {@code flipOpenAfter}
+     * calls and {@code false} thereafter — used to reproduce a close that races in mid-way through
+     * {@code completeSubscribe} (open at the pre-join check, closed at the post-join check). {@code
+     * -1} (the default) reports the plain {@link #open} field, leaving every other test unaffected.
+     */
+    int flipOpenAfter = -1;
+
+    private int openChecks;
+
     @Override
     public String getId() {
       return id;
@@ -1031,6 +1168,9 @@ class LiveSyncWebSocketHandlerTest {
 
     @Override
     public boolean isOpen() {
+      if (flipOpenAfter >= 0) {
+        return openChecks++ < flipOpenAfter;
+      }
       return open;
     }
 

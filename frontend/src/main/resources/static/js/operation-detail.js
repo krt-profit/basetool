@@ -39,12 +39,13 @@
 // for every other viewer, over the shared /ws/sync socket. Only opaque section keys cross the wire;
 // each viewer re-pulls its own authorization-checked fragment. OPERATION_SECTIONS is the single
 // source of truth shared by the write-side broadcast and the receive-side refresh (the three-mirror-
-// points rule): its keys mirror the server-side LiveSyncTopicClass.OPERATION whitelist.
+// points rule): its keys mirror the server-side LiveSyncTopicClass.OPERATION whitelist, so it only
+// lists the two sections the operation surface itself mutates. The embedded missions table and the
+// finance roll-up change on the mission surface, which does not yet cross-publish to the operation
+// room; re-adding 'missions'/'finance' here in lockstep with the whitelist is tracked in #1241.
 const OPERATION_SECTIONS = {
     overview: { container: '#op-overview-results', fragmentValue: 'overview' },
-    missions: { container: '#op-missions-results', fragmentValue: 'missions' },
     payout: { container: '#op-payout-results', fragmentValue: 'payout' },
-    finance: { container: '#op-finance-results', fragmentValue: 'finance' },
 };
 
 (function () {
@@ -537,8 +538,10 @@ document.addEventListener('change', function (ev) {
             });
     }
     // Document-delegated on the CAPTURE phase: the `toggle` event does not bubble, so a plain
-    // bubbling delegation would never fire — capture catches it at the document. This also survives a
-    // peer-driven finance fragment swap that replaces the <details> elements (REQ-FE-015).
+    // bubbling delegation would never fire — capture catches it at the document. Binding at the
+    // document (not on each <details>) also means it survives any DOM replacement of the <details>
+    // elements — a tab re-render today, and the peer-driven finance fragment swap once #1241 wires
+    // the mission -> operation finance cross-publish (REQ-FE-015).
     document.addEventListener(
         'toggle',
         function (ev) {

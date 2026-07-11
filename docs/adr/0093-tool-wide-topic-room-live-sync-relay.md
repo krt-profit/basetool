@@ -70,9 +70,10 @@ no channel at all, and the bank surfaces would need 3–4 parallel sockets per a
   of publish rate; and the population able to abuse it (invite-gated realm accounts) is the
   population ADR-0031 already trusts. The spoof-proof server-side trigger interceptor stays
   the not-taken heavier option, unchanged from ADR-0031.
-- **Server-side publish hook** (`LiveSyncLocalBus.publishLocal`) exists for mutations that
-  reach the frontend without a client socket: first consumer is the job-order create path,
-  whose anonymous-guest submissions must still refresh the staff queue.
+- **Server-side publish hook** (`LiveSyncLocalBus.publish`, delegating to
+  `LiveSyncWebSocketHandler.publishFromServer`) exists for mutations that reach the frontend
+  without a client socket: first consumer is the job-order create path, whose anonymous-guest
+  submissions must still refresh the staff queue.
 
 ### Redis pub/sub fan-out — frontend relay and backend SSE
 
@@ -110,8 +111,12 @@ no channel at all, and the bank surfaces would need 3–4 parallel sockets per a
   frames without a `topic` field resolve against it) so tabs opened before the deploy keep
   their live sync after reconnect instead of going silently stale. Removal is a tracked
   follow-up.
-- The global `MAX_CHANGED_SECTIONS = 8` cap is replaced by each class's whitelist size (the
-  order topic has 9 sections) with a defensive raw parse bound.
+- The per-frame section count is bounded by two independent gates: each class's section
+  whitelist (a `changed` frame keeps only keys in `LiveSyncTopicClass.allowedSections()`, so
+  the effective ceiling is that class's size — the order topic has the largest at 9) and a
+  defensive raw count cap `MAX_CHANGED_SECTIONS = 16` that also bounds the parse of an
+  oversized array. The count cap sits above every class whitelist, so it never clips a
+  legitimate frame; it only backstops a crafted one.
 
 ### Capacity model (5000 accounts / ≥200 concurrent, extends ADR-0085)
 

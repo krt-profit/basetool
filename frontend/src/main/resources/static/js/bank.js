@@ -108,8 +108,9 @@
     // section keys cross the wire; each viewer re-pulls its OWN authorization-checked fragment (its
     // own filter/page). The four section maps below are the single source of truth shared with the
     // server LiveSyncTopicClass whitelists (the three-mirror-points rule, build-enforced by
-    // LiveSyncSectionMapParityTest). This wires the RECEIVE side; the publish (broadcast) side follows
-    // in a later change, so until then these receivers are inert (nothing broadcasts to them yet).
+    // LiveSyncSectionMapParityTest). Both sides ship together: the RECEIVE side (these maps + the
+    // receivers wired below) and the publish side (publishBankLiveSync, driven by the per-form
+    // data-livesync matrix, called from handleBankSuccess).
 
     // bank:{id} on the STAFF account-detail page: the balance chart + booking history are NESTED
     // inside #bank-account-results (the accountBody fragment), so re-rendering any of the three keys

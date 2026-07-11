@@ -83,11 +83,19 @@ public enum LiveSyncTopicClass {
   /**
    * Per-operation room: the operation detail page (#1115). No editor-presence dots; a subscribe is
    * authorized by the same authenticated {@code GET /api/v1/operations/{id}} the page performs.
+   *
+   * <p>The whitelist carries only the two sections the operation surface itself mutates and
+   * broadcasts — {@code overview} (core save) and {@code payout} (paid-out toggle). The embedded
+   * {@code missions} table and the {@code finance} roll-up change on the <em>mission</em> surface,
+   * which does not yet cross-publish to this room; those two keys are deliberately kept out of the
+   * whitelist (and out of the {@code OPERATION_SECTIONS} seam map) so the three-mirror-points
+   * parity stays honest — the whitelist declares only what is actually broadcast. Wiring the
+   * mission → operation cross-publish (and re-adding the two keys in lockstep) is tracked in #1241.
    */
   OPERATION(
       "operation",
       true,
-      Set.of("overview", "missions", "payout", "finance"),
+      Set.of("overview", "payout"),
       false,
       "operation",
       "/api/v1/operations/{id}",

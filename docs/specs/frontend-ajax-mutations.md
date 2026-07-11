@@ -698,10 +698,11 @@ live-sync case.
 **Enforced by:** `LiveSyncWebSocketHandlerTest` (relay to peers, origin exclusion, key
 sanitising/dedup, full seam-map whitelist relay for the mission topic, no-op on empty, per-session
 rate limit — the 17 mission cases ported 1:1 from `MissionPresenceWebSocketHandlerTest`) ·
-`LiveSyncTopicAuthorizerTest` (mission: allowed on authorized read, refused on 403/404, fail-open on
-transient, malformed topic rejected) · `LiveSyncSectionMapParityTest` (seam map ↔ registry whitelist
-set-equality) · `MissionLiveSyncE2eTest` (two-context live participant-add propagation + no-reload
-assertion) · **Code:** `LiveSyncWebSocketHandler` / `LiveSyncTopicRegistry` (mission row),
+`LiveSyncSubscriptionAuthorizerTest` (mission: allowed on authorized read, refused on 403/404,
+fail-open on transient, malformed topic rejected) · `LiveSyncSectionMapParityTest` (seam map ↔
+registry whitelist set-equality) · `MissionLiveSyncE2eTest` (two-context live participant-add
+propagation + no-reload assertion) · **Code:** `LiveSyncWebSocketHandler` / `LiveSyncTopicClass`
+(mission row),
 `mission-presence.js` (adapter: `sendChanged` / `krt:mission-changed` / `krt:mission-resync`),
 `krt-live-sync.js` (shared receiver factory), `mission-detail.js` (`krtRefreshMissionSection`
 broadcast + receiver config — its container map derived from the `MISSION_SECTIONS` seam map — with
@@ -947,8 +948,8 @@ this requirement exists to prevent, #1102). Covered topics and their section whi
 | `orgunit-bank` (global)  | orgUnitBank, orgUnitBankSettings                                                                                  | no            | member-or-above (the `/org-unit-bank` page gate, local check)                                         |
 | `materialboard` (global) | board                                                                                                             | no            | authenticated                                                                                         |
 
-The server-side **topic registry** (`LiveSyncTopicRegistry`) is the single source of truth for this
-table. The REQ-FE-010 **three-mirror-points rule applies per topic**: the acting page's seam map,
+The server-side **topic-class registry** (the `LiveSyncTopicClass` enum) is the single source of
+truth for this table. The REQ-FE-010 **three-mirror-points rule applies per topic**: the acting page's seam map,
 the registry whitelist and the receiving page's apply map must change together in the same PR, and
 `LiveSyncSectionMapParityTest` enforces seam-map ↔ registry set-equality at build time, so a key
 added on one side without the other **fails the build** instead of silently stranding peers stale.
@@ -1000,15 +1001,17 @@ pattern on `basetool:notify:published` (REQ-NOTIF-006 polling stays the correctn
 
 **Enforced by:** `LiveSyncWebSocketHandlerTest` (topic parsing, cross-room isolation, per-topic
 whitelists, publish-without-subscription, per-session rate limit, topic cap, close cleanup) ·
-`LiveSyncTopicRegistryTest` + `LiveSyncSectionMapParityTest` (registry exhaustiveness + seam-map
-parity) · `LiveSyncTopicAuthorizerTest` (per-topic allow/deny/fail-open incl. requester-refused
-queue + bank dual-auth matrix) · `LiveSyncRedisBridgeTest` (publish-once, origin skip, Redis-down
-degradation) · `OperationLiveSyncE2eTest` / `JobOrderQueueLiveSyncE2eTest` /
-`BankRequestsLiveSyncE2eTest` / `MissionOrganisationLiveSyncE2eTest` (one two-context e2e per page
-family) · **Code:** `LiveSyncWebSocketHandler`, `LiveSyncTopicRegistry`, `LiveSyncTopicAuthorizer`,
+`LiveSyncTopicTest` + `LiveSyncSectionMapParityTest` (topic-class parsing/exhaustiveness + seam-map
+parity) · `LiveSyncSubscriptionAuthorizerTest` (per-topic allow/deny/fail-open incl.
+requester-refused queue + bank dual-auth matrix) · `RedisLiveSyncFanoutTest` +
+`RedisLiveSyncFanoutIntegrationTest` (publish-once, origin skip, Redis-down degradation) ·
+`OperationLiveSyncE2eTest` / `JobOrderQueueLiveSyncE2eTest` / `BankRequestsLiveSyncE2eTest` /
+`MissionOrganisationLiveSyncE2eTest` (one two-context e2e per page family) · **Code:**
+`LiveSyncWebSocketHandler`, `LiveSyncTopicClass`, `LiveSyncSubscriptionAuthorizer`,
 `LiveSyncLocalBus`, `RedisLiveSyncFanout`, `krt-live-sync.js`, the per-page seam maps
 (`MISSION_SECTIONS`, `OPERATION_SECTIONS`, `ORDER_SECTIONS`, orders-queue seam, bank
-`LIVESYNC_SECTIONS`, materialboard) · **ADR:** ADR-0093 · **Issues:** #1102, #1115, #1120
+`BANK_ACCOUNT_SECTIONS` / `ORGUNIT_ACCOUNT_SECTIONS` / `BANK_STAFF_SECTIONS` /
+`ORGUNIT_BANK_SECTIONS`, materialboard) · **ADR:** ADR-0093 · **Issues:** #1102, #1115, #1120
 
 ## Out of scope
 

@@ -26,10 +26,11 @@ import org.jetbrains.annotations.NotNull;
  * Single-instance {@link LiveSyncFanout}: publishing is a no-op because the handler's local relay
  * is the whole story when the frontend runs as one replica (ADR-0093).
  *
- * <p>Contributed as the fallback {@code @Bean} in {@code LiveSyncWebSocketConfig} via
- * {@code @ConditionalOnMissingBean}, so the Redis binding (when enabled) replaces it and the {@code
- * test} profile — which loads no Redis — keeps a working, dependency-free fan-out. Keeping the seam
- * uniform means the handler's call path is identical whether or not Redis is wired.
+ * <p>Instantiated as the fallback in {@code LiveSyncWebSocketConfig} via {@code
+ * fanoutProvider.getIfAvailable(NoopLiveSyncFanout::new)}, so a registered {@link LiveSyncFanout}
+ * bean (the Redis binding, when enabled) is used and this no-op is created only when none is — the
+ * {@code test} profile, which loads no Redis, keeps a working, dependency-free fan-out. Keeping the
+ * seam uniform means the handler's call path is identical whether or not Redis is wired.
  */
 public class NoopLiveSyncFanout implements LiveSyncFanout {
 
