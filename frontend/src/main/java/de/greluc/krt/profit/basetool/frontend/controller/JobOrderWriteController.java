@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.ClaimDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.CreateClaimDto;
@@ -256,28 +257,23 @@ public class JobOrderWriteController {
     if (lines.isEmpty()) {
       return org.springframework.http.ResponseEntity.badRequest().build();
     }
-    try {
-      CreateJobOrderItemRequestDto dto =
-          new CreateJobOrderItemRequestDto(
-              form.getResponsibleOrgUnitId(),
-              form.getRequestingOrgUnitId(),
-              form.getHandle(),
-              form.getComment(),
-              lines,
-              form.getVersion());
-      backendApiClient.post("/api/v1/orders/items", dto, JobOrderDto.class, true);
-      return org.springframework.http.ResponseEntity.ok(
-          java.util.Map.of(
-              "targetUrl", postCreateTarget(principal, canViewJobOrders, form.getSource())));
-    } catch (BackendServiceException bse) {
-      log.debug("Failed to create item order (ajax): {}", bse.getMessage());
-      return propagateBackendError(bse);
-    } catch (Exception e) {
-      log.error("Failed to create item order (ajax)", e);
-      return org.springframework.http.ResponseEntity.status(
-              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
-          .build();
-    }
+    return relay(
+        log,
+        "create item order (ajax)",
+        () -> {
+          CreateJobOrderItemRequestDto dto =
+              new CreateJobOrderItemRequestDto(
+                  form.getResponsibleOrgUnitId(),
+                  form.getRequestingOrgUnitId(),
+                  form.getHandle(),
+                  form.getComment(),
+                  lines,
+                  form.getVersion());
+          backendApiClient.post("/api/v1/orders/items", dto, JobOrderDto.class, true);
+          return org.springframework.http.ResponseEntity.ok(
+              java.util.Map.of(
+                  "targetUrl", postCreateTarget(principal, canViewJobOrders, form.getSource())));
+        });
   }
 
   /**
@@ -363,27 +359,22 @@ public class JobOrderWriteController {
     if (lines.isEmpty()) {
       return org.springframework.http.ResponseEntity.badRequest().build();
     }
-    try {
-      CreateJobOrderItemRequestDto dto =
-          new CreateJobOrderItemRequestDto(
-              null,
-              form.getRequestingOrgUnitId(),
-              form.getHandle(),
-              form.getComment(),
-              lines,
-              form.getVersion());
-      backendApiClient.put("/api/v1/orders/" + id + "/items", dto, JobOrderDto.class);
-      return org.springframework.http.ResponseEntity.ok(
-          java.util.Map.of("targetUrl", "/orders/" + id));
-    } catch (BackendServiceException bse) {
-      log.debug("Failed to update item order {} (ajax): {}", id, bse.getMessage());
-      return propagateBackendError(bse);
-    } catch (Exception e) {
-      log.error("Failed to update item order {} (ajax)", id, e);
-      return org.springframework.http.ResponseEntity.status(
-              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
-          .build();
-    }
+    return relay(
+        log,
+        "update item order " + id + " (ajax)",
+        () -> {
+          CreateJobOrderItemRequestDto dto =
+              new CreateJobOrderItemRequestDto(
+                  null,
+                  form.getRequestingOrgUnitId(),
+                  form.getHandle(),
+                  form.getComment(),
+                  lines,
+                  form.getVersion());
+          backendApiClient.put("/api/v1/orders/" + id + "/items", dto, JobOrderDto.class);
+          return org.springframework.http.ResponseEntity.ok(
+              java.util.Map.of("targetUrl", "/orders/" + id));
+        });
   }
 
   /**
@@ -502,28 +493,23 @@ public class JobOrderWriteController {
     if (materials.isEmpty()) {
       return org.springframework.http.ResponseEntity.badRequest().build();
     }
-    try {
-      CreateJobOrderDto dto =
-          new CreateJobOrderDto(
-              form.getResponsibleOrgUnitId(),
-              form.getRequestingOrgUnitId(),
-              form.getHandle(),
-              form.getComment(),
-              materials,
-              form.getVersion());
-      backendApiClient.post("/api/v1/orders", dto, JobOrderDto.class, true);
-      return org.springframework.http.ResponseEntity.ok(
-          java.util.Map.of(
-              "targetUrl", postCreateTarget(principal, canViewJobOrders, form.getSource())));
-    } catch (BackendServiceException bse) {
-      log.debug("Failed to create order (ajax): {}", bse.getMessage());
-      return propagateBackendError(bse);
-    } catch (Exception e) {
-      log.error("Failed to create order (ajax)", e);
-      return org.springframework.http.ResponseEntity.status(
-              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
-          .build();
-    }
+    return relay(
+        log,
+        "create order (ajax)",
+        () -> {
+          CreateJobOrderDto dto =
+              new CreateJobOrderDto(
+                  form.getResponsibleOrgUnitId(),
+                  form.getRequestingOrgUnitId(),
+                  form.getHandle(),
+                  form.getComment(),
+                  materials,
+                  form.getVersion());
+          backendApiClient.post("/api/v1/orders", dto, JobOrderDto.class, true);
+          return org.springframework.http.ResponseEntity.ok(
+              java.util.Map.of(
+                  "targetUrl", postCreateTarget(principal, canViewJobOrders, form.getSource())));
+        });
   }
 
   /**
@@ -569,20 +555,17 @@ public class JobOrderWriteController {
   @ResponseBody
   public org.springframework.http.ResponseEntity<Object> updatePriorityAjax(
       @PathVariable UUID id, @RequestParam Integer priority) {
-    try {
-      JobOrderDto result =
-          backendApiClient.put(
-              "/api/v1/orders/" + id + "/priority?priority=" + priority, null, JobOrderDto.class);
-      return org.springframework.http.ResponseEntity.ok(result);
-    } catch (BackendServiceException bse) {
-      log.debug("Failed to update priority (ajax) for order {}: {}", id, bse.getMessage());
-      return propagateBackendError(bse);
-    } catch (Exception e) {
-      log.error("Failed to update priority (ajax) for order {}", id, e);
-      return org.springframework.http.ResponseEntity.status(
-              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
-          .build();
-    }
+    return relay(
+        log,
+        "update priority (ajax) for order " + id,
+        () -> {
+          JobOrderDto result =
+              backendApiClient.put(
+                  "/api/v1/orders/" + id + "/priority?priority=" + priority,
+                  null,
+                  JobOrderDto.class);
+          return org.springframework.http.ResponseEntity.ok(result);
+        });
   }
 
   /**
@@ -597,19 +580,14 @@ public class JobOrderWriteController {
   @org.springframework.web.bind.annotation.ResponseBody
   public org.springframework.http.ResponseEntity<Object> updateStatus(
       @PathVariable UUID id, @RequestBody UpdateJobOrderStatusDto dto) {
-    try {
-      JobOrderDto result =
-          backendApiClient.put("/api/v1/orders/" + id + "/status", dto, JobOrderDto.class);
-      return org.springframework.http.ResponseEntity.ok(result);
-    } catch (BackendServiceException bse) {
-      log.debug("Failed to update status for order {}: {}", id, bse.getMessage());
-      return propagateBackendError(bse);
-    } catch (Exception e) {
-      log.error("Failed to update status for order {}", id, e);
-      return org.springframework.http.ResponseEntity.status(
-              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
-          .build();
-    }
+    return relay(
+        log,
+        "update status for order " + id,
+        () -> {
+          JobOrderDto result =
+              backendApiClient.put("/api/v1/orders/" + id + "/status", dto, JobOrderDto.class);
+          return org.springframework.http.ResponseEntity.ok(result);
+        });
   }
 
   /**
@@ -629,21 +607,15 @@ public class JobOrderWriteController {
   @org.springframework.web.bind.annotation.ResponseBody
   public org.springframework.http.ResponseEntity<Object> updateBlueprintVariantCounting(
       @PathVariable UUID id, @RequestBody UpdateJobOrderBlueprintCountingDto dto) {
-    try {
-      JobOrderDto result =
-          backendApiClient.patch(
-              "/api/v1/orders/" + id + "/blueprint-variant-counting", dto, JobOrderDto.class);
-      return org.springframework.http.ResponseEntity.ok(result);
-    } catch (BackendServiceException bse) {
-      log.debug(
-          "Failed to update blueprint variant counting for order {}: {}", id, bse.getMessage());
-      return propagateBackendError(bse);
-    } catch (Exception e) {
-      log.error("Failed to update blueprint variant counting for order {}", id, e);
-      return org.springframework.http.ResponseEntity.status(
-              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
-          .build();
-    }
+    return relay(
+        log,
+        "update blueprint variant counting for order " + id,
+        () -> {
+          JobOrderDto result =
+              backendApiClient.patch(
+                  "/api/v1/orders/" + id + "/blueprint-variant-counting", dto, JobOrderDto.class);
+          return org.springframework.http.ResponseEntity.ok(result);
+        });
   }
 
   /**
@@ -672,25 +644,19 @@ public class JobOrderWriteController {
   @ResponseBody
   public org.springframework.http.ResponseEntity<Object> upsertClaim(
       @PathVariable UUID id, @RequestBody CreateClaimDto dto) {
-    try {
-      ClaimDto result =
-          backendApiClient.post("/api/v1/orders/" + id + "/claims", dto, ClaimDto.class);
-      return org.springframework.http.ResponseEntity.status(
-              org.springframework.http.HttpStatus.CREATED)
-          .body(result);
-    } catch (BackendServiceException bse) {
-      // Mirrors every backend status faithfully, including a 409 that survived the backend's
-      // bounded
-      // claim-upsert retry — its RFC 7807 code is preserved so the client toasts/reloads correctly
-      // instead of the race being collapsed into a 500.
-      log.debug("Failed to upsert claim on order {}: {}", id, bse.getMessage());
-      return propagateBackendError(bse);
-    } catch (Exception e) {
-      log.error("Failed to upsert claim on order {}", id, e);
-      return org.springframework.http.ResponseEntity.status(
-              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
-          .build();
-    }
+    // Mirrors every backend status faithfully, including a 409 that survived the backend's bounded
+    // claim-upsert retry — its RFC 7807 code is preserved (via propagateBackendError inside relay)
+    // so the client toasts/reloads correctly instead of the race being collapsed into a 500.
+    return relay(
+        log,
+        "upsert claim on order " + id,
+        () -> {
+          ClaimDto result =
+              backendApiClient.post("/api/v1/orders/" + id + "/claims", dto, ClaimDto.class);
+          return org.springframework.http.ResponseEntity.status(
+                  org.springframework.http.HttpStatus.CREATED)
+              .body(result);
+        });
   }
 
   /**
@@ -707,18 +673,13 @@ public class JobOrderWriteController {
   @ResponseBody
   public org.springframework.http.ResponseEntity<Object> withdrawClaim(
       @PathVariable UUID id, @PathVariable UUID claimId) {
-    try {
-      backendApiClient.delete("/api/v1/orders/" + id + "/claims/" + claimId, Void.class);
-      return org.springframework.http.ResponseEntity.noContent().build();
-    } catch (BackendServiceException bse) {
-      log.debug("Failed to withdraw claim {} on order {}: {}", claimId, id, bse.getMessage());
-      return propagateBackendError(bse);
-    } catch (Exception e) {
-      log.error("Failed to withdraw claim {} on order {}", claimId, id, e);
-      return org.springframework.http.ResponseEntity.status(
-              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
-          .build();
-    }
+    return relay(
+        log,
+        "withdraw claim " + claimId + " on order " + id,
+        () -> {
+          backendApiClient.delete("/api/v1/orders/" + id + "/claims/" + claimId, Void.class);
+          return org.springframework.http.ResponseEntity.noContent().build();
+        });
   }
 
   /**
@@ -798,26 +759,22 @@ public class JobOrderWriteController {
     if (materials.isEmpty()) {
       return org.springframework.http.ResponseEntity.badRequest().build();
     }
-    try {
-      CreateJobOrderDto dto =
-          new CreateJobOrderDto(
-              null,
-              form.getRequestingOrgUnitId(),
-              form.getHandle(),
-              form.getComment(),
-              materials,
-              form.getVersion());
-      JobOrderDto updated = backendApiClient.put("/api/v1/orders/" + id, dto, JobOrderDto.class);
-      return org.springframework.http.ResponseEntity.ok(updated);
-    } catch (BackendServiceException bse) {
-      log.debug("Failed to update order {} (ajax): {}", id, bse.getMessage());
-      return propagateBackendError(bse);
-    } catch (Exception e) {
-      log.error("Failed to update order {} (ajax)", id, e);
-      return org.springframework.http.ResponseEntity.status(
-              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
-          .build();
-    }
+    return relay(
+        log,
+        "update order " + id + " (ajax)",
+        () -> {
+          CreateJobOrderDto dto =
+              new CreateJobOrderDto(
+                  null,
+                  form.getRequestingOrgUnitId(),
+                  form.getHandle(),
+                  form.getComment(),
+                  materials,
+                  form.getVersion());
+          JobOrderDto updated =
+              backendApiClient.put("/api/v1/orders/" + id, dto, JobOrderDto.class);
+          return org.springframework.http.ResponseEntity.ok(updated);
+        });
   }
 
   /**
@@ -895,21 +852,17 @@ public class JobOrderWriteController {
     if (materials.isEmpty()) {
       return org.springframework.http.ResponseEntity.badRequest().build();
     }
-    try {
-      CreateJobOrderDto dto =
-          new CreateJobOrderDto(null, null, null, form.getComment(), materials, form.getVersion());
-      JobOrderDto updated =
-          backendApiClient.put("/api/v1/orders/" + id + "/requested", dto, JobOrderDto.class);
-      return org.springframework.http.ResponseEntity.ok(updated);
-    } catch (BackendServiceException bse) {
-      log.debug("Failed requester-update of order {} (ajax): {}", id, bse.getMessage());
-      return propagateBackendError(bse);
-    } catch (Exception e) {
-      log.error("Failed requester-update of order {} (ajax)", id, e);
-      return org.springframework.http.ResponseEntity.status(
-              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
-          .build();
-    }
+    return relay(
+        log,
+        "requester-update of order " + id + " (ajax)",
+        () -> {
+          CreateJobOrderDto dto =
+              new CreateJobOrderDto(
+                  null, null, null, form.getComment(), materials, form.getVersion());
+          JobOrderDto updated =
+              backendApiClient.put("/api/v1/orders/" + id + "/requested", dto, JobOrderDto.class);
+          return org.springframework.http.ResponseEntity.ok(updated);
+        });
   }
 
   /**
@@ -943,18 +896,13 @@ public class JobOrderWriteController {
   @PreAuthorize("isAuthenticated()")
   @ResponseBody
   public org.springframework.http.ResponseEntity<Object> deleteOrderAjax(@PathVariable UUID id) {
-    try {
-      backendApiClient.delete("/api/v1/orders/" + id, Void.class);
-      return org.springframework.http.ResponseEntity.noContent().build();
-    } catch (BackendServiceException bse) {
-      log.debug("Failed to delete order {} (ajax): {}", id, bse.getMessage());
-      return propagateBackendError(bse);
-    } catch (Exception e) {
-      log.error("Failed to delete order {} (ajax)", id, e);
-      return org.springframework.http.ResponseEntity.status(
-              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
-          .build();
-    }
+    return relay(
+        log,
+        "delete order " + id + " (ajax)",
+        () -> {
+          backendApiClient.delete("/api/v1/orders/" + id, Void.class);
+          return org.springframework.http.ResponseEntity.noContent().build();
+        });
   }
 
   /**
@@ -1367,24 +1315,15 @@ public class JobOrderWriteController {
   @ResponseBody
   public org.springframework.http.ResponseEntity<Object> unlinkInventoryItemAjax(
       @PathVariable UUID id, @PathVariable UUID inventoryItemId) {
-    try {
-      backendApiClient.delete(
-          "/api/v1/orders/" + id + "/inventory/" + inventoryItemId + "/unlink", Void.class);
-      JobOrderDto order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
-      return org.springframework.http.ResponseEntity.ok(order);
-    } catch (BackendServiceException bse) {
-      log.debug(
-          "Failed to unlink inventory item {} from order {} (ajax): {}",
-          inventoryItemId,
-          id,
-          bse.getMessage());
-      return propagateBackendError(bse);
-    } catch (Exception e) {
-      log.error("Failed to unlink inventory item {} from order {} (ajax)", inventoryItemId, id, e);
-      return org.springframework.http.ResponseEntity.status(
-              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
-          .build();
-    }
+    return relay(
+        log,
+        "unlink inventory item " + inventoryItemId + " from order " + id + " (ajax)",
+        () -> {
+          backendApiClient.delete(
+              "/api/v1/orders/" + id + "/inventory/" + inventoryItemId + "/unlink", Void.class);
+          JobOrderDto order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
+          return org.springframework.http.ResponseEntity.ok(order);
+        });
   }
 
   /**
