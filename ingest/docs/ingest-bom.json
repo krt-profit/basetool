@@ -1,7 +1,7 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:f2d9556f-e37d-4527-9a79-954a982034a4",
+  "serialNumber" : "urn:uuid:55260b34-1389-4a21-bd0d-ca4414c8f6ed",
   "version" : 1,
   "metadata" : {
     "timestamp" : "2026-07-11T08:44:13Z",
@@ -17,11 +17,11 @@
     },
     "component" : {
       "type" : "application",
-      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/backend@0.0.1-SNAPSHOT?project_path=%3Abackend",
+      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/ingest@0.0.1-SNAPSHOT?project_path=%3Aingest",
       "group" : "de.greluc.krt.profit.basetool",
-      "name" : "backend",
+      "name" : "ingest",
       "version" : "0.0.1-SNAPSHOT",
-      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/backend@0.0.1-SNAPSHOT?project_path=%3Abackend",
+      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/ingest@0.0.1-SNAPSHOT?project_path=%3Aingest",
       "modified" : false,
       "externalReferences" : [
         {
@@ -152,120 +152,6 @@
         }
       ],
       "purl" : "pkg:maven/ch.qos.logback/logback-core@1.5.34?type=jar",
-      "modified" : false,
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/com.aayushatharva.brotli4j/brotli4j@1.23.0?type=jar",
-      "group" : "com.aayushatharva.brotli4j",
-      "name" : "brotli4j",
-      "version" : "1.23.0",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "8a0578e7bd8cb161185aae98d8f176fa"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "eec13740c1ee09cbe9c6e836f17ee2c984a10333"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "5fcf13ad78d07319cc507465dcf61cbc3efee9f45c9ae1c42a9902414696bc0b"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "579f7fe00eb5d2ce09d975980babb186335791ee3b035d2e99c13abcbbe3daf1588d53a1892c70bdbe0df7e565a597c1058222c6bc93484e22c963351edbf38c"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "f968ede93edec24e403b3177dca8884d8f6709974b35ab8ea7d440dd6ee5f1c7bb9ab109154b53691cad1ebcc4c33929"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "262a46c422b4b744bfeb58d54e6a20bdf5e853795ab9747785c9fde0576b614a9b18bb0b078dbb73c61a518c2244a68b"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "6f962fd8decc413cf8d6e411d7f98475e1b080fed8fd56af1039e24fe05465ec"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "c3be55e02bd46b5c5784f1560277ec2dbb3c4792bd89a8d02a6a7cb9120cbd6f1d26a1b2f8b617362e8fae612772a5d8fa9e603b76b0c450955ee4256963de16"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0",
-            "url" : "https://www.apache.org/licenses/LICENSE-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/com.aayushatharva.brotli4j/brotli4j@1.23.0?type=jar",
-      "modified" : false,
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/com.aayushatharva.brotli4j/service@1.23.0?type=jar",
-      "group" : "com.aayushatharva.brotli4j",
-      "name" : "service",
-      "version" : "1.23.0",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "034392efa0a6d8f43a35818f9eea20a0"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "872c4907f6b97765dcad9693f2b1ae118b8bc435"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "7f298d44dbb7688419f0179ee1dfa0e4436633272b05d38a5faf3a2b8d08697b"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "114012480fc387de7607fc311ab265c59679a772a8df03d9047df0f17ecc450221285be75999ade8789a35dcc337771e481223e7f7091b0cf9e8e7628e577538"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "74b5dd53743b8a620b40cbb24b01f559242b22225c77f6c85243abd2f45e77716fae8ee7591cb927fc2a44be99f91ad5"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "c98f7a03583227a67df43def68d223a10e5d50fa70426cba5c470787ddd6e5c0a99c6c16f2f1a327615e72987cbd7599"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "2d7d4c3f0ab61650b33e7c0333d65812ca55c14af93b89d346fe330155508250"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "e66d229962b72be498eefd71aadac9e97219731b12296c32bd2fe887652c9c5aa4ae1efa7c57334a268113d775b0c73ef1dce72bc3fb742fa6bb98bb3f5f577e"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0",
-            "url" : "https://www.apache.org/licenses/LICENSE-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/com.aayushatharva.brotli4j/service@1.23.0?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -748,189 +634,6 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.4?type=jar",
-      "group" : "com.github.ben-manes.caffeine",
-      "name" : "caffeine",
-      "version" : "3.2.4",
-      "description" : "A high performance caching library",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "04d655feb58be297a86fa2814a1f1ef8"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "c63b303adf59c733d2a96125ad6670e938a2c15d"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "9d9d2cfd681fd9272ded3d27c9930db12f89f732345975aa113ebc223bbf1224"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "6923d1b826e3723a9d58b092626045bdbac48dd91e758b3b78164de31105035343145d14c20a00b62658b7d1dff2a5cfb7475b200cc630dcd967c4732c2628ee"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "dd9a4951638126227d1a27ed4689391783f42f55a6e863d5022dd9f864e0cf174bc9e6267b3f7f3d6ca4a03399d38c28"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "f84911ac6299bccc137471d1ea3ca870ca0d0604e47e475ef19ee1850bcd5d98e1a13b6ae493096a4349dcaef94abcf7"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "745b6815303fc9a89f385e7d17120b1d3d5987b5af03870d72d077c2d060f038"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "cb5ea47d93b8bd42d4df7d1727c0870479acadd423c284843bd95fdc1f4becf328943adad501a253d91d369bb3b6ec9858ebca4d272008e655afe89a037a0c96"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.4?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/ben-manes/caffeine"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar",
-      "group" : "com.github.librepdf",
-      "name" : "openpdf",
-      "version" : "3.0.5",
-      "description" : "Open and Free PDF library. It uses the new package name `org.openpdf`.",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "1e8e56e03e1eacc7e7858d34e0500429"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "4d8174b818f61820f318a578f060cf3e2846ec7f"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "2a70c6024bb10b6192b4b91d8bb581de24b776a799a30ef5b87748e54aca2144"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "aabe8ca4eea976a3d7b27af500a32a03dcd46b36a453706b8b3c0b0d81be9c484a0bd7f5dd9afd8c87fc793582262c35b706d77d68f36abcd2bb935cbe88f2f9"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "e430c90b41676fbc433511fb94d620558de0867ba4e9a9360fa93fa9e39d4985963b48269299a82c7c77a522958e635c"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "d0eb665bae81c9024f091002d84a369d67f58e9b2526b2e675761cdfac8e2cc795e0cf953fec92869656630a35ac8b31"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "bafa6416c25cc63c85942d620b9839e497d80083f0d8e044666ddc76d9a2ab4d"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "ad7ac24f895c5354d8a03d243ddef3319ff7666165930944e5226a5d884e5dc70d5fccaf2e6b621420fd55103f9e8172952de4b5ad77e6a07ee7164e9ec79e0e"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "name" : "GNU Lesser General Public License (LGPL), Version 2.1",
-            "url" : "https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html"
-          }
-        },
-        {
-          "license" : {
-            "name" : "Mozilla Public License Version 2.0",
-            "url" : "https://www.mozilla.org/en-US/MPL/2.0/"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar",
-      "modified" : false,
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/com.google.errorprone/error_prone_annotations@2.49.0?type=jar",
-      "group" : "com.google.errorprone",
-      "name" : "error_prone_annotations",
-      "version" : "2.49.0",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "f15f20dc5df752e2c0f8e37f7cdd9b1d"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "8b42a2e3865f6e0576da3fad51dbb96732ff0f14"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "3b1003e51b8ae56fdbd7c71073e81d1683b97e6c4dff5a9151164d59b769d13c"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "88ad711b9c573a4f44a0e4c230104845ddf92b51d0955e390736bff1fe7afda6718c3d8b9d73349054668ecd83ceb174ef0021f10cf369df600aec4ac50998d4"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "8842b762fcc5fc14e694e05a3fce0f5cb6c04cd3977c869a81b85e087cdc967fa88b03cce940cf68a12fc08854b5c7f7"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "09b0a23d9757fab413da9121446849ca9442d42774fb1d61432d94dd4e75c9e2269a6888f0d945d476f8691c0dbdb7cd"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "8e4d7a07a2f8f5dc26dd03c33a4ca2ee4c7ad258038c185f375027f880635643"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "ef162cd1e3c52a58e928980ce3a78723a2f379767a2fd10a057a4b3b7c58cc4cf3bfe58e407813b32f264d59ca49ef2503e7ba5dc66d71f182ad77d963977ef8"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/com.google.errorprone/error_prone_annotations@2.49.0?type=jar",
-      "modified" : false,
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
       "bom-ref" : "pkg:maven/com.nimbusds/nimbus-jose-jwt@10.9?type=jar",
       "publisher" : "Connect2id Ltd.",
       "group" : "com.nimbusds",
@@ -1187,134 +890,6 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.sun.istack/istack-commons-runtime@4.1.2?type=jar",
-      "group" : "com.sun.istack",
-      "name" : "istack-commons-runtime",
-      "version" : "4.1.2",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "535154ef647af2a52478c4debec93659"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "18ec117c85f3ba0ac65409136afa8e42bc74e739"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "7fd6792361f4dd00f8c56af4a20cecc0066deea4a8f3dec38348af23fc2296ee"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "c3b191409b9ace8cccca6be103b684a25f10675977d38f608036ffb687651a74fd4581a66e1c38e588e77165d32614e4b547bff412379f7a84b926ccb93515bb"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "9b8e20b08b109c485c654359ede00fcef74d85ac18f9c7978acd47bf630838d21ea193f79d144e66cf0f6992efd82ff8"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "81c4cf19a5d0f078263cc8f9320d4208da28e25b93c1f45885e237148a3a7c7266ba7586a1eb5cd3efc86be6f90082bc"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "218aa7dd7bca7cfdbee752bb1c2737a7066b47058a42b4ee466a14350bcd2741"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "74770476681a130a3057fdfa2df3977b8aa9bbf1a520d9481694d0e9e0635c2e88d74ff73bbb870de34d93d0a4b6eae7f030e4ba12fbcc51debde58897fdcb6c"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "BSD-3-Clause"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/com.sun.istack/istack-commons-runtime@4.1.2?type=jar",
-      "modified" : false,
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/com.zaxxer/HikariCP@7.0.2?type=jar",
-      "publisher" : "Zaxxer.com",
-      "group" : "com.zaxxer",
-      "name" : "HikariCP",
-      "version" : "7.0.2",
-      "description" : "Ultimate JDBC Connection Pool",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "c36937c742c20cbdc7bcb47019e33151"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "c2b43c946b86a14a96342379e22b004c56c6166d"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "f1e612fa27345be3107a85431e8a8aeb205c15364ab2f2d411e40a9d7bb08095"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "fab69440ecf96687ac9cd69d19503a824f7bec74d97329ee6f8568981200799a1503df5517b9e0322a8d139fc71d6af193314890716ff8f0fd52163dad6f0c6c"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "b14c735ebeeb00e113c159cbc22b579ebe9676949a0c50f478bdc54daad8370d13954fc8df7b751ce6b3ab978fbfc43c"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "ecbcb443c087f455cc0e15f65736f9559a79e6375c4686830ede2e653d9dc79c36bb99b537f242f0f8a8acf3d5f22d56"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "3ff38f8630222d165d6ac18696a780e19d8e70019210a59a1dbff293de0b2db2"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "7ca91f467a107c528c8da8ea75a3503d8aa88fc4ac521e2d5d0359c28c4f8997bf472bc0445089a77f1a0efa0513fd9304de9bfd6ed4b14288b87461046b2e1b"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/com.zaxxer/HikariCP@7.0.2?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "website",
-          "url" : "https://github.com/brettwooldridge"
-        },
-        {
-          "type" : "issue-tracker",
-          "url" : "https://github.com/brettwooldridge/HikariCP/issues"
-        },
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/brettwooldridge/HikariCP"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
       "bom-ref" : "pkg:maven/commons-logging/commons-logging@1.3.6?type=jar",
       "group" : "commons-logging",
       "name" : "commons-logging",
@@ -1376,6 +951,975 @@
         {
           "type" : "vcs",
           "url" : "https://gitbox.apache.org/repos/asf/commons-logging"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.github.resilience4j/resilience4j-annotations@2.4.0?type=jar",
+      "group" : "io.github.resilience4j",
+      "name" : "resilience4j-annotations",
+      "version" : "2.4.0",
+      "description" : "Resilience4j is a lightweight, easy-to-use fault tolerance library designed for Java8 and functional programming",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "96738d8503d5fe3b3fcac884fab33ba7"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "c4cce893cb14ef9115297f1d7795e3fcfa0ed3ec"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "3689c9c3916be17b1a5867143c3017331e379050267bb8b0301b4303ec1d1fb4"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "6dbada3d89fe92939670c6c9393c6c4a43e166b54b35b27b705317af552c2f2f5bc488a3be672a476832f9f3b0b37b50177a088878eb62d88c5d3bcddd84e10c"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "457d635fac8bc7b11e93de2f12b568401cda7675cb04ae4588e6317de8308336277c1e21f82ca0c9b11f76410748756f"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "1a65e7d536fb1bbcf0d2fb148a010f589df90125525ec133cf2d749ac7bb4bc1f6b5229de07312a390432530a63a6d38"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "0feecc3b7441087e80bd756d290aba5364d922408bb00d76813d62f2e88306e0"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "006740ba779ce6e7f4fc13152783be54a423de9865f5c6e9ef84e4841d7dc4e2e4b00003c7813a3010ae170fc2196eaf7e13f1de3767a731e45dd88b093a64ed"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0",
+            "url" : "https://www.apache.org/licenses/LICENSE-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.github.resilience4j/resilience4j-annotations@2.4.0?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/resilience4j/resilience4j.git"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.github.resilience4j/resilience4j-bulkhead@2.4.0?type=jar",
+      "group" : "io.github.resilience4j",
+      "name" : "resilience4j-bulkhead",
+      "version" : "2.4.0",
+      "description" : "Resilience4j is a lightweight, easy-to-use fault tolerance library designed for Java8 and functional programming",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "dfd76f43ef9c2d7912a99c128af344bb"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "eb8ba5861207fcaec13468eab5a4dbe1d9e9e66f"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "d718b601cedd94946c7572caafac1d93f5c9695bad61e0e4b6518e3f5f7c6ccc"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "00b42a5110c37bcef4df56a807882f1d6919ceb9fc53e0daca2564258d7dafd299925f2f5ef9ac65c076c2757a934f48e88028f7bf839a956d44350ecfd4d28e"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "03455782043e549dcb307f728281cfc8ecb4a8d6dd96d944db0d8cdb9bf80bed43cef1370b65f32e71dc52505a0803f1"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "af46a0541107931e8f5f7995d0f40f35914c66b8944f56417aff9605d29f888f571a1afcca1ea81f384eb747cd350e40"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "b00fd36b17bfb3db6b0ee095f9980af4829df095fdf326f78b0a26163a4d3916"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "de367c0a1d1bfe4c38333f8668567416adee1eba420e80c4524842180da9e2dc09579d4b2063edbab2da1e468f1fd093e42adfe174b0afa372cd33f421f9146c"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0",
+            "url" : "https://www.apache.org/licenses/LICENSE-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.github.resilience4j/resilience4j-bulkhead@2.4.0?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/resilience4j/resilience4j.git"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.github.resilience4j/resilience4j-circuitbreaker@2.4.0?type=jar",
+      "group" : "io.github.resilience4j",
+      "name" : "resilience4j-circuitbreaker",
+      "version" : "2.4.0",
+      "description" : "Resilience4j is a lightweight, easy-to-use fault tolerance library designed for Java8 and functional programming",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "5e142f710747b6d4746413aca6757222"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "10b06bc2b679f5682f5528b0058ba1a166734db5"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "31ab1d15570357271b8c28d82b2f412c5f36a81ac253145aa32177c4f087efdc"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "b5d23f8ddabb8d22585e93db1d5ed0b11cb2807c1279b45c74988eaf621e87324cd9a74deaad8b17c6b5a7219f2a17b32550be478c0621cb9fea762f3f5d867c"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "826513581ccb029b95c9fb4b579035131a3166e6d99381b7084875fe2997545dfc41956f9449f3f4963d233b71f9d647"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "6f25185fccf89be43a7aef0349ce69a272ef09bc179d8394932bf473cd17650d143cdc6a24a3aaeb77bb806be018b630"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "6de361abc2ecbde73d99917ee11cc808c12f72f4a4c0da8682835675da985f4b"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "3baa1529e89d34844eab621f170ff4ea78771f15bdda9a5ff50ae1095b3d1c579b4ca45bc169c654f8934118325bd82ea6cdb3977d06d76218b2c128591b9a44"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0",
+            "url" : "https://www.apache.org/licenses/LICENSE-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.github.resilience4j/resilience4j-circuitbreaker@2.4.0?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/resilience4j/resilience4j.git"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.github.resilience4j/resilience4j-circularbuffer@2.4.0?type=jar",
+      "group" : "io.github.resilience4j",
+      "name" : "resilience4j-circularbuffer",
+      "version" : "2.4.0",
+      "description" : "Resilience4j is a lightweight, easy-to-use fault tolerance library designed for Java8 and functional programming",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "67cda808aec5db2599b199be7c0cea58"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "20caef75179a95ca2e411318aadee89d8f34a5e6"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "b90ba559ea8a553172184513ba47f191776bd4bdcb67d13e58fd34e1131c3db7"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "c765dfc5b95931698495f7d262aef6cff49103f4fc6217a3da0c90cc92b307f0ed13a4c7e6bd8bcccfe6ebba8e3c151314a4364f104c2492bac130a0717a54de"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "38c6f7448a450efc23e391f1ccd024111b4053fae57990b5d65c2752f9e1920991f1e9e9519cb7313d29198d95eeb002"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "63f3f9cfd31134b2c551d9452b1b21ad396c431ae31f18e2013610a9e1291901d308b0a3832f0234a916f2362a8f96fb"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "63d0758a60c73368db00aa9dde6ef6a1be750cb34421dce74d36cbadc04ad506"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "acebab4cb1613072565f0b3a95da35319d4424f3044844b7a26da623f869302e5c776786ac4fe17dc6434c4c5f9390fdf4203b7c3d52f032cc0f5c7263d3bf46"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0",
+            "url" : "https://www.apache.org/licenses/LICENSE-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.github.resilience4j/resilience4j-circularbuffer@2.4.0?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/resilience4j/resilience4j.git"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.github.resilience4j/resilience4j-consumer@2.4.0?type=jar",
+      "group" : "io.github.resilience4j",
+      "name" : "resilience4j-consumer",
+      "version" : "2.4.0",
+      "description" : "Resilience4j is a lightweight, easy-to-use fault tolerance library designed for Java8 and functional programming",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "0d1988f8020168da025360d61b392be5"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "5f508acd8ee26fbb4d5311602aa0c13a3116bfd4"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "631f7cb6c30b0fa1a6e4d75c1204c1b2f8a7d4b26b287004b8fa485c5de392ee"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "bac2b5543d17a25369ed531a952960ac67054775df5f88c91ec21982ab4656ca94cade227095fa81134d2bf0605cbe499ef4e2b8443de40a173c789727cc0a09"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "50ec8a816a62cf0c17390512822f67990f5abd9dc91aad2e132b8b5021789e264e142603e2bf9713791efdec7fc0a38c"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "3e1093cd55769f6495f7d0cad0a911266804b0a04406c9e779b0a393325b6298383d68685cb120dee007b077673d11f5"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "a290f8b565ff746afbac73de42d5aa0c467d2274eb3596471b77aad2ecf4df65"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "5f9c5d019a1d8fa3962551092beba56401a84680699af2c25ae4d216f4445a29d96ab60f5b55b1f468c0a3c666bd67b0c7f60daad213d3fa2875b23f773ee1b6"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0",
+            "url" : "https://www.apache.org/licenses/LICENSE-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.github.resilience4j/resilience4j-consumer@2.4.0?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/resilience4j/resilience4j.git"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.github.resilience4j/resilience4j-core@2.4.0?type=jar",
+      "group" : "io.github.resilience4j",
+      "name" : "resilience4j-core",
+      "version" : "2.4.0",
+      "description" : "Resilience4j is a lightweight, easy-to-use fault tolerance library designed for Java8 and functional programming",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "876d87ec308d8636105e17577dc32ec0"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "917315545f2ae0221ef3d6c27337b9ba6cba2702"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "a15d25c4709a4c12432cd0a4f620e37a00a82dbe112f5d1a7a68b31325ffc978"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "0b297e68f9e4542a724d507697c5476568dc8459156e70dc2e4b3fa812be7a6d070c603a58ba9eb1e2331df78479da71a44ada6a4d303f6f0ab224cb24bb2f07"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "73498053467091de64ba6cdb62948e268afba62386a03fabcee6aafcfde6ed152bcec726c1f7d78d5b9ee7a1c34008fe"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "d1adb2a7e58982ff23beafd2aebfd2b3769d37caa965a1542d8d1c6d3cc1499117d874fa2e95c8e4b1c98033ecc37656"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "db568c467b698f1e695e75982105fbce261f91ba528539cc3ff10c67e81562b5"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "635fd7c97582d1deaf7b3fc74ff38d796656fd110e881d3cf793aafd30d73e649a25e58f7575bf8ce54e85291061871c21bbf31c19db937902b31a5de27f0054"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0",
+            "url" : "https://www.apache.org/licenses/LICENSE-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.github.resilience4j/resilience4j-core@2.4.0?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/resilience4j/resilience4j.git"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.github.resilience4j/resilience4j-framework-common@2.4.0?type=jar",
+      "group" : "io.github.resilience4j",
+      "name" : "resilience4j-framework-common",
+      "version" : "2.4.0",
+      "description" : "Resilience4j is a lightweight, easy-to-use fault tolerance library designed for Java8 and functional programming",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "d8de7618acdffc1deb636e059a546d94"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "1dcca4d0d8ce498f2090bcd0d1881c498eb9f900"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "7f0e2f7f981276940172603357d7243e8461bbb8fe0dff3ebdb6ff1809d4bb79"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "75d2e866cf4c5d3bdca77bc97a377a3a8557c6bace69a3591b67cbdfb6481180e96d106f1cb770f092670a99e504995b076dc6eb51864a91b435043e0d79180c"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "d566d07b94362ed9e9682b6f9234aee96defd4f4c9c1413d73d96b4430d1c7f8a4d97bc10d2e527c11ffe363c2ec5043"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "3ade4fe166b9cfe62d7966c84fe25754330e96cd8a6345c607905d5dc4a33f417460666c879184fd1b7866ab40241cc0"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "f7f5f6217f2525138e95a37c8734ad1f9ddb91fbca61db3c19222324410ded82"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "8eda94ecd4a19a6da99bf25c4ef8f08cd0d512006eff8880a9086a094d99fdb07a64cf5e4fd354ddf094ccd055cc221fd2f6cb50f330b4ea90022eb48775daa4"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0",
+            "url" : "https://www.apache.org/licenses/LICENSE-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.github.resilience4j/resilience4j-framework-common@2.4.0?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/resilience4j/resilience4j.git"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.github.resilience4j/resilience4j-micrometer@2.4.0?type=jar",
+      "group" : "io.github.resilience4j",
+      "name" : "resilience4j-micrometer",
+      "version" : "2.4.0",
+      "description" : "Resilience4j is a lightweight, easy-to-use fault tolerance library designed for Java8 and functional programming",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "b89d1f870641d912bbb350339b63bd94"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "4d81d22237b84c5c075f805a0c7d4640bbd7ca33"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "728613147bbbc0c329f69f5423b760778322e2f9af345cb0bd69b3fc89b17e88"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "ec0f842b57a23b8536f9672c0c3eeb6831c9e9951be5862141ee029c6ff51994e9c3a046343ae985286acb3ab35766a770507fbaf35735aafc269fb28cf4fad4"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "2187703d3e99f7f8b86f5d3280b3a247721752c38ef0dab42962729bf3ef6d88aff5eb34c6349e4b3f9e524d77ff1433"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "38f298fca66df6f9421b7cc92cfa13a537c49f57aa3651dd680684ca452fd764bc2e51e0d00b5774eb45b6126ebcf0da"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "2a57abc1c0ab88009c34b48f4135ce4e23974fc37deb33b99e4310cb8f0ff0a4"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "8b0f573a05168383121e9590c73c3263b43e9fc8f84b6813034baf07841d23661a965aa0abd348bc1c5b0166c9d3e50b896c8462b9d9381d60a7d1c08a10c9fe"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0",
+            "url" : "https://www.apache.org/licenses/LICENSE-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.github.resilience4j/resilience4j-micrometer@2.4.0?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/resilience4j/resilience4j.git"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.github.resilience4j/resilience4j-ratelimiter@2.4.0?type=jar",
+      "group" : "io.github.resilience4j",
+      "name" : "resilience4j-ratelimiter",
+      "version" : "2.4.0",
+      "description" : "Resilience4j is a lightweight, easy-to-use fault tolerance library designed for Java8 and functional programming",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "6a450ca57c1c0172ffc32c2355d4885d"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "4017079c1f73b0cc73fcc53a25306f3f8743e64c"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "09a3c33cced3e1135cefda8667914b32b7304429c509b07fca771bd92d0c1780"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "d50e1bcb0700963bfe2b4802301cdf2156a553f29caae07aa8192a44e0a2abac703fa190b1527a9aeae1412ae9215d701b494220ee3f3edfdeb9d3b3652f71ae"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "6ee2786d1c40380381393adb6beef91b978bc9ba66647b16316ab448e3c97e2eb486521ebfdb965c5db6aae7c72e0fb6"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "189831d7d92301ca5f1211909d8787cb4a2fa6d9f267e3af9b0d9900dfe718ec75130d26110c21b34c59674e1f2720e4"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "8ac8f08bc4c21b1dcff1e8561364e5c7149523cdd658cecc426eb9fcfc4114d0"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "c078763d56a7190c102719fac6c012bd4c4d6e4e1b61c8201a8ed9909b4c7736c9d681163a0c46d99251ac1d2186d158ffd6539666bccf8b5ac759825dc2f755"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0",
+            "url" : "https://www.apache.org/licenses/LICENSE-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.github.resilience4j/resilience4j-ratelimiter@2.4.0?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/resilience4j/resilience4j.git"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.github.resilience4j/resilience4j-reactor@2.4.0?type=jar",
+      "group" : "io.github.resilience4j",
+      "name" : "resilience4j-reactor",
+      "version" : "2.4.0",
+      "description" : "Resilience4j is a lightweight, easy-to-use fault tolerance library designed for Java8 and functional programming",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "2258e735d118c273d3e7c3d385cf20a1"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "003b46efef19a56fd36291d6c50dfb4292c8b817"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "b883564f8cea11428342be98017acd323f9a7113c11d46dfdf73af4373f26000"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "faa0061309cdccff42e98a9e91b1da24da8427804711267c6772cbb85dafaa6dbc005e6091938ca265488a6f5cd2e700c7d1b76e7d1bfae8de16157d3a4b7bd7"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "5dfce081b50670371d5b65a30791fccd55f365884459ae7d12bedf5c67a5491b80a9d84a1b182bd5a2ae99b30b983ad4"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "90c64959e8a073464d088fc993ed8de7e64187d8f38adb75a1fb9520b15c7dac6a76f2cdceabb153eb4a1d1c7bd4743d"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "7fff09aa273244704351a55307adc5e5e96e8683f93affc4905c3be0ede354c8"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "aa606d0c30b606763a706ec23d84d154262b17fc21dcec430ef633e060b3ec4af1cfb147e62f0981004cb36751e87d2269ce992f6f15fd4fd55d1415323ac9c9"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0",
+            "url" : "https://www.apache.org/licenses/LICENSE-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.github.resilience4j/resilience4j-reactor@2.4.0?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/resilience4j/resilience4j.git"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.github.resilience4j/resilience4j-retry@2.4.0?type=jar",
+      "group" : "io.github.resilience4j",
+      "name" : "resilience4j-retry",
+      "version" : "2.4.0",
+      "description" : "Resilience4j is a lightweight, easy-to-use fault tolerance library designed for Java8 and functional programming",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "0cdac2f0d96184c09dfe3e4f1705e963"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "7072ed9351dc3a38a7c5a4a1ca21d3355e1f6453"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "13cd52c89b69b9dbd68188877f16bdbeb3ae524d351a2d947f31ae07684c420a"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "1e60cc69111eee4fe1d18d9c36e1baad62cc6ea06aa065cdce461fbd3cdc8c625f4ef818750def5b31469a80af2f8f52d4441aa946205b3203cafceed55655c0"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "a1373917623fd647255c0c29533604d69d4f8395b8b7c50c95830447871d52d983df4a16a58990f9f7d6c242fdbb2903"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "b405c2ddefb6b78aa8d936c5c581e62cfdefc719c892da1625d82a624a6ac5afc60aa78251ccccbf056e8b6b4a4ce766"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "320682e81e53f54397c029244f5b1ee1b0cd589f88e57b00643e300c924f4623"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "9bc37b4a7fc968fc2c2f6f17b1083208b95a82aa5f826974a110cd9b057040071f02b850b32099f7657b20e36198da8eec5dd46e203a574338428d2f84d0845e"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0",
+            "url" : "https://www.apache.org/licenses/LICENSE-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.github.resilience4j/resilience4j-retry@2.4.0?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/resilience4j/resilience4j.git"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.github.resilience4j/resilience4j-spring-boot3@2.4.0?type=jar",
+      "group" : "io.github.resilience4j",
+      "name" : "resilience4j-spring-boot3",
+      "version" : "2.4.0",
+      "description" : "Resilience4j is a lightweight, easy-to-use fault tolerance library designed for Java8 and functional programming",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "65cbb298b53506247767aabd0caf7024"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "cbade703c34f474098f7a7673d5421e28e994bc7"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "093b36e9d76ff9e6539f9de71fa0754c5e504ab266ca8506331f6aa2f0cdc364"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "eeeb9f328a22acaf8c65b6909fe7197ee23a008d69d5c20561a7d6139508372fc897123f7dfbe09189fe76493348cf927266eb68d6965964d01422d44ab000f5"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "a8d6c8e86c07cd0a78c19e6fefbb99ca7774ab08d393ca574ebedb3937d81d39ac9714e256cb30405309aa523e9afd32"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "79c7cf559bbc1e8f310684c85136bf8dd992211d3c8a5773ce9c31327146a8328616119f7f24c2562382df049f06dee6"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "2a06bf92d7c6f28d969ab0021302d6ec86785c7bfebc7849271e3326f267293c"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "1470336bfe355136aadccc14c08fae1766f9d019c50448942e2a5073faa77202da5aeb4d41800498c1f8c71d80a3bbf993d3cb043c669044de924f07bd3631f1"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0",
+            "url" : "https://www.apache.org/licenses/LICENSE-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.github.resilience4j/resilience4j-spring-boot3@2.4.0?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/resilience4j/resilience4j.git"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.github.resilience4j/resilience4j-spring6@2.4.0?type=jar",
+      "group" : "io.github.resilience4j",
+      "name" : "resilience4j-spring6",
+      "version" : "2.4.0",
+      "description" : "Resilience4j is a lightweight, easy-to-use fault tolerance library designed for Java8 and functional programming",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "840f230888c55a79951820ab58bd785f"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "814c2111a8dd7c1cb582d297fc783ab997929964"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "802b1e3d8f63a531d3e125271ddf4eb15a4e5a6cdb9e4b03803e07fcb13213ff"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "2947053d854fca9187b444e8ac364a98417eeb08fc2e141c99ab8500d711a3753e232527df85b4042a761223ecf8e55387efe69442916aeaf17c9822d3306f34"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "2c8df4ea28def386749997218eed40574c8404492141fb8b25f73cf85cb678132965667eb6c8db2af1064e855e044125"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "8f43554d743c371d57465847cdbb95c76fbbd0b3a36a31e65bea4a431e81c6c9bd74832c6eae0e5ea469d5122c031a0f"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "a11510ec6fa2caaf426255da44a8b0dad4a4fb1d536361832a319c77695d5955"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "c5dd7b9e27cc7897fddab609ad12daa76a240f13df436c6ddd42b7a94c9b5dce736470b273030b9dda4444a806c65fd79bbefad0206a1c4d9d4c554b334635b0"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0",
+            "url" : "https://www.apache.org/licenses/LICENSE-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.github.resilience4j/resilience4j-spring6@2.4.0?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/resilience4j/resilience4j.git"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.github.resilience4j/resilience4j-timelimiter@2.4.0?type=jar",
+      "group" : "io.github.resilience4j",
+      "name" : "resilience4j-timelimiter",
+      "version" : "2.4.0",
+      "description" : "Resilience4j is a lightweight, easy-to-use fault tolerance library designed for Java8 and functional programming",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "2d421c59f3f87eaee243997f529cf5b4"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "28351433fa75cccb0e0c8154676a427b5b4a3340"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "946237017a5f52a878cfad8227c3eb6b957482be30d25a409cb8004e13237d38"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "74e100e06388785058cd506459a0190bef879953dfd2ae2e3f16dcc83e76c5ecff62880d8ac7b96fcdf4087e863f4f3423b44290010a15a5b64c60808d2544f1"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "586453333996b3d2b8150277eb41dbb7e2146b8e2a877e7cf8932cdddfe8a0e7c690335ba6e53e7051b0265a5016ecfa"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "b99c965e83e8f57bded1e66856b1278525947bea15c905dda5e13333ab9b82ebc5d0c27f14e6a8961ee32a0861995772"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "8709bedf51af90c9ee3c31b64fb893a199ef5defe54670507825b15551312737"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "865aa0e62b990fda80679824ae9ba32b631fe6cd72ea437201e0ce43bbae1b3a5c23fcdfe7454736822a7e6a38ba68456494f694775fc7b06a1077847357e988"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0",
+            "url" : "https://www.apache.org/licenses/LICENSE-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.github.resilience4j/resilience4j-timelimiter@2.4.0?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/resilience4j/resilience4j.git"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.lettuce/lettuce-core@7.5.2.RELEASE?type=jar",
+      "publisher" : "lettuce.io",
+      "group" : "io.lettuce",
+      "name" : "lettuce-core",
+      "version" : "7.5.2.RELEASE",
+      "description" : "Advanced and thread-safe Java Redis client for synchronous, asynchronous, and reactive usage. Supports Cluster, Sentinel, Pipelining, Auto-Reconnect, Codecs and much more.",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "999cbc66cdc995d0cdebe8e5e204190d"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "e67339dc0eb3ceac40fad8213cc2750b7944bb75"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "86e245a6cfc36a40aaa1f54027e639a70cb4008d12717164041aefe9bbd072c1"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "96bd1424a58341030fed30b8aca3ba1ddcc64acbc193c0b1ddecd0f08f100cca0ae8bd11edeabbe53025d7d16a29c9cdfe51763c496cace60f46fbf9e1f1e322"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "8cd79feed3f1486f1bc47aa5e9c3e80523a818816f916ddf146dbc4b1ad6f4cbb1fba4fb936d7d3ce4ea537550074d15"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "24d143e3e6917e39884cb1d14816af14fc1a13b3b7b101bc0dee676ebb42fc02131516e503c540de4107c91690538dd0"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "9eacdbb0ef3e0dfb04fea755b2bd5e4089cf77736c87d4a8518f3272f308af2d"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "0d17146c3f83d8c6b10b3d579c4d18851c866cb58907d5e72420af5f4e175785859127a2f4e608dce7bcafb1d3caa813161a3eaa628c83f8a0020d41ed737f82"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "MIT",
+            "url" : "https://opensource.org/license/mit/"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.lettuce/lettuce-core@7.5.2.RELEASE?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "website",
+          "url" : "https://lettuce.io"
+        },
+        {
+          "type" : "issue-tracker",
+          "url" : "https://github.com/redis/lettuce/issues"
+        },
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/redis/lettuce"
         }
       ],
       "properties" : [
@@ -4757,302 +5301,6 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/jakarta.inject/jakarta.inject-api@2.0.1?type=jar",
-      "group" : "jakarta.inject",
-      "name" : "jakarta.inject-api",
-      "version" : "2.0.1",
-      "description" : "Jakarta Dependency Injection",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "72003bf6efcc8455d414bbd7da86c11c"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "4c28afe1991a941d7702fe1362c365f0a8641d1e"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "f7dc98062fccf14126abb751b64fab12c312566e8cbdc8483598bffcea93af7c"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "f186b2ada470abba1cc3b4f8c4373d940fb7c71a051b2c26f7c204ad4dfb69235fbf3f9c33da36d744cb90f52d921c51d76c0ff263bacb35eafb66cab83dc47d"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "405bd297a73901f013d48a0da028d04d400f3e61f4997c0e7297eb08120670a0e242e0002db8f130c33ab16cb02feb2d"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "4db7e54434d0a208c876868f5595b808f2728c0455feaa752ab7b569a2186fc37cb891c9aa0076de3d08f6da6ff06eba"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "3a5aba9f1ff1a130b76af886123eb375fa578498490df3dc60bb7ce7d59e9404"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "00bba8efc2d6e7f0a509b321868d75f1aaf0681a750d089d913bde8424ab7bb88aadf49de6e291e352523e4f8c117b1b48033ff31d4d665dcc43c4c6ea000ba9"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/jakarta.inject/jakarta.inject-api@2.0.1?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/eclipse-ee4j/injection-api"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/jakarta.mail/jakarta.mail-api@2.1.5?type=jar",
-      "group" : "jakarta.mail",
-      "name" : "jakarta.mail-api",
-      "version" : "2.1.5",
-      "description" : "${project.name} ${spec.version} Specification API",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "a1872951f46b87594806bb01e342a468"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "be9b3b677ed6083f575c437ebc442a6a4bd2b931"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "aa493753acb7a8c45ba8f4c9cf1230a74e20237056dd5b5c8bc86c583e8cfa0e"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "f537477c3dbf81cf7112fb348221b91c0223b5dcbbac816454e88cb8f293f8c5d566b2a827f78dfdfebec1fbe5a93c909e78fb13789ed41ecbb96a86d171b267"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "0ae200a91c5879f7b50b9a07c3df864d7b7af31cb771ff2a636cf8ee76d019456e7fb541efb69ca96f90f497c597d608"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "862bceaf42659250d354809cb2259bfd11b9d4a87cf1bcafc9c2346f134bad45e27f8f7227722905eb1c870e9314ee77"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "9dc094cd2476872a9da6b8065878b5e5a9895dad13762caa025ac5c2656c65e7"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "e01072fafeb8a06ca6e32bdac205189fc9dde12fa039c453cfcc9a0cbddadc466d400d117cea64066cb1d04b34b0bc7a809ef8a832b11e7adb3015abf33e34d0"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "EPL-2.0"
-          }
-        },
-        {
-          "license" : {
-            "id" : "GPL-2.0-with-classpath-exception"
-          }
-        },
-        {
-          "license" : {
-            "id" : "BSD-3-Clause"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/jakarta.mail/jakarta.mail-api@2.1.5?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "issue-tracker",
-          "url" : "https://github.com/jakartaee/mail-api/issues"
-        },
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/jakartaee/mail-api"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/jakarta.persistence/jakarta.persistence-api@3.2.0?type=jar",
-      "group" : "jakarta.persistence",
-      "name" : "jakarta.persistence-api",
-      "version" : "3.2.0",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "79acec18d202797dcba1fff596a47684"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "bb75a113f3fa191c2c7ee7b206d8e674251b3129"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "be8a26b0e75c84c1b7600f759256fbc68d60333d89ec0ce3f784fc3ffa09aa8c"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "2913707daaad67506551f016fb582612cf76565386b48e9b27ac96ac72f5763ecd1bf8b25fdb06ea94e57782eeaaf6378c709d13221634a23dabbadf3eeadb18"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "26b919c9c720a6ef60ee071787099b9f72096870132bd0df05a258b25ce465e3f0bc0bd9196cd39def76ddf2d22f0e6c"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "0469ec95cf94bc641edad7085a1afcea5a9533090617900fb1e41c9b3e817bfec560a861ea3271fbd2701b41ab463c36"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "991f44eb42c824663e55cc0e3dd70447381806021d7a1cbffebf51c316112a7a"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "2e094d39690bee54c2933cbe4de425d65ed965739526cff65a4f6265d85df1dcec0b71cba9629405880cf4141daeb435489c9f27d708d148072202867ee541a0"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "EPL-2.0"
-          }
-        },
-        {
-          "license" : {
-            "id" : "BSD-3-Clause"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/jakarta.persistence/jakarta.persistence-api@3.2.0?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "issue-tracker",
-          "url" : "https://github.com/jakartaee/persistence/issues"
-        },
-        {
-          "type" : "mailing-list",
-          "url" : "https://dev.eclipse.org/mhonarc/lists/jpa-dev/"
-        },
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/jakartaee/persistence.git"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/jakarta.transaction/jakarta.transaction-api@2.0.1?type=jar",
-      "publisher" : "EE4J Community",
-      "group" : "jakarta.transaction",
-      "name" : "jakarta.transaction-api",
-      "version" : "2.0.1",
-      "description" : "Jakarta Transactions",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "5315974a3935e342b40849478e1c9966"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "51a520e3fae406abb84e2e1148e6746ce3f80a1a"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "50c0a7c760c13ae6c042acf182b28f0047413db95b4636fb8879bcffab5ba875"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "13c1a21af3c8030794155a62b4cdc70ba1d951fbfc0aead9e89f3f529e7bb4473a070bd4a6c593ce1c0cfb781332bd62d21cf0b34e3751f99b0de463f566ec61"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "9484a0adc05a5ea5377f6037ac2d1efa1d59d172ac03b683580f7d3e542d6e26779128dd1a7fab41f7061156f66c3b44"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "064434509905dcaaeebd4e1eaeb26446cb911ff74f30d49e1b0c7f29a0e62fd9f5b84114129ec845eb99cc37cc4b5048"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "7d865d16dc3e2a2b7e097a305a33f7fd419ec4dcea2df1e278b66a74e59325bd"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "efe99bb4d2397b5d004b7aac679ec2ea0c13ce6c06fdcaec56b12f07d5938ac5f07df2937478b551955382612e2544819ea7f5827e0f6ea2726bbc1643dfdab3"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "EPL-2.0"
-          }
-        },
-        {
-          "license" : {
-            "id" : "GPL-2.0-with-classpath-exception"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/jakarta.transaction/jakarta.transaction-api@2.0.1?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "website",
-          "url" : "https://github.com/eclipse-ee4j"
-        },
-        {
-          "type" : "issue-tracker",
-          "url" : "https://github.com/eclipse-ee4j/jta-api/issues"
-        },
-        {
-          "type" : "mailing-list",
-          "url" : "https://dev.eclipse.org/mhonarc/lists/jta-dev/"
-        },
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/eclipse-ee4j/jta-api"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
       "bom-ref" : "pkg:maven/jakarta.validation/jakarta.validation-api@3.1.1?type=jar",
       "group" : "jakarta.validation",
       "name" : "jakarta.validation-api",
@@ -5177,63 +5425,6 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/net.bytebuddy/byte-buddy@1.18.10?type=jar",
-      "group" : "net.bytebuddy",
-      "name" : "byte-buddy",
-      "version" : "1.18.10",
-      "description" : "Byte Buddy is a Java library for creating Java classes at run time. This artifact is a build of Byte Buddy with all ASM dependencies repackaged into its own name space.",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "058f205c90d1563d2cb90d9e3567cef8"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "5b34812ced047973a6d42654d50c3b69124ce587"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "8b31f4ea806afaa900b67bffd8498760d1f65464f4c2ea78cdbda2f3e633898b"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "41db9543869fcd240b9cc5e4144d4a9a641ccbe164ac2274afc33dde559c4e60e5effdd6b7f54cb0f2b7da5f78e6031ea1a8615e6ad2b902eefdca8435079882"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "7be06205e38bc88ac29f92bfa327925941fffdbaf0d93f86134a7206f01b5f54e05c9b0a3d9a5e6a15064569de9dbc02"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "f3c0a22f314135383a2d78e01cf60c0e14e1e38430c720336f258a7ef1a807d949b64432ae9f4760a35dfece740f0c35"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "2161443b06bfd915db0524ff281d626476fb0a0e324aef0b326b6af2e0225feb"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "b58b3cd805dba04d80e0e8d3c2cad6ef52ab8973b7fe899b07b979f5c6175e7f0d5d84b5559bc228fa5e76aa8221912b0fd13c9683305b0118b3546d4dc0bb5d"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/net.bytebuddy/byte-buddy@1.18.10?type=jar",
-      "modified" : false,
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
       "bom-ref" : "pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar",
       "group" : "net.logstash.logback",
       "name" : "logstash-logback-encoder",
@@ -5294,64 +5485,6 @@
           "url" : "https://github.com/logfellow/logstash-logback-encoder"
         }
       ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/org.antlr/antlr4-runtime@4.13.2?type=jar",
-      "group" : "org.antlr",
-      "name" : "antlr4-runtime",
-      "version" : "4.13.2",
-      "description" : "The ANTLR 4 Runtime",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "eecf1908f0cfff10f8bb82878b5ca401"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "fc3db6d844df652a3d5db31c87fa12757f13691d"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "dd3e8a13a2d669bf84fb8d834de35ce4875f27157698d206241ec8488aadcaf7"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "1c3e47b6b5dc40ca13927a7ae2ed187f470b8f406cea325e73c7a18af8e07b9ada0484312dd611f225f030b5585924932c702fd9326c143a626e271682b2b95e"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "f49c2395e16fe71fa35622bcca225c0910609ef09626207ce4522c73c760fd232489489ea88d54c88fc21b05a03031e0"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "322345326586e3f8954e80efa80b510228a7eb06f6d7283177f04809c15aad1722c700897c8c8f405955946b63808bc0"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "2d39db66ce6dc530c7796f75d646f4d8316586e2acd0756524c25b238eb71618"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "a4cdaec49dff4a6963a0db56712a837db7300de7145335b915ffc2234b0d53d6f9fd4b1d6e82c4350e22fee9390ca643cfbf7f51ff47a11bc44561b6686be32b"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "BSD-3-Clause",
-            "url" : "https://opensource.org/licenses/BSD-3-Clause"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.antlr/antlr4-runtime@4.13.2?type=jar",
-      "modified" : false,
       "properties" : [
         {
           "name" : "cdx:maven:package:test",
@@ -5720,475 +5853,6 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.aspectj/aspectjweaver@1.9.25.1?type=jar",
-      "group" : "org.aspectj",
-      "name" : "aspectjweaver",
-      "version" : "1.9.25.1",
-      "description" : "The AspectJ weaver applies aspects to Java classes. It can be used as a Java agent in order to apply load-time weaving (LTW) during class-loading and also contains the AspectJ runtime classes.",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "7a88f606f52185a15a1527c968f55dfb"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "a713c790da4d794c7dfb542b550d4e44898d5e23"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "4fe86fdc18faea571f29129c70eaad5d121363504a06d7907be88f6c60ba3116"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "c3b99289f305795c7ed662a0e86219ce8458e7797e38f6222198c74dcd5bcf9c2a026a83584ebe2d514d17da2ca382c897acb940e55c471bad0154719cb4ba46"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "7bc5761d491b67ae952a063c94102c58b902bc7aa0b5c3995d7dd8727ddde74dbb33e6312db6512fa5f7817c350e303f"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "37b2304bb12db621c350c0231f77f1afd41246dfc488128eeb02bb9ff6ab9c5eeab086fcc47815c20da338a043c986bb"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "689afe66772cae896d23ffe63ab938a26fbdd55fb06361b694cfb3aa2900a63d"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "141f70786de40250b7fc4caac8f88362bd6316de02bcb4d746b3d7d2f46518521e363696db9dd7dd696d639c6afc9fa98868d05f7da662371293746f4cc0a437"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "EPL-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.aspectj/aspectjweaver@1.9.25.1?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/eclipse/org.aspectj"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/org.eclipse.angus/angus-activation@2.0.3?type=jar",
-      "group" : "org.eclipse.angus",
-      "name" : "angus-activation",
-      "version" : "2.0.3",
-      "description" : "${project.name} Implementation",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "ad20392145690b36b4f950fe31a31a2a"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "7f80607ea5014fef0b1779e6c33d63a88a45a563"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "a6bd35c538cf90fff941ad6258c40c08fca0b5c9c3f536c657114f27ce0527a7"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "efb987b781f665589b2a524d86826ffcf37eaf105b2f823be124fded85bd118098c0749b5d268373d00b1d3b8bf0f89f86670444f9990b91948704a7052376e1"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "4086b356cdf168e28a09dfa2ee9cd54926491438d556e4608508ae6a895929adf63f3a259779c83624a9bb1f886efb6d"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "7b79721ec0b28964fad4bf56ffc3be67d81b62e45a4ac703917094e281c125834b9bebcc0623176d4904c5b50c94450e"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "aecadbd33e92abf894ae28c8cc609f5f85e8af736621c44fb71b84ca34e91247"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "ebdc07c3b3cf0817f6d9ee54bb23461657f213648b70f6c7f634a1028cdf1522d5b5a7e2168130f72afa112f36cb08858d1c94bb67b40a0f051f567b4d696d1e"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "BSD-3-Clause"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.eclipse.angus/angus-activation@2.0.3?type=jar",
-      "modified" : false,
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/org.eclipse.angus/angus-mail@2.0.5?type=jar",
-      "group" : "org.eclipse.angus",
-      "name" : "angus-mail",
-      "version" : "2.0.5",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "e965a2653568c0138457b4c6fc9e5d77"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "427f6d52ec0782f7efaca0c0732042e347a6cb4f"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "b4d8c30d35f455def6c7a05fe595a1e62ea2b80cac3efec1e9ccf4118b23168a"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "500985e3045a7640049aa1ebb008d675983f537150605f192d2746ca2aa8c7a1b5231f782f950dfd968cc8ca26c32c6e93008cc7de309c5da4b17af0139baff7"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "35c797fdc52800ccfbd36d7574c0919fbba1f820eafb1d236271eefb07266360c1b87c07c089f97c07d12a634e54037c"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "9a10dd9cf09af51c29d178d2dd87c6a796121753c91ca13b8c51843b8ed737803090fa93f41ec8689469550941e12473"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "7ac45dd92d65996c4de11701bf1a1130e393a3e33b4bc02af69bf627e54b122e"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "b45eb356f855b9777cfdf6be94c6797c33e86fe28e8e2e7fe7311e661f07d162e8c4e46a2f3dd67b7c0f8261ab5610c85f4f62cc874e64ee2a76eca3501e2e2d"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "EPL-2.0"
-          }
-        },
-        {
-          "license" : {
-            "id" : "GPL-2.0-with-classpath-exception"
-          }
-        },
-        {
-          "license" : {
-            "id" : "BSD-3-Clause"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.eclipse.angus/angus-mail@2.0.5?type=jar",
-      "modified" : false,
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/org.flywaydb/flyway-core@12.10.0?type=jar",
-      "group" : "org.flywaydb",
-      "name" : "flyway-core",
-      "version" : "12.10.0",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "ffda6281e5d4b88ce7b3e4ceb318cb92"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "1b6f40472b6c06bd831d81c017abeb8c4693ca73"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "78819df13e3196f44506b00a4657b3faaf1d4256914dcfe608396a8585eb51b2"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "642c60fa3ef32b7b131c0878eb7f7a65ab85ef05bd220f9c548f3d40baf1398c6c534c1f6947936c497f69e19bceaf4b3377b18f97c76f1a59ac5fdb588e3c8d"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "8a007b09fb1ab5ffe16d64c8083f4ab8ea2d327dce48278b6f1e2ddad71388ce26b65898fa31de56de7727e180d9dee0"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "6fc0fd85f0d050b68ebf065a28949df9bc6210755392ae44569f7cef9d6790167ac3fcef9fd5799f65513da815f1e9c3"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "df4f6f77ea21a14b05bcf459cf93bb170c65f4e3101a729180fc73ed7ad7d85c"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "73b892b6fee60a0ae819ee4e3d307424891d06799c3bdc8f0865154ff1a2e910436c6d9e9058c582169287e884180a5958ddae4f9d13ac925d953479316786e5"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.flywaydb/flyway-core@12.10.0?type=jar",
-      "modified" : false,
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/org.flywaydb/flyway-database-postgresql@12.10.0?type=jar",
-      "group" : "org.flywaydb",
-      "name" : "flyway-database-postgresql",
-      "version" : "12.10.0",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "ddaf999d6340fcb92339b10b191b3163"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "2749e2f1c268e7b48cc525e76c27191e5b7fbdb8"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "3a40db4c597d130f0bec3c333f62adb534adeddf54a01cb405e75f473b19b209"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "65da20cb10f407a326319d2dfaf78039c1deaf8c0d1322b65c13a3ea6e6e1b4fe309ac60f0771c48c0950f6f8ebffbba13a1329aa0c20507b9df9895f1ee3495"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "9d46011924a3183320d3c4b464318d352acc5daeb82bd9c7a2de98aa75dfab74d5e8e15a351de4afb2bdeb62fb7ebf28"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "76ecee888ec24e5e5bd24c6aa79be18734aba7d95172357c42d416d0e08ee0815e65776492f30a35989c4e3f63d4f189"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "70d60293e56439007161085381afd90b5a228cb2fd82bf84aacdd45269918328"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "dfe518776d0893d0dd9112f5bc4a9a4d243867e7985f208694b9c527fa8a878e4266bdc3aaeb1e36b003fb9295cfdb0c90079055679fb92a06ab0a25c632b39f"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.flywaydb/flyway-database-postgresql@12.10.0?type=jar",
-      "modified" : false,
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/org.glassfish.jaxb/jaxb-core@4.0.9?type=jar",
-      "group" : "org.glassfish.jaxb",
-      "name" : "jaxb-core",
-      "version" : "4.0.9",
-      "description" : "JAXB Core module. Contains sources required by XJC, JXC and Runtime modules.",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "cfe79c0de53d009f9b171d1320f7879a"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "3f32ec949d109d666fa30994223d1c25a47b105f"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "6b014df25d22c8446cc2df0a378c5b2137747f197a731d99eb24c756b26f7e8d"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "66b9b7229aae2c0f74213bed97a8cc6cdbaadd68b2335424718c36e2cec0a8c03b7960128dcf77082b7edb2df053262290ee76d988197ffc2c057a6b9a45a047"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "6a4fad8a4b0c0ce1ed18fac77d171eadfd5d20eecef45ebc580255f633f1ec523f270696e836a199e4186025dcb10445"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "e1f08bbac17ab5f35189c17acf46fa1d7a5d5b1e3b02cc6e1f3113291935e6ef5103d729f92f683d2d45dc4bdb5cba79"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "9919fd1d9292c1ed357b4d7f27a936fdb44ff52affa223a62558414d791c616b"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "7890e6f8504ce73a09e5db6f5b660c9b23f05e29160dc5de017411f21bdbcfb7a3ca2f0eaef563e6a10fbf30016ab42391290f8f5a9a16abd5dfb297f5b6430c"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "BSD-3-Clause"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.glassfish.jaxb/jaxb-core@4.0.9?type=jar",
-      "modified" : false,
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/org.glassfish.jaxb/jaxb-runtime@4.0.9?type=jar",
-      "group" : "org.glassfish.jaxb",
-      "name" : "jaxb-runtime",
-      "version" : "4.0.9",
-      "description" : "JAXB (JSR 222) Reference Implementation",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "5a09f7188a527773fc71f0ac8ca30652"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "500c199572538675d2819c938fbafe34935d8d6b"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "93e09b7316b6af68d6e2083e4c297daf28e8957f45d725077af812c0b12c39ab"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "9f423f0bf977b4648254c18ab1b48a73e37266246f04fd7a1e7e7efb9cb936662016bf3d2e6e1d9e16ae18eb575778800808845733a8fcb3239665b7f338a058"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "75d8d1152da59f7d9ec4cec983d0aca389f7404587f32ac491c08b7c204ff4295c1eaef37f9c1340ce5aaab205986106"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "16eb766449c17691ae0ed0500bd578b3568bb9b42070f96d3776ada74ce56554f948ffbc6debd39b5a620332a95be576"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "889a0912554cb74d05de386d7275a2e90522817a0e9ee8a417982939dec3ce43"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "b4b1a127515d5e1f83b9ec63f37a40c37565d8e79593d5276f30544ecd1ecf14d6ab423c4feaa7fa45d4f89b6d2ad318ab346ba6a2a2e2e27e0ab7af21b88587"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "BSD-3-Clause"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.glassfish.jaxb/jaxb-runtime@4.0.9?type=jar",
-      "modified" : false,
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/org.glassfish.jaxb/txw2@4.0.9?type=jar",
-      "group" : "org.glassfish.jaxb",
-      "name" : "txw2",
-      "version" : "4.0.9",
-      "description" : "TXW is a library that allows you to write XML documents.",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "09ca7799e2d1a5b484e1290db7bb9344"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "70325ebdebca3e7aae1dfa395fd41fc25d8a6f4e"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "d6343e5945d87266ca4e8974a0a2a876e1bd147a00fb65ed3f2e1a3a00f3a82a"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "84d0459954e53b6daf90fc6550a44385cb8a559005994fef1701e1528db311f5250dbefe54dd6dc1b09a6fb76e03d87f8d6fef256eece2289c5de433513cf01e"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "71a2864684dc808a7526e6d739db22df91bc709b4c99cfb192c91d764ba30ae3e4d6114ebebae43a106e6ae06cfcfcce"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "5e2898d9b8ac8644e3a4b3e04869e793db4cf8782d7c27c76c284c57547fd26d4b48f6b20350f78095cc994fe50d121b"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "c7e005e9917a481dae07019db4fcbce844fd5f94882a49f2ec1f3a52bb347659"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "11f22e8e5c31d46697b6234a9c67526ce8eb88b9cf4457d1e19302ce14944694f596799cb2f45d93b84c6d0935dcb3838831ba8c75d15730ac38a57318664010"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "BSD-3-Clause"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.glassfish.jaxb/txw2@4.0.9?type=jar",
-      "modified" : false,
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
       "bom-ref" : "pkg:maven/org.hdrhistogram/HdrHistogram@2.2.2?type=jar",
       "group" : "org.hdrhistogram",
       "name" : "HdrHistogram",
@@ -6251,188 +5915,6 @@
         {
           "type" : "vcs",
           "url" : "scm:git:git://github.com/HdrHistogram/HdrHistogram.git"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/org.hibernate.models/hibernate-models@1.1.1?type=jar",
-      "publisher" : "Hibernate.org",
-      "group" : "org.hibernate.models",
-      "name" : "hibernate-models",
-      "version" : "1.1.1",
-      "description" : "A de-typed abstraction over reflection and annotations",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "bfdc23cef68eaa53fc308edb20a46264"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "c890a4cc781fd8720e0e2613b4a24b33cdaa80a1"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "7cb645f2ebe5fcb63e21d26259cef62d93a1ca77c400bda6992c92cb19826a89"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "781ff85372693dfee4f3c060af2ac8de4abb49100f5e6b9b559553f5b464b71cce03732fecc43cbd8f852de392178f24a36d0b4993f9999eda1393471688ac8c"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "3c1eb605a55bb320941390414522d446eeeed2ff4a19137ea63bc7c1cdb3f4d6c96f8605014c4525b4295c1e22d7b5b7"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "7212d771e6285dd46b62e09c65dcb07f88117541ddb0c7841efcdb604f9e13b9e86b021835e7bbbb1bd482630548eafb"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "5e1e1167673db36f6327eb6cf3ff17dbdcd00a976c4dce325145a69d58c08b71"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "d45199f15cfc63ef6aff65a7e017714201f0e7750734b8d3a7d24f9cf2dcdf4845c647158d93bedf48e3cb2c061fb6b81f1e099223958ef837e353ce6dfeda18"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.hibernate.models/hibernate-models@1.1.1?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "website",
-          "url" : "https://hibernate.org"
-        },
-        {
-          "type" : "issue-tracker",
-          "url" : "https://github.com/hibernate/hibernate-models"
-        },
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/hibernate/hibernate-models"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/org.hibernate.orm/hibernate-core@7.4.1.Final?type=jar",
-      "publisher" : "Hibernate.org",
-      "group" : "org.hibernate.orm",
-      "name" : "hibernate-core",
-      "version" : "7.4.1.Final",
-      "description" : "Hibernate's core ORM functionality",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "aa284ba1f033426944be07a7435f493c"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "b405096e4aa04ff9c99a3e6e632eb2b8d252e1f1"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "e4bfe7df423f3555f322eefb1ab51f28df439844610ef76c36d92a85d483004e"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "9aa692144ddd310b25829eb39046ea426d2a21f5520f5f067c2f9695ed03197c96cc5a04dc97f5443dd71ff02f772cbaea410bb7be87bacb154d43a409c13797"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "8ce104511d0470316bb6873e6dbc4b5774b60caa1ba6f7f6a7f5b83d9a31fe1d98ec0df6cfc19a774068781ca74b8ce1"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "aed9e57767fae21baecff941b7e5079939ecb6e89149fd37023db453d423cecf3a50583adb29324c6629c1d07ea10707"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "fbc5cc6d6cd34038592333babab8d806428df17f99e3bcefdd4167162a13992d"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "6a8608554c6aee5cb920590047773cc4657d90c371e5d2d5cdc61db1b39e0b6dc3d68c05b8ba30e6c6190839f2e94cefac691420f1a9b1cffd6a91b6394c06ca"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.hibernate.orm/hibernate-core@7.4.1.Final?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "website",
-          "url" : "https://hibernate.org"
-        },
-        {
-          "type" : "issue-tracker",
-          "url" : "https://hibernate.atlassian.net/browse/HHH"
-        },
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/hibernate/hibernate-orm"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/org.hibernate.orm/hibernate-platform@7.4.1.Final?type=pom",
-      "publisher" : "Hibernate.org",
-      "group" : "org.hibernate.orm",
-      "name" : "hibernate-platform",
-      "version" : "7.4.1.Final",
-      "description" : "Platform (BOM) for Hibernate ORM dependencies",
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.hibernate.orm/hibernate-platform@7.4.1.Final?type=pom",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "website",
-          "url" : "https://hibernate.org"
-        },
-        {
-          "type" : "issue-tracker",
-          "url" : "https://hibernate.atlassian.net/browse/HHH"
-        },
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/hibernate/hibernate-orm"
         }
       ],
       "properties" : [
@@ -6766,146 +6248,6 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.mapstruct/mapstruct@1.6.3?type=jar",
-      "group" : "org.mapstruct",
-      "name" : "mapstruct",
-      "version" : "1.6.3",
-      "description" : "An annotation processor for generating type-safe bean mappers",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "3662b4f7a5abfb4f233e6b0dba5d3070"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "416a2155212286d6a1c4cb3bb553c7dfd6a1a092"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "00b52467f31d482f8673b0b74306f4be0a305cdce31e587bc1b3d7bf779f1dbf"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "e051d49058c974ea56795bb978e0daf82cbec72a4012611dd76bc9b3874f991dd9e11e420a628930dea97654f4bd3e5ce504c50c2bb43f802ec68e3347d5b620"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "4b7a3e6d0288016bf8fa1b875911a42bd7d695bcf2a1d5ccc497e2caacb58e0ebeb82ac2916617d786c0c0b3056fea83"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "20c5087a70b3a6fa2305eb57ce0a7793412b2e0bfea01d940049dc6b5c86bcca158595119dd0c4478d50311cb50086fb"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "3a3b804ae940504fa6322cd1ed0571dcd6adb1f5c6d7b173a3753a318e58ae8d"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "37f104fcfa7c22681ec165a6de54f8f267fe62ac73d958dfdfe54e27fdb756fe1f152d910b29f8b0a339ce78696812704bf86396a36950a9674c107a1b7397aa"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.mapstruct/mapstruct@1.6.3?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/mapstruct/mapstruct/mapstruct/"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/org.postgresql/postgresql@42.7.12?type=jar",
-      "publisher" : "PostgreSQL Global Development Group",
-      "group" : "org.postgresql",
-      "name" : "postgresql",
-      "version" : "42.7.12",
-      "description" : "PostgreSQL JDBC Driver Postgresql",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "bf3dd29ad502aeff677c4920bc6d6c9a"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "9d30cb5aaf509e58b05da3b8ef98b6f9cc93d7af"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "31fbf6f06b2217fb51d5100cee51b22625cc81640da0679b47914e54c1e6377c"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "3759e7160591863e5100361298943df94488a6e4ee03936d20723638142fe8038c9a6a47fa8ee7e424f4ef09bb351edc89dfe2ae4acdfc0f92699a8b00196c5c"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "15077d5c4364feaeb6cb95d76eea3f2f35438f14cb79f240457cfc9ee4a971b8efbfb9784b83c14246bff3ea786a20ab"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "2f982268c9ba1fb569bf3757cf92a00320a22e5896a1f529a63774c60297602831d4f2d14e8fe4ccd7e150054a064502"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "e63380c49bbe5da35954f08fac19470cb301b8684d86d0e4410b6369dd739c2f"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "d1da2833c59519daff56baf7ad87b81a7dd22d60a826baebb1df676921f3460d86ea2890b5c783624fd19b8feeac7c3ed4ef327254351587cf3c77a4547c8398"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "BSD-2-Clause",
-            "url" : "https://opensource.org/licenses/BSD-2-Clause"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.postgresql/postgresql@42.7.12?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "website",
-          "url" : "https://jdbc.postgresql.org/"
-        },
-        {
-          "type" : "issue-tracker",
-          "url" : "https://github.com/pgjdbc/pgjdbc/issues"
-        },
-        {
-          "type" : "mailing-list",
-          "url" : "https://www.postgresql.org/list/pgsql-jdbc/"
-        },
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/pgjdbc/pgjdbc"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
       "bom-ref" : "pkg:maven/org.reactivestreams/reactive-streams@1.0.4?type=jar",
       "group" : "org.reactivestreams",
       "name" : "reactive-streams",
@@ -6955,73 +6297,6 @@
       ],
       "purl" : "pkg:maven/org.reactivestreams/reactive-streams@1.0.4?type=jar",
       "modified" : false,
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/org.semver4j/semver4j@6.0.0?type=jar",
-      "group" : "org.semver4j",
-      "name" : "semver4j",
-      "version" : "6.0.0",
-      "description" : "Semantic versioning for Java apps.",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "fbedac2197067c12480b9307d80b010d"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "995a8afc0b9d9a700c7858843a36ece815852d72"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "43d5e02f60e2b1f8ff0c92139f612a547691a1debe6bea32b0a70ba5a3bcbdd7"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "2ad8fa43b1cc1c48ad45745ff93c382b551295229f81b65bfac491b6e4e390d2c4eea9fb3579b0bfedc899269188db56d0c25e8761c384f8383b835a1c3b4d21"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "dc6d9ecb07dc2cd0bdc4339f16abf06ea4464e356f56fffc8396301439fd760b91ea996567196cbba266ce72fa40dd9a"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "3c54e80bbbd52bcb01a24346344a93a1ebad014310570deda8acca26caff279f132aef2625496aed7df3226f44d18b06"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "91ef930b1a8ef306850694251daeb62e3779c5c1eb4b19ba3c0c45c102f1099f"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "314bd842c2db08610832029bc01a74dcddd8ac5429238764ad651ddb48602876c709bab7f65862dbf778e4a53311392a7d1fcc20be20d63603aad92e9f1cda50"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "MIT"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.semver4j/semver4j@6.0.0?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "distribution",
-          "url" : "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
-        },
-        {
-          "type" : "issue-tracker",
-          "url" : "https://github.com/semver4j/semver4j/issues"
-        }
-      ],
       "properties" : [
         {
           "name" : "cdx:maven:package:test",
@@ -7475,78 +6750,6 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-cache@4.1.0?type=jar",
-      "publisher" : "VMware, Inc.",
-      "group" : "org.springframework.boot",
-      "name" : "spring-boot-cache",
-      "version" : "4.1.0",
-      "description" : "Spring Boot Cache",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "d46fc2156f2604c527109d55afcb1b8d"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "ed94c2d47058204b56f7ba43aed55331fb898bba"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "b0ed05ab1621fabd83f8d2191c0593b105120fdb6b34e2b813634abe99591a90"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "4b5c028cec0196392f541a724cb5d44e84e3fdc78a3108d2d3435ebc9372fb79baaa2f6a2e43001cfb58034feead400552a409b2209366f17a0fc1c726cbf5f6"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "f3bf7ee4b8026244095f7bc6fd300be9ed98763ea1709dce5714fb852432ec1799bc1a7e4c5cb910f5102aabdbbbf263"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "d80f3311ac47a27c18c76b611414f5b787e0d673464ee43e06d71d1e40e8154401bb568b1e851196400341b86aa58c11"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "700dc6c4267026c4b763bbf789e1e82a2c87e150889c2630d1c0ab961a06d6fa"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "a5b4a37878d44f392131a80e4f884e46c4d5064c93921fdeec3b277a78a74c19a78375033922b865fdbe4aa33f1e5e42de42f1bd205a24918d9ff6c7d08d4562"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.springframework.boot/spring-boot-cache@4.1.0?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "website",
-          "url" : "https://spring.io"
-        },
-        {
-          "type" : "issue-tracker",
-          "url" : "https://github.com/spring-projects/spring-boot/issues"
-        },
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/spring-projects/spring-boot"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
       "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-data-commons@4.1.0?type=jar",
       "publisher" : "VMware, Inc.",
       "group" : "org.springframework.boot",
@@ -7619,44 +6822,44 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-data-jpa@4.1.0?type=jar",
+      "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-data-redis@4.1.0?type=jar",
       "publisher" : "VMware, Inc.",
       "group" : "org.springframework.boot",
-      "name" : "spring-boot-data-jpa",
+      "name" : "spring-boot-data-redis",
       "version" : "4.1.0",
-      "description" : "Spring Boot Data JPA",
+      "description" : "Spring Boot Data Redis",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "a0138e5e41543a5f0e0012d586c34841"
+          "content" : "855f4a26f0e0d67c49a365d12940316e"
         },
         {
           "alg" : "SHA-1",
-          "content" : "d29dbdc6734afe2f4d5c56cf3112c491c3582642"
+          "content" : "ae52af2d818ca43d61c486e5cff5d0e81d545c4c"
         },
         {
           "alg" : "SHA-256",
-          "content" : "5c9fe8ee830a45bba829e7bd150aa0633c18d50870561d85299af1e8418daac4"
+          "content" : "a3cee050807b8e0b437678ab40319930dfcffc7eb1da9bb57bf8e10900967e24"
         },
         {
           "alg" : "SHA-512",
-          "content" : "b924cecc492e646940b1e1a3bd3a51504ef9866d27762fef6b051401fdc008b62c0cc64260b6acbd88b6afd734f52e42bde864f5c9d748ff7119ab14433b5f70"
+          "content" : "04b42960d633c2e6cb2c003dc610395168ae51f646f03a2c667bce4301337db98ae10521d07c301e6be2f8e8fbadc2e6340c66041245d2e9a2ad559353f0b7c2"
         },
         {
           "alg" : "SHA-384",
-          "content" : "b3526db0dcfb477f095cf09798a624e882551191697e9179d44809092e083628fae0721af2059abb79db73d30821537a"
+          "content" : "dc26843632ff513443cb9dae1b2109f20d49c6d7b4625dc3bab0445a0fb5983615234a112c73c7f63c4e96b00d0e98d9"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "59ddc5863089ec65fad8c3039bad57f2445aa4aadc28f2c7e346e1caed2b21405c50fa2fcfa0853a0c83c69ab0e3676c"
+          "content" : "9c38704d3a556fc02d4d4f2fa8fd15724045f85ffe673645f308ba3067124f2a6a6efab4b11626fd1d22d75f611ef9d7"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "f1b58b1cbd3125c96a67baec5202ded635c88fb60647a2586b85faefab04edb0"
+          "content" : "e675fb10c10f0e8ff31a0aa8b5941aa819dbcb2ac2bafff1354251cf8b34ae8d"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "c157e99da7ab137aaec3e9e200fa7d9bfd410ab2908326f65ba45969079d94f8125becafaf3de7d972338527094d39a9faffe65c3fb87b98ee1fc20ff7af1cbd"
+          "content" : "98a8120e2099325d4032f2206d2c4be239a76be17ff5155a4ac52838af9eef0f638387c5131e1449b96a13450d0be2acf45c96c99b1eb546bfad0e6f0ca3064e"
         }
       ],
       "licenses" : [
@@ -7666,7 +6869,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.springframework.boot/spring-boot-data-jpa@4.1.0?type=jar",
+      "purl" : "pkg:maven/org.springframework.boot/spring-boot-data-redis@4.1.0?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -7811,78 +7014,6 @@
         }
       ],
       "purl" : "pkg:maven/org.springframework.boot/spring-boot-health@4.1.0?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "website",
-          "url" : "https://spring.io"
-        },
-        {
-          "type" : "issue-tracker",
-          "url" : "https://github.com/spring-projects/spring-boot/issues"
-        },
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/spring-projects/spring-boot"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-hibernate@4.1.0?type=jar",
-      "publisher" : "VMware, Inc.",
-      "group" : "org.springframework.boot",
-      "name" : "spring-boot-hibernate",
-      "version" : "4.1.0",
-      "description" : "Spring Boot Hibernate",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "04c686743d09246ce2aa71a5ed3c6d48"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "af702315125871004a8a7df290f55ac5e5617d91"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "fcdcf4b490a8fa0e6ce466334bc8ae752a80e1ff1c9eb58a101e2fff878a2863"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "99a71a532487e7d8167f155259a66167b13902b910d4e0d875f1af494f71e7e3c1d0e49593ce746525ed696971474f62e347063becb5e7b517115ebc72154974"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "997402310f7bef5833e6ca32e7430925d8d3092c10ebc33da1f957d186011da218bcc1b0ace4fb15d3020be04bb529c2"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "ed83addf644f859a84deb13bde966386f5330f6cb87aaf0706416b6c5bf9a34f3a84c89507d95e38e7bf74796b849db6"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "adadc564eff225e022731a06e8cc4792a4eba0f43a54dbf05bfc2af49a51efa1"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "32d3134c555735b48a20e0dbd43f17c4f0875cf097e59f0c5fbda5bdba432c15edd31df66790bdf854fab9ed61c0f6f706b36e051bcbc16be9438bf40fe86d93"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.springframework.boot/spring-boot-hibernate@4.1.0?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -8099,222 +7230,6 @@
         }
       ],
       "purl" : "pkg:maven/org.springframework.boot/spring-boot-jackson@4.1.0?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "website",
-          "url" : "https://spring.io"
-        },
-        {
-          "type" : "issue-tracker",
-          "url" : "https://github.com/spring-projects/spring-boot/issues"
-        },
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/spring-projects/spring-boot"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-jdbc@4.1.0?type=jar",
-      "publisher" : "VMware, Inc.",
-      "group" : "org.springframework.boot",
-      "name" : "spring-boot-jdbc",
-      "version" : "4.1.0",
-      "description" : "Spring Boot JDBC",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "2338fe3f45285b6c084552e66cfaf9f7"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "71f00c6af0ae910530d9fce8f5ae6e54c595f690"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "3b5aab97e72d8a15a40546c31365ed2090cf25451e18762add8ed22cbb4ead43"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "313d07eacd5363491bb9302b3489e20963ca116df54fc888aa9afb6d6601255789246ac992597212e01b6b79b448705c7138407d72f8fd4ad71cc0bedfe1b29a"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "2728493935c09fc8ce7d38ea3263c301b0f157853184fc5d100957bffdff07628d7fa5c86bc929ba652fc1d0cdb4b0e2"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "fe4c5e5aa9e637d72703eda44834c2d45ce95243c2639c608f0d9e11c00198bf15c2b7e7f3e2bbb95994726e0b8d0d7e"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "0be171cab95e63589cdc233fe5085789619decf1405e5f515f8268c1d292bd64"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "fcfa4c9199edd116862a45e0afa6a9cde8ec90f80caf7dec2264344a00246806ab6eebecc7186ce9a3e25466aca4095a87b6f2952329cb3cdec8ed07d28addd8"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.springframework.boot/spring-boot-jdbc@4.1.0?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "website",
-          "url" : "https://spring.io"
-        },
-        {
-          "type" : "issue-tracker",
-          "url" : "https://github.com/spring-projects/spring-boot/issues"
-        },
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/spring-projects/spring-boot"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-jpa@4.1.0?type=jar",
-      "publisher" : "VMware, Inc.",
-      "group" : "org.springframework.boot",
-      "name" : "spring-boot-jpa",
-      "version" : "4.1.0",
-      "description" : "Spring Boot JPA",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "50f75d7c2024c9283d465c788b31051f"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "bf645cdf194c71f829225793a5d6545d9dfe96ae"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "cd61301aebef59f3d2874ebd51862ed52d342d8c162874791475486232316d95"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "e6fc4e87c8725d33c193db1fc989e0deb1305ab68b3080647b44e2f3388aeb13f32325b257b8c745867d1dc7caf96026da86bbb13f329008690fdf010da8f726"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "19f0dd7a9c6e9c04a534b699d08ea56f59a83904df9fcc89e6307803b780820d5b3618f3b434d78819de7f9f05562ca8"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "bc846822fa094f4254b6d3b0def81f2fc305687a4e7d25ce011a17e4647cf0916f4bb0a818bf280b0958f99c2fa2f2b5"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "74a960781d5eee54fb92c871e7dc2670da5d2a326760de4db7db12f1054a3b66"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "2c910314edef1d990055a3facccbbf16af311e33670c0357c060ae0fb80541d19e95fce386a51ffe6e58b4983d4e755de141dfe22390642baedc92610a09f755"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.springframework.boot/spring-boot-jpa@4.1.0?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "website",
-          "url" : "https://spring.io"
-        },
-        {
-          "type" : "issue-tracker",
-          "url" : "https://github.com/spring-projects/spring-boot/issues"
-        },
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/spring-projects/spring-boot"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-mail@4.1.0?type=jar",
-      "publisher" : "VMware, Inc.",
-      "group" : "org.springframework.boot",
-      "name" : "spring-boot-mail",
-      "version" : "4.1.0",
-      "description" : "Spring Boot Mail",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "b9de6348152f02a61d28494c10cb6b51"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "b8051f1cfbd57903eaa11612f6a1e51828e6fe8c"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "9e33897373e22dc31984fc13c1319036ba696d7de83ae002203381b75007a7c0"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "00bc3cc77e724fabb92c957be1ad9228b5c2224c087fc377d4d5cfd84f3ef6e1ca2245ece395f8158fa308165d7f68842e08d7cf15d7b434bde2e298f7b90432"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "d23e67aa894de0cecd3c73325c2ee7407c916faafe2865abd1f054f6effaf4203f229050a37adff996fce134539ffbef"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "a36f92e3cec459e0dc934084a1abb1ebc86ffa45f4fd935f728b577dcd37f910396fe16aaa731e185b583fb915683005"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "b347fee8cc90c95cf1c4a59917a6eb7f31401ce183522300da63a88c029b53a9"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "6bf3c9710dff2f490a1d6d13b1cb336498a01b13b4f9624a8190ab8172ccceabfa56a6c36a5d0b3b3d38d92ba52157abbea63088128cb8d0fb2d703d207e53fb"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.springframework.boot/spring-boot-mail@4.1.0?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -9203,78 +8118,6 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-sql@4.1.0?type=jar",
-      "publisher" : "VMware, Inc.",
-      "group" : "org.springframework.boot",
-      "name" : "spring-boot-sql",
-      "version" : "4.1.0",
-      "description" : "Spring Boot SQL",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "ad1c89cce65ae3fdde36c2487676bf05"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "7a5ef86020d10e926b2e98e1d7b4b79258fb2f38"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "2826a5380675337f4c5b3e90db02279e68a2c9a7eb2b2ac312828c05fb827a9a"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "49acda6ba708b310a640c5116397d94c9066eacf038bae9bbf1fa78fe422cd60a96788e4c509fc07e13d47fda3db179b3c1a4aa73d08fc579c5d0f5596ed886f"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "902c08842283071bd2abf2e40fa7e5383c2eea919a462355f258c6ca48b17ff9c374c94efaa0b9ac3bbe753cdac01e1f"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "617829d1d48a8effeb4458a4c0d12b57d4e82eda234175cdeb8fb8abb15d7f29a4d64fc53db19e0b8cebeb040f0414ba"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "37fae2a6af08a2b101aefb96df4b88e631b0977aef661b11768716e96a616f3d"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "380c915112789ee05ed913806d3f18af128c3fa1f1a726f5ff9b90e677bf6b7248f17909638f45c779afde08103167bb4e62142c242afe24eb4f39063ed33268"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.springframework.boot/spring-boot-sql@4.1.0?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "website",
-          "url" : "https://spring.io"
-        },
-        {
-          "type" : "issue-tracker",
-          "url" : "https://github.com/spring-projects/spring-boot/issues"
-        },
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/spring-projects/spring-boot"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
       "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-starter-actuator@4.1.0?type=jar",
       "publisher" : "VMware, Inc.",
       "group" : "org.springframework.boot",
@@ -9347,44 +8190,44 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-starter-cache@4.1.0?type=jar",
+      "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-starter-data-redis@4.1.0?type=jar",
       "publisher" : "VMware, Inc.",
       "group" : "org.springframework.boot",
-      "name" : "spring-boot-starter-cache",
+      "name" : "spring-boot-starter-data-redis",
       "version" : "4.1.0",
-      "description" : "Starter for using Spring's caching support",
+      "description" : "Starter for using Redis key-value data store with Spring Data Redis and the Lettuce client",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "036913b52a5bfda4f0de8012a775997c"
+          "content" : "64910908d0c4f35500aacea3e9d0ad13"
         },
         {
           "alg" : "SHA-1",
-          "content" : "a1eeb694e80f3be4702f0f71643930386e68cc69"
+          "content" : "efdaaedff624a7f406d53d2d945ee71676d7759a"
         },
         {
           "alg" : "SHA-256",
-          "content" : "e04e6630336b780a0693fa708e92425038ac3f690fd31d7e7e5cde1a01908918"
+          "content" : "85d475bcc240f0c8e2a142b0278d6063d11e64522823abe34d92a8c4dfb50c75"
         },
         {
           "alg" : "SHA-512",
-          "content" : "962f9c57d211e7eaf60d03009fd8efa0a2f41c24465f45bac8cb97dbc0445d6b7407e6a2a2de083ffe94d71355d69296df2692c46bf9b79b677c114cfeb55b43"
+          "content" : "d5aae119bcca1bce0f370b3b92442716507c15feef3380b385cd40658cdd9e52c89b2587ff3a7ef23c1393b971375c8975692aaace369e14356c8144c1e04943"
         },
         {
           "alg" : "SHA-384",
-          "content" : "4b8e507e1fd66f96ebf1c45b77c4af51c840b33b43b66401432e7716f89bd76a16a0df47d518696aa936dd36ec182f14"
+          "content" : "3152a32ac871b2cdea30d746129e3db3c49f23bfc175c4ddb6541d4ef0f5c72c11b25ae823447a3c1c6931e3f0f240fe"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "5a27be24d0832b29fc049fc92bda355eeba9bff029c7080d3b748dbc94a820bc047859b958bcaefdb1e9213fcbb89d0b"
+          "content" : "792916839853576dcd7db4f4115891e65fd09eca3ca3b7fbb9c9080afc3e6beb380e700579ac4dc50ee8c9989a86cbbc"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "0cecf10b36c5ded91788b4fd2c36ce263b17bad53be2bf9825a1755858277b51"
+          "content" : "88d7da08fcdcd5d13eb9ea9629192be2ab462e8d811aaf45bbf321923deec524"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "8735eecc2819a8e3200776665bb6b50ed5e9e79b85dbebea0e15928541b8ff3b2e211a158536c98d7e03bdac26f1580ea00b417a2eaea1fc3f1f85b64bf7a7cb"
+          "content" : "c3b9088f774295023296be0aecd7a4fb8a4c8864af385206986905425e2852468b0269e11fa246e41cde0be35cb9030a690d0a34c69d80039532ff9d85c69f64"
         }
       ],
       "licenses" : [
@@ -9394,79 +8237,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.springframework.boot/spring-boot-starter-cache@4.1.0?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "website",
-          "url" : "https://spring.io"
-        },
-        {
-          "type" : "issue-tracker",
-          "url" : "https://github.com/spring-projects/spring-boot/issues"
-        },
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/spring-projects/spring-boot"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-starter-data-jpa@4.1.0?type=jar",
-      "publisher" : "VMware, Inc.",
-      "group" : "org.springframework.boot",
-      "name" : "spring-boot-starter-data-jpa",
-      "version" : "4.1.0",
-      "description" : "Starter for using Spring Data JPA with Hibernate",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "f57ac85ceca335b212b72a3e7629b500"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "252e31911d5042a8ae811ad9bfc3e18ec4ac42a5"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "9fe4c797d98e10c3761c1ff6bc14fa5ca68bc0e4b9941a951f39b99502f57d56"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "f80e8035552c4eda88acb0457b86b2630b0f5a1017653d3bf9d201691bf779de6314245cdcd65865d3d10ed9d3d5918aeb3b7a05b2ded294df1a40a0a03d1c8c"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "363bfb933a3cb4d464118e607544d8ddfc9efaa2a2e5adc0ba843724a2be0848ce28b3a050327bbc5a2b5dd2f61d341e"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "06ca90390b03ec3a1a94f06d2137934013e14bab0b9512533cc13c7a7f60aaf4e52675b69929f547c028c3dfa96e5b0a"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "10c7700b4a37cdc2061bfd886c80562f983bc5587965930ff61e327748253a9a"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "a16692a5bcb64fb8807243b6615a06df8d48793be3410c50201f8681583ddd7c3c5430366bfd23344df20dd0fd261b3d4ae7b5a472731e3139692f2a8eb5b0cf"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.springframework.boot/spring-boot-starter-data-jpa@4.1.0?type=jar",
+      "purl" : "pkg:maven/org.springframework.boot/spring-boot-starter-data-redis@4.1.0?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -9563,78 +8334,6 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-starter-jdbc@4.1.0?type=jar",
-      "publisher" : "VMware, Inc.",
-      "group" : "org.springframework.boot",
-      "name" : "spring-boot-starter-jdbc",
-      "version" : "4.1.0",
-      "description" : "Starter for using JDBC with the HikariCP connection pool",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "126815aa3bcd261d65ed3c2040fa2010"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "aa7c6585dd28891cb052d95606776076b5445df2"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "ce3e3dfdde267f11d21960715967b59713575cab8e5e8b3b00fba6a3bb022c99"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "da03d36dc6c95e43a081755d78496b11a8697e51c16ae7c4aec6dc9405809b60604616082c69c0c9a64afa4e60afe4142fc62dd1a19dcee836c2872d872f746b"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "9b68e9a2c7d9d5ecfc9f386a45d8939974c91fc8bf14f4e8b21b8cf6440043852e045421eae4124e46eb7d35d00d9600"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "1243326a814f17ac817fd0e720eb86d548497a39437fc5fb6fc969deabf5228d0bb57c0179ad297d19774af5d3bb18c7"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "b648997339ebf9689991a737b788c61d3417ffba61ea5016257cbe0670ca27e5"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "face0b5a28f6e36fffaf8ad4fb2668ab235e5c96ade9818c32ac971197ac642acbf88194ade5854250c76a7a0ade0add9c0122b32df03f49098fccd334b9256c"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.springframework.boot/spring-boot-starter-jdbc@4.1.0?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "website",
-          "url" : "https://spring.io"
-        },
-        {
-          "type" : "issue-tracker",
-          "url" : "https://github.com/spring-projects/spring-boot/issues"
-        },
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/spring-projects/spring-boot"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
       "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-starter-logging@4.1.0?type=jar",
       "publisher" : "VMware, Inc.",
       "group" : "org.springframework.boot",
@@ -9683,78 +8382,6 @@
         }
       ],
       "purl" : "pkg:maven/org.springframework.boot/spring-boot-starter-logging@4.1.0?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "website",
-          "url" : "https://spring.io"
-        },
-        {
-          "type" : "issue-tracker",
-          "url" : "https://github.com/spring-projects/spring-boot/issues"
-        },
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/spring-projects/spring-boot"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
-      "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-starter-mail@4.1.0?type=jar",
-      "publisher" : "VMware, Inc.",
-      "group" : "org.springframework.boot",
-      "name" : "spring-boot-starter-mail",
-      "version" : "4.1.0",
-      "description" : "Starter for using Java Mail and Spring Framework's email sending support",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "9f1dfc308b4744e57aa68bc8aca50cb6"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "9404230e81be0a7595a014069afc61f81e63b0ed"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "f22d5b5cc88a0c68c2bbe21d09a244d5685cfa144e31e320a31598c7e63d3557"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "33491e7608278b6f168fc20a2be364b6c9f3b0903ed9a82f873fc4b06d5566c75679fb3b8c8da62d51242fb00ee8525a56608f20ecf51b3628612b14b1467282"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "c5cf506dea635015ccb66cfb7ef9634270fba8b367105fa0d126dad871e9674f5d88c2f45336db4008e08ce56b10abeb"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "03799e94981eeb252eb53a87e5cba87c01fa1138643495d3810a3ea7bfc02f3e7df9ac4f5fba1901545c8c372919900e"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "791438b83fe3fc1d73489610d003ad7b19924aef2a70406e6aa3e7606c4e6677"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "83dc3b7410e2bb973356967f53c386bbe158093d39d08458ca72a2021054a374bb39988f1d603fc0df5a4a2b1f0573ad77b97fdea542f41b8bc00314a81896d1"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.springframework.boot/spring-boot-starter-mail@4.1.0?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -11142,43 +9769,42 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.springframework.data/spring-data-jpa@4.1.0?type=jar",
+      "bom-ref" : "pkg:maven/org.springframework.data/spring-data-keyvalue@4.1.0?type=jar",
       "group" : "org.springframework.data",
-      "name" : "spring-data-jpa",
+      "name" : "spring-data-keyvalue",
       "version" : "4.1.0",
-      "description" : "Spring Data module for JPA repositories.",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "4997e5be3b798b61a7df43a21fe80533"
+          "content" : "ed50fe6b70fac0b29ca44ae1978a858b"
         },
         {
           "alg" : "SHA-1",
-          "content" : "6387c88a4a9637f129e0ebcad50ada478ad01c3f"
+          "content" : "9ade00273c269ca0d50c4d2d5f564d21a84f94f7"
         },
         {
           "alg" : "SHA-256",
-          "content" : "60b72b0513faecb3ef51f53f35d74de68b193af06dc7c1c66b54e265762bad66"
+          "content" : "1cab6685ee820428a9fb48eab4a5cb48ddcab1dfdb2467b9afb3c47f5455d19b"
         },
         {
           "alg" : "SHA-512",
-          "content" : "25dd4db89d58b195ed1991b65c220ddc945e0008814657c1985ca8c2f122da09453adcd3da8c00632e161e423ebce473e6fa39b0ea7f1512fe3e8ee773889d30"
+          "content" : "60706452e408416e189c2e075fe772e5b4a5ced448dd3818a6b878afe84426f45f0853ee6af836af82ed264a21ee8e0c03e8de5c3dfe7c6d25250a511e32473d"
         },
         {
           "alg" : "SHA-384",
-          "content" : "2489ef2fe6785243f7ae8b50044f068f4555f24edd33c608ebb098b48c09944713585c241995715028871302e2c86c47"
+          "content" : "a75c3413ed771b689cd5af090cc0b4bb2823b6ed99be3db8bd35be06d6b80da4ffd12713bec833447cb5a068fd3f481f"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "8a4145db4f0087886a7b7e3f0bb8bad10ca5a01a6f2666897ee7cd99940af1e27eff31a886a41352b834c8f10f9c8a53"
+          "content" : "4d2ec30a926b81f7951d4e256b9d3d3729bf79b186d10f602dd1ba072e629380ea873b196d919d797bca9156d169ca31"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "872259011e098f1d3658060a22923ce2b397bb633d4394874ea491596890fc16"
+          "content" : "16409b4cc2af5e834025e42b9fb0b7b9e26a9063880890092c765ea33803fc95"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "4a672d5605cb48a3af612d5936417d7ea71ba50056c75a0bdbfd912e265eed28420c50c79aeacd06b375511ad8c01a7885170931e22c096015f5187e4c0c8cfb"
+          "content" : "a2746d84034abad4f81b6236828dd608954fd010d3ea98f32999d66a9661001ff2d7661c6851a4d7a7aec3353d64792ae0a340504197669c6ed6f4eb853c3394"
         }
       ],
       "licenses" : [
@@ -11188,8 +9814,75 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.springframework.data/spring-data-jpa@4.1.0?type=jar",
+      "purl" : "pkg:maven/org.springframework.data/spring-data-keyvalue@4.1.0?type=jar",
       "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/org.springframework.data/spring-data-redis@4.1.0?type=jar",
+      "group" : "org.springframework.data",
+      "name" : "spring-data-redis",
+      "version" : "4.1.0",
+      "description" : "Spring Data module for Redis",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "9297792ea082d817de320796c2b48403"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "0db3c9ffef46e71f2697d28d8654021220766b4e"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "c9f7c6d38c98e4240250c0c3969758b26763c4e0e87726915a71855062ae6cb2"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "1f0be6effd561adec7757eb855cd5e99a30c99a1117e9c55ec9e2dfc4e1ed30e920bef0d29972006a963c811df84f4abbfb19a421ee751f4daed1472fb64b1eb"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "99cf932ed81ed47b5aea4557e12a190bc735dc785227ef7da6f560bd9c07e06045123a83a3ba2f863c15eef9f99cf209"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "5694e97705b6bff8b94eb9244eb31d62b5d8c9e2d75deb0a93c7c5f2d27959bc4fc33cecfae4b1664e02a6fde1635a56"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "218b2ec9df3675f91ca73aed6a788341712650af5eb6e326a6c45f9f01d95e49"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "0986ec6c3f3021e2686bec76bc7ddae786d47cb2daf2b2c25a3bc2f0f223e29c46d9128a549a9aa34c33842e03ef9897ac6bed11c7565f39755b283e59ca819f"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/org.springframework.data/spring-data-redis@4.1.0?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "issue-tracker",
+          "url" : "https://github.com/spring-projects/spring-data-redis/issues"
+        },
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/spring-projects/spring-data-redis"
+        }
+      ],
       "properties" : [
         {
           "name" : "cdx:maven:package:test",
@@ -11775,78 +10468,6 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.springframework/spring-aspects@7.0.8?type=jar",
-      "publisher" : "Spring IO",
-      "group" : "org.springframework",
-      "name" : "spring-aspects",
-      "version" : "7.0.8",
-      "description" : "Spring Aspects",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "7ec63c9adf31ddc69538d8d090829da1"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "daf535194ee6cd1e1e23c7368c58b5f02fe18f65"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "f5e7eb54ff5b6355976977401852c0f0670312aa2f18c153d29ff02943883b06"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "b003300eff8e223710e73c0da376afc826699239363800888477a265e8f322d62fe79d0c8a5d75fc5aa306550b4af4ded2b20641fd6d8dd1aee59ec6ec1cc102"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "510eca8337cf6ba1ce200adc3344930a83562a22cb4e5be47919322f81d3fa88489e9c46e6e340650345382aa81a8ce4"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "0f52680d9c4812b95dde8dbb2e5393464b75c2a0b0cf30d015c61cd40237c7554fb3af1090d34e7b1a92938af2b50096"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "ba517bc94f6380ac770cc02f4d7b912d61b76d3abebd08007741a7a3fe517e94"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "379592c7c63d262ee4ebbb0535835fe4d0fe893fb4f7039d6139dd57fe455d8511b80c7f35e8f7ca9b9a4800b257d47e7284a90cfa15c7333d0e8e8259686604"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.springframework/spring-aspects@7.0.8?type=jar",
-      "modified" : false,
-      "externalReferences" : [
-        {
-          "type" : "website",
-          "url" : "https://spring.io/projects/spring-framework"
-        },
-        {
-          "type" : "issue-tracker",
-          "url" : "https://github.com/spring-projects/spring-framework/issues"
-        },
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/spring-projects/spring-framework"
-        }
-      ],
-      "properties" : [
-        {
-          "name" : "cdx:maven:package:test",
-          "value" : "false"
-        }
-      ]
-    },
-    {
-      "type" : "library",
       "bom-ref" : "pkg:maven/org.springframework/spring-beans@7.0.8?type=jar",
       "publisher" : "Spring IO",
       "group" : "org.springframework",
@@ -12207,44 +10828,44 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.springframework/spring-jdbc@7.0.8?type=jar",
+      "bom-ref" : "pkg:maven/org.springframework/spring-messaging@7.0.8?type=jar",
       "publisher" : "Spring IO",
       "group" : "org.springframework",
-      "name" : "spring-jdbc",
+      "name" : "spring-messaging",
       "version" : "7.0.8",
-      "description" : "Spring JDBC",
+      "description" : "Spring Messaging",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "0f5bec4f15d7dc4627d2b8bb74185bea"
+          "content" : "afa1d7aa1c701b171f4e066016b13202"
         },
         {
           "alg" : "SHA-1",
-          "content" : "f979da380cd01fd363510ca98a7f544d1959a914"
+          "content" : "2379224f4c36aeaeceb706750138b8ca9d265916"
         },
         {
           "alg" : "SHA-256",
-          "content" : "7d6bbf130ed919d5f4f01ec0ea771ab59ac3936ab29f50fd3a705c0119871e32"
+          "content" : "0f96694ebb88fed6bf4aef608010c23ee922a476dd71e0fab76ca9ed0eaa70b0"
         },
         {
           "alg" : "SHA-512",
-          "content" : "f91bcc6c1d7932eaa5438ea155f4bb9788f3e96f543761ff5ea9fa167a4e60f50d5c6b7a4ddf08dc0e081cd1e310a73a5ff578abe92bb8101ff43c8c5ec83ff4"
+          "content" : "83bf70d03617fb516ee3fa1987ef2debfce4f84724c6bc810716a51c1244bad43164af423bf4596b26671bccfdae3c04a53d5d0739905fe29730cf814c4d3218"
         },
         {
           "alg" : "SHA-384",
-          "content" : "29abe74588c7c4c48d102271f46af3a4461df3ab144e20bc2b305f5964ea20c2b0a2a11d40d544996d162974a79bddb2"
+          "content" : "c39b2e9e2cc6f5d0fe4665a3360483176cc6625f6937094e2ac05a96f30386067bfc2cfcfcdef2281b7f64ac7507d3bc"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "c8ff521f09335887004d6ee12a17551e39c93a941fae98ba41eec8a062c0455c36ade5fba55cc0dfe842052a9ca2c897"
+          "content" : "f5f8c0f64ae092c047b0472a948d078b563aa43f9a7eb2f88467f0360a5b835187e561fd05a45c5c42e9953bbec72507"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "db93215bea464d795ef350a7a813ddd42d15ad5de28d759a709e91c2cd3d72c5"
+          "content" : "25759480204e50f65f1e48a97d974f7d4fc8b8dc9e8c29dd7cd032b7527d5289"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "31e81f2b6dbde6ca427da9983612e176d2b61198e7150055d8672c0242128efa9dd1f4af0ec21f7e9721343c10c74d11fe31d7aee69f5bcb0ad0cfb9f1c42453"
+          "content" : "ec418fbcac3614d059687cd4e14b06024a092e3838f53f915b1eef6ca2efd84b79d8e922378288be95f5117c432dfe68a7a56a7a16c48d6810617186593d9314"
         }
       ],
       "licenses" : [
@@ -12254,7 +10875,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.springframework/spring-jdbc@7.0.8?type=jar",
+      "purl" : "pkg:maven/org.springframework/spring-messaging@7.0.8?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -12279,44 +10900,44 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.springframework/spring-orm@7.0.8?type=jar",
+      "bom-ref" : "pkg:maven/org.springframework/spring-oxm@7.0.8?type=jar",
       "publisher" : "Spring IO",
       "group" : "org.springframework",
-      "name" : "spring-orm",
+      "name" : "spring-oxm",
       "version" : "7.0.8",
-      "description" : "Spring Object/Relational Mapping",
+      "description" : "Spring Object/XML Marshalling",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "33e68da99b0bd20072960759975e2a5b"
+          "content" : "8422eba43a43d99cb6f227464714b914"
         },
         {
           "alg" : "SHA-1",
-          "content" : "8c40fad8ecc72337353818da54ef2d104b3fa7a9"
+          "content" : "e74c099072565db0552b56691449e52b79f6f23e"
         },
         {
           "alg" : "SHA-256",
-          "content" : "3ff1ad6ab4ebcc7dc9ef02f40aa60790bddead11b0e0fc7f75cb20f41f7d291e"
+          "content" : "67f91ffb41a94cf0e443f02ee6f740d52e10a84cabae218cdb0de65f87a82172"
         },
         {
           "alg" : "SHA-512",
-          "content" : "836d1fb2f90ddb9f433391d89c3901d7e8e296150fea474d54947de8f080946c5b796726d13c5f2b0f83f36e35052795322313a2c904b9da1729274074d6f719"
+          "content" : "34cb275b2661a73f6506a468a275e63f6802305b39fd2eb124544e6921348e0be4f61b1049071c5ef3ddf307a7fe10753bf3822842da33c632d91f60bef00351"
         },
         {
           "alg" : "SHA-384",
-          "content" : "4dac527eadf1655a08927865afb96b44dc9175f0cc17e0049bda0a08496cf81707def11b12448171ae6a80c65f307e9c"
+          "content" : "46d9332eaa1f641ca89da20617a5896539e66e2398c609032e080ede6fb4eab970a1cf564702537928a02748eceee469"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "5279b1e35d78f258d2161848d6f988f7fff4a988b1da0279eaab2ae31134923f7a1108462acdca5849f2346277a5a5d9"
+          "content" : "ada011496787b114c1871c12cfdf07c6191520b77ff43ad19069ebfd8c83c3c15fd6395cdd63c65b045f31084e0af41d"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "7ab4bf7a80b5c773966c4dc1eede68c2e877822dc746a87f4f5cec452446ed4e"
+          "content" : "b58fb94b44f335a0076dce2d2fea358ae22e4a0146a70fa912cd5571316198d4"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "63fb419a7ba89b08526b8bea30f014c38fb8c049451b9daa01ea7b55f3a890b7367c47bb24bef9405c99e75c2724f54499113f8f588f6c6e5ae57ad8e9f6fc34"
+          "content" : "848a0b87362bf96678ca86ed52e32e3c3a940ef56e67cad3003269ac3cdafd5f8d7d218a954671be448acb3e28e0ba89fa5479665bbc944cb92a53a468ccb9a4"
         }
       ],
       "licenses" : [
@@ -12326,7 +10947,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.springframework/spring-orm@7.0.8?type=jar",
+      "purl" : "pkg:maven/org.springframework/spring-oxm@7.0.8?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -12706,6 +11327,82 @@
     },
     {
       "type" : "library",
+      "bom-ref" : "pkg:maven/redis.clients.authentication/redis-authx-core@0.1.1-beta2?type=jar",
+      "group" : "redis.clients.authentication",
+      "name" : "redis-authx-core",
+      "version" : "0.1.1-beta2",
+      "description" : "Redis AuthX Core is the core lib of an extension for Redis Java Clients to support token-based authentication.",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "f31eb733d8fb8ee53f186efea30d0357"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "4037345ff29fb22c737bab2ed116a34262718ae5"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "cc56edb08b3df8562cddac108dca61907d21cc4ad04de05e9f5d1b01058390af"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "a8d6f3c9cb3e8710014e268c68670c7dcea63bde1457b037ab07e0623c83b3db44daa51217fd4470976a14cd994402771fb9faf039f0428f3f9c39e5ed254bb7"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "e73479b7584b02626632711fe5694f7b2fb63878e56fbd241179f239031d2fa8b438f73a914b9852ee20e6e9337b5d6e"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "968df599ea26ff629090b4f6a7b642f4ea29ddd20f8c5efedf7a37954280ed9c312f0c8e4ae27d365f517cc80687975b"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "3cf85499e7b4df76e070b619aba104d2a4a02cae40de103ae6778ed1ddecb906"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "537a1f9df7fd408ed3ede6cfe2364954f2c03c0bdbfdf88db1e5deeb4d6aa4405bec6e4f98082b13d0ae53671820dc4487dd412f120a740069781042dc614ab2"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "MIT",
+            "url" : "https://opensource.org/license/mit/"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/redis.clients.authentication/redis-authx-core@0.1.1-beta2?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "distribution",
+          "url" : "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
+        },
+        {
+          "type" : "issue-tracker",
+          "url" : "https://github.com/redis/redis-authx-core/issues"
+        },
+        {
+          "type" : "mailing-list",
+          "url" : "https://groups.google.com/group/redis_authx"
+        },
+        {
+          "type" : "vcs",
+          "url" : "scm:git:git@github.com:redis/redis-authx-core.git"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
       "bom-ref" : "pkg:maven/tools.jackson.core/jackson-core@3.1.4?type=jar",
       "group" : "tools.jackson.core",
       "name" : "jackson-core",
@@ -12882,16 +11579,6 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/com.aayushatharva.brotli4j/brotli4j@1.23.0?type=jar",
-      "dependsOn" : [
-        "pkg:maven/com.aayushatharva.brotli4j/service@1.23.0?type=jar"
-      ]
-    },
-    {
-      "ref" : "pkg:maven/com.aayushatharva.brotli4j/service@1.23.0?type=jar",
-      "dependsOn" : [ ]
-    },
-    {
       "ref" : "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.19.0?type=jar",
       "dependsOn" : [ ]
     },
@@ -12940,23 +11627,6 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.4?type=jar",
-      "dependsOn" : [
-        "pkg:maven/com.google.errorprone/error_prone_annotations@2.49.0?type=jar",
-        "pkg:maven/org.jspecify/jspecify@1.0.0?type=jar"
-      ]
-    },
-    {
-      "ref" : "pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar",
-      "dependsOn" : [
-        "pkg:maven/com.aayushatharva.brotli4j/brotli4j@1.23.0?type=jar"
-      ]
-    },
-    {
-      "ref" : "pkg:maven/com.google.errorprone/error_prone_annotations@2.49.0?type=jar",
-      "dependsOn" : [ ]
-    },
-    {
       "ref" : "pkg:maven/com.nimbusds/nimbus-jose-jwt@10.9?type=jar",
       "dependsOn" : [ ]
     },
@@ -12986,44 +11656,155 @@
       ]
     },
     {
-      "ref" : "pkg:maven/com.sun.istack/istack-commons-runtime@4.1.2?type=jar",
-      "dependsOn" : [ ]
-    },
-    {
-      "ref" : "pkg:maven/com.zaxxer/HikariCP@7.0.2?type=jar",
-      "dependsOn" : [
-        "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar"
-      ]
-    },
-    {
       "ref" : "pkg:maven/commons-logging/commons-logging@1.3.6?type=jar",
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/backend@0.0.1-SNAPSHOT?project_path=%3Abackend",
+      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/ingest@0.0.1-SNAPSHOT?project_path=%3Aingest",
       "dependsOn" : [
         "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.19.0?type=jar",
-        "pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.4?type=jar",
-        "pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar",
+        "pkg:maven/io.github.resilience4j/resilience4j-reactor@2.4.0?type=jar",
+        "pkg:maven/io.github.resilience4j/resilience4j-spring-boot3@2.4.0?type=jar",
+        "pkg:maven/io.micrometer/context-propagation@1.2.1?type=jar",
         "pkg:maven/io.micrometer/micrometer-registry-prometheus@1.17.0?type=jar",
         "pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar",
-        "pkg:maven/org.flywaydb/flyway-core@12.10.0?type=jar",
-        "pkg:maven/org.flywaydb/flyway-database-postgresql@12.10.0?type=jar",
-        "pkg:maven/org.mapstruct/mapstruct@1.6.3?type=jar",
-        "pkg:maven/org.postgresql/postgresql@42.7.12?type=jar",
-        "pkg:maven/org.semver4j/semver4j@6.0.0?type=jar",
         "pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-api@3.0.3?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-devtools@4.1.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-actuator@4.1.0?type=jar",
-        "pkg:maven/org.springframework.boot/spring-boot-starter-cache@4.1.0?type=jar",
-        "pkg:maven/org.springframework.boot/spring-boot-starter-data-jpa@4.1.0?type=jar",
-        "pkg:maven/org.springframework.boot/spring-boot-starter-mail@4.1.0?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-starter-data-redis@4.1.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-oauth2-resource-server@4.1.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-opentelemetry@4.1.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-security@4.1.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-validation@4.1.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-web@4.1.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-webflux@4.1.0?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.github.resilience4j/resilience4j-annotations@2.4.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.github.resilience4j/resilience4j-bulkhead@2.4.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.github.resilience4j/resilience4j-core@2.4.0?type=jar",
+        "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.github.resilience4j/resilience4j-circuitbreaker@2.4.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.github.resilience4j/resilience4j-core@2.4.0?type=jar",
+        "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.github.resilience4j/resilience4j-circularbuffer@2.4.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.github.resilience4j/resilience4j-consumer@2.4.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.github.resilience4j/resilience4j-circularbuffer@2.4.0?type=jar",
+        "pkg:maven/io.github.resilience4j/resilience4j-core@2.4.0?type=jar",
+        "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.github.resilience4j/resilience4j-core@2.4.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.github.resilience4j/resilience4j-framework-common@2.4.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.github.resilience4j/resilience4j-bulkhead@2.4.0?type=jar",
+        "pkg:maven/io.github.resilience4j/resilience4j-circuitbreaker@2.4.0?type=jar",
+        "pkg:maven/io.github.resilience4j/resilience4j-micrometer@2.4.0?type=jar",
+        "pkg:maven/io.github.resilience4j/resilience4j-ratelimiter@2.4.0?type=jar",
+        "pkg:maven/io.github.resilience4j/resilience4j-retry@2.4.0?type=jar",
+        "pkg:maven/io.github.resilience4j/resilience4j-timelimiter@2.4.0?type=jar",
+        "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.github.resilience4j/resilience4j-micrometer@2.4.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.github.resilience4j/resilience4j-bulkhead@2.4.0?type=jar",
+        "pkg:maven/io.github.resilience4j/resilience4j-circuitbreaker@2.4.0?type=jar",
+        "pkg:maven/io.github.resilience4j/resilience4j-ratelimiter@2.4.0?type=jar",
+        "pkg:maven/io.github.resilience4j/resilience4j-retry@2.4.0?type=jar",
+        "pkg:maven/io.github.resilience4j/resilience4j-timelimiter@2.4.0?type=jar",
+        "pkg:maven/io.micrometer/micrometer-core@1.17.0?type=jar",
+        "pkg:maven/io.micrometer/micrometer-observation@1.17.0?type=jar",
+        "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.github.resilience4j/resilience4j-ratelimiter@2.4.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.github.resilience4j/resilience4j-core@2.4.0?type=jar",
+        "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.github.resilience4j/resilience4j-reactor@2.4.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.github.resilience4j/resilience4j-bulkhead@2.4.0?type=jar",
+        "pkg:maven/io.github.resilience4j/resilience4j-circuitbreaker@2.4.0?type=jar",
+        "pkg:maven/io.github.resilience4j/resilience4j-micrometer@2.4.0?type=jar",
+        "pkg:maven/io.github.resilience4j/resilience4j-ratelimiter@2.4.0?type=jar",
+        "pkg:maven/io.github.resilience4j/resilience4j-retry@2.4.0?type=jar",
+        "pkg:maven/io.github.resilience4j/resilience4j-timelimiter@2.4.0?type=jar",
+        "pkg:maven/io.projectreactor/reactor-core@3.8.6?type=jar",
+        "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.github.resilience4j/resilience4j-retry@2.4.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.github.resilience4j/resilience4j-core@2.4.0?type=jar",
+        "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.github.resilience4j/resilience4j-spring-boot3@2.4.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.github.resilience4j/resilience4j-micrometer@2.4.0?type=jar",
+        "pkg:maven/io.github.resilience4j/resilience4j-spring6@2.4.0?type=jar",
+        "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.github.resilience4j/resilience4j-spring6@2.4.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.github.resilience4j/resilience4j-annotations@2.4.0?type=jar",
+        "pkg:maven/io.github.resilience4j/resilience4j-consumer@2.4.0?type=jar",
+        "pkg:maven/io.github.resilience4j/resilience4j-framework-common@2.4.0?type=jar",
+        "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.github.resilience4j/resilience4j-timelimiter@2.4.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.github.resilience4j/resilience4j-core@2.4.0?type=jar",
+        "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.lettuce/lettuce-core@7.5.2.RELEASE?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.netty/netty-common@4.2.15.Final?type=jar",
+        "pkg:maven/io.netty/netty-handler@4.2.15.Final?type=jar",
+        "pkg:maven/io.netty/netty-resolver-dns@4.2.15.Final?type=jar",
+        "pkg:maven/io.netty/netty-transport@4.2.15.Final?type=jar",
+        "pkg:maven/io.projectreactor/reactor-core@3.8.6?type=jar",
+        "pkg:maven/redis.clients.authentication/redis-authx-core@0.1.1-beta2?type=jar"
       ]
     },
     {
@@ -13488,24 +12269,6 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/jakarta.inject/jakarta.inject-api@2.0.1?type=jar",
-      "dependsOn" : [ ]
-    },
-    {
-      "ref" : "pkg:maven/jakarta.mail/jakarta.mail-api@2.1.5?type=jar",
-      "dependsOn" : [
-        "pkg:maven/jakarta.activation/jakarta.activation-api@2.1.4?type=jar"
-      ]
-    },
-    {
-      "ref" : "pkg:maven/jakarta.persistence/jakarta.persistence-api@3.2.0?type=jar",
-      "dependsOn" : [ ]
-    },
-    {
-      "ref" : "pkg:maven/jakarta.transaction/jakarta.transaction-api@2.0.1?type=jar",
-      "dependsOn" : [ ]
-    },
-    {
       "ref" : "pkg:maven/jakarta.validation/jakarta.validation-api@3.1.1?type=jar",
       "dependsOn" : [ ]
     },
@@ -13516,18 +12279,10 @@
       ]
     },
     {
-      "ref" : "pkg:maven/net.bytebuddy/byte-buddy@1.18.10?type=jar",
-      "dependsOn" : [ ]
-    },
-    {
       "ref" : "pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar",
       "dependsOn" : [
         "pkg:maven/tools.jackson.core/jackson-databind@3.1.4?type=jar"
       ]
-    },
-    {
-      "ref" : "pkg:maven/org.antlr/antlr4-runtime@4.13.2?type=jar",
-      "dependsOn" : [ ]
     },
     {
       "ref" : "pkg:maven/org.apache.commons/commons-lang3@3.20.0?type=jar",
@@ -13559,82 +12314,7 @@
       ]
     },
     {
-      "ref" : "pkg:maven/org.aspectj/aspectjweaver@1.9.25.1?type=jar",
-      "dependsOn" : [ ]
-    },
-    {
-      "ref" : "pkg:maven/org.eclipse.angus/angus-activation@2.0.3?type=jar",
-      "dependsOn" : [
-        "pkg:maven/jakarta.activation/jakarta.activation-api@2.1.4?type=jar"
-      ]
-    },
-    {
-      "ref" : "pkg:maven/org.eclipse.angus/angus-mail@2.0.5?type=jar",
-      "dependsOn" : [
-        "pkg:maven/jakarta.activation/jakarta.activation-api@2.1.4?type=jar",
-        "pkg:maven/jakarta.mail/jakarta.mail-api@2.1.5?type=jar",
-        "pkg:maven/org.eclipse.angus/angus-activation@2.0.3?type=jar"
-      ]
-    },
-    {
-      "ref" : "pkg:maven/org.flywaydb/flyway-core@12.10.0?type=jar",
-      "dependsOn" : [
-        "pkg:maven/tools.jackson.core/jackson-databind@3.1.4?type=jar"
-      ]
-    },
-    {
-      "ref" : "pkg:maven/org.flywaydb/flyway-database-postgresql@12.10.0?type=jar",
-      "dependsOn" : [
-        "pkg:maven/org.flywaydb/flyway-core@12.10.0?type=jar"
-      ]
-    },
-    {
-      "ref" : "pkg:maven/org.glassfish.jaxb/jaxb-core@4.0.9?type=jar",
-      "dependsOn" : [
-        "pkg:maven/com.sun.istack/istack-commons-runtime@4.1.2?type=jar",
-        "pkg:maven/jakarta.activation/jakarta.activation-api@2.1.4?type=jar",
-        "pkg:maven/jakarta.xml.bind/jakarta.xml.bind-api@4.0.5?type=jar",
-        "pkg:maven/org.eclipse.angus/angus-activation@2.0.3?type=jar",
-        "pkg:maven/org.glassfish.jaxb/txw2@4.0.9?type=jar"
-      ]
-    },
-    {
-      "ref" : "pkg:maven/org.glassfish.jaxb/jaxb-runtime@4.0.9?type=jar",
-      "dependsOn" : [
-        "pkg:maven/org.glassfish.jaxb/jaxb-core@4.0.9?type=jar"
-      ]
-    },
-    {
-      "ref" : "pkg:maven/org.glassfish.jaxb/txw2@4.0.9?type=jar",
-      "dependsOn" : [ ]
-    },
-    {
       "ref" : "pkg:maven/org.hdrhistogram/HdrHistogram@2.2.2?type=jar",
-      "dependsOn" : [ ]
-    },
-    {
-      "ref" : "pkg:maven/org.hibernate.models/hibernate-models@1.1.1?type=jar",
-      "dependsOn" : [
-        "pkg:maven/org.jboss.logging/jboss-logging@3.6.3.Final?type=jar"
-      ]
-    },
-    {
-      "ref" : "pkg:maven/org.hibernate.orm/hibernate-core@7.4.1.Final?type=jar",
-      "dependsOn" : [
-        "pkg:maven/jakarta.inject/jakarta.inject-api@2.0.1?type=jar",
-        "pkg:maven/jakarta.persistence/jakarta.persistence-api@3.2.0?type=jar",
-        "pkg:maven/jakarta.transaction/jakarta.transaction-api@2.0.1?type=jar",
-        "pkg:maven/jakarta.xml.bind/jakarta.xml.bind-api@4.0.5?type=jar",
-        "pkg:maven/net.bytebuddy/byte-buddy@1.18.10?type=jar",
-        "pkg:maven/org.antlr/antlr4-runtime@4.13.2?type=jar",
-        "pkg:maven/org.glassfish.jaxb/jaxb-runtime@4.0.9?type=jar",
-        "pkg:maven/org.hibernate.models/hibernate-models@1.1.1?type=jar",
-        "pkg:maven/org.hibernate.orm/hibernate-platform@7.4.1.Final?type=pom",
-        "pkg:maven/org.jboss.logging/jboss-logging@3.6.3.Final?type=jar"
-      ]
-    },
-    {
-      "ref" : "pkg:maven/org.hibernate.orm/hibernate-platform@7.4.1.Final?type=pom",
       "dependsOn" : [ ]
     },
     {
@@ -13664,22 +12344,8 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/org.mapstruct/mapstruct@1.6.3?type=jar",
-      "dependsOn" : [ ]
-    },
-    {
-      "ref" : "pkg:maven/org.postgresql/postgresql@42.7.12?type=jar",
-      "dependsOn" : [ ]
-    },
-    {
       "ref" : "pkg:maven/org.reactivestreams/reactive-streams@1.0.4?type=jar",
       "dependsOn" : [ ]
-    },
-    {
-      "ref" : "pkg:maven/org.semver4j/semver4j@6.0.0?type=jar",
-      "dependsOn" : [
-        "pkg:maven/org.jspecify/jspecify@1.0.0?type=jar"
-      ]
     },
     {
       "ref" : "pkg:maven/org.slf4j/jul-to-slf4j@2.0.18?type=jar",
@@ -13729,13 +12395,6 @@
       ]
     },
     {
-      "ref" : "pkg:maven/org.springframework.boot/spring-boot-cache@4.1.0?type=jar",
-      "dependsOn" : [
-        "pkg:maven/org.springframework.boot/spring-boot@4.1.0?type=jar",
-        "pkg:maven/org.springframework/spring-context-support@7.0.8?type=jar"
-      ]
-    },
-    {
       "ref" : "pkg:maven/org.springframework.boot/spring-boot-data-commons@4.1.0?type=jar",
       "dependsOn" : [
         "pkg:maven/org.springframework.boot/spring-boot-persistence@4.1.0?type=jar",
@@ -13744,12 +12403,14 @@
       ]
     },
     {
-      "ref" : "pkg:maven/org.springframework.boot/spring-boot-data-jpa@4.1.0?type=jar",
+      "ref" : "pkg:maven/org.springframework.boot/spring-boot-data-redis@4.1.0?type=jar",
       "dependsOn" : [
+        "pkg:maven/io.lettuce/lettuce-core@7.5.2.RELEASE?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-data-commons@4.1.0?type=jar",
-        "pkg:maven/org.springframework.boot/spring-boot-hibernate@4.1.0?type=jar",
-        "pkg:maven/org.springframework.data/spring-data-jpa@4.1.0?type=jar",
-        "pkg:maven/org.springframework/spring-aspects@7.0.8?type=jar"
+        "pkg:maven/org.springframework.boot/spring-boot-netty@4.1.0?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-transaction@4.1.0?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot@4.1.0?type=jar",
+        "pkg:maven/org.springframework.data/spring-data-redis@4.1.0?type=jar"
       ]
     },
     {
@@ -13763,14 +12424,6 @@
       "ref" : "pkg:maven/org.springframework.boot/spring-boot-health@4.1.0?type=jar",
       "dependsOn" : [
         "pkg:maven/org.springframework.boot/spring-boot@4.1.0?type=jar"
-      ]
-    },
-    {
-      "ref" : "pkg:maven/org.springframework.boot/spring-boot-hibernate@4.1.0?type=jar",
-      "dependsOn" : [
-        "pkg:maven/org.hibernate.orm/hibernate-core@7.4.1.Final?type=jar",
-        "pkg:maven/org.springframework.boot/spring-boot-jpa@4.1.0?type=jar",
-        "pkg:maven/org.springframework/spring-orm@7.0.8?type=jar"
       ]
     },
     {
@@ -13792,33 +12445,6 @@
       "dependsOn" : [
         "pkg:maven/org.springframework.boot/spring-boot@4.1.0?type=jar",
         "pkg:maven/tools.jackson.core/jackson-databind@3.1.4?type=jar"
-      ]
-    },
-    {
-      "ref" : "pkg:maven/org.springframework.boot/spring-boot-jdbc@4.1.0?type=jar",
-      "dependsOn" : [
-        "pkg:maven/org.springframework.boot/spring-boot-sql@4.1.0?type=jar",
-        "pkg:maven/org.springframework.boot/spring-boot-transaction@4.1.0?type=jar",
-        "pkg:maven/org.springframework.boot/spring-boot@4.1.0?type=jar",
-        "pkg:maven/org.springframework/spring-jdbc@7.0.8?type=jar"
-      ]
-    },
-    {
-      "ref" : "pkg:maven/org.springframework.boot/spring-boot-jpa@4.1.0?type=jar",
-      "dependsOn" : [
-        "pkg:maven/jakarta.persistence/jakarta.persistence-api@3.2.0?type=jar",
-        "pkg:maven/org.springframework.boot/spring-boot-jdbc@4.1.0?type=jar",
-        "pkg:maven/org.springframework.boot/spring-boot-transaction@4.1.0?type=jar",
-        "pkg:maven/org.springframework/spring-orm@7.0.8?type=jar"
-      ]
-    },
-    {
-      "ref" : "pkg:maven/org.springframework.boot/spring-boot-mail@4.1.0?type=jar",
-      "dependsOn" : [
-        "pkg:maven/jakarta.mail/jakarta.mail-api@2.1.5?type=jar",
-        "pkg:maven/org.eclipse.angus/angus-mail@2.0.5?type=jar",
-        "pkg:maven/org.springframework.boot/spring-boot@4.1.0?type=jar",
-        "pkg:maven/org.springframework/spring-context-support@7.0.8?type=jar"
       ]
     },
     {
@@ -13917,12 +12543,6 @@
       ]
     },
     {
-      "ref" : "pkg:maven/org.springframework.boot/spring-boot-sql@4.1.0?type=jar",
-      "dependsOn" : [
-        "pkg:maven/org.springframework.boot/spring-boot@4.1.0?type=jar"
-      ]
-    },
-    {
       "ref" : "pkg:maven/org.springframework.boot/spring-boot-starter-actuator@4.1.0?type=jar",
       "dependsOn" : [
         "pkg:maven/io.micrometer/micrometer-jakarta9@1.17.0?type=jar",
@@ -13934,19 +12554,11 @@
       ]
     },
     {
-      "ref" : "pkg:maven/org.springframework.boot/spring-boot-starter-cache@4.1.0?type=jar",
+      "ref" : "pkg:maven/org.springframework.boot/spring-boot-starter-data-redis@4.1.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/org.springframework.boot/spring-boot-cache@4.1.0?type=jar",
-        "pkg:maven/org.springframework.boot/spring-boot-starter@4.1.0?type=jar"
-      ]
-    },
-    {
-      "ref" : "pkg:maven/org.springframework.boot/spring-boot-starter-data-jpa@4.1.0?type=jar",
-      "dependsOn" : [
-        "pkg:maven/org.springframework.boot/spring-boot-data-jpa@4.1.0?type=jar",
-        "pkg:maven/org.springframework.boot/spring-boot-jdbc@4.1.0?type=jar",
-        "pkg:maven/org.springframework.boot/spring-boot-starter-jdbc@4.1.0?type=jar",
-        "pkg:maven/org.springframework.boot/spring-boot-starter@4.1.0?type=jar"
+        "pkg:maven/org.springframework.boot/spring-boot-data-redis@4.1.0?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-starter@4.1.0?type=jar",
+        "pkg:maven/org.springframework/spring-messaging@7.0.8?type=jar"
       ]
     },
     {
@@ -13957,26 +12569,11 @@
       ]
     },
     {
-      "ref" : "pkg:maven/org.springframework.boot/spring-boot-starter-jdbc@4.1.0?type=jar",
-      "dependsOn" : [
-        "pkg:maven/com.zaxxer/HikariCP@7.0.2?type=jar",
-        "pkg:maven/org.springframework.boot/spring-boot-jdbc@4.1.0?type=jar",
-        "pkg:maven/org.springframework.boot/spring-boot-starter@4.1.0?type=jar"
-      ]
-    },
-    {
       "ref" : "pkg:maven/org.springframework.boot/spring-boot-starter-logging@4.1.0?type=jar",
       "dependsOn" : [
         "pkg:maven/ch.qos.logback/logback-classic@1.5.34?type=jar",
         "pkg:maven/org.apache.logging.log4j/log4j-to-slf4j@2.25.4?type=jar",
         "pkg:maven/org.slf4j/jul-to-slf4j@2.0.18?type=jar"
-      ]
-    },
-    {
-      "ref" : "pkg:maven/org.springframework.boot/spring-boot-starter-mail@4.1.0?type=jar",
-      "dependsOn" : [
-        "pkg:maven/org.springframework.boot/spring-boot-mail@4.1.0?type=jar",
-        "pkg:maven/org.springframework.boot/spring-boot-starter@4.1.0?type=jar"
       ]
     },
     {
@@ -14140,17 +12737,22 @@
       ]
     },
     {
-      "ref" : "pkg:maven/org.springframework.data/spring-data-jpa@4.1.0?type=jar",
+      "ref" : "pkg:maven/org.springframework.data/spring-data-keyvalue@4.1.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/jakarta.annotation/jakarta.annotation-api@3.0.0?type=jar",
-        "pkg:maven/org.antlr/antlr4-runtime@4.13.2?type=jar",
         "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar",
         "pkg:maven/org.springframework.data/spring-data-commons@4.1.0?type=jar",
-        "pkg:maven/org.springframework/spring-aop@7.0.8?type=jar",
-        "pkg:maven/org.springframework/spring-beans@7.0.8?type=jar",
         "pkg:maven/org.springframework/spring-context@7.0.8?type=jar",
-        "pkg:maven/org.springframework/spring-core@7.0.8?type=jar",
-        "pkg:maven/org.springframework/spring-orm@7.0.8?type=jar",
+        "pkg:maven/org.springframework/spring-tx@7.0.8?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/org.springframework.data/spring-data-redis@4.1.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar",
+        "pkg:maven/org.springframework.data/spring-data-keyvalue@4.1.0?type=jar",
+        "pkg:maven/org.springframework/spring-aop@7.0.8?type=jar",
+        "pkg:maven/org.springframework/spring-context-support@7.0.8?type=jar",
+        "pkg:maven/org.springframework/spring-oxm@7.0.8?type=jar",
         "pkg:maven/org.springframework/spring-tx@7.0.8?type=jar"
       ]
     },
@@ -14226,12 +12828,6 @@
       ]
     },
     {
-      "ref" : "pkg:maven/org.springframework/spring-aspects@7.0.8?type=jar",
-      "dependsOn" : [
-        "pkg:maven/org.aspectj/aspectjweaver@1.9.25.1?type=jar"
-      ]
-    },
-    {
       "ref" : "pkg:maven/org.springframework/spring-beans@7.0.8?type=jar",
       "dependsOn" : [
         "pkg:maven/org.springframework/spring-core@7.0.8?type=jar"
@@ -14269,20 +12865,18 @@
       ]
     },
     {
-      "ref" : "pkg:maven/org.springframework/spring-jdbc@7.0.8?type=jar",
+      "ref" : "pkg:maven/org.springframework/spring-messaging@7.0.8?type=jar",
       "dependsOn" : [
         "pkg:maven/org.springframework/spring-beans@7.0.8?type=jar",
-        "pkg:maven/org.springframework/spring-core@7.0.8?type=jar",
-        "pkg:maven/org.springframework/spring-tx@7.0.8?type=jar"
+        "pkg:maven/org.springframework/spring-core@7.0.8?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/org.springframework/spring-orm@7.0.8?type=jar",
+      "ref" : "pkg:maven/org.springframework/spring-oxm@7.0.8?type=jar",
       "dependsOn" : [
+        "pkg:maven/jakarta.xml.bind/jakarta.xml.bind-api@4.0.5?type=jar",
         "pkg:maven/org.springframework/spring-beans@7.0.8?type=jar",
-        "pkg:maven/org.springframework/spring-core@7.0.8?type=jar",
-        "pkg:maven/org.springframework/spring-jdbc@7.0.8?type=jar",
-        "pkg:maven/org.springframework/spring-tx@7.0.8?type=jar"
+        "pkg:maven/org.springframework/spring-core@7.0.8?type=jar"
       ]
     },
     {
@@ -14323,6 +12917,12 @@
     {
       "ref" : "pkg:maven/org.yaml/snakeyaml@2.6?type=jar",
       "dependsOn" : [ ]
+    },
+    {
+      "ref" : "pkg:maven/redis.clients.authentication/redis-authx-core@0.1.1-beta2?type=jar",
+      "dependsOn" : [
+        "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar"
+      ]
     },
     {
       "ref" : "pkg:maven/tools.jackson.core/jackson-core@3.1.4?type=jar",
