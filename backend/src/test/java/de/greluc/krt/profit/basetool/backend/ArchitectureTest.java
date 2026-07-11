@@ -872,8 +872,11 @@ class ArchitectureTest {
     // JobOrderHandoverService is intentionally excluded — its access gate lives on the parent
     // order's controller endpoint (@ownerScopeService.canEditJobOrder), and it injects
     // AuthHelperService anyway for the audit stamp on the handover record, verified by its own unit
-    // tests rather than by this rule. JobOrderService IS included as of Phase 3 (#343): it wires
-    // OwnerScopeService to scope the list/detail visibility (SK-public vs squadron-private).
+    // tests rather than by this rule. The list/detail visibility scoping that JobOrderService wired
+    // for Phase 3 (#343) moved into JobOrderQueryService (audit Thema 7, #14): it pushes
+    // OwnerScopeService into every read (SK-public vs squadron-private), so it is whitelisted
+    // below.
+    // JobOrderService itself stays whitelisted via AuthHelperService, which its writes still wire.
     Set<String> staffelScopedServiceNames =
         Set.of(
             "MissionService",
@@ -891,6 +894,8 @@ class ArchitectureTest {
             "HangarService",
             "OperationService",
             "JobOrderService",
+            // Read/write split (#14): the list/detail visibility scoping moved into the query half.
+            "JobOrderQueryService",
             // Phase 4 (#344): material claims gate on the claiming squadron's scope
             // (AuthHelperService.canEditOrgUnit) + the responsible-SK authority
             // (OwnerScopeService.hasRoleInOrgUnit), so the service must wire both.
