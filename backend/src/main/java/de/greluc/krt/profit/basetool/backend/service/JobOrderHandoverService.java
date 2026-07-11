@@ -70,7 +70,7 @@ public class JobOrderHandoverService {
   private final JobOrderMaterialRepository jobOrderMaterialRepository;
   private final JobOrderService jobOrderService;
   private final UserService userService;
-  private final OrgUnitMembershipService orgUnitMembershipService;
+  private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   private final SquadronRepository squadronRepository;
   private final AuditService auditService;
 
@@ -161,7 +161,7 @@ public class JobOrderHandoverService {
         .ifPresent(
             current -> {
               handover.setExecutingUser(current);
-              orgUnitMembershipService
+              orgUnitMembershipQueryService
                   .findExecutingStaffelForOrder(current.getId(), responsibleOrgUnitId)
                   .flatMap(squadronRepository::findById)
                   .ifPresent(handover::setExecutingSquadron);

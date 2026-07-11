@@ -571,12 +571,13 @@ class MemberManagementControllerTest {
       when(br.getFieldErrors()).thenReturn(List.of(fe));
       when(messageSource.getMessage(eq(fe), any())).thenReturn("Description too long");
 
-      org.springframework.http.ResponseEntity<java.util.Map<String, Object>> response =
+      org.springframework.http.ResponseEntity<Object> response =
           controller.updateMemberAjax(id, form, br, java.util.Locale.ENGLISH);
 
       assertEquals(422, response.getStatusCode().value());
       assertNotNull(response.getBody());
-      assertEquals("Description too long", response.getBody().get("description"));
+      assertEquals(
+          "Description too long", ((java.util.Map<?, ?>) response.getBody()).get("description"));
       verify(backendApiClient, never()).put(anyString(), any(), any());
     }
 
@@ -593,12 +594,12 @@ class MemberManagementControllerTest {
       when(backendApiClient.get(eq("/api/v1/users/" + id), eq(UserDto.class)))
           .thenReturn(newUser("alice"));
 
-      org.springframework.http.ResponseEntity<java.util.Map<String, Object>> response =
+      org.springframework.http.ResponseEntity<Object> response =
           controller.updateMemberAjax(id, form, br, java.util.Locale.ENGLISH);
 
       assertEquals(200, response.getStatusCode().value());
       assertNotNull(response.getBody());
-      assertEquals(1L, response.getBody().get("version"));
+      assertEquals(1L, ((java.util.Map<?, ?>) response.getBody()).get("version"));
       verify(backendApiClient)
           .put(eq("/api/v1/users/" + id + "/attributes"), any(), eq(Void.class));
     }
@@ -617,21 +618,20 @@ class MemberManagementControllerTest {
           .when(backendApiClient)
           .put(eq("/api/v1/users/" + id + "/attributes"), any(), eq(Void.class));
 
-      org.springframework.http.ResponseEntity<java.util.Map<String, Object>> response =
+      org.springframework.http.ResponseEntity<Object> response =
           controller.updateMemberAjax(id, form, br, java.util.Locale.ENGLISH);
 
       assertEquals(409, response.getStatusCode().value());
       assertNotNull(response.getBody());
-      assertEquals("OPTIMISTIC_LOCK", response.getBody().get("code"));
-      assertEquals("Stale data", response.getBody().get("detail"));
+      assertEquals("OPTIMISTIC_LOCK", ((java.util.Map<?, ?>) response.getBody()).get("code"));
+      assertEquals("Stale data", ((java.util.Map<?, ?>) response.getBody()).get("detail"));
     }
 
     @Test
     void deleteMemberAjax_success_returns200() {
       UUID id = UUID.randomUUID();
 
-      org.springframework.http.ResponseEntity<java.util.Map<String, Object>> response =
-          controller.deleteMemberAjax(id);
+      org.springframework.http.ResponseEntity<Object> response = controller.deleteMemberAjax(id);
 
       assertEquals(200, response.getStatusCode().value());
       verify(backendApiClient).delete("/api/v1/users/" + id, Void.class);
@@ -646,12 +646,11 @@ class MemberManagementControllerTest {
           .when(backendApiClient)
           .delete("/api/v1/users/" + id, Void.class);
 
-      org.springframework.http.ResponseEntity<java.util.Map<String, Object>> response =
-          controller.deleteMemberAjax(id);
+      org.springframework.http.ResponseEntity<Object> response = controller.deleteMemberAjax(id);
 
       assertEquals(409, response.getStatusCode().value());
       assertNotNull(response.getBody());
-      assertEquals("ENTITY_IN_USE", response.getBody().get("code"));
+      assertEquals("ENTITY_IN_USE", ((java.util.Map<?, ?>) response.getBody()).get("code"));
     }
 
     @Test
@@ -662,12 +661,11 @@ class MemberManagementControllerTest {
               eq(de.greluc.krt.profit.basetool.frontend.model.dto.UserSyncResultDto.class)))
           .thenReturn(new de.greluc.krt.profit.basetool.frontend.model.dto.UserSyncResultDto(7));
 
-      org.springframework.http.ResponseEntity<java.util.Map<String, Object>> response =
-          controller.syncMembersAjax();
+      org.springframework.http.ResponseEntity<Object> response = controller.syncMembersAjax();
 
       assertEquals(200, response.getStatusCode().value());
       assertNotNull(response.getBody());
-      assertEquals(7, response.getBody().get("syncedCount"));
+      assertEquals(7, ((java.util.Map<?, ?>) response.getBody()).get("syncedCount"));
     }
 
     @Test
@@ -686,12 +684,11 @@ class MemberManagementControllerTest {
                   List.of(),
                   "Keycloak unreachable"));
 
-      org.springframework.http.ResponseEntity<java.util.Map<String, Object>> response =
-          controller.syncMembersAjax();
+      org.springframework.http.ResponseEntity<Object> response = controller.syncMembersAjax();
 
       assertEquals(503, response.getStatusCode().value());
       assertNotNull(response.getBody());
-      assertEquals("SERVICE_UNAVAILABLE", response.getBody().get("code"));
+      assertEquals("SERVICE_UNAVAILABLE", ((java.util.Map<?, ?>) response.getBody()).get("code"));
     }
   }
 

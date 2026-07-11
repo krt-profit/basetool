@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipLeadToggleRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipDto;
+import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipService;
 import java.time.Instant;
 import java.util.List;
@@ -52,6 +53,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class SpecialCommandMembershipControllerTest {
 
   @Mock private OrgUnitMembershipService service;
+  @Mock private OrgUnitMembershipQueryService queryService;
 
   @InjectMocks private SpecialCommandMembershipController controller;
 
@@ -64,7 +66,7 @@ class SpecialCommandMembershipControllerTest {
   void listMembers_forwardsServiceDtoProjection() {
     UUID scId = UUID.randomUUID();
     OrgUnitMembershipDto dto = sampleDto(UUID.randomUUID(), scId);
-    when(service.listMemberDtos(scId)).thenReturn(List.of(dto));
+    when(queryService.listMemberDtos(scId)).thenReturn(List.of(dto));
 
     List<OrgUnitMembershipDto> result = controller.listMembers(scId);
 

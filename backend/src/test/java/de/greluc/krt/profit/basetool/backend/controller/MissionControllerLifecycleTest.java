@@ -105,6 +105,12 @@ class MissionControllerLifecycleTest {
   @Mock private MissionSecurityService missionSecurityService;
   @Mock private de.greluc.krt.profit.basetool.backend.service.AuthHelperService authHelperService;
 
+  // Real redactor (not a mock) so the outsider-redaction assertions exercise the actual
+  // MissionGuestRedactor logic; @Spy makes @InjectMocks wire it into the controller.
+  @org.mockito.Spy
+  private de.greluc.krt.profit.basetool.backend.support.MissionGuestRedactor missionGuestRedactor =
+      new de.greluc.krt.profit.basetool.backend.support.MissionGuestRedactor();
+
   @InjectMocks private MissionController controller;
 
   private static Jwt jwt(String sub) {

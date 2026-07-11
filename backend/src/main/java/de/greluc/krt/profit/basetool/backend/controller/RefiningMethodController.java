@@ -26,7 +26,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.service.RefiningMethodService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -72,15 +71,7 @@ public class RefiningMethodController {
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, sort, Set.of("name", "id"), "name");
     Page<RefiningMethod> p = refiningMethodService.getAllRefiningMethods(pageable);
-    List<RefiningMethodDto> content =
-        p.getContent().stream().map(refiningMethodMapper::toDto).toList();
-    return new PageResponse<>(
-        content,
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p.map(refiningMethodMapper::toDto));
   }
 
   /**
@@ -101,7 +92,7 @@ public class RefiningMethodController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public RefiningMethodDto createRefiningMethod(
       @RequestBody @NotNull RefiningMethodDto refiningMethod) {
     var toCreate = refiningMethodMapper.toEntity(refiningMethod);
@@ -121,7 +112,7 @@ public class RefiningMethodController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public RefiningMethodDto updateRefiningMethod(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull RefiningMethodDto refiningMethod) {
     return refiningMethodMapper.toDto(
@@ -135,7 +126,7 @@ public class RefiningMethodController {
    * @param id refining method id
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public void deleteRefiningMethod(@PathVariable @NotNull UUID id) {
     refiningMethodService.deleteRefiningMethod(id);
   }

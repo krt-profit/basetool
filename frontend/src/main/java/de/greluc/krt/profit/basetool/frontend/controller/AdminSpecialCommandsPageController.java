@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.SpecialCommandForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
+import de.greluc.krt.profit.basetool.frontend.support.MapPayloadValues;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.validation.Valid;
 import java.time.Instant;
@@ -165,13 +166,13 @@ public class AdminSpecialCommandsPageController {
             .map(
                 m ->
                     new SpecialCommandDto(
-                        parseUuid(m.get("id")),
-                        parseString(m.get("name")),
-                        parseString(m.get("shorthand")),
-                        parseString(m.get("description")),
-                        parseBoolean(m.get("active")),
-                        parseBoolean(m.get("isProfitEligible")),
-                        parseLong(m.get("version"))))
+                        MapPayloadValues.uuidOrNull(m.get("id")),
+                        MapPayloadValues.stringOrNull(m.get("name")),
+                        MapPayloadValues.stringOrNull(m.get("shorthand")),
+                        MapPayloadValues.stringOrNull(m.get("description")),
+                        MapPayloadValues.booleanOrFalse(m.get("active")),
+                        MapPayloadValues.booleanOrFalse(m.get("isProfitEligible")),
+                        MapPayloadValues.longOrZero(m.get("version"))))
             .collect(Collectors.toCollection(ArrayList::new));
     commands.sort(
         Comparator.comparing(s -> s.name() == null ? "" : s.name(), String.CASE_INSENSITIVE_ORDER));
@@ -739,13 +740,13 @@ public class AdminSpecialCommandsPageController {
       return null;
     }
     return new SpecialCommandDto(
-        parseUuid(map.get("id")),
-        parseString(map.get("name")),
-        parseString(map.get("shorthand")),
-        parseString(map.get("description")),
-        parseBoolean(map.get("active")),
-        parseBoolean(map.get("isProfitEligible")),
-        parseLong(map.get("version")));
+        MapPayloadValues.uuidOrNull(map.get("id")),
+        MapPayloadValues.stringOrNull(map.get("name")),
+        MapPayloadValues.stringOrNull(map.get("shorthand")),
+        MapPayloadValues.stringOrNull(map.get("description")),
+        MapPayloadValues.booleanOrFalse(map.get("active")),
+        MapPayloadValues.booleanOrFalse(map.get("isProfitEligible")),
+        MapPayloadValues.longOrZero(map.get("version")));
   }
 
   private List<OrgUnitMembershipDto> fetchMembers(UUID specialCommandId) {
@@ -760,62 +761,21 @@ public class AdminSpecialCommandsPageController {
             .map(
                 m ->
                     new OrgUnitMembershipDto(
-                        parseUuid(m.get("userId")),
-                        parseString(m.get("userDisplayName")),
-                        parseUuid(m.get("orgUnitId")),
+                        MapPayloadValues.uuidOrNull(m.get("userId")),
+                        MapPayloadValues.stringOrNull(m.get("userDisplayName")),
+                        MapPayloadValues.uuidOrNull(m.get("orgUnitId")),
                         parseKind(m.get("kind")),
-                        parseBoolean(m.get("isLogistician")),
-                        parseBoolean(m.get("isMissionManager")),
-                        parseBoolean(m.get("isLead")),
+                        MapPayloadValues.booleanOrFalse(m.get("isLogistician")),
+                        MapPayloadValues.booleanOrFalse(m.get("isMissionManager")),
+                        MapPayloadValues.booleanOrFalse(m.get("isLead")),
                         parseInstant(m.get("joinedAt")),
-                        parseLong(m.get("version"))))
+                        MapPayloadValues.longOrZero(m.get("version"))))
             .collect(Collectors.toCollection(ArrayList::new));
     members.sort(
         Comparator.comparing(
             m -> m.userDisplayName() == null ? "" : m.userDisplayName(),
             String.CASE_INSENSITIVE_ORDER));
     return members;
-  }
-
-  // ---------- payload-parsing helpers (mirror AdminMissionDataPageController) -----------
-
-  private static String parseString(Object o) {
-    return o == null ? null : String.valueOf(o);
-  }
-
-  private static UUID parseUuid(Object o) {
-    if (o == null) {
-      return null;
-    }
-    try {
-      return UUID.fromString(String.valueOf(o));
-    } catch (Exception ignored) {
-      return null;
-    }
-  }
-
-  private static boolean parseBoolean(Object o) {
-    if (o == null) {
-      return false;
-    }
-    if (o instanceof Boolean b) {
-      return b;
-    }
-    return Boolean.parseBoolean(String.valueOf(o));
-  }
-
-  private static Long parseLong(Object o) {
-    if (o == null) {
-      return 0L;
-    }
-    if (o instanceof Number n) {
-      return n.longValue();
-    }
-    try {
-      return Long.parseLong(String.valueOf(o));
-    } catch (Exception ignored) {
-      return 0L;
-    }
   }
 
   /**

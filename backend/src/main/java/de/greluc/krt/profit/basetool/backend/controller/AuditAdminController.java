@@ -63,7 +63,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/audit")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+@PreAuthorize(Roles.HAS_ROLE_ADMIN)
 public class AuditAdminController {
 
   private static final Set<String> AUDIT_SORT_FIELDS = Set.of("occurredAt", "id");
@@ -104,13 +104,7 @@ public class AuditAdminController {
             page, size, effectiveSort, AUDIT_SORT_FIELDS, "occurredAt");
     Page<AuditEventDto> result =
         auditService.getEvents(domain, from, to, actorUserId, eventType, pageable);
-    return new PageResponse<>(
-        result.getContent(),
-        result.getNumber(),
-        result.getSize(),
-        result.getTotalElements(),
-        result.getTotalPages(),
-        PaginationUtil.toSortStrings(result.getSort()));
+    return PageResponse.of(result);
   }
 
   /**

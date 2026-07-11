@@ -31,6 +31,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.FilterChain;
 import java.util.Arrays;
@@ -61,7 +62,10 @@ class PendingApprovalAccessFilterTest {
     meterRegistry = new SimpleMeterRegistry();
     filter =
         new PendingApprovalAccessFilter(
-            messageSource, new AppProblemProperties(), JsonMapper.builder().build(), meterRegistry);
+            messageSource,
+            new ProblemResponseFactory(new AppProblemProperties()),
+            JsonMapper.builder().build(),
+            meterRegistry);
   }
 
   @AfterEach

@@ -28,6 +28,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import jakarta.servlet.RequestDispatcher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,7 +55,9 @@ class BasetoolErrorControllerTest {
     MessageSource messageSource = mock(MessageSource.class);
     when(messageSource.getMessage(anyString(), any(), anyString(), any()))
         .thenAnswer(invocation -> invocation.getArgument(2));
-    controller = new BasetoolErrorController(new AppProblemProperties(), messageSource);
+    controller =
+        new BasetoolErrorController(
+            new ProblemResponseFactory(new AppProblemProperties()), messageSource);
   }
 
   private static MockHttpServletRequest errorDispatch(Integer statusCode, String originalUri) {

@@ -96,14 +96,7 @@ public class RefineryOrderController {
     Page<RefineryOrder> p =
         refineryOrderService.getMyRefineryOrders(
             userService.getUserIdFromJwt(jwt), status, pageable);
-    List<RefineryOrderListDto> dtoList = p.getContent().stream().map(mapper::toListDto).toList();
-    return new PageResponse<>(
-        dtoList,
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p.map(mapper::toListDto));
   }
 
   /**
@@ -286,14 +279,7 @@ public class RefineryOrderController {
             Set.of("startedAt", "durationMinutes", "expenses", "id"),
             "startedAt");
     Page<RefineryOrder> p = refineryOrderService.getAllRefineryOrders(status, pageable);
-    List<RefineryOrderListDto> dtoList = p.getContent().stream().map(mapper::toListDto).toList();
-    return new PageResponse<>(
-        dtoList,
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p.map(mapper::toListDto));
   }
 
   /**
@@ -330,14 +316,7 @@ public class RefineryOrderController {
             Set.of("startedAt", "durationMinutes", "expenses", "id"),
             "startedAt");
     Page<RefineryOrder> p = refineryOrderService.getUserRefineryOrdersScoped(userId, pageable);
-    List<RefineryOrderListDto> dtoList = p.getContent().stream().map(mapper::toListDto).toList();
-    return new PageResponse<>(
-        dtoList,
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p.map(mapper::toListDto));
   }
 
   /**

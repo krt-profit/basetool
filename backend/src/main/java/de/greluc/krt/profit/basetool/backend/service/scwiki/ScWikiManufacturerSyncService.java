@@ -175,12 +175,8 @@ public class ScWikiManufacturerSyncService {
       }
     }
 
-    if (!seen.isEmpty()) {
-      int marked = manufacturerRepository.markScwikiDeletedExcept(seen, now);
-      if (marked > 0) {
-        log.info("Marked {} manufacturer row(s) scwiki_deleted (no longer in Wiki feed)", marked);
-      }
-    }
+    ScWikiOrphanSweep.sweepDeletedOrphans(
+        seen, s -> manufacturerRepository.markScwikiDeletedExcept(s, now), log, "manufacturer");
     syncReportService.pruneRuns(SyncSourceSystem.SCWIKI);
     log.info(
         "Finished SC Wiki manufacturer reconciliation: {} newly linked, {} refreshed, {} conflicts,"

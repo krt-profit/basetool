@@ -31,7 +31,6 @@ import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -55,7 +54,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/admin")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+@PreAuthorize(Roles.HAS_ROLE_ADMIN)
 @Transactional
 public class AdminController {
 
@@ -77,14 +76,7 @@ public class AdminController {
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, sort, Set.of("name", "id"), "name");
     Page<Role> p = roleService.getAllRoles(pageable);
-    List<RoleDto> content = p.getContent().stream().map(roleMapper::toDto).toList();
-    return new PageResponse<>(
-        content,
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p.map(roleMapper::toDto));
   }
 
   /**

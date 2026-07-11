@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.dto.uex.UexCategoryDto;
 import de.greluc.krt.profit.basetool.backend.integration.UexClient;
 import de.greluc.krt.profit.basetool.backend.model.UexCategory;
 import de.greluc.krt.profit.basetool.backend.repository.UexCategoryRepository;
+import de.greluc.krt.profit.basetool.backend.support.UexValues;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -96,8 +97,8 @@ public class UexCategoryRefService {
       category.setType(type);
       category.setSection(dto.section());
       category.setName(dto.name());
-      category.setIsGameRelated(asBoolean(dto.isGameRelated()));
-      category.setIsMining(asBoolean(dto.isMining()));
+      category.setIsGameRelated(UexValues.asBooleanOrFalse(dto.isGameRelated()));
+      category.setIsMining(UexValues.asBooleanOrFalse(dto.isMining()));
       category.setUexSyncedAt(now);
       category.setUexDeletedAt(null);
       repository.save(category);
@@ -114,16 +115,5 @@ public class UexCategoryRefService {
         updated,
         skipped);
     return repository.findAll();
-  }
-
-  /**
-   * Normalises UEX's integer 0/1 flag into a Java {@link Boolean}. A {@code null} input maps to
-   * {@code false} — categories without a flag value are treated as "not set".
-   *
-   * @param flag UEX-style 0/1 integer
-   * @return {@code true} iff {@code flag} equals 1
-   */
-  private static Boolean asBoolean(Integer flag) {
-    return flag != null && flag == 1;
   }
 }

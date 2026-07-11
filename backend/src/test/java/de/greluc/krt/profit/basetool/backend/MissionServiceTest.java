@@ -82,8 +82,8 @@ class MissionServiceTest {
   @Mock private de.greluc.krt.profit.basetool.backend.service.AuthHelperService authHelperService;
 
   @Mock
-  private de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipService
-      orgUnitMembershipService;
+  private de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryService
+      orgUnitMembershipQueryService;
 
   @Mock private AuditService auditService;
 
@@ -253,7 +253,7 @@ class MissionServiceTest {
     when(userRepository.findById(userId)).thenReturn(Optional.of(existingUser));
     // The resolved user has no memberships, so the participant gets no org-unit affiliation —
     // there is deliberately no IRIDIUM fallback anymore.
-    when(orgUnitMembershipService.findAllMembershipsForUser(userId)).thenReturn(List.of());
+    when(orgUnitMembershipQueryService.findAllMembershipsForUser(userId)).thenReturn(List.of());
 
     Mission result = missionService.addParticipant(missionId, null, "TestUser", null, "No comment");
 
@@ -282,7 +282,7 @@ class MissionServiceTest {
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(orgUnitMembershipService.findAllMembershipsForUser(userId)).thenReturn(List.of());
+    when(orgUnitMembershipQueryService.findAllMembershipsForUser(userId)).thenReturn(List.of());
 
     Mission result = missionService.addParticipant(missionId, userId, null, null, "No comment");
 
@@ -308,7 +308,7 @@ class MissionServiceTest {
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(orgUnitMembershipService.findAllMembershipsForUser(userId)).thenReturn(List.of());
+    when(orgUnitMembershipQueryService.findAllMembershipsForUser(userId)).thenReturn(List.of());
 
     Mission result = missionService.addParticipant(missionId, userId, null, null, "No comment");
 
@@ -334,7 +334,7 @@ class MissionServiceTest {
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(orgUnitMembershipService.findAllMembershipsForUser(userId)).thenReturn(List.of());
+    when(orgUnitMembershipQueryService.findAllMembershipsForUser(userId)).thenReturn(List.of());
 
     Mission result =
         missionService.addParticipant(

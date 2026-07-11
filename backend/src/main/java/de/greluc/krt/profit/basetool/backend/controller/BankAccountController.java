@@ -98,7 +98,7 @@ public class BankAccountController {
    */
   @Operation(summary = "List the bank accounts visible to the caller (paged)")
   @GetMapping
-  @PreAuthorize("hasRole('" + Roles.BANK_EMPLOYEE + "')")
+  @PreAuthorize(Roles.HAS_ROLE_BANK_EMPLOYEE)
   @Transactional(readOnly = true)
   public PageResponse<BankAccountDto> getAccounts(
       @RequestParam(required = false) Integer page,
@@ -123,7 +123,7 @@ public class BankAccountController {
    */
   @Operation(summary = "Create a bank account (management: any type; employee: SPECIAL only)")
   @PostMapping
-  @PreAuthorize("hasRole('" + Roles.BANK_EMPLOYEE + "')")
+  @PreAuthorize(Roles.HAS_ROLE_BANK_EMPLOYEE)
   @Transactional
   @ResponseStatus(HttpStatus.CREATED)
   public BankAccountDto createAccount(@RequestBody @Valid CreateBankAccountRequest request) {
@@ -163,7 +163,7 @@ public class BankAccountController {
    */
   @Operation(summary = "Rename a bank account (management)")
   @PatchMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.BANK_MANAGEMENT + "')")
+  @PreAuthorize(Roles.HAS_ROLE_BANK_MANAGEMENT)
   @Transactional
   public BankAccountDto renameAccount(
       @PathVariable @NotNull UUID id, @RequestBody @Valid RenameBankAccountRequest request) {
@@ -200,7 +200,7 @@ public class BankAccountController {
    */
   @Operation(summary = "Set or clear the KRT-account 3-stage approval thresholds (management)")
   @PatchMapping("/{id}/approval-tiers")
-  @PreAuthorize("hasRole('" + Roles.BANK_MANAGEMENT + "')")
+  @PreAuthorize(Roles.HAS_ROLE_BANK_MANAGEMENT)
   @Transactional
   public BankAccountDto setCartelApprovalTiers(
       @PathVariable @NotNull UUID id, @RequestBody @Valid SetCartelApprovalTiersRequest request) {
@@ -217,7 +217,7 @@ public class BankAccountController {
    */
   @Operation(summary = "Close a bank account (management; zero balance required)")
   @PostMapping("/{id}/close")
-  @PreAuthorize("hasRole('" + Roles.BANK_MANAGEMENT + "')")
+  @PreAuthorize(Roles.HAS_ROLE_BANK_MANAGEMENT)
   @Transactional
   public BankAccountDto closeAccount(
       @PathVariable @NotNull UUID id, @RequestBody @Valid BankAccountLifecycleRequest request) {
@@ -233,7 +233,7 @@ public class BankAccountController {
    */
   @Operation(summary = "Reopen a closed bank account (management)")
   @PostMapping("/{id}/reopen")
-  @PreAuthorize("hasRole('" + Roles.BANK_MANAGEMENT + "')")
+  @PreAuthorize(Roles.HAS_ROLE_BANK_MANAGEMENT)
   @Transactional
   public BankAccountDto reopenAccount(
       @PathVariable @NotNull UUID id, @RequestBody @Valid BankAccountLifecycleRequest request) {

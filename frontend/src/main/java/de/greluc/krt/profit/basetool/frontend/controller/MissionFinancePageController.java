@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.form.MissionFinanceEntryForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -218,7 +220,7 @@ public class MissionFinancePageController {
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
       log.debug("Add finance entry (AJAX) failed: status={}", e.getStatusCode());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.error("UNEXPECTED ERROR in addFinanceEntryAjax for mission {}", id, e);
       return ResponseEntity.internalServerError().build();
@@ -247,7 +249,7 @@ public class MissionFinancePageController {
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
       log.debug("Update finance entry (AJAX) failed: status={}", e.getStatusCode());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.error(
           "UNEXPECTED ERROR in updateFinanceEntryAjax for mission {} entry {}", id, entryId, e);
@@ -273,7 +275,7 @@ public class MissionFinancePageController {
       return ResponseEntity.noContent().build();
     } catch (BackendServiceException e) {
       log.debug("Delete finance entry (AJAX) failed: status={}", e.getStatusCode());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.error(
           "UNEXPECTED ERROR in deleteFinanceEntryAjax for mission {} entry {}", id, entryId, e);

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
+import de.greluc.krt.profit.basetool.backend.config.EvictAllMaterialCaches;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.Material;
@@ -40,9 +41,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -217,11 +216,7 @@ public class MaterialService {
    *     that does not exist
    */
   @Transactional
-  @Caching(
-      evict = {
-        @CacheEvict(cacheNames = CacheConfig.MATERIALS_CACHE, allEntries = true),
-        @CacheEvict(cacheNames = CacheConfig.MATERIAL_BY_ID_CACHE, allEntries = true)
-      })
+  @EvictAllMaterialCaches
   public Material createMaterial(@NotNull MaterialCreateDto dto) {
     MaterialType type;
     try {
@@ -292,11 +287,7 @@ public class MaterialService {
    *     version is stale
    */
   @Transactional
-  @Caching(
-      evict = {
-        @CacheEvict(cacheNames = CacheConfig.MATERIALS_CACHE, allEntries = true),
-        @CacheEvict(cacheNames = CacheConfig.MATERIAL_BY_ID_CACHE, allEntries = true)
-      })
+  @EvictAllMaterialCaches
   public Material updateMaterial(@NotNull UUID id, @NotNull Material materialDetails) {
     Material material = getMaterial(id);
 
@@ -342,11 +333,7 @@ public class MaterialService {
    * @param id material primary key
    */
   @Transactional
-  @Caching(
-      evict = {
-        @CacheEvict(cacheNames = CacheConfig.MATERIALS_CACHE, allEntries = true),
-        @CacheEvict(cacheNames = CacheConfig.MATERIAL_BY_ID_CACHE, allEntries = true)
-      })
+  @EvictAllMaterialCaches
   public void deleteMaterial(@NotNull UUID id) {
     Material material = getMaterial(id);
     materialRepository.delete(material);

@@ -57,7 +57,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/bank/requests")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('" + Roles.BANK_EMPLOYEE + "')")
+@PreAuthorize(Roles.HAS_ROLE_BANK_EMPLOYEE)
 public class BankRequestController {
 
   private static final Set<String> QUEUE_SORT_FIELDS = Set.of("createdAt", "amount", "id");
@@ -90,13 +90,7 @@ public class BankRequestController {
         PaginationUtil.createPageRequest(page, size, effectiveSort, QUEUE_SORT_FIELDS, "createdAt");
     Page<BankBookingRequestDto> result =
         bankBookingRequestService.listQueue(effectiveStatuses, pageable);
-    return new PageResponse<>(
-        result.getContent(),
-        result.getNumber(),
-        result.getSize(),
-        result.getTotalElements(),
-        result.getTotalPages(),
-        PaginationUtil.toSortStrings(result.getSort()));
+    return PageResponse.of(result);
   }
 
   /**

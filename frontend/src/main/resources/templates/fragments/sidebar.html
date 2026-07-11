@@ -149,7 +149,7 @@
                      the surrounding nav anchors (an <a>-vs-<button> "font: inherit" mismatch made
                      it look dimmer and mixed-case). NOTE: the POST success redirect targets
                      Keycloak's cross-origin end_session_endpoint, so the CSP form-action directive
-                     must list the Keycloak origin (see SecurityConfig#cspNonceHeaderWriter) — with
+                     must list the Keycloak origin (see SecurityHeaders#cspNonceHeaderWriter) — with
                      form-action 'self' alone the browser blocks the redirect and the Keycloak SSO
                      session is never ended, leaving a silent re-login on the next login click. -->
                 <form th:action="@{/logout}" method="post" class="sidebar-logout-form">
