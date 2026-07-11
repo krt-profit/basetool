@@ -20,17 +20,12 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.event.DiscordRegistrationPendingEvent;
-import de.greluc.krt.profit.basetool.backend.event.UserApprovalDecidedEvent;
-import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
-import de.greluc.krt.profit.basetool.backend.model.ApprovalDecision;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.UserApprovalEvent;
 import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
-import de.greluc.krt.profit.basetool.backend.repository.UserApprovalEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
@@ -89,7 +84,6 @@ public class UserService {
   private final OrgUnitMembershipService orgUnitMembershipService;
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   private final DefaultBlueprintProvisioningService defaultBlueprintProvisioningService;
-  private final UserApprovalEventRepository userApprovalEventRepository;
   private final ApplicationEventPublisher eventPublisher;
 
   /**
@@ -936,112 +930,5 @@ public class UserService {
           throw new IllegalArgumentException(
               "Unsupported SpecialCommandChange action: " + change.action());
     }
-  }
-
-  /**
-   * Returns the registrations awaiting an admin decision (status {@link ApprovalStatus#PENDING}),
-   * oldest first. Admin-only at the controller boundary; not squadron-scoped because a pending user
-   * has no org unit yet.
-   *
-   * @return the pending registrations, oldest registration first
-   */
-  @NotNull
-  public List<User> findPendingRegistrations() {
-    return userRepository.findByApprovalStatusOrderByCreatedAtAsc(ApprovalStatus.PENDING);
-  }
-
-  /**
-   * Approves a pending registration: moves it to {@link ApprovalStatus#ACTIVE}, stamps the
-   * approving admin + time, and writes an audit row. The user's Basetool roles/units stay manually
-   * managed (Track 1) — approval grants no roles by itself. Optimistic-locking via {@code version}.
-   *
-   * @param userId the registration to approve
-   * @param version the optimistic-lock version echoed back from the admin queue; {@code null}
-   *     bypasses the check
-   * @param adminId the approving admin's id (for the audit row)
-   * @return the now-active user
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the user is
-   *     unknown
-   * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
-   */
-  @Transactional
-  @NotNull
-  public User approveUser(@NotNull UUID userId, @Nullable Long version, @NotNull UUID adminId) {
-    User user = decide(userId, version, ApprovalStatus.ACTIVE, adminId);
-    userApprovalEventRepository.save(
-        new UserApprovalEvent(userId, ApprovalDecision.APPROVED, null, adminId));
-    // REQ-NOTIF-014: notify the user by e-mail after commit. Best-effort and off-thread — the
-    // after-commit listener swallows any mail failure so it never affects this approval.
-    eventPublisher.publishEvent(
-        new UserApprovalDecidedEvent(userId, true, user.getEmail(), user.getEffectiveName(), null));
-    return user;
-  }
-
-  /**
-   * Rejects a pending registration: moves it to {@link ApprovalStatus#REJECTED} (the user keeps no
-   * authorities and is routed to the waiting page), stamps the deciding admin + time, and writes an
-   * audit row carrying the optional reason. Optimistic-locking via {@code version}.
-   *
-   * @param userId the registration to reject
-   * @param reason optional free-text reason recorded in the audit; may be {@code null}
-   * @param version the optimistic-lock version echoed back from the admin queue; {@code null}
-   *     bypasses the check
-   * @param adminId the deciding admin's id (for the audit row)
-   * @return the now-rejected user
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the user is
-   *     unknown
-   * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
-   */
-  @Transactional
-  @NotNull
-  public User rejectUser(
-      @NotNull UUID userId,
-      @Nullable String reason,
-      @Nullable Long version,
-      @NotNull UUID adminId) {
-    User user = decide(userId, version, ApprovalStatus.REJECTED, adminId);
-    userApprovalEventRepository.save(
-        new UserApprovalEvent(userId, ApprovalDecision.REJECTED, reason, adminId));
-    // REQ-NOTIF-014: notify the user by e-mail after commit, including the admin's reason. Best-
-    // effort and off-thread — the after-commit listener swallows any mail failure.
-    eventPublisher.publishEvent(
-        new UserApprovalDecidedEvent(
-            userId, false, user.getEmail(), user.getEffectiveName(), reason));
-    return user;
-  }
-
-  /**
-   * Shared approve/reject body: loads the user, checks the optimistic-lock version, stamps the new
-   * status + deciding admin + time, and persists (saveAndFlush so the bumped {@code @Version}
-   * reaches the response for the no-reload admin queue).
-   *
-   * @param userId the registration to decide
-   * @param version the optimistic-lock version; {@code null} bypasses the check
-   * @param newStatus the target status ({@link ApprovalStatus#ACTIVE} or {@link
-   *     ApprovalStatus#REJECTED})
-   * @param adminId the deciding admin's id
-   * @return the persisted user
-   */
-  private User decide(UUID userId, @Nullable Long version, ApprovalStatus newStatus, UUID adminId) {
-    User user =
-        userRepository
-            .findById(userId)
-            .orElseThrow(
-                () ->
-                    new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                        "User not found"));
-    OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, userId);
-    // State-transition guard (PR review #3): only a still-PENDING registration may be approved or
-    // rejected. Acting on an already-ACTIVE member would silently strip their authorities and trap
-    // them on the waiting page; an already-REJECTED row is a stale double-action. Either is a 409.
-    if (user.getApprovalStatus() != ApprovalStatus.PENDING) {
-      throw new BusinessConflictException(
-          "Only a pending registration can be decided; current status is "
-              + user.getApprovalStatus());
-    }
-    user.setApprovalStatus(newStatus);
-    user.setApprovedAt(Instant.now());
-    user.setApprovedById(adminId);
-    return userRepository.saveAndFlush(user);
   }
 }
