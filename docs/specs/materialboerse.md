@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-10.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-11.
 > **Owner area:** MARKET · **Related ADRs:** ADR-0082, ADR-0086, ADR-0087
 
 # Materialbörse — material-exchange trade board
@@ -266,6 +266,14 @@ the `MARKET_*` audit events with a kind-aware, PII-free `kind`/`product`/`qty` d
 key), and honours the location-never-exposed / interessenten-anonymity rules unchanged
 (REQ-MARKET-004/006).
 
+The shared release/edit modal carries the item-quantity field (`[data-mb-qty-block]`, "Menge
+(Stück)") and the material offered-amount field (`[data-mb-amount-block]`, "Menge anbieten",
+REQ-MARKET-002) as **mutually exclusive** inputs — exactly one is shown per offer kind, toggled via
+the `hidden` attribute by `materialboerse-release.js` (mode `'item'` → item field, otherwise → amount
+field). Because `.mb-modal-qty` sets an author `display:flex`, the item field **must** carry the
+`.mb-modal-qty[hidden]` CSS guard, or the UA `[hidden] { display:none }` rule loses to the class and
+the item-quantity field leaks into every material release (the shipped #1252 defect).
+
 **Acceptance**
 - [ ] "Item anbieten" lists an item with a stated quantity; a `productKey` no active blueprint
 produces is rejected (404), and nothing is persisted.
@@ -274,13 +282,16 @@ min-quality filter excludes it.
 - [ ] The same member may hold several active offers for the same item.
 - [ ] Item-offer release/deactivate/remark/interest record `MARKET_*` events whose details never
 contain the display name or remark body.
+- [ ] The shared modal shows exactly one quantity field per kind: a material release shows only "Menge
+anbieten" (item field hidden), an item offer only "Menge (Stück)" (amount field hidden) — never both.
 
 **Enforced by:** `MaterialExchangeServiceTest`, `MaterialExchangeRepositoryDataTest`,
-`MaterialboersePageControllerMvcTest` · **Code:** `MaterialExchangeService#releaseItem`,
+`MaterialboersePageControllerMvcTest`, `MaterialboardQuantityFieldExclusivityE2eTest` · **Code:**
+`MaterialExchangeService#releaseItem`,
 `MaterialExchangeItemReleaseRequest`, `MaterialExchangeOffer` (`kind`/`itemProductKey`/`itemName`/
 `itemQuantity`), `MaterialExchangeOfferRepository#findBoard`,
 `db/migration/V213__add_material_exchange_item_offers.sql`, `materialboerse.html`,
-`materialboerse-release.js`
+`materialboerse-release.js`, `materialboerse.css`
 
 ## Out of scope
 
