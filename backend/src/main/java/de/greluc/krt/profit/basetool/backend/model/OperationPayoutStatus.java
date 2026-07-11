@@ -43,9 +43,10 @@ import lombok.ToString;
  * mission managers (or higher) on the operation detail page. One row exists for each (operation,
  * participant) tuple that has ever been toggled — absence of a row is semantically equivalent to
  * {@code paid_out = false}, so the read path tolerates missing rows. {@code participant_key}
- * intentionally mirrors the opaque format produced by {@code OperationService.getOperationPayouts}
- * (real user UUID stringified, or {@code "guest_<name>"} for guests) so the roll-up service can
- * merge in payout status with a plain map lookup.
+ * intentionally mirrors the opaque format produced by {@code
+ * OperationPayoutService.getOperationPayouts} (real user UUID stringified, or {@code
+ * "guest_<name>"} for guests) so the roll-up service can merge in payout status with a plain map
+ * lookup.
  */
 @Entity
 @Table(
@@ -93,7 +94,8 @@ public class OperationPayoutStatus extends AbstractEntity<UUID> {
 
   /**
    * Whether the participant has been paid out. Defaults to {@code false}; toggled by the {@link
-   * de.greluc.krt.profit.basetool.backend.service.OperationService#setPayoutStatus} entry point.
+   * de.greluc.krt.profit.basetool.backend.service.OperationPayoutService#setPayoutStatus} entry
+   * point.
    */
   @Column(name = "paid_out", nullable = false)
   private boolean paidOut;

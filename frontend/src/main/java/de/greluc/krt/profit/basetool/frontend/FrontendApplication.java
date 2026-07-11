@@ -37,7 +37,7 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
  *       backend is paged through the module's own {@code PageResponse} DTO), so its {@code
  *       ProxyingHandlerMethodArgumentResolver} is dead weight — and it emits a WARN ("not annotated
  *       with @ProjectedPayload") for every interface-typed {@code @ModelAttribute} parameter, which
- *       {@link de.greluc.krt.profit.basetool.frontend.config.SquadronContextAdvice} legitimately
+ *       {@link de.greluc.krt.profit.basetool.frontend.config.OrgUnitContextAdvice} legitimately
  *       uses to cross-inject its already-loaded {@code List<…>} catalogues. Dropping the unused
  *       auto-config removes that false-positive at the source rather than muting the logger
  *       (REQ-OBS-015, #1202).

@@ -211,7 +211,7 @@ class AdminSpecialCommandsPageControllerMvcTest {
   }
 
   // REQ-DATA-007 — every SK lifecycle mutation evicts STATIC_DATA_CACHE so the cached org-units
-  // pickers + SquadronContextAdvice's SK catalogue cannot serve a stale name/active/profit-eligible
+  // pickers + OrgUnitContextAdvice's SK catalogue cannot serve a stale name/active/profit-eligible
   // up to the TTL. Classic create path.
   @Test
   @WithMockUser(roles = "ADMIN")

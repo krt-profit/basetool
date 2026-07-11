@@ -47,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BankHolderPostingReposit
 import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepository;
+import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -55,10 +56,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -85,10 +86,45 @@ class BankLedgerSplitDepositTest {
   @Mock private BankAuditService bankAuditService;
   @Mock private BankTransferFeeService transferFeeService;
   @Mock private AuthHelperService authHelperService;
+  @Mock private UserRepository userRepository;
+  @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
 
-  @InjectMocks private BankLedgerService bankLedgerService;
+  private BankLedgerService bankLedgerService;
 
   private final Map<UUID, BankAccount> accountsById = new HashMap<>();
+
+  /**
+   * Assembles the ledger service under test with the real persistence engine {@link
+   * BankPostingWriter} and validation guards {@link BankBookingGuards} (#1253), both driven by the
+   * mocked repositories, so the split-arithmetic assertions on the captured {@code
+   * postingRepository} / {@code holderPostingRepository} legs still exercise the extracted
+   * persistence path end to end.
+   */
+  @BeforeEach
+  void setUp() {
+    BankPostingWriter writer =
+        new BankPostingWriter(
+            accountRepository,
+            holderRepository,
+            transactionRepository,
+            postingRepository,
+            holderPostingRepository,
+            authHelperService);
+    BankBookingGuards guards =
+        new BankBookingGuards(accountRepository, postingRepository, authHelperService);
+    bankLedgerService =
+        new BankLedgerService(
+            accountRepository,
+            transactionRepository,
+            postingRepository,
+            holderPostingRepository,
+            bankAuditService,
+            transferFeeService,
+            userRepository,
+            orgUnitMembershipQueryService,
+            writer,
+            guards);
+  }
 
   /**
    * Wires the shared, always-needed stubs and registers every supplied account for the

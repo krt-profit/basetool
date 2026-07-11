@@ -25,7 +25,7 @@ import java.util.UUID;
  * Frontend mirror of the backend Squadron DTO. {@code isPromotionEnabled} is the per-squadron
  * feature flag for the promotion subsystem; the admin toggle lives at {@code
  * /api/proxy/squadrons/{id}/promotion-enabled} and the page-render flow reads the flag through
- * {@code SquadronContextAdvice} so the sidebar and {@link
+ * {@code CapabilityFlagsAdvice} so the sidebar and {@link
  * de.greluc.krt.profit.basetool.frontend.controller.PromotionPageController} know whether to expose
  * the promotion menu for a non-admin caller.
  *

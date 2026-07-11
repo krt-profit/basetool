@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.OperationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationUpdateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.OperationFinanceService;
+import de.greluc.krt.profit.basetool.backend.service.OperationPayoutService;
 import de.greluc.krt.profit.basetool.backend.service.OperationService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
@@ -93,6 +94,7 @@ public class OperationController {
       Set.of("id", "name", "status", "description", "createdAt", "updatedAt");
 
   private final OperationService operationService;
+  private final OperationPayoutService operationPayoutService;
   private final OperationMapper operationMapper;
   private final OperationFinanceService operationFinanceService;
 
@@ -371,7 +373,7 @@ public class OperationController {
   })
   @Transactional(readOnly = true)
   public OperationPayoutSummaryDto getOperationPayouts(@PathVariable UUID id) {
-    return operationService.getOperationPayoutSummary(id);
+    return operationPayoutService.getOperationPayoutSummary(id);
   }
 
   /**
@@ -427,7 +429,7 @@ public class OperationController {
   })
   public OperationPayoutStatusDto setPayoutStatus(
       @PathVariable UUID id, @Valid @RequestBody OperationPayoutStatusUpdateDto dto) {
-    return operationService.setPayoutStatus(id, dto.participantKey(), dto.paidOut());
+    return operationPayoutService.setPayoutStatus(id, dto.participantKey(), dto.paidOut());
   }
 
   /**

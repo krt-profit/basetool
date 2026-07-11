@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -33,16 +33,9 @@ import de.greluc.krt.profit.basetool.backend.model.BankAccountStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountType;
 import de.greluc.krt.profit.basetool.backend.model.BankHolder;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankTransferRequest;
-import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
-import de.greluc.krt.profit.basetool.backend.repository.BankHolderPostingRepository;
-import de.greluc.krt.profit.basetool.backend.repository.BankHolderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
-import de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepository;
-import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.math.BigDecimal;
-import java.util.Optional;
+import java.util.Map;
 import java.util.UUID;
-import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -53,122 +46,27 @@ import org.mockito.quality.Strictness;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Unit tests for the two <strong>authorization/guard</strong> seams of {@code BankLedgerService}
- * that the ledger-arithmetic suites leave uncovered — the KRT-account direct-booking cap {@code
- * requireCartelDirectBookingAllowed} (REQ-BANK-047) and the two early rejections inside {@link
- * BankLedgerService#bookTransfer} that fire before any ledger row is written: the destination
- * visibility gate (REQ-BANK-011) and the fee-inclusive {@code amount - fee <= 0} guard
- * (REQ-BANK-033, #999) on the holder-changing transfer path. Pure Mockito — these are pre-persist
- * branch decisions driven by the role hierarchy, the {@code CARTEL} type/ceiling and the fee rate,
- * so no database is needed; the account-locking, overdraft and posting arithmetic stay covered by
- * the Testcontainers {@code BankLedgerServiceTest} and {@code BankLedgerSplitDepositTest}.
+ * Unit tests for the two orchestration-level guard seams of {@link BankLedgerService#bookTransfer}
+ * that fire before any ledger row is written: the destination-visibility gate (REQ-BANK-011) that
+ * the orchestrator itself enforces, and the wiring that routes a holder-changing fee-inclusive
+ * transfer through {@link BankBookingGuards#requireAmountExceedsFee} (REQ-BANK-033, #999) and
+ * aborts the booking when it rejects. Pure Mockito with the extracted {@code BankPostingWriter} /
+ * {@code BankBookingGuards} collaborators stubbed — the guards' own decision logic and the
+ * KRT-account cap (REQ-BANK-047) are covered directly by {@link BankBookingGuardsTest}, and the
+ * account-locking, overdraft and posting arithmetic by the Testcontainers {@code
+ * BankLedgerServiceTest} / {@code BankLedgerSplitDepositTest}.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class BankLedgerServiceGuardTest {
 
-  @Mock private BankAccountRepository accountRepository;
-  @Mock private BankHolderRepository holderRepository;
-  @Mock private BankTransactionRepository transactionRepository;
-  @Mock private BankPostingRepository postingRepository;
-  @Mock private BankHolderPostingRepository holderPostingRepository;
-  @Mock private BankAuditService bankAuditService;
   @Mock private BankTransferFeeService transferFeeService;
-  @Mock private AuthHelperService authHelperService;
+  @Mock private BankPostingWriter writer;
+  @Mock private BankBookingGuards guards;
 
   @InjectMocks private BankLedgerService bankLedgerService;
 
-  // ---- Gap 1: requireCartelDirectBookingAllowed (REQ-BANK-047) ---------------------------------
-
-  @Test
-  void requireCartelDirectBookingAllowed_plainEmployeeAboveCeiling_throwsCartelApprovalRequired() {
-    // Given: a plain bank employee (not management) and a KRT/CARTEL account with a T1 ceiling of
-    // 1000.
-    UUID accountId = UUID.randomUUID();
-    when(authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT)))
-        .thenReturn(false);
-    when(accountRepository.findById(accountId))
-        .thenReturn(Optional.of(cartelAccount(accountId, new BigDecimal("1000"))));
-
-    // When / Then: a direct booking above the ceiling routes through external approval.
-    BankConflictException ex =
-        assertThrows(
-            BankConflictException.class,
-            () ->
-                bankLedgerService.requireCartelDirectBookingAllowed(
-                    accountId, new BigDecimal("1500")));
-    assertEquals(BankConflictException.CODE_BANK_CARTEL_APPROVAL_REQUIRED, ex.getCode());
-    assertEquals("1000", ex.getProperties().get("ceiling"));
-  }
-
-  @Test
-  void requireCartelDirectBookingAllowed_atOrBelowCeiling_passes() {
-    // Given: a plain employee and a CARTEL account with a 1000 ceiling.
-    UUID accountId = UUID.randomUUID();
-    when(authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT)))
-        .thenReturn(false);
-    when(accountRepository.findById(accountId))
-        .thenReturn(Optional.of(cartelAccount(accountId, new BigDecimal("1000"))));
-
-    // When / Then: exactly at the ceiling is allowed — the guard is strictly greater-than, so a
-    // flipped comparison (>= instead of >) would wrongly reject this boundary amount.
-    assertDoesNotThrow(
-        () ->
-            bankLedgerService.requireCartelDirectBookingAllowed(accountId, new BigDecimal("1000")));
-  }
-
-  @Test
-  void requireCartelDirectBookingAllowed_nullCeilingTreatedAsZero_rejectsAnyPositive() {
-    // Given: a plain employee and a CARTEL account whose ceiling is unset (null -> treated as 0).
-    UUID accountId = UUID.randomUUID();
-    when(authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT)))
-        .thenReturn(false);
-    when(accountRepository.findById(accountId))
-        .thenReturn(Optional.of(cartelAccount(accountId, null)));
-
-    // When / Then: with a null ceiling any positive direct booking needs external approval.
-    BankConflictException ex =
-        assertThrows(
-            BankConflictException.class,
-            () ->
-                bankLedgerService.requireCartelDirectBookingAllowed(
-                    accountId, new BigDecimal("1")));
-    assertEquals(BankConflictException.CODE_BANK_CARTEL_APPROVAL_REQUIRED, ex.getCode());
-    assertEquals("0", ex.getProperties().get("ceiling"), "an unset ceiling is reported as 0");
-  }
-
-  @Test
-  void requireCartelDirectBookingAllowed_management_bypassesEvenAboveCeiling() {
-    // Given: the caller reaches BANK_MANAGEMENT.
-    UUID accountId = UUID.randomUUID();
-    when(authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT)))
-        .thenReturn(true);
-
-    // When / Then: management is unrestricted and the method short-circuits before ever loading the
-    // account (an inverted role check would instead fall through to findById here).
-    assertDoesNotThrow(
-        () ->
-            bankLedgerService.requireCartelDirectBookingAllowed(
-                accountId, new BigDecimal("999999999")));
-    verify(accountRepository, never()).findById(any());
-  }
-
-  @Test
-  void requireCartelDirectBookingAllowed_nonCartelAccount_isNoOp() {
-    // Given: a plain employee and a non-CARTEL (AREA) account — the cap is CARTEL-only.
-    UUID accountId = UUID.randomUUID();
-    when(authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT)))
-        .thenReturn(false);
-    when(accountRepository.findById(accountId)).thenReturn(Optional.of(areaAccount(accountId)));
-
-    // When / Then: any amount is allowed on a non-CARTEL account regardless of its ceiling.
-    assertDoesNotThrow(
-        () ->
-            bankLedgerService.requireCartelDirectBookingAllowed(
-                accountId, new BigDecimal("999999999")));
-  }
-
-  // ---- Gap 2: bookTransfer destination-visibility gate (REQ-BANK-011) --------------------------
+  // ---- bookTransfer destination-visibility gate (REQ-BANK-011) ---------------------------------
 
   @Test
   void bookTransfer_destinationNotVisible_throwsAccessDeniedAndBooksNothing() {
@@ -185,31 +83,37 @@ class BankLedgerServiceGuardTest {
     // When / Then: an invisible destination is refused before any account is locked or booked, so a
     // dropped/inverted guard cannot leak money into an account the caller may not see.
     assertThrows(AccessDeniedException.class, () -> bankLedgerService.bookTransfer(request, false));
-    verify(accountRepository, never()).findByIdForUpdate(any());
-    verify(postingRepository, never()).save(any());
-    verify(holderPostingRepository, never()).save(any());
-    verify(transactionRepository, never()).save(any());
+    verify(writer, never()).lockAccount(any());
+    verify(writer, never()).persistTransaction(any(), any(), any(), any(), any(), any(), any());
+    verify(writer, never()).persistAccountPosting(any(), any(), any(), any());
+    verify(writer, never()).persistHolderPosting(any(), any(), any(), any());
   }
 
-  // ---- Gap 3: bookTransfer fee-inclusive amount<=fee guard (REQ-BANK-033, #999) ----------------
+  // ---- bookTransfer fee-inclusive amount<=fee guard wiring (REQ-BANK-033, #999) ----------------
 
   @Test
-  void bookTransfer_feeInclusive_holderChange_rejectsWhenAmountDoesNotExceedFee() {
+  void bookTransfer_feeInclusive_holderChange_delegatesToGuardAndBooksNothingWhenItRejects() {
     // Given: a holder-CHANGING transfer in fee-inclusive mode where a punitive fee consumes the
-    // whole entered amount (fee 1 on amount 1 -> amount - fee = 0), so nothing would arrive.
+    // whole entered amount (fee 1 on amount 1 -> amount - fee = 0), so the extracted inclusive
+    // guard
+    // rejects it.
     UUID sourceAccountId = UUID.randomUUID();
     UUID destinationAccountId = UUID.randomUUID();
-    when(accountRepository.findByIdForUpdate(sourceAccountId))
-        .thenReturn(Optional.of(areaAccount(sourceAccountId)));
-    when(accountRepository.findByIdForUpdate(destinationAccountId))
-        .thenReturn(Optional.of(areaAccount(destinationAccountId)));
+    when(writer.lockAccount(sourceAccountId)).thenReturn(areaAccount(sourceAccountId));
+    when(writer.lockAccount(destinationAccountId)).thenReturn(areaAccount(destinationAccountId));
 
     BankHolder sourceHolder = holder();
     BankHolder destinationHolder = holder();
-    when(holderRepository.findById(sourceHolder.getId())).thenReturn(Optional.of(sourceHolder));
-    when(holderRepository.findById(destinationHolder.getId()))
-        .thenReturn(Optional.of(destinationHolder));
+    when(writer.requireHolder(sourceHolder.getId())).thenReturn(sourceHolder);
+    when(writer.requireHolder(destinationHolder.getId())).thenReturn(destinationHolder);
     when(transferFeeService.feeOn(new BigDecimal("1"))).thenReturn(new BigDecimal("1"));
+    doThrow(
+            new BankConflictException(
+                BankConflictException.CODE_BANK_FEE_EXCEEDS_AMOUNT,
+                "In fee-inclusive mode the entered amount does not exceed the fee",
+                Map.of("fee", "1")))
+        .when(guards)
+        .requireAmountExceedsFee(new BigDecimal("1"), new BigDecimal("1"));
 
     BankTransferRequest request =
         new BankTransferRequest(
@@ -222,37 +126,20 @@ class BankLedgerServiceGuardTest {
             null,
             true);
 
-    // When / Then: the inclusive guard rejects the booking with the stable code and books nothing —
-    // without it the destination would get a zero/negative credit leg while the source was debited.
+    // When / Then: bookTransfer routes the holder-changing inclusive path through the guard and
+    // propagates its rejection with the stable code, booking nothing — without the wiring the
+    // destination would get a zero/negative credit leg while the source was debited.
     BankConflictException ex =
         assertThrows(
             BankConflictException.class, () -> bankLedgerService.bookTransfer(request, true));
     assertEquals(BankConflictException.CODE_BANK_FEE_EXCEEDS_AMOUNT, ex.getCode());
     assertEquals("1", ex.getProperties().get("fee"));
-    verify(postingRepository, never()).save(any());
-    verify(holderPostingRepository, never()).save(any());
-    verify(transactionRepository, never()).save(any());
+    verify(writer, never()).persistTransaction(any(), any(), any(), any(), any(), any(), any());
+    verify(writer, never()).persistAccountPosting(any(), any(), any(), any());
+    verify(writer, never()).persistHolderPosting(any(), any(), any(), any());
   }
 
   // ---- fixtures --------------------------------------------------------------------------------
-
-  /**
-   * Builds an active {@code CARTEL} account with the given direct-booking ceiling.
-   *
-   * @param id the account id the lookup returns it for
-   * @param ceiling the T1 employee-approval ceiling, or {@code null} for an unset ceiling
-   * @return the CARTEL account
-   */
-  private static BankAccount cartelAccount(UUID id, @Nullable BigDecimal ceiling) {
-    BankAccount account = new BankAccount();
-    account.setId(id);
-    account.setAccountNo("KB-CART");
-    account.setName("KRT");
-    account.setType(BankAccountType.CARTEL);
-    account.setStatus(BankAccountStatus.ACTIVE);
-    account.setEmployeeApprovalCeiling(ceiling);
-    return account;
-  }
 
   /**
    * Builds an active {@code AREA} account — a non-CARTEL, justification-optional type.

@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.request.BankDepositReques
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankTransferRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankWithdrawalRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.ReverseBankTransactionRequest;
+import de.greluc.krt.profit.basetool.backend.service.BankBookingGuards;
 import de.greluc.krt.profit.basetool.backend.service.BankLedgerService;
 import de.greluc.krt.profit.basetool.backend.service.BankSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.BankTransferFeeService;
@@ -59,6 +60,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class BankBookingController {
 
   private final BankLedgerService bankLedgerService;
+  private final BankBookingGuards bankBookingGuards;
   private final BankSecurityService bankSecurityService;
   private final BankTransferFeeService bankTransferFeeService;
 
@@ -113,7 +115,7 @@ public class BankBookingController {
   public BankTransactionDto bookWithdrawal(@RequestBody @Valid BankWithdrawalRequest request) {
     // REQ-BANK-047: a plain bank employee may directly withdraw from the KRT account only up to the
     // employee ceiling T1; above it the request → external-approval flow must be used.
-    bankLedgerService.requireCartelDirectBookingAllowed(request.accountId(), request.amount());
+    bankBookingGuards.requireCartelDirectBookingAllowed(request.accountId(), request.amount());
     return bankLedgerService.bookWithdrawal(request);
   }
 
@@ -138,7 +140,7 @@ public class BankBookingController {
       @RequestBody @Valid BankTransferRequest request, Authentication authentication) {
     // REQ-BANK-047: a plain bank employee may directly transfer FROM the KRT account only up to the
     // employee ceiling T1; above it the request → external-approval flow must be used.
-    bankLedgerService.requireCartelDirectBookingAllowed(
+    bankBookingGuards.requireCartelDirectBookingAllowed(
         request.sourceAccountId(), request.amount());
     boolean destinationVisible =
         bankSecurityService.canSee(request.destinationAccountId(), authentication);

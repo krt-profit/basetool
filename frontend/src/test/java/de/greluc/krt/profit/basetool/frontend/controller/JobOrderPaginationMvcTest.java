@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
-import de.greluc.krt.profit.basetool.frontend.config.SquadronContextAdvice;
+import de.greluc.krt.profit.basetool.frontend.config.CapabilityFlagsAdvice;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -76,8 +76,8 @@ class JobOrderPaginationMvcTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     // Pass the profit gate so viewOrders renders the list instead of redirecting to /orders/create.
     when(backendApiClient.get(
-            "/api/v1/me/capabilities", SquadronContextAdvice.CapabilitiesResponse.class))
-        .thenReturn(new SquadronContextAdvice.CapabilitiesResponse(true, true, true));
+            "/api/v1/me/capabilities", CapabilityFlagsAdvice.CapabilitiesResponse.class))
+        .thenReturn(new CapabilityFlagsAdvice.CapabilitiesResponse(true, true, true));
   }
 
   /**
