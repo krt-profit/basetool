@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeOfferUpda
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleasableItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleaseRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.backend.service.MaterialExchangeBoardService;
 import de.greluc.krt.profit.basetool.backend.service.MaterialExchangeService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
@@ -51,8 +52,10 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * REST API for the Materialbörse — the org-wide material-exchange trade board of Flotte &amp;
  * Logistik (REQ-MARKET-001…). The whole surface is gated on {@code KRT_MEMBER} (decision D2:
- * authenticated-but-roleless guests do not see the internal trade board); per-offer ownership and
- * the interessenten-anonymity redaction are enforced in {@link MaterialExchangeService}.
+ * authenticated-but-roleless guests do not see the internal trade board); the read endpoints
+ * delegate to {@link MaterialExchangeBoardService} (board / detail / counts / picker + the
+ * interessenten-anonymity redaction), the write endpoints to {@link MaterialExchangeService}
+ * (release / edit / deactivate / interest lifecycle), which enforces per-offer ownership.
  */
 @RestController
 @RequestMapping("/api/v1/material-exchange")
@@ -63,6 +66,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class MaterialExchangeController {
 
   private final MaterialExchangeService service;
+  private final MaterialExchangeBoardService boardService;
 
   /**
    * Returns a page of the board — all offers, or the caller's own offers — with the toolbar filters
@@ -87,7 +91,7 @@ public class MaterialExchangeController {
       @RequestParam(required = false) String sort,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size) {
-    return service.board(tab, q, minQuality, minAmount, sort, page, size);
+    return boardService.board(tab, q, minQuality, minAmount, sort, page, size);
   }
 
   /**
@@ -98,7 +102,7 @@ public class MaterialExchangeController {
   @GetMapping("/counts")
   @Operation(summary = "Materialbörse board tab counts.")
   public MaterialExchangeCountsDto counts() {
-    return service.counts();
+    return boardService.counts();
   }
 
   /**
@@ -110,7 +114,7 @@ public class MaterialExchangeController {
   @GetMapping("/offers/{id}")
   @Operation(summary = "Get one Materialbörse offer detail.")
   public MaterialExchangeOfferDto detail(@PathVariable UUID id) {
-    return service.detail(id);
+    return boardService.detail(id);
   }
 
   /**
@@ -217,7 +221,7 @@ public class MaterialExchangeController {
   @GetMapping("/released-item-ids")
   @Operation(summary = "Which of the given Lager rows currently carry an active offer.")
   public List<UUID> releasedItemIds(@RequestParam(name = "ids", required = false) List<UUID> ids) {
-    return ids == null ? List.of() : List.copyOf(service.releasedInventoryItemIds(ids));
+    return ids == null ? List.of() : List.copyOf(boardService.releasedInventoryItemIds(ids));
   }
 
   /**
@@ -231,6 +235,6 @@ public class MaterialExchangeController {
   @Operation(summary = "List the caller's own Lager rows eligible for release.")
   public List<MaterialExchangeReleasableItemDto> releasableItems(
       @RequestParam(required = false) String q) {
-    return service.myReleasableItems(q);
+    return boardService.myReleasableItems(q);
   }
 }

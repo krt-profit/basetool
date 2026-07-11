@@ -56,7 +56,7 @@ with the SCU unit — the amount unit follows `Material.quantityType`, matching 
 (#1182).
 
 **Enforced by:** `MaterialExchangeServiceTest`, `MaterialboersePageControllerMvcTest` · **Code:**
-`MaterialExchangeService#board`, `MaterialExchangeController`, `MaterialboersePageController`
+`MaterialExchangeBoardService#board`, `MaterialExchangeController`, `MaterialboersePageController`
 
 ### REQ-MARKET-002 — Release a Lager row (whole or partial, with a Markdown remark)
 
@@ -133,7 +133,8 @@ negotiation; a member cannot register interest in their own offer. Registration 
 - [ ] A duplicate interest registration is a no-op (unique `(offer, user)`).
 
 **Enforced by:** `MaterialExchangeServiceTest`, `MaterialExchangeRepositoryDataTest` · **Code:**
-`MaterialExchangeService#detail/registerInterest`, `MaterialExchangeInterest`
+`MaterialExchangeBoardService#detail`, `MaterialExchangeService#registerInterest`,
+`MaterialExchangeInterest`
 
 ### REQ-MARKET-007 — Offer lifecycle (edit / deactivate), owner-only, optimistic-locked
 
