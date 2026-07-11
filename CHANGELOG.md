@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Preis-Übersicht wird wieder angezeigt.** Nach der CSP-Härtung (`style-src-attr 'none'`, ADR-0093) blieb die Handelsmatrix unter „Preis-Übersicht" unsichtbar: Die Tabelle wurde per CSS-Klasse ausgeblendet, das Skript blendete sie aber noch über das inzwischen wirkungslose `style.display` ein, und die dynamischen Abstandszeilen des virtuellen Scrollens trugen ein vom Browser blockiertes `style="height:…"`. Sichtbarkeit läuft jetzt über das Umschalten der Klasse, die Zeilenhöhe über das CSSOM — die Seite funktioniert wieder.
+
 ## [v1.3.2](https://github.com/krt-profit/basetool/releases/tag/v1.3.2) - 2026-07-11
 
 ### Fixed

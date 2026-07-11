@@ -171,6 +171,15 @@ via the CSSOM in `inline-style-apply.js` — the CSSOM is not governed by `style
 style through JavaScript (`element.style.x = …`) stays allowed; only literal `style=""` attributes in
 the rendered HTML are forbidden (ADR-0093).
 
+The prohibition covers `style=""` attributes emitted by **JavaScript**, not just server-rendered
+templates: a `style="…"` inside an `innerHTML` string is parsed as an inline style attribute and
+blocked exactly the same way (this is what broke the `/materials/overview` virtual-scroll spacer
+rows — a JS-built `style="height:…"` — after the CSP was pinned). A genuinely dynamic value a script
+computes goes through the same `data-krtm-*` → CSSOM path (`element.style.x = …`) instead. And when
+a script toggles the visibility of an element whose hidden state is a **class** (e.g. the skeleton
+hides it with `krtm-display-none-*`), it must toggle that class — clearing `element.style.display`
+does not override a class rule, so `el.style.display = ''` leaves a class-hidden element hidden.
+
 **Acceptance**
 
 - [ ] A new/migrated `.krt-modal-overlay` modal renders through `modal-wrapper :: modal(...)` with
