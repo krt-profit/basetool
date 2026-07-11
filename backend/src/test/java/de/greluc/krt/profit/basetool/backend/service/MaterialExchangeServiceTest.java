@@ -81,12 +81,16 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
- * Unit coverage for {@link MaterialExchangeService}'s security-critical behaviour: the
- * interessenten anonymity redaction (names only for the owner), the owner-only write gates, the
- * item-ownership check on release, the self-interest block, and the optimistic-lock guard on a
- * remark edit.
+ * Unit coverage for the material-exchange domain's security-critical behaviour across the
+ * read/write split (#14): the interessenten anonymity redaction (names only for the owner) lives in
+ * {@link MaterialExchangeBoardService} and is exercised via that co-wired subject, while the
+ * owner-only write gates, the item-ownership check on release, the self-interest block and the
+ * optimistic-lock guard on a remark edit live in {@link MaterialExchangeService}. The write service
+ * is co-wired to the real board service so a mutation's redacted response goes through the
+ * identical projection.
  */
 @ExtendWith(MockitoExtension.class)
 class MaterialExchangeServiceTest {
@@ -107,6 +111,12 @@ class MaterialExchangeServiceTest {
 
   @InjectMocks private MaterialExchangeService service;
 
+  // Read/write split (#14): the board/detail/counts/picker reads plus the interessenten-anonymity
+  // redaction moved to MaterialExchangeBoardService, built from the same mocks and co-wired into
+  // the write service below so both the moved read paths and the write→read projection keep
+  // exercising the real logic from this fixture.
+  @InjectMocks private MaterialExchangeBoardService boardService;
+
   private final UUID ownerId = UUID.randomUUID();
   private final UUID otherId = UUID.randomUUID();
   private final UUID offerId = UUID.randomUUID();
@@ -116,6 +126,10 @@ class MaterialExchangeServiceTest {
   /** Builds a fresh owner + active offer fixture before each test. */
   @BeforeEach
   void setUp() {
+    // Mockito passes null for the board-service constructor arg (no @Mock of that type); wire the
+    // real co-built board service so the write service's write→read projection runs the real
+    // redaction/DTO mapping.
+    ReflectionTestUtils.setField(service, "boardService", boardService);
     owner = user(ownerId, "Anbieter");
     Material material = material("Agricium");
     InventoryItem item = item(owner, material, 796, 340.0);
@@ -133,7 +147,7 @@ class MaterialExchangeServiceTest {
     when(interestRepository.countByOfferId(offerId)).thenReturn(3L);
     when(interestRepository.existsByOfferIdAndInterestedUserId(offerId, otherId)).thenReturn(true);
 
-    MaterialExchangeOfferDto dto = service.detail(offerId);
+    MaterialExchangeOfferDto dto = boardService.detail(offerId);
 
     assertThat(dto.mine()).isFalse();
     assertThat(dto.interestCount()).isEqualTo(3);
@@ -155,7 +169,7 @@ class MaterialExchangeServiceTest {
                 interest(user(UUID.randomUUID(), "Mara")),
                 interest(user(UUID.randomUUID(), "Hex"))));
 
-    MaterialExchangeOfferDto dto = service.detail(offerId);
+    MaterialExchangeOfferDto dto = boardService.detail(offerId);
 
     assertThat(dto.mine()).isTrue();
     assertThat(dto.interestCount()).isEqualTo(2);
@@ -193,7 +207,7 @@ class MaterialExchangeServiceTest {
                 specialCommand(skId, "Zulu Kommando", "ZK"),
                 squadron(staffelAlphaId, "Alpha", "ALP")));
 
-    MaterialExchangeOfferDto dto = service.detail(offerId);
+    MaterialExchangeOfferDto dto = boardService.detail(offerId);
 
     assertThat(dto.ownerOrgUnits())
         .extracting(OrgUnitReferenceDto::shorthand)
@@ -216,7 +230,7 @@ class MaterialExchangeServiceTest {
     when(orgUnitMembershipRepository.findAllByIdUserIdInAndKindIn(any(), any()))
         .thenReturn(List.of());
 
-    MaterialExchangeOfferDto dto = service.detail(offerId);
+    MaterialExchangeOfferDto dto = boardService.detail(offerId);
 
     assertThat(dto.ownerOrgUnits()).isEmpty();
   }
@@ -393,7 +407,7 @@ class MaterialExchangeServiceTest {
     when(offerRepository.countByStatusAndOwnerId(MaterialExchangeOfferStatus.ACTIVE, ownerId))
         .thenReturn(3L);
 
-    var counts = service.counts();
+    var counts = boardService.counts();
 
     assertThat(counts.all()).isEqualTo(7);
     assertThat(counts.mine()).isEqualTo(3);
@@ -411,7 +425,7 @@ class MaterialExchangeServiceTest {
     when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
     when(offerRepository.findWithDetailById(offerId)).thenReturn(Optional.of(offer));
 
-    MaterialExchangeOfferDto dto = service.detail(offerId);
+    MaterialExchangeOfferDto dto = boardService.detail(offerId);
 
     assertThat(dto.amount()).as("shown amount is clamped to remaining stock").isEqualTo(60.0);
   }
@@ -422,7 +436,7 @@ class MaterialExchangeServiceTest {
     when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
     when(offerRepository.findWithDetailById(offerId)).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> service.detail(offerId)).isInstanceOf(NotFoundException.class);
+    assertThatThrownBy(() -> boardService.detail(offerId)).isInstanceOf(NotFoundException.class);
   }
 
   /**
@@ -440,7 +454,7 @@ class MaterialExchangeServiceTest {
         .thenReturn(List.of(item));
     when(offerRepository.findInventoryItemIdsWithStatus(any(), any())).thenReturn(Set.of());
 
-    List<MaterialExchangeReleasableItemDto> items = service.myReleasableItems(null);
+    List<MaterialExchangeReleasableItemDto> items = boardService.myReleasableItems(null);
 
     assertThat(items).hasSize(1);
     assertThat(items.get(0).quantityType()).isEqualTo(QuantityType.PIECE);
