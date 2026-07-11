@@ -25,6 +25,8 @@ import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.options.SelectOption;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -36,14 +38,14 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * {@code /orders} queue must gain a newly-created order IN PLACE, no manual reload — the {@code
  * queue} section key crossing the global {@code orders} room.
  *
- * <p>Unlike the per-resource tests this drives the <b>server-side</b> publish path: an order create
- * fans {@code orders/[queue]} to every subscribed viewer straight from {@code
- * JobOrderWriteController} (the path that also covers <em>anonymous guest</em> creates, which have
- * no socket to publish from), so seeding a create through the backend exercises exactly the
- * production fan-out a guest would trigger. A second browser context reordering rows drives the
- * identical queue receiver; the server-publish create is chosen here because it is deterministic
- * (no drag-and-drop flake) and covers the socket-less create path a client publish cannot. The
- * global {@code orders} room coalesces at ~1.5&nbsp;s, so the assertion carries a generous timeout.
+ * <p>This drives the <b>server-side</b> publish path: an <em>anonymous guest</em> order create fans
+ * {@code orders/[queue]} to every subscribed viewer straight from the frontend {@code
+ * JobOrderWriteController} (a guest has no socket to publish from, so the create is what triggers
+ * the fan-out). The publish only fires for a create that goes through the <b>frontend</b> form — a
+ * backend-direct seed would never reach the controller — so context A submits the real public
+ * {@code /orders/create} form (the flow {@code AnonymousJobOrderE2eTest} exercises), while context
+ * B is a passive logged-in queue viewer that must gain the new row without a reload. The global
+ * {@code orders} room coalesces at ~1.5&nbsp;s, so the assertion carries a generous timeout.
  */
 @Tag("e2e")
 class JobOrderQueueLiveSyncE2eTest {
@@ -55,17 +57,18 @@ class JobOrderQueueLiveSyncE2eTest {
   private static final String PASSWORD = System.getProperty("e2e.password", "test-admin-pw");
 
   /**
-   * The canonical IRIDIUM Squadron seeded at stack bootstrap (a profit-eligible processing unit).
+   * The canonical IRIDIUM Squadron seeded at stack bootstrap (a profit-eligible unit, so it is both
+   * a valid requester and a valid responsible for the guest create, and the queue viewer sees it).
    */
   private static final String IRIDIUM_ID = "00000000-0000-0000-0000-000000000001";
 
   private static Playwright playwright;
   private static Browser browser;
   private static BackendSeeder seeder;
-  private static String materialId;
 
   /**
-   * Launches the browser and seeds IRIDIUM membership, a job-order material and one initial order.
+   * Launches the browser and seeds IRIDIUM membership, a job-order material and one initial order
+   * so the queue has a non-empty baseline the live create adds to.
    */
   @BeforeAll
   static void setUp() {
@@ -74,7 +77,7 @@ class JobOrderQueueLiveSyncE2eTest {
     if (STACK.managesStack()) {
       seeder = new BackendSeeder();
       seeder.ensureIridiumMembership(USERNAME, PASSWORD);
-      materialId = seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, "E2E LiveSync Ore");
+      String materialId = seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, "E2E LiveSync Ore");
       seeder.createJobOrder(USERNAME, PASSWORD, IRIDIUM_ID, "E2E seed", materialId, 650, 10);
     }
   }
@@ -91,19 +94,24 @@ class JobOrderQueueLiveSyncE2eTest {
   }
 
   /**
-   * A passive viewer on {@code /orders} that never reloads must gain a row when a new order is
-   * created server-side, driven purely by the {@code orders/[queue]} change signal.
+   * A passive viewer on {@code /orders} that never reloads must gain a row when a guest creates a
+   * new order through the public form, driven purely by the {@code orders/[queue]} change signal
+   * the frontend controller publishes server-side.
    */
   @Test
   void orderCreatePropagatesToTheQueueViewerLive() {
     String baseUrl = STACK.baseUrl();
-    try (BrowserContext contextB =
-        browser.newContext(
-            new Browser.NewContextOptions()
-                .setIgnoreHTTPSErrors(true)
-                .setStorageStatePath(
-                    E2eSupport.authenticatedStorageState(browser, baseUrl, USERNAME, PASSWORD)))) {
-      Page pageB = contextB.newPage();
+    try (BrowserContext viewer =
+            browser.newContext(
+                new Browser.NewContextOptions()
+                    .setIgnoreHTTPSErrors(true)
+                    .setStorageStatePath(
+                        E2eSupport.authenticatedStorageState(
+                            browser, baseUrl, USERNAME, PASSWORD)));
+        BrowserContext guest =
+            browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
+      Page pageB = viewer.newPage();
+      Page pageA = guest.newPage();
       try {
         E2eSupport.navigate(pageB, baseUrl + "/orders");
         pageB.waitForLoadState();
@@ -121,8 +129,17 @@ class JobOrderQueueLiveSyncE2eTest {
                         "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
                             + " && window.krtLiveSync.subscribedTopics().length > 0)")));
 
-        // Create a new order server-side — JobOrderWriteController fans orders/[queue] to the room.
-        seeder.createJobOrder(USERNAME, PASSWORD, IRIDIUM_ID, "E2E live", materialId, 650, 5);
+        // Context A (an anonymous guest) creates an order through the public frontend form — the
+        // frontend JobOrderWriteController fans orders/[queue] to the room server-side (the guest
+        // has no socket). Responsible = IRIDIUM (profit-eligible) so the row lands in B's queue.
+        E2eSupport.navigate(pageA, baseUrl + "/orders/create");
+        pageA.locator("#requestingOrgUnitId").selectOption(IRIDIUM_ID);
+        pageA.locator("#responsibleOrgUnitId").selectOption(IRIDIUM_ID);
+        pageA.locator("#handle").fill("E2E live " + UUID.randomUUID());
+        pageA.getByTestId("order-material-select").selectOption(new SelectOption().setIndex(1));
+        pageA.getByTestId("order-material-amount").fill("5");
+        E2eSupport.clickSubmitClearingFooter(pageA.getByTestId("order-submit"));
+        pageA.waitForLoadState();
 
         // The assertion under test: B's queue gains the new row in place (global room coalesces at
         // ~1.5 s, so allow a generous window), without a full-page reload.
@@ -135,6 +152,7 @@ class JobOrderQueueLiveSyncE2eTest {
             "the live update on the viewer must be an in-place swap — no full-page reload");
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(pageB, "orders-queue-livesync-b");
+        E2eSupport.dump(pageA, "orders-queue-livesync-a");
         throw failure;
       }
     }

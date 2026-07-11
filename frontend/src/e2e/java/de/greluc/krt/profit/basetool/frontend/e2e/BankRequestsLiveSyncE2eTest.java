@@ -95,8 +95,10 @@ class BankRequestsLiveSyncE2eTest {
             MGMT_USER, MGMT_PASSWORD, "E2E Requests Sync Account", IRIDIUM_SQUADRON_ID);
 
     // The employee may act on the account, so its pending requests show in their staff queue.
+    // Idempotent: an org-unit account already auto-grants some members, so a plain create would 409
+    // "already holds a grant"; either way the employee ends up able to act on the account.
     String employeeId = seeder.getUserId(EMPLOYEE_USER, EMPLOYEE_PASSWORD);
-    seeder.createBankGrant(MGMT_USER, MGMT_PASSWORD, employeeId, accountId, true, true, false);
+    seeder.ensureBankGrant(MGMT_USER, MGMT_PASSWORD, employeeId, accountId, true, true, false);
   }
 
   /** Releases the browser and the Playwright driver process. */

@@ -947,6 +947,52 @@ public final class BackendSeeder {
   }
 
   /**
+   * Idempotently grants a user access to a bank account: creates the grant, tolerating a {@code
+   * 409} when the user already holds one on that account (an org-unit account auto-grants some
+   * members, so an explicit grant on top duplicates the unique {@code (user, account)} row). Either
+   * outcome leaves the grantee able to act on the account, which is all a test precondition needs.
+   *
+   * @param username the granting caller's Keycloak username
+   * @param password the granting caller's Keycloak password
+   * @param granteeUserId the user id being granted access
+   * @param accountId the bank account id
+   * @param canDeposit whether the grantee may deposit
+   * @param canWithdraw whether the grantee may withdraw
+   * @param canTransfer whether the grantee may transfer
+   */
+  public void ensureBankGrant(
+      String username,
+      String password,
+      String granteeUserId,
+      String accountId,
+      boolean canDeposit,
+      boolean canWithdraw,
+      boolean canTransfer) {
+    String body =
+        "{\"userId\":\""
+            + granteeUserId
+            + "\",\"accountId\":\""
+            + accountId
+            + "\",\"canDeposit\":"
+            + canDeposit
+            + ",\"canWithdraw\":"
+            + canWithdraw
+            + ",\"canTransfer\":"
+            + canTransfer
+            + "}";
+    try {
+      int status = postStatus(passwordGrant(username, password), "/api/v1/bank/grants", body);
+      if (status != 409 && (status < 200 || status >= 300)) {
+        throw new IllegalStateException("ensureBankGrant failed: HTTP " + status);
+      }
+    } catch (IllegalStateException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.ensureBankGrant failed", e);
+    }
+  }
+
+  /**
    * Raises a confirm-before-post {@code DEPOSIT} booking request against the given account via
    * {@code POST /api/v1/org-units/bank/requests} and returns the created request's id. The request
    * is recorded {@code PENDING} and moves no money; a deposit may target any active account and is
