@@ -56,7 +56,7 @@
         <div class="data-section">
             <div class="flex-between-mb">
                 <h2 th:text="#{ship.shiptypes}">Schiffstypen</h2>
-                <div class="form-group" style="margin-bottom: 0; width: 300px; position: relative;">
+                <div class="form-group krtm-margin-bottom-0-width-300px-position-relativ-70af">
                     <input type="text" id="filterShipTypes" th:placeholder="#{general.filter.name.placeholder}" data-trigger="filter-table" data-table-id="shipTypesTable" autocomplete="off">
                     <!--/*
                       Ship-type names are exposed to JavaScript via this server-
@@ -68,7 +68,7 @@
                       close handler would silently never wire. Keep the
                       datalist; do NOT move this back into <script>.
                     */-->
-                    <datalist id="shipTypeNames-data" style="display: none;">
+                    <datalist id="shipTypeNames-data" class="krtm-display-none-5790">
                         <option th:each="st : ${shipTypes}" th:value="${st.name}"></option>
                     </datalist>
                 </div>
@@ -85,7 +85,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr th:each="st : ${shipTypes}" th:style="${st.hidden} ? 'opacity: 0.5;' : ''">
+                    <tr th:each="st : ${shipTypes}" th:classappend="${st.hidden} ? 'krtm-opacity-05' : ''">
                         <td th:text="${st.name}">Name</td>
                         <td th:text="${st.manufacturer != null ? st.manufacturer.abbreviation : ''}">Hersteller</td>
                         <td th:text="${st.description}">Desc</td>
@@ -107,14 +107,14 @@
         <div class="data-section">
             <div class="flex-between-mb">
                 <h2 th:text="#{ship.manufacturers}">Hersteller</h2>
-                <div class="form-group" style="margin-bottom: 0; width: 300px; position: relative;">
+                <div class="form-group krtm-margin-bottom-0-width-300px-position-relativ-70af">
                     <input type="text" id="filterManufacturers" th:placeholder="#{general.filter.name.placeholder}" data-trigger="filter-table" data-table-id="manufacturersTable" autocomplete="off">
                     <!--/*
                       Manufacturer names datalist — companion to the shipTypes
                       datalist above. See that comment for the Thymeleaf 3.1
                       truncation bug.
                     */-->
-                    <datalist id="mfgNames-data" style="display: none;">
+                    <datalist id="mfgNames-data" class="krtm-display-none-5790">
                         <option th:each="m : ${manufacturers}" th:value="${m.name}"></option>
                     </datalist>
                 </div>
@@ -131,7 +131,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr th:each="m : ${manufacturers}" th:style="${m.hidden} ? 'opacity: 0.5;' : ''">
+                    <tr th:each="m : ${manufacturers}" th:classappend="${m.hidden} ? 'krtm-opacity-05' : ''">
                         <td th:text="${m.name}">Name</td>
                         <td th:text="${m.abbreviation}">Kürzel</td>
                         <td th:text="${m.description}">Desc</td>
@@ -154,11 +154,11 @@
 <!-- Modals -->
 <div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
     <!-- Reset Fitted Confirmation Modal -->
-    <div id="reset-fitted-confirm-modal" class="modal" style="display:none;">
-        <div class="modal-content" style="max-width:480px; text-align:center;">
+    <div id="reset-fitted-confirm-modal" class="modal krtm-display-none-5790">
+        <div class="modal-content krtm-max-width-480px-text-align-center-2fdb">
             <h2 th:text="#{hangar.ship.reset_fitted.confirm.title}">Zurücksetzen bestätigen</h2>
-            <p style="margin:1.5rem 0; font-family:var(--font-body); color:var(--color-gray-1);" th:text="#{hangar.ship.reset_fitted.confirm.message}">Möchten Sie wirklich alle Schiffe aller Spieler auf "nicht einsatzbereit" (unfitted) setzen?</p>
-            <div style="display:flex; gap:1rem; justify-content:center;">
+            <p class="krtm-margin-1-5rem-0-font-family-var-font-body-co-9e0f" th:text="#{hangar.ship.reset_fitted.confirm.message}">Möchten Sie wirklich alle Schiffe aller Spieler auf "nicht einsatzbereit" (unfitted) setzen?</p>
+            <div class="krtm-display-flex-gap-1rem-justify-content-center-c890">
                 <button type="button" class="btn btn-ghost" data-trigger="ship-close-modal" data-modal-id="reset-fitted-confirm-modal" th:text="#{info.cancel}">Abbrechen</button>
                 <button type="button" class="btn btn-danger" data-trigger="shipdata-reset" th:text="#{hangar.ship.reset_fitted.button}">Zurücksetzen</button>
             </div>

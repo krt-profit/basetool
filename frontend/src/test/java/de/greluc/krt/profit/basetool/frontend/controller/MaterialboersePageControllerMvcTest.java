@@ -38,8 +38,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeCountsDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeOfferDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
@@ -92,8 +92,7 @@ class MaterialboersePageControllerMvcTest {
             null,
             null,
             new UserReferenceDto(UUID.randomUUID(), "Lenoro", "Lenoro", "Lenoro", null),
-            new SquadronReferenceDto(UUID.randomUUID(), "IRIDIUM", "IRI"),
-            false,
+            List.of(new OrgUnitReferenceDto(UUID.randomUUID(), "IRIDIUM", "IRI", "SQUADRON")),
             false,
             796,
             120.0,
@@ -124,7 +123,10 @@ class MaterialboersePageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("Agricium")))
         .andExpect(content().string(containsString("data-mb-tab")))
-        .andExpect(content().string(containsString("<strong>Titanium</strong>")));
+        .andExpect(content().string(containsString("<strong>Titanium</strong>")))
+        // The Anbieter's org-unit affiliation badge renders next to the username.
+        .andExpect(content().string(containsString("squadron-badge")))
+        .andExpect(content().string(containsString(">IRI<")));
   }
 
   /**
@@ -143,8 +145,7 @@ class MaterialboersePageControllerMvcTest {
             null,
             null,
             new UserReferenceDto(UUID.randomUUID(), "Lenoro", "Lenoro", "Lenoro", null),
-            new SquadronReferenceDto(UUID.randomUUID(), "IRIDIUM", "IRI"),
-            false,
+            List.of(new OrgUnitReferenceDto(UUID.randomUUID(), "IRIDIUM", "IRI", "SQUADRON")),
             false,
             500,
             12.0,
@@ -185,8 +186,7 @@ class MaterialboersePageControllerMvcTest {
             "Venture Helmet",
             7,
             new UserReferenceDto(UUID.randomUUID(), "Lenoro", "Lenoro", "Lenoro", null),
-            new SquadronReferenceDto(UUID.randomUUID(), "IRIDIUM", "IRI"),
-            false,
+            List.of(new OrgUnitReferenceDto(UUID.randomUUID(), "IRIDIUM", "IRI", "SQUADRON")),
             false,
             null,
             null,

@@ -642,7 +642,7 @@ docker run --rm -v /var/iri/monitoring/secrets/alertmanager.yml:/cfg.yml:ro \
 
 # promtool against the committed prometheus config + alert rules:
 docker run --rm -v /var/iri/code/monitoring/prometheus:/p:ro \
-  --entrypoint promtool prom/prometheus:v3.13.0 check config /p/prometheus.yml
+  --entrypoint promtool prom/prometheus:v3.13.1 check config /p/prometheus.yml
 
 # alloy config check:
 docker run --rm -v /var/iri/code/monitoring/alloy:/a:ro \

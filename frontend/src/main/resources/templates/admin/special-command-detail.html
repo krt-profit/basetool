@@ -67,7 +67,7 @@
 
 <main>
     <div class="greeting hud-box">
-        <a th:href="@{/admin/special-commands}" style="font-size: 0.9rem; color: var(--color-gray-2);" th:text="#{admin.specialcommands.back_to_list}">&larr; zurück zur Übersicht</a>
+        <a th:href="@{/admin/special-commands}" class="krtm-font-size-0-9rem-color-var-color-gray-2-58f9" th:text="#{admin.specialcommands.back_to_list}">&larr; zurück zur Übersicht</a>
         <h1 th:text="${specialCommand != null ? specialCommand.name() : ''}">Spezialkommando</h1>
         <p class="sk-meta">
             <span th:text="#{admin.specialcommands.column.shorthand}">Kürzel</span>:
@@ -79,7 +79,7 @@
 
     <!-- Member roster -->
     <div class="hud-box mt-2" id="members-box" th:data-sc-id="${specialCommand != null ? specialCommand.id() : ''}">
-        <div class="box-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <div class="box-header krtm-display-flex-justify-content-space-between-a-1321">
             <h2 th:text="#{admin.specialcommands.members.title}" class="m-0">Mitglieder</h2>
             <button id="add-member-btn" class="btn btn--cta" type="button" th:text="#{admin.specialcommands.members.add}">Mitglied hinzufügen</button>
         </div>
@@ -89,7 +89,7 @@
              so the next member action does not 409. -->
         <div id="members-results">
         <th:block th:fragment="membersResults">
-        <div th:if="${members == null or #lists.isEmpty(members)}" style="color: var(--color-gray-2); padding: 1rem 0;" th:text="#{admin.specialcommands.members.empty}">
+        <div th:if="${members == null or #lists.isEmpty(members)}" class="krtm-color-var-color-gray-2-padding-1rem-0-5444" th:text="#{admin.specialcommands.members.empty}">
             Noch keine Mitglieder zugeordnet.
         </div>
 
@@ -118,15 +118,15 @@
                                      and the demote-via-uncheck path would silently no-op. -->
                                 <input type="hidden" name="_isLogistician">
                                 <input type="hidden" name="_isMissionManager">
-                                <label style="display: inline-flex; align-items: center; gap: 0.25rem; cursor: pointer; margin-right: 0.5rem;">
+                                <label class="krtm-display-inline-flex-align-items-center-gap-0-5ab4">
                                     <input type="checkbox" class="role-checkbox" name="isLogistician" value="true" th:checked="${m.isLogistician()}">
                                     <span th:text="#{admin.specialcommands.members.role.logistician}">Logistiker</span>
                                 </label>
-                                <label style="display: inline-flex; align-items: center; gap: 0.25rem; cursor: pointer;">
+                                <label class="krtm-display-inline-flex-align-items-center-gap-0-f16b">
                                     <input type="checkbox" class="role-checkbox" name="isMissionManager" value="true" th:checked="${m.isMissionManager()}">
                                     <span th:text="#{admin.specialcommands.members.role.mission_manager}">Einsatzleiter</span>
                                 </label>
-                                <button type="submit" class="btn btn-ghost btn-icon" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;" th:title="#{members.save}" th:aria-label="#{members.save}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg></button>
+                                <button type="submit" class="btn btn-ghost btn-icon krtm-font-size-0-8rem-padding-0-25rem-0-5rem-51c7" th:title="#{members.save}" th:aria-label="#{members.save}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg></button>
                             </form>
                         </td>
                         <td>
@@ -142,7 +142,7 @@
                         </td>
                         <td>
                             <form th:action="@{/admin/special-commands/{id}/members/{userId}/delete(id=${specialCommand.id()},userId=${m.userId()})}"
-                                  method="post" style="margin: 0; display: inline;">
+                                  method="post" class="krtm-margin-0-display-inline-3bbd">
                                 <button type="submit" class="btn btn-quiet-danger delete-btn btn-icon"
                                         th:data-action="@{/admin/special-commands/{id}/members/{userId}/delete(id=${specialCommand.id()},userId=${m.userId()})}"
                                         th:title="#{admin.specialcommands.members.remove}" th:aria-label="#{admin.specialcommands.members.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
@@ -158,7 +158,7 @@
 </main>
 
 <!-- Add-Member Modal -->
-<div id="add-member-modal" class="modal" style="display: none;">
+<div id="add-member-modal" class="modal krtm-display-none-5790">
     <div class="modal-content hud-box">
         <span class="close-add-member-modal close-modal">&times;</span>
         <h2 th:text="#{admin.specialcommands.members.add}">Mitglied hinzufügen</h2>

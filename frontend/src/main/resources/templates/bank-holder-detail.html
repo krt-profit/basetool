@@ -30,12 +30,12 @@
     <div class="greeting hud-box flex-between">
         <div>
             <h1 th:text="${holder.handle()}" data-testid="bank-holder-handle">greluc</h1>
-            <p class="text-muted" style="margin: 0.25rem 0 0; font-size: 0.8rem;">
+            <p class="text-muted krtm-margin-0-25rem-0-0-font-size-0-8rem-cb15">
                 <span class="status-pill"
                       th:classappend="${holder.active()} ? ' status-active' : ' status-completed'"
                       th:text="${holder.active()} ? #{bank.holder.status.active} : #{bank.holder.status.inactive}"
                       data-testid="bank-holder-status">Aktiv</span>
-                <span class="chip" style="font-size: 0.55rem;"
+                <span class="chip krtm-font-size-0-55rem-eff3"
                       th:text="${holder.roleManaged()} ? #{bank.holder.source.auto} : #{bank.holder.source.manual}">Auto</span>
             </p>
         </div>
@@ -70,9 +70,9 @@
             <h2 th:text="#{bank.holder.calc.title}">Kontostand-Aufteilung</h2>
         </div>
         <div class="bank-panel-body">
-            <p class="text-muted" style="margin: 0 0 0.75rem; font-size: 0.8rem;"
+            <p class="text-muted krtm-margin-0-0-0-75rem-font-size-0-8rem-2c92"
                th:text="#{bank.holder.calc.hint}">Trag deinen aktuellen Kontostand ein.</p>
-            <div class="bank-form-row" style="max-width: 22rem;">
+            <div class="bank-form-row krtm-max-width-22rem-08eb">
                 <label for="bank-holder-balance-input" th:text="#{bank.holder.calc.balance}">Aktueller Kontostand (aUEC)</label>
                 <input type="number" id="bank-holder-balance-input" min="0" step="1" inputmode="numeric"
                        data-balance-input data-testid="bank-holder-balance-input">

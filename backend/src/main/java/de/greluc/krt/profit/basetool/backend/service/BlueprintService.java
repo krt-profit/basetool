@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.mapper.BlueprintMapper;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintDto;
 import de.greluc.krt.profit.basetool.backend.model.scwiki.Blueprint;
 import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -61,7 +62,7 @@ public class BlueprintService {
     boolean hasSearch = search != null && !search.isBlank();
     Page<Blueprint> page =
         hasSearch
-            ? blueprintRepository.searchActive(search.trim(), pageable)
+            ? blueprintRepository.searchActive(LikePatterns.escapeNullable(search.trim()), pageable)
             : blueprintRepository.findByScwikiDeletedAtIsNull(pageable);
     return page.map(blueprintMapper::toDto);
   }

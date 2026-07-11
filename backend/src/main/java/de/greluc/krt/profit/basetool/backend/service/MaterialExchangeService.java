@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.event.MaterialExchangeInterestRegisteredEvent;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -31,6 +30,9 @@ import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeInterest;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOffer;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferKind;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeCountsDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeInterestCount;
@@ -40,17 +42,22 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeOfferUpda
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleasableItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleaseRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeInterestRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
+import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -104,6 +111,24 @@ public class MaterialExchangeService {
   /** Cap on the number of rows the "Material anbieten" item picker returns. */
   private static final int PICKER_LIMIT = 50;
 
+  /**
+   * Org-unit kinds surfaced as an Anbieter's affiliation badges (REQ-MARKET-001): the member's
+   * Staffeln, Spezialkommandos and Bereiche. The Organisationsleitung is deliberately excluded — a
+   * leadership-only affiliation carries no board badge.
+   */
+  private static final List<OrgUnitKind> BADGE_KINDS =
+      List.of(OrgUnitKind.SQUADRON, OrgUnitKind.SPECIAL_COMMAND, OrgUnitKind.BEREICH);
+
+  /**
+   * Display order of an Anbieter's affiliation badges: Staffel(n) first, then Spezialkommando(s),
+   * then Bereich(e) (see {@link #badgeRank(OrgUnitKind)}), each group name-sorted
+   * case-insensitively — so the same member's badges read in a stable order across the board.
+   */
+  private static final Comparator<OrgUnit> ORG_UNIT_BADGE_ORDER =
+      Comparator.<OrgUnit>comparingInt(ou -> badgeRank(ou.getKind()))
+          .thenComparing(
+              ou -> ou.getName() == null ? "" : ou.getName(), String.CASE_INSENSITIVE_ORDER);
+
   private final MaterialExchangeOfferRepository offerRepository;
   private final MaterialExchangeInterestRepository interestRepository;
   private final InventoryItemRepository inventoryItemRepository;
@@ -111,7 +136,21 @@ public class MaterialExchangeService {
   private final AuthHelperService authHelperService;
   private final AuditService auditService;
   private final UserMapper userMapper;
-  private final SquadronMapper squadronMapper;
+
+  /**
+   * Reads each offering member's badge-kind memberships ({@link #BADGE_KINDS}: {@code SQUADRON} /
+   * {@code SPECIAL_COMMAND} / {@code BEREICH}) so the board can render <b>all</b> of the Anbieter's
+   * affiliation badges after the username (REQ-MARKET-001) — batch-loaded via {@link
+   * OrgUnitMembershipRepository#findAllByIdUserIdInAndKindIn} to stay N+1-free across a board page.
+   */
+  private final OrgUnitMembershipRepository orgUnitMembershipRepository;
+
+  /**
+   * Resolves the membership rows' org-unit ids to their concrete {@link OrgUnit} entities (id,
+   * name, shorthand, kind) for the anbieter affiliation badges — one batch {@code findAllById} per
+   * board page rather than a per-offer lookup.
+   */
+  private final OrgUnitRepository orgUnitRepository;
 
   /**
    * Resolves and validates a blueprint product for an item offer (#1185, REQ-MARKET-012): {@code
@@ -171,7 +210,6 @@ public class MaterialExchangeService {
       @Nullable Integer page,
       @Nullable Integer size) {
     UUID viewerId = authHelperService.currentUserId().orElse(null);
-    UUID viewerSquadronId = authHelperService.currentSquadronId().orElse(null);
     boolean onlyMine = "mein".equalsIgnoreCase(tab);
     Pageable pageable = PageRequest.of(clampPage(page), clampSize(size));
     Page<MaterialExchangeOffer> offers =
@@ -190,6 +228,8 @@ public class MaterialExchangeService {
         viewerId == null || offerIds.isEmpty()
             ? Set.of()
             : interestRepository.findOfferIdsInterestedByViewer(viewerId, offerIds);
+    Map<UUID, List<OrgUnitReferenceDto>> badges =
+        ownerOrgUnitBadges(ownerIdsOf(offers.getContent()));
 
     Page<MaterialExchangeOfferDto> dtos =
         offers.map(
@@ -197,7 +237,7 @@ public class MaterialExchangeService {
                 toDto(
                     offer,
                     viewerId,
-                    viewerSquadronId,
+                    badges.getOrDefault(ownerIdOf(offer), List.of()),
                     counts.getOrDefault(offer.getId(), 0L).intValue(),
                     interested.contains(offer.getId()),
                     null));
@@ -615,7 +655,6 @@ public class MaterialExchangeService {
    * @return the offer detail.
    */
   private MaterialExchangeOfferDto detailDto(MaterialExchangeOffer offer, @Nullable UUID viewerId) {
-    UUID viewerSquadronId = authHelperService.currentSquadronId().orElse(null);
     boolean mine = isMine(offer, viewerId);
     int count = (int) interestRepository.countByOfferId(offer.getId());
     boolean viewerInterested =
@@ -627,7 +666,12 @@ public class MaterialExchangeService {
                 .map(interest -> interest.getInterestedUser().getEffectiveName())
                 .toList()
             : null;
-    return toDto(offer, viewerId, viewerSquadronId, count, viewerInterested, names);
+    UUID ownerId = ownerIdOf(offer);
+    List<OrgUnitReferenceDto> badges =
+        ownerId == null
+            ? List.of()
+            : ownerOrgUnitBadges(Set.of(ownerId)).getOrDefault(ownerId, List.of());
+    return toDto(offer, viewerId, badges, count, viewerInterested, names);
   }
 
   /**
@@ -635,7 +679,8 @@ public class MaterialExchangeService {
    *
    * @param offer the offer.
    * @param viewerId the requesting member, or {@code null}.
-   * @param viewerSquadronId the requesting member's squadron, or {@code null}.
+   * @param ownerOrgUnits the Anbieter's affiliation badges (Staffel(n) then SK(s)), never {@code
+   *     null}.
    * @param interestCount the interessenten count.
    * @param viewerInterested whether the viewer has registered interest.
    * @param interestedHandles the interessenten handles (owner-only), or {@code null}.
@@ -644,13 +689,10 @@ public class MaterialExchangeService {
   private MaterialExchangeOfferDto toDto(
       MaterialExchangeOffer offer,
       @Nullable UUID viewerId,
-      @Nullable UUID viewerSquadronId,
+      List<OrgUnitReferenceDto> ownerOrgUnits,
       int interestCount,
       boolean viewerInterested,
       @Nullable List<String> interestedHandles) {
-    SquadronReferenceDto squadron = squadronMapper.orgUnitToReferenceDto(offer.getOwningOrgUnit());
-    boolean foreign =
-        squadron != null && viewerSquadronId != null && !viewerSquadronId.equals(squadron.id());
     boolean mine = isMine(offer, viewerId);
 
     MaterialReferenceDto material = null;
@@ -680,8 +722,7 @@ public class MaterialExchangeService {
         itemName,
         itemQuantity,
         userMapper.toReferenceDto(offer.getOwner()),
-        squadron,
-        foreign,
+        ownerOrgUnits,
         mine,
         quality,
         amount,
@@ -693,6 +734,96 @@ public class MaterialExchangeService {
         viewerInterested,
         offer.getStatus(),
         offer.getVersion());
+  }
+
+  /**
+   * The distinct, non-null owner ids across a page of offers — the input set for the batched
+   * anbieter-affiliation badge resolution.
+   *
+   * @param offers the board page's offers.
+   * @return the distinct owner ids (a defensively null-owner offer contributes nothing).
+   */
+  private static Set<UUID> ownerIdsOf(Collection<MaterialExchangeOffer> offers) {
+    return offers.stream()
+        .map(MaterialExchangeService::ownerIdOf)
+        .filter(id -> id != null)
+        .collect(Collectors.toSet());
+  }
+
+  /**
+   * The owner id of an offer, or {@code null} for the defensive no-owner case.
+   *
+   * @param offer the offer.
+   * @return the owner's user id, or {@code null}.
+   */
+  @Nullable
+  private static UUID ownerIdOf(MaterialExchangeOffer offer) {
+    return offer.getOwner() == null ? null : offer.getOwner().getId();
+  }
+
+  /**
+   * Batch-resolves each given member's org-unit affiliation badges for the board — every {@link
+   * #BADGE_KINDS} ({@code SQUADRON} / {@code SPECIAL_COMMAND} / {@code BEREICH}) membership the
+   * member holds, ordered by {@link #ORG_UNIT_BADGE_ORDER} (Staffel(n), then Spezialkommando(s),
+   * then Bereich(e), each name-sorted). There is deliberately no "primary" Staffel: a member in
+   * several Staffeln and/or SKs and/or Bereiche surfaces <b>all</b> of their badges
+   * (REQ-MARKET-001). Two queries total regardless of page size — one membership batch, one
+   * org-unit batch — so the board stays free of the per-offer N+1 (REQ-DATA-003). A dangling
+   * membership whose org unit no longer resolves is dropped.
+   *
+   * @param ownerIds the offering members whose affiliations to resolve; an empty set yields an
+   *     empty map.
+   * @return owner id → their ordered affiliation badges; members with no membership are absent.
+   */
+  private Map<UUID, List<OrgUnitReferenceDto>> ownerOrgUnitBadges(Set<UUID> ownerIds) {
+    if (ownerIds.isEmpty()) {
+      return Map.of();
+    }
+    List<OrgUnitMembership> rows =
+        orgUnitMembershipRepository.findAllByIdUserIdInAndKindIn(ownerIds, BADGE_KINDS);
+    if (rows.isEmpty()) {
+      return Map.of();
+    }
+    Set<UUID> orgUnitIds =
+        rows.stream().map(row -> row.getId().getOrgUnitId()).collect(Collectors.toSet());
+    Map<UUID, OrgUnit> orgUnitsById =
+        orgUnitRepository.findAllById(orgUnitIds).stream()
+            .collect(Collectors.toMap(OrgUnit::getId, ou -> ou));
+    Map<UUID, List<OrgUnitReferenceDto>> byOwner = new HashMap<>();
+    rows.stream()
+        .collect(Collectors.groupingBy(row -> row.getId().getUserId()))
+        .forEach(
+            (ownerId, ownerRows) ->
+                byOwner.put(
+                    ownerId,
+                    ownerRows.stream()
+                        .map(row -> orgUnitsById.get(row.getId().getOrgUnitId()))
+                        .filter(ou -> ou != null)
+                        .sorted(ORG_UNIT_BADGE_ORDER)
+                        .map(
+                            ou ->
+                                new OrgUnitReferenceDto(
+                                    ou.getId(), ou.getName(), ou.getShorthand(), ou.getKind()))
+                        .toList()));
+    return byOwner;
+  }
+
+  /**
+   * Sort rank of an org-unit kind for the affiliation-badge order: Staffel (0) before
+   * Spezialkommando (1) before Bereich (2). The Organisationsleitung (3) is never queried into a
+   * badge (it is absent from {@link #BADGE_KINDS}); it is ranked last only to keep the switch
+   * exhaustive.
+   *
+   * @param kind the org-unit kind.
+   * @return the badge sort rank (lower sorts first).
+   */
+  private static int badgeRank(OrgUnitKind kind) {
+    return switch (kind) {
+      case SQUADRON -> 0;
+      case SPECIAL_COMMAND -> 1;
+      case BEREICH -> 2;
+      case ORGANISATIONSLEITUNG -> 3;
+    };
   }
 
   /**
@@ -869,7 +1000,7 @@ public class MaterialExchangeService {
     if (query == null || query.isBlank()) {
       return null;
     }
-    return "%" + query.trim().toLowerCase(Locale.ROOT) + "%";
+    return LikePatterns.contains(query.trim().toLowerCase(Locale.ROOT));
   }
 
   /**

@@ -101,7 +101,7 @@
                 <label th:text="#{member.join_date}">Beitrittsdatum</label>
                 <input type="date" name="joinDate"
                        th:value="*{joinDate}"
-                       style="min-height:44px;" />
+                       class="krtm-min-height-44px-1df5" />
             </div>
 
             <!-- Staffel memberships (admin-only, since /members/{id}/edit is admin-only). REQ-ORG-017:
@@ -122,9 +122,9 @@
 
                 <th:block th:if="${memberEditForm.staffelDetailLoaded}">
                 <!-- Slot 1 -->
-                <div class="staffel-slot hud-box" style="padding:1rem; margin-bottom:0.75rem;">
+                <div class="staffel-slot hud-box krtm-padding-1rem-margin-bottom-0-75rem-cbd2">
                     <label for="staffel1-select" th:text="#{members.staffel.slot1}">Staffel 1</label>
-                    <select id="staffel1-select" class="staffel-select" name="staffel1Id" style="min-height:44px;">
+                    <select id="staffel1-select" class="staffel-select krtm-min-height-44px-1df5" name="staffel1Id">
                         <option value=""
                                 th:selected="${memberEditForm.staffel1Id == null}"
                                 th:text="#{members.field.squadron.unassigned}">-- Keine --</option>
@@ -133,14 +133,14 @@
                                 th:selected="${memberEditForm.staffel1Id != null and memberEditForm.staffel1Id == sq.id()}"
                                 th:text="|${sq.shorthand()} — ${sq.name()}|">IRI — IRIDIUM</option>
                     </select>
-                    <div style="display:flex; flex-direction:column; gap:0.5rem; margin-top:0.5rem;">
-                        <label style="display:flex; align-items:center; gap:0.5rem;">
+                    <div class="krtm-display-flex-flex-direction-column-gap-0-5re-4fed">
+                        <label class="krtm-display-flex-align-items-center-gap-0-5rem-be72">
                             <input type="hidden" name="_staffel1Logistician" value="on" />
                             <input type="checkbox" name="staffel1Logistician"
                                    th:checked="${memberEditForm.staffel1Logistician}" />
                             <span th:text="#{members.is_logistician}">Logistiker</span>
                         </label>
-                        <label style="display:flex; align-items:center; gap:0.5rem;">
+                        <label class="krtm-display-flex-align-items-center-gap-0-5rem-be72">
                             <input type="hidden" name="_staffel1MissionManager" value="on" />
                             <input type="checkbox" name="staffel1MissionManager"
                                    th:checked="${memberEditForm.staffel1MissionManager}" />
@@ -150,12 +150,10 @@
                 </div>
 
                 <!-- Slot 2 (optional, REQ-ORG-017 second Staffel) -->
-                <div id="staffel-slot-2" class="staffel-slot hud-box"
-                     th:style="${memberEditForm.staffel2Id == null}
-                               ? 'display:none; padding:1rem; margin-bottom:0.75rem;'
-                               : 'padding:1rem; margin-bottom:0.75rem;'">
+                <div id="staffel-slot-2" class="staffel-slot hud-box krtm-pad-1rem-mb-075"
+                     th:classappend="${memberEditForm.staffel2Id == null} ? 'krtm-hidden' : ''">
                     <label for="staffel2-select" th:text="#{members.staffel.slot2}">Staffel 2</label>
-                    <select id="staffel2-select" class="staffel-select" name="staffel2Id" style="min-height:44px;">
+                    <select id="staffel2-select" class="staffel-select krtm-min-height-44px-1df5" name="staffel2Id">
                         <option value=""
                                 th:selected="${memberEditForm.staffel2Id == null}"
                                 th:text="#{members.field.squadron.unassigned}">-- Keine --</option>
@@ -164,26 +162,26 @@
                                 th:selected="${memberEditForm.staffel2Id != null and memberEditForm.staffel2Id == sq.id()}"
                                 th:text="|${sq.shorthand()} — ${sq.name()}|">IRI — IRIDIUM</option>
                     </select>
-                    <div style="display:flex; flex-direction:column; gap:0.5rem; margin-top:0.5rem;">
-                        <label style="display:flex; align-items:center; gap:0.5rem;">
+                    <div class="krtm-display-flex-flex-direction-column-gap-0-5re-4fed">
+                        <label class="krtm-display-flex-align-items-center-gap-0-5rem-be72">
                             <input type="hidden" name="_staffel2Logistician" value="on" />
                             <input type="checkbox" name="staffel2Logistician"
                                    th:checked="${memberEditForm.staffel2Logistician}" />
                             <span th:text="#{members.is_logistician}">Logistiker</span>
                         </label>
-                        <label style="display:flex; align-items:center; gap:0.5rem;">
+                        <label class="krtm-display-flex-align-items-center-gap-0-5rem-be72">
                             <input type="hidden" name="_staffel2MissionManager" value="on" />
                             <input type="checkbox" name="staffel2MissionManager"
                                    th:checked="${memberEditForm.staffel2MissionManager}" />
                             <span th:text="#{members.is_mission_manager}">Missions-Manager</span>
                         </label>
                     </div>
-                    <button type="button" class="btn btn-ghost" id="staffel-remove-2"
-                            style="margin-top:0.75rem;" th:text="#{members.staffel.remove}">Entfernen</button>
+                    <button type="button" class="btn btn-ghost krtm-margin-top-0-75rem-3666" id="staffel-remove-2"
+                            th:text="#{members.staffel.remove}">Entfernen</button>
                 </div>
 
                 <button type="button" class="btn btn-ghost" id="staffel-add-2"
-                        th:style="${memberEditForm.staffel2Id == null} ? '' : 'display:none;'"
+                        th:classappend="${memberEditForm.staffel2Id != null} ? 'krtm-hidden' : ''"
                         th:text="#{members.staffel.add_second}">Zweite Staffel hinzufügen</button>
                 </th:block>
             </div>
@@ -204,8 +202,8 @@
         <p th:if="${memberMemberships == null or memberMemberships.isEmpty()}"
            th:text="#{members.memberships.none}">Keine Mitgliedschaften.</p>
         <ul th:if="${memberMemberships != null and !memberMemberships.isEmpty()}"
-            class="memberships-list" style="list-style:none; padding-left:0;">
-            <li th:each="m : ${memberMemberships}" style="margin: 0.4rem 0; display:flex; gap:0.6rem; align-items:center;">
+            class="memberships-list krtm-list-style-none-padding-left-0-b13a">
+            <li th:each="m : ${memberMemberships}" class="krtm-margin-0-4rem-0-display-flex-gap-0-6rem-alig-9fe8">
                 <span class="squadron-badge"
                       th:classappend="${m.kind() == 'SPECIAL_COMMAND' ? ' squadron-badge-sk' : ''}"
                       th:text="${m.orgUnitShorthand() != null ? m.orgUnitShorthand() : m.orgUnitName()}">IRI</span>

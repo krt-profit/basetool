@@ -26,12 +26,12 @@
 <main>
     <div class="greeting hud-box">
         <h1 th:text="#{admin.bank.title}">Bank-Administration</h1>
-        <p class="text-muted" style="margin: 0.25rem 0 0; font-size: 0.8rem;"
+        <p class="text-muted krtm-margin-0-25rem-0-0-font-size-0-8rem-cb15"
            th:text="#{admin.bank.subtitle}">Gef&auml;hrliche Wartungsaktionen der Kartellbank.</p>
     </div>
 
     <!-- Flash banners: success counts / idempotent no-op / error. -->
-    <div th:if="${wipeResult != null}" class="hud-box mt-2" style="border-color: var(--color-success);"
+    <div th:if="${wipeResult != null}" class="hud-box mt-2 krtm-border-color-var-color-success-77db"
          data-testid="bank-wipe-success">
         <p th:text="#{admin.bank.wipe.success(${wipeResult.accountsReset()}, ${wipeResult.holderStashesZeroed()})}">
             5 Konten und 12 Halter-Best&auml;nde auf 0 gesetzt.</p>
@@ -39,7 +39,7 @@
     <div th:if="${wipeNoop != null}" class="hud-box mt-2" data-testid="bank-wipe-noop">
         <p th:text="#{admin.bank.wipe.noop}">Alle Salden waren bereits 0 — nichts zu tun.</p>
     </div>
-    <div th:if="${error != null}" class="hud-box mt-2" style="border-color: var(--color-danger);"
+    <div th:if="${error != null}" class="hud-box mt-2 krtm-border-color-var-color-danger-b169"
          data-testid="bank-wipe-error">
         <p th:text="#{${error}}">Fehler.</p>
     </div>

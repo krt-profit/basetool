@@ -121,6 +121,8 @@ class InventoryOperationsE2eTest {
   private static String overbookItemId;
   private static String sameLocMatId;
   private static String sameLocItemId;
+  private static String viewStateMatId;
+  private static String viewStateItemId;
 
   /**
    * Launches the browser, performs the single shared login, and (ephemeral stack only) seeds the
@@ -191,6 +193,13 @@ class InventoryOperationsE2eTest {
     sameLocItemId =
         seeder.createInventoryItem(
             USERNAME, PASSWORD, sameLocMatId, refineryHubLocId, SEED_QUALITY, 50);
+
+    // Isolated row for the tree view-state persistence test: a partial DISCARD leaves the row (and
+    // its item id) in place, so the leaf must resurface after the post-write re-swap.
+    viewStateMatId = seeder.createRefineryMaterial(USERNAME, PASSWORD, "E2E Inv View State Mat");
+    viewStateItemId =
+        seeder.createInventoryItem(
+            USERNAME, PASSWORD, viewStateMatId, opsHubLocId, SEED_QUALITY, 100);
   }
 
   /** Releases the browser and the Playwright driver process. */
@@ -475,6 +484,45 @@ class InventoryOperationsE2eTest {
           // id),
           // not the server-rendered flash toast — the AJAX path never re-renders the page.
           assertThat(page.locator(".notification-toast.error-toast").first()).isVisible();
+        });
+  }
+
+  /**
+   * REQ-INV-002 view-state persistence: a modal write must not collapse the tree the user was
+   * working in. Expands the material group and its stack (so the leaf is loaded and visible), books
+   * out a partial amount in place, and asserts the same leaf row is visible again <em>without any
+   * manual re-expand</em> — the post-write grouped-table re-swap restores the persisted group +
+   * stack expansion from {@code localStorage} and re-loads the entries. The assertion waits on the
+   * restore-triggered stack-entries GET first, so the leaf is checked against the freshly
+   * re-swapped DOM rather than the pre-swap one.
+   */
+  @Test
+  void inPlaceBookOutKeepsTheExpandedTreeState() {
+    runFlow(
+        "inventory-viewstate-persist",
+        page -> {
+          openBookOutModal(page, viewStateMatId, viewStateItemId);
+          page.locator("input[name='type'][value='DISCARD']").check();
+          page.locator("#amount").fill("10");
+
+          page.evaluate("window.__krtNoReload = true;");
+          page.evaluate(
+              "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
+                  + " 'none'; } }");
+          // The book-out re-swaps the grouped table, and the restore re-fetches this stack's
+          // entries; wait for that post-write GET so the leaf is asserted against the restored DOM.
+          page.waitForResponse(
+              r -> r.url().contains("/stack/entries") && "GET".equals(r.request().method()),
+              () -> page.locator("#bookOutSubmitBtn").click());
+
+          assertEquals(
+              Boolean.TRUE,
+              page.evaluate("window.__krtNoReload === true"),
+              "the in-place book-out must not reload the page");
+          // 20 s, not the 5 s default: the re-swap + lazy stack-entries re-fetch is slow on WebKit
+          // under CI load.
+          assertThat(page.locator("div.tree-row--leaf[data-item-id='" + viewStateItemId + "']"))
+              .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
         });
   }
 

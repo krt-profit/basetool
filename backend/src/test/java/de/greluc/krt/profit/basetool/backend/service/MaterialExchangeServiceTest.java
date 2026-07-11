@@ -33,26 +33,34 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.event.MaterialExchangeInterestRegisteredEvent;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.model.Bereich;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeInterest;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOffer;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferKind;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
+import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
+import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeItemReleaseRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeOfferDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeOfferUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleasableItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleaseRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeInterestRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
+import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
@@ -90,7 +98,8 @@ class MaterialExchangeServiceTest {
   @Mock private AuthHelperService authHelperService;
   @Mock private AuditService auditService;
   @Mock private UserMapper userMapper;
-  @Mock private SquadronMapper squadronMapper;
+  @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
+  @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private BlueprintProductService blueprintProductService;
   @Mock private OwnerScopeService ownerScopeService;
   @Mock private ApplicationEventPublisher eventPublisher;
@@ -111,7 +120,6 @@ class MaterialExchangeServiceTest {
     Material material = material("Agricium");
     InventoryItem item = item(owner, material, 796, 340.0);
     offer = offer(offerId, item, owner);
-    lenient().when(authHelperService.currentSquadronId()).thenReturn(Optional.empty());
     lenient()
         .when(userMapper.toReferenceDto(any()))
         .thenReturn(new UserReferenceDto(ownerId, "Anbieter", "Anbieter", "Anbieter", null));
@@ -152,6 +160,65 @@ class MaterialExchangeServiceTest {
     assertThat(dto.mine()).isTrue();
     assertThat(dto.interestCount()).isEqualTo(2);
     assertThat(dto.interestedHandles()).containsExactly("Mara", "Hex");
+  }
+
+  /**
+   * The offer carries <b>every</b> badge-kind org unit the Anbieter belongs to (no "primary"
+   * Staffel): Staffel(n) first, then Spezialkommando(s), then Bereich(e), each name-sorted
+   * (REQ-MARKET-001). A member of two Staffeln, one SK and one Bereich surfaces all four
+   * affiliation badges — in that kind order — to any viewer.
+   */
+  @Test
+  void detail_ownerOrgUnits_listsStaffelnThenSksThenBereicheNameSorted() {
+    UUID staffelBravoId = UUID.randomUUID();
+    UUID staffelAlphaId = UUID.randomUUID();
+    UUID skId = UUID.randomUUID();
+    UUID bereichId = UUID.randomUUID();
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
+    when(offerRepository.findWithDetailById(offerId)).thenReturn(Optional.of(offer));
+    when(interestRepository.countByOfferId(offerId)).thenReturn(0L);
+    // Rows returned in a deliberately unsorted order to prove the service imposes the ordering.
+    when(orgUnitMembershipRepository.findAllByIdUserIdInAndKindIn(any(), any()))
+        .thenReturn(
+            List.of(
+                membership(ownerId, bereichId, OrgUnitKind.BEREICH),
+                membership(ownerId, staffelBravoId, OrgUnitKind.SQUADRON),
+                membership(ownerId, skId, OrgUnitKind.SPECIAL_COMMAND),
+                membership(ownerId, staffelAlphaId, OrgUnitKind.SQUADRON)));
+    when(orgUnitRepository.findAllById(any()))
+        .thenReturn(
+            List.of(
+                bereich(bereichId, "Profit", "PROFIT"),
+                squadron(staffelBravoId, "Bravo", "BRV"),
+                specialCommand(skId, "Zulu Kommando", "ZK"),
+                squadron(staffelAlphaId, "Alpha", "ALP")));
+
+    MaterialExchangeOfferDto dto = service.detail(offerId);
+
+    assertThat(dto.ownerOrgUnits())
+        .extracting(OrgUnitReferenceDto::shorthand)
+        .containsExactly("ALP", "BRV", "ZK", "PROFIT");
+    assertThat(dto.ownerOrgUnits())
+        .extracting(OrgUnitReferenceDto::kind)
+        .containsExactly(
+            OrgUnitKind.SQUADRON,
+            OrgUnitKind.SQUADRON,
+            OrgUnitKind.SPECIAL_COMMAND,
+            OrgUnitKind.BEREICH);
+  }
+
+  /** An Anbieter with no org-unit membership surfaces no affiliation badges (empty, never null). */
+  @Test
+  void detail_ownerWithoutMembership_hasEmptyOrgUnits() {
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
+    when(offerRepository.findWithDetailById(offerId)).thenReturn(Optional.of(offer));
+    when(interestRepository.countByOfferId(offerId)).thenReturn(0L);
+    when(orgUnitMembershipRepository.findAllByIdUserIdInAndKindIn(any(), any()))
+        .thenReturn(List.of());
+
+    MaterialExchangeOfferDto dto = service.detail(offerId);
+
+    assertThat(dto.ownerOrgUnits()).isEmpty();
   }
 
   /** Releasing an item the caller does not own is forbidden. */
@@ -652,5 +719,36 @@ class MaterialExchangeServiceTest {
     interest.setId(UUID.randomUUID());
     interest.setInterestedUser(user);
     return interest;
+  }
+
+  private static OrgUnitMembership membership(UUID userId, UUID orgUnitId, OrgUnitKind kind) {
+    OrgUnitMembership membership = new OrgUnitMembership();
+    membership.setId(new OrgUnitMembershipId(userId, orgUnitId));
+    membership.setKind(kind);
+    return membership;
+  }
+
+  private static Squadron squadron(UUID id, String name, String shorthand) {
+    Squadron squadron = new Squadron();
+    squadron.setId(id);
+    squadron.setName(name);
+    squadron.setShorthand(shorthand);
+    return squadron;
+  }
+
+  private static SpecialCommand specialCommand(UUID id, String name, String shorthand) {
+    SpecialCommand specialCommand = new SpecialCommand();
+    specialCommand.setId(id);
+    specialCommand.setName(name);
+    specialCommand.setShorthand(shorthand);
+    return specialCommand;
+  }
+
+  private static Bereich bereich(UUID id, String name, String shorthand) {
+    Bereich bereich = new Bereich();
+    bereich.setId(id);
+    bereich.setName(name);
+    bereich.setShorthand(shorthand);
+    return bereich;
   }
 }

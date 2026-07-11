@@ -105,6 +105,26 @@ class MissionPresenceServiceTest {
   }
 
   @Test
+  void touch_refusesNewSectionsBeyondTheDistinctSectionCap() {
+    // Fill the mission to the distinct-section cap with unique keys — each is accepted.
+    for (int i = 0; i < MissionPresenceService.MAX_SECTIONS_PER_MISSION; i++) {
+      assertThat(service.touch(missionA, "section-" + i, "user-1", "User One")).isTrue();
+    }
+
+    // A further, previously-unseen section is refused (returns false, map stays at the cap) rather
+    // than growing — the memory-exhaustion guard against a crafted client looping focus frames with
+    // unique section keys.
+    assertThat(service.touch(missionA, "section-overflow", "user-1", "User One")).isFalse();
+    assertThat(service.snapshot(missionA, Instant.now()))
+        .hasSize(MissionPresenceService.MAX_SECTIONS_PER_MISSION)
+        .doesNotContainKey("section-overflow");
+
+    // An already-tracked section still accepts a new editor even while the mission is at the cap.
+    service.touch(missionA, "section-0", "user-2", "User Two");
+    assertThat(service.get(missionA, "section-0", "user-2")).isNotNull();
+  }
+
+  @Test
   void clear_shouldRemoveEntry_andBeIdempotent() {
     service.touch(missionA, "details", "user-1", "Alice");
 

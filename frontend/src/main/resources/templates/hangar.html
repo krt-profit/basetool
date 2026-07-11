@@ -292,7 +292,7 @@
     </div>
 
     <!-- Ship Modal -->
-    <div id="ship-modal" class="modal" style="display: none;" th:data-title-add="#{hangar.ship.add}" th:data-title-edit="#{hangar.ship.edit}">
+    <div id="ship-modal" class="modal krtm-display-none-5790" th:data-title-add="#{hangar.ship.add}" th:data-title-edit="#{hangar.ship.edit}">
         <div class="modal-content hud-box">
             <span class="close-modal">&times;</span>
             <h2 id="modal-title" th:text="#{hangar.ship.modal_title}">Schiff</h2>
@@ -338,13 +338,13 @@
                 </div>
                 <div class="form-group flex-gap-sm">
                     <input type="checkbox" id="ship-fitted" name="fitted" th:field="*{fitted}">
-                    <label for="ship-fitted" style="margin-bottom: 0;" th:text="#{hangar.ship.fitted.label}">Fitted (Einsatzbereit)</label>
+                    <label for="ship-fitted" class="krtm-margin-bottom-0-5043" th:text="#{hangar.ship.fitted.label}">Fitted (Einsatzbereit)</label>
                 </div>
                 <!-- R5.d.f owner-picker: hidden when the caller has ≤1 OrgUnit membership. -->
                 <th:block th:replace="~{fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=*{owningOrgUnitId}, required=false)}"></th:block>
-                <div style="display: flex; justify-content: space-between;">
+                <div class="krtm-display-flex-justify-content-space-between-be5f">
                     <button type="submit" class="btn btn--cta" data-testid="hangar-ship-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{hangar.ship.save}">Speichern</span></button>
-                    <button type="button" id="modal-delete-btn" class="btn btn-quiet-danger" style="display: none;"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{hangar.ship.delete}">Löschen</span></button>
+                    <button type="button" id="modal-delete-btn" class="btn btn-quiet-danger krtm-display-none-5790"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{hangar.ship.delete}">Löschen</span></button>
                 </div>
             </form>
         </div>
@@ -357,7 +357,7 @@
         <div class="form-row">
             <div class="form-group">
                 <label for="fleetview-file" th:text="#{hangar.import.label}">Fleetview-JSON-Datei</label>
-                <input type="file" id="fleetview-file" accept=".json,application/json" style="min-height:44px;">
+                <input type="file" id="fleetview-file" accept=".json,application/json" class="krtm-min-height-44px-1df5">
             </div>
             <button id="fleetview-import-btn" class="btn btn-outline" type="button"
                     th:text="#{hangar.import.btn}"
@@ -365,7 +365,7 @@
                     th:data-error-nofile="#{hangar.import.error.nofile}"
                     th:data-error-failed="#{hangar.import.error.failed}">Importieren</button>
         </div>
-        <p id="fleetview-status" class="import-status-msg" style="display:none;"></p>
+        <p id="fleetview-status" class="import-status-msg krtm-display-none-5790"></p>
 
         <!-- Delete All Ships Section -->
         <div class="delete-all-section">
@@ -380,8 +380,8 @@
     </div>
 
     <!-- Fleetview Import Result Modal -->
-    <div id="import-result-modal" class="modal" style="display:none; z-index:3200;">
-        <div class="modal-content hud-box" style="max-width:560px;">
+    <div id="import-result-modal" class="modal krtm-display-none-z-index-3200-e00a">
+        <div class="modal-content hud-box krtm-max-width-560px-6a9c">
             <h2 id="import-result-title" th:text="#{hangar.import.result.title}" class="mt-0">Import-Ergebnis</h2>
             <div class="stat-row">
                 <span th:text="#{hangar.import.result.imported}">Importiert</span>
@@ -395,23 +395,23 @@
                 <span th:text="#{hangar.import.result.duplicates}">Duplikate übersprungen</span>
                 <span id="import-res-duplicates">0</span>
             </div>
-            <div id="import-skip-section" style="display:none;">
-                <p style="margin-top:1rem; font-weight:700; color:var(--color-primary);" th:text="#{hangar.import.result.skipped_list}">Nicht erkannte Schiffe</p>
+            <div id="import-skip-section" class="krtm-display-none-5790">
+                <p class="krtm-margin-top-1rem-font-weight-700-color-var-co-65be" th:text="#{hangar.import.result.skipped_list}">Nicht erkannte Schiffe</p>
                 <div id="import-skip-list" class="skip-list"></div>
             </div>
-            <div id="import-dup-section" style="display:none;">
-                <p style="margin-top:1rem; font-weight:700; color:var(--color-primary);" th:text="#{hangar.import.result.duplicates_list}">Übersprungene Duplikate</p>
+            <div id="import-dup-section" class="krtm-display-none-5790">
+                <p class="krtm-margin-top-1rem-font-weight-700-color-var-co-65be" th:text="#{hangar.import.result.duplicates_list}">Übersprungene Duplikate</p>
                 <div id="import-dup-list" class="skip-list"></div>
             </div>
-            <div style="margin-top:1.5rem; text-align:right;">
+            <div class="krtm-margin-top-1-5rem-text-align-right-01f0">
                 <button id="import-result-close" class="btn btn-ghost" type="button" th:text="#{hangar.import.result.close}">Schließen</button>
             </div>
         </div>
     </div>
 
     <!-- Delete All Ships Confirmation Modal -->
-    <div id="delete-all-confirm-modal" class="modal" style="display:none; z-index: 3300;">
-        <div class="modal-content hud-box" style="max-width: 520px; text-align: center;">
+    <div id="delete-all-confirm-modal" class="modal krtm-display-none-z-index-3300-c2c8">
+        <div class="modal-content hud-box krtm-max-width-520px-text-align-center-b4d9">
             <h2 th:text="#{hangar.delete_all.modal.title}" class="mt-0">Hangar leeren</h2>
             <p th:text="#{hangar.delete_all.modal.body}" class="mb-2">Alle eigenen Schiffe wirklich löschen?</p>
             <div class="flex-center-gap">
@@ -422,8 +422,8 @@
     </div>
 
     <!-- Set Home Location Modal -->
-    <div id="home-location-modal" class="modal" style="display:none; z-index: 3300;">
-        <div class="modal-content hud-box" style="max-width: 520px;">
+    <div id="home-location-modal" class="modal krtm-display-none-z-index-3300-c2c8">
+        <div class="modal-content hud-box krtm-max-width-520px-acb4">
             <span class="close-modal-home">&times;</span>
             <h2 th:text="#{hangar.home_location.modal.title}" class="mt-0">Home-Location setzen</h2>
 
@@ -440,21 +440,21 @@
                     </select>
                 </div>
                 <p id="home-location-body" class="mb-2" th:text="#{hangar.home_location.modal.body(${totalShipCount})}">Setzt den Ort aller Schiffe auf die gewählte Home-Location.</p>
-                <div style="display: flex; justify-content: space-between;">
+                <div class="krtm-display-flex-justify-content-space-between-be5f">
                     <button type="button" class="btn btn-ghost close-home-cancel" th:text="#{general.cancel}">Abbrechen</button>
                     <button type="submit" class="btn btn--cta" th:text="#{hangar.home_location.confirm}">Bestätigen</button>
                 </div>
             </form>
 
-            <div th:if="${#lists.isEmpty(homeLocations)}" style="display:flex; justify-content:flex-end;">
+            <div th:if="${#lists.isEmpty(homeLocations)}" class="krtm-display-flex-justify-content-flex-end-da46">
                 <button type="button" class="btn btn-ghost close-home-cancel" th:text="#{general.cancel}">Abbrechen</button>
             </div>
         </div>
     </div>
 
     <!-- Delete Confirmation Modal -->
-    <div id="delete-confirm-modal" class="modal" style="display:none; z-index: 3100;">
-        <div class="modal-content hud-box" style="max-width: 500px; text-align: center;">
+    <div id="delete-confirm-modal" class="modal krtm-display-none-z-index-3100-25fb">
+        <div class="modal-content hud-box krtm-max-width-500px-text-align-center-ff4b">
             <h2 th:text="#{info.delete.confirm.title}" class="mt-0">Löschen bestätigen</h2>
             <p th:text="#{hangar.ship.delete_confirm}" class="mb-2">Schiff wirklich löschen?</p>
             <div class="flex-center-gap">

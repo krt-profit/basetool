@@ -182,7 +182,7 @@
             }
         });
         document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape' && modal.style.display === 'flex') {
+            if (e.key === 'Escape' && window.getComputedStyle(modal).display === 'flex') {
                 closeModal();
             }
         });

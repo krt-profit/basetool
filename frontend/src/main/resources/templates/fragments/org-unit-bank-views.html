@@ -52,7 +52,7 @@
              th:with="pct=${b.balance().doubleValue() / b.balanceTarget().doubleValue() * 100.0}">
             <div class="bank-target-bar" aria-hidden="true">
                 <div class="bank-target-bar-fill"
-                     th:attr="style='width:' + ${pct > 100 ? 100 : (pct < 0 ? 0 : pct)} + '%'"></div>
+                     th:attr="data-krtm-width=${pct > 100 ? 100 : (pct < 0 ? 0 : pct)}"></div>
             </div>
             <div class="ou-target-meta">
                 <b th:text="${#numbers.formatDecimal(pct, 1, 'NONE', 1, 'COMMA')} + ' %'">18,5 %</b>
@@ -124,7 +124,7 @@
              th:with="pct=${b.balance().doubleValue() / b.balanceTarget().doubleValue() * 100.0}">
             <div class="bank-target-bar" aria-hidden="true">
                 <div class="bank-target-bar-fill"
-                     th:attr="style='width:' + ${pct > 100 ? 100 : (pct < 0 ? 0 : pct)} + '%'"></div>
+                     th:attr="data-krtm-width=${pct > 100 ? 100 : (pct < 0 ? 0 : pct)}"></div>
             </div>
             <div class="ou-target-meta">
                 <b th:text="${#numbers.formatDecimal(pct, 1, 'NONE', 1, 'COMMA')} + ' %'">18,5 %</b>

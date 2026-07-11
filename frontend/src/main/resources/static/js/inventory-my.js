@@ -258,6 +258,10 @@ function filterMyInventory() {
         .then((response) => response.text())
         .then((html) => {
             container.outerHTML = html;
+            // A fragment swap does not re-fire DOMContentLoaded, so re-apply the persisted tree
+            // expansion (REQ-INV-002) — otherwise a filter change or a modal write collapses every
+            // row the user had opened.
+            restoreExpandedTree();
         })
         .catch((error) => {
             console.error('Error fetching filtered personal inventory:', error);
@@ -300,44 +304,131 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
+// ===================== Lager tree expand/collapse view-state persistence (REQ-INV-002) =========
+// The grouped tree (material group -> location stack -> lazy leaf entries) is re-rendered in place
+// on every grouped-table re-swap: a filter change AND — the bug this guards — every modal write
+// (book-out, Umbuchen and bulk-checkout all call filterMyInventory in their onSuccess). Because a
+// fragment swap replaces #inventoryTable wholesale and does NOT re-fire DOMContentLoaded, the
+// expanded state must be re-applied explicitly after each swap; otherwise closing a modal collapses
+// every row the user had opened. Both the material-group expansion (persisted as
+// expanded_rows_lager_*) and the location-stack expansion (persisted as expanded_stacks_lager_*)
+// live in localStorage, keyed per user, and are re-applied by restoreExpandedTree().
+
+// The per-user localStorage suffix taken from the tree's data-user-id, or null when the table is
+// absent / anonymous (nothing is then persisted).
+function lagerUserId() {
+    const table = document.getElementById('inventoryTable');
+    const userId = table ? table.getAttribute('data-user-id') : null;
+    return userId && userId !== 'unknown' ? userId : null;
+}
+
+// localStorage key holding the array of expanded material-group ids.
+function groupStorageKey() {
+    const userId = lagerUserId();
+    return userId ? 'expanded_rows_lager_' + userId : null;
+}
+
+// localStorage key holding the array of expanded stack ids.
+function stackStorageKey() {
+    const userId = lagerUserId();
+    return userId ? 'expanded_stacks_lager_' + userId : null;
+}
+
+// A stack's identity is exactly the page-less stack-entries URL its data-attributes build, so the
+// same stack maps to the same key across re-renders and a /my stack can never collide with a /all
+// one (they carry a different path prefix).
+function stackKey(headerRow) {
+    return buildStackEntriesUrl(headerRow, null);
+}
+
+// Reads a persisted expansion array, tolerating absent / corrupt storage.
+function readExpanded(key) {
+    if (!key) return [];
+    try {
+        return JSON.parse(localStorage.getItem(key) || '[]');
+    } catch (e) {
+        console.warn('LocalStorage error', e);
+        return [];
+    }
+}
+
+// Persists an expansion array, tolerating a storage write failure (quota / privacy mode).
+function writeExpanded(key, values) {
+    if (!key) return;
+    try {
+        localStorage.setItem(key, JSON.stringify(values));
+    } catch (e) {
+        console.warn('LocalStorage error', e);
+    }
+}
+
+// Re-applies the persisted material-group expansion to the freshly rendered tree.
+function restoreExpandedGroups() {
+    const expandedRows = readExpanded(groupStorageKey());
+    if (expandedRows.length === 0) return;
+    document.querySelectorAll('.tree-row--group').forEach(function (row) {
+        const materialId = row.getAttribute('data-material-id');
+        if (materialId && expandedRows.includes(materialId)) {
+            const nextRow = row.nextElementSibling;
+            const icon = row.querySelector('.toggle-icon');
+            if (nextRow && nextRow.classList.contains('tree-group-items')) {
+                nextRow.style.display = 'block';
+                if (icon) icon.textContent = '▼';
+            }
+        }
+    });
+}
+
+// Re-applies the persisted location-stack expansion and re-triggers the lazy entry load for each
+// restored stack (the re-rendered header comes back with data-stack-loaded="false", so the leaf
+// rows — carrying the fresh post-write amounts — are fetched again).
+function restoreExpandedStacks() {
+    const expandedStacks = readExpanded(stackStorageKey());
+    if (expandedStacks.length === 0) return;
+    document.querySelectorAll('.stack-header').forEach(function (row) {
+        if (!expandedStacks.includes(stackKey(row))) return;
+        const nextRow = row.nextElementSibling;
+        const icon = row.querySelector('.toggle-icon');
+        if (nextRow && nextRow.classList.contains('tree-stack-entries')) {
+            nextRow.style.display = 'block';
+            if (icon) icon.textContent = '▼';
+            if (row.getAttribute('data-stack-loaded') !== 'true') {
+                loadStackEntries(row, 0);
+            }
+        }
+    });
+}
+
+// Restores the whole tree (groups first, then their stacks) — run on initial load and after every
+// in-place grouped-table re-swap.
+function restoreExpandedTree() {
+    restoreExpandedGroups();
+    restoreExpandedStacks();
+}
+
 function toggleGroup(row) {
     const nextRow = row.nextElementSibling;
     const icon = row.querySelector('.toggle-icon');
     const materialId = row.getAttribute('data-material-id');
-    const table = row.closest('.tree-table');
-    const userId = table ? table.getAttribute('data-user-id') : 'unknown';
-    const storageKey = 'expanded_rows_lager_' + userId;
+    if (!nextRow || !nextRow.classList.contains('tree-group-items')) return;
 
-    if (nextRow && nextRow.classList.contains('tree-group-items')) {
-        let expandedRows = [];
-        try {
-            expandedRows = JSON.parse(localStorage.getItem(storageKey) || '[]');
-        } catch (e) {
-            console.warn('LocalStorage error', e);
+    const key = groupStorageKey();
+    const expandedRows = readExpanded(key);
+    if (window.getComputedStyle(nextRow).display === 'none') {
+        nextRow.style.display = 'block';
+        if (icon) icon.textContent = '▼';
+        if (materialId && !expandedRows.includes(materialId)) {
+            expandedRows.push(materialId);
+            writeExpanded(key, expandedRows);
         }
-
-        if (nextRow.style.display === 'none') {
-            nextRow.style.display = 'block';
-            icon.textContent = '▼';
-            if (materialId && !expandedRows.includes(materialId)) {
-                expandedRows.push(materialId);
-                try {
-                    localStorage.setItem(storageKey, JSON.stringify(expandedRows));
-                } catch (e) {
-                    console.warn('LocalStorage error', e);
-                }
-            }
-        } else {
-            nextRow.style.display = 'none';
-            icon.textContent = '▶';
-            if (materialId) {
-                expandedRows = expandedRows.filter((id) => id !== materialId);
-                try {
-                    localStorage.setItem(storageKey, JSON.stringify(expandedRows));
-                } catch (e) {
-                    console.warn('LocalStorage error', e);
-                }
-            }
+    } else {
+        nextRow.style.display = 'none';
+        if (icon) icon.textContent = '▶';
+        if (materialId) {
+            writeExpanded(
+                key,
+                expandedRows.filter((id) => id !== materialId),
+            );
         }
     }
 }
@@ -346,9 +437,17 @@ function toggleStack(row) {
     const nextRow = row.nextElementSibling;
     const icon = row.querySelector('.toggle-icon');
     if (!nextRow || !nextRow.classList.contains('tree-stack-entries')) return;
-    if (nextRow.style.display === 'none') {
+    const key = stackStorageKey();
+    const expandedStacks = readExpanded(key);
+    const id = stackKey(row);
+    if (window.getComputedStyle(nextRow).display === 'none') {
         nextRow.style.display = 'block';
         if (icon) icon.textContent = '▼';
+        // Persist so a later in-place re-swap (filter change or modal write) re-opens this stack.
+        if (id && !expandedStacks.includes(id)) {
+            expandedStacks.push(id);
+            writeExpanded(key, expandedStacks);
+        }
         // Append-only Lager: a stack's entries are not inlined. Fetch them on first
         // expand from /inventory/my/stack/entries (ADR-0003, REQ-INV-002); subsequent
         // toggles just reveal the already-loaded rows.
@@ -358,6 +457,12 @@ function toggleStack(row) {
     } else {
         nextRow.style.display = 'none';
         if (icon) icon.textContent = '▶';
+        if (id) {
+            writeExpanded(
+                key,
+                expandedStacks.filter((k) => k !== id),
+            );
+        }
     }
 }
 
@@ -434,34 +539,9 @@ function goToStackEntriesPage(btn) {
     loadStackEntries(headerRow, isNaN(page) ? 0 : page);
 }
 
-document.addEventListener('DOMContentLoaded', function () {
-    const table = document.getElementById('inventoryTable');
-    if (table) {
-        const userId = table.getAttribute('data-user-id');
-        if (userId && userId !== 'unknown') {
-            const storageKey = 'expanded_rows_lager_' + userId;
-            let expandedRows = [];
-            try {
-                expandedRows = JSON.parse(localStorage.getItem(storageKey) || '[]');
-            } catch {
-                /* ignore */
-            }
-            if (expandedRows.length > 0) {
-                document.querySelectorAll('.tree-row--group').forEach(function (row) {
-                    const materialId = row.getAttribute('data-material-id');
-                    if (materialId && expandedRows.includes(materialId)) {
-                        const nextRow = row.nextElementSibling;
-                        const icon = row.querySelector('.toggle-icon');
-                        if (nextRow && nextRow.classList.contains('tree-group-items')) {
-                            nextRow.style.display = 'block';
-                            icon.textContent = '▼';
-                        }
-                    }
-                });
-            }
-        }
-    }
-});
+// Restore the persisted tree expansion on initial load (the same restore runs after each in-place
+// grouped-table re-swap — see filterMyInventory).
+document.addEventListener('DOMContentLoaded', restoreExpandedTree);
 
 function updateAmountFromTarget() {
     const targetAmountInput = document.getElementById('targetAmount');
@@ -743,7 +823,7 @@ function submitUmbuchen(event) {
         const orgWrapper = document.getElementById('umbuchenPersonalOrgUnitWrapper');
         const orgSelect = document.getElementById('umbuchenPersonalOrgUnitId');
         const orgUnitId =
-            orgWrapper && orgWrapper.style.display !== 'none' && orgSelect
+            orgWrapper && window.getComputedStyle(orgWrapper).display !== 'none' && orgSelect
                 ? orgSelect.value || null
                 : null;
         payload = { amount: amount, version: version, targetOwningOrgUnitId: orgUnitId };

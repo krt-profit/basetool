@@ -215,7 +215,10 @@ class AdminMissionDataPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("admin/mission-data :: freqtypes-results"))
         .andExpect(content().string(containsString("Frag FT")))
-        .andExpect(content().string(containsString("class=\"draggable-row\"")))
+        // Prefix match: the row carries additional migrated utility classes after the CSP
+        // inline-style migration (e.g. krtm-cursor-grab-*), so assert the class attribute begins
+        // with draggable-row rather than pinning an exact single-class value.
+        .andExpect(content().string(containsString("class=\"draggable-row")))
         .andExpect(content().string(not(containsString("id=\"freqtypes-results\""))))
         .andExpect(content().string(not(containsString("id=\"squadrons-results\""))))
         .andExpect(content().string(not(containsString("id=\"frequency-type-modal\""))))

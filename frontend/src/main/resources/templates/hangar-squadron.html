@@ -108,8 +108,7 @@
              a Bereichsleitung the units of their Bereich, and the OL every ship. In admin "all
              org units" mode the bucket merges ships from every unit - tell the admin the totals
              span all of them. An active pin narrows the view back to the pinned unit. -->
-        <div th:if="${isAllSquadronsMode}" class="squadron-badge squadron-badge-muted"
-             style="display: block; padding: 0.6rem 0.9rem; margin-bottom: 1rem; border-radius: var(--radius-none); white-space: normal; text-align: left;"
+        <div th:if="${isAllSquadronsMode}" class="squadron-badge squadron-badge-muted krtm-display-block-padding-0-6rem-0-9rem-margin-b-3373"
              th:text="#{hangar.squadron.all_squadrons_notice}">
             Aggregation across all org units. Select a single org unit to filter.
         </div>
@@ -148,11 +147,11 @@
             <tbody>
             <th:block th:each="item : ${overview}">
             <tr class="sq-row">
-                <td th:text="${item.shipType.name}" style="vertical-align: top; padding-top: 1rem;">Typ</td>
-                <td th:text="${item.count} + ' (' + ${item.fittedCount} + ' ' + #{hangar.squadron.fitted} + ')'" style="vertical-align: top; padding-top: 1rem;">0 (0 gefittet)</td>
-                <td style="vertical-align: top; padding-top: 0.5rem;">
+                <td th:text="${item.shipType.name}" class="krtm-vertical-align-top-padding-top-1rem-7058">Typ</td>
+                <td th:text="${item.count} + ' (' + ${item.fittedCount} + ' ' + #{hangar.squadron.fitted} + ')'" class="krtm-vertical-align-top-padding-top-1rem-7058">0 (0 gefittet)</td>
+                <td class="krtm-vertical-align-top-padding-top-0-5rem-8539">
                     <details sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)" th:if="${item.details != null and !item.details.isEmpty()}">
-                        <summary class="btn btn-ghost" style="cursor: pointer; display: inline-flex; align-items: center; min-height: unset; padding: 0.25rem 0.75rem; font-size: 0.8rem; width: auto;" th:text="#{general.details}">Details</summary>
+                        <summary class="btn btn-ghost krtm-cursor-pointer-display-inline-flex-align-ite-c175" th:text="#{general.details}">Details</summary>
                     </details>
                 </td>
             </tr>
