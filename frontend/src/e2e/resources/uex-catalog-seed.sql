@@ -33,3 +33,12 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO refining_method (id, name)
 VALUES ('55555555-5555-5555-5555-555555555555', 'E2E Refining Method')
 ON CONFLICT (id) DO NOTHING;
+
+-- A city carrying a numeric id_city, required by the Mein Inventar (personal
+-- inventory) location typeahead: PersonalInventoryItemService.resolveLocationName
+-- looks the location up by id_city / id_space_station, and the UEX location search
+-- skips rows whose id_city is null. The refinery city above deliberately has no
+-- id_city, so PersonalInventoryCrudE2eTest seeds this distinct one to select.
+INSERT INTO city (id, name, id_city, has_refinery)
+VALUES ('66666666-6666-6666-6666-666666666666', 'E2E Personal Inventory City', 900001, false)
+ON CONFLICT (id) DO NOTHING;
