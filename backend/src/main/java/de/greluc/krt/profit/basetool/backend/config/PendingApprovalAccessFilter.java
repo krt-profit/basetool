@@ -20,14 +20,13 @@
 package de.greluc.krt.profit.basetool.backend.config;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.net.URI;
 import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -82,7 +81,7 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
   static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
 
   private final MessageSource messageSource;
-  private final AppProblemProperties problemProperties;
+  private final ProblemResponseFactory problemResponseFactory;
   private final ObjectMapper objectMapper;
   private final MeterRegistry meterRegistry;
 
@@ -126,18 +125,11 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
       throws IOException {
     String correlationId = UUID.randomUUID().toString();
     Locale locale = request.getLocale();
-    String title =
+    final String title =
         messageSource.getMessage("problem.pending_approval.title", null, "Forbidden", locale);
-    String detail =
+    final String detail =
         messageSource.getMessage(
             "problem.pending_approval.detail", null, "Account is pending admin approval.", locale);
-
-    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, detail);
-    problem.setTitle(title);
-    problem.setType(URI.create(problemProperties.getBaseUri() + "pending-approval"));
-    problem.setInstance(URI.create(request.getRequestURI()));
-    problem.setProperty("code", CODE_PENDING_APPROVAL);
-    problem.setProperty("correlationId", correlationId);
 
     log.warn(
         "Pending-approval user blocked on {} {} [correlationId={}]",
@@ -160,6 +152,15 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
     response.setHeader(CORRELATION_ID_HEADER, correlationId);
     // Write UTF-8 bytes directly rather than through getWriter(): the localized title/detail may
     // contain non-ASCII (German umlauts) and the servlet writer defaults to ISO-8859-1.
+    ProblemDetail problem =
+        problemResponseFactory.problem(
+            HttpStatus.FORBIDDEN,
+            title,
+            detail,
+            request.getRequestURI(),
+            "pending-approval",
+            CODE_PENDING_APPROVAL,
+            correlationId);
     response.getOutputStream().write(objectMapper.writeValueAsBytes(problem));
   }
 }

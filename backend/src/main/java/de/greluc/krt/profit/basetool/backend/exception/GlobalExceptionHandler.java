@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.exception;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.OptimisticLockException;
@@ -33,7 +34,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
@@ -104,6 +104,7 @@ public class GlobalExceptionHandler {
   private static final String MDC_CORRELATION_ID = "correlationId";
 
   private final AppProblemProperties problemProperties;
+  private final ProblemResponseFactory problemResponseFactory;
   private final MessageSource messageSource;
   private final MeterRegistry meterRegistry;
 
@@ -194,11 +195,7 @@ public class GlobalExceptionHandler {
    * the same id appear in log lines emitted during the same request.
    */
   private static String correlationId() {
-    String existing = MDC.get(MDC_CORRELATION_ID);
-    if (existing != null && !existing.isBlank()) {
-      return existing;
-    }
-    return UUID.randomUUID().toString();
+    return ProblemResponseFactory.correlationId();
   }
 
   /**
@@ -250,15 +247,14 @@ public class GlobalExceptionHandler {
       HttpServletRequest req,
       String typeSuffix,
       String code) {
-    ProblemDetail pd = ProblemDetail.forStatusAndDetail(status, detail);
-    pd.setTitle(title);
-    pd.setType(type(typeSuffix));
-    if (req != null) {
-      pd.setInstance(URI.create(req.getRequestURI()));
-    }
-    pd.setProperty("code", code);
-    pd.setProperty("correlationId", correlationId());
-    return pd;
+    return problemResponseFactory.problem(
+        status,
+        title,
+        detail,
+        req != null ? req.getRequestURI() : null,
+        typeSuffix,
+        code,
+        correlationId());
   }
 
   // --- 409 Optimistic Locking -----------------------------------------------------------

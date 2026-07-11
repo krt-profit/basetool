@@ -20,14 +20,13 @@
 package de.greluc.krt.profit.basetool.backend.config;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.net.URI;
 import java.nio.channels.UnresolvedAddressException;
 import java.util.Locale;
 import java.util.UUID;
@@ -100,7 +99,7 @@ public class IdentityProviderUnavailableFilter extends OncePerRequestFilter {
   private static final int MAX_CAUSE_DEPTH = 12;
 
   private final MessageSource messageSource;
-  private final AppProblemProperties problemProperties;
+  private final ProblemResponseFactory problemResponseFactory;
   private final ObjectMapper objectMapper;
   private final MeterRegistry meterRegistry;
 
@@ -108,17 +107,17 @@ public class IdentityProviderUnavailableFilter extends OncePerRequestFilter {
    * Creates the filter with the collaborators needed to render and count a localized RFC-7807 503.
    *
    * @param messageSource resolves the localized {@code problem.service_unavailable.*} title/detail
-   * @param problemProperties supplies the RFC-7807 {@code type} base URI
+   * @param problemResponseFactory assembles the RFC-7807 {@link ProblemDetail} body
    * @param objectMapper serializes the {@link ProblemDetail} with uniform JSON escaping
    * @param meterRegistry counts the re-mapped 503 on {@code basetool_http_error_total}
    */
   public IdentityProviderUnavailableFilter(
       @NotNull MessageSource messageSource,
-      @NotNull AppProblemProperties problemProperties,
+      @NotNull ProblemResponseFactory problemResponseFactory,
       @NotNull ObjectMapper objectMapper,
       @NotNull MeterRegistry meterRegistry) {
     this.messageSource = messageSource;
-    this.problemProperties = problemProperties;
+    this.problemResponseFactory = problemResponseFactory;
     this.objectMapper = objectMapper;
     this.meterRegistry = meterRegistry;
   }
@@ -198,23 +197,15 @@ public class IdentityProviderUnavailableFilter extends OncePerRequestFilter {
       throws IOException {
     String correlationId = correlationId();
     Locale locale = request.getLocale();
-    String title =
+    final String title =
         messageSource.getMessage(
             "problem.service_unavailable.title", null, "Service Unavailable", locale);
-    String detail =
+    final String detail =
         messageSource.getMessage(
             "problem.service_unavailable.detail",
             null,
             "The authentication service is temporarily unreachable. Please retry shortly.",
             locale);
-
-    ProblemDetail problem =
-        ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, detail);
-    problem.setTitle(title);
-    problem.setType(URI.create(problemProperties.getBaseUri() + TYPE_SUFFIX));
-    problem.setInstance(URI.create(request.getRequestURI()));
-    problem.setProperty("code", CODE_SERVICE_UNAVAILABLE);
-    problem.setProperty("correlationId", correlationId);
 
     // WARN, not ERROR: an unreachable identity provider is an availability event, not an
     // application fault — keeping it out of ERROR avoids inflating the logback error-rate signal
@@ -234,6 +225,15 @@ public class IdentityProviderUnavailableFilter extends OncePerRequestFilter {
     response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
     response.setHeader(HttpHeaders.RETRY_AFTER, RETRY_AFTER_SECONDS);
     response.setHeader(CORRELATION_ID_HEADER, correlationId);
+    ProblemDetail problem =
+        problemResponseFactory.problem(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            title,
+            detail,
+            request.getRequestURI(),
+            TYPE_SUFFIX,
+            CODE_SERVICE_UNAVAILABLE,
+            correlationId);
     response.getOutputStream().write(objectMapper.writeValueAsBytes(problem));
   }
 
