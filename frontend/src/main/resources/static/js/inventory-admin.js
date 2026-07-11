@@ -318,7 +318,7 @@ function toggleGroup(row) {
 
     const key = groupStorageKey();
     const expandedRows = readExpanded(key);
-    if (nextRow.style.display === 'none') {
+    if (window.getComputedStyle(nextRow).display === 'none') {
         nextRow.style.display = 'block';
         if (icon) icon.textContent = '▼';
         if (materialId && !expandedRows.includes(materialId)) {
@@ -344,7 +344,7 @@ function toggleStack(row) {
     const key = stackStorageKey();
     const expandedStacks = readExpanded(key);
     const id = stackKey(row);
-    if (nextRow.style.display === 'none') {
+    if (window.getComputedStyle(nextRow).display === 'none') {
         nextRow.style.display = 'block';
         if (icon) icon.textContent = '▼';
         // Persist so a later in-place re-swap (filter change or modal write) re-opens this stack.

@@ -30,7 +30,7 @@
 function toggleInfo() {
     const body = document.getElementById('info-body');
     const icon = document.getElementById('info-toggle-icon');
-    if (body.style.display === 'none') {
+    if (window.getComputedStyle(body).display === 'none') {
         body.style.display = 'block';
         icon.innerText = '▼';
     } else {

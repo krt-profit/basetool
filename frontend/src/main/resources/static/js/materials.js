@@ -104,7 +104,10 @@ function onToggleGrouping() {
 function toggleKindGroup(element) {
     const content = element.nextElementSibling;
     const icon = element.querySelector('.toggle-icon');
-    if (content.style.display === 'none' || content.style.display === '') {
+    if (
+        window.getComputedStyle(content).display === 'none' ||
+        window.getComputedStyle(content).display === ''
+    ) {
         content.style.display = 'grid'; // or block depending on css, grid-auto-cards needs grid
         icon.textContent = '−';
     } else {
