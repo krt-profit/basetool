@@ -47,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitLabels;
 import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -451,7 +452,7 @@ public class OrgUnitMembershipService {
     auditService.record(
         AuditEventType.MEMBERSHIP_GRANTED,
         sc.getId(),
-        orgUnitLabel(sc),
+        OrgUnitLabels.shorthandOrName(sc),
         userId,
         "kind=SPECIAL_COMMAND");
     return saved;
@@ -492,7 +493,7 @@ public class OrgUnitMembershipService {
     auditService.record(
         AuditEventType.MEMBERSHIP_REVOKED,
         sc.getId(),
-        orgUnitLabel(sc),
+        OrgUnitLabels.shorthandOrName(sc),
         userId,
         "kind=SPECIAL_COMMAND");
     orgUnitBankAccessServiceProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
@@ -570,7 +571,7 @@ public class OrgUnitMembershipService {
     auditService.record(
         firstGrant ? AuditEventType.ROLE_GRANTED : AuditEventType.ROLE_CHANGED,
         bereich.getId(),
-        orgUnitLabel(bereich),
+        OrgUnitLabels.shorthandOrName(bereich),
         userId,
         firstGrant ? "role=" + saved.getRole() : "from=" + previousRole + " to=" + saved.getRole());
     orgUnitBankAccessServiceProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
@@ -659,7 +660,11 @@ public class OrgUnitMembershipService {
     // Mirror the OL seat onto the descriptive chart in the same transaction (REQ-ROLE-006).
     orgChartService.mirrorOlMember(ol.getId(), userId);
     auditService.record(
-        AuditEventType.ROLE_GRANTED, ol.getId(), orgUnitLabel(ol), userId, "role=OL_MEMBER");
+        AuditEventType.ROLE_GRANTED,
+        ol.getId(),
+        OrgUnitLabels.shorthandOrName(ol),
+        userId,
+        "role=OL_MEMBER");
     orgUnitBankAccessServiceProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
     return saved;
   }
@@ -773,7 +778,7 @@ public class OrgUnitMembershipService {
     auditService.record(
         AuditEventType.CAPABILITY_FLAGS_CHANGED,
         squadron.getId(),
-        orgUnitLabel(squadron),
+        OrgUnitLabels.shorthandOrName(squadron),
         userId,
         AuditDetails.of("logistician", saved.isLogistician())
             .with("missionManager", saved.isMissionManager()));
@@ -915,7 +920,7 @@ public class OrgUnitMembershipService {
         auditService.record(
             AuditEventType.MEMBERSHIP_GRANTED,
             squadronId,
-            orgUnitLabel(sq),
+            OrgUnitLabels.shorthandOrName(sq),
             user.getId(),
             "kind=SQUADRON");
         addedSquadrons.add(sq);
@@ -1564,32 +1569,13 @@ public class OrgUnitMembershipService {
 
   /**
    * Loads an org unit by id and resolves its audit {@code subjectLabel} via {@link
-   * #orgUnitLabel(OrgUnit)}, or {@code null} when the org unit cannot be resolved (e.g. already
-   * deleted). Used by the delete / patch audit paths that hold only the org-unit id.
+   * OrgUnitLabels#shorthandOrName(OrgUnit)}, or {@code null} when the org unit cannot be resolved
+   * (e.g. already deleted). Used by the delete / patch audit paths that hold only the org-unit id.
    *
    * @param orgUnitId the org unit id; never {@code null}.
    * @return the org unit's shorthand/name label, or {@code null}.
    */
   private @org.jetbrains.annotations.Nullable String orgUnitLabelById(@NotNull UUID orgUnitId) {
-    return orgUnitRepository
-        .findById(orgUnitId)
-        .map(OrgUnitMembershipService::orgUnitLabel)
-        .orElse(null);
-  }
-
-  /**
-   * Resolves a compact, non-personal audit label for an org unit: its shorthand, falling back to
-   * its name. Used as the {@code subjectLabel} on role / membership audit events.
-   *
-   * @param unit the org unit, or {@code null}.
-   * @return the shorthand if set, otherwise the name, otherwise {@code null}.
-   */
-  private static @org.jetbrains.annotations.Nullable String orgUnitLabel(
-      @org.jetbrains.annotations.Nullable OrgUnit unit) {
-    if (unit == null) {
-      return null;
-    }
-    String shorthand = unit.getShorthand();
-    return shorthand != null && !shorthand.isBlank() ? shorthand : unit.getName();
+    return orgUnitRepository.findById(orgUnitId).map(OrgUnitLabels::shorthandOrName).orElse(null);
   }
 }

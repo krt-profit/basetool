@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipReposit
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitLabels;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -130,7 +131,7 @@ public class KommandoGroupService {
         saved.getId(),
         saved.getName(),
         null,
-        AuditDetails.of("squadron", orgUnitLabel(squadron)));
+        AuditDetails.of("squadron", OrgUnitLabels.shorthandOrName(squadron)));
     return kommandoGroupMapper.toDto(saved);
   }
 
@@ -211,18 +212,5 @@ public class KommandoGroupService {
    */
   private static void assertVersionMatches(@NotNull KommandoGroup group, java.lang.Long version) {
     OptimisticLock.check(group.getVersion(), version, KommandoGroup.class, group.getId());
-  }
-
-  /**
-   * A compact non-personal label for an org unit (shorthand, falling back to name) for audit
-   * details.
-   *
-   * @param unit the org unit; never {@code null}.
-   * @return the shorthand if set, otherwise the name.
-   */
-  @NotNull
-  private static String orgUnitLabel(@NotNull OrgUnit unit) {
-    String shorthand = unit.getShorthand();
-    return shorthand != null && !shorthand.isBlank() ? shorthand : unit.getName();
   }
 }
