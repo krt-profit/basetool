@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.repository.OperationPayoutStatusRep
 import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -225,7 +226,7 @@ public class OperationService {
             : status;
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     return operationRepository.searchOperations(
-        query,
+        LikePatterns.escapeNullable(query),
         start,
         end,
         effectiveStatus,
