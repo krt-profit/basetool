@@ -34,12 +34,15 @@ import de.greluc.krt.profit.basetool.backend.event.UserApprovalDecidedEvent;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalDecision;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
+import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.UserApprovalEvent;
 import de.greluc.krt.profit.basetool.backend.repository.UserApprovalEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -48,16 +51,22 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.test.util.ReflectionTestUtils;
 
-/** Mockito unit tests for the registration approve/reject path on {@link UserService}. */
+/**
+ * Mockito unit tests for {@link UserRegistrationService} — the registration approval lifecycle
+ * (approve / reject / decide, the pending-queue read) plus the shared {@link
+ * UserRegistrationService#stampNewPendingRegistration} fail-safe PENDING stamping, extracted out of
+ * {@code UserService} (audit Thema&nbsp;7, #1252).
+ */
 @ExtendWith(MockitoExtension.class)
-class UserServiceApprovalTest {
+class UserRegistrationServiceTest {
 
   @Mock private UserRepository userRepository;
   @Mock private UserApprovalEventRepository userApprovalEventRepository;
   @Mock private ApplicationEventPublisher eventPublisher;
 
-  @InjectMocks private UserService userService;
+  @InjectMocks private UserRegistrationService userRegistrationService;
 
   private static final UUID USER_ID = UUID.randomUUID();
   private static final UUID ADMIN_ID = UUID.randomUUID();
@@ -70,6 +79,13 @@ class UserServiceApprovalTest {
     return u;
   }
 
+  private static Role roleWithCode(String code) {
+    Role r = new Role();
+    r.setName(code);
+    r.setCode(code);
+    return r;
+  }
+
   @Test
   void approveUser_setsActive_stampsAdmin_andAuditsApproved() {
     User user = pendingUser(3L);
@@ -78,7 +94,7 @@ class UserServiceApprovalTest {
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
     when(userRepository.saveAndFlush(user)).thenReturn(user);
 
-    User result = userService.approveUser(USER_ID, 3L, ADMIN_ID);
+    User result = userRegistrationService.approveUser(USER_ID, 3L, ADMIN_ID);
 
     assertEquals(ApprovalStatus.ACTIVE, result.getApprovalStatus());
     assertEquals(ADMIN_ID, result.getApprovedById());
@@ -108,7 +124,7 @@ class UserServiceApprovalTest {
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
     when(userRepository.saveAndFlush(user)).thenReturn(user);
 
-    User result = userService.rejectUser(USER_ID, "not a real member", 0L, ADMIN_ID);
+    User result = userRegistrationService.rejectUser(USER_ID, "not a real member", 0L, ADMIN_ID);
 
     assertEquals(ApprovalStatus.REJECTED, result.getApprovalStatus());
     ArgumentCaptor<UserApprovalEvent> audit = ArgumentCaptor.forClass(UserApprovalEvent.class);
@@ -131,7 +147,7 @@ class UserServiceApprovalTest {
 
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
-        () -> userService.approveUser(USER_ID, 3L, ADMIN_ID));
+        () -> userRegistrationService.approveUser(USER_ID, 3L, ADMIN_ID));
 
     verify(userApprovalEventRepository, never()).save(any());
     // No decision-mail event on a rejected (409) decision.
@@ -148,11 +164,73 @@ class UserServiceApprovalTest {
 
     assertThrows(
         BusinessConflictException.class,
-        () -> userService.rejectUser(USER_ID, "oops", 2L, ADMIN_ID));
+        () -> userRegistrationService.rejectUser(USER_ID, "oops", 2L, ADMIN_ID));
 
     verify(userApprovalEventRepository, never()).save(any());
     // No decision-mail event when the decision itself conflicts (409).
     verify(eventPublisher, never()).publishEvent(any());
     assertEquals(ApprovalStatus.ACTIVE, active.getApprovalStatus());
+  }
+
+  /**
+   * Tests for {@link UserRegistrationService#stampNewPendingRegistration}, the shared fail-safe
+   * PENDING stamping applied by both Keycloak reconciliation sync paths.
+   */
+  @Nested
+  class StampNewPendingRegistrationTests {
+
+    @Test
+    void stampsPending_andReturnsTrue_forBrandNewNonAdmin() {
+      User user = new User();
+
+      boolean stamped =
+          userRegistrationService.stampNewPendingRegistration(
+              user, true, Set.of(roleWithCode("Guest")));
+
+      assertTrue(stamped);
+      assertEquals(ApprovalStatus.PENDING, user.getApprovalStatus());
+    }
+
+    @Test
+    void doesNotStamp_forBrandNewAdmin() {
+      User user = new User();
+      ApprovalStatus before = user.getApprovalStatus();
+
+      boolean stamped =
+          userRegistrationService.stampNewPendingRegistration(
+              user, true, Set.of(roleWithCode("ADMIN")));
+
+      assertFalse(stamped);
+      assertEquals(before, user.getApprovalStatus(), "an admin keeps the entity-default status");
+    }
+
+    @Test
+    void doesNotStamp_forExistingUser() {
+      User user = new User();
+      ApprovalStatus before = user.getApprovalStatus();
+
+      boolean stamped =
+          userRegistrationService.stampNewPendingRegistration(
+              user, false, Set.of(roleWithCode("Guest")));
+
+      assertFalse(stamped);
+      assertEquals(before, user.getApprovalStatus());
+    }
+
+    @Test
+    void doesNotStamp_whenApprovalGateDisabled() {
+      // The e2e carve-out (APP_REGISTRATION_REQUIRE_APPROVAL=false): a brand-new non-admin keeps
+      // the ACTIVE entity default so the fixture seeder is not blocked on an interactive approval.
+      ReflectionTestUtils.setField(userRegistrationService, "requireApproval", false);
+      User user = new User();
+      ApprovalStatus before = user.getApprovalStatus();
+
+      boolean stamped =
+          userRegistrationService.stampNewPendingRegistration(
+              user, true, Set.of(roleWithCode("Guest")));
+
+      assertFalse(stamped);
+      assertEquals(before, user.getApprovalStatus());
+    }
   }
 }

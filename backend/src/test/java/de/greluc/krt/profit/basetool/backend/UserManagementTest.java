@@ -36,7 +36,7 @@ import de.greluc.krt.profit.basetool.backend.model.UserApprovalEvent;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserApprovalEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
+import de.greluc.krt.profit.basetool.backend.service.UserDeletionService;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,7 +64,7 @@ class UserManagementTest {
 
   @Autowired private UserRepository userRepository;
 
-  @Autowired private UserService userService;
+  @Autowired private UserDeletionService userDeletionService;
 
   @Autowired private UserApprovalEventRepository userApprovalEventRepository;
 
@@ -163,7 +163,7 @@ class UserManagementTest {
         new UserApprovalEvent(targetId, ApprovalDecision.APPROVED, null, admin.getId()));
     userRepository.flush();
 
-    userService.deleteUser(targetId);
+    userDeletionService.deleteUser(targetId);
     // Before the fix the scheduled app_user delete threw on flush; it must now succeed.
     assertDoesNotThrow(userRepository::flush);
 

@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.ApproveRegistrationRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.PendingRegistrationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RejectRegistrationRequest;
+import de.greluc.krt.profit.basetool.backend.service.UserRegistrationService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import jakarta.validation.Valid;
@@ -54,6 +55,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class DiscordRegistrationAdminController {
 
   private final UserService userService;
+  private final UserRegistrationService userRegistrationService;
 
   /**
    * Lists the registrations awaiting an admin decision, oldest first.
@@ -63,7 +65,7 @@ public class DiscordRegistrationAdminController {
   @GetMapping
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public List<PendingRegistrationDto> listPending() {
-    return userService.findPendingRegistrations().stream().map(this::toDto).toList();
+    return userRegistrationService.findPendingRegistrations().stream().map(this::toDto).toList();
   }
 
   /**
@@ -81,7 +83,8 @@ public class DiscordRegistrationAdminController {
       @AuthenticationPrincipal Jwt jwt,
       @Nullable @RequestBody(required = false) ApproveRegistrationRequest body) {
     Long version = body == null ? null : body.version();
-    return toDto(userService.approveUser(id, version, userService.getUserIdFromJwt(jwt)));
+    return toDto(
+        userRegistrationService.approveUser(id, version, userService.getUserIdFromJwt(jwt)));
   }
 
   /**
@@ -100,7 +103,8 @@ public class DiscordRegistrationAdminController {
       @Nullable @Valid @RequestBody(required = false) RejectRegistrationRequest body) {
     String reason = body == null ? null : body.reason();
     Long version = body == null ? null : body.version();
-    return toDto(userService.rejectUser(id, reason, version, userService.getUserIdFromJwt(jwt)));
+    return toDto(
+        userRegistrationService.rejectUser(id, reason, version, userService.getUserIdFromJwt(jwt)));
   }
 
   private PendingRegistrationDto toDto(User user) {

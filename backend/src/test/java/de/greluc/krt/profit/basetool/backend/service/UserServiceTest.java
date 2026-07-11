@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -29,17 +28,8 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
-import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
-import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
-import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
-import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,30 +39,20 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * Regression tests for the optimistic-lock {@code @Version} write-back on the in-place profile
- * edits ({@code updateUserDescription}, {@code updateUserDefaultPayoutPreference}). Both are
- * {@code @Transactional}, so the commit — and thus the {@code @Version} increment — happens after
- * the method returns. The profile page writes the returned version back onto every hidden version
- * input in place via {@code syncAllVersions} (no reload), so the response must be mapped from a
- * {@code saveAndFlush}, not a plain {@code save}: a plain {@code save} leaves the version
- * unflushed, so the response carries the STALE version and the user's next consecutive profile edit
- * fails with {@code ObjectOptimisticLockingFailureException} (HTTP 409). These tests pin {@code
- * saveAndFlush}, mirroring {@code InventoryItemServiceVersionFlushTest}.
+ * edits ({@code updateUserDescription}, {@code updateUserDefaultPayoutPreference}, {@code
+ * updateUserShareBlueprintsGlobally}). Both are {@code @Transactional}, so the commit — and thus
+ * the {@code @Version} increment — happens after the method returns. The profile page writes the
+ * returned version back onto every hidden version input in place via {@code syncAllVersions} (no
+ * reload), so the response must be mapped from a {@code saveAndFlush}, not a plain {@code save}: a
+ * plain {@code save} leaves the version unflushed, so the response carries the STALE version and
+ * the user's next consecutive profile edit fails with {@code
+ * ObjectOptimisticLockingFailureException} (HTTP 409). These tests pin {@code saveAndFlush},
+ * mirroring {@code InventoryItemServiceVersionFlushTest}.
  */
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
 
   @Mock private UserRepository userRepository;
-  @Mock private RoleRepository roleRepository;
-  @Mock private InventoryItemRepository inventoryItemRepository;
-  @Mock private ShipRepository shipRepository;
-  @Mock private RefineryOrderRepository refineryOrderRepository;
-  @Mock private MissionRepository missionRepository;
-  @Mock private JobOrderRepository jobOrderRepository;
-  @Mock private MissionParticipantRepository missionParticipantRepository;
-  @Mock private SquadronRepository squadronRepository;
-  @Mock private AuthHelperService authHelperService;
-  @Mock private OwnerScopeService ownerScopeService;
-  @Mock private OrgUnitMembershipService orgUnitMembershipService;
 
   @InjectMocks private UserService userService;
 
@@ -126,32 +106,6 @@ class UserServiceTest {
 
     verify(userRepository).saveAndFlush(user);
     verify(userRepository, never()).save(user);
-  }
-
-  /**
-   * Pins that {@code getMappableRoleNames} (the input that bounds the sync's role-indexed
-   * membership fetch) returns exactly the local role catalog's names via {@code
-   * RoleRepository.findAllNames}.
-   */
-  @Test
-  void getMappableRoleNames_returnsTheLocalRoleCatalogNames() {
-    when(roleRepository.findAllNames()).thenReturn(Set.of("ADMIN", "OFFICER", "Guest"));
-
-    assertEquals(Set.of("ADMIN", "OFFICER", "Guest"), userService.getMappableRoleNames());
-    verify(roleRepository).findAllNames();
-  }
-
-  /**
-   * Pins that {@code getKnownDiscordLinkedUserIds} (the skip-set for the incremental Discord
-   * back-fill) delegates to {@code UserRepository.findIdsWithDiscordLink}.
-   */
-  @Test
-  void getKnownDiscordLinkedUserIds_returnsAlreadyLinkedIds() {
-    UUID linked = UUID.randomUUID();
-    when(userRepository.findIdsWithDiscordLink()).thenReturn(Set.of(linked));
-
-    assertEquals(Set.of(linked), userService.getKnownDiscordLinkedUserIds());
-    verify(userRepository).findIdsWithDiscordLink();
   }
 
   /**

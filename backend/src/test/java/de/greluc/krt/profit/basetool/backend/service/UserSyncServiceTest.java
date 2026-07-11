@@ -49,7 +49,7 @@ class UserSyncServiceTest {
 
   @Mock private KeycloakService keycloakService;
 
-  @Mock private UserService userService;
+  @Mock private UserReconciliationService userReconciliationService;
 
   @Mock private BankHolderReconciliationService bankHolderReconciliationService;
 
@@ -64,9 +64,9 @@ class UserSyncServiceTest {
     int count = userSyncService.syncFromKeycloak();
 
     assertEquals(2, count);
-    verify(userService).syncUser(user1);
-    verify(userService).syncUser(user2);
-    verify(userService).markMissingUsers(anySet());
+    verify(userReconciliationService).syncUser(user1);
+    verify(userReconciliationService).syncUser(user2);
+    verify(userReconciliationService).markMissingUsers(anySet());
     verify(bankHolderReconciliationService).reconcileAll();
   }
 
@@ -80,8 +80,8 @@ class UserSyncServiceTest {
     verify(keycloakService).fetchUsers(anyCollection(), anySet());
     // The role-name + already-linked reads happen before the fetch (to parameterise it), but an
     // empty roster must touch no write path and never reconcile the bank holders.
-    verify(userService, never()).syncUser(any(KeycloakUserDto.class));
-    verify(userService, never()).markMissingUsers(anySet());
+    verify(userReconciliationService, never()).syncUser(any(KeycloakUserDto.class));
+    verify(userReconciliationService, never()).markMissingUsers(anySet());
     verifyNoInteractions(bankHolderReconciliationService);
   }
 
@@ -90,16 +90,16 @@ class UserSyncServiceTest {
     KeycloakUserDto user1 = user("user1");
     KeycloakUserDto user2 = user("user2");
     when(keycloakService.fetchUsers(anyCollection(), anySet())).thenReturn(List.of(user1, user2));
-    doThrow(new RuntimeException("sync failed")).when(userService).syncUser(user1);
+    doThrow(new RuntimeException("sync failed")).when(userReconciliationService).syncUser(user1);
 
     int count = userSyncService.syncFromKeycloak();
 
     // The bad row is logged and swallowed; only the good row is counted, and the batch still
     // finishes.
     assertEquals(1, count);
-    verify(userService).syncUser(user1);
-    verify(userService).syncUser(user2);
-    verify(userService).markMissingUsers(anySet());
+    verify(userReconciliationService).syncUser(user1);
+    verify(userReconciliationService).syncUser(user2);
+    verify(userReconciliationService).markMissingUsers(anySet());
     verify(bankHolderReconciliationService).reconcileAll();
   }
 
@@ -116,8 +116,8 @@ class UserSyncServiceTest {
     int count = userSyncService.syncFromKeycloak();
 
     assertEquals(1, count);
-    verify(userService).syncUser(user1);
-    verify(userService).markMissingUsers(anySet());
+    verify(userReconciliationService).syncUser(user1);
+    verify(userReconciliationService).markMissingUsers(anySet());
     verify(bankHolderReconciliationService).reconcileAll();
   }
 
