@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Betrieb: Deploy-blockierende Subnetz-Kollision im Compose-Stack behoben.** Das mit v1.3.0 neu hinzugekommene Netzwerk `net-redis-backend` (Redis-Fan-out für die Live-Benachrichtigungen) war auf dasselbe Subnetz `172.28.11.0/24` gepinnt wie das bestehende `net-proxy-grafana`. Da Grafana dieses Netz aktiv hält, brach der v1.3.0-Deploy beim Anlegen mit „Pool overlaps with other one on this address space" ab und löste einen Rollback aus. `net-redis-backend` liegt jetzt auf dem freien `172.28.12.0/24`.
+
 ## [v1.3.0](https://github.com/krt-profit/basetool/releases/tag/v1.3.0) - 2026-07-11
 
 ### Added
