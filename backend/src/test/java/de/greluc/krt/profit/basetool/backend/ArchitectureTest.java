@@ -1150,9 +1150,10 @@ class ArchitectureTest {
 
   /**
    * Naming convention for helper methods that strip participant PII for anonymous / guest callers:
-   * {@code cleanup<EntityName>ForGuest}. Examples in the codebase: {@code
-   * MissionController#cleanupMissionForGuest} (member-peer level), {@code
-   * MissionController#cleanupOutsiderMissionForGuest} (strict outsider level), {@code
+   * {@code cleanup<EntityName>ForGuest}. Examples in the codebase (the redaction helpers now live
+   * in {@code MissionGuestRedactor}, called by the controllers): {@code
+   * MissionGuestRedactor#cleanupMissionForGuest} (member-peer level), {@code
+   * MissionGuestRedactor#cleanupOutsiderMissionForGuest} (strict outsider level), {@code
    * …#cleanupParticipantForGuest}. The ArchUnit rule recognises any call to a method matching this
    * pattern as a valid redaction call — so adding a new guest-reachable controller with its own
    * entity-specific redactor (named accordingly) does not require updating this test.
