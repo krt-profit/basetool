@@ -110,12 +110,14 @@ public class UserService {
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
 
   /**
-   * The org-unit-aware bank seam, injected as an {@link ObjectProvider} to avoid a constructor
-   * cycle. Used only by {@link #deleteUser(UUID)} to audit a change of a bank account's derived
-   * responsible holder when the deleted user was a leader whose membership the DB cascade removes
-   * (REQ-BANK-034, ADR-0070). All bank access stays inside the seam.
+   * The OwnerScope-free responsible-holder audit seam, injected as an {@link ObjectProvider} and
+   * resolved lazily. Used only by {@link #deleteUser(UUID)} to audit a change of a bank account's
+   * derived responsible holder when the deleted user was a leader whose membership the DB cascade
+   * removes (REQ-BANK-034, ADR-0070). All bank access stays inside {@link
+   * OrgUnitBankResponsibilityService}.
    */
-  private final ObjectProvider<OrgUnitBankAccessService> orgUnitBankAccessServiceProvider;
+  private final ObjectProvider<OrgUnitBankResponsibilityService>
+      orgUnitBankResponsibilityServiceProvider;
 
   private final DefaultBlueprintProvisioningService defaultBlueprintProvisioningService;
   private final UserApprovalEventRepository userApprovalEventRepository;
@@ -1085,12 +1087,16 @@ public class UserService {
     // org-unit membership rows go via the DB ON DELETE CASCADE, so the delete is flushed before the
     // re-diff so the recompute observes the post-cascade state.
     final Map<UUID, Set<UUID>> responsibleBefore =
-        orgUnitBankAccessServiceProvider.getObject().snapshotResponsibleHoldersForUser(userId);
+        orgUnitBankResponsibilityServiceProvider
+            .getObject()
+            .snapshotResponsibleHoldersForUser(userId);
 
     // Delete the user
     userRepository.delete(user);
     userRepository.flush();
-    orgUnitBankAccessServiceProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
+    orgUnitBankResponsibilityServiceProvider
+        .getObject()
+        .recordResponsibleHolderChanges(responsibleBefore);
     log.info("User {} deleted and references reassigned to admin {}", userId, admin.getId());
   }
 

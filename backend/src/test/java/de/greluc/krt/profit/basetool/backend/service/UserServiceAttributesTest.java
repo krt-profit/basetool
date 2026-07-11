@@ -112,8 +112,10 @@ class UserServiceAttributesTest {
 
   @Mock private AuditService auditService;
 
-  @Mock private ObjectProvider<OrgUnitBankAccessService> orgUnitBankAccessServiceProvider;
-  @Mock private OrgUnitBankAccessService orgUnitBankAccessService;
+  @Mock
+  private ObjectProvider<OrgUnitBankResponsibilityService> orgUnitBankResponsibilityServiceProvider;
+
+  @Mock private OrgUnitBankResponsibilityService orgUnitBankResponsibilityService;
 
   @InjectMocks private UserService userService;
 
@@ -508,8 +510,10 @@ class UserServiceAttributesTest {
       Authentication auth = new UsernamePasswordAuthenticationToken(jwt, "n/a", List.of());
       when(authHelperService.rawAuthentication()).thenReturn(auth);
       when(userRepository.findById(currentAdminId)).thenReturn(Optional.of(currentAdmin));
-      when(orgUnitBankAccessServiceProvider.getObject()).thenReturn(orgUnitBankAccessService);
-      when(orgUnitBankAccessService.snapshotResponsibleHoldersForUser(any())).thenReturn(Map.of());
+      when(orgUnitBankResponsibilityServiceProvider.getObject())
+          .thenReturn(orgUnitBankResponsibilityService);
+      when(orgUnitBankResponsibilityService.snapshotResponsibleHoldersForUser(any()))
+          .thenReturn(Map.of());
 
       userService.deleteUser(USER_ID);
 
