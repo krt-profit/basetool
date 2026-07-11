@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobTypeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionCrewDto;
@@ -990,39 +992,6 @@ public class MissionPageController {
       log.error("UNEXPECTED ERROR in getUnassignedParticipantsAjax for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
     }
-  }
-
-  /**
-   * Re-emits a backend {@link
-   * de.greluc.krt.profit.basetool.frontend.service.BackendServiceException} as an {@code
-   * application/problem+json} response that preserves the stable {@code code} and human-readable
-   * {@code detail} from the upstream RFC 7807 body.
-   *
-   * <p>The mission-detail AJAX layer (see {@code krt-fetch.js}) reads {@code code} to decide
-   * between a "stale data, reload?" prompt (only for {@code OPTIMISTIC_LOCK} / {@code
-   * PESSIMISTIC_LOCK}) and a plain error toast for domain conflicts ({@code DUPLICATE_ENTITY},
-   * {@code BUSINESS_CONFLICT}, …). Returning {@code .build()} with only the status code stripped
-   * that signal and made every 409 look like an optimistic-lock conflict.
-   *
-   * @param e parsed backend exception with status + RFC 7807 fields
-   * @return problem+json response mirroring the upstream status and body
-   */
-  // Package-private so the sibling MissionFinancePageController's /ajax handlers reuse the same
-  // RFC 7807 passthrough instead of duplicating it.
-  static org.springframework.http.ResponseEntity<Object> propagateBackendError(
-      @NotNull de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
-    Map<String, Object> body = new java.util.LinkedHashMap<>();
-    body.put("status", e.getStatusCode());
-    body.put("code", e.getProblemCode());
-    if (e.getProblemDetail() != null && !e.getProblemDetail().isBlank()) {
-      body.put("detail", e.getProblemDetail());
-    }
-    if (e.getCorrelationId() != null && !e.getCorrelationId().isBlank()) {
-      body.put("correlationId", e.getCorrelationId());
-    }
-    return org.springframework.http.ResponseEntity.status(e.getStatusCode())
-        .contentType(org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON)
-        .body(body);
   }
 
   private String extractParticipantName(MissionParticipantDto participant) {

@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+
 import de.greluc.krt.profit.basetool.frontend.model.dto.ClaimDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.CreateClaimDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.CreateJobOrderDto;
@@ -581,34 +583,6 @@ public class JobOrderWriteController {
               org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
           .build();
     }
-  }
-
-  /**
-   * Re-emits a backend {@link BackendServiceException} as an {@code application/problem+json}
-   * response preserving the stable {@code code} and human-readable {@code detail} from the upstream
-   * RFC 7807 body. The order-detail / order-index AJAX layer ({@code krt-fetch.js}) reads {@code
-   * code} to decide between a "stale data, reload?" prompt (only {@code OPTIMISTIC_LOCK} / {@code
-   * PESSIMISTIC_LOCK}) and a plain error toast for domain conflicts; returning {@code .build()}
-   * with only the status would strip that signal and make every 409 look like an optimistic-lock
-   * conflict.
-   *
-   * @param e parsed backend exception with status + RFC 7807 fields
-   * @return problem+json response mirroring the upstream status and body
-   */
-  private static org.springframework.http.ResponseEntity<Object> propagateBackendError(
-      BackendServiceException e) {
-    java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
-    body.put("status", e.getStatusCode());
-    body.put("code", e.getProblemCode());
-    if (e.getProblemDetail() != null && !e.getProblemDetail().isBlank()) {
-      body.put("detail", e.getProblemDetail());
-    }
-    if (e.getCorrelationId() != null && !e.getCorrelationId().isBlank()) {
-      body.put("correlationId", e.getCorrelationId());
-    }
-    return org.springframework.http.ResponseEntity.status(e.getStatusCode())
-        .contentType(org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON)
-        .body(body);
   }
 
   /**

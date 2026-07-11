@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RefineryOrderStoreDto;
@@ -391,31 +393,6 @@ public class RefineryOrderWriteController {
               f.getOwningOrgUnitId()));
     }
     return new RefineryOrderStoreDto(dtoList);
-  }
-
-  /**
-   * Re-emits a backend {@link
-   * de.greluc.krt.profit.basetool.frontend.service.BackendServiceException} as an {@code
-   * application/problem+json} response preserving the RFC 7807 {@code code} + {@code detail} so the
-   * refinery-detail AJAX layer ({@code krt-fetch.js}) can drive its conflict/error UX.
-   *
-   * @param e the parsed backend exception
-   * @return problem+json response mirroring the upstream status and body
-   */
-  private static org.springframework.http.ResponseEntity<Object> propagateBackendError(
-      de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
-    java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
-    body.put("status", e.getStatusCode());
-    body.put("code", e.getProblemCode());
-    if (e.getProblemDetail() != null && !e.getProblemDetail().isBlank()) {
-      body.put("detail", e.getProblemDetail());
-    }
-    if (e.getCorrelationId() != null && !e.getCorrelationId().isBlank()) {
-      body.put("correlationId", e.getCorrelationId());
-    }
-    return org.springframework.http.ResponseEntity.status(e.getStatusCode())
-        .contentType(org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON)
-        .body(body);
   }
 
   /**

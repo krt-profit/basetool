@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -305,7 +307,7 @@ public class MissionWriteController {
       return org.springframework.http.ResponseEntity.ok(mission);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Set party lead (AJAX) failed: status={}", e.getStatusCode());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.error("UNEXPECTED ERROR in setPartyLeadAjax for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
@@ -1046,7 +1048,7 @@ public class MissionWriteController {
       return org.springframework.http.ResponseEntity.ok(versions);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Update mission (ajax) failed for {}: {}", id, e.getMessage());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Update mission (ajax) failed for {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
@@ -1124,7 +1126,7 @@ public class MissionWriteController {
             e.getStatusCode(),
             e.getMessage(),
             e.getReadableErrorMessage());
-        return MissionPageController.propagateBackendError(e);
+        return propagateBackendError(e);
       }
     } catch (Exception e) {
       log.debug(
@@ -1185,7 +1187,7 @@ public class MissionWriteController {
           e.getStatusCode(),
           e.getMessage(),
           e.getReadableErrorMessage());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug(
           "UNEXPECTED ERROR in removeManager: id='{}', userId='{}', error={}",
@@ -1246,7 +1248,7 @@ public class MissionWriteController {
             e.getStatusCode(),
             e.getMessage(),
             e.getReadableErrorMessage());
-        return MissionPageController.propagateBackendError(e);
+        return propagateBackendError(e);
       }
     } catch (Exception e) {
       log.debug(
@@ -1294,7 +1296,7 @@ public class MissionWriteController {
       return org.springframework.http.ResponseEntity.ok(mission);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Reassign owning org unit (AJAX) failed: status={}", e.getStatusCode());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in setMissionOwningOrgUnit for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
@@ -1374,7 +1376,7 @@ public class MissionWriteController {
           "Add/update frequency (AJAX) failed: status={}, msg={}",
           e.getStatusCode(),
           e.getMessage());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in addOrUpdateFrequencyAjax for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
@@ -1402,7 +1404,7 @@ public class MissionWriteController {
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
           "Delete frequency (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug(
           "UNEXPECTED ERROR in deleteFrequencyAjax for mission {} freq {}", id, frequencyId, e);
@@ -1437,7 +1439,7 @@ public class MissionWriteController {
           "Add custom frequency (AJAX) failed: status={}, msg={}",
           e.getStatusCode(),
           e.getMessage());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in addCustomFrequencyAjax for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
@@ -1476,7 +1478,7 @@ public class MissionWriteController {
           "Update custom frequency (AJAX) failed: status={}, msg={}",
           e.getStatusCode(),
           e.getMessage());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug(
           "UNEXPECTED ERROR in updateCustomFrequencyAjax for mission {} freq {}",
@@ -1507,7 +1509,7 @@ public class MissionWriteController {
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Add unit (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.error("UNEXPECTED ERROR in addUnitAjax for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
@@ -1534,7 +1536,7 @@ public class MissionWriteController {
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Update unit (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in updateUnitAjax for mission {} unit {}", id, unitId, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
@@ -1555,7 +1557,7 @@ public class MissionWriteController {
       return org.springframework.http.ResponseEntity.noContent().build();
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Delete unit (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in deleteUnitAjax for mission {} unit {}", id, unitId, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
@@ -1588,7 +1590,7 @@ public class MissionWriteController {
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Add step (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.error("UNEXPECTED ERROR in addStepAjax for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
@@ -1619,7 +1621,7 @@ public class MissionWriteController {
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Update step (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in updateStepAjax for mission {} step {}", id, stepId, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
@@ -1653,7 +1655,7 @@ public class MissionWriteController {
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Delete step (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in deleteStepAjax for mission {} step {}", id, stepId, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
@@ -1683,7 +1685,7 @@ public class MissionWriteController {
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
           "Reorder steps (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in reorderStepsAjax for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
@@ -1716,7 +1718,7 @@ public class MissionWriteController {
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Toggle step (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in toggleStepDoneAjax for mission {} step {}", id, stepId, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
@@ -1750,7 +1752,7 @@ public class MissionWriteController {
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
           "Add objective (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.error("UNEXPECTED ERROR in addObjectiveAjax for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
@@ -1785,7 +1787,7 @@ public class MissionWriteController {
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
           "Update objective (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug(
           "UNEXPECTED ERROR in updateObjectiveAjax for mission {} objective {}",
@@ -1829,7 +1831,7 @@ public class MissionWriteController {
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
           "Delete objective (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug(
           "UNEXPECTED ERROR in deleteObjectiveAjax for mission {} objective {}",
@@ -1863,7 +1865,7 @@ public class MissionWriteController {
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
           "Reorder objectives (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in reorderObjectivesAjax for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
@@ -1899,7 +1901,7 @@ public class MissionWriteController {
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
           "Add participant (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.error("UNEXPECTED ERROR in addParticipantAjax for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
@@ -1935,7 +1937,7 @@ public class MissionWriteController {
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
           "Update participant (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug(
           "UNEXPECTED ERROR in updateParticipantAjax for mission {} participant {}",
@@ -1968,7 +1970,7 @@ public class MissionWriteController {
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
           "Delete participant (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug(
           "UNEXPECTED ERROR in deleteParticipantAjax for mission {} participant {}",
@@ -2005,7 +2007,7 @@ public class MissionWriteController {
           "Check-in participant (AJAX) failed: status={}, msg={}",
           e.getStatusCode(),
           e.getMessage());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug(
           "UNEXPECTED ERROR in checkInParticipantAjax for mission {} participant {}",
@@ -2042,7 +2044,7 @@ public class MissionWriteController {
           "Check-out participant (AJAX) failed: status={}, msg={}",
           e.getStatusCode(),
           e.getMessage());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug(
           "UNEXPECTED ERROR in checkOutParticipantAjax for mission {} participant {}",
@@ -2076,7 +2078,7 @@ public class MissionWriteController {
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Add crew (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.error("UNEXPECTED ERROR in addCrewAjax for mission {} unit {}", id, unitId, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
@@ -2107,7 +2109,7 @@ public class MissionWriteController {
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Update crew (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug(
           "UNEXPECTED ERROR in updateCrewAjax for mission {} unit {} crew {}",
@@ -2140,7 +2142,7 @@ public class MissionWriteController {
       return org.springframework.http.ResponseEntity.noContent().build();
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Delete crew (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return MissionPageController.propagateBackendError(e);
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.debug(
           "UNEXPECTED ERROR in deleteCrewAjax for mission {} unit {} crew {}",

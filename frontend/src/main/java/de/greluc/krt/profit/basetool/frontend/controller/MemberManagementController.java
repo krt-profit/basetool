@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MembershipDeltaRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MembershipDeltaResponse;
@@ -385,7 +387,7 @@ public class MemberManagementController {
    */
   @PostMapping(value = "/{id}/edit", headers = "X-Requested-With=XMLHttpRequest")
   @ResponseBody
-  public ResponseEntity<Map<String, Object>> updateMemberAjax(
+  public ResponseEntity<Object> updateMemberAjax(
       @PathVariable @NotNull UUID id,
       @Valid @ModelAttribute("memberEditForm") MemberEditForm form,
       BindingResult bindingResult,
@@ -506,22 +508,20 @@ public class MemberManagementController {
   }
 
   /**
-   * Relays a backend failure to the AJAX caller with its original HTTP status and a slim {@code
-   * {code, detail}} body so {@code krtFetch} can recognise {@code OPTIMISTIC_LOCK} and show the
-   * backend's localized message.
+   * Logs a backend AJAX failure and relays it to the caller as {@code application/problem+json} via
+   * the shared {@link de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses}, so the
+   * body carries the backend status, the stable {@code code} (e.g. {@code OPTIMISTIC_LOCK}) and the
+   * optional {@code detail}/{@code correlationId} exactly like every other AJAX write, and {@code
+   * krtFetch} branches on the conflict semantics uniformly. This replaced a divergent slim {@code
+   * {code, detail}} body that dropped the status/correlationId and the problem+json content type.
    *
    * @param logMessage context for the warn log line
    * @param e the backend service exception carrying the relayed status, problem code and detail
-   * @return the relayed error response
+   * @return the relayed error as a {@code problem+json} response mirroring the backend status
    */
-  private ResponseEntity<Map<String, Object>> relayBackendError(
-      String logMessage, BackendServiceException e) {
+  private ResponseEntity<Object> relayBackendError(String logMessage, BackendServiceException e) {
     log.warn("{}: status={}, code={}", logMessage, e.getStatusCode(), e.getProblemCode());
-    Map<String, Object> payload = new LinkedHashMap<>();
-    payload.put("code", e.getProblemCode());
-    payload.put("detail", e.getProblemDetail());
-    int status = e.getStatusCode() > 0 ? e.getStatusCode() : 500;
-    return ResponseEntity.status(status).body(payload);
+    return propagateBackendError(e);
   }
 
   /**
@@ -562,7 +562,7 @@ public class MemberManagementController {
   @DeleteMapping("/{id}")
   @ResponseBody
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
-  public ResponseEntity<Map<String, Object>> deleteMemberAjax(@PathVariable @NotNull UUID id) {
+  public ResponseEntity<Object> deleteMemberAjax(@PathVariable @NotNull UUID id) {
     try {
       backendApiClient.delete("/api/v1/users/" + id, Void.class);
       return ResponseEntity.ok(Map.of());
@@ -588,7 +588,7 @@ public class MemberManagementController {
   @PostMapping("/sync")
   @ResponseBody
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
-  public ResponseEntity<Map<String, Object>> syncMembersAjax() {
+  public ResponseEntity<Object> syncMembersAjax() {
     try {
       UserSyncResultDto result =
           backendApiClient.post("/api/v1/users/sync", null, UserSyncResultDto.class);
