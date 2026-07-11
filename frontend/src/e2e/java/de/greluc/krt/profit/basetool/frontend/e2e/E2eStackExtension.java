@@ -150,6 +150,14 @@ public final class E2eStackExtension implements BeforeAllCallback {
   private static volatile boolean started = false;
 
   /**
+   * Remembers the first bring-up failure so the remaining test classes fail fast with the original
+   * cause instead of each re-running the multi-minute compose bring-up and re-failing identically —
+   * the mode that turned one startup crash into a whole-job (~45 min) timeout reported only as a
+   * "cancelled" run.
+   */
+  private static volatile Throwable bootFailure = null;
+
+  /**
    * Resolves the URL the tests should target: an explicit {@code E2E_BASE_URL} / {@code
    * -De2e.baseUrl} (staging mode) when provided, otherwise the ephemeral local frontend.
    *
@@ -189,45 +197,73 @@ public final class E2eStackExtension implements BeforeAllCallback {
       if (started) {
         return;
       }
-      Path root = repoRoot();
-      stageRealm(root);
-      ensureKeystore(root);
-      prePullImages(root);
-      composeUp(root);
-      // Seed UEX-owned catalog reference data (refinery-hosting location, ship type, refining
-      // method) the admin REST API cannot create on a fresh DB — unblocks the Refinery/Hangar
-      // flows.
-      BackendSeeder seeder = new BackendSeeder();
-      seeder.seedCatalog();
-      // Opt the canonical IRIDIUM Squadron into Job-Order processing exactly once, before any test
-      // page warms the frontend's 10-minute squadrons-catalog cache. Only profit-eligible org units
-      // may be a job order's responsible (processing) unit (V128); without this the create form's
-      // responsible picker stays empty and every order-create / handover flow 400s. Seeding it here
-      // (not per test class) guarantees the cache never pins a stale not-eligible snapshot.
-      seeder.setSquadronProfitEligible(
-          E2E_ADMIN_USER, E2E_ADMIN_PASSWORD, IRIDIUM_SQUADRON_ID, true);
-      // Seed one orderable item (a game_item + an active blueprint with a resolved RESOURCE
-      // ingredient) so the item-order create form's *frontend-cached* item picker is never empty.
-      // Done here — before any test navigates to /orders/create and warms that 10-minute cache —
-      // for the same reason the profit-eligibility seeding above runs at bootstrap. Non-fatal: only
-      // the anonymous item-order flow (UC-12) depends on it, so a seed hiccup must not sink the
-      // whole suite's bring-up.
-      try {
-        String ingredientMaterialId =
-            seeder.ensureJobOrderMaterial(
-                E2E_ADMIN_USER, E2E_ADMIN_PASSWORD, "E2E Blueprint Ingredient");
-        seeder.seedOrderableItem("E2E Orderable Widget", ingredientMaterialId);
-      } catch (RuntimeException seedFailure) {
-        System.out.printf(
-            "[E2E] orderable-item seeding failed (item-order flow will be skipped/failing): %s%n",
-            seedFailure.getMessage());
+      if (bootFailure != null) {
+        // The stack already failed to come up for an earlier test class. Re-running the
+        // multi-minute compose bring-up for every remaining class would just re-fail identically
+        // and
+        // burn the whole job timeout (~45 min) with no new signal — the mode that masked a real
+        // startup crash behind a "cancelled" e2e run. Fail fast with the original cause instead, so
+        // every class reports the actual reason in seconds and the job ends promptly.
+        throw new IllegalStateException(
+            "E2E stack bring-up already failed for an earlier test class; not retrying it",
+            bootFailure);
       }
-      started = true;
-      context
-          .getRoot()
-          .getStore(ExtensionContext.Namespace.GLOBAL)
-          .put("e2e-docker-stack", (AutoCloseable) () -> composeDown(root));
+      try {
+        bringUpAndSeed(context);
+      } catch (Exception bringUpFailure) {
+        bootFailure = bringUpFailure;
+        throw bringUpFailure;
+      }
     }
+  }
+
+  /**
+   * Performs the one-time ephemeral-stack bring-up: stages the realm/keystore, pulls + {@code up}s
+   * the compose stack, seeds the UEX-owned catalog + profit-eligibility + an orderable item, marks
+   * the stack started, and registers the one-time teardown on the JUnit root store. Extracted from
+   * {@link #beforeAll} so the caller can remember a failure and fail the remaining classes fast.
+   *
+   * @param context the JUnit extension context whose root store owns the teardown hook
+   * @throws Exception if bootstrap or {@code docker compose up} fails
+   */
+  private void bringUpAndSeed(ExtensionContext context) throws Exception {
+    Path root = repoRoot();
+    stageRealm(root);
+    ensureKeystore(root);
+    prePullImages(root);
+    composeUp(root);
+    // Seed UEX-owned catalog reference data (refinery-hosting location, ship type, refining
+    // method) the admin REST API cannot create on a fresh DB — unblocks the Refinery/Hangar
+    // flows.
+    BackendSeeder seeder = new BackendSeeder();
+    seeder.seedCatalog();
+    // Opt the canonical IRIDIUM Squadron into Job-Order processing exactly once, before any test
+    // page warms the frontend's 10-minute squadrons-catalog cache. Only profit-eligible org units
+    // may be a job order's responsible (processing) unit (V128); without this the create form's
+    // responsible picker stays empty and every order-create / handover flow 400s. Seeding it here
+    // (not per test class) guarantees the cache never pins a stale not-eligible snapshot.
+    seeder.setSquadronProfitEligible(E2E_ADMIN_USER, E2E_ADMIN_PASSWORD, IRIDIUM_SQUADRON_ID, true);
+    // Seed one orderable item (a game_item + an active blueprint with a resolved RESOURCE
+    // ingredient) so the item-order create form's *frontend-cached* item picker is never empty.
+    // Done here — before any test navigates to /orders/create and warms that 10-minute cache —
+    // for the same reason the profit-eligibility seeding above runs at bootstrap. Non-fatal: only
+    // the anonymous item-order flow (UC-12) depends on it, so a seed hiccup must not sink the
+    // whole suite's bring-up.
+    try {
+      String ingredientMaterialId =
+          seeder.ensureJobOrderMaterial(
+              E2E_ADMIN_USER, E2E_ADMIN_PASSWORD, "E2E Blueprint Ingredient");
+      seeder.seedOrderableItem("E2E Orderable Widget", ingredientMaterialId);
+    } catch (RuntimeException seedFailure) {
+      System.out.printf(
+          "[E2E] orderable-item seeding failed (item-order flow will be skipped/failing): %s%n",
+          seedFailure.getMessage());
+    }
+    started = true;
+    context
+        .getRoot()
+        .getStore(ExtensionContext.Namespace.GLOBAL)
+        .put("e2e-docker-stack", (AutoCloseable) () -> composeDown(root));
   }
 
   /**

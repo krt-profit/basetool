@@ -26,6 +26,7 @@ import java.util.UUID;
 import java.util.concurrent.ThreadPoolExecutor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -117,14 +118,16 @@ public class LiveSyncRedisConfig {
    *
    * @param connectionFactory the auto-configured Redis connection factory
    * @param fanout the Redis fan-out (also the message listener)
-   * @param listenerExecutor the bounded dispatch executor
+   * @param listenerExecutor the bounded dispatch executor — {@code @Qualifier}'d by bean name so an
+   *     added {@link ThreadPoolTaskExecutor} bean can never make this inject ambiguous (the failure
+   *     mode that took the backend's equivalent container down once the fan-out was enabled)
    * @return the message-listener container
    */
   @Bean
   public RedisMessageListenerContainer liveSyncRedisMessageListenerContainer(
       RedisConnectionFactory connectionFactory,
       RedisLiveSyncFanout fanout,
-      ThreadPoolTaskExecutor listenerExecutor) {
+      @Qualifier("liveSyncRedisListenerExecutor") ThreadPoolTaskExecutor listenerExecutor) {
     RedisMessageListenerContainer container = new RedisMessageListenerContainer();
     container.setConnectionFactory(connectionFactory);
     container.setTaskExecutor(listenerExecutor);

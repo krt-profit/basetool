@@ -24,6 +24,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.util.UUID;
 import java.util.concurrent.ThreadPoolExecutor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -124,14 +125,18 @@ public class NotificationRedisConfig {
    *
    * @param connectionFactory the auto-configured Redis connection factory
    * @param fanout the Redis fan-out (also the message listener)
-   * @param listenerExecutor the bounded dispatch executor
+   * @param listenerExecutor the bounded dispatch executor — {@code @Qualifier}'d by bean name
+   *     because the context holds several {@link ThreadPoolTaskExecutor} beans (the async
+   *     uex/scWiki/import/notification/mail executors) and the parameter name alone cannot
+   *     disambiguate them, so an un-qualified inject fails to start the context once the fan-out is
+   *     enabled (the crash the disabled-by-default unit test never exercised)
    * @return the message-listener container
    */
   @Bean
   public RedisMessageListenerContainer notificationRedisMessageListenerContainer(
       RedisConnectionFactory connectionFactory,
       RedisNotificationFanout fanout,
-      ThreadPoolTaskExecutor listenerExecutor) {
+      @Qualifier("notificationRedisListenerExecutor") ThreadPoolTaskExecutor listenerExecutor) {
     RedisMessageListenerContainer container = new RedisMessageListenerContainer();
     container.setConnectionFactory(connectionFactory);
     container.setTaskExecutor(listenerExecutor);
