@@ -6,6 +6,8 @@
 
 - **Preis-Übersicht wird wieder angezeigt.** Nach der CSP-Härtung (`style-src-attr 'none'`, ADR-0093) blieb die Handelsmatrix unter „Preis-Übersicht" unsichtbar: Die Tabelle wurde per CSS-Klasse ausgeblendet, das Skript blendete sie aber noch über das inzwischen wirkungslose `style.display` ein, und die dynamischen Abstandszeilen des virtuellen Scrollens trugen ein vom Browser blockiertes `style="height:…"`. Sichtbarkeit läuft jetzt über das Umschalten der Klasse, die Zeilenhöhe über das CSSOM — die Seite funktioniert wieder.
 
+- **Weitere per JavaScript aufgebaute Oberflächen funktionieren wieder unter der verschärften CSP.** Nach derselben CSP-Härtung blieben weitere client-seitig erzeugte Elemente unsichtbar oder verloren ihr Layout — u. a. die Statuszeilen der Gewinn-Übersicht, die dynamisch hinzugefügten Auftragspositionen, diverse SCU-Hinweise (Auftrag, Lager, Umbuchen, Ausbuchen), der „Zurückziehen"-Knopf im Anspruchs-Dialog, die Missions-Frequenzanzeige, die Operations-Vorschau und die „Keine Terminals gefunden"-Zeile. Sie steuern Layout und Sichtbarkeit jetzt über CSS-Klassen statt über vom Browser blockierte Inline-Stile.
+
 ## [v1.3.2](https://github.com/krt-profit/basetool/releases/tag/v1.3.2) - 2026-07-11
 
 ### Fixed

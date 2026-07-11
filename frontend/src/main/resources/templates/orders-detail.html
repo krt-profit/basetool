@@ -1,7 +1,48 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
-<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{orders.detail.title} + ' - ' + ${appTitle}">Auftrag Details - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+        <style th:attr="nonce=${cspNonce}">
+            /*
+             * Classes for the handover-row and inventory-expand markup that orders-detail.js builds
+             * via innerHTML. They replace the former inline style="" attributes on those elements:
+             * an inline style inside a JS innerHTML string is blocked by the CSP style-src-attr 'none'
+             * pin just like a template one (ADR-0093). Visibility of the SCU hints and the withdraw
+             * button toggles the runtime .krtm-hidden class instead of clearing an inline style.
+             */
+            .od-remove-btn {
+                padding: 0.5rem;
+            }
+            .od-inv-cell {
+                padding: 1rem;
+                background: var(--color-surface-input);
+            }
+            .od-inv-note {
+                font-style: italic;
+                color: var(--color-gray-2);
+            }
+            .od-inv-th {
+                background: var(--color-gray-4);
+                font-size: 0.85rem;
+            }
+            .od-inv-panel {
+                background: var(--color-surface-input);
+                border: 1px solid var(--color-gray-3);
+                border-top: none;
+            }
+            .od-inv-table {
+                margin: 0;
+                border: none;
+                background: transparent;
+            }
+            .od-inv-unlink-btn {
+                padding: 0.1rem 0.5rem;
+                font-size: 0.8rem;
+                min-height: 44px;
+            }
+        </style>
+    </th:block>
 </head>
 <body>
 <th:block th:replace="~{fragments/sidebar :: sidebar}" />
@@ -911,7 +952,7 @@
             <small id="claim-open-hint" class="text-muted"></small>
         </div>
         <div class="krtm-display-flex-gap-0-5rem-justify-content-flex-9f87">
-            <button type="button" id="claim-withdraw-btn" class="btn btn-outline-danger krtm-display-none-min-height-44px-603e" data-trigger="claim-withdraw" th:text="#{orders.claim.withdraw}">Zurückziehen</button>
+            <button type="button" id="claim-withdraw-btn" class="btn btn-outline-danger krtm-min-height-44px-1df5 krtm-hidden" data-trigger="claim-withdraw" th:text="#{orders.claim.withdraw}">Zurückziehen</button>
             <button type="button" class="btn btn-ghost krtm-min-height-44px-1df5" data-trigger="close-modal-display" data-modal-id="claim-modal" th:text="#{orders.detail.cancel}">Abbrechen</button>
             <button type="button" id="claim-submit-btn" class="btn btn--cta krtm-min-height-44px-1df5" data-trigger="claim-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.claim.submit}">Speichern</span></button>
         </div>

@@ -63,4 +63,17 @@ Remove every inline `style=""` attribute from the templates and pin the CSP to
   shipped in v1.3.2 as a blank price-overview and was fixed by moving the spacer height to the CSSOM
   and toggling the visibility class. The rule in `ui-design-system.md` now states both traps
   explicitly, and `MaterialsOverviewMatrixRendersE2eTest` guards the page.
+- **JS-side audit completed repo-wide.** Beyond `materials-matrix.js`, the same two traps were found
+  and fixed across `static/js/**`: static innerHTML `style="…"` values became per-page CSS classes
+  (in the page's nonce'd `<style>` block, or the global `flex-*` / `nowrap` utilities), and
+  reveal-over-class sites now toggle the runtime `krtm-hidden` (or the shared `krtm-display-none-5790`)
+  class. Affected modules: `materials-profit-calculation.js` (status rows), `orders-create.js` and
+  `orders-detail.js` (item/handover rows, inventory-expand table, SCU hints, claim-withdraw button),
+  `material-detail.js` (no-results row), `mission-detail.js` (read-only org-units group, frequency
+  value), `operation-detail.js` (markdown preview), and `inventory-admin.js` / `inventory-input.js` /
+  `inventory-my.js` (SCU hints). Pure JS filter loops that hide *and* reveal rows via
+  `el.style.display` (no class) are unaffected and were left alone. Per-page e2e tests
+  (`MaterialsProfitCalculationRendersE2eTest`, `OrdersCreateItemLineRendersE2eTest`,
+  `OrdersCreateScuHintRevealE2eTest`) assert the elements render/reveal with no `style-src-attr`
+  console violation.
 

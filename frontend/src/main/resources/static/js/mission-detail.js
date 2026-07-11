@@ -1144,7 +1144,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     const eOrgUnitsReadonly = document.getElementById('edit-org-units-readonly');
                     if (eOrgUnitsGroup && eOrgUnitsReadonlyGroup) {
                         eOrgUnitsGroup.style.display = isGuest ? '' : 'none';
-                        eOrgUnitsReadonlyGroup.style.display = isGuest ? 'none' : '';
+                        // The read-only group's hidden default is the krtm-display-none-5790 class
+                        // (ADR-0093), which a `style.display = ''` reveal cannot override — toggle the
+                        // class so registered members actually see the org-units read-out.
+                        eOrgUnitsReadonlyGroup.classList.toggle('krtm-display-none-5790', isGuest);
                         if (!isGuest && eOrgUnitsReadonly) {
                             eOrgUnitsReadonly.textContent = '';
                             const unitNames = (this.getAttribute('data-org-unit-names') || '')
@@ -1336,7 +1339,10 @@ document.addEventListener('DOMContentLoaded', function () {
                                 )
                                 .forEach(function (display) {
                                     display.textContent = formatted;
-                                    display.style.display = '';
+                                    // A first-time value's span renders with the krtm-hidden class
+                                    // (its f == null default, ADR-0093); remove the class to reveal it
+                                    // — clearing the inline display would leave the class rule in force.
+                                    display.classList.remove('krtm-hidden');
                                 });
                             document
                                 .querySelectorAll('.set-freq-btn[data-type-id="' + typeId + '"]')

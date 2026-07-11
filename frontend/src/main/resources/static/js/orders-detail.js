@@ -243,11 +243,11 @@ function addHandoverItemRow() {
                 </select>
             </div>
             <div>
-                <label class="form-label-sm">${escapeHtml(labelMenge)} <span data-role="amount-unit"></span> <span class="scu-hint" data-role="scu-hint" tabindex="0" role="img" aria-label="${escapeAttr(scuHintText)}" style="display:none;"><span aria-hidden="true">?</span><span class="scu-hint__bubble" aria-hidden="true">${escapeHtml(scuHintText)}</span></span></label>
+                <label class="form-label-sm">${escapeHtml(labelMenge)} <span data-role="amount-unit"></span> <span class="scu-hint krtm-hidden" data-role="scu-hint" tabindex="0" role="img" aria-label="${escapeAttr(scuHintText)}"><span aria-hidden="true">?</span><span class="scu-hint__bubble" aria-hidden="true">${escapeHtml(scuHintText)}</span></span></label>
                 <input type="text" inputmode="decimal" data-scu-decimal step="0.001" name="items[${index}].amount" min="0.001" required class="w-full">
             </div>
             <div>
-                <button type="button" class="btn btn-quiet-danger btn-icon" style="padding: 0.5rem;" data-trigger="od-remove-handover-row" title="Entfernen" aria-label="Entfernen"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                <button type="button" class="btn btn-quiet-danger btn-icon od-remove-btn" data-trigger="od-remove-handover-row" title="Entfernen" aria-label="Entfernen"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
             </div>
         `;
     const sel = row.querySelector('select');
@@ -267,17 +267,17 @@ function addHandoverItemRow() {
                 amtInput.setAttribute('step', '1');
                 amtInput.setAttribute('min', '1');
                 if (unitSpan) unitSpan.textContent = '(' + labelPiece + ')';
-                if (rowScuHint) rowScuHint.style.display = 'none';
+                if (rowScuHint) rowScuHint.classList.add('krtm-hidden');
             } else if (qt === 'SCU') {
                 amtInput.setAttribute('step', '0.001');
                 amtInput.setAttribute('min', '0.001');
                 if (unitSpan) unitSpan.textContent = '(' + labelScu + ')';
-                if (rowScuHint) rowScuHint.style.display = '';
+                if (rowScuHint) rowScuHint.classList.remove('krtm-hidden');
             } else {
                 amtInput.setAttribute('step', '0.001');
                 amtInput.setAttribute('min', '0.001');
                 if (unitSpan) unitSpan.textContent = '';
-                if (rowScuHint) rowScuHint.style.display = 'none';
+                if (rowScuHint) rowScuHint.classList.add('krtm-hidden');
             }
         });
     }
@@ -495,17 +495,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 amountInput.setAttribute('step', '1');
                 amountInput.setAttribute('min', '1');
                 if (unitSpan) unitSpan.textContent = '(' + MSG_UNIT_PIECE + ')';
-                if (hint) hint.style.display = 'none';
+                if (hint) hint.classList.add('krtm-hidden');
             } else if (qt === 'SCU') {
                 amountInput.setAttribute('step', '0.001');
                 amountInput.setAttribute('min', '0.001');
                 if (unitSpan) unitSpan.textContent = '(' + MSG_UNIT_SCU + ')';
-                if (hint) hint.style.display = '';
+                if (hint) hint.classList.remove('krtm-hidden');
             } else {
                 amountInput.setAttribute('step', '0.001');
                 amountInput.setAttribute('min', '0.001');
                 if (unitSpan) unitSpan.textContent = '';
-                if (hint) hint.style.display = 'none';
+                if (hint) hint.classList.add('krtm-hidden');
             }
         }
 
@@ -834,7 +834,7 @@ function _openClaimModal(opts) {
         const maxEdit = open + (parseFloat(opts.amount || '0') || 0);
         document.getElementById('claim-max').value = maxEdit;
         document.getElementById('claim-open-hint').textContent = MSG_CLAIM_MAX_HINT + ' ' + maxEdit;
-        document.getElementById('claim-withdraw-btn').style.display = '';
+        document.getElementById('claim-withdraw-btn').classList.remove('krtm-hidden');
     } else {
         document.getElementById('claim-modal-title').textContent = MSG_CLAIM_TITLE_ADD;
         sel.value = '';
@@ -842,10 +842,10 @@ function _openClaimModal(opts) {
         amountInput.value = '';
         document.getElementById('claim-max').value = open;
         document.getElementById('claim-open-hint').textContent = MSG_CLAIM_MAX_HINT + ' ' + open;
-        document.getElementById('claim-withdraw-btn').style.display = 'none';
+        document.getElementById('claim-withdraw-btn').classList.add('krtm-hidden');
     }
     const claimScuHint = document.getElementById('claim-scu-hint');
-    if (claimScuHint) claimScuHint.style.display = opts.quantityType === 'PIECE' ? 'none' : '';
+    if (claimScuHint) claimScuHint.classList.toggle('krtm-hidden', opts.quantityType === 'PIECE');
     document.getElementById('claim-modal').style.display = 'flex';
 }
 
@@ -1348,8 +1348,8 @@ async function toggleInventory(row) {
     const detailsRow = document.createElement('tr');
     detailsRow.classList.add('inventory-details-row');
     detailsRow.innerHTML = `
-            <td colspan="5" style="padding: 1rem; background: var(--color-surface-input);">
-                <div style="font-style: italic; color: var(--color-gray-2);">${MSG_LOADING_INVENTORY}</div>
+            <td colspan="5" class="od-inv-cell">
+                <div class="od-inv-note">${MSG_LOADING_INVENTORY}</div>
             </td>
         `;
     row.parentNode.insertBefore(detailsRow, row.nextSibling);
@@ -1363,30 +1363,28 @@ async function toggleInventory(row) {
 
         if (items.length === 0) {
             detailsRow.innerHTML = `
-                    <td colspan="5" style="padding: 1rem; background: var(--color-surface-input);">
-                        <div style="font-style: italic; color: var(--color-gray-2);">${MSG_EMPTY_INVENTORY}</div>
+                    <td colspan="5" class="od-inv-cell">
+                        <div class="od-inv-note">${MSG_EMPTY_INVENTORY}</div>
                     </td>
                 `;
             return;
         }
 
-        const unlinkColHeader = IS_LOGISTICIAN
-            ? `<th style="background: var(--color-gray-4); font-size: 0.85rem;"></th>`
-            : '';
+        const unlinkColHeader = IS_LOGISTICIAN ? `<th class="od-inv-th"></th>` : '';
         const subColspan = IS_LOGISTICIAN ? 7 : 6;
 
         let html = `
                 <td colspan="${subColspan}" class="p-0">
-                    <div style="background: var(--color-surface-input); border: 1px solid var(--color-gray-3); border-top: none;">
+                    <div class="od-inv-panel">
                         <div class="table-responsive">
-                            <table class="data-table" style="margin: 0; border: none; background: transparent;">
+                            <table class="data-table od-inv-table">
                                 <thead>
                                     <tr>
-                                        <th style="background: var(--color-gray-4); font-size: 0.85rem;">${MSG_OWNER}</th>
-                                        <th style="background: var(--color-gray-4); font-size: 0.85rem;">${MSG_SQUADRON}</th>
-                                        <th style="background: var(--color-gray-4); font-size: 0.85rem;">${MSG_LOCATION}</th>
-                                        <th style="background: var(--color-gray-4); font-size: 0.85rem;">${MSG_QUALITY}</th>
-                                        <th style="background: var(--color-gray-4); font-size: 0.85rem;">${MSG_QUANTITY}</th>
+                                        <th class="od-inv-th">${MSG_OWNER}</th>
+                                        <th class="od-inv-th">${MSG_SQUADRON}</th>
+                                        <th class="od-inv-th">${MSG_LOCATION}</th>
+                                        <th class="od-inv-th">${MSG_QUALITY}</th>
+                                        <th class="od-inv-th">${MSG_QUANTITY}</th>
                                         ${unlinkColHeader}
                                     </tr>
                                 </thead>
@@ -1419,11 +1417,10 @@ async function toggleInventory(row) {
             const unlinkCell = IS_LOGISTICIAN
                 ? `
                                         <td data-trigger="stop-propagation">
-                                            <button type="button" class="btn btn-quiet-danger"
+                                            <button type="button" class="btn btn-quiet-danger od-inv-unlink-btn"
                                                     data-trigger="od-unlink-inventory"
                                                     data-order-id="${escapeAttr(orderId)}"
                                                     data-inventory-item-id="${escapeAttr(item.id)}"
-                                                    style="padding: 0.1rem 0.5rem; font-size: 0.8rem; min-height: 44px;"
                                                     title="${escapeAttr(MSG_INVENTORY_UNLINK_TOOLTIP)}">&times;</button>
                                         </td>`
                 : '';
@@ -1452,7 +1449,7 @@ async function toggleInventory(row) {
     } catch (error) {
         console.error('Error fetching inventory items:', error);
         detailsRow.innerHTML = `
-                <td colspan="5" style="padding: 1rem; background: var(--color-surface-input);">
+                <td colspan="5" class="od-inv-cell">
                     <div class="text-danger">Fehler beim Laden der Lagereinträge.</div>
                 </td>
             `;
