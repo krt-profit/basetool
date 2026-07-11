@@ -19,7 +19,7 @@ springBoot = "4.1.0"
 springDependencyManagement = "1.1.7"
 cyclonedx = "3.2.4"
 testcontainers = "2.0.5"
-flyway = "12.10.0"
+flyway = "12.11.0"
 mapstruct = "1.6.3"
 ##     ⬆ = "1.7.0.Beta1"
 ##     ⬆ = "1.7.0.Beta2"
@@ -52,7 +52,7 @@ owaspDependencycheck = "12.2.2"
 findsecbugs = "1.14.0"
 checkstyle = "13.6.0"
 googleJavaFormat = "1.35.0"
-node = "24.17.0"
+node = "24.18.0"
 # Keycloak server SPI artifacts for the keycloak-spi provider module (Discord
 # federation + first-login gate, epic #720). Pin to the highest 26.7.x patch — the
 # floating `quay.io/keycloak/keycloak:26.7` runtime tag resolves to it; SPI APIs are
