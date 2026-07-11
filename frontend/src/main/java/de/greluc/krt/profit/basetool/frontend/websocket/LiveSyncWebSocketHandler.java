@@ -706,6 +706,11 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     LiveSyncTopic topic = LiveSyncTopic.parse(rawTopic);
     if (topic == null) {
       log.debug("Live-sync subscribe to unknown topic '{}' refused", rawTopic);
+      // #1239: an unknown/unparseable subscribe topic is the signature of a client/server
+      // topic-vocabulary skew — count it so the drift is visible. No topic_class tag: the topic did
+      // not parse, so it belongs to no class (a dedicated unlabelled meter, not a topic_class
+      // sentinel — REQ-OBS-011).
+      meterRegistry.counter(MetricNames.LIVESYNC_INVALID_TOPIC).increment();
       sendControlFrame(session, "denied", rawTopic);
       return;
     }
