@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:f2d9556f-e37d-4527-9a79-954a982034a4",
+  "serialNumber" : "urn:uuid:4a894985-4131-462b-adad-51c238967359",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-07-11T08:44:13Z",
+    "timestamp" : "2026-07-11T19:18:44Z",
     "tools" : {
       "components" : [
         {
@@ -25,8 +25,12 @@
       "modified" : false,
       "externalReferences" : [
         {
+          "type" : "build-system",
+          "url" : "https://github.com/krt-profit/basetool/actions/runs/29165005926"
+        },
+        {
           "type" : "vcs",
-          "url" : "https://github.com/krt-profit/basetool.git"
+          "url" : "https://github.com/krt-profit/basetool"
         }
       ]
     }
@@ -1376,6 +1380,79 @@
         {
           "type" : "vcs",
           "url" : "https://gitbox.apache.org/repos/asf/commons-logging"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/io.lettuce/lettuce-core@7.5.2.RELEASE?type=jar",
+      "publisher" : "lettuce.io",
+      "group" : "io.lettuce",
+      "name" : "lettuce-core",
+      "version" : "7.5.2.RELEASE",
+      "description" : "Advanced and thread-safe Java Redis client for synchronous, asynchronous, and reactive usage. Supports Cluster, Sentinel, Pipelining, Auto-Reconnect, Codecs and much more.",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "999cbc66cdc995d0cdebe8e5e204190d"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "e67339dc0eb3ceac40fad8213cc2750b7944bb75"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "86e245a6cfc36a40aaa1f54027e639a70cb4008d12717164041aefe9bbd072c1"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "96bd1424a58341030fed30b8aca3ba1ddcc64acbc193c0b1ddecd0f08f100cca0ae8bd11edeabbe53025d7d16a29c9cdfe51763c496cace60f46fbf9e1f1e322"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "8cd79feed3f1486f1bc47aa5e9c3e80523a818816f916ddf146dbc4b1ad6f4cbb1fba4fb936d7d3ce4ea537550074d15"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "24d143e3e6917e39884cb1d14816af14fc1a13b3b7b101bc0dee676ebb42fc02131516e503c540de4107c91690538dd0"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "9eacdbb0ef3e0dfb04fea755b2bd5e4089cf77736c87d4a8518f3272f308af2d"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "0d17146c3f83d8c6b10b3d579c4d18851c866cb58907d5e72420af5f4e175785859127a2f4e608dce7bcafb1d3caa813161a3eaa628c83f8a0020d41ed737f82"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "MIT",
+            "url" : "https://opensource.org/license/mit/"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/io.lettuce/lettuce-core@7.5.2.RELEASE?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "website",
+          "url" : "https://lettuce.io"
+        },
+        {
+          "type" : "issue-tracker",
+          "url" : "https://github.com/redis/lettuce/issues"
+        },
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/redis/lettuce"
         }
       ],
       "properties" : [
@@ -5906,42 +5983,42 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.flywaydb/flyway-core@12.10.0?type=jar",
+      "bom-ref" : "pkg:maven/org.flywaydb/flyway-core@12.11.0?type=jar",
       "group" : "org.flywaydb",
       "name" : "flyway-core",
-      "version" : "12.10.0",
+      "version" : "12.11.0",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "ffda6281e5d4b88ce7b3e4ceb318cb92"
+          "content" : "63e450042e1edc448d5a14732e0083c3"
         },
         {
           "alg" : "SHA-1",
-          "content" : "1b6f40472b6c06bd831d81c017abeb8c4693ca73"
+          "content" : "99b145893a0492379b10aae207a7633b0790aa1f"
         },
         {
           "alg" : "SHA-256",
-          "content" : "78819df13e3196f44506b00a4657b3faaf1d4256914dcfe608396a8585eb51b2"
+          "content" : "34c9696e6fd4ebae87ba36e021fa491dfcb853c72e8dbe3e4177da22a1e9eacc"
         },
         {
           "alg" : "SHA-512",
-          "content" : "642c60fa3ef32b7b131c0878eb7f7a65ab85ef05bd220f9c548f3d40baf1398c6c534c1f6947936c497f69e19bceaf4b3377b18f97c76f1a59ac5fdb588e3c8d"
+          "content" : "f236d2e7c8cdfeca3c108e6c79b7878d2b559720648e451b8677eea69e6bcd43cd32dd84882375f16d2e571d1fcd01d14b7b52246ecc9e210cdb4c6cef04d2ee"
         },
         {
           "alg" : "SHA-384",
-          "content" : "8a007b09fb1ab5ffe16d64c8083f4ab8ea2d327dce48278b6f1e2ddad71388ce26b65898fa31de56de7727e180d9dee0"
+          "content" : "2ed566cff12d5355fbf940eb8c90ef0e926752aa4516cad890df440851ce54f83344a1ad1b858362fea3fab97cbcbff0"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "6fc0fd85f0d050b68ebf065a28949df9bc6210755392ae44569f7cef9d6790167ac3fcef9fd5799f65513da815f1e9c3"
+          "content" : "131169b1c3e4c366500c3c9394cd3e59799da392345b457cc4b1b033e602ea766780c19ef3aa9d354f7dbcaf7dc354d2"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "df4f6f77ea21a14b05bcf459cf93bb170c65f4e3101a729180fc73ed7ad7d85c"
+          "content" : "caa94adbc89025762a6642aa68831eb223466e5f282babb2598793bbd6da2a2b"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "73b892b6fee60a0ae819ee4e3d307424891d06799c3bdc8f0865154ff1a2e910436c6d9e9058c582169287e884180a5958ddae4f9d13ac925d953479316786e5"
+          "content" : "7375d754bb5c533eeecd35616506138b009fa2866b2329ad9ccd247c03dc1d102e04ccba35f4153890cf490b93ec4bc147961c078679964633ab14e0188fd5e1"
         }
       ],
       "licenses" : [
@@ -5951,7 +6028,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.flywaydb/flyway-core@12.10.0?type=jar",
+      "purl" : "pkg:maven/org.flywaydb/flyway-core@12.11.0?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -5962,42 +6039,42 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.flywaydb/flyway-database-postgresql@12.10.0?type=jar",
+      "bom-ref" : "pkg:maven/org.flywaydb/flyway-database-postgresql@12.11.0?type=jar",
       "group" : "org.flywaydb",
       "name" : "flyway-database-postgresql",
-      "version" : "12.10.0",
+      "version" : "12.11.0",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "ddaf999d6340fcb92339b10b191b3163"
+          "content" : "7bacf983291971b67946acb6f5b44ba7"
         },
         {
           "alg" : "SHA-1",
-          "content" : "2749e2f1c268e7b48cc525e76c27191e5b7fbdb8"
+          "content" : "f4721bdd0ff377be099b5a1b3a4a7bfc6651978c"
         },
         {
           "alg" : "SHA-256",
-          "content" : "3a40db4c597d130f0bec3c333f62adb534adeddf54a01cb405e75f473b19b209"
+          "content" : "38836ae3d6851869e7235d5e2093c0eb4c45b97507b625de5cc38701f56a0439"
         },
         {
           "alg" : "SHA-512",
-          "content" : "65da20cb10f407a326319d2dfaf78039c1deaf8c0d1322b65c13a3ea6e6e1b4fe309ac60f0771c48c0950f6f8ebffbba13a1329aa0c20507b9df9895f1ee3495"
+          "content" : "d3ecd1d0f366720893cd4d48a4d67cb843adb942e4279196cb4aec535f91286d11734da09ccf07b69fe4cff97c63eb52a511b4c4d57cafca1ee8fc4a639ac278"
         },
         {
           "alg" : "SHA-384",
-          "content" : "9d46011924a3183320d3c4b464318d352acc5daeb82bd9c7a2de98aa75dfab74d5e8e15a351de4afb2bdeb62fb7ebf28"
+          "content" : "1f824a46fb78980a8f6fd5742d455dc5320443f0248879a88fed7d20f4835ed3b9fdf77d08aba4c715dc83da778540df"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "76ecee888ec24e5e5bd24c6aa79be18734aba7d95172357c42d416d0e08ee0815e65776492f30a35989c4e3f63d4f189"
+          "content" : "efa0adaa5a25a5e63cefc889f6c60164b5c4a95788011a93357b9381e97898e750b2e321a718c66a1c2b17df79cacef5"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "70d60293e56439007161085381afd90b5a228cb2fd82bf84aacdd45269918328"
+          "content" : "da26b9ac2d751951a113ae542d77537bfe99e844c8cb532296fcee196e0802d2"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "dfe518776d0893d0dd9112f5bc4a9a4d243867e7985f208694b9c527fa8a878e4266bdc3aaeb1e36b003fb9295cfdb0c90079055679fb92a06ab0a25c632b39f"
+          "content" : "411ae80722a39d2a499dc3eec7fb7d84f51eec55bea152c0f236e16af8eaa4b236a282e712848bd350c6e7333a652f9b145002ea7f81eb03da5a3fa9f31a29ed"
         }
       ],
       "licenses" : [
@@ -6007,7 +6084,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.flywaydb/flyway-database-postgresql@12.10.0?type=jar",
+      "purl" : "pkg:maven/org.flywaydb/flyway-database-postgresql@12.11.0?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -7667,6 +7744,78 @@
         }
       ],
       "purl" : "pkg:maven/org.springframework.boot/spring-boot-data-jpa@4.1.0?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "website",
+          "url" : "https://spring.io"
+        },
+        {
+          "type" : "issue-tracker",
+          "url" : "https://github.com/spring-projects/spring-boot/issues"
+        },
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/spring-projects/spring-boot"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-data-redis@4.1.0?type=jar",
+      "publisher" : "VMware, Inc.",
+      "group" : "org.springframework.boot",
+      "name" : "spring-boot-data-redis",
+      "version" : "4.1.0",
+      "description" : "Spring Boot Data Redis",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "855f4a26f0e0d67c49a365d12940316e"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "ae52af2d818ca43d61c486e5cff5d0e81d545c4c"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "a3cee050807b8e0b437678ab40319930dfcffc7eb1da9bb57bf8e10900967e24"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "04b42960d633c2e6cb2c003dc610395168ae51f646f03a2c667bce4301337db98ae10521d07c301e6be2f8e8fbadc2e6340c66041245d2e9a2ad559353f0b7c2"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "dc26843632ff513443cb9dae1b2109f20d49c6d7b4625dc3bab0445a0fb5983615234a112c73c7f63c4e96b00d0e98d9"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "9c38704d3a556fc02d4d4f2fa8fd15724045f85ffe673645f308ba3067124f2a6a6efab4b11626fd1d22d75f611ef9d7"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "e675fb10c10f0e8ff31a0aa8b5941aa819dbcb2ac2bafff1354251cf8b34ae8d"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "98a8120e2099325d4032f2206d2c4be239a76be17ff5155a4ac52838af9eef0f638387c5131e1449b96a13450d0be2acf45c96c99b1eb546bfad0e6f0ca3064e"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/org.springframework.boot/spring-boot-data-redis@4.1.0?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -9491,6 +9640,78 @@
     },
     {
       "type" : "library",
+      "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-starter-data-redis@4.1.0?type=jar",
+      "publisher" : "VMware, Inc.",
+      "group" : "org.springframework.boot",
+      "name" : "spring-boot-starter-data-redis",
+      "version" : "4.1.0",
+      "description" : "Starter for using Redis key-value data store with Spring Data Redis and the Lettuce client",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "64910908d0c4f35500aacea3e9d0ad13"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "efdaaedff624a7f406d53d2d945ee71676d7759a"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "85d475bcc240f0c8e2a142b0278d6063d11e64522823abe34d92a8c4dfb50c75"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "d5aae119bcca1bce0f370b3b92442716507c15feef3380b385cd40658cdd9e52c89b2587ff3a7ef23c1393b971375c8975692aaace369e14356c8144c1e04943"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "3152a32ac871b2cdea30d746129e3db3c49f23bfc175c4ddb6541d4ef0f5c72c11b25ae823447a3c1c6931e3f0f240fe"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "792916839853576dcd7db4f4115891e65fd09eca3ca3b7fbb9c9080afc3e6beb380e700579ac4dc50ee8c9989a86cbbc"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "88d7da08fcdcd5d13eb9ea9629192be2ab462e8d811aaf45bbf321923deec524"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "c3b9088f774295023296be0aecd7a4fb8a4c8864af385206986905425e2852468b0269e11fa246e41cde0be35cb9030a690d0a34c69d80039532ff9d85c69f64"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/org.springframework.boot/spring-boot-starter-data-redis@4.1.0?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "website",
+          "url" : "https://spring.io"
+        },
+        {
+          "type" : "issue-tracker",
+          "url" : "https://github.com/spring-projects/spring-boot/issues"
+        },
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/spring-projects/spring-boot"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
       "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-starter-jackson@4.1.0?type=jar",
       "publisher" : "VMware, Inc.",
       "group" : "org.springframework.boot",
@@ -11199,6 +11420,129 @@
     },
     {
       "type" : "library",
+      "bom-ref" : "pkg:maven/org.springframework.data/spring-data-keyvalue@4.1.0?type=jar",
+      "group" : "org.springframework.data",
+      "name" : "spring-data-keyvalue",
+      "version" : "4.1.0",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "ed50fe6b70fac0b29ca44ae1978a858b"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "9ade00273c269ca0d50c4d2d5f564d21a84f94f7"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "1cab6685ee820428a9fb48eab4a5cb48ddcab1dfdb2467b9afb3c47f5455d19b"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "60706452e408416e189c2e075fe772e5b4a5ced448dd3818a6b878afe84426f45f0853ee6af836af82ed264a21ee8e0c03e8de5c3dfe7c6d25250a511e32473d"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "a75c3413ed771b689cd5af090cc0b4bb2823b6ed99be3db8bd35be06d6b80da4ffd12713bec833447cb5a068fd3f481f"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "4d2ec30a926b81f7951d4e256b9d3d3729bf79b186d10f602dd1ba072e629380ea873b196d919d797bca9156d169ca31"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "16409b4cc2af5e834025e42b9fb0b7b9e26a9063880890092c765ea33803fc95"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "a2746d84034abad4f81b6236828dd608954fd010d3ea98f32999d66a9661001ff2d7661c6851a4d7a7aec3353d64792ae0a340504197669c6ed6f4eb853c3394"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/org.springframework.data/spring-data-keyvalue@4.1.0?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/org.springframework.data/spring-data-redis@4.1.0?type=jar",
+      "group" : "org.springframework.data",
+      "name" : "spring-data-redis",
+      "version" : "4.1.0",
+      "description" : "Spring Data module for Redis",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "9297792ea082d817de320796c2b48403"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "0db3c9ffef46e71f2697d28d8654021220766b4e"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "c9f7c6d38c98e4240250c0c3969758b26763c4e0e87726915a71855062ae6cb2"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "1f0be6effd561adec7757eb855cd5e99a30c99a1117e9c55ec9e2dfc4e1ed30e920bef0d29972006a963c811df84f4abbfb19a421ee751f4daed1472fb64b1eb"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "99cf932ed81ed47b5aea4557e12a190bc735dc785227ef7da6f560bd9c07e06045123a83a3ba2f863c15eef9f99cf209"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "5694e97705b6bff8b94eb9244eb31d62b5d8c9e2d75deb0a93c7c5f2d27959bc4fc33cecfae4b1664e02a6fde1635a56"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "218b2ec9df3675f91ca73aed6a788341712650af5eb6e326a6c45f9f01d95e49"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "0986ec6c3f3021e2686bec76bc7ddae786d47cb2daf2b2c25a3bc2f0f223e29c46d9128a549a9aa34c33842e03ef9897ac6bed11c7565f39755b283e59ca819f"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/org.springframework.data/spring-data-redis@4.1.0?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "issue-tracker",
+          "url" : "https://github.com/spring-projects/spring-data-redis/issues"
+        },
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/spring-projects/spring-data-redis"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
       "bom-ref" : "pkg:maven/org.springframework.security/spring-security-config@7.1.0?type=jar",
       "publisher" : "Pivotal Software, Inc.",
       "group" : "org.springframework.security",
@@ -12279,6 +12623,78 @@
     },
     {
       "type" : "library",
+      "bom-ref" : "pkg:maven/org.springframework/spring-messaging@7.0.8?type=jar",
+      "publisher" : "Spring IO",
+      "group" : "org.springframework",
+      "name" : "spring-messaging",
+      "version" : "7.0.8",
+      "description" : "Spring Messaging",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "afa1d7aa1c701b171f4e066016b13202"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "2379224f4c36aeaeceb706750138b8ca9d265916"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "0f96694ebb88fed6bf4aef608010c23ee922a476dd71e0fab76ca9ed0eaa70b0"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "83bf70d03617fb516ee3fa1987ef2debfce4f84724c6bc810716a51c1244bad43164af423bf4596b26671bccfdae3c04a53d5d0739905fe29730cf814c4d3218"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "c39b2e9e2cc6f5d0fe4665a3360483176cc6625f6937094e2ac05a96f30386067bfc2cfcfcdef2281b7f64ac7507d3bc"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "f5f8c0f64ae092c047b0472a948d078b563aa43f9a7eb2f88467f0360a5b835187e561fd05a45c5c42e9953bbec72507"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "25759480204e50f65f1e48a97d974f7d4fc8b8dc9e8c29dd7cd032b7527d5289"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "ec418fbcac3614d059687cd4e14b06024a092e3838f53f915b1eef6ca2efd84b79d8e922378288be95f5117c432dfe68a7a56a7a16c48d6810617186593d9314"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/org.springframework/spring-messaging@7.0.8?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "website",
+          "url" : "https://spring.io/projects/spring-framework"
+        },
+        {
+          "type" : "issue-tracker",
+          "url" : "https://github.com/spring-projects/spring-framework/issues"
+        },
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/spring-projects/spring-framework"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
       "bom-ref" : "pkg:maven/org.springframework/spring-orm@7.0.8?type=jar",
       "publisher" : "Spring IO",
       "group" : "org.springframework",
@@ -12327,6 +12743,78 @@
         }
       ],
       "purl" : "pkg:maven/org.springframework/spring-orm@7.0.8?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "website",
+          "url" : "https://spring.io/projects/spring-framework"
+        },
+        {
+          "type" : "issue-tracker",
+          "url" : "https://github.com/spring-projects/spring-framework/issues"
+        },
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/spring-projects/spring-framework"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/org.springframework/spring-oxm@7.0.8?type=jar",
+      "publisher" : "Spring IO",
+      "group" : "org.springframework",
+      "name" : "spring-oxm",
+      "version" : "7.0.8",
+      "description" : "Spring Object/XML Marshalling",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "8422eba43a43d99cb6f227464714b914"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "e74c099072565db0552b56691449e52b79f6f23e"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "67f91ffb41a94cf0e443f02ee6f740d52e10a84cabae218cdb0de65f87a82172"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "34cb275b2661a73f6506a468a275e63f6802305b39fd2eb124544e6921348e0be4f61b1049071c5ef3ddf307a7fe10753bf3822842da33c632d91f60bef00351"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "46d9332eaa1f641ca89da20617a5896539e66e2398c609032e080ede6fb4eab970a1cf564702537928a02748eceee469"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "ada011496787b114c1871c12cfdf07c6191520b77ff43ad19069ebfd8c83c3c15fd6395cdd63c65b045f31084e0af41d"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "b58fb94b44f335a0076dce2d2fea358ae22e4a0146a70fa912cd5571316198d4"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "848a0b87362bf96678ca86ed52e32e3c3a940ef56e67cad3003269ac3cdafd5f8d7d218a954671be448acb3e28e0ba89fa5479665bbc944cb92a53a468ccb9a4"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/org.springframework/spring-oxm@7.0.8?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -12706,6 +13194,82 @@
     },
     {
       "type" : "library",
+      "bom-ref" : "pkg:maven/redis.clients.authentication/redis-authx-core@0.1.1-beta2?type=jar",
+      "group" : "redis.clients.authentication",
+      "name" : "redis-authx-core",
+      "version" : "0.1.1-beta2",
+      "description" : "Redis AuthX Core is the core lib of an extension for Redis Java Clients to support token-based authentication.",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "f31eb733d8fb8ee53f186efea30d0357"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "4037345ff29fb22c737bab2ed116a34262718ae5"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "cc56edb08b3df8562cddac108dca61907d21cc4ad04de05e9f5d1b01058390af"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "a8d6f3c9cb3e8710014e268c68670c7dcea63bde1457b037ab07e0623c83b3db44daa51217fd4470976a14cd994402771fb9faf039f0428f3f9c39e5ed254bb7"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "e73479b7584b02626632711fe5694f7b2fb63878e56fbd241179f239031d2fa8b438f73a914b9852ee20e6e9337b5d6e"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "968df599ea26ff629090b4f6a7b642f4ea29ddd20f8c5efedf7a37954280ed9c312f0c8e4ae27d365f517cc80687975b"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "3cf85499e7b4df76e070b619aba104d2a4a02cae40de103ae6778ed1ddecb906"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "537a1f9df7fd408ed3ede6cfe2364954f2c03c0bdbfdf88db1e5deeb4d6aa4405bec6e4f98082b13d0ae53671820dc4487dd412f120a740069781042dc614ab2"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "MIT",
+            "url" : "https://opensource.org/license/mit/"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/redis.clients.authentication/redis-authx-core@0.1.1-beta2?type=jar",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "distribution",
+          "url" : "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
+        },
+        {
+          "type" : "issue-tracker",
+          "url" : "https://github.com/redis/redis-authx-core/issues"
+        },
+        {
+          "type" : "mailing-list",
+          "url" : "https://groups.google.com/group/redis_authx"
+        },
+        {
+          "type" : "vcs",
+          "url" : "scm:git:git@github.com:redis/redis-authx-core.git"
+        }
+      ],
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
       "bom-ref" : "pkg:maven/tools.jackson.core/jackson-core@3.1.4?type=jar",
       "group" : "tools.jackson.core",
       "name" : "jackson-core",
@@ -13007,8 +13571,8 @@
         "pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar",
         "pkg:maven/io.micrometer/micrometer-registry-prometheus@1.17.0?type=jar",
         "pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar",
-        "pkg:maven/org.flywaydb/flyway-core@12.10.0?type=jar",
-        "pkg:maven/org.flywaydb/flyway-database-postgresql@12.10.0?type=jar",
+        "pkg:maven/org.flywaydb/flyway-core@12.11.0?type=jar",
+        "pkg:maven/org.flywaydb/flyway-database-postgresql@12.11.0?type=jar",
         "pkg:maven/org.mapstruct/mapstruct@1.6.3?type=jar",
         "pkg:maven/org.postgresql/postgresql@42.7.12?type=jar",
         "pkg:maven/org.semver4j/semver4j@6.0.0?type=jar",
@@ -13017,6 +13581,7 @@
         "pkg:maven/org.springframework.boot/spring-boot-starter-actuator@4.1.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-cache@4.1.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-data-jpa@4.1.0?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-starter-data-redis@4.1.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-mail@4.1.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-oauth2-resource-server@4.1.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-opentelemetry@4.1.0?type=jar",
@@ -13024,6 +13589,17 @@
         "pkg:maven/org.springframework.boot/spring-boot-starter-validation@4.1.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-web@4.1.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-webflux@4.1.0?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/io.lettuce/lettuce-core@7.5.2.RELEASE?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.netty/netty-common@4.2.15.Final?type=jar",
+        "pkg:maven/io.netty/netty-handler@4.2.15.Final?type=jar",
+        "pkg:maven/io.netty/netty-resolver-dns@4.2.15.Final?type=jar",
+        "pkg:maven/io.netty/netty-transport@4.2.15.Final?type=jar",
+        "pkg:maven/io.projectreactor/reactor-core@3.8.6?type=jar",
+        "pkg:maven/redis.clients.authentication/redis-authx-core@0.1.1-beta2?type=jar"
       ]
     },
     {
@@ -13577,15 +14153,15 @@
       ]
     },
     {
-      "ref" : "pkg:maven/org.flywaydb/flyway-core@12.10.0?type=jar",
+      "ref" : "pkg:maven/org.flywaydb/flyway-core@12.11.0?type=jar",
       "dependsOn" : [
         "pkg:maven/tools.jackson.core/jackson-databind@3.1.4?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/org.flywaydb/flyway-database-postgresql@12.10.0?type=jar",
+      "ref" : "pkg:maven/org.flywaydb/flyway-database-postgresql@12.11.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/org.flywaydb/flyway-core@12.10.0?type=jar"
+        "pkg:maven/org.flywaydb/flyway-core@12.11.0?type=jar"
       ]
     },
     {
@@ -13750,6 +14326,17 @@
         "pkg:maven/org.springframework.boot/spring-boot-hibernate@4.1.0?type=jar",
         "pkg:maven/org.springframework.data/spring-data-jpa@4.1.0?type=jar",
         "pkg:maven/org.springframework/spring-aspects@7.0.8?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/org.springframework.boot/spring-boot-data-redis@4.1.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/io.lettuce/lettuce-core@7.5.2.RELEASE?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-data-commons@4.1.0?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-netty@4.1.0?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-transaction@4.1.0?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot@4.1.0?type=jar",
+        "pkg:maven/org.springframework.data/spring-data-redis@4.1.0?type=jar"
       ]
     },
     {
@@ -13947,6 +14534,14 @@
         "pkg:maven/org.springframework.boot/spring-boot-jdbc@4.1.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-jdbc@4.1.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter@4.1.0?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/org.springframework.boot/spring-boot-starter-data-redis@4.1.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/org.springframework.boot/spring-boot-data-redis@4.1.0?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-starter@4.1.0?type=jar",
+        "pkg:maven/org.springframework/spring-messaging@7.0.8?type=jar"
       ]
     },
     {
@@ -14155,6 +14750,26 @@
       ]
     },
     {
+      "ref" : "pkg:maven/org.springframework.data/spring-data-keyvalue@4.1.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar",
+        "pkg:maven/org.springframework.data/spring-data-commons@4.1.0?type=jar",
+        "pkg:maven/org.springframework/spring-context@7.0.8?type=jar",
+        "pkg:maven/org.springframework/spring-tx@7.0.8?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/org.springframework.data/spring-data-redis@4.1.0?type=jar",
+      "dependsOn" : [
+        "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar",
+        "pkg:maven/org.springframework.data/spring-data-keyvalue@4.1.0?type=jar",
+        "pkg:maven/org.springframework/spring-aop@7.0.8?type=jar",
+        "pkg:maven/org.springframework/spring-context-support@7.0.8?type=jar",
+        "pkg:maven/org.springframework/spring-oxm@7.0.8?type=jar",
+        "pkg:maven/org.springframework/spring-tx@7.0.8?type=jar"
+      ]
+    },
+    {
       "ref" : "pkg:maven/org.springframework.security/spring-security-config@7.1.0?type=jar",
       "dependsOn" : [
         "pkg:maven/org.springframework.security/spring-security-core@7.1.0?type=jar",
@@ -14277,12 +14892,27 @@
       ]
     },
     {
+      "ref" : "pkg:maven/org.springframework/spring-messaging@7.0.8?type=jar",
+      "dependsOn" : [
+        "pkg:maven/org.springframework/spring-beans@7.0.8?type=jar",
+        "pkg:maven/org.springframework/spring-core@7.0.8?type=jar"
+      ]
+    },
+    {
       "ref" : "pkg:maven/org.springframework/spring-orm@7.0.8?type=jar",
       "dependsOn" : [
         "pkg:maven/org.springframework/spring-beans@7.0.8?type=jar",
         "pkg:maven/org.springframework/spring-core@7.0.8?type=jar",
         "pkg:maven/org.springframework/spring-jdbc@7.0.8?type=jar",
         "pkg:maven/org.springframework/spring-tx@7.0.8?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/org.springframework/spring-oxm@7.0.8?type=jar",
+      "dependsOn" : [
+        "pkg:maven/jakarta.xml.bind/jakarta.xml.bind-api@4.0.5?type=jar",
+        "pkg:maven/org.springframework/spring-beans@7.0.8?type=jar",
+        "pkg:maven/org.springframework/spring-core@7.0.8?type=jar"
       ]
     },
     {
@@ -14323,6 +14953,12 @@
     {
       "ref" : "pkg:maven/org.yaml/snakeyaml@2.6?type=jar",
       "dependsOn" : [ ]
+    },
+    {
+      "ref" : "pkg:maven/redis.clients.authentication/redis-authx-core@0.1.1-beta2?type=jar",
+      "dependsOn" : [
+        "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar"
+      ]
     },
     {
       "ref" : "pkg:maven/tools.jackson.core/jackson-core@3.1.4?type=jar",
