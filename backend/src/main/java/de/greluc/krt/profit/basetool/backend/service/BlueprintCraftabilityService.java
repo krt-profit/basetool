@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintRequirementGr
 import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.support.QuantityTypeRounding;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -286,7 +287,7 @@ public class BlueprintCraftabilityService {
       // piece and the craftable count stays in step with the rest of the app. SCU materials keep
       // their fractional requirement.
       QuantityType quantityType = material.getQuantityType();
-      double required = roundForQuantityType(rawRequired, quantityType);
+      double required = QuantityTypeRounding.roundForQuantityType(rawRequired, quantityType);
       if (required <= 0.0d) {
         continue;
       }
@@ -560,24 +561,6 @@ public class BlueprintCraftabilityService {
   @Nullable
   private static Double roundNullable(@Nullable Double value) {
     return value == null ? null : Math.round(value * 100.0d) / 100.0d;
-  }
-
-  /**
-   * Rounds one slot's per-craft requirement to the precision its quantity type can express: a whole
-   * piece for a {@link QuantityType#PIECE} material, three decimals (the SCU input step) otherwise.
-   * Mirrors {@code JobOrderItemService.roundForQuantityType} so a blueprint's craftable count never
-   * diverges from the job-order requirement snapshot for the same PIECE material; a {@code null}
-   * type is treated as SCU (the {@link Material#getQuantityType()} default).
-   *
-   * @param quantity the raw per-craft requirement from {@code quantity_scu}
-   * @param quantityType the material's quantity type, or {@code null} (treated as SCU)
-   * @return the rounded requirement, in the material's own unit
-   */
-  private static double roundForQuantityType(double quantity, @Nullable QuantityType quantityType) {
-    if (quantityType == QuantityType.PIECE) {
-      return Math.round(quantity);
-    }
-    return Math.round(quantity * 1000.0d) / 1000.0d;
   }
 
   /** Mutable accumulator for one material's pooled RESOURCE requirement across a recipe's slots. */

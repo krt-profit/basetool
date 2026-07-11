@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.model.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.model.ManufacturerUexCompany;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerUexCompanyRepository;
+import de.greluc.krt.profit.basetool.backend.support.UexValues;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
@@ -211,9 +212,13 @@ public class UexManufacturerService {
     } else {
       // Duplicate company of an already-resolved brand: only widen the surfaces it serves.
       manufacturer.setIsItemManufacturer(
-          orFlag(manufacturer.getIsItemManufacturer(), asBoolean(dto.isItemManufacturer())));
+          orFlag(
+              manufacturer.getIsItemManufacturer(),
+              UexValues.asBooleanOrFalse(dto.isItemManufacturer())));
       manufacturer.setIsVehicleManufacturer(
-          orFlag(manufacturer.getIsVehicleManufacturer(), asBoolean(dto.isVehicleManufacturer())));
+          orFlag(
+              manufacturer.getIsVehicleManufacturer(),
+              UexValues.asBooleanOrFalse(dto.isVehicleManufacturer())));
     }
 
     manufacturer.setUexSyncedAt(now);
@@ -281,8 +286,8 @@ public class UexManufacturerService {
     }
     manufacturer.setUexCompanyId(dto.id());
     manufacturer.setIndustry(dto.industry());
-    manufacturer.setIsItemManufacturer(asBoolean(dto.isItemManufacturer()));
-    manufacturer.setIsVehicleManufacturer(asBoolean(dto.isVehicleManufacturer()));
+    manufacturer.setIsItemManufacturer(UexValues.asBooleanOrFalse(dto.isItemManufacturer()));
+    manufacturer.setIsVehicleManufacturer(UexValues.asBooleanOrFalse(dto.isVehicleManufacturer()));
   }
 
   /**
@@ -313,15 +318,5 @@ public class UexManufacturerService {
    */
   private static Boolean orFlag(Boolean existing, Boolean incoming) {
     return Boolean.TRUE.equals(existing) || Boolean.TRUE.equals(incoming);
-  }
-
-  /**
-   * Normalises UEX's 0/1 integer flag into a {@link Boolean}.
-   *
-   * @param flag UEX-style integer
-   * @return {@code true} when {@code flag == 1}, {@code false} otherwise (including {@code null})
-   */
-  private static Boolean asBoolean(Integer flag) {
-    return flag != null && flag == 1;
   }
 }

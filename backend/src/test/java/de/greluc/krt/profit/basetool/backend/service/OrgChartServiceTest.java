@@ -86,6 +86,13 @@ class OrgChartServiceTest {
         positionRepository, orgUnitRepository, userRepository, new OrgChartPositionMapperImpl());
   }
 
+  // Read/write split (#14): the chart assembly moved to OrgChartReadService, built from the same
+  // mocked repositories + the real generated mapper so the nested-tree assertions stay unchanged.
+  private OrgChartReadService readService() {
+    return new OrgChartReadService(
+        positionRepository, orgUnitRepository, new OrgChartPositionMapperImpl());
+  }
+
   // ------------------------------------------------------------------ read assembly --
 
   @Test
@@ -109,7 +116,7 @@ class OrgChartServiceTest {
         .thenReturn(
             List.of(squadronLead, commandLead, deputy, commandEnsign, directEnsign, skCommander));
 
-    OrgChartDto chart = service().getOrgChart();
+    OrgChartDto chart = readService().getOrgChart();
 
     assertNotNull(chart.areaLeadership().lead());
     assertEquals(OrgChartPositionType.AREA_LEAD, chart.areaLeadership().lead().positionType());
@@ -149,7 +156,7 @@ class OrgChartServiceTest {
     when(positionRepository.findAllByOrgUnitIdInOrderBySortIndexAscCreatedAtAsc(any()))
         .thenReturn(List.of(command, deputy));
 
-    CommandChartDto dto = service().getOrgChart().squadrons().getFirst().commands().getFirst();
+    CommandChartDto dto = readService().getOrgChart().squadrons().getFirst().commands().getFirst();
 
     assertEquals("Alpha", dto.name());
     assertNull(dto.leaderUserId(), "a leaderless Kommando exposes no holder");
@@ -174,7 +181,7 @@ class OrgChartServiceTest {
     when(positionRepository.findAllByOrgUnitIdInOrderBySortIndexAscCreatedAtAsc(any()))
         .thenReturn(List.of(command));
 
-    CommandChartDto dto = service().getOrgChart().squadrons().getFirst().commands().getFirst();
+    CommandChartDto dto = readService().getOrgChart().squadrons().getFirst().commands().getFirst();
 
     assertEquals("Alpha", dto.name());
     assertNull(dto.leaderUserId(), "a free-text leader has no account id");
@@ -205,7 +212,7 @@ class OrgChartServiceTest {
     when(positionRepository.findAllByOrgUnitIdInOrderBySortIndexAscCreatedAtAsc(any()))
         .thenReturn(List.of(grouped, legacy));
 
-    List<CommandChartDto> commands = service().getOrgChart().squadrons().getFirst().commands();
+    List<CommandChartDto> commands = readService().getOrgChart().squadrons().getFirst().commands();
 
     assertEquals(
         linked.getId(),
@@ -221,7 +228,7 @@ class OrgChartServiceTest {
     when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
         .thenReturn(List.of());
 
-    OrgChartDto chart = service().getOrgChart();
+    OrgChartDto chart = readService().getOrgChart();
 
     assertNull(chart.areaLeadership().lead());
     assertTrue(chart.squadrons().isEmpty());
@@ -248,7 +255,7 @@ class OrgChartServiceTest {
                 pos(OrgChartPositionType.ENSIGN, squadron, null),
                 pos(OrgChartPositionType.ENSIGN, squadron, null)));
 
-    SquadronChartDto squadronDto = service().getOrgChart().squadrons().getFirst();
+    SquadronChartDto squadronDto = readService().getOrgChart().squadrons().getFirst();
 
     assertEquals(4, squadronDto.commands().size());
     assertFalse(squadronDto.canAddCommand());
@@ -277,7 +284,7 @@ class OrgChartServiceTest {
     when(positionRepository.findAllByOrgUnitIdInOrderBySortIndexAscCreatedAtAsc(any()))
         .thenReturn(List.of(bereichsleiter, olMember));
 
-    OrgChartDto chart = service().getOrgChart();
+    OrgChartDto chart = readService().getOrgChart();
 
     // OL members surface at the top, carried by the OL tier (id + name + members).
     assertEquals(olId, chart.organisationsleitung().orgUnitId());
@@ -312,7 +319,7 @@ class OrgChartServiceTest {
     when(positionRepository.findAllByOrgUnitIdInOrderBySortIndexAscCreatedAtAsc(any()))
         .thenReturn(List.of());
 
-    OrgChartDto chart = service().getOrgChart();
+    OrgChartDto chart = readService().getOrgChart();
 
     assertEquals(1, chart.bereiche().size());
     BereichChartDto b = chart.bereiche().getFirst();

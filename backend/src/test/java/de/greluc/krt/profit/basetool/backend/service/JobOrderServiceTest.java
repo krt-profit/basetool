@@ -110,6 +110,11 @@ class JobOrderServiceTest {
 
   @InjectMocks private JobOrderService jobOrderService;
 
+  // Read/write split (#14): the list/detail/picker reads moved to JobOrderQueryService, built from
+  // the same mocks with the real stock projection wired in below, so the moved read paths keep
+  // exercising the real logic from this fixture.
+  @InjectMocks private JobOrderQueryService jobOrderQueryService;
+
   private Material material;
   private MaterialDto materialDto;
   private JobOrder jobOrder;
@@ -129,6 +134,8 @@ class JobOrderServiceTest {
         jobOrderPriorityService, "jobOrderStockProjectionService", jobOrderStockProjectionService);
     ReflectionTestUtils.setField(
         jobOrderService, "jobOrderPriorityService", jobOrderPriorityService);
+    ReflectionTestUtils.setField(
+        jobOrderQueryService, "jobOrderStockProjectionService", jobOrderStockProjectionService);
     orderId = UUID.randomUUID();
     materialId = UUID.randomUUID();
 
@@ -226,7 +233,7 @@ class JobOrderServiceTest {
     when(ownerScopeService.canViewJobOrders()).thenReturn(false);
 
     org.springframework.data.domain.Page<JobOrderDto> result =
-        jobOrderService.getAllJobOrders(
+        jobOrderQueryService.getAllJobOrders(
             null, null, org.springframework.data.domain.PageRequest.of(0, 20));
 
     assertTrue(result.isEmpty());
@@ -960,7 +967,7 @@ class JobOrderServiceTest {
     when(ownerScopeService.currentDirectMembershipOrgUnitIds()).thenReturn(java.util.Set.of());
 
     org.springframework.data.domain.Page<JobOrderDto> page =
-        jobOrderService.getRequestedJobOrders(
+        jobOrderQueryService.getRequestedJobOrders(
             null, org.springframework.data.domain.PageRequest.of(0, 20));
 
     assertTrue(page.isEmpty(), "no memberships -> empty page");
@@ -978,7 +985,7 @@ class JobOrderServiceTest {
             any(), eq(java.util.Set.of(requestingUnitId)), any()))
         .thenReturn(org.springframework.data.domain.Page.empty());
 
-    jobOrderService.getRequestedJobOrders(
+    jobOrderQueryService.getRequestedJobOrders(
         null, org.springframework.data.domain.PageRequest.of(0, 20));
 
     org.mockito.ArgumentCaptor<List<JobOrderStatus>> statusesCaptor =
@@ -1176,7 +1183,7 @@ class JobOrderServiceTest {
 
     // When
     List<InventoryItemDto> result =
-        jobOrderService.getInventoryItemsForJobOrderMaterial(orderId, materialId);
+        jobOrderQueryService.getInventoryItemsForJobOrderMaterial(orderId, materialId);
 
     // Then
     assertNotNull(result);
@@ -1412,7 +1419,7 @@ class JobOrderServiceTest {
 
     // When
     List<InventoryItemDto> result =
-        jobOrderService.getInventoryItemsForJobOrderMaterial(orderId, materialId);
+        jobOrderQueryService.getInventoryItemsForJobOrderMaterial(orderId, materialId);
 
     // Then
     // Expected order: dto2 (Alpha, q90, ArcCorp, 3), dto4 (Alpha, q80, ArcCorp, 10), dto1 (Alpha,
@@ -1478,7 +1485,7 @@ class JobOrderServiceTest {
         .thenReturn(List.of(requiredItem, orphanItem));
     when(inventoryItemMapper.toDto(orphanItem)).thenReturn(orphanDto);
 
-    List<InventoryItemDto> result = jobOrderService.getOrphanedLinkedInventory(orderId);
+    List<InventoryItemDto> result = jobOrderQueryService.getOrphanedLinkedInventory(orderId);
 
     assertEquals(1, result.size(), "only the non-required (orphaned) link is returned");
     assertEquals(orphanDto.id(), result.get(0).id());

@@ -30,7 +30,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -116,15 +115,7 @@ public class SpecialCommandController {
     }
     Pageable pageable = PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "name");
     Page<SpecialCommand> p = specialCommandService.getAllSpecialCommands(pageable, includeInactive);
-    List<SpecialCommandDto> content =
-        p.getContent().stream().map(specialCommandMapper::toDto).toList();
-    return new PageResponse<>(
-        content,
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p.map(specialCommandMapper::toDto));
   }
 
   /**
@@ -138,7 +129,7 @@ public class SpecialCommandController {
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException if no SK matches.
    */
   @GetMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Operation(
       summary = "Get a Spezialkommando by id",
       description = "Returns the full DTO for the requested Spezialkommando. ADMIN-only.")
@@ -158,7 +149,7 @@ public class SpecialCommandController {
    * @return the persisted DTO.
    */
   @PostMapping
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Operation(
       summary = "Create a Spezialkommando",
       description = "Creates a new Spezialkommando. Name must be unique across all org units.")
@@ -186,7 +177,7 @@ public class SpecialCommandController {
    * @return the persisted DTO with the bumped version.
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Operation(
       summary = "Update a Spezialkommando",
       description =
@@ -213,7 +204,7 @@ public class SpecialCommandController {
    * @param id Spezialkommando id.
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Operation(
       summary = "Soft-delete a Spezialkommando",
       description =
@@ -234,7 +225,7 @@ public class SpecialCommandController {
    * @param id Spezialkommando id.
    */
   @PostMapping("/{id}/activate")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Operation(
       summary = "Activate a soft-deleted Spezialkommando",
       description = "Flips active=true on a previously soft-deleted Spezialkommando.")
@@ -259,7 +250,7 @@ public class SpecialCommandController {
    * @return the updated DTO with the new flag value.
    */
   @PatchMapping("/{id}/profit-eligible")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Operation(
       summary = "Toggle Spezialkommando profit-eligibility",
       description =

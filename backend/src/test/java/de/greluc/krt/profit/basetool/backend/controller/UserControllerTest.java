@@ -35,7 +35,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserSyncResultDto;
-import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipService;
+import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.service.UserSyncService;
 import java.time.LocalDate;
@@ -70,7 +70,7 @@ class UserControllerTest {
   @Mock private UserService userService;
   @Mock private UserMapper userMapper;
   @Mock private de.greluc.krt.profit.basetool.backend.service.AuthHelperService authHelperService;
-  @Mock private OrgUnitMembershipService orgUnitMembershipService;
+  @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   @Mock private UserSyncService userSyncService;
   @Mock private TaskMetrics taskMetrics;
   @Mock private Jwt jwt;
@@ -258,7 +258,7 @@ class UserControllerTest {
     entity.setId(userId);
     // REQ-ORG-017: the home Staffel(n) come from the membership service (the PII gate ORs across
     // all of the target's Staffeln).
-    when(orgUnitMembershipService.findStaffelMembershipOrgUnitIds(userId))
+    when(orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(userId))
         .thenReturn(java.util.List.of(foreignSquadronId));
     UserDto fullDto = fullPiiUserDto(userId);
     when(userService.findById(userId)).thenReturn(entity);
@@ -282,7 +282,7 @@ class UserControllerTest {
     User entity = new User();
     entity.setId(userId);
     // REQ-ORG-017: "no Staffel" surfaces as an empty list from the membership lookup.
-    when(orgUnitMembershipService.findStaffelMembershipOrgUnitIds(userId))
+    when(orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(userId))
         .thenReturn(java.util.List.of());
     UserDto fullDto = fullPiiUserDto(userId);
     when(userService.findById(userId)).thenReturn(entity);
@@ -305,7 +305,7 @@ class UserControllerTest {
     User entity = new User();
     entity.setId(userId);
     // REQ-ORG-017: same-squadron lookup goes through the membership service (ORs across Staffeln).
-    when(orgUnitMembershipService.findStaffelMembershipOrgUnitIds(userId))
+    when(orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(userId))
         .thenReturn(java.util.List.of(sharedSquadronId));
     UserDto fullDto = fullPiiUserDto(userId);
     when(userService.findById(userId)).thenReturn(entity);
@@ -558,13 +558,13 @@ class UserControllerTest {
     OrgUnitMembershipOptionDto option =
         new OrgUnitMembershipOptionDto(
             UUID.randomUUID(), "IRIDIUM", "IRI", OrgUnitKind.SQUADRON, false);
-    when(orgUnitMembershipService.listOptionsForUser(userId)).thenReturn(List.of(option));
+    when(orgUnitMembershipQueryService.listOptionsForUser(userId)).thenReturn(List.of(option));
 
     List<OrgUnitMembershipOptionDto> result = controller.getUserMemberships(userId, false);
 
     assertEquals(1, result.size());
     assertSame(option, result.getFirst());
-    verify(orgUnitMembershipService).listOptionsForUser(userId);
+    verify(orgUnitMembershipQueryService).listOptionsForUser(userId);
   }
 
   @Test
@@ -574,18 +574,19 @@ class UserControllerTest {
     OrgUnitMembershipOptionDto bereich =
         new OrgUnitMembershipOptionDto(
             UUID.randomUUID(), "Bereich Logistik", "LOG", OrgUnitKind.BEREICH, false);
-    when(orgUnitMembershipService.listDirectMembershipOptions(userId)).thenReturn(List.of(bereich));
+    when(orgUnitMembershipQueryService.listDirectMembershipOptions(userId))
+        .thenReturn(List.of(bereich));
 
     List<OrgUnitMembershipOptionDto> result = controller.getUserMemberships(userId, true);
 
     assertSame(bereich, result.getFirst());
-    verify(orgUnitMembershipService).listDirectMembershipOptions(userId);
+    verify(orgUnitMembershipQueryService).listDirectMembershipOptions(userId);
   }
 
   @Test
   void getUserMemberships_emptyResult_returnsEmptyList() {
     UUID userId = UUID.randomUUID();
-    when(orgUnitMembershipService.listOptionsForUser(userId)).thenReturn(List.of());
+    when(orgUnitMembershipQueryService.listOptionsForUser(userId)).thenReturn(List.of());
 
     List<OrgUnitMembershipOptionDto> result = controller.getUserMemberships(userId, false);
 
@@ -596,14 +597,14 @@ class UserControllerTest {
   void getMyOrgUnitIds_derivesCallerFromJwt_andDelegatesToService() {
     java.util.Set<UUID> ids = java.util.Set.of(UUID.randomUUID(), UUID.randomUUID());
     when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
-    when(orgUnitMembershipService.findDirectMembershipOrgUnitIds(CALLER_ID)).thenReturn(ids);
+    when(orgUnitMembershipQueryService.findDirectMembershipOrgUnitIds(CALLER_ID)).thenReturn(ids);
 
     java.util.Set<UUID> result = controller.getMyOrgUnitIds(jwt);
 
     // The caller id is taken from the JWT (never an URL path), and the id set is handed through.
     assertSame(ids, result);
     verify(userService).getUserIdFromJwt(jwt);
-    verify(orgUnitMembershipService).findDirectMembershipOrgUnitIds(CALLER_ID);
+    verify(orgUnitMembershipQueryService).findDirectMembershipOrgUnitIds(CALLER_ID);
   }
 
   // ── helpers ─────────────────────────────────────────────────────────────

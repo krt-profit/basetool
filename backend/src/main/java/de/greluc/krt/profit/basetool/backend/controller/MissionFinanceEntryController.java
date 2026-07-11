@@ -25,8 +25,8 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryUpdate
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceTotalsDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.backend.service.MissionFinanceEntryService;
+import de.greluc.krt.profit.basetool.backend.support.MissionGuestRedactor;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
@@ -87,6 +87,7 @@ public class MissionFinanceEntryController {
   private static final int MAX_FINANCE_PAGE_SIZE = 500;
 
   private final MissionFinanceEntryService financeEntryService;
+  private final MissionGuestRedactor missionGuestRedactor;
 
   /**
    * Paged finance entries for a mission. Sort is whitelisted; unknown fields → 400.
@@ -116,7 +117,7 @@ public class MissionFinanceEntryController {
     // that the nested participant PII is stripped for EVERY caller — including Logistician/Officer.
     // A participant's email may only ever be shown to that user themselves in their own profile, so
     // it must never travel to a peer through the finance ledger (there is no business need for a
-    // peer's contact data here). redactUserPii keeps only the public name tuple.
+    // peer's contact data here). The shared MissionGuestRedactor keeps only the public name tuple.
     entries = entries.map(this::redactParticipantPii);
     return PageResponse.of(entries);
   }
@@ -211,9 +212,11 @@ public class MissionFinanceEntryController {
    * Redacts the nested participant's PII from a finance-entry DTO for every finance-ledger caller
    * (audit H-1) — the redaction is unconditional, a Logistician/Officer is treated no differently
    * from a squadron member here. A {@code null} participant or user passes through unchanged;
-   * otherwise the nested user is stripped via {@link #redactUserPii} while the participant's
-   * non-sensitive fields (org units, job types, comment, times, payout preference) are kept.
-   * Mirrors {@code MissionController#cleanupParticipantForGuest}.
+   * otherwise the nested user is stripped via {@link MissionGuestRedactor#cleanupUserForGuest}
+   * while the participant's non-sensitive fields (org units, job types, comment, times, payout
+   * preference) are kept. Mirrors {@link MissionGuestRedactor#cleanupParticipantForGuest} (which
+   * additionally forwards the guest edit token; a finance read never mints one, so it is nulled
+   * here).
    *
    * @param dto the finance-entry DTO straight from the service
    * @return a copy with the nested participant PII stripped, or {@code dto} when there is no
@@ -227,7 +230,7 @@ public class MissionFinanceEntryController {
     MissionParticipantDto redacted =
         new MissionParticipantDto(
             participant.id(),
-            redactUserPii(participant.user()),
+            missionGuestRedactor.cleanupUserForGuest(participant.user()),
             participant.guestName(),
             participant.orgUnits(),
             participant.desiredMissionJobType(),
@@ -242,43 +245,5 @@ public class MissionFinanceEntryController {
             null);
     return new MissionFinanceEntryDto(
         dto.id(), dto.missionId(), redacted, dto.note(), dto.type(), dto.amount(), dto.version());
-  }
-
-  /**
-   * Strips PII from a participant's {@link UserDto} for every finance-ledger caller: nulls email,
-   * description, roles, permissions, last-read watermark, squadron and join date and forces the
-   * logistician/mission-manager flags to {@code false}; keeps the id, the public name tuple
-   * (username/displayName/effectiveName), {@code rank}, {@code inKeycloak} and {@code version}.
-   * Email is dropped for everyone because it may only ever be shown to the user themselves in their
-   * own profile, never to a peer. {@code effectiveName} is retained — not a real name but, by
-   * construction in {@link de.greluc.krt.profit.basetool.backend.model.User#getEffectiveName()},
-   * just the display name with a username fallback — because the ledger UI renders the participant
-   * column from it. The same contract as {@code MissionController#cleanupUserForGuest} so the
-   * redacted shape is consistent across the mission and finance views.
-   *
-   * @param dto the participant's user DTO
-   * @return a redacted copy carrying only the public name tuple and non-sensitive scalars
-   */
-  private UserDto redactUserPii(UserDto dto) {
-    return new UserDto(
-        dto.id(),
-        dto.username(),
-        dto.displayName(),
-        dto.effectiveName(),
-        null, // email
-        dto.rank(),
-        null, // description
-        null, // roles
-        null, // permissions
-        null, // lastReadAnnouncementId
-        false, // isLogistician
-        false, // isMissionManager
-        dto.inKeycloak(),
-        null, // squadron
-        null, // squadrons
-        dto.version(),
-        null, // joinDate
-        null // discordLinked – not exposed to guests
-        );
   }
 }

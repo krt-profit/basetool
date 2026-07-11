@@ -81,7 +81,7 @@ public class SquadronMembershipController {
    * @return the persisted membership DTO with the bumped version.
    */
   @PatchMapping("/{userId}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Operation(
       summary = "Patch per-Squadron-membership role flags",
       description =

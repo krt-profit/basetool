@@ -26,7 +26,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.OutpostService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -52,7 +51,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/outposts")
 @RequiredArgsConstructor
 @Transactional
-@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+@PreAuthorize(Roles.HAS_ROLE_ADMIN)
 public class OutpostController {
 
   private final OutpostService outpostService;
@@ -75,14 +74,7 @@ public class OutpostController {
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("name", "id", "starSystemName"), "name");
     Page<Outpost> p = outpostService.getAllOutposts(pageable);
-    List<OutpostDto> content = p.getContent().stream().map(outpostMapper::toDto).toList();
-    return new PageResponse<>(
-        content,
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p.map(outpostMapper::toDto));
   }
 
   /**
@@ -105,7 +97,7 @@ public class OutpostController {
    * @return the persisted outpost DTO
    */
   @PatchMapping("/{id}/loading-dock")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public OutpostDto setLoadingDockOverride(
       @PathVariable @NotNull UUID id, @RequestParam boolean value) {
     return outpostMapper.toDto(outpostService.setLoadingDockOverride(id, value));
@@ -119,7 +111,7 @@ public class OutpostController {
    * @return the persisted outpost DTO
    */
   @DeleteMapping("/{id}/loading-dock-override")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public OutpostDto clearLoadingDockOverride(@PathVariable @NotNull UUID id) {
     return outpostMapper.toDto(outpostService.clearLoadingDockOverride(id));
   }

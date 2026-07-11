@@ -22,10 +22,12 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportSuggestionDto;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Function;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
@@ -56,9 +58,11 @@ public class BlueprintFuzzyMatcher {
   public static final int DEFAULT_LIMIT = 5;
 
   /**
-   * Scores every candidate against the normalized query key and returns the best {@code limit}
-   * candidates whose score reaches {@code threshold}, highest score first. Ties break
-   * alphabetically by product name for a stable order.
+   * Scores every {@link ResolvedProduct} candidate against the normalized query key and returns the
+   * best {@code limit} suggestions whose score reaches {@code threshold}, highest score first. Ties
+   * break alphabetically by product name for a stable order. A thin domain wrapper over the generic
+   * {@link #topMatches} — the SCMDB import's original entry point, kept so its callers and tests
+   * are untouched.
    *
    * @param normalizedQuery normalized external name (already lowercased / whitespace-folded)
    * @param candidates the master product set to score against
@@ -72,27 +76,79 @@ public class BlueprintFuzzyMatcher {
       @NotNull List<ResolvedProduct> candidates,
       int limit,
       double threshold) {
+    return topMatches(
+            normalizedQuery,
+            candidates,
+            ResolvedProduct::productKey,
+            Comparator.comparing(
+                ResolvedProduct::productName, Comparator.nullsLast(String::compareToIgnoreCase)),
+            limit,
+            threshold)
+        .stream()
+        .map(
+            match ->
+                new BlueprintImportSuggestionDto(
+                    match.candidate().productKey(), match.candidate().productName(), match.score()))
+        .toList();
+  }
+
+  /**
+   * Scores every candidate against the normalized query key and returns the best {@code limit}
+   * candidates whose score reaches {@code threshold}, highest (rounded) score first, ties broken by
+   * {@code tieBreak} for a stable order. The scoring is pure string math over the key {@code
+   * keyExtractor} pulls from each candidate, so a caller can rank its own type without wrapping it
+   * in a domain DTO: {@code RefineryImportService} ranks {@code Material}s directly and the SCMDB
+   * import ranks {@code ResolvedProduct}s (see {@link #topSuggestions}).
+   *
+   * @param <T> the candidate type
+   * @param normalizedQuery normalized external name (already lowercased / whitespace-folded)
+   * @param candidates the candidates to score against
+   * @param keyExtractor pulls each candidate's normalized key to score against; a candidate whose
+   *     key is {@code null} or empty is skipped (it can only ever score 0)
+   * @param tieBreak stable secondary order applied to candidates of equal score
+   * @param limit maximum number of matches to return ({@code <= 0} yields an empty list)
+   * @param threshold minimum (raw) score in {@code [0.0, 1.0]} for a candidate to qualify
+   * @return the top matches, highest score first
+   */
+  @NotNull
+  public <T> List<Scored<T>> topMatches(
+      @NotNull String normalizedQuery,
+      @NotNull Collection<T> candidates,
+      @NotNull Function<? super T, String> keyExtractor,
+      @NotNull Comparator<? super T> tieBreak,
+      int limit,
+      double threshold) {
     if (limit <= 0 || normalizedQuery.isEmpty()) {
       return List.of();
     }
     Set<String> queryTokens = tokenize(normalizedQuery);
-    List<BlueprintImportSuggestionDto> scored = new ArrayList<>();
-    for (ResolvedProduct candidate : candidates) {
-      double score = score(normalizedQuery, queryTokens, candidate.productKey());
-      if (score >= threshold) {
-        scored.add(
-            new BlueprintImportSuggestionDto(
-                candidate.productKey(), candidate.productName(), round(score)));
+    List<Scored<T>> scored = new ArrayList<>();
+    for (T candidate : candidates) {
+      String key = keyExtractor.apply(candidate);
+      if (key == null || key.isEmpty()) {
+        continue;
+      }
+      double value = score(normalizedQuery, queryTokens, key);
+      if (value >= threshold) {
+        scored.add(new Scored<>(candidate, round(value)));
       }
     }
     scored.sort(
-        Comparator.comparingDouble(BlueprintImportSuggestionDto::score)
+        Comparator.comparingDouble((Scored<T> match) -> match.score())
             .reversed()
-            .thenComparing(
-                BlueprintImportSuggestionDto::productName,
-                Comparator.nullsLast(String::compareToIgnoreCase)));
+            .thenComparing(Scored::candidate, tieBreak));
     return scored.size() > limit ? new ArrayList<>(scored.subList(0, limit)) : scored;
   }
+
+  /**
+   * A ranked candidate: the candidate itself and its rounded similarity score in {@code [0.0,
+   * 1.0]}.
+   *
+   * @param <T> the candidate type
+   * @param candidate the scored candidate
+   * @param score the rounded similarity score
+   */
+  public record Scored<T>(@NotNull T candidate, double score) {}
 
   /**
    * Computes the blended similarity score between the query and one candidate key: the larger of

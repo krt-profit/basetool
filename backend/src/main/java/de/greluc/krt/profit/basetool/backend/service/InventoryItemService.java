@@ -48,6 +48,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.util.List;
@@ -454,7 +455,7 @@ public class InventoryItemService {
     item.setMaterial(material);
     item.setLocation(location);
     item.setQuality(dto.quality());
-    item.setAmount(roundAmount(dto.amount()));
+    item.setAmount(InventoryItem.roundToScuScale(dto.amount()));
     item.setPersonal(isPersonal);
     item.setMission(mission);
     item.setJobOrder(jobOrder);
@@ -463,12 +464,12 @@ public class InventoryItemService {
     auditService.record(
         AuditEventType.INVENTORY_ITEM_CREATED,
         item.getId(),
-        inventoryLabel(item),
+        InventoryAuditLabels.label(item),
         item.getUser().getId(),
         AuditDetails.of("qty", item.getAmount())
             .with("q", item.getQuality())
             .with("personal", item.getPersonal())
-            .with("jobOrder", jobOrderRef(item))
+            .with("jobOrder", InventoryAuditLabels.jobOrderRef(item))
             .with("mission", item.getMission() != null ? item.getMission().getName() : "-"));
     return inventoryItemMapper.toDto(saved);
   }
@@ -518,7 +519,7 @@ public class InventoryItemService {
     item.setLocation(location);
 
     item.setQuality(dto.quality());
-    item.setAmount(roundAmount(dto.amount()));
+    item.setAmount(InventoryItem.roundToScuScale(dto.amount()));
 
     if (dto.jobOrderId() != null) {
       JobOrder jobOrder =
@@ -552,12 +553,12 @@ public class InventoryItemService {
     auditService.record(
         AuditEventType.INVENTORY_ITEM_UPDATED,
         item.getId(),
-        inventoryLabel(item),
+        InventoryAuditLabels.label(item),
         item.getUser().getId(),
         AuditDetails.of("qty", item.getAmount())
             .with("q", item.getQuality())
             .with("personal", item.getPersonal())
-            .with("jobOrder", jobOrderRef(item))
+            .with("jobOrder", InventoryAuditLabels.jobOrderRef(item))
             .with("mission", item.getMission() != null ? item.getMission().getName() : "-"));
     return inventoryItemMapper.toDto(saved);
   }
@@ -632,7 +633,7 @@ public class InventoryItemService {
     auditService.record(
         AuditEventType.INVENTORY_ITEM_NOTE_UPDATED,
         item.getId(),
-        inventoryLabel(item),
+        InventoryAuditLabels.label(item),
         item.getUser().getId(),
         normalizedNote == null
             ? "note=cleared"
@@ -738,37 +739,5 @@ public class InventoryItemService {
   public InventoryItemDto updateDelivered(
       UUID id, UpdateDeliveredRequest request, UUID currentUserId, boolean isLogistician) {
     return inventoryCheckoutService.updateDelivered(id, request, currentUserId, isLogistician);
-  }
-
-  /**
-   * Composes the audit subject label for an inventory row — {@code material @ location}, the
-   * deletion-proof identity snapshot stored on each audit event (REQ-AUDIT-001).
-   *
-   * @param item the inventory row (associations may be lazily loaded but are within the tx)
-   * @return the {@code material @ location} label
-   */
-  private static String inventoryLabel(InventoryItem item) {
-    String mat = item.getMaterial() != null ? item.getMaterial().getName() : "—";
-    String loc = item.getLocation() != null ? item.getLocation().getName() : "—";
-    return mat + " @ " + loc;
-  }
-
-  /**
-   * Renders an inventory row's job-order reference for an audit details payload.
-   *
-   * @param item the inventory row
-   * @return {@code #<displayId>} when linked, {@code -} otherwise
-   */
-  private static String jobOrderRef(InventoryItem item) {
-    return item.getJobOrder() != null ? "#" + item.getJobOrder().getDisplayId() : "-";
-  }
-
-  private Double roundAmount(Double amount) {
-    if (amount == null) {
-      return null;
-    }
-    return java.math.BigDecimal.valueOf(amount)
-        .setScale(3, java.math.RoundingMode.HALF_UP)
-        .doubleValue();
   }
 }

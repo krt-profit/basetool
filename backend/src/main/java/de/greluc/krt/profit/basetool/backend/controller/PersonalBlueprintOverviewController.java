@@ -97,13 +97,7 @@ public class PersonalBlueprintOverviewController {
             PersonalBlueprintOverviewService.SORTABLE_FIELDS,
             PersonalBlueprintOverviewService.DEFAULT_SORT_FIELD);
     Page<BlueprintOverviewEntryDto> result = service.listAvailableBlueprints(pageable, search);
-    return new PageResponse<>(
-        result.getContent(),
-        result.getNumber(),
-        result.getSize(),
-        result.getTotalElements(),
-        result.getTotalPages(),
-        PaginationUtil.toSortStrings(result.getSort()));
+    return PageResponse.of(result);
   }
 
   /**

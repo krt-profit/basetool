@@ -77,7 +77,7 @@ public class MaterialCategoryController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public MaterialCategoryDto create(@RequestBody MaterialCategoryDto dto) {
     MaterialCategory category = mapper.toEntity(dto);
     // L-7: strip client-supplied id/version so create cannot become a merge()-UPSERT of another
@@ -96,7 +96,7 @@ public class MaterialCategoryController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public MaterialCategoryDto update(@PathVariable UUID id, @RequestBody MaterialCategoryDto dto) {
     MaterialCategory category = mapper.toEntity(dto);
     MaterialCategory updated = service.update(id, category);
@@ -109,7 +109,7 @@ public class MaterialCategoryController {
    * @param id category id
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public void delete(@PathVariable UUID id) {
     service.delete(id);
   }

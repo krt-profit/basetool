@@ -30,7 +30,6 @@ import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import java.util.List;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -56,7 +55,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/sync-reports")
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+@PreAuthorize(Roles.HAS_ROLE_ADMIN)
 public class SyncReportController {
 
   private static final int DEFAULT_PAGE_SIZE = 50;
@@ -92,15 +91,7 @@ public class SyncReportController {
 
     Page<ExternalSyncReport> events =
         syncReportService.findEvents(sourceFilter, PageRequest.of(safePage, safeSize));
-    List<SyncReportDto> content =
-        events.getContent().stream().map(syncReportMapper::toDto).toList();
-    return new PageResponse<>(
-        content,
-        events.getNumber(),
-        events.getSize(),
-        events.getTotalElements(),
-        events.getTotalPages(),
-        List.of());
+    return PageResponse.of(events.map(syncReportMapper::toDto));
   }
 
   /**

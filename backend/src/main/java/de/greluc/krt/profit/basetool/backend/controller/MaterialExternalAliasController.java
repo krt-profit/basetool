@@ -61,7 +61,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/material-external-aliases")
 @RequiredArgsConstructor
 @Transactional
-@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+@PreAuthorize(Roles.HAS_ROLE_ADMIN)
 public class MaterialExternalAliasController {
 
   private final MaterialExternalAliasService service;

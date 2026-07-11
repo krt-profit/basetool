@@ -26,7 +26,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PoiDto;
 import de.greluc.krt.profit.basetool.backend.service.PoiService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -52,7 +51,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/pois")
 @RequiredArgsConstructor
 @Transactional
-@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+@PreAuthorize(Roles.HAS_ROLE_ADMIN)
 public class PoiController {
 
   private final PoiService poiService;
@@ -75,14 +74,7 @@ public class PoiController {
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("name", "id", "starSystemName"), "name");
     Page<Poi> p = poiService.getAllPois(pageable);
-    List<PoiDto> content = p.getContent().stream().map(poiMapper::toDto).toList();
-    return new PageResponse<>(
-        content,
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p.map(poiMapper::toDto));
   }
 
   /**
@@ -105,7 +97,7 @@ public class PoiController {
    * @return the persisted POI DTO
    */
   @PatchMapping("/{id}/loading-dock")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public PoiDto setLoadingDockOverride(
       @PathVariable @NotNull UUID id, @RequestParam boolean value) {
     return poiMapper.toDto(poiService.setLoadingDockOverride(id, value));
@@ -119,7 +111,7 @@ public class PoiController {
    * @return the persisted POI DTO
    */
   @DeleteMapping("/{id}/loading-dock-override")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public PoiDto clearLoadingDockOverride(@PathVariable @NotNull UUID id) {
     return poiMapper.toDto(poiService.clearLoadingDockOverride(id));
   }

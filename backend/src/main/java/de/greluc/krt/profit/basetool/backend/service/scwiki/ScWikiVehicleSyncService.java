@@ -140,12 +140,8 @@ public class ScWikiVehicleSyncService {
       }
     }
 
-    if (!seen.isEmpty()) {
-      int marked = shipTypeRepository.markScwikiDeletedExcept(seen, now);
-      if (marked > 0) {
-        log.info("Marked {} ship_type row(s) scwiki_deleted (no longer in Wiki feed)", marked);
-      }
-    }
+    ScWikiOrphanSweep.sweepDeletedOrphans(
+        seen, s -> shipTypeRepository.markScwikiDeletedExcept(s, now), log, "ship_type");
     syncReportService.pruneRuns(SyncSourceSystem.SCWIKI);
     log.info(
         "Finished SC Wiki vehicle sync: {} linked, {} created WIKI_ONLY.", linked, createdWikiOnly);

@@ -187,14 +187,7 @@ public class MemberEvaluationController {
             java.util.Set.of("id", "username", "displayName", "userRank"),
             "username");
     var result = userService.findEvaluatableMembers(pageable);
-    List<UserDto> content = result.getContent().stream().map(userMapper::toDto).toList();
-    return new PageResponse<>(
-        content,
-        result.getNumber(),
-        result.getSize(),
-        result.getTotalElements(),
-        result.getTotalPages(),
-        PaginationUtil.toSortStrings(result.getSort()));
+    return PageResponse.of(result.map(userMapper::toDto));
   }
 
   /**

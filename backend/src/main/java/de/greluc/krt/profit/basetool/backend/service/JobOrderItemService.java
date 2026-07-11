@@ -48,6 +48,7 @@ import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintIngredientKin
 import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.support.QuantityTypeRounding;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -96,12 +97,6 @@ public class JobOrderItemService {
    * {@link QualityRequirement#GOOD}.
    */
   private static final int GOOD_QUALITY_THRESHOLD = 650;
-
-  /**
-   * Scale factor for rounding SCU quantities to three decimals (the {@code 0.001} input step used
-   * across the order UI), used to strip binary floating-point artefacts from derived quantities.
-   */
-  private static final double SCU_ROUNDING_SCALE = 1000.0;
 
   private final BlueprintRepository blueprintRepository;
   private final GameItemRepository gameItemRepository;
@@ -169,7 +164,7 @@ public class JobOrderItemService {
         rawQuantity = (double) perUnit * line.amount();
       }
 
-      double required = roundForQuantityType(rawQuantity, material);
+      double required = QuantityTypeRounding.roundForQuantityType(rawQuantity, material);
       QualityRequirement quality =
           qualityChoices.getOrDefault(material.getId(), defaultQuality(ingredient.getMinQuality()));
 
@@ -235,7 +230,7 @@ public class JobOrderItemService {
               return new AggregatedMaterialDto(
                   materialMapper.toDto(material),
                   e.getKey().quality(),
-                  roundForQuantityType(e.getValue(), material),
+                  QuantityTypeRounding.roundForQuantityType(e.getValue(), material),
                   null,
                   java.util.List.of(),
                   null);
@@ -344,25 +339,6 @@ public class JobOrderItemService {
   }
 
   /**
-   * Rounds a derived quantity to the precision its quantity type can express, eliminating the
-   * binary floating-point artefacts that {@code perUnit * amount} introduces (e.g. {@code 0.36 * 5}
-   * yielding {@code 1.7999999999999998} instead of {@code 1.8}). {@code PIECE} materials round to a
-   * whole unit; {@code SCU} materials round to three decimals, matching the {@code 0.001} input
-   * step used throughout the UI.
-   *
-   * @param quantity the raw, possibly noisy product of per-unit quantity and ordered amount
-   * @param material the material whose quantity type selects the rounding granularity; {@code null}
-   *     is treated as SCU
-   * @return the cleaned quantity
-   */
-  private static double roundForQuantityType(double quantity, Material material) {
-    if (material != null && material.getQuantityType() == QuantityType.PIECE) {
-      return Math.round(quantity);
-    }
-    return Math.round(quantity * SCU_ROUNDING_SCALE) / SCU_ROUNDING_SCALE;
-  }
-
-  /**
    * Resolves the available blueprint references for a game item, by output name. Exposed for the
    * create UI's blueprint picker (shown when an item has more than one recipe).
    *
@@ -428,7 +404,7 @@ public class JobOrderItemService {
         materials.add(
             new DerivedMaterialDto(
                 materialMapper.toDto(material),
-                roundForQuantityType(perUnit * scaledBy, material),
+                QuantityTypeRounding.roundForQuantityType(perUnit * scaledBy, material),
                 defaultQuality(ingredient.getMinQuality())));
       } else {
         GameItem subItem = ingredient.getGameItem();
@@ -446,7 +422,8 @@ public class JobOrderItemService {
             materials.add(
                 new DerivedMaterialDto(
                     materialMapper.toDto(material),
-                    roundForQuantityType((double) perUnit * scaledBy, material),
+                    QuantityTypeRounding.roundForQuantityType(
+                        (double) perUnit * scaledBy, material),
                     defaultQuality(ingredient.getMinQuality())));
             continue;
           }

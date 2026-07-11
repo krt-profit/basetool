@@ -99,14 +99,7 @@ public class MaterialController {
     } else {
       p = materialService.getVisibleMaterials(pageable);
     }
-    List<MaterialDto> content = p.getContent().stream().map(materialMapper::toDto).toList();
-    return new PageResponse<>(
-        content,
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p.map(materialMapper::toDto));
   }
 
   /**
@@ -155,13 +148,7 @@ public class MaterialController {
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("name", "id", "minPriceBuy", "maxPriceSell"), "name");
     Page<MaterialPriceOverviewDto> p = materialService.getMaterialPriceOverview(name, pageable);
-    return new PageResponse<>(
-        p.getContent(),
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p);
   }
 
   /**
@@ -179,13 +166,7 @@ public class MaterialController {
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("material.name", "terminal.name", "id"), "material.name");
     Page<MaterialMatrixItemDto> p = materialService.getAllMatrixItems(pageable);
-    return new PageResponse<>(
-        p.getContent(),
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p);
   }
 
   /**
@@ -219,13 +200,7 @@ public class MaterialController {
             Set.of("terminal.name", "priceBuy", "priceSell", "id"),
             "terminal.name");
     Page<MaterialPriceDto> p = materialService.getMaterialPrices(id, pageable);
-    return new PageResponse<>(
-        p.getContent(),
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p);
   }
 
   /**
@@ -251,7 +226,7 @@ public class MaterialController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public MaterialDto createMaterial(@RequestBody @Valid @NotNull MaterialCreateDto material) {
     return materialMapper.toDto(materialService.createMaterial(material));
   }
@@ -265,7 +240,7 @@ public class MaterialController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public MaterialDto updateMaterial(
       @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull MaterialDto material) {
     return materialMapper.toDto(
@@ -278,7 +253,7 @@ public class MaterialController {
    * @param id material id
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public void deleteMaterial(@PathVariable @NotNull UUID id) {
     materialService.deleteMaterial(id);
   }

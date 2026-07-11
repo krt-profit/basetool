@@ -94,7 +94,7 @@ class BankBookingRequestServiceTest {
   @Mock private BankAuditService bankAuditService;
   @Mock private AuthHelperService authHelperService;
   @Mock private UserRepository userRepository;
-  @Mock private OrgUnitMembershipService orgUnitMembershipService;
+  @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   @Mock private ApplicationEventPublisher eventPublisher;
 
   @InjectMocks private BankBookingRequestService service;
@@ -467,7 +467,7 @@ class BankBookingRequestServiceTest {
     // REQ-BANK-044: the confirmed booking records the requester (Einzahler) plus their primary
     // unit.
     UUID requesterOrgUnit = UUID.randomUUID();
-    when(orgUnitMembershipService.findPrimaryDirectMembershipOrgUnitId(requester))
+    when(orgUnitMembershipQueryService.findPrimaryDirectMembershipOrgUnitId(requester))
         .thenReturn(Optional.of(requesterOrgUnit));
 
     BankBookingRequestDto dto = service.confirm(requestId, holderId, null, false, 0L, null);

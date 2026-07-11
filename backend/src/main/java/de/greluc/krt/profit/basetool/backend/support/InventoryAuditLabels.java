@@ -1,0 +1,56 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.support;
+
+import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
+
+/**
+ * Shared renderers for the audit-subject strings of an inventory row, so the item-CRUD service and
+ * the checkout/transfer service emit byte-identical REQ-AUDIT-001 identity snapshots instead of
+ * each carrying a private copy that could drift apart.
+ */
+public final class InventoryAuditLabels {
+
+  private InventoryAuditLabels() {}
+
+  /**
+   * Composes the audit subject label for an inventory row — {@code material @ location}, the
+   * deletion-proof identity snapshot stored on each audit event (REQ-AUDIT-001). A missing material
+   * or location renders as an em dash so the label stays well-formed for orphaned rows.
+   *
+   * @param item the inventory row (associations may be lazily loaded but must be within the tx)
+   * @return the {@code material @ location} label
+   */
+  public static String label(InventoryItem item) {
+    String mat = item.getMaterial() != null ? item.getMaterial().getName() : "—";
+    String loc = item.getLocation() != null ? item.getLocation().getName() : "—";
+    return mat + " @ " + loc;
+  }
+
+  /**
+   * Renders an inventory row's job-order reference for an audit details payload.
+   *
+   * @param item the inventory row
+   * @return {@code #<displayId>} when the row is linked to a job order, {@code -} otherwise
+   */
+  public static String jobOrderRef(InventoryItem item) {
+    return item.getJobOrder() != null ? "#" + item.getJobOrder().getDisplayId() : "-";
+  }
+}

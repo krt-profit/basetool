@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
-import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.support.Permissions;
+import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
@@ -269,7 +269,7 @@ public class SecurityConfig {
    * @param securityProblemResponseHandler renders filter-level 401/403 as RFC&nbsp;7807
    *     problem+json (wired as both the entry point and the access-denied handler)
    * @param messageSource localizes the {@code PendingApprovalAccessFilter} 403 problem body
-   * @param appProblemProperties supplies the RFC&nbsp;7807 {@code type} base URI for that body
+   * @param problemResponseFactory assembles the RFC&nbsp;7807 problem body for those filters
    * @param objectMapper serializes that filter's {@code ProblemDetail} to JSON
    * @param meterRegistry counts the identity-provider-unavailable 503 on {@code
    *     basetool_http_error_total} (REQ-OBS-011)
@@ -283,7 +283,7 @@ public class SecurityConfig {
       org.springframework.core.env.Environment env,
       SecurityProblemResponseHandler securityProblemResponseHandler,
       MessageSource messageSource,
-      AppProblemProperties appProblemProperties,
+      ProblemResponseFactory problemResponseFactory,
       ObjectMapper objectMapper,
       MeterRegistry meterRegistry)
       throws Exception {
@@ -635,7 +635,7 @@ public class SecurityConfig {
         // correlationId (it runs before CorrelationIdFilter) — RFC-7807 hardening.
         .addFilterAfter(
             new PendingApprovalAccessFilter(
-                messageSource, appProblemProperties, objectMapper, meterRegistry),
+                messageSource, problemResponseFactory, objectMapper, meterRegistry),
             org.springframework.security.oauth2.server.resource.web.authentication
                 .BearerTokenAuthenticationFilter.class)
         // REQ-SEC-024: catch an identity-provider-unreachable failure (JWKS fetch timeout / 5xx /
@@ -646,7 +646,7 @@ public class SecurityConfig {
         // Keycloak blip does not masquerade as an application error (LogbackErrorSpike).
         .addFilterBefore(
             new IdentityProviderUnavailableFilter(
-                messageSource, appProblemProperties, objectMapper, meterRegistry),
+                messageSource, problemResponseFactory, objectMapper, meterRegistry),
             org.springframework.security.oauth2.server.resource.web.authentication
                 .BearerTokenAuthenticationFilter.class)
         // L-11: backend is a pure JWT-bearer resource server — no HTTP session needed for any

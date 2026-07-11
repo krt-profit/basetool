@@ -65,6 +65,7 @@ class MaterialClaimIntegrationTest {
 
   @Autowired private MaterialClaimService materialClaimService;
   @Autowired private JobOrderService jobOrderService;
+  @Autowired private JobOrderQueryService jobOrderQueryService;
   @Autowired private JobOrderRepository jobOrderRepository;
   @Autowired private MaterialClaimRepository materialClaimRepository;
   @Autowired private SquadronRepository squadronRepository;
@@ -196,7 +197,7 @@ class MaterialClaimIntegrationTest {
     Fixture f = seed();
     materialClaimService.upsertClaim(f.orderId(), claim(f.materialId(), f.squadronAId(), 6.0));
 
-    JobOrderDto dto = jobOrderService.getJobOrderById(f.orderId());
+    JobOrderDto dto = jobOrderQueryService.getJobOrderById(f.orderId());
 
     assertThat(dto.materials()).hasSize(1);
     assertThat(dto.materials().get(0).openAmount()).isEqualTo(4.0);
@@ -211,7 +212,7 @@ class MaterialClaimIntegrationTest {
     Fixture f = seed();
     jobOrderService.reassignResponsibleOrgUnit(f.orderId(), f.squadronAId());
 
-    JobOrderDto dto = jobOrderService.getJobOrderById(f.orderId());
+    JobOrderDto dto = jobOrderQueryService.getJobOrderById(f.orderId());
 
     assertThat(dto.materials()).hasSize(1);
     assertThat(dto.materials().get(0).openAmount()).isNull();

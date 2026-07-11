@@ -39,7 +39,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -109,14 +108,7 @@ public class HangarController {
     Pageable pageable = PaginationUtil.createUnsortedPageRequest(page, size);
     Page<Ship> p =
         hangarService.getMyShipsFiltered(userService.getUserIdFromJwt(jwt), search, pageable);
-    List<ShipDto> dtos = p.getContent().stream().map(shipMapper::toDto).toList();
-    return new PageResponse<>(
-        dtos,
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p.map(shipMapper::toDto));
   }
 
   /**
@@ -135,14 +127,7 @@ public class HangarController {
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("name", "insurance", "fitted", "id"), "name");
     Page<Ship> p = hangarService.getAllShips(pageable);
-    List<ShipDto> dtos = p.getContent().stream().map(shipMapper::toDto).toList();
-    return new PageResponse<>(
-        dtos,
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p.map(shipMapper::toDto));
   }
 
   /**
@@ -181,13 +166,7 @@ public class HangarController {
             page, size, sort, Set.of("shipType.name"), "shipType.name");
     Page<SquadronShipOverviewDto> p =
         hangarService.getSquadronOverview(pageable, includeOwnerDetails, search);
-    return new PageResponse<>(
-        p.getContent(),
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p);
   }
 
   /**
@@ -261,7 +240,7 @@ public class HangarController {
    * @return paged ship DTOs
    */
   @GetMapping("/users/{userId}/ships")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Transactional(readOnly = true)
   public PageResponse<ShipDto> getUserShips(
       @PathVariable @NotNull UUID userId,
@@ -272,19 +251,12 @@ public class HangarController {
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("name", "insurance", "fitted", "id"), "name");
     Page<Ship> p = hangarService.getMyShips(userId, pageable);
-    List<ShipDto> dtos = p.getContent().stream().map(shipMapper::toDto).toList();
-    return new PageResponse<>(
-        dtos,
-        p.getNumber(),
-        p.getSize(),
-        p.getTotalElements(),
-        p.getTotalPages(),
-        PaginationUtil.toSortStrings(p.getSort()));
+    return PageResponse.of(p.map(shipMapper::toDto));
   }
 
   /** Admin-only: adds a ship to a target user's hangar. */
   @PostMapping("/users/{userId}/ships")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Transactional
   public ShipDto addUserShip(
       @PathVariable @NotNull UUID userId, @RequestBody @Valid ShipRequestDto shipRequest) {
@@ -293,7 +265,7 @@ public class HangarController {
 
   /** Admin-only: updates a target user's ship. */
   @PutMapping("/users/{userId}/ships/{shipId}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Transactional
   public ShipDto updateUserShip(
       @PathVariable @NotNull UUID userId,
@@ -304,7 +276,7 @@ public class HangarController {
 
   /** Admin-only: deletes a target user's ship. */
   @DeleteMapping("/users/{userId}/ships/{shipId}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public void deleteUserShip(
       @PathVariable @NotNull UUID userId, @PathVariable @NotNull UUID shipId) {
     hangarService.deleteShip(userId, shipId);

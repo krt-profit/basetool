@@ -44,12 +44,12 @@ import de.greluc.krt.profit.basetool.backend.model.dto.UpdateCrewRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateParticipantRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdatePayoutPreferenceRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateUnitRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.MissionSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.MissionService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
+import de.greluc.krt.profit.basetool.backend.support.MissionGuestRedactor;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -59,7 +59,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -103,9 +102,9 @@ import org.springframework.web.bind.annotation.RestController;
  * </ul>
  *
  * <p>Guest reads are heavily redacted: internal and past missions are hidden, and {@link
- * #cleanupMissionForGuest} strips names, emails, internal inventory and refinery orders before the
- * DTO leaves the controller. {@code addParticipantPublic} additionally resolves free-text guest
- * names against registered users to prevent impersonation.
+ * MissionGuestRedactor#cleanupMissionForGuest} strips names, emails, internal inventory and
+ * refinery orders before the DTO leaves the controller. {@code addParticipantPublic} additionally
+ * resolves free-text guest names against registered users to prevent impersonation.
  *
  * <p>Authorisation is delegated to {@link MissionSecurityService} via SpEL ({@code
  * canManageMission}, {@code canAccessParticipant}, {@code canManageManagers}, {@code
@@ -127,6 +126,7 @@ public class MissionController {
   private final ShipMapper shipMapper;
   private final MissionSecurityService missionSecurityService;
   private final AuthHelperService authHelperService;
+  private final MissionGuestRedactor missionGuestRedactor;
 
   /** Sunset date for legacy sub-section endpoints that still return the full MissionDto. */
   private static final String SLIM_DEPRECATION_SUNSET = "2026-10-20";
@@ -263,7 +263,8 @@ public class MissionController {
    * {@code GUEST} accounts (see {@link
    * de.greluc.krt.profit.basetool.backend.service.AuthHelperService#isMemberOrAbove()}) — are
    * blocked from internal and past missions (403) and get the strict redaction via {@link
-   * #cleanupOutsiderMissionForGuest}. Registered members and above see the full DTO.
+   * MissionGuestRedactor#cleanupOutsiderMissionForGuest}. Registered members and above see the full
+   * DTO.
    *
    * @param id mission id
    * @return the mission DTO
@@ -285,7 +286,7 @@ public class MissionController {
     }
     var dto = missionMapper.toDto(mission);
     if (outsider) {
-      dto = cleanupOutsiderMissionForGuest(dto);
+      dto = missionGuestRedactor.cleanupOutsiderMissionForGuest(dto);
     }
     return dto;
   }
@@ -310,240 +311,11 @@ public class MissionController {
             m -> {
               var dto = missionMapper.toDto(m);
               if (outsider) {
-                dto = cleanupOutsiderMissionForGuest(dto);
+                dto = missionGuestRedactor.cleanupOutsiderMissionForGuest(dto);
               }
               return ResponseEntity.ok(dto);
             })
         .orElse(ResponseEntity.noContent().build());
-  }
-
-  /**
-   * Redacts a mission DTO for an anonymous viewer: strips owner/managers, clears edit/manage flags,
-   * and recursively cleans each participant. The mission economy (inventory / refinery orders) is
-   * no longer part of this DTO (#1138) — it is member-gated at its own endpoints — so there is
-   * nothing to strip here for it. This is the only path that controls what leaves the API for
-   * guests — never lift data into the controller layer without thinking about this method first.
-   *
-   * @param dto the full mission DTO
-   * @return a redacted copy safe for unauthenticated callers
-   */
-  private MissionDto cleanupMissionForGuest(MissionDto dto) {
-    Set<MissionParticipantDto> cleanedParticipants =
-        dto.participants() == null
-            ? null
-            : dto.participants().stream()
-                .map(this::cleanupParticipantForGuest)
-                .collect(Collectors.toSet());
-
-    return new MissionDto(
-        dto.id(),
-        dto.name(),
-        dto.description(),
-        dto.calendarLink(),
-        dto.status(),
-        dto.meetingTime(),
-        dto.plannedStartTime(),
-        dto.actualStartTime(),
-        dto.plannedEndTime(),
-        dto.actualEndTime(),
-        dto.isInternal(),
-        cleanedParticipants,
-        dto.assignedUnits(),
-        dto.frequencies(),
-        dto.operation(),
-        null, // owner
-        null, // managers
-        false, // canEdit
-        false, // canManageManagers
-        dto.version(),
-        dto.coreVersion(),
-        dto.scheduleVersion(),
-        dto.flagsVersion(),
-        dto.checkedInParticipants(),
-        dto.registeredParticipants(),
-        // Squadron shorthand is not sensitive (MULTI_SQUADRON_PLAN.md section 7) — forward
-        // through to guests so the public detail view shows the owning-squadron badge.
-        dto.owningSquadron(),
-        dto.owningOrgUnitVersion(),
-        // Party lead is a public leadership designation (like the Führungspositionen list) and the
-        // UserReferenceDto carries only the callsign tuple
-        // (username/displayName/effectiveName/rank)
-        // — no email or real name — so it is forwarded to guests unchanged.
-        dto.partyLeadUser(),
-        dto.partyLeadGuestName(),
-        dto.partyLeadVersion(),
-        // Ablauf steps, goals (Ziele) and meeting point (Treffpunkt) are non-PII mission
-        // planning data — forwarded like the assigned units and frequencies (the long Markdown
-        // description stays the one free-text field hidden from outsiders, handled below).
-        dto.steps(),
-        dto.stepsVersion(),
-        dto.objectives(),
-        dto.objectivesVersion(),
-        dto.meetingPoint());
-  }
-
-  /**
-   * Redaction for mission "outsiders" — anonymous callers AND authenticated but role-less {@code
-   * GUEST} accounts (see {@link
-   * de.greluc.krt.profit.basetool.backend.service.AuthHelperService#isMemberOrAbove()}). It applies
-   * the member-peer {@link #cleanupMissionForGuest} pass (owner / managers cleared, participant PII
-   * stripped to the public callsign tuple) and additionally hides only the free-text
-   * <b>description</b>.
-   *
-   * <p>By explicit product decision an outsider <b>does</b> see — on a non-internal mission — the
-   * owning <b>organisation</b> ({@code owningSquadron}), the <b>participant roster</b> with each
-   * participant's <b>payout preference</b> (PII removed by the peer pass), the assigned
-   * <b>units</b> and the mission <b>frequencies</b>. The only things kept from an outsider beyond
-   * the member-peer redaction are the description (here) and the finance ledger (the {@code
-   * /finance-entries} endpoints stay member-only — they are a separate surface, not part of this
-   * DTO). The mission economy (inventory / refinery orders) is no longer part of this DTO (#1138)
-   * and is member-gated at its own endpoints, so it is never on the outsider surface at all. The
-   * {@code ForGuest} suffix + the delegated {@link #cleanupMissionForGuest} call satisfy the {@code
-   * anonymousReadableMissionEndpointsMustRedactGuestPii} ArchUnit rule.
-   *
-   * @param dto the full mission DTO straight from the mapper
-   * @return a copy with participant PII + owner/managers stripped and the description hidden, but
-   *     organisation, roster, units, frequencies and payout preference kept
-   */
-  private MissionDto cleanupOutsiderMissionForGuest(MissionDto dto) {
-    MissionDto peer = cleanupMissionForGuest(dto);
-
-    // ADR-0034: the anonymous outsider view drops each participant's payoutPreference + free-text
-    // comment (kept on the member-peer view). The peer roster is already PII-stripped; strip these
-    // two fields here so getMissionById and the participant endpoints (which all redact through
-    // this
-    // method for outsiders) never expose them to unauthenticated callers.
-    Set<MissionParticipantDto> outsiderParticipants =
-        peer.participants() == null
-            ? null
-            : peer.participants().stream()
-                .map(this::stripOutsiderParticipantFields)
-                .collect(Collectors.toSet());
-
-    return new MissionDto(
-        peer.id(),
-        peer.name(),
-        null, // description — the only field hidden on top of the member-peer redaction
-        peer.calendarLink(),
-        peer.status(),
-        peer.meetingTime(),
-        peer.plannedStartTime(),
-        peer.actualStartTime(),
-        peer.plannedEndTime(),
-        peer.actualEndTime(),
-        peer.isInternal(),
-        outsiderParticipants, // roster kept, but payout + comment stripped (ADR-0034)
-        peer.assignedUnits(), // units kept
-        peer.frequencies(), // frequencies kept
-        peer.operation(),
-        peer.owner(), // already null
-        peer.managers(), // already null
-        peer.canEdit(), // already false
-        peer.canManageManagers(), // already false
-        peer.version(),
-        peer.coreVersion(),
-        peer.scheduleVersion(),
-        peer.flagsVersion(),
-        peer.checkedInParticipants(),
-        peer.registeredParticipants(),
-        peer.owningSquadron(), // organisation kept
-        peer.owningOrgUnitVersion(),
-        peer.partyLeadUser(),
-        peer.partyLeadGuestName(),
-        peer.partyLeadVersion(),
-        peer.steps(), // Ablauf kept (planning data, like units/frequencies)
-        peer.stepsVersion(),
-        peer.objectives(), // goals kept; long description is the hidden free-text field
-        peer.objectivesVersion(),
-        peer.meetingPoint());
-  }
-
-  /**
-   * Redacts a participant DTO for guests: cleans the nested user via {@link #cleanupUserForGuest},
-   * keeps the displayed fields (org units, job-type, comment, payout preference, times) intact
-   * because those are public per the squadron policy.
-   *
-   * @param dto the participant DTO
-   * @return a redacted copy safe for unauthenticated callers
-   */
-  private MissionParticipantDto cleanupParticipantForGuest(MissionParticipantDto dto) {
-    UserDto cleanedUser = dto.user() != null ? cleanupUserForGuest(dto.user()) : null;
-    return new MissionParticipantDto(
-        dto.id(),
-        cleanedUser,
-        dto.guestName(),
-        dto.orgUnits(),
-        dto.desiredMissionJobType(),
-        dto.plannedMissionJobType(),
-        dto.comment(),
-        dto.startTime(),
-        dto.endTime(),
-        dto.payoutPreference(),
-        dto.version(),
-        // M1: preserve the per-row capability token so the anonymous guest-sign-up CREATE response
-        // still hands the creator their edit token. It is non-null only on that create response
-        // (transient on the freshly persisted entity) and null on every read/edit, so redacting it
-        // here would break the legitimate self-edit UX without adding any protection.
-        dto.guestEditToken());
-  }
-
-  /**
-   * ADR-0034: removes the two fields the anonymous outsider mission view does not expose — the
-   * per-participant {@code payoutPreference} (financial intent) and the free-text {@code comment}
-   * (uncontrolled text, possible incidental PII). Applied ONLY on the strict outsider paths ({@link
-   * #cleanupOutsiderMissionForGuest} and the {@code addParticipantSlim} outsider branch); the
-   * shared {@link #cleanupParticipantForGuest} deliberately keeps both fields so the authenticated
-   * member-peer view is unchanged (REQ-SEC-021). Every other field — including the M1 {@code
-   * guestEditToken} — passes through untouched.
-   *
-   * @param dto an already-PII-redacted participant DTO from the guest cleanup pass
-   * @return a copy with {@code payoutPreference} and {@code comment} nulled
-   */
-  private MissionParticipantDto stripOutsiderParticipantFields(MissionParticipantDto dto) {
-    return new MissionParticipantDto(
-        dto.id(),
-        dto.user(),
-        dto.guestName(),
-        dto.orgUnits(),
-        dto.desiredMissionJobType(),
-        dto.plannedMissionJobType(),
-        null, // comment — ADR-0034: not exposed to anonymous outsiders
-        dto.startTime(),
-        dto.endTime(),
-        null, // payoutPreference — ADR-0034: not exposed to anonymous outsiders
-        dto.version(),
-        dto.guestEditToken());
-  }
-
-  /**
-   * Redacts a user DTO for guests: drops email, description, roles, permissions, announcement
-   * watermark and join date. Username + displayName + rank remain visible because those are the
-   * public callsign tuple.
-   *
-   * @param dto the user DTO
-   * @return a redacted copy safe for unauthenticated callers
-   */
-  private UserDto cleanupUserForGuest(UserDto dto) {
-    return new UserDto(
-        dto.id(),
-        dto.username(),
-        dto.displayName(),
-        dto.effectiveName(),
-        null, // email
-        dto.rank(),
-        null, // description
-        null, // roles
-        null, // permissions
-        null, // lastReadAnnouncementId
-        false, // isLogistician
-        false, // isMissionManager
-        dto.inKeycloak(),
-        null, // squadron – not exposed to guests
-        null, // squadrons – not exposed to guests
-        dto.version(),
-        null, // joinDate – not exposed to guests
-        null // discordLinked – not exposed to guests
-        );
   }
 
   /**
@@ -705,7 +477,7 @@ public class MissionController {
    * @return 204 No Content
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Operation(summary = "Delete a mission")
   public ResponseEntity<Void> deleteMission(@PathVariable @NotNull UUID id) {
     missionService.deleteMission(id);
@@ -935,9 +707,9 @@ public class MissionController {
    * @param participantId participant id
    * @param request participant payload (carries the expected participant version)
    * @param jwt caller's JWT (null for anonymous)
-   * @return the persisted parent DTO (redacted via {@link #cleanupMissionForGuest} for anonymous
-   *     callers, who reach this endpoint when editing a guest participant per {@code
-   *     MissionSecurityService#canAccessParticipant})
+   * @return the persisted parent DTO (redacted via {@link
+   *     MissionGuestRedactor#cleanupMissionForGuest} for anonymous callers, who reach this endpoint
+   *     when editing a guest participant per {@code MissionSecurityService#canAccessParticipant})
    * @deprecated use {@link #updateParticipantSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
    */
   @Deprecated(forRemoval = true)
@@ -976,7 +748,7 @@ public class MissionController {
     // jwt == null fast-path keeps the common anonymous case cheap, the role check additionally
     // catches guest accounts (treat guest like anonymous on the mission surface).
     if (jwt == null || !authHelperService.isMemberOrAbove()) {
-      dto = cleanupOutsiderMissionForGuest(dto);
+      dto = missionGuestRedactor.cleanupOutsiderMissionForGuest(dto);
     }
     return dto;
   }
@@ -1012,7 +784,7 @@ public class MissionController {
     // jwt == null fast-path keeps the common anonymous case cheap, the role check additionally
     // catches guest accounts (treat guest like anonymous on the mission surface).
     if (jwt == null || !authHelperService.isMemberOrAbove()) {
-      dto = cleanupOutsiderMissionForGuest(dto);
+      dto = missionGuestRedactor.cleanupOutsiderMissionForGuest(dto);
     }
     return dto;
   }
@@ -1048,7 +820,7 @@ public class MissionController {
     // jwt == null fast-path keeps the common anonymous case cheap, the role check additionally
     // catches guest accounts (treat guest like anonymous on the mission surface).
     if (jwt == null || !authHelperService.isMemberOrAbove()) {
-      dto = cleanupOutsiderMissionForGuest(dto);
+      dto = missionGuestRedactor.cleanupOutsiderMissionForGuest(dto);
     }
     return dto;
   }
@@ -1091,7 +863,7 @@ public class MissionController {
     // jwt == null fast-path keeps the common anonymous case cheap, the role check additionally
     // catches guest accounts (treat guest like anonymous on the mission surface).
     if (jwt == null || !authHelperService.isMemberOrAbove()) {
-      dto = cleanupOutsiderMissionForGuest(dto);
+      dto = missionGuestRedactor.cleanupOutsiderMissionForGuest(dto);
     }
     return dto;
   }
@@ -1154,7 +926,7 @@ public class MissionController {
     // jwt == null fast-path keeps the common anonymous case cheap, the role check additionally
     // catches guest accounts (treat guest like anonymous on the mission surface).
     if (jwt == null || !authHelperService.isMemberOrAbove()) {
-      dto = cleanupOutsiderMissionForGuest(dto);
+      dto = missionGuestRedactor.cleanupOutsiderMissionForGuest(dto);
     }
     return dto;
   }
@@ -1283,9 +1055,9 @@ public class MissionController {
     // The ArchUnit rule {@code anonymousReadableMissionEndpointsMustRedactGuestPii} keeps the
     // outsider redaction from regressing (this method calls a cleanup…ForGuest helper).
     if (jwt == null || !authHelperService.isMemberOrAbove()) {
-      dto = cleanupOutsiderMissionForGuest(dto);
+      dto = missionGuestRedactor.cleanupOutsiderMissionForGuest(dto);
     } else if (!authHelperService.isLogisticianOrAbove()) {
-      dto = cleanupMissionForGuest(dto);
+      dto = missionGuestRedactor.cleanupMissionForGuest(dto);
     }
     return dto;
   }
@@ -2153,7 +1925,7 @@ public class MissionController {
     // a non-null {@code UserDto} on a guest participant cannot leak through. The role check
     // additionally treats an authenticated role-less GUEST like an anonymous caller here.
     if (jwt == null || !authHelperService.isMemberOrAbove()) {
-      dto = cleanupParticipantForGuest(dto);
+      dto = missionGuestRedactor.cleanupParticipantForGuest(dto);
     }
     return dto;
   }
@@ -2180,7 +1952,7 @@ public class MissionController {
     MissionParticipantDto dto = missionMapper.toDto(findParticipant(mission, participantId));
     // Outsiders (anonymous OR authenticated role-less GUEST) get the participant PII redaction.
     if (jwt == null || !authHelperService.isMemberOrAbove()) {
-      dto = cleanupParticipantForGuest(dto);
+      dto = missionGuestRedactor.cleanupParticipantForGuest(dto);
     }
     return dto;
   }
@@ -2207,7 +1979,7 @@ public class MissionController {
     MissionParticipantDto dto = missionMapper.toDto(findParticipant(mission, participantId));
     // Outsiders (anonymous OR authenticated role-less GUEST) get the participant PII redaction.
     if (jwt == null || !authHelperService.isMemberOrAbove()) {
-      dto = cleanupParticipantForGuest(dto);
+      dto = missionGuestRedactor.cleanupParticipantForGuest(dto);
     }
     return dto;
   }
@@ -2236,7 +2008,7 @@ public class MissionController {
     MissionParticipantDto dto = missionMapper.toDto(findParticipant(mission, participantId));
     // Outsiders (anonymous OR authenticated role-less GUEST) get the participant PII redaction.
     if (jwt == null || !authHelperService.isMemberOrAbove()) {
-      dto = cleanupParticipantForGuest(dto);
+      dto = missionGuestRedactor.cleanupParticipantForGuest(dto);
     }
     return dto;
   }
@@ -2334,13 +2106,13 @@ public class MissionController {
     // {@code anonymousReadableMissionEndpointsMustRedactGuestPii} statically enforces this for any
     // future endpoint added with the same {@code @ownerScopeService.canSeeMission(#id)} gate.
     if (jwt == null || !authHelperService.isLogisticianOrAbove()) {
-      participants = participants.map(this::cleanupParticipantForGuest);
+      participants = participants.map(missionGuestRedactor::cleanupParticipantForGuest);
     }
     // ADR-0034: outsiders (anonymous / role-less GUEST) additionally lose each participant's
     // payoutPreference + comment in the returned roster; the member-peer tier (a member below
     // logistician) keeps them. The freshly created guest's own guestEditToken is preserved.
     if (jwt == null || !authHelperService.isMemberOrAbove()) {
-      participants = participants.map(this::stripOutsiderParticipantFields);
+      participants = participants.map(missionGuestRedactor::stripOutsiderParticipantFields);
     }
     return participants.toList();
   }

@@ -60,7 +60,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/material-exchange")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('" + Roles.KRT_MEMBER + "')")
+@PreAuthorize(Roles.HAS_ROLE_KRT_MEMBER)
 @Tag(name = "Material Exchange", description = "The Materialbörse trade board (Flotte & Logistik).")
 @SecurityRequirement(name = "bearerAuth")
 public class MaterialExchangeController {

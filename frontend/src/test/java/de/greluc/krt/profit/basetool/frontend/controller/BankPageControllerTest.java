@@ -140,8 +140,8 @@ class BankPageControllerTest {
 
     // Then
     assertEquals("bank-dashboard", view);
-    List<BankPageController.BankDashboardCardView> cards =
-        (List<BankPageController.BankDashboardCardView>) model.getAttribute("cards");
+    List<BankDashboardViewAssembler.BankDashboardCardView> cards =
+        (List<BankDashboardViewAssembler.BankDashboardCardView>) model.getAttribute("cards");
     assertNotNull(cards);
     assertEquals(1, cards.size());
     // Rising series: first point at the padded bottom (y=24), last at the padded top (y=2).
@@ -170,8 +170,8 @@ class BankPageControllerTest {
     controller.dashboard(null, null, null, model);
 
     // Then
-    List<BankPageController.BankDashboardCardView> cards =
-        (List<BankPageController.BankDashboardCardView>) model.getAttribute("cards");
+    List<BankDashboardViewAssembler.BankDashboardCardView> cards =
+        (List<BankDashboardViewAssembler.BankDashboardCardView>) model.getAttribute("cards");
     assertNotNull(cards);
     assertTrue(cards.get(0).flat());
     assertEquals("0.0,13.0 96.0,13.0", cards.get(0).sparklinePoints());
@@ -190,8 +190,8 @@ class BankPageControllerTest {
     controller.dashboard(null, null, null, model);
 
     // Then
-    List<BankPageController.BankDashboardCardView> cards =
-        (List<BankPageController.BankDashboardCardView>) model.getAttribute("cards");
+    List<BankDashboardViewAssembler.BankDashboardCardView> cards =
+        (List<BankDashboardViewAssembler.BankDashboardCardView>) model.getAttribute("cards");
     assertNotNull(cards);
     assertNull(cards.get(0).sparklinePoints());
     assertTrue(cards.get(0).flat());
@@ -218,8 +218,8 @@ class BankPageControllerTest {
     controller.dashboard(null, null, null, model);
 
     // Then — cards are ordered case-insensitively by account name, not by account number.
-    List<BankPageController.BankDashboardCardView> cards =
-        (List<BankPageController.BankDashboardCardView>) model.getAttribute("cards");
+    List<BankDashboardViewAssembler.BankDashboardCardView> cards =
+        (List<BankDashboardViewAssembler.BankDashboardCardView>) model.getAttribute("cards");
     assertNotNull(cards);
     assertEquals(
         List.of("alpha Reserve", "Mittelkasse", "Zeta Vorrat"),
@@ -255,13 +255,13 @@ class BankPageControllerTest {
     // Bereich, Geschlossen; each Bereich group leads with its AREA account and is colour-classed.
     assertEquals("bank-dashboard", view);
     assertEquals("bereich", model.getAttribute("group"));
-    List<BankPageController.BankDashboardGroupView> groups =
-        (List<BankPageController.BankDashboardGroupView>) model.getAttribute("groups");
+    List<BankDashboardViewAssembler.BankDashboardGroupView> groups =
+        (List<BankDashboardViewAssembler.BankDashboardGroupView>) model.getAttribute("groups");
     assertNotNull(groups);
     assertEquals(
         List.of("krt", "bereich:" + profit, "special", "ungrouped", "closed"),
-        groups.stream().map(BankPageController.BankDashboardGroupView::key).toList());
-    BankPageController.BankDashboardGroupView bereich = groups.get(1);
+        groups.stream().map(BankDashboardViewAssembler.BankDashboardGroupView::key).toList());
+    BankDashboardViewAssembler.BankDashboardGroupView bereich = groups.get(1);
     assertEquals("Profit", bereich.bereichName());
     assertEquals("bank-dept--profit", bereich.deptClass());
     assertEquals(

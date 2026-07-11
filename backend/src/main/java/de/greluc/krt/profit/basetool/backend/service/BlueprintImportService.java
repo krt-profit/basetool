@@ -23,8 +23,6 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.model.BlueprintExternalAlias;
 import de.greluc.krt.profit.basetool.backend.model.BlueprintExternalAliasSource;
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintExportEntryDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintExportFileDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportApplyRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintImportPreviewDto;
@@ -36,9 +34,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BlueprintExternalAliasRe
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
-import java.io.IOException;
 import java.time.Instant;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -55,9 +51,6 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import tools.jackson.core.JacksonException;
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -97,14 +90,6 @@ public class BlueprintImportService {
   /** External catalogue every import row and learned alias belongs to. */
   private static final BlueprintExternalAliasSource SOURCE = BlueprintExternalAliasSource.SCMDB;
 
-  /**
-   * Application-level cap on a blueprint-export upload, enforced before the body is materialised
-   * into a Jackson tree (security audit gap-fill). A real blueprint export is well under 1 MB; 8 MB
-   * leaves generous headroom while keeping this member-reachable import off the 64 MB global
-   * multipart cap (sized for the admin-only P4K catalogue).
-   */
-  private static final long MAX_IMPORT_BYTES = 8L * 1024 * 1024;
-
   private final ObjectMapper objectMapper;
   private final BlueprintProductService blueprintProductService;
   private final BlueprintNameNormalizer normalizer;
@@ -127,7 +112,8 @@ public class BlueprintImportService {
   @NotNull
   public BlueprintImportPreviewDto previewImport(
       @NotNull String ownerSub, @NotNull MultipartFile file) {
-    List<ParsedEntry> parsed = parse(file);
+    List<BlueprintExportParser.ParsedEntry> parsed =
+        BlueprintExportParser.parse(objectMapper, file);
 
     Map<String, ResolvedProduct> productByKey = productIndex();
     List<ResolvedProduct> allProducts = new ArrayList<>(productByKey.values());
@@ -142,7 +128,7 @@ public class BlueprintImportService {
     // First pass: resolve each name (without the owned check) and collect resolved keys.
     List<Resolution> resolutions = new ArrayList<>(parsed.size());
     Set<String> resolvedKeys = new HashSet<>();
-    for (ParsedEntry entry : parsed) {
+    for (BlueprintExportParser.ParsedEntry entry : parsed) {
       Resolution resolution = resolve(entry, productByKey, allProducts, tagIndex);
       resolutions.add(resolution);
       if (resolution.product != null) {
@@ -353,7 +339,7 @@ public class BlueprintImportService {
    */
   @NotNull
   private Resolution resolve(
-      @NotNull ParsedEntry entry,
+      @NotNull BlueprintExportParser.ParsedEntry entry,
       @NotNull Map<String, ResolvedProduct> productByKey,
       @NotNull List<ResolvedProduct> allProducts,
       @NotNull Map<String, String> tagIndex) {
@@ -461,150 +447,6 @@ public class BlueprintImportService {
   }
 
   /**
-   * Reads the multipart body and converts it into the de-duplicated parsed entries. Accepts either
-   * the documented {@code {"blueprints": [...]}} object (the SCMDB log-watcher, the Basetool
-   * Blueprint Extractor, and the scmdb.net profile / tracking export all wrap their records this
-   * way — REQ-INV-014) or a bare array of blueprint records. The scmdb.net {@code name} key is read
-   * as {@code productName} (via {@code @JsonAlias}); scmdb.net checklist entries the user has not
-   * unlocked yet ({@code completed == false}) are skipped, while a {@code null} / {@code true} flag
-   * (the watcher / extractor exports, which list only acquired blueprints) counts as owned. Entries
-   * collapse by their structural {@code tag} when present, else by trimmed product name, keeping
-   * the earliest acquisition time as the suggestion — so two distinct blueprints scmdb.net shows
-   * under one name (different tags) stay separate while tag-less duplicates merge as before; blank
-   * names are dropped.
-   *
-   * @param file the uploaded blueprint export JSON
-   * @return parsed entries in first-seen order (possibly empty)
-   * @throws BadRequestException if the file is empty, not valid JSON, or carries no blueprint array
-   */
-  @NotNull
-  private List<ParsedEntry> parse(@NotNull MultipartFile file) {
-    if (file.isEmpty()) {
-      throw new BadRequestException("The uploaded file is empty.");
-    }
-    // Reject an oversized upload BEFORE readTree builds the in-memory tree (security audit
-    // gap-fill). getSize() reflects the buffered multipart length, so this never reads the body.
-    if (file.getSize() > MAX_IMPORT_BYTES) {
-      throw new BadRequestException(
-          "The uploaded blueprint file is too large (limit "
-              + (MAX_IMPORT_BYTES / (1024 * 1024))
-              + " MB).");
-    }
-    JsonNode root;
-    try {
-      root = objectMapper.readTree(file.getInputStream());
-    } catch (IOException | JacksonException e) {
-      log.warn("Blueprint import: failed to parse JSON — {}", e.getMessage());
-      throw new BadRequestException(
-          "The uploaded file could not be parsed as valid blueprint export JSON.");
-    }
-
-    List<BlueprintExportEntryDto> raw;
-    if (root != null && root.isArray()) {
-      raw = objectMapper.convertValue(root, new TypeReference<List<BlueprintExportEntryDto>>() {});
-    } else if (root != null && root.isObject()) {
-      raw = objectMapper.convertValue(root, BlueprintExportFileDto.class).blueprints();
-    } else {
-      raw = null;
-    }
-    if (raw == null) {
-      throw new BadRequestException(
-          "The uploaded file must contain a 'blueprints' array (SCMDB log-watcher, Basetool"
-              + " Blueprint Extractor, or scmdb.net export).");
-    }
-
-    // Collapse duplicates, keeping the earliest acquisition time per group. The de-dup key is the
-    // structural tag (lower-cased) when present, else the trimmed product name. Keying on the tag
-    // is what stops two DISTINCT DataForge blueprints that scmdb.net happens to display under the
-    // same name — e.g. a genuine piece and a CIG-mislabeled one both shown as "Antium Core Jet"
-    // (REQ-INV-007) — from collapsing into one (which would drop one tag and import only one of the
-    // two owned products). Tag-less entries (watcher / extractor / bare array) key on the name, so
-    // their de-dup behaviour is unchanged. scmdb.net checklist entries the user has not unlocked
-    // yet
-    // (completed == false) are skipped.
-    LinkedHashMap<String, Instant> earliestByKey = new LinkedHashMap<>();
-    LinkedHashMap<String, String> nameByKey = new LinkedHashMap<>();
-    LinkedHashMap<String, String> tagByKey = new LinkedHashMap<>();
-    for (BlueprintExportEntryDto entry : raw) {
-      if (entry == null || entry.productName() == null || entry.productName().isBlank()) {
-        continue;
-      }
-      if (Boolean.FALSE.equals(entry.completed())) {
-        continue;
-      }
-      String name = entry.productName().trim();
-      String tag = entry.tag() == null || entry.tag().isBlank() ? null : entry.tag().trim();
-      Instant acquiredAt = acquiredAtOf(entry);
-      String dedupKey = tag != null ? "t:" + tag.toLowerCase(Locale.ROOT) : "n:" + name;
-      if (!earliestByKey.containsKey(dedupKey)) {
-        earliestByKey.put(dedupKey, acquiredAt);
-        nameByKey.put(dedupKey, name);
-        tagByKey.put(dedupKey, tag);
-      } else {
-        Instant current = earliestByKey.get(dedupKey);
-        if (acquiredAt != null && (current == null || acquiredAt.isBefore(current))) {
-          earliestByKey.put(dedupKey, acquiredAt);
-        }
-      }
-    }
-
-    List<ParsedEntry> entries = new ArrayList<>(earliestByKey.size());
-    for (String key : earliestByKey.keySet()) {
-      entries.add(new ParsedEntry(nameByKey.get(key), tagByKey.get(key), earliestByKey.get(key)));
-    }
-    return entries;
-  }
-
-  /**
-   * Resolves a parsed entry's acquisition instant from whichever timestamp its source exporter
-   * stamped: SCMDB's {@code ts} (fractional Unix epoch seconds) takes precedence, then the Basetool
-   * Blueprint Extractor's {@code receivedAt} (ISO-8601 instant). A malformed {@code receivedAt} is
-   * treated as absent rather than failing the whole import.
-   *
-   * @param entry the parsed export entry
-   * @return the acquisition instant, or {@code null} if neither field is present and parseable
-   */
-  @Nullable
-  private Instant acquiredAtOf(@NotNull BlueprintExportEntryDto entry) {
-    if (entry.ts() != null) {
-      return toInstant(entry.ts());
-    }
-    return parseInstant(entry.receivedAt());
-  }
-
-  /**
-   * Parses an ISO-8601 instant string (e.g. {@code 2026-03-26T16:49:31.050Z}) leniently. A blank or
-   * unparseable value yields {@code null} so one malformed record never aborts the import.
-   *
-   * @param iso the ISO-8601 instant string, or {@code null}
-   * @return the parsed instant, or {@code null}
-   */
-  @Nullable
-  private Instant parseInstant(@Nullable String iso) {
-    if (iso == null || iso.isBlank()) {
-      return null;
-    }
-    try {
-      return Instant.parse(iso.trim());
-    } catch (DateTimeParseException e) {
-      log.debug("Blueprint import: ignoring unparseable receivedAt '{}'", iso);
-      return null;
-    }
-  }
-
-  /**
-   * Converts a fractional Unix-epoch-seconds timestamp into an {@link Instant} (millisecond
-   * precision). {@code null} in yields {@code null} out.
-   *
-   * @param epochSeconds fractional epoch seconds (e.g. {@code 1774534484.296}), or {@code null}
-   * @return the corresponding instant, or {@code null}
-   */
-  @Nullable
-  private Instant toInstant(@Nullable Double epochSeconds) {
-    return epochSeconds == null ? null : Instant.ofEpochMilli(Math.round(epochSeconds * 1000.0));
-  }
-
-  /**
    * Builds the master product index keyed by normalized product key, in master-scan order.
    *
    * @return the product index
@@ -699,19 +541,6 @@ public class BlueprintImportService {
     entity.setNote(note);
     return entity;
   }
-
-  /**
-   * A single de-duplicated export entry after parsing: the external product name, the structural
-   * blueprint tag (scmdb.net only), and the earliest acquisition instant seen for it.
-   *
-   * @param externalName the export {@code productName} / scmdb.net {@code name} (trimmed)
-   * @param tag the scmdb.net structural blueprint key for the tag match (REQ-INV-019), or {@code
-   *     null} for the watcher / extractor exports, which do not carry it
-   * @param suggestedAcquiredAt the earliest acquisition instant (from {@code ts} or {@code
-   *     receivedAt}), or {@code null}
-   */
-  private record ParsedEntry(
-      @NotNull String externalName, @Nullable String tag, @Nullable Instant suggestedAcquiredAt) {}
 
   /**
    * Intermediate per-name resolution carried between the two preview passes. Mutable status is not

@@ -107,7 +107,7 @@ public class BankBookingRequestService {
   private final BankAuditService bankAuditService;
   private final AuthHelperService authHelperService;
   private final UserRepository userRepository;
-  private final OrgUnitMembershipService orgUnitMembershipService;
+  private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   private final ApplicationEventPublisher eventPublisher;
 
   /**
@@ -388,7 +388,7 @@ public class BankBookingRequestService {
     UUID counterpartyOrgUnitId =
         requesterId == null
             ? null
-            : orgUnitMembershipService
+            : orgUnitMembershipQueryService
                 .findPrimaryDirectMembershipOrgUnitId(requesterId)
                 .orElse(null);
 

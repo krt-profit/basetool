@@ -113,13 +113,7 @@ public class PersonalBlueprintController {
             PersonalBlueprintService.SORTABLE_FIELDS,
             PersonalBlueprintService.DEFAULT_SORT_FIELD);
     Page<PersonalBlueprintResponse> result = service.listOwn(ownerSub, q, pageable);
-    return new PageResponse<>(
-        result.getContent(),
-        result.getNumber(),
-        result.getSize(),
-        result.getTotalElements(),
-        result.getTotalPages(),
-        PaginationUtil.toSortStrings(result.getSort()));
+    return PageResponse.of(result);
   }
 
   /**

@@ -110,7 +110,7 @@ public class BankLedgerService {
   private final BankTransferFeeService transferFeeService;
   private final AuthHelperService authHelperService;
   private final UserRepository userRepository;
-  private final OrgUnitMembershipService orgUnitMembershipService;
+  private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
 
   /**
    * Books a deposit (REQ-BANK-004): one positive account leg on the receiving account and one
@@ -1087,7 +1087,7 @@ public class BankLedgerService {
         return new CounterpartySnapshot(user.getId(), user.getEffectiveName(), null, null);
       }
       OrgUnitMembershipOptionDto membership =
-          orgUnitMembershipService.listDirectMembershipOptions(userId).stream()
+          orgUnitMembershipQueryService.listDirectMembershipOptions(userId).stream()
               .filter(option -> option.orgUnitId().equals(orgUnitId))
               .findFirst()
               .orElseThrow(
@@ -1102,7 +1102,7 @@ public class BankLedgerService {
       return new CounterpartySnapshot(null, external, null, null);
     }
     OrgUnitMembershipOptionDto orgUnit =
-        orgUnitMembershipService.listAllActiveOrgUnitOptionsAllKinds().stream()
+        orgUnitMembershipQueryService.listAllActiveOrgUnitOptionsAllKinds().stream()
             .filter(option -> option.orgUnitId().equals(orgUnitId))
             .findFirst()
             .orElseThrow(
