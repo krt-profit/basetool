@@ -338,6 +338,12 @@
     gap: 5px;
     margin-bottom: 14px;
 }
+/* The hidden attribute must win over the flex display (the UA [hidden] rule loses to a class), so
+   the item-quantity field stays hidden during a material release/edit — where materialboerse-release.js
+   sets `hidden` on it (mode !== 'item'). Without this the block leaked into every material release. */
+.mb-modal-qty[hidden] {
+    display: none;
+}
 .mb-modal-qty input[type='number'] {
     width: 140px;
     height: 34px;
