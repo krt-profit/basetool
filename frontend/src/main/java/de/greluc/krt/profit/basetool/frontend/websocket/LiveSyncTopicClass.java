@@ -208,8 +208,7 @@ public enum LiveSyncTopicClass {
    * global room carrying one opaque {@code board} section key; every peer re-pulls its own {@code
    * KRT_MEMBER}-gated board fragment, so no board data crosses the socket. No editor-presence dots.
    * A subscribe is authorized by the socket's authentication alone (no probe path, no capability,
-   * no role gate) — the same "authenticated member" bar the {@code /ws/materialboerse/board} legacy
-   * alias and the board page itself already carry.
+   * no role gate) — the same "authenticated member" bar the board page itself already carries.
    */
   MATERIALBOARD("materialboard", false, Set.of("board"), false, "materialboard", null, null);
 

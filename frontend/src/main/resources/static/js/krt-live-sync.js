@@ -138,6 +138,13 @@
                 const wasAcked = entry.ackedOnce;
                 entry.state = 'subscribed';
                 entry.ackedOnce = true;
+                // Fired on EVERY ack (first and re-subscribe). The presence adapter uses it to
+                // re-announce its active focus once the room is subscribed — a presence frame sent
+                // before the server acked the subscribe is dropped (the server only tracks presence
+                // for a subscribed topic), so focus must be replayed here.
+                if (typeof entry.handlers.onSubscribed === 'function') {
+                    entry.handlers.onSubscribed();
+                }
                 // Only a RE-subscribe (after a reconnect) triggers a resync: signals may have been
                 // missed while offline. The very first ack means nothing was missed.
                 if (wasAcked && typeof entry.handlers.onResync === 'function') {
@@ -219,6 +226,20 @@
                 if (!rawSend({ type: 'changed', topic: topic, sections: secs })) {
                     publishBuffer.push({ topic: topic, sections: secs });
                 }
+            },
+            // Publishes an editor-presence control frame (`focus` / `heartbeat` / `blur`) for a
+            // presence-enabled room (today only mission:{id}). Best-effort awareness: unlike
+            // `changed` it is NEVER buffered — a stale focus replayed after a long outage would be
+            // wrong — so if the socket is not open the frame is simply dropped and the focus is
+            // re-announced on the next subscribe ack (see onSubscribed). The server drops a presence
+            // frame for a topic this socket has not subscribed to, so a frame that races ahead of the
+            // subscribe ack is harmlessly ignored and re-sent by that same onSubscribed re-announce.
+            sendPresence: function (topic, type, sectionKey) {
+                if (!topic || !type) {
+                    return;
+                }
+                ensureSocket();
+                rawSend({ type: type, topic: topic, sectionKey: sectionKey });
             },
             // Test-support only: the canonical topics this tab has an acknowledged (`subscribed`)
             // subscription for. The two-context live-sync e2e tests poll this to wait deterministically
@@ -424,6 +445,7 @@
         createReceiver: createReceiver,
         subscribe: syncSocket.subscribe,
         sendChanged: syncSocket.sendChanged,
+        sendPresence: syncSocket.sendPresence,
         subscribedTopics: syncSocket.subscribedTopics,
     };
 })();

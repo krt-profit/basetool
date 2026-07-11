@@ -602,10 +602,11 @@ reload.
 
 > **Amendment (#1102 / ADR-0094):** the mission detail page is the **first instance of the
 > tool-wide live-sync standard REQ-FE-015**. The transport described below now rides the
-> `mission:{id}` topic room on the shared multiplexed socket (`/ws/sync`, `krt-live-sync.js`); the
-> legacy `/ws/missions/{id}/presence` path stays aliased for one release. Everything else in this
-> requirement — the opaque-keys rule, the three mirror points, the pill/coalesce contract, the
-> abuse bounds — is unchanged and is what REQ-FE-015 generalizes.
+> `mission:{id}` topic room on the shared multiplexed socket (`/ws/sync`, `krt-live-sync.js` + the
+> `mission-presence.js` adapter); the one-release legacy `/ws/missions/{id}/presence` alias was
+> **removed in #1236** (`mission-presence.js` now subscribes on `/ws/sync` like every other surface).
+> Everything else in this requirement — the opaque-keys rule, the three mirror points, the
+> pill/coalesce contract, the abuse bounds — is unchanged and is what REQ-FE-015 generalizes.
 
 The transport is the **`mission:{id}` topic room of the shared live-sync WebSocket** (REQ-FE-015;
 `/ws/sync`, `krt-live-sync.js` + the `mission-presence.js` adapter) — no new backend module, no
@@ -638,8 +639,8 @@ status pill / facts) is added by this requirement so core/schedule/status edits 
 
 Three server-side guards bound the abuse surface the socket adds. Joining the mission room is
 **authorized against mission access** — the topic authorizer issues the same authenticated
-`GET /api/v1/missions/{id}` the page does (per REQ-FE-015 this now happens at `subscribe` time on the
-shared socket; the legacy alias path keeps the handshake-time check), so an authenticated user cannot
+`GET /api/v1/missions/{id}` the page does (per REQ-FE-015 this happens at `subscribe` time on the
+shared socket), so an authenticated user cannot
 join the presence room of a mission they may not see (an explicit backend 403/404 refuses; a transient
 backend error fails open so a blip never kills presence). Inbound `changed` frames are **rate-limited
 per session** (a token bucket sized far above any human edit cadence), so a crafted client cannot

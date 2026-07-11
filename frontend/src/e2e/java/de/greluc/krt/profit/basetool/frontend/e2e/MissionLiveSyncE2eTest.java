@@ -129,17 +129,21 @@ class MissionLiveSyncE2eTest {
         // is the whole point — B must update WITHOUT reloading.
         pageB.evaluate("window.__krtNoReload = true;");
 
-        // Wait until B's presence socket is actually OPEN (readyState === 1) rather than sleeping a
-        // fixed interval before a race: the server registers the session during the handshake,
-        // which
-        // completes before the client sees OPEN, so an open socket deterministically implies B is
-        // registered with the relay and A's subsequent change frame will reach it.
+        // Wait until B holds an ACKNOWLEDGED subscription to the mission room on the shared
+        // /ws/sync
+        // socket rather than sleeping a fixed interval before a race: a subscribe only appears in
+        // subscribedTopics() once the server has authorized it and acked, which means B is
+        // registered with the relay, so A's subsequent change frame deterministically reaches it.
+        // This is the /ws/sync analogue of the retired missionPresence.socket.readyState wait
+        // (#1236).
         pageB.waitForCondition(
             () ->
                 Boolean.TRUE.equals(
                     pageB.evaluate(
-                        "!!(window.missionPresence && window.missionPresence.socket"
-                            + " && window.missionPresence.socket.readyState === 1)")));
+                        "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
+                            + " && window.krtLiveSync.subscribedTopics().indexOf('mission:"
+                            + missionId
+                            + "') !== -1)")));
 
         // Context A adds a guest. A distinctive name resolves to no realm user, so it is a guest.
         pageA.locator("#add-participant-btn").click();
@@ -206,14 +210,16 @@ class MissionLiveSyncE2eTest {
         // A full reload on B would clear this marker; the live in-place swap leaves it intact.
         pageB.evaluate("window.__krtNoReload = true;");
 
-        // Same deterministic handshake wait as the participant test: an OPEN socket implies B is
-        // registered with the relay, so A's change frame cannot race past it.
+        // Same deterministic wait as the participant test: an acked mission-room subscription on
+        // /ws/sync implies B is registered with the relay, so A's change frame cannot race past it.
         pageB.waitForCondition(
             () ->
                 Boolean.TRUE.equals(
                     pageB.evaluate(
-                        "!!(window.missionPresence && window.missionPresence.socket"
-                            + " && window.missionPresence.socket.readyState === 1)")));
+                        "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
+                            + " && window.krtLiveSync.subscribedTopics().indexOf('mission:"
+                            + missionId
+                            + "') !== -1)")));
 
         // Context A adds an objective (created with the localized default title + PRIMARY kind).
         pageA.locator("#mission-objective-add").click();

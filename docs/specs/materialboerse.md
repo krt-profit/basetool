@@ -204,7 +204,8 @@ by `LiveSyncTopicClass.MATERIALBOARD`, and applied by the `materialboerse.js` `k
 receiver. Only opaque section keys cross the socket; each peer re-pulls its own authorization-checked
 fragment. Behaviour is unchanged from the dedicated relay — the same debounced, modal-skipping list
 refresh (no deferred-refresh pill) — only the transport is now shared. The pre-rollout
-`/ws/materialboerse/board` alias stays one release for tabs opened before the migration.
+`/ws/materialboerse/board` alias (kept one release for tabs opened before the migration) was
+removed in #1236; every board tab now rides the `materialboard` room on `/ws/sync`.
 
 **Acceptance**
 - [ ] A release/deactivate/interest by one member refreshes the board of another member viewing it,
