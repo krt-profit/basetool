@@ -49,6 +49,9 @@ groups:
   # alerts make the plane notice its own reload/rule-eval/notification/TSDB failures. Metric
   # names verified against the pinned images (prometheus v3.13.0, alertmanager v0.33.0,
   # alloy v1.17.1, loki 3.7.3, blackbox v0.28.0, node-exporter v1.11.1).
+  # PrometheusConfigStale additionally catches a reload that never landed at all (a MISSED/lost
+  # SIGHUP) — invisible to the *_config_last_reload_successful==0 checks, which only see a reload
+  # that was attempted and failed. Precedent: 2026-07-11 ingest TargetDown (ADR-0090 port move).
   - name: meta-self-health
     rules:
       - alert: PrometheusConfigReloadFailed
@@ -59,6 +62,28 @@ groups:
         annotations:
           summary: "Prometheus config reload failed"
           description: "Prometheus is running the LAST-GOOD config because the most recent reload failed — new scrape jobs / alert rules from the last deploy are NOT active. Check `deploy.sh` and `promtool check config`."
+
+      # Catches a reload that never LANDED (a missed/lost SIGHUP), which PrometheusConfigReloadFailed
+      # cannot: that alert only sees a reload that was ATTEMPTED and failed (last_reload_successful==0),
+      # whereas a never-sent reload leaves last_reload_successful==1 (the last one, at startup, was
+      # fine) while the running config silently outruns the on-disk one. deploy.sh stamps
+      # basetool_monitoring_config_applied_timestamp (node_exporter textfile) whenever it SIGHUP-signals
+      # a Prometheus config change; if that stamp stays newer than Prometheus's own last-successful-
+      # reload timestamp, the signal was lost / never received. deploy.sh's self-healing reconcile
+      # re-signals on the next tick, so >15m of drift means it is not converging (SIGHUP lost, Prometheus
+      # not signalled, or the iri-deploy timer stopped). Precedent: 2026-07-11 ingest TargetDown after
+      # ADR-0090 moved ingest's actuator 11262->11272 while the running Prometheus kept scraping 11262.
+      # scalar() bridges the two single-series metrics' disjoint label sets (job=node vs job=prometheus).
+      - alert: PrometheusConfigStale
+        expr: |
+          basetool_monitoring_config_applied_timestamp{component="prometheus"}
+            > scalar(prometheus_config_last_reload_success_timestamp_seconds)
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus running a stale config (a reload was missed)"
+          description: "deploy.sh applied an on-disk Prometheus config more recently than Prometheus's last SUCCESSFUL reload — the running Prometheus is serving a stale config (scrape targets / alert rules out of date), which PrometheusConfigReloadFailed cannot see. Check the deploy.sh monitoring-reload logs, SIGHUP Prometheus, and verify the iri-deploy timer is running."
 
       - alert: PrometheusRuleEvaluationFailures
         expr: rate(prometheus_rule_evaluation_failures_total[5m]) > 0

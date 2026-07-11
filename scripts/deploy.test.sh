@@ -700,6 +700,12 @@ scenario_monitoring_config_reload() {
   echo "scrape_interval: 15s  # bumped" > "${bundle}/monitoring/prometheus/prometheus.yml"
   echo "same" > "${bundle}/monitoring/alloy/config.alloy"
   echo "same" > "${bundle}/monitoring/blackbox/blackbox.yml"
+  # Seed the reload baseline as if a prior tick had already converged the running monitoring config
+  # to the LIVE (pre-apply) tree, so only the slice the bundle actually changes (prometheus) drifts.
+  mkdir -p "${T_STATE_DIR}/monitoring-reload"
+  cp -R "${T_COMPOSE_DIR}/monitoring/prometheus" "${T_STATE_DIR}/monitoring-reload/prometheus"
+  cp -R "${T_COMPOSE_DIR}/monitoring/alloy" "${T_STATE_DIR}/monitoring-reload/alloy"
+  cp -R "${T_COMPOSE_DIR}/monitoring/blackbox" "${T_STATE_DIR}/monitoring-reload/blackbox-exporter"
   write_marker "${MARKER}"
   mapfile -t fake < <(converged_env)
   run_deploy -- "${fake[@]}" \
@@ -715,25 +721,81 @@ scenario_monitoring_config_reload() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 12: monitoring enabled, a normal image re-apply but NO config-bundle
-# change. The monitoring stack must still be reconciled, but nothing may be
-# SIGHUP-reloaded — the reload is gated on a config tree actually being swapped
-# in this tick, so a plain 5-minute app tick never bounces the monitoring config.
+# Scenario 12: monitoring enabled, a normal image re-apply, and the running
+# monitoring config already MATCHES the last reloaded snapshot (steady state).
+# The monitoring stack is reconciled (up -d) but nothing is SIGHUP-reloaded — a
+# plain tick over a converged monitoring config must never bounce it.
 # ---------------------------------------------------------------------------
-scenario_monitoring_reload_gated_on_config_change() {
-  echo "Scenario: monitoring enabled, no config change → reconcile but no SIGHUP reload"
+scenario_monitoring_reload_no_drift() {
+  echo "Scenario: monitoring enabled, config already converged → reconcile but no SIGHUP reload"
   local tmp rc=0
   tmp="$(mktmp)"
   setup_host "${tmp}"
   echo "# dummy monitoring compose" > "${T_COMPOSE_DIR}/docker-compose.monitoring.yml"
+  mkdir -p "${T_COMPOSE_DIR}/monitoring/prometheus" \
+    "${T_COMPOSE_DIR}/monitoring/alloy" "${T_COMPOSE_DIR}/monitoring/blackbox"
+  echo "scrape_interval: 30s" > "${T_COMPOSE_DIR}/monitoring/prometheus/prometheus.yml"
+  echo "same" > "${T_COMPOSE_DIR}/monitoring/alloy/config.alloy"
+  echo "same" > "${T_COMPOSE_DIR}/monitoring/blackbox/blackbox.yml"
+  # Seed the reload baseline to MATCH the on-disk tree exactly → no drift, so no service is signalled.
+  mkdir -p "${T_STATE_DIR}/monitoring-reload"
+  cp -R "${T_COMPOSE_DIR}/monitoring/prometheus" "${T_STATE_DIR}/monitoring-reload/prometheus"
+  cp -R "${T_COMPOSE_DIR}/monitoring/alloy" "${T_STATE_DIR}/monitoring-reload/alloy"
+  cp -R "${T_COMPOSE_DIR}/monitoring/blackbox" "${T_STATE_DIR}/monitoring-reload/blackbox-exporter"
   write_marker "${MARKER}"
   mapfile -t fake < <(converged_env)
   run_deploy -- "${fake[@]}" \
     "IRI_MONITORING_ENABLED=true" \
     "FAKE_REPODIGESTS_backend=ghcr.io/krt-profit/basetool-backend@sha256:backend-stale" || rc=$?
-  assert_exit 0 "$rc" "monitoring-enabled deploy without a config change succeeds"
+  assert_exit 0 "$rc" "monitoring-enabled deploy over a converged config succeeds"
   assert_docker "monitoring.yml up -d" "the monitoring stack is still reconciled"
-  assert_no_docker "kill -s SIGHUP" "no service is reloaded when the config tree did not change"
+  assert_no_docker "kill -s SIGHUP" "no service is reloaded when on-disk matches the reloaded snapshot"
+  rm -rf "${tmp}"
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 12b: the 2026-07-11 ingest TargetDown regression. A converged no-op
+# (marker matches, stack healthy) with monitoring enabled, but the on-disk
+# Prometheus config differs from the snapshot the running Prometheus was last
+# reloaded for — a prior tick's SIGHUP was lost, or a rollback bypassed it. Even
+# on the fast-exit no-op path deploy.sh must SELF-HEAL: SIGHUP prometheus so the
+# committed config lands, WITHOUT pulling/restarting the app stack and without a
+# heavy monitoring `up -d`; alloy/blackbox, already converged, stay untouched.
+# ---------------------------------------------------------------------------
+scenario_monitoring_reload_self_heals_on_noop() {
+  echo "Scenario: converged no-op but Prometheus config drifted → self-healing SIGHUP on the fast exit"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  echo "# dummy monitoring compose" > "${T_COMPOSE_DIR}/docker-compose.monitoring.yml"
+  mkdir -p "${T_COMPOSE_DIR}/monitoring/prometheus" \
+    "${T_COMPOSE_DIR}/monitoring/alloy" "${T_COMPOSE_DIR}/monitoring/blackbox"
+  # On-disk carries the committed post-ADR-0090 target (11272); alloy/blackbox are already converged.
+  echo "  - targets: [ingest:11272]" > "${T_COMPOSE_DIR}/monitoring/prometheus/prometheus.yml"
+  echo "same" > "${T_COMPOSE_DIR}/monitoring/alloy/config.alloy"
+  echo "same" > "${T_COMPOSE_DIR}/monitoring/blackbox/blackbox.yml"
+  # The running Prometheus was last reloaded for the STALE (pre-ADR-0090) 11262 target.
+  mkdir -p "${T_STATE_DIR}/monitoring-reload/prometheus"
+  echo "  - targets: [ingest:11262]" \
+    > "${T_STATE_DIR}/monitoring-reload/prometheus/prometheus.yml"
+  cp -R "${T_COMPOSE_DIR}/monitoring/alloy" "${T_STATE_DIR}/monitoring-reload/alloy"
+  cp -R "${T_COMPOSE_DIR}/monitoring/blackbox" "${T_STATE_DIR}/monitoring-reload/blackbox-exporter"
+  write_marker "${MARKER}"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" "IRI_MONITORING_ENABLED=true" || rc=$?
+  assert_exit 0 "$rc" "the self-healing no-op tick exits 0"
+  assert_contains "no change" "it is still the idempotence no-op for the app stack"
+  assert_no_docker " pull " "the app stack is not pulled on the fast exit"
+  assert_no_docker " up -d" "neither the app nor a heavy monitoring up -d runs on the fast exit"
+  assert_docker "kill -s SIGHUP prometheus" "the stale Prometheus config is self-healed (SIGHUP)"
+  assert_no_docker "kill -s SIGHUP alloy" "alloy is already converged — left alone"
+  assert_no_docker "kill -s SIGHUP blackbox-exporter" "blackbox is already converged — left alone"
+  if grep -q '^basetool_monitoring_config_applied_timestamp{component="prometheus"} [1-9]' \
+       "${T_STATE_DIR}/textfile/monitoring-config.prom" 2>/dev/null; then
+    record 1 "the config-applied timestamp metric is emitted for PrometheusConfigStale"
+  else
+    record 0 "the config-applied timestamp metric is emitted for PrometheusConfigStale"
+  fi
   rm -rf "${tmp}"
 }
 
@@ -904,7 +966,8 @@ scenario_drift_reapply_fails
 scenario_oneoff_ignored
 scenario_starting_grace
 scenario_monitoring_config_reload
-scenario_monitoring_reload_gated_on_config_change
+scenario_monitoring_reload_no_drift
+scenario_monitoring_reload_self_heals_on_noop
 scenario_signature_verified_on_apply
 scenario_signature_failure_aborts
 scenario_break_glass_skips_verify

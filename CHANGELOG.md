@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Monitoring: Prometheus übernimmt geänderte Scrape-/Alert-Konfiguration jetzt zuverlässig.** Ein beim Deploy ausgebliebenes oder verlorenes Konfigurations-Reload ließ Prometheus dauerhaft auf der alten Konfiguration weiterlaufen — nach der Portumstellung des Ingest-Actuators (11262→11272) blieb so das Ingest-Ziel unüberwacht und löste einen kritischen `TargetDown`-Alarm aus. `deploy.sh` gleicht die geladene Konfiguration jetzt bei jedem Durchlauf gegen die Datei ab und lädt bei Abweichung selbstheilend nach; der neue Alarm `PrometheusConfigStale` meldet zusätzlich eine nie übernommene Konfiguration (REQ-OBS-014, REQ-OPS-013).
+
 ## [v1.3.2](https://github.com/krt-profit/basetool/releases/tag/v1.3.2) - 2026-07-11
 
 ### Fixed

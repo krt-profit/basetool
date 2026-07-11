@@ -427,26 +427,89 @@ apply_config_tree() {
   fi
 }
 
-# In-place reload of a monitoring service whose slice of the config tree changed this run.
-# `up -d` recreates a container only when its DEFINITION changes; a config-file-only edit would
-# otherwise leave the process on the old config until its next natural recreate. Prometheus
-# (config + alert rules), Alloy (pipelines) and blackbox_exporter do NOT auto-reload, so we send
-# them SIGHUP — an in-place reload with no restart, no scrape gap, no state loss (an invalid
-# config is rejected and the running one stays live). Grafana file-provisions its dashboards and
-# the Loki ruler polls its rule dir, so both pick changes up on their own and are deliberately not
-# signalled here. `${CONFIG_PREVIOUS_DIR}/monitoring` is the pre-apply snapshot; `diff -rq` is
-# non-zero when the subtree changed OR the snapshot is absent (first apply) — both mean "reload".
+# Idempotently reconcile ONE monitoring service's LOADED config against the on-disk config tree.
+# `up -d` recreates a container only when its DEFINITION changes; a bind-mounted config-file edit
+# leaves the running process on the OLD config until an explicit SIGHUP — Prometheus (config +
+# alert rules), Alloy (pipelines) and blackbox_exporter do NOT auto-reload (Grafana file-provisions
+# its dashboards and the Loki ruler polls its rule dir, so both pick changes up on their own and are
+# deliberately never signalled). The OLD logic signalled ONLY on the exact tick that swapped a new
+# config bundle in AND reached the success block, so a SIGHUP that was skipped (monitoring down at
+# that moment), lost, or bypassed by a rollback was NEVER retried — the on-disk config could
+# permanently outrun the running process (the 2026-07-11 ingest TargetDown: ADR-0090 moved ingest's
+# actuator 11262->11272 and prometheus.yml followed in the same release, but the running Prometheus
+# kept scraping the retired 11262). The baseline is now a PERSISTED per-service snapshot of the
+# config subtree the process was last SIGHUP'd for (${MON_RELOAD_STATE_DIR}/<svc>), refreshed ONLY
+# after a successful signal, and reconciled on EVERY healthy tick: a drift (content differs, or the
+# snapshot is absent = never signalled) reloads and re-snapshots; a lost/failed signal leaves the
+# snapshot stale so the NEXT tick retries — the self-healing property. An invalid config is rejected
+# by the target (the running one stays live) and trips the matching *ConfigReloadFailed alert; a
+# genuinely stale running config (a reload that never landed) trips PrometheusConfigStale (meta.yml).
+# `diff -rq` compares CONTENT, so rsync size/mtime quick-check quirks cannot mask a change.
 # Best-effort: a stopped service or a failed signal only logs and never gates the deploy.
-reload_monitoring_on_config_change() {
-  local svc="$1" subpath="$2"
-  if diff -rq "${CONFIG_PREVIOUS_DIR}/monitoring/${subpath}" \
-       "${COMPOSE_DIR}/monitoring/${subpath}" >/dev/null 2>&1; then
+reconcile_monitoring_reload() {
+  local svc="$1" subpath="$2" src snap
+  src="${COMPOSE_DIR}/monitoring/${subpath}"
+  snap="${MON_RELOAD_STATE_DIR}/${svc}"
+  # Nothing on disk for this service (a stripped-down monitoring tree) → nothing to reconcile.
+  [[ -d "${src}" ]] || return 0
+  if diff -rq "${snap}" "${src}" >/dev/null 2>&1; then
     return 0
   fi
-  log "  monitoring: ${subpath} config changed → reloading ${svc} (SIGHUP)"
-  docker compose -p iri-monitoring --project-directory "${COMPOSE_DIR}" \
-    -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" kill -s SIGHUP "${svc}" >/dev/null 2>&1 \
-    || log "  monitoring: WARN reload of ${svc} failed (non-gating; service not running?)"
+  log "  monitoring: ${subpath} config differs from the last reloaded snapshot → reloading ${svc} (SIGHUP)"
+  if docker compose -p iri-monitoring --project-directory "${COMPOSE_DIR}" \
+       -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" kill -s SIGHUP "${svc}" >/dev/null 2>&1; then
+    # Refresh the baseline ONLY on a successful signal, so a failed/lost SIGHUP re-drifts next tick.
+    install -d -m 0755 "${MON_RELOAD_STATE_DIR}" 2>/dev/null || true
+    rm -rf "${snap}"
+    if cp -R "${src}" "${snap}" 2>/dev/null; then
+      date +%s > "${MON_RELOAD_STATE_DIR}/${svc}.applied" 2>/dev/null || true
+    else
+      log "  monitoring: WARN could not snapshot ${subpath} reload baseline (will re-signal next tick)"
+    fi
+  else
+    log "  monitoring: WARN reload of ${svc} failed (non-gating; service not running?) — will retry next tick"
+  fi
+}
+
+# Emit basetool_monitoring_config_applied_timestamp{component="prometheus"} = the Unix time deploy.sh
+# last SIGHUP-signalled a Prometheus config change (the .applied stamp reconcile_monitoring_reload
+# writes on a successful signal). Paired in PrometheusConfigStale (meta.yml) with Prometheus's own
+# prometheus_config_last_reload_success_timestamp_seconds: if this applied stamp stays NEWER than the
+# last successful reload, a reload was missed/lost and the running Prometheus is serving a stale
+# config — the gap PrometheusConfigReloadFailed (== 0, only ATTEMPTED-and-FAILED reloads) cannot see.
+# Written into the node_exporter textfile dir alongside deploy.prom. Best-effort; an absent stamp
+# yields no series, so a host that never re-signalled Prometheus cannot false-fire the alert.
+write_prometheus_config_applied_metric() {
+  local applied_file applied tmp f
+  applied_file="${MON_RELOAD_STATE_DIR}/prometheus.applied"
+  [[ -f "${applied_file}" ]] || return 0
+  applied="$(cat "${applied_file}" 2>/dev/null || true)"
+  [[ "${applied}" =~ ^[0-9]+$ ]] || return 0
+  install -d -m 0755 "${TEXTFILE_DIR}" 2>/dev/null || true
+  f="${TEXTFILE_DIR}/monitoring-config.prom"
+  tmp="${f}.$$"
+  if {
+    echo "# HELP basetool_monitoring_config_applied_timestamp Unix time deploy.sh last SIGHUP-signalled a monitoring component's on-disk config change."
+    echo "# TYPE basetool_monitoring_config_applied_timestamp gauge"
+    echo "basetool_monitoring_config_applied_timestamp{component=\"prometheus\"} ${applied}"
+  } > "${tmp}" 2>/dev/null; then
+    mv -f "${tmp}" "${f}" 2>/dev/null || true
+  else
+    log "  monitoring: WARN could not write monitoring-config textfile metric (${TEXTFILE_DIR})"
+    rm -f "${tmp}" 2>/dev/null || true
+  fi
+}
+
+# Reconcile ALL SIGHUP-only monitoring components against on-disk, then refresh the config-applied
+# metric. Gated on the monitoring stack being present/enabled on this host. Called on every healthy
+# tick — the success block AND the idempotence no-op fast-exit — so a missed reload self-heals even
+# on a quiet host that never re-deploys. Cheap: a per-service content diff, a SIGHUP only on drift.
+reconcile_monitoring_reloads() {
+  [[ "${IRI_MONITORING_ENABLED:-false}" == "true" && -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" ]] || return 0
+  reconcile_monitoring_reload prometheus prometheus
+  reconcile_monitoring_reload alloy alloy
+  reconcile_monitoring_reload blackbox-exporter blackbox
+  write_prometheus_config_applied_metric
 }
 
 # Extract the promoted Keycloak provider JAR (/providers/keycloak-spi.jar inside
@@ -580,9 +643,11 @@ LAST_DEPLOYED_FILE="${STATE_DIR}/last-deployed.digests"
 FAILED_FILE="${STATE_DIR}/failed.digests"
 CONFIG_STAGE_DIR="${STATE_DIR}/config-stage"
 CONFIG_PREVIOUS_DIR="${STATE_DIR}/config-previous"
-# Set true once a new config tree is swapped in this run; gates the post-apply monitoring
-# in-place reload so a config-unchanged tick signals nothing.
-CONFIG_APPLIED=false
+# Per-service persisted snapshot of the monitoring config subtree each SIGHUP-only component
+# (prometheus/alloy/blackbox) was last successfully reloaded for. reconcile_monitoring_reload diffs
+# the on-disk subtree against this baseline on EVERY healthy tick and re-signals on drift, so a
+# missed/lost/rolled-back reload self-heals instead of leaving the running process on a stale config.
+MON_RELOAD_STATE_DIR="${STATE_DIR}/monitoring-reload"
 # Set true when the promoted compose changes the `networks:` topology (a re-pinned
 # subnet, a net added/removed); forces a clean down+up instead of an in-place `up`
 # on apply AND on rollback, so the change never strands name resolution (#974).
@@ -949,6 +1014,11 @@ if [[ -f "${LAST_DEPLOYED_FILE}" ]] \
       # so the DeployHealthRestartFailing alert self-clears the moment recovery
       # is observed. Written on the hot no-op path so the gauge never goes stale.
       write_stack_health_metric healthy
+      # Even on a converged no-op, reconcile the SIGHUP-only monitoring components against on-disk:
+      # a config reload a prior tick failed to land (or a rollback bypassed) would otherwise linger
+      # on a quiet host until the next real deploy — the 2026-07-11 ingest TargetDown. Cheap and
+      # non-gating: a per-service content diff, a SIGHUP only on actual drift.
+      reconcile_monitoring_reloads
       exit 0
     fi
     NOOP=true
@@ -1202,7 +1272,6 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
   [[ -f "${COMPOSE_DIR}/.env" ]] \
     || fail "POST-APPLY: ${COMPOSE_DIR}/.env vanished after config swap — aborting before up"
   log "config applied"
-  CONFIG_APPLIED=true
 fi
 
 # --- Apply ------------------------------------------------------------------
@@ -1320,14 +1389,10 @@ if docker compose \
     if docker compose -p iri-monitoring --project-directory "${COMPOSE_DIR}" \
          -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" up -d 2>&1 | sed 's/^/  monitoring: /'; then
       log "monitoring stack reconciled"
-      # `up -d` already reloaded any service whose DEFINITION changed; for a config-file-only
-      # change, SIGHUP the components that do not auto-reload — only when this tick swapped in a
-      # new config tree, and only the services whose own slice actually changed.
-      if [[ "${CONFIG_APPLIED}" == "true" ]]; then
-        reload_monitoring_on_config_change prometheus prometheus
-        reload_monitoring_on_config_change alloy alloy
-        reload_monitoring_on_config_change blackbox-exporter blackbox
-      fi
+      # `up -d` recreates a service only when its DEFINITION changes; a bind-mounted config-file
+      # edit needs an explicit SIGHUP. Reconcile the LOADED config against on-disk — self-healing:
+      # re-signals on ANY drift from the last reloaded snapshot, not just this tick's bundle swap.
+      reconcile_monitoring_reloads
     else
       log "WARN: monitoring stack apply failed — app deploy stays successful (non-gating)"
     fi

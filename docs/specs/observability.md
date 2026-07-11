@@ -699,8 +699,12 @@ dead-man's switch, not by the app's own error log.
 
 The monitoring plane must detect its **own** silent failures — a signal that stops flowing
 without any alert noticing (frozen gauges, failed config reloads, dead log streams, absent
-series). `deploy.sh` SIGHUP-reloads Prometheus/Alloy/blackbox on every config change and the
-Watchdog only proves the pipeline is alive, not that it is correct; the plane therefore alerts on:
+series). `deploy.sh` reconciles the SIGHUP-only components (Prometheus/Alloy/blackbox) against the
+on-disk config on **every** healthy tick — the config-changing apply, the steady-state idempotence
+no-op, all of them — re-signalling whenever a component's on-disk config drifts from a persisted
+per-service snapshot of what it was last reloaded for, so a missed, lost or rolled-back SIGHUP
+**self-heals** on the next tick instead of leaving the process on a stale config. The Watchdog only
+proves the pipeline is alive, not that it is correct; the plane therefore alerts on:
 
 - **Config-reload failures.** A failed SIGHUP silently keeps the last-good config running.
   Prometheus, Alertmanager, Alloy and the blackbox exporter each expose a
@@ -709,6 +713,19 @@ Watchdog only proves the pipeline is alive, not that it is correct; the plane th
   `BlackboxConfigReloadFailed` (critical) fire when the running config diverges from the deployed
   one. The blackbox exporter's own metrics are scraped by a dedicated `blackbox-exporter` job (its
   `/metrics`, distinct from the `/probe` posture/liveness jobs).
+- **A reload that never LANDED.** The gauges above only catch a reload that was *attempted and
+  failed*; a SIGHUP that was **never sent or lost** leaves `*_config_last_reload_successful == 1`
+  (the last one, at startup, was fine) while the running config silently outruns the on-disk one —
+  the 2026-07-11 ingest `TargetDown` (ADR-0090 moved ingest's actuator `11262`→`11272`, the
+  committed `prometheus.yml` followed, but the running Prometheus kept scraping the retired
+  `11262`). `deploy.sh` stamps `basetool_monitoring_config_applied_timestamp{component="prometheus"}`
+  (a node_exporter textfile gauge) whenever it SIGHUP-signals a Prometheus config change;
+  `PrometheusConfigStale` (warning) fires when that stamp stays newer than Prometheus's own
+  `prometheus_config_last_reload_success_timestamp_seconds` for 15 minutes — long enough for the
+  self-healing reconcile to converge, so a persistent alert means it is *not* converging (SIGHUP
+  lost, Prometheus not signalled, or the `iri-deploy` timer stopped). The acute case (a wrong/absent
+  scrape target) still pages `TargetDown`; this is the complementary early signal that the running
+  Prometheus config is out of date at all.
 - **Rule-evaluation & notification failures.** The two independent alert evaluators (Prometheus and
   the Loki ruler) must keep evaluating and delivering. `PrometheusRuleEvaluationFailures`,
   `PrometheusNotificationsDropped`, `LokiRuleEvaluationFailures`, `LokiRulerNotificationsFailing`
@@ -737,8 +754,10 @@ free-text values.
 **Enforced by:** `monitoring/prometheus/alerts/meta.yml` (`meta-self-health` + `meta-log-pipeline`
 groups) · `monitoring/prometheus/alerts/infrastructure.yml` (container guards) ·
 `monitoring/prometheus/prometheus.yml` (the `blackbox-exporter` self-metrics scrape job) ·
-`monitoring/grafana/dashboards/13-meta-monitoring.json` (log-pipeline panels) ·
-`monitoring/README.md` (alert-response runbook).
+`scripts/deploy.sh` (`reconcile_monitoring_reload(s)` self-healing SIGHUP + the
+`basetool_monitoring_config_applied_timestamp` textfile metric) · `scripts/deploy.test.sh`
+(config-reload / self-heal self-tests) · `monitoring/grafana/dashboards/13-meta-monitoring.json`
+(log-pipeline panels) · `monitoring/README.md` (alert-response runbook).
 
 ### REQ-OBS-015 — Framework false-positive log noise is removed at the source, not muted
 
