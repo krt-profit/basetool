@@ -27,7 +27,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.frontend.config.SquadronContextAdvice;
+import de.greluc.krt.profit.basetool.frontend.config.CapabilityFlagsAdvice;
 import de.greluc.krt.profit.basetool.frontend.model.dto.AggregatedMaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.GameItemReferenceDto;
@@ -79,8 +79,8 @@ class JobOrderListRenderTest {
     // redirect to /orders/create. Stub the capability as a profit-eligible viewer so the list path
     // renders.
     when(backendApiClient.get(
-            "/api/v1/me/capabilities", SquadronContextAdvice.CapabilitiesResponse.class))
-        .thenReturn(new SquadronContextAdvice.CapabilitiesResponse(true, true, true));
+            "/api/v1/me/capabilities", CapabilityFlagsAdvice.CapabilitiesResponse.class))
+        .thenReturn(new CapabilityFlagsAdvice.CapabilitiesResponse(true, true, true));
   }
 
   private MaterialDto material(String name, String quantityType) {

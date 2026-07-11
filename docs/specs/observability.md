@@ -712,7 +712,7 @@ running). The canonical case is Spring Data Web's `ProxyingHandlerMethodArgument
 inspects every `@ModelAttribute`-annotated handler parameter whose static type is an **interface**
 and, when it is not a `@ProjectedPayload` projection, logs `… is not annotated with @ProjectedPayload
 …` at WARN before correctly delegating to the standard resolver. The frontend's
-`SquadronContextAdvice` cross-injects the already-loaded `List<SquadronDto>` /
+`OrgUnitContextAdvice` cross-injects the already-loaded `List<SquadronDto>` /
 `List<OrgUnitMembershipOptionDto>` catalogues between its `@ModelAttribute` methods so each is fetched
 once per request and reused (re-deriving them in the dependent method would double the un-cached
 `/api/v1/users/me` + `/memberships` round-trip on every non-admin request); `java.util.List` is an
@@ -732,9 +732,9 @@ the backend genuinely uses Spring Data web paging and keeps the auto-config.
 
 - [ ] The frontend context contains no `ProxyingHandlerMethodArgumentResolver` in the
   `RequestMappingHandlerAdapter` resolver chain, so a page render can no longer emit the
-  `@ProjectedPayload` WARN for the `SquadronContextAdvice` catalogue parameters.
+  `@ProjectedPayload` WARN for the `OrgUnitContextAdvice` catalogue parameters.
 - [ ] No application logger is muted to achieve this (the fix removes the resolver, not the log line).
-- [ ] `SquadronContextAdvice` still fetches each catalogue at most once per request (the
+- [ ] `OrgUnitContextAdvice` still fetches each catalogue at most once per request (the
   `@ModelAttribute` cross-injection is preserved, not replaced by an in-method re-fetch).
 
 **Enforced by:**
@@ -742,5 +742,5 @@ the backend genuinely uses Spring Data web paging and keeps the auto-config.
 (`@SpringBootApplication(exclude = … DataWebAutoConfiguration.class)`) ·
 `frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/FrontendApplicationTests.java`
 (asserts the resolver is absent from the live chain) ·
-`frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/config/SquadronContextAdvice.java`
+`frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/config/OrgUnitContextAdvice.java`
 (the single-fetch `@ModelAttribute` cross-injection the exclusion protects).

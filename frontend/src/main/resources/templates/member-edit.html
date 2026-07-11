@@ -106,7 +106,7 @@
 
             <!-- Staffel memberships (admin-only, since /members/{id}/edit is admin-only). REQ-ORG-017:
                  up to two Staffeln, each with its own Logistician / Mission-Manager flags
-                 (REQ-SEC-005). SquadronContextAdvice injects `availableSquadrons`. The two fixed slots
+                 (REQ-SEC-005). OrgUnitContextAdvice injects `availableSquadrons`. The two fixed slots
                  bind to staffel1*/staffel2* fields; the Save button folds the non-empty slots into one
                  PATCH /api/v1/users/{id}/memberships reconcile. -->
             <div class="form-group" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" id="staffel-section">

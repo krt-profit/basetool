@@ -109,7 +109,7 @@ public class PromotionPageController {
    * the current caller, so every {@code @GetMapping} below short-circuits with HTTP 403 instead of
    * rendering the page. The advisor-supplied flag (admin override + active-org-unit lookup) is
    * passed in as a {@link ModelAttribute} parameter so the controller does not duplicate the
-   * resolution logic that {@code SquadronContextAdvice.promotionFeatureEnabled} already runs once
+   * resolution logic that {@code CapabilityFlagsAdvice.promotionFeatureEnabled} already runs once
    * per request.
    *
    * @param enabled value of the {@code promotionFeatureEnabled} model attribute; {@code null} is

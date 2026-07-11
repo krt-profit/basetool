@@ -40,7 +40,7 @@ import org.springframework.web.bind.annotation.RestController;
  * here when the admin flips either checkbox so the browser never has to know the backend hostname
  * and the CSRF-protected session is reused via {@link BackendApiClient}.
  *
- * <p>Both flags live on the cached {@code SquadronDto} that {@code SquadronContextAdvice} reads on
+ * <p>Both flags live on the cached {@code SquadronDto} that {@code OrgUnitContextAdvice} reads on
  * every authenticated render, so each toggle evicts {@code STATIC_DATA_CACHE} (REQ-DATA-007) to
  * keep the shared squadron catalogue truthful rather than stale up to the cache TTL.
  *
@@ -68,7 +68,7 @@ public class SquadronAdminProxyController {
   public ResponseEntity<Void> setPromotionEnabled(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
     backendApiClient.patch("/api/v1/squadrons/" + id + "/promotion-enabled", body, Void.class);
-    // The flag lives on the cached SquadronDto that SquadronContextAdvice reads on every render, so
+    // The flag lives on the cached SquadronDto that OrgUnitContextAdvice reads on every render, so
     // a toggle must evict STATIC_DATA_CACHE or the sidebar/title gate stays stale up to the TTL
     // (REQ-DATA-007 — squadron-catalogue cacheability is gated on every admin mutation evicting).
     backendApiClient.evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);

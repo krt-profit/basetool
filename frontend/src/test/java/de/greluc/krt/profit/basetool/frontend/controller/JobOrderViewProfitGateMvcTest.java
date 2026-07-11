@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.frontend.config.SquadronContextAdvice;
+import de.greluc.krt.profit.basetool.frontend.config.CapabilityFlagsAdvice;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,8 +70,8 @@ class JobOrderViewProfitGateMvcTest {
     // covered
     // by the backend gate tests + e2e.
     when(backendApiClient.get(
-            "/api/v1/me/capabilities", SquadronContextAdvice.CapabilitiesResponse.class))
-        .thenReturn(new SquadronContextAdvice.CapabilitiesResponse(false, false, false));
+            "/api/v1/me/capabilities", CapabilityFlagsAdvice.CapabilitiesResponse.class))
+        .thenReturn(new CapabilityFlagsAdvice.CapabilitiesResponse(false, false, false));
   }
 
   @Test
