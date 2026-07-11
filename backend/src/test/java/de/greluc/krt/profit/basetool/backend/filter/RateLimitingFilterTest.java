@@ -728,6 +728,46 @@ class RateLimitingFilterTest {
       assertEquals(200, post("/api/v1/missions", "203.0.113.2"));
     }
 
+    @Test
+    void orderCreateRule_coversTheItemOrderChildPath() throws Exception {
+      // Regression for the rate-limit coverage gap: the anonymous item-order create at
+      // POST /api/v1/orders/items must share the tight order-create budget. Listing the child path
+      // explicitly is required because PathPattern uses exact-segment matching.
+      properties.setCapacity(100);
+      properties.setRefillTokens(100);
+
+      RateLimitProperties.Rule orderCreate =
+          newRule(
+              "order-create",
+              List.of("POST"),
+              List.of("/api/v1/orders", "/api/v1/orders/items"),
+              1);
+      properties.setRules(List.of(orderCreate));
+
+      // First item-order POST consumes the tight per-rule bucket; the second is blocked by it.
+      assertEquals(200, post("/api/v1/orders/items", "203.0.113.10"));
+      MockHttpServletResponse blocked = postResponse("/api/v1/orders/items", "203.0.113.10");
+      assertEquals(429, blocked.getStatus());
+      assertEquals("1", blocked.getHeader("X-Rate-Limit-Limit"));
+    }
+
+    @Test
+    void orderCreateRule_parentPathAlone_doesNotCoverItemChild() throws Exception {
+      // Documents WHY the child path must be listed: with only `/api/v1/orders`, the item-order
+      // create at `/api/v1/orders/items` is NOT matched by the rule (exact-segment PathPattern), so
+      // a tight per-rule budget of 1 never bites it — the coverage gap the fix closes.
+      properties.setCapacity(100);
+      properties.setRefillTokens(100);
+
+      RateLimitProperties.Rule orderCreateParentOnly =
+          newRule("order-create", List.of("POST"), List.of("/api/v1/orders"), 1);
+      properties.setRules(List.of(orderCreateParentOnly));
+
+      // Two POSTs to the child path both pass — the parent-only pattern does not cover it.
+      assertEquals(200, post("/api/v1/orders/items", "203.0.113.11"));
+      assertEquals(200, post("/api/v1/orders/items", "203.0.113.11"));
+    }
+
     private RateLimitProperties.Rule newRule(
         String name, List<String> methods, List<String> paths, int capacity) {
       RateLimitProperties.Rule r = new RateLimitProperties.Rule();

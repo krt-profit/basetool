@@ -22,7 +22,7 @@
                 <div class="kpi-title" th:text="${card.account().name()}">Staffel IRIDIUM</div>
                 <div class="kpi-sub" th:text="${card.account().accountNo()}">KB-0001</div>
             </div>
-            <span class="chip" style="font-size: 0.55rem;"
+            <span class="chip krtm-font-size-0-55rem-eff3"
                   th:classappend="${card.account().status() == 'CLOSED'} ? ' chip--muted' : ''"
                   th:text="${card.account().status() == 'CLOSED'} ? #{bank.account.status.CLOSED} : #{'bank.account.type.' + ${card.account().type()}}">Staffel</span>
         </div>
@@ -60,7 +60,7 @@
             <td>
                 <a th:href="@{'/bank/accounts/' + ${card.account().id()}}" th:text="${card.account().name()}">Staffel IRIDIUM</a>
                 <br>
-                <span class="text-muted" style="font-size: 0.8rem;" th:text="${card.account().accountNo()}">KB-0001</span>
+                <span class="text-muted krtm-font-size-0-8rem-0fed" th:text="${card.account().accountNo()}">KB-0001</span>
             </td>
             <td>
                 <span class="chip"

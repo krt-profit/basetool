@@ -218,15 +218,15 @@
 
     <div class="hud-box mt-2">
         <h2 th:text="#{promotion.my.eligibility.title}">Beförderbarkeit</h2>
-        <p th:text="#{promotion.my.eligibility.subtitle}" style="color:var(--color-gray-2);margin-bottom:1rem;font-size:0.9rem;">Zeigt, welche Beförderungen anhand deiner aktuellen Bewertungen möglich sind.</p>
+        <p th:text="#{promotion.my.eligibility.subtitle}" class="krtm-color-var-color-gray-2-margin-bottom-1rem-fo-2271">Zeigt, welche Beförderungen anhand deiner aktuellen Bewertungen möglich sind.</p>
 
-        <div th:if="${currentUserRank != null}" style="color:var(--color-gray-2);font-size:0.85rem;margin-bottom:0.75rem;">
+        <div th:if="${currentUserRank != null}" class="krtm-color-var-color-gray-2-font-size-0-85rem-mar-2492">
             <span th:text="#{promotion.overview.your.rank}">Dein Rang</span>:
-            <strong th:text="${currentUserRank}" style="color:var(--data-fg);">20</strong>
+            <strong th:text="${currentUserRank}" class="krtm-color-var-data-fg-3a2d">20</strong>
         </div>
 
         <div th:if="${#lists.isEmpty(eligibilities)}">
-            <p th:text="#{promotion.my.eligibility.none}" style="color:var(--color-gray-2);">Es sind aktuell keine Rangvoraussetzungen konfiguriert.</p>
+            <p th:text="#{promotion.my.eligibility.none}" class="krtm-color-var-color-gray-2-4fcb">Es sind aktuell keine Rangvoraussetzungen konfiguriert.</p>
         </div>
 
         <th:block th:unless="${#lists.isEmpty(eligibilities)}">
@@ -253,7 +253,7 @@
                         <span th:text="#{promotion.overview.rank.to}">Rang</span>
                         <span th:text="${elig.toRank}">19</span>
                     </span>
-                    <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+                    <div class="krtm-display-flex-gap-0-5rem-align-items-center-f-6ef4">
                         <span th:if="${currentUserRank != null and elig.fromRank == currentUserRank}"
                               class="next-step-badge"
                               th:text="#{promotion.my.next.step}">Dein nächster Sprung</span>
@@ -270,11 +270,11 @@
                         <span class="me-progress-text">0 / 0</span>
                     </div>
                     <div class="eligibility-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100">
-                        <div class="eligibility-progress-fill" style="width:0%;"></div>
+                        <div class="eligibility-progress-fill krtm-width-0-0343"></div>
                     </div>
                 </th:block>
 
-                <div th:if="${!#lists.isEmpty(elig.checks)}" class="checks-wrapper" style="overflow-x:auto;">
+                <div th:if="${!#lists.isEmpty(elig.checks)}" class="checks-wrapper krtm-overflow-x-auto-987e">
                     <table class="checks-table">
                         <thead>
                             <tr>

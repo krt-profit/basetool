@@ -107,8 +107,7 @@
         <!-- The overview aggregates owned blueprints per product across the caller's oversight
              org units. In admin "all org units" mode the bucket merges every org unit - tell the
              admin the totals span all of them. Officers / SK leads only ever see their own. -->
-        <div th:if="${isAllSquadronsMode}" class="squadron-badge squadron-badge-muted"
-             style="display: block; padding: 0.6rem 0.9rem; margin-bottom: 1rem; border-radius: var(--radius-none); white-space: normal; text-align: left;"
+        <div th:if="${isAllSquadronsMode}" class="squadron-badge squadron-badge-muted krtm-display-block-padding-0-6rem-0-9rem-margin-b-3373"
              th:text="#{blueprintOverview.all_orgunits_notice}">
             Aggregation across all org units.
         </div>
@@ -143,13 +142,13 @@
             <tbody>
             <th:block th:each="item : ${overview}">
             <tr class="bp-row">
-                <td th:text="${item.productName}" style="vertical-align: top; padding-top: 1rem;">Blueprint</td>
-                <td style="vertical-align: top; padding-top: 1rem;">
+                <td th:text="${item.productName}" class="krtm-vertical-align-top-padding-top-1rem-7058">Blueprint</td>
+                <td class="krtm-vertical-align-top-padding-top-1rem-7058">
                     <span class="bp-owner-count" th:text="${item.ownerCount}">0</span>
                 </td>
-                <td style="vertical-align: top; padding-top: 0.5rem;">
+                <td class="krtm-vertical-align-top-padding-top-0-5rem-8539">
                     <details th:attr="data-product-key=${item.productKey}">
-                        <summary class="btn btn-ghost" style="cursor: pointer; display: inline-flex; align-items: center; min-height: unset; padding: 0.25rem 0.75rem; font-size: 0.8rem; width: auto;" th:text="#{general.details}">Details</summary>
+                        <summary class="btn btn-ghost krtm-cursor-pointer-display-inline-flex-align-ite-c175" th:text="#{general.details}">Details</summary>
                     </details>
                 </td>
             </tr>

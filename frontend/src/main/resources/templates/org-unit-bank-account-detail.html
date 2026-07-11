@@ -40,13 +40,13 @@
          the balance target and configurable visibility (REQ-BANK-035/-036). -->
     <div class="greeting hud-box flex-between">
         <div>
-            <p style="margin: 0 0 0.25rem;"><a th:href="@{/org-unit-bank}" class="text-muted"
-                  style="font-size: 0.75rem;" th:text="'&#8592; ' + #{bank.orgUnit.detail.back}">&#8592; Zur&uuml;ck zur &Uuml;bersicht</a></p>
+            <p class="krtm-margin-0-0-0-25rem-0b90"><a th:href="@{/org-unit-bank}" class="text-muted krtm-font-size-0-75rem-de0c"
+                  th:text="'&#8592; ' + #{bank.orgUnit.detail.back}">&#8592; Zur&uuml;ck zur &Uuml;bersicht</a></p>
             <h1 th:text="${acct.name()}">Staffel IRIDIUM</h1>
             <!-- The page only ever lists active accounts, so the always-"Aktiv" status pill is
                  dropped; the header keeps the type chip + account number. -->
-            <p class="text-muted" style="margin: 0.25rem 0 0; font-size: 0.8rem;">
-                <span class="chip" style="font-size: 0.55rem;"
+            <p class="text-muted krtm-margin-0-25rem-0-0-font-size-0-8rem-cb15">
+                <span class="chip krtm-font-size-0-55rem-eff3"
                       th:text="#{'bank.account.type.' + ${acct.type()}}">Staffel</span>
                 <span th:text="${acct.accountNo()}" data-testid="org-unit-bank-detail-no">KB-0001</span>
             </p>
@@ -96,7 +96,7 @@
                 <div class="kpi-value r-noziel" th:unless="${hasTarget}" th:text="#{bank.orgUnit.noTarget}">&mdash; kein Ziel</div>
                 <div class="bank-target-bar" th:if="${hasTarget}" aria-hidden="true">
                     <div class="bank-target-bar-fill"
-                         th:attr="style='width:' + ${pct > 100 ? 100 : (pct < 0 ? 0 : pct)} + '%'"></div>
+                         th:attr="data-krtm-width=${pct > 100 ? 100 : (pct < 0 ? 0 : pct)}"></div>
                 </div>
             </div>
             <div class="kpi-total">
@@ -132,7 +132,7 @@
              data-testid="org-unit-bank-cartel-ladder"
              th:with="t1=${acct.employeeApprovalCeiling()},t2=${acct.areaLeadApprovalCeiling()}">
             <h3 class="sub-h" th:text="#{bank.cartelLadder.title}">Freigabe-Stufen</h3>
-            <p class="text-muted" style="font-size: 0.8rem;" th:text="#{bank.cartelLadder.hint}">
+            <p class="text-muted krtm-font-size-0-8rem-0fed" th:text="#{bank.cartelLadder.hint}">
                 Auszahlungen und Transfers vom KRT-Konto werden je nach H&ouml;he des Betrags freigegeben.</p>
             <div class="vis-row">
                 <span class="v-label" th:text="#{bank.cartelLadder.tier.employee}">Bankmitarbeiter</span>
@@ -177,7 +177,7 @@
             <div th:if="${settings.canConfigureVisibility() and settings.visibilityConfigurable()}" class="hud-box"
                  data-testid="org-unit-bank-visibility-settings">
                 <h3 class="sub-h" th:text="#{bank.orgUnit.settings.visibility.title}">Sichtbarkeit</h3>
-                <p class="text-muted" style="font-size: 0.8rem;" th:text="#{bank.orgUnit.settings.visibility.hint}">
+                <p class="text-muted krtm-font-size-0-8rem-0fed" th:text="#{bank.orgUnit.settings.visibility.hint}">
                     Lege fest, wer den Kontostand und die Detailansicht zus&auml;tzlich sehen darf.</p>
 
                 <!-- Role buckets + all-members in one toggle list. -->
@@ -188,9 +188,8 @@
                         <span class="vis-state">
                             <span th:if="${granted}" class="chip chip--success"
                                   th:text="#{bank.orgUnit.settings.visibility.granted}">Freigegeben</span>
-                            <form class="bank-ajax-form no-track" data-refresh="orgUnitBankSettings"
-                                  th:attr="data-endpoint='/api/proxy/org-units/bank/accounts/{id}/visibility/role/' + ${role},data-method=${granted ? 'DELETE' : 'POST'}"
-                                  style="display:inline;">
+                            <form class="bank-ajax-form no-track krtm-display-inline-2f87" data-refresh="orgUnitBankSettings"
+                                  th:attr="data-endpoint='/api/proxy/org-units/bank/accounts/{id}/visibility/role/' + ${role},data-method=${granted ? 'DELETE' : 'POST'}">
                                 <input type="hidden" name="_id" th:value="${acct.id()}">
                                 <button type="submit" class="btn btn-xs"
                                         th:classappend="${granted} ? ' btn-ghost' : ' btn-outline'"
@@ -207,9 +206,9 @@
                     <span class="vis-state">
                         <span th:if="${settings.allMembersGranted()}" class="chip chip--success"
                               th:text="#{bank.orgUnit.settings.visibility.granted}">Freigegeben</span>
-                        <form class="bank-ajax-form no-track" data-refresh="orgUnitBankSettings"
+                        <form class="bank-ajax-form no-track krtm-display-inline-2f87" data-refresh="orgUnitBankSettings"
                               th:attr="data-endpoint='/api/proxy/org-units/bank/accounts/{id}/visibility/all-members/' + ${!settings.allMembersGranted()}"
-                              data-method="PUT" style="display:inline;">
+                              data-method="PUT">
                             <input type="hidden" name="_id" th:value="${acct.id()}">
                             <button type="submit" class="btn btn-xs"
                                     th:classappend="${settings.allMembersGranted()} ? ' btn-ghost' : ' btn-outline'"
@@ -225,9 +224,9 @@
                     <span class="vis-state">
                         <span th:if="${settings.areaMembersGranted()}" class="chip chip--success"
                               th:text="#{bank.orgUnit.settings.visibility.granted}">Freigegeben</span>
-                        <form class="bank-ajax-form no-track" data-refresh="orgUnitBankSettings"
+                        <form class="bank-ajax-form no-track krtm-display-inline-2f87" data-refresh="orgUnitBankSettings"
                               th:attr="data-endpoint='/api/proxy/org-units/bank/accounts/{id}/visibility/area-members/' + ${!settings.areaMembersGranted()}"
-                              data-method="PUT" style="display:inline;">
+                              data-method="PUT">
                             <input type="hidden" name="_id" th:value="${acct.id()}">
                             <button type="submit" class="btn btn-xs"
                                     th:classappend="${settings.areaMembersGranted()} ? ' btn-ghost' : ' btn-outline'"
@@ -242,9 +241,9 @@
                 <div th:if="${!#lists.isEmpty(settings.grantedUsers())}">
                     <div class="vis-row" th:each="u : ${settings.grantedUsers()}" data-testid="org-unit-vis-user-row">
                         <span class="v-label" th:text="${u.displayName()}">greluc</span>
-                        <form class="bank-ajax-form no-track" data-refresh="orgUnitBankSettings"
+                        <form class="bank-ajax-form no-track krtm-display-inline-2f87" data-refresh="orgUnitBankSettings"
                               th:attr="data-endpoint='/api/proxy/org-units/bank/accounts/{id}/visibility/user/' + ${u.userId()}"
-                              data-method="DELETE" style="display:inline;">
+                              data-method="DELETE">
                             <input type="hidden" name="_id" th:value="${acct.id()}">
                             <button type="submit" class="btn btn-xs btn-ghost"
                                     th:text="#{bank.orgUnit.settings.visibility.user.remove}">Entfernen</button>
@@ -287,7 +286,7 @@
                  fill-to-target goal. -->
             <div th:if="${settings.canSetTarget()}" class="hud-box" data-testid="org-unit-bank-target-settings">
                 <h3 class="sub-h" th:text="#{bank.orgUnit.settings.target.title}">Kontostandsziel</h3>
-                <p class="text-muted" style="font-size: 0.8rem;" th:text="#{bank.orgUnit.settings.target.hint}">
+                <p class="text-muted krtm-font-size-0-8rem-0fed" th:text="#{bank.orgUnit.settings.target.hint}">
                     Ziel, bis zu dem das Konto gef&uuml;llt werden soll. Wird allen Berechtigten angezeigt.</p>
                 <form class="bank-ajax-form no-track" data-refresh="orgUnitBankSettings"
                       data-endpoint="/api/proxy/org-units/bank/accounts/{id}/balance-target" data-method="PUT">

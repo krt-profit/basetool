@@ -59,12 +59,12 @@
                 <input type="hidden" name="transferFeeVersion" th:value="${transferFeeVersion}">
                 <input type="hidden" name="intakeSpecialCommandVersion" th:value="${intakeSpecialCommandVersion}">
 
-                <div class="form-group" style="max-width: 300px;">
+                <div class="form-group krtm-max-width-300px-c261">
                     <label for="ageYellowDays" th:text="#{admin.settings.orders.yellowDays}">Tage bis gelbe Markierung</label>
                     <input type="number" id="ageYellowDays" name="ageYellowDays" th:value="${ageYellowDays}" min="0" required>
                 </div>
 
-                <div class="form-group" style="max-width: 300px;">
+                <div class="form-group krtm-max-width-300px-c261">
                     <label for="ageRedDays" th:text="#{admin.settings.orders.redDays}">Tage bis rote Markierung</label>
                     <input type="number" id="ageRedDays" name="ageRedDays" th:value="${ageRedDays}" min="0" required>
                 </div>
@@ -73,7 +73,7 @@
                     <h2 th:text="#{admin.settings.refinery}">Raffinerie</h2>
                     <p class="mb-1 text-muted" th:text="#{admin.settings.refinery.description}">Konfiguration des Rundungsverhaltens (Units zu SCU).</p>
 
-                    <div class="form-group" style="max-width: 300px;">
+                    <div class="form-group krtm-max-width-300px-c261">
                         <label for="refineryRoundingMode" th:text="#{admin.settings.refinery.roundingMode}">Rundungsmodus (Units -> SCU)</label>
                         <select id="refineryRoundingMode" name="refineryRoundingMode" required>
                             <option value="UP" th:selected="${refineryRoundingMode == 'UP'}" th:text="#{admin.settings.refinery.rounding.up}">Aufrunden (Ceil)</option>
@@ -86,7 +86,7 @@
                     <h2 th:text="#{admin.settings.operations}">Operationen</h2>
                     <p class="mb-1 text-muted" th:text="#{admin.settings.operations.description}">Konfiguration der ingame-Überweisungsgebühr, die vom Auszahlungsbetrag jedes Teilnehmers abgezogen wird.</p>
 
-                    <div class="form-group" style="max-width: 300px;">
+                    <div class="form-group krtm-max-width-300px-c261">
                         <label for="transferFeePercent" th:text="#{admin.settings.operations.transferFeeRate}">Überweisungsgebühr (%)</label>
                         <input type="number" id="transferFeePercent" name="transferFeePercent" th:value="${transferFeePercent}" min="0" max="99.99" step="0.01" required>
                     </div>
@@ -96,7 +96,7 @@
                     <h2 th:text="#{admin.settings.joborder}">Auftragsannahme</h2>
                     <p class="mb-1 text-muted" th:text="#{admin.settings.joborder.intakeSpecialCommand.description}">Spezialkommando, dem anonym erstellte Aufträge zugewiesen werden.</p>
 
-                    <div class="form-group" style="max-width: 300px;">
+                    <div class="form-group krtm-max-width-300px-c261">
                         <label for="intakeSpecialCommandId" th:text="#{admin.settings.joborder.intakeSpecialCommand}">Eingangs-Spezialkommando</label>
                         <select id="intakeSpecialCommandId" name="intakeSpecialCommandId">
                             <option value="" th:text="#{admin.settings.joborder.intakeSpecialCommand.none}">— Keines —</option>
@@ -124,11 +124,11 @@
             <p class="mb-1 text-muted"
                th:text="#{admin.settings.squadron.promotion.description}">Schaltet das gesamte Beförderungssystem (Themenbereiche, Bewertungen, Rangvoraussetzungen) für die Mitglieder einer Staffel an oder aus. Bestehende Daten bleiben beim Deaktivieren erhalten und werden beim Aktivieren wieder sichtbar.</p>
 
-            <div th:if="${#lists.isEmpty(squadrons)}" style="color: var(--color-gray-2); font-style: italic;"
+            <div th:if="${#lists.isEmpty(squadrons)}" class="krtm-color-var-color-gray-2-font-style-italic-46f0"
                  th:text="#{admin.settings.squadron.promotion.empty}">Keine Staffeln gefunden.</div>
 
             <div th:unless="${#lists.isEmpty(squadrons)}" class="table-responsive">
-            <table class="krt-table" style="max-width: 600px;">
+            <table class="krt-table krtm-max-width-600px-2e56">
                 <thead>
                     <tr>
                         <th th:text="#{admin.settings.squadron.column.shorthand}">Kürzel</th>
@@ -141,7 +141,7 @@
                         <td th:text="${squadron.shorthand}">IRI</td>
                         <td th:text="${squadron.name}">IRIDIUM</td>
                         <td>
-                            <label class="flex-gap-sm" style="cursor:pointer;">
+                            <label class="flex-gap-sm krtm-cursor-pointer-74fa">
                                 <input type="checkbox"
                                        class="squadron-promotion-toggle"
                                        th:attr="data-squadron-id=${squadron.id}"
@@ -166,11 +166,11 @@
             <p class="mb-1 text-muted"
                th:text="#{admin.settings.squadron.profit.description}">Legt fest, welche Staffeln als verantwortliche (bearbeitende) Einheit eines Auftrags ausgewählt werden können.</p>
 
-            <div th:if="${#lists.isEmpty(squadrons)}" style="color: var(--color-gray-2); font-style: italic;"
+            <div th:if="${#lists.isEmpty(squadrons)}" class="krtm-color-var-color-gray-2-font-style-italic-46f0"
                  th:text="#{admin.settings.squadron.profit.empty}">Keine Staffeln gefunden.</div>
 
             <div th:unless="${#lists.isEmpty(squadrons)}" class="table-responsive">
-            <table class="krt-table" style="max-width: 600px;">
+            <table class="krt-table krtm-max-width-600px-2e56">
                 <thead>
                     <tr>
                         <th th:text="#{admin.settings.squadron.column.shorthand}">Kürzel</th>
@@ -183,7 +183,7 @@
                         <td th:text="${squadron.shorthand}">IRI</td>
                         <td th:text="${squadron.name}">IRIDIUM</td>
                         <td>
-                            <label class="flex-gap-sm" style="cursor:pointer;">
+                            <label class="flex-gap-sm krtm-cursor-pointer-74fa">
                                 <input type="checkbox"
                                        class="squadron-profit-toggle"
                                        th:attr="data-squadron-id=${squadron.id}"
@@ -207,11 +207,11 @@
             <p class="mb-1 text-muted"
                th:text="#{admin.settings.sk.profit.description}">Legt fest, welche Spezialkommandos Aufträge abarbeiten dürfen. SKs anderer Bereiche können Aufträge aufgeben, aber nicht bearbeiten.</p>
 
-            <div th:if="${#lists.isEmpty(specialCommands)}" style="color: var(--color-gray-2); font-style: italic;"
+            <div th:if="${#lists.isEmpty(specialCommands)}" class="krtm-color-var-color-gray-2-font-style-italic-46f0"
                  th:text="#{admin.settings.sk.profit.empty}">Keine Spezialkommandos gefunden.</div>
 
             <div th:unless="${#lists.isEmpty(specialCommands)}" class="table-responsive">
-            <table class="krt-table" style="max-width: 600px;">
+            <table class="krt-table krtm-max-width-600px-2e56">
                 <thead>
                     <tr>
                         <th th:text="#{admin.settings.squadron.column.shorthand}">Kürzel</th>
@@ -224,7 +224,7 @@
                         <td th:text="${sk.shorthand}">SK</td>
                         <td th:text="${sk.name}">Spezialkommando</td>
                         <td>
-                            <label class="flex-gap-sm" style="cursor:pointer;">
+                            <label class="flex-gap-sm krtm-cursor-pointer-74fa">
                                 <input type="checkbox"
                                        class="sk-profit-toggle"
                                        th:attr="data-sk-id=${sk.id}"

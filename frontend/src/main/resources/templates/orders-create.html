@@ -108,20 +108,20 @@
         <div class="form-container">
             <!-- In edit mode the order kind is fixed to ITEM (only item orders are edited via this
                  page reuse), so the toggle is hidden but the item radio is pre-checked. -->
-            <div class="form-group" th:style="${editOrderId != null} ? 'display:none' : ''">
+            <div class="form-group" th:classappend="${editOrderId != null} ? 'krtm-hidden' : ''">
                 <label th:text="#{orders.create.kind}">Auftragsart</label>
-                <div class="flex-gap-sm" style="display:flex; gap:1.5rem;">
-                    <label style="display:flex; align-items:center; gap:0.5rem; font-weight:400;">
+                <div class="flex-gap-sm krtm-display-flex-gap-1-5rem-7e37">
+                    <label class="krtm-display-flex-align-items-center-gap-0-5rem-f-0218">
                         <input type="radio" name="orderModeToggle" value="material"
                                th:attr="checked=${editOrderId == null} ? 'checked' : null"
-                               data-trigger="order-mode-toggle" style="width:auto;"
+                               data-trigger="order-mode-toggle" class="krtm-width-auto-7e37"
                                data-testid="order-mode-material" />
                         <span th:text="#{orders.create.kind.material}">Materialauftrag</span>
                     </label>
-                    <label style="display:flex; align-items:center; gap:0.5rem; font-weight:400;">
+                    <label class="krtm-display-flex-align-items-center-gap-0-5rem-f-0218">
                         <input type="radio" name="orderModeToggle" value="item"
                                th:attr="checked=${editOrderId != null} ? 'checked' : null"
-                               data-trigger="order-mode-toggle" style="width:auto;"
+                               data-trigger="order-mode-toggle" class="krtm-width-auto-7e37"
                                data-testid="order-mode-item" />
                         <span th:text="#{orders.create.kind.item}">Item-Auftrag</span>
                     </label>
@@ -143,13 +143,13 @@
                     <input type="text" id="handle" th:field="*{handle}" autocomplete="off" required>
                 </div>
                 
-                <h3 style="color: var(--color-gray-1); font-family: var(--font-body); font-weight: 700; margin-top: 2rem; margin-bottom: 1rem;" th:text="#{orders.create.materials.title}">Materialien</h3>
+                <h3 class="krtm-color-var-color-gray-1-font-family-var-font-03e4" th:text="#{orders.create.materials.title}">Materialien</h3>
                 
-                <details class="form-group scmdb-import" style="border: 1px dashed var(--color-primary); padding: 1rem; border-radius: var(--radius-none); margin-bottom: 2rem;">
+                <details class="form-group scmdb-import krtm-border-1px-dashed-var-color-primary-padding-8290">
                     <summary th:text="#{orders.create.scmdb.label}">scmdb.net Export</summary>
                     <div class="mt-1">
-                        <textarea id="scmdb-import-text" rows="5" th:placeholder="#{orders.create.scmdb.placeholder}" style="width: 100%; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); padding: 0.75rem; box-sizing: border-box; resize: vertical;"></textarea>
-                        <button type="button" class="btn btn-ghost" style="margin-top: 1rem; width: 100%;" data-trigger="orders-import-scmdb" th:text="#{orders.create.scmdb.button}">Materialien extrahieren</button>
+                        <textarea id="scmdb-import-text" rows="5" th:placeholder="#{orders.create.scmdb.placeholder}" class="krtm-width-100-background-color-var-color-surface-101d"></textarea>
+                        <button type="button" class="btn btn-ghost krtm-margin-top-1rem-width-100-a81a" data-trigger="orders-import-scmdb" th:text="#{orders.create.scmdb.button}">Materialien extrahieren</button>
                     </div>
                 </details>
                 
@@ -189,7 +189,7 @@
 
                 <div class="mt-2-flex-gap">
                     <button type="submit" class="btn btn--cta" data-testid="order-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.create.save}">Speichern</span></button>
-                    <a sec:authorize="isAuthenticated()" th:href="@{/orders}" class="btn btn-ghost" style="text-align:center; display:flex; align-items:center; justify-content:center;" th:text="#{orders.create.cancel}">Abbrechen</a>
+                    <a sec:authorize="isAuthenticated()" th:href="@{/orders}" class="btn btn-ghost krtm-text-align-center-display-flex-align-items-c-a651" th:text="#{orders.create.cancel}">Abbrechen</a>
                 </div>
             </form>
             </div>
@@ -209,7 +209,7 @@
                     <input type="text" id="item-handle" th:field="*{handle}" autocomplete="off" required>
                 </div>
 
-                <h3 style="color: var(--color-gray-1); font-family: var(--font-body); font-weight: 700; margin-top: 2rem; margin-bottom: 1rem;" th:text="#{orders.create.items.title}">Items</h3>
+                <h3 class="krtm-color-var-color-gray-1-font-family-var-font-03e4" th:text="#{orders.create.items.title}">Items</h3>
 
                 <div th:if="${!hasOrderableItems}" class="hud-box hud-box-error">
                     <p th:text="#{orders.create.item.noItems}">Keine bestellbaren Items verfügbar.</p>
@@ -226,7 +226,7 @@
 
                 <div class="mt-2-flex-gap">
                     <button type="submit" class="btn btn--cta" data-testid="order-item-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.create.save}">Speichern</span></button>
-                    <a sec:authorize="isAuthenticated()" th:href="@{/orders}" class="btn btn-ghost" style="text-align:center; display:flex; align-items:center; justify-content:center;" th:text="#{orders.create.cancel}">Abbrechen</a>
+                    <a sec:authorize="isAuthenticated()" th:href="@{/orders}" class="btn btn-ghost krtm-text-align-center-display-flex-align-items-c-a651" th:text="#{orders.create.cancel}">Abbrechen</a>
                 </div>
             </form>
             </div>
@@ -234,13 +234,13 @@
     </div>
     
     <!-- Template for new material options -->
-    <select id="material-options-template" style="display: none;">
+    <select id="material-options-template" class="krtm-display-none-5790">
         <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
         <option th:each="m : ${materials}" th:value="${m.id}" th:data-quantity-type="${m.quantityType}" th:text="${m.name}"></option>
     </select>
 
     <!-- Template for new min-quality options (650 / Keine), cloned by addMaterialRow() -->
-    <select id="minquality-options-template" style="display: none;">
+    <select id="minquality-options-template" class="krtm-display-none-5790">
         <option value="650">650</option>
         <option value="" th:text="#{orders.material.minQuality.none}">Keine</option>
     </select>
@@ -248,7 +248,7 @@
     <!-- Placeholder-only template cloned by addItemLine(); the item options themselves are fetched
          on demand from the backend (see fetchItemOptions / GET /orders/item-search), so the picker
          no longer preloads — and silently truncates past an alphabetical cap — the whole catalog. -->
-    <select id="item-options-template" style="display: none;">
+    <select id="item-options-template" class="krtm-display-none-5790">
         <option value="" th:text="#{orders.create.item.select}">-- Item wählen --</option>
     </select>
 </main>

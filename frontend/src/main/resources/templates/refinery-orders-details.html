@@ -203,7 +203,7 @@
                         <label for="profitPreview" th:text="#{refineryorder.form.profit}">Gewinn/Verlust (aUEC)</label>
                         <input type="text" id="profitPreview" readonly tabindex="-1"
                                th:title="#{refineryorder.form.profit.help}"
-                               style="background-color: var(--color-gray-4); color: var(--color-gray-1); border: 1px solid var(--color-primary); border-left-width: 4px; min-height: 44px;">
+                               class="krtm-background-color-var-color-gray-4-color-var-deb9">
                     </div>
                 </div>
 
@@ -216,7 +216,7 @@
                                 <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}" th:readonly="${!canEdit}">
                                 <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}" th:readonly="${!canEdit}">
                             </div>
-                            <button th:if="${canEdit}" type="button" class="btn btn-ghost" data-trigger="rod-set-started-now" th:text="#{refineryorder.form.now}" style="padding: 0.5rem 1rem;">Jetzt</button>
+                            <button th:if="${canEdit}" type="button" class="btn btn-ghost krtm-padding-0-5rem-1rem-c865" data-trigger="rod-set-started-now" th:text="#{refineryorder.form.now}">Jetzt</button>
                         </div>
                     </div>
                     
@@ -232,7 +232,7 @@
 
                     <div class="form-group flex-1 mb-0">
                         <label th:text="#{refineryorder.form.endsAt}">Fertig am</label>
-                        <div id="endsAtDisplay" style="padding: 0.75rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; min-height: 44px; display: flex; align-items: center;">
+                        <div id="endsAtDisplay" class="krtm-padding-0-75rem-background-color-var-color-g-3181">
                             <span>-</span>
                         </div>
                     </div>
@@ -276,7 +276,7 @@
                                 th:attr="data-yield=${method.ratingYield},data-cost=${method.ratingCost},data-speed=${method.ratingSpeed}"></option>
                         </select>
                     </div>
-                    <div id="methodRatings" style="flex: 3; display: none; align-items: center; gap: 1.5rem; padding: 0.5rem 1rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); border-radius: var(--radius-none); min-height: 44px;">
+                    <div id="methodRatings" class="krtm-flex-3-display-none-align-items-center-gap-1-5b34">
                         <div class="stat-label">
                             <span th:text="#{refineryorder.rating.yield}">Ertrag</span>
                             <span id="ratingYieldVal" class="stat-value">-</span>
@@ -292,15 +292,15 @@
                     </div>
                 </div>
 
-                <div style="margin-top: 2rem; margin-bottom: 1rem;">
-                    <h3 style="color: var(--color-gray-1); font-family: var(--font-body); font-weight: bold; margin: 0;" th:text="#{refineryorder.form.materials.title}">Materialien</h3>
+                <div class="krtm-margin-top-2rem-margin-bottom-1rem-72de">
+                    <h3 class="krtm-color-var-color-gray-1-font-family-var-font-1f0d" th:text="#{refineryorder.form.materials.title}">Materialien</h3>
                 </div>
 
                 <div id="materials-container">
-                    <div th:each="good, stat : *{goods}" class="material-entry" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: var(--radius-none); background-color: var(--color-bg-dark-gray); margin-bottom: 1rem;">
+                    <div th:each="good, stat : *{goods}" class="material-entry krtm-border-1px-solid-var-color-gray-3-padding-1r-ae8b">
                         <div class="material-entry-header">
                             <span class="material-entry-title" th:text="#{refineryorder.form.material.entryTitle} + ' #' + ${stat.index + 1}">Material #1</span>
-                            <button th:if="${canEdit and stat.index > 0}" type="button" class="btn btn-quiet-danger remove-btn btn-icon" data-trigger="rod-remove-material" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;" th:title="#{refineryorder.form.material.remove}" th:aria-label="#{refineryorder.form.material.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                            <button th:if="${canEdit and stat.index > 0}" type="button" class="btn btn-quiet-danger remove-btn btn-icon krtm-padding-0-25rem-0-5rem-font-size-0-8rem-ba3b" data-trigger="rod-remove-material" th:title="#{refineryorder.form.material.remove}" th:aria-label="#{refineryorder.form.material.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                         </div>
 
                         <div class="material-row">
@@ -326,8 +326,8 @@
                         <div class="material-row mt-1-5">
                             <div class="form-group flex-2 mb-0">
                                 <label th:text="#{refineryorder.form.material.output}">Ausgangsmaterial</label>
-                                <div class="output-material-display" style="padding: 0.75rem; background-color: var(--color-bg-dark-gray); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; min-height: 44px; display: flex; align-items: center;">
-                                    <span th:id="'outputMaterialDisplay_' + ${stat.index}" style="opacity: 0.7;">-</span>
+                                <div class="output-material-display krtm-padding-0-75rem-background-color-var-color-b-8925">
+                                    <span th:id="'outputMaterialDisplay_' + ${stat.index}" class="krtm-opacity-0-7-ffc8">-</span>
                                 </div>
                             </div>
 
@@ -347,7 +347,7 @@
 
                             <div class="form-group flex-1 mb-0">
                                 <label th:for="'outputQuantityScu_' + ${stat.index}" th:text="#{refineryorder.form.material.outputQtyScu}">Erwartete Ausgangsmenge (SCU)</label>
-                                <input type="text" th:id="'outputQuantityScu_' + ${stat.index}" readonly style="background-color: var(--color-gray-4); cursor: not-allowed;">
+                                <input type="text" th:id="'outputQuantityScu_' + ${stat.index}" readonly class="krtm-background-color-var-color-gray-4-cursor-not-108c">
                             </div>
                         </div>
                     </div>
@@ -357,7 +357,7 @@
 
             </form>
 
-            <div style="margin-top: 2rem; display: flex; gap: 1rem; align-items: center;">
+            <div class="krtm-margin-top-2rem-display-flex-gap-1rem-align-52fa">
                 <th:block th:if="${canEdit}">
                     <button type="submit" form="refineryOrderMainForm" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.create.save}">Speichern</span></button>
                 </th:block>
@@ -367,24 +367,24 @@
                         <th:block th:replace="~{fragments/components :: button(label=#{refineryorder.action.cancel}, variant='danger', type='submit', extraClass=null)}"></th:block>
                     </form>
                 </th:block>
-                <a th:href="@{/refinery-orders}" class="btn btn-ghost" style="text-align:center; display:flex; align-items:center; justify-content:center;" th:text="#{profile.back}">Zurück</a>
+                <a th:href="@{/refinery-orders}" class="btn btn-ghost krtm-text-align-center-display-flex-align-items-c-a651" th:text="#{profile.back}">Zurück</a>
             </div>
         </div>
     </div>
 
-    <div id="storeModal" class="modal" th:style="${showStoreModal} ? 'display: flex;' : 'display: none;'">
-        <div class="modal-content form-container" style="max-width: 600px; padding: 2rem; background-color: var(--color-bg-dark-gray); border: 1px solid var(--color-gray-3); border-radius: var(--radius-none);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                <h2 style="margin: 0; color: var(--color-primary); font-family: var(--font-headline); text-transform: uppercase;" th:text="#{refineryorder.action.store}">Einlagern</h2>
-                <span class="close" data-trigger="rod-close-store" style="cursor: pointer; font-size: 1.5rem;">&times;</span>
+    <div id="storeModal" class="modal" th:classappend="${showStoreModal} ? 'krtm-modal-open' : 'krtm-hidden'">
+        <div class="modal-content form-container krtm-max-width-600px-padding-2rem-background-colo-7756">
+            <div class="krtm-display-flex-justify-content-space-between-a-aa0e">
+                <h2 class="krtm-margin-0-color-var-color-primary-font-family-a934" th:text="#{refineryorder.action.store}">Einlagern</h2>
+                <span class="close krtm-cursor-pointer-font-size-1-5rem-650b" data-trigger="rod-close-store">&times;</span>
             </div>
             
             <form id="storeForm" th:action="@{/refinery-orders/{id}/store(id=${orderId})}" method="post" th:object="${storeForm}" data-trigger="rod-disable-submit">
                 <div id="storeItemsContainer">
-                    <div th:each="item, stat : *{items}" class="store-item-block" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: var(--radius-none); background-color: var(--color-surface-input); margin-bottom: 1rem;">
+                    <div th:each="item, stat : *{items}" class="store-item-block krtm-border-1px-solid-var-color-gray-3-padding-1r-0499">
                         <div class="flex-between-mb">
-                            <h4 style="margin: 0; color: var(--color-gray-1); font-family: var(--font-body);" th:text="${item.materialName}"></h4>
-                            <button type="button" class="btn btn-ghost" style="padding: 0.2rem 0.5rem;" data-trigger="rod-duplicate-store" th:title="#{refineryorder.action.split}" th:if="${!item.amountFixed}">+</button>
+                            <h4 class="krtm-margin-0-color-var-color-gray-1-font-family-a861" th:text="${item.materialName}"></h4>
+                            <button type="button" class="btn btn-ghost krtm-padding-0-2rem-0-5rem-55b2" data-trigger="rod-duplicate-store" th:title="#{refineryorder.action.split}" th:if="${!item.amountFixed}">+</button>
                         </div>
                         
                         <input type="hidden" th:field="*{items[__${stat.index}__].materialId}" />
@@ -431,28 +431,28 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="form-group" style="margin-bottom: 0; margin-top: 1rem;">
+                        <div class="form-group krtm-margin-bottom-0-margin-top-1rem-7579">
                             <label th:for="'storeOrgUnit_' + ${stat.index}" th:text="#{refineryorder.store.orgUnit}">Org-Einheit</label>
                             <select th:id="'storeOrgUnit_' + ${stat.index}" class="store-org-unit-select" th:field="*{items[__${stat.index}__].owningOrgUnitId}">
                                 <option value="" th:text="#{refineryorder.store.orgUnit.placeholder}">-- Org-Einheit w&#228;hlen --</option>
                                 <option th:each="ou : ${storeOrgUnitOptions}" th:value="${ou.orgUnitId()}" th:text="${ou.orgUnitName()}"></option>
                             </select>
                         </div>
-                        <div class="form-group" style="margin-bottom: 0; margin-top: 1rem;">
+                        <div class="form-group krtm-margin-bottom-0-margin-top-1rem-7579">
                             <label th:for="'storeJobOrder_' + ${stat.index}" th:text="#{refineryorder.store.joborder}">Auftrag (Optional)</label>
                             <select th:id="'storeJobOrder_' + ${stat.index}" th:field="*{items[__${stat.index}__].jobOrderId}">
                                 <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
                                 <option th:each="jo : ${jobOrders}" th:if="${(item.jobOrderId != null and item.jobOrderId == jo.id) or (jo.requiredMaterialIds != null and #lists.contains(jo.requiredMaterialIds, item.materialId))}" th:value="${jo.id}" th:text="${jo.displayId + ' - ' + (jo.requestingOrgUnit != null ? jo.requestingOrgUnit.name() : '—')}"></option>
                             </select>
                         </div>
-                        <div class="form-group" style="margin-bottom: 0; margin-top: 1rem;">
+                        <div class="form-group krtm-margin-bottom-0-margin-top-1rem-7579">
                             <label th:for="'storeNote_' + ${stat.index}" th:text="#{refineryorder.store.note}">Notiz (Optional)</label>
                             <textarea th:id="'storeNote_' + ${stat.index}" th:field="*{items[__${stat.index}__].note}" maxlength="1000" rows="2" th:placeholder="#{refineryorder.store.note.placeholder}"></textarea>
                         </div>
                     </div>
                 </div>
                 
-                <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+                <div class="krtm-display-flex-gap-1rem-margin-top-2rem-84e2">
                     <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.create.save}">Speichern</span></button>
                     <button type="button" class="btn btn-ghost" data-trigger="rod-close-store" th:text="#{orders.create.cancel}">Abbrechen</button>
                 </div>

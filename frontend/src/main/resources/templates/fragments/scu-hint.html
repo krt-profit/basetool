@@ -22,7 +22,7 @@
 <span th:fragment="scuHint(hintId, startHidden)"
       class="scu-hint"
       th:id="${hintId}"
-      th:style="${startHidden} ? 'display:none;'"
+      th:classappend="${startHidden} ? 'krtm-hidden' : ''"
       tabindex="0"
       role="img"
       th:aria-label="#{material.scu.hint}">

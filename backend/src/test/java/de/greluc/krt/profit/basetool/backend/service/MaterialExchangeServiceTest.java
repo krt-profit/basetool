@@ -33,26 +33,34 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.event.MaterialExchangeInterestRegisteredEvent;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.model.Bereich;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeInterest;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOffer;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferKind;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
+import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
+import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeItemReleaseRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeOfferDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeOfferUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleasableItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeReleaseRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeInterestRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
+import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
@@ -73,12 +81,16 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
- * Unit coverage for {@link MaterialExchangeService}'s security-critical behaviour: the
- * interessenten anonymity redaction (names only for the owner), the owner-only write gates, the
- * item-ownership check on release, the self-interest block, and the optimistic-lock guard on a
- * remark edit.
+ * Unit coverage for the material-exchange domain's security-critical behaviour across the
+ * read/write split (#14): the interessenten anonymity redaction (names only for the owner) lives in
+ * {@link MaterialExchangeBoardService} and is exercised via that co-wired subject, while the
+ * owner-only write gates, the item-ownership check on release, the self-interest block and the
+ * optimistic-lock guard on a remark edit live in {@link MaterialExchangeService}. The write service
+ * is co-wired to the real board service so a mutation's redacted response goes through the
+ * identical projection.
  */
 @ExtendWith(MockitoExtension.class)
 class MaterialExchangeServiceTest {
@@ -90,13 +102,20 @@ class MaterialExchangeServiceTest {
   @Mock private AuthHelperService authHelperService;
   @Mock private AuditService auditService;
   @Mock private UserMapper userMapper;
-  @Mock private SquadronMapper squadronMapper;
+  @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
+  @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private BlueprintProductService blueprintProductService;
   @Mock private OwnerScopeService ownerScopeService;
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private ObjectProvider<MaterialExchangeService> selfProvider;
 
   @InjectMocks private MaterialExchangeService service;
+
+  // Read/write split (#14): the board/detail/counts/picker reads plus the interessenten-anonymity
+  // redaction moved to MaterialExchangeBoardService, built from the same mocks and co-wired into
+  // the write service below so both the moved read paths and the write→read projection keep
+  // exercising the real logic from this fixture.
+  @InjectMocks private MaterialExchangeBoardService boardService;
 
   private final UUID ownerId = UUID.randomUUID();
   private final UUID otherId = UUID.randomUUID();
@@ -107,11 +126,14 @@ class MaterialExchangeServiceTest {
   /** Builds a fresh owner + active offer fixture before each test. */
   @BeforeEach
   void setUp() {
+    // Mockito passes null for the board-service constructor arg (no @Mock of that type); wire the
+    // real co-built board service so the write service's write→read projection runs the real
+    // redaction/DTO mapping.
+    ReflectionTestUtils.setField(service, "boardService", boardService);
     owner = user(ownerId, "Anbieter");
     Material material = material("Agricium");
     InventoryItem item = item(owner, material, 796, 340.0);
     offer = offer(offerId, item, owner);
-    lenient().when(authHelperService.currentSquadronId()).thenReturn(Optional.empty());
     lenient()
         .when(userMapper.toReferenceDto(any()))
         .thenReturn(new UserReferenceDto(ownerId, "Anbieter", "Anbieter", "Anbieter", null));
@@ -125,7 +147,7 @@ class MaterialExchangeServiceTest {
     when(interestRepository.countByOfferId(offerId)).thenReturn(3L);
     when(interestRepository.existsByOfferIdAndInterestedUserId(offerId, otherId)).thenReturn(true);
 
-    MaterialExchangeOfferDto dto = service.detail(offerId);
+    MaterialExchangeOfferDto dto = boardService.detail(offerId);
 
     assertThat(dto.mine()).isFalse();
     assertThat(dto.interestCount()).isEqualTo(3);
@@ -147,11 +169,70 @@ class MaterialExchangeServiceTest {
                 interest(user(UUID.randomUUID(), "Mara")),
                 interest(user(UUID.randomUUID(), "Hex"))));
 
-    MaterialExchangeOfferDto dto = service.detail(offerId);
+    MaterialExchangeOfferDto dto = boardService.detail(offerId);
 
     assertThat(dto.mine()).isTrue();
     assertThat(dto.interestCount()).isEqualTo(2);
     assertThat(dto.interestedHandles()).containsExactly("Mara", "Hex");
+  }
+
+  /**
+   * The offer carries <b>every</b> badge-kind org unit the Anbieter belongs to (no "primary"
+   * Staffel): Staffel(n) first, then Spezialkommando(s), then Bereich(e), each name-sorted
+   * (REQ-MARKET-001). A member of two Staffeln, one SK and one Bereich surfaces all four
+   * affiliation badges — in that kind order — to any viewer.
+   */
+  @Test
+  void detail_ownerOrgUnits_listsStaffelnThenSksThenBereicheNameSorted() {
+    UUID staffelBravoId = UUID.randomUUID();
+    UUID staffelAlphaId = UUID.randomUUID();
+    UUID skId = UUID.randomUUID();
+    UUID bereichId = UUID.randomUUID();
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
+    when(offerRepository.findWithDetailById(offerId)).thenReturn(Optional.of(offer));
+    when(interestRepository.countByOfferId(offerId)).thenReturn(0L);
+    // Rows returned in a deliberately unsorted order to prove the service imposes the ordering.
+    when(orgUnitMembershipRepository.findAllByIdUserIdInAndKindIn(any(), any()))
+        .thenReturn(
+            List.of(
+                membership(ownerId, bereichId, OrgUnitKind.BEREICH),
+                membership(ownerId, staffelBravoId, OrgUnitKind.SQUADRON),
+                membership(ownerId, skId, OrgUnitKind.SPECIAL_COMMAND),
+                membership(ownerId, staffelAlphaId, OrgUnitKind.SQUADRON)));
+    when(orgUnitRepository.findAllById(any()))
+        .thenReturn(
+            List.of(
+                bereich(bereichId, "Profit", "PROFIT"),
+                squadron(staffelBravoId, "Bravo", "BRV"),
+                specialCommand(skId, "Zulu Kommando", "ZK"),
+                squadron(staffelAlphaId, "Alpha", "ALP")));
+
+    MaterialExchangeOfferDto dto = boardService.detail(offerId);
+
+    assertThat(dto.ownerOrgUnits())
+        .extracting(OrgUnitReferenceDto::shorthand)
+        .containsExactly("ALP", "BRV", "ZK", "PROFIT");
+    assertThat(dto.ownerOrgUnits())
+        .extracting(OrgUnitReferenceDto::kind)
+        .containsExactly(
+            OrgUnitKind.SQUADRON,
+            OrgUnitKind.SQUADRON,
+            OrgUnitKind.SPECIAL_COMMAND,
+            OrgUnitKind.BEREICH);
+  }
+
+  /** An Anbieter with no org-unit membership surfaces no affiliation badges (empty, never null). */
+  @Test
+  void detail_ownerWithoutMembership_hasEmptyOrgUnits() {
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
+    when(offerRepository.findWithDetailById(offerId)).thenReturn(Optional.of(offer));
+    when(interestRepository.countByOfferId(offerId)).thenReturn(0L);
+    when(orgUnitMembershipRepository.findAllByIdUserIdInAndKindIn(any(), any()))
+        .thenReturn(List.of());
+
+    MaterialExchangeOfferDto dto = boardService.detail(offerId);
+
+    assertThat(dto.ownerOrgUnits()).isEmpty();
   }
 
   /** Releasing an item the caller does not own is forbidden. */
@@ -326,7 +407,7 @@ class MaterialExchangeServiceTest {
     when(offerRepository.countByStatusAndOwnerId(MaterialExchangeOfferStatus.ACTIVE, ownerId))
         .thenReturn(3L);
 
-    var counts = service.counts();
+    var counts = boardService.counts();
 
     assertThat(counts.all()).isEqualTo(7);
     assertThat(counts.mine()).isEqualTo(3);
@@ -344,7 +425,7 @@ class MaterialExchangeServiceTest {
     when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
     when(offerRepository.findWithDetailById(offerId)).thenReturn(Optional.of(offer));
 
-    MaterialExchangeOfferDto dto = service.detail(offerId);
+    MaterialExchangeOfferDto dto = boardService.detail(offerId);
 
     assertThat(dto.amount()).as("shown amount is clamped to remaining stock").isEqualTo(60.0);
   }
@@ -355,7 +436,7 @@ class MaterialExchangeServiceTest {
     when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
     when(offerRepository.findWithDetailById(offerId)).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> service.detail(offerId)).isInstanceOf(NotFoundException.class);
+    assertThatThrownBy(() -> boardService.detail(offerId)).isInstanceOf(NotFoundException.class);
   }
 
   /**
@@ -373,7 +454,7 @@ class MaterialExchangeServiceTest {
         .thenReturn(List.of(item));
     when(offerRepository.findInventoryItemIdsWithStatus(any(), any())).thenReturn(Set.of());
 
-    List<MaterialExchangeReleasableItemDto> items = service.myReleasableItems(null);
+    List<MaterialExchangeReleasableItemDto> items = boardService.myReleasableItems(null);
 
     assertThat(items).hasSize(1);
     assertThat(items.get(0).quantityType()).isEqualTo(QuantityType.PIECE);
@@ -652,5 +733,36 @@ class MaterialExchangeServiceTest {
     interest.setId(UUID.randomUUID());
     interest.setInterestedUser(user);
     return interest;
+  }
+
+  private static OrgUnitMembership membership(UUID userId, UUID orgUnitId, OrgUnitKind kind) {
+    OrgUnitMembership membership = new OrgUnitMembership();
+    membership.setId(new OrgUnitMembershipId(userId, orgUnitId));
+    membership.setKind(kind);
+    return membership;
+  }
+
+  private static Squadron squadron(UUID id, String name, String shorthand) {
+    Squadron squadron = new Squadron();
+    squadron.setId(id);
+    squadron.setName(name);
+    squadron.setShorthand(shorthand);
+    return squadron;
+  }
+
+  private static SpecialCommand specialCommand(UUID id, String name, String shorthand) {
+    SpecialCommand specialCommand = new SpecialCommand();
+    specialCommand.setId(id);
+    specialCommand.setName(name);
+    specialCommand.setShorthand(shorthand);
+    return specialCommand;
+  }
+
+  private static Bereich bereich(UUID id, String name, String shorthand) {
+    Bereich bereich = new Bereich();
+    bereich.setId(id);
+    bereich.setName(name);
+    bereich.setShorthand(shorthand);
+    return bereich;
   }
 }

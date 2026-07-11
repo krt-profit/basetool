@@ -118,15 +118,15 @@
                     </select>
                 </div>
                 
-                <div class="form-group" th:unless="*{isGlobal}" style="display: flex; align-items: center; gap: 0.5rem; margin-top: 1rem;">
-                    <input type="checkbox" id="personal" th:field="*{personal}" style="width: auto; margin: 0;">
-                    <label for="personal" th:text="#{inventory.personal.label}" style="margin: 0; display: inline-block;">Als persönlicher Eintrag markieren</label>
-                    <span style="font-size: 0.8rem; color: var(--color-gray-2); margin-left: 0.5rem;" th:text="#{inventory.personal.help}">Dieser Eintrag ist nur für dich sichtbar und taucht nicht im globalen Lager auf.</span>
+                <div class="form-group krtm-display-flex-align-items-center-gap-0-5rem-m-c9b5" th:unless="*{isGlobal}">
+                    <input type="checkbox" id="personal" th:field="*{personal}" class="krtm-width-auto-margin-0-5449">
+                    <label for="personal" th:text="#{inventory.personal.label}" class="krtm-margin-0-display-inline-block-00ba">Als persönlicher Eintrag markieren</label>
+                    <span class="krtm-font-size-0-8rem-color-var-color-gray-2-marg-f610" th:text="#{inventory.personal.help}">Dieser Eintrag ist nur für dich sichtbar und taucht nicht im globalen Lager auf.</span>
                 </div>
                 
                 <div class="mt-2-flex-gap">
                     <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{general.save}">Speichern</span></button>
-                    <a th:href="@{/inventory}" data-trigger="history-back" class="btn btn-ghost" style="text-align:center; display:flex; align-items:center; justify-content:center;" th:text="#{general.cancel}">Abbrechen</a>
+                    <a th:href="@{/inventory}" data-trigger="history-back" class="btn btn-ghost krtm-text-align-center-display-flex-align-items-c-a651" th:text="#{general.cancel}">Abbrechen</a>
                 </div>
             </form>
         </div>

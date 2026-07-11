@@ -31,18 +31,32 @@ Every `ACTIVE` offer is visible to every real member (`KRT_MEMBER`) regardless o
 org unit — the board is a single org-wide marketplace, not staffel-scoped. Authenticated-but-roleless
 guests do **not** see the board. The board shows per offer: material, quality (0–1000), quantity in
 the material's own unit (SCU for bulk materials, Stück/piece for `PIECE` materials — never a
-hardcoded SCU), the anbieter (username) + squadron badge, when it was released, and the interessenten
-count.
+hardcoded SCU), the anbieter (username) followed by their org-unit affiliation badges, when it was
+released, and the interessenten count.
+
+The affiliation badges are derived from the **anbieter's own memberships**, not from the offer's
+stored owning org unit (which is `null` for an ownerless-personal Lager row and would leave the
+badge blank): there is **no "primary" Staffel** — a member who belongs to several Staffeln, Spezial-
+kommandos and/or Bereiche surfaces **all** of them, rendered **after** the username, Staffel(n) first
+(brand badge) then Spezialkommando(s) and Bereich(e) (neutral `squadron-badge-sk` badge), each group
+name-sorted. Only the three badge kinds `SQUADRON` / `SPECIAL_COMMAND` / `BEREICH` are surfaced — the
+Organisationsleitung is deliberately not shown as a badge. The badges are batch-resolved (one
+membership query + one org-unit query per board page) so the board stays free of the per-offer N+1
+(REQ-DATA-003).
 
 **Acceptance**
 - [ ] A `KRT_MEMBER` sees offers from every squadron; a `GUEST` gets 403 on `/materialboerse`.
 - [ ] The board read applies no OrgUnit scope filter.
+- [ ] The anbieter's every Staffel, Spezialkommando and Bereich membership renders as a badge after
+the username (Staffel first, then SK, then Bereich, each name-sorted); an Organisationsleitung
+membership is not badged; an anbieter with no such membership shows no badge, and a
+legacy/ownerless-stamped offer still shows the anbieter's badges.
 - [ ] A `PIECE` material's quantity renders as an integer count in the piece unit, an SCU material's
 with the SCU unit — the amount unit follows `Material.quantityType`, matching the Lager
 (#1182).
 
 **Enforced by:** `MaterialExchangeServiceTest`, `MaterialboersePageControllerMvcTest` · **Code:**
-`MaterialExchangeService#board`, `MaterialExchangeController`, `MaterialboersePageController`
+`MaterialExchangeBoardService#board`, `MaterialExchangeController`, `MaterialboersePageController`
 
 ### REQ-MARKET-002 — Release a Lager row (whole or partial, with a Markdown remark)
 
@@ -119,7 +133,8 @@ negotiation; a member cannot register interest in their own offer. Registration 
 - [ ] A duplicate interest registration is a no-op (unique `(offer, user)`).
 
 **Enforced by:** `MaterialExchangeServiceTest`, `MaterialExchangeRepositoryDataTest` · **Code:**
-`MaterialExchangeService#detail/registerInterest`, `MaterialExchangeInterest`
+`MaterialExchangeBoardService#detail`, `MaterialExchangeService#registerInterest`,
+`MaterialExchangeInterest`
 
 ### REQ-MARKET-007 — Offer lifecycle (edit / deactivate), owner-only, optimistic-locked
 

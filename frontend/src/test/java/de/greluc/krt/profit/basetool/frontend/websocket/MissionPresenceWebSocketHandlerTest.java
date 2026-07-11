@@ -370,6 +370,47 @@ class MissionPresenceWebSocketHandlerTest {
   }
 
   @Test
+  void presenceFocusFrames_areRateLimitedPerSession_boundingTheSectionMap() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    FakeSession alice = openSession(missionId, oidcUser("user-1", "Alice"));
+    openSession(missionId, oidcUser("user-2", "Bob"));
+
+    // A crafted client loops focus frames each carrying a UNIQUE section key — the vector that,
+    // without a bound, grows the per-mission presence map indefinitely and forces a full-map
+    // snapshot rebuild + broadcast on every frame (O(N^2) amplification from a single socket).
+    int emitted = MissionPresenceWebSocketHandler.PRESENCE_BURST + 60;
+    for (int i = 0; i < emitted; i++) {
+      handler.handleTextMessage(
+          alice, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"s-" + i + "\"}"));
+    }
+
+    // Frames past the per-session token bucket are dropped (and counted), so only a bounded number
+    // of distinct sections ever reach the presence map — far fewer than were emitted.
+    assertThat(dropCounter(MetricNames.DROPPED_THROTTLED)).isGreaterThan(0.0);
+    assertThat(service.snapshot(missionId, Instant.now()).size())
+        .isGreaterThan(0)
+        .isLessThanOrEqualTo(MissionPresenceWebSocketHandler.PRESENCE_BURST + 1)
+        .isLessThan(emitted);
+  }
+
+  @Test
+  void presenceFocusFrame_withOverlongSectionKey_isIgnored() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    FakeSession alice = openSession(missionId, oidcUser("user-1", "Alice"));
+    FakeSession bob = openSession(missionId, oidcUser("user-2", "Bob"));
+    bob.sent.clear();
+
+    // One character past MAX_SECTION_KEY_LENGTH (64): dropped before it can enter the presence map
+    // or trigger a broadcast to peers.
+    String overlong = "x".repeat(65);
+    handler.handleTextMessage(
+        alice, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"" + overlong + "\"}"));
+
+    assertThat(service.snapshot(missionId, Instant.now())).isEmpty();
+    assertThat(bob.sent).isEmpty();
+  }
+
+  @Test
   void sendFailureToBrokenPeer_isCountedAsDroppedSendFailed() throws Exception {
     UUID missionId = UUID.randomUUID();
     FakeSession alice = openSession(missionId, oidcUser("user-1", "Alice"));

@@ -204,12 +204,12 @@
             </thead>
             <tbody>
             <tr th:each="mat : ${order.materials}"
-                class="material-row"
+                class="material-row krtm-cursor-pointer-74fa"
                 th:data-order-id="${order.id}"
                 th:data-material-id="${mat.material.id}"
                 th:data-amount-type="${mat.material.quantityType}"
                 data-trigger="od-toggle-inventory"
-                style="cursor: pointer;">
+               >
                 <td th:text="${mat.material.name}"></td>
                 <td>
                     <span th:if="${mat.minQuality != null}" th:text="${mat.minQuality}"></span>
@@ -225,7 +225,7 @@
                 </td>
                 <td th:if="${showClaims}" data-claim-control>
                     <span th:if="${mat.claims == null or mat.claims.isEmpty()}" class="text-muted">&#8212;</span>
-                    <span th:each="c : ${mat.claims}" class="claim-chip" style="display: inline-block; margin: 0 0.35rem 0.25rem 0;"
+                    <span th:each="c : ${mat.claims}" class="claim-chip krtm-display-inline-block-margin-0-0-35rem-0-25re-632d"
                           th:title="${c.claimingOrgUnit != null ? c.claimingOrgUnit.name : ''}">
                         <strong th:text="${c.claimingOrgUnit != null ? c.claimingOrgUnit.shorthand : '?'}">SQ</strong>:
                         <span th:switch="${mat.material.quantityType}">
@@ -252,8 +252,8 @@
                             <span th:case="'PIECE'" th:text="|${mat.openAmount != null ? #numbers.formatInteger(mat.openAmount, 1) : '0'} #{material.quantity.piece}|"></span>
                             <span th:case="*" th:text="|${mat.openAmount != null ? #numbers.formatDecimal(mat.openAmount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
                         </span>
-                        <button th:if="${isLogistician}" type="button" class="btn btn-ghost btn-claim-add" data-claim-control data-trigger="claim-add"
-                                style="padding:0.2rem 0.5rem;min-height:auto;font-size:0.85rem;"
+                        <button th:if="${isLogistician}" type="button" class="btn btn-ghost btn-claim-add krtm-padding-0-2rem-0-5rem-min-height-auto-font-s-ae33" data-claim-control data-trigger="claim-add"
+                               
                                 th:data-material-id="${mat.material.id}"
                                 th:data-quality="${mat.minQuality != null ? 'GOOD' : 'NONE'}"
                                 th:data-material-name="${mat.material.name}"
@@ -328,8 +328,8 @@
              signal that a recipe's RESOURCE ingredients were all unresolved / ITEM-only. -->
         <div th:if="${itemsWithoutMaterials != null and !itemsWithoutMaterials.isEmpty()}" class="alert alert-warning mt-2">
             <strong th:text="#{orders.detail.item.noMaterials.title}">Items ohne ableitbare Materialien</strong>
-            <p style="margin: 0.5rem 0 0;" th:text="#{orders.detail.item.noMaterials.body}">Für folgende Items konnten keine Materialien abgeleitet werden:</p>
-            <ul style="margin: 0.5rem 0 0; padding-left: 1.5rem;">
+            <p class="krtm-margin-0-5rem-0-0-7775" th:text="#{orders.detail.item.noMaterials.body}">Für folgende Items konnten keine Materialien abgeleitet werden:</p>
+            <ul class="krtm-margin-0-5rem-0-0-padding-left-1-5rem-2f51">
                 <li th:each="name : ${itemsWithoutMaterials}" th:text="${name}"></li>
             </ul>
         </div>
@@ -359,12 +359,12 @@
                  for that material regardless of quality (mirroring the MATERIAL drill-down), so two
                  quality buckets of one material expand the same list. -->
             <tr th:each="agg : ${order.aggregatedMaterials}"
-                class="aggregated-material-row"
+                class="aggregated-material-row krtm-cursor-pointer-74fa"
                 th:data-order-id="${order.id}"
                 th:data-material-id="${agg.material != null ? agg.material.id() : ''}"
                 th:data-amount-type="${agg.material != null ? agg.material.quantityType() : 'SCU'}"
                 data-trigger="od-toggle-inventory"
-                style="cursor: pointer;">
+               >
                 <td th:text="${agg.material != null ? agg.material.name() : '-'}"></td>
                 <td>
                     <span th:if="${agg.qualityRequirement == 'GOOD'}" class="quality-badge quality-good" th:text="#{orders.detail.quality.good}">Gut (650+)</span>
@@ -376,7 +376,7 @@
                 </td>
                 <td th:if="${showClaims}" data-claim-control>
                     <span th:if="${agg.claims == null or agg.claims.isEmpty()}" class="text-muted">&#8212;</span>
-                    <span th:each="c : ${agg.claims}" class="claim-chip" style="display: inline-block; margin: 0 0.35rem 0.25rem 0;"
+                    <span th:each="c : ${agg.claims}" class="claim-chip krtm-display-inline-block-margin-0-0-35rem-0-25re-632d"
                           th:title="${c.claimingOrgUnit != null ? c.claimingOrgUnit.name : ''}">
                         <strong th:text="${c.claimingOrgUnit != null ? c.claimingOrgUnit.shorthand : '?'}">SQ</strong>:
                         <span th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
@@ -403,8 +403,8 @@
                             <span th:case="'PIECE'" th:text="|${agg.openAmount != null ? #numbers.formatInteger(agg.openAmount, 1) : '0'} #{material.quantity.piece}|"></span>
                             <span th:case="*" th:text="|${agg.openAmount != null ? #numbers.formatDecimal(agg.openAmount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
                         </span>
-                        <button th:if="${isLogistician}" type="button" class="btn btn-ghost btn-claim-add" data-claim-control data-trigger="claim-add"
-                                style="padding:0.2rem 0.5rem;min-height:auto;font-size:0.85rem;"
+                        <button th:if="${isLogistician}" type="button" class="btn btn-ghost btn-claim-add krtm-padding-0-2rem-0-5rem-min-height-auto-font-s-ae33" data-claim-control data-trigger="claim-add"
+                               
                                 th:data-material-id="${agg.material != null ? agg.material.id() : ''}"
                                 th:data-quality="${agg.qualityRequirement}"
                                 th:data-material-name="${agg.material != null ? agg.material.name() : ''}"
@@ -430,8 +430,8 @@
              the entry's "Auftrag" back to "Kein Auftrag". -->
         <div th:if="${orphanedInventory != null and !orphanedInventory.isEmpty()}" class="alert alert-warning mt-2">
             <strong th:text="#{orders.detail.orphanedInventory.title}">Verknüpfter, nicht benötigter Bestand</strong>
-            <p style="margin: 0.5rem 0 0;" th:text="#{orders.detail.orphanedInventory.body}">Dieser Lagerbestand ist dem Auftrag zugeordnet, gehört aber zu keinem benötigten Material und erscheint daher nicht in den Materiallisten. Die Zuordnung kann im Lager aufgehoben werden.</p>
-            <div class="table-responsive" style="margin-top: 0.5rem;">
+            <p class="krtm-margin-0-5rem-0-0-7775" th:text="#{orders.detail.orphanedInventory.body}">Dieser Lagerbestand ist dem Auftrag zugeordnet, gehört aber zu keinem benötigten Material und erscheint daher nicht in den Materiallisten. Die Zuordnung kann im Lager aufgehoben werden.</p>
+            <div class="table-responsive krtm-margin-top-0-5rem-fc21">
                 <table class="data-table">
                     <thead>
                     <tr>
@@ -474,17 +474,17 @@
              section's outerHTML is replaced. -->
         <!-- The wrapper makes the heading a :first-child, which zeroes .section-title's 2rem top
              margin — restore it here so the section keeps the same gap as its unwrapped siblings. -->
-        <div id="assignees-section" th:fragment="assigneesSection" th:data-order-id="${order.id}" style="margin-top: 2rem;" th:unless="${requesterView}">
+        <div class="krtm-margin-top-2rem-daaa" id="assignees-section" th:fragment="assigneesSection" th:data-order-id="${order.id}" th:unless="${requesterView}">
         <h3 class="section-title" th:text="#{orders.detail.assignees.title}">Bearbeiter</h3>
         <div class="flex-col-gap">
-            <ul style="list-style-type: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.75rem;">
-                <li th:each="assignee : ${order.assignees}"
+            <ul class="krtm-list-style-type-none-padding-0-margin-0-disp-59be">
+                <li class="krtm-background-color-var-color-surface-input-pad-35c9" th:each="assignee : ${order.assignees}"
                     th:with="canEdit=${(currentUserId != null and assignee.user != null and currentUserId.equals(assignee.user.id)) or #authorization.expression('hasRole(''LOGISTICIAN'')')}"
-                    style="background-color: var(--color-surface-input); padding: 0.6rem 0.9rem; border: 1px solid var(--color-gray-3); border-radius: var(--radius-none);">
-                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
-                        <span style="font-weight: 600;" th:text="${assignee.user.effectiveName}">Name</span>
-                        <div style="display: flex; gap: 0.35rem; align-items: center;">
-                            <button th:if="${canEdit}" type="button" class="btn btn-ghost btn-icon" style="padding: 0.35rem; min-height: 36px;"
+                   >
+                    <div class="krtm-display-flex-align-items-center-justify-cont-5284">
+                        <span class="krtm-font-weight-600-21a1" th:text="${assignee.user.effectiveName}">Name</span>
+                        <div class="krtm-display-flex-gap-0-35rem-align-items-center-7598">
+                            <button th:if="${canEdit}" type="button" class="btn btn-ghost btn-icon krtm-padding-0-35rem-min-height-36px-ebdf"
                                     data-trigger="oa-edit-note"
                                     th:data-user-id="${assignee.user.id}"
                                     th:data-user-name="${assignee.user.effectiveName}"
@@ -494,7 +494,7 @@
                                     th:aria-label="#{orders.detail.assignees.note.edit}">
                                 <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg>
                             </button>
-                            <button th:if="${canEdit and assignee.note != null and !assignee.note.isEmpty()}" type="button" class="btn btn-quiet-danger btn-icon" style="padding: 0.35rem; min-height: 36px;"
+                            <button th:if="${canEdit and assignee.note != null and !assignee.note.isEmpty()}" type="button" class="btn btn-quiet-danger btn-icon krtm-padding-0-35rem-min-height-36px-ebdf"
                                     data-trigger="oa-delete-note"
                                     th:data-user-id="${assignee.user.id}"
                                     th:data-version="${assignee.version}"
@@ -502,7 +502,7 @@
                                     th:aria-label="#{orders.detail.assignees.note.delete}">
                                 <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>
                             </button>
-                            <button th:if="${canEdit}" type="button" class="btn btn-quiet-danger btn-icon" style="padding: 0.35rem; min-height: 36px;"
+                            <button th:if="${canEdit}" type="button" class="btn btn-quiet-danger btn-icon krtm-padding-0-35rem-min-height-36px-ebdf"
                                     data-trigger="oa-remove-assignee"
                                     th:data-user-id="${assignee.user.id}"
                                     th:title="#{orders.detail.assignees.remove}"
@@ -511,16 +511,16 @@
                             </button>
                         </div>
                     </div>
-                    <p th:if="${assignee.note != null and !assignee.note.isEmpty()}"
-                       style="margin: 0.5rem 0 0; color: var(--color-gray-2); font-size: 0.9rem; white-space: pre-wrap; word-break: break-word;"
+                    <p class="krtm-margin-0-5rem-0-0-color-var-color-gray-2-fon-7578" th:if="${assignee.note != null and !assignee.note.isEmpty()}"
+                      
                        th:text="${assignee.note}">Notiz</p>
                 </li>
-                <li th:if="${order.assignees == null or order.assignees.isEmpty()}" style="color: var(--color-gray-2); padding: 0.5rem 0;" th:text="#{orders.detail.assignees.empty}">
+                <li class="krtm-color-var-color-gray-2-padding-0-5rem-0-7042" th:if="${order.assignees == null or order.assignees.isEmpty()}" th:text="#{orders.detail.assignees.empty}">
                     Bisher arbeitet niemand an diesem Auftrag.
                 </li>
             </ul>
 
-            <div style="display: flex; gap: 1rem; align-items: center; margin-top: 0.5rem; flex-wrap: wrap;">
+            <div class="krtm-display-flex-gap-1rem-align-items-center-mar-0f52">
                 <button th:if="${currentUserId != null and (order.assignees == null or !#lists.contains(order.assignees.![user.id], currentUserId))}"
                         type="button" class="btn btn-outline"
                         data-trigger="oa-add-me" th:data-user-id="${currentUserId}"
@@ -529,9 +529,9 @@
                 <!-- #1193: server-side user search (remote-users) replaces the preloaded ${users} full list; the roster is queried on demand via /users/search.
                      (a) The former th:if="${users != null and !users.isEmpty()}" gate is dropped - with the list gone it would always hide the picker; the sec:authorize logistician gate is kept so only logisticians see it.
                      (b) The per-option exclusion of already-assigned users cannot be reproduced in remote mode (server search returns all matches). This is acceptable: the add-assignee flow must tolerate/ignore an already-assigned pick. -->
-                <div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)"
-                     style="display: flex; gap: 0.5rem; align-items: center;">
-                    <select id="assignee-add-select" data-krt-combobox="remote-users" style="padding: 0.5rem 2.5rem 0.5rem 0.5rem; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1);">
+                <div class="krtm-display-flex-gap-0-5rem-align-items-center-3eb8" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)"
+                    >
+                    <select class="krtm-padding-0-5rem-2-5rem-0-5rem-0-5rem-backgrou-a9dd" id="assignee-add-select" data-krt-combobox="remote-users">
                         <option value="" disabled selected th:text="#{orders.detail.assignees.selectUser}">-- Nutzer wählen --</option>
                     </select>
                     <button type="button" class="btn btn-ghost" data-trigger="oa-add-user" th:text="#{orders.detail.assignees.addUser}">Hinzufügen</button>
@@ -643,13 +643,13 @@
         <div id="order-handovers-results" class="mt-2" th:unless="${requesterView}"><th:block th:fragment="materialHandoverSection">
         <h3 class="section-title" th:text="#{orders.detail.handovers.title}">Übergaben</h3>
 
-        <div sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+        <div class="krtm-margin-top-1-5rem-display-flex-gap-1rem-flex-767d" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
             <button type="button" class="btn btn-outline" data-testid="order-handover-open" data-trigger="od-open-handover"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clipboard-check"/></svg> <span th:text="#{orders.detail.handover}">Übergabe protokollieren</span></button>
             <a th:href="@{/orders/{id}/material-collection(id=${order.id})}" class="btn btn-ghost"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-list"/></svg> <span th:text="#{orders.detail.materialCollection}">Materialsammelübersicht</span></a>
         </div>
 
         <div th:if="${order.handovers != null and !order.handovers.isEmpty()}" class="mt-2">
-            <h3 style="display: none;" th:text="#{orders.detail.handovers.title}">Übergaben</h3>
+            <h3 class="krtm-display-none-5790" th:text="#{orders.detail.handovers.title}">Übergaben</h3>
             <div class="table-responsive">
                 <table class="data-table">
                     <thead>
@@ -667,7 +667,7 @@
                         <td th:text="${ho.recipientHandle}"></td>
                         <td th:text="${ho.recipientSquadron != null ? ho.recipientSquadron : '-'}"></td>
                         <td>
-                            <ul style="list-style-type: none; padding: 0; margin: 0;">
+                            <ul class="krtm-list-style-type-none-padding-0-margin-0-449e">
                                 <li th:each="item : ${ho.items}">
                                     <span th:text="${item.material.name}"></span>
                                     <span th:text="' (Qual. ' + ${item.quality} + ')'"></span>:
@@ -709,11 +709,11 @@
              renders for logisticians so the collection link stays reachable even after every item is
              delivered; only the handover button is gated on outstanding lines (it hides once the
              order is fully delivered). -->
-        <div sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
-            <button th:if="${hasOutstandingItemLines}" type="button" class="btn btn-outline" style="min-height: 44px;" data-testid="item-handover-open" data-trigger="open-modal-display" data-modal-id="item-handover-modal"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clipboard-check"/></svg> <span th:text="#{orders.detail.itemHandover}">Item-Übergabe protokollieren</span></button>
-            <a th:href="@{/orders/{id}/material-collection(id=${order.id})}" class="btn btn-ghost" style="min-height: 44px; display: inline-flex; align-items: center;"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-list"/></svg> <span th:text="#{orders.detail.materialCollection}">Materialsammelübersicht</span></a>
+        <div class="krtm-margin-top-1-5rem-display-flex-gap-1rem-flex-767d" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+            <button th:if="${hasOutstandingItemLines}" type="button" class="btn btn-outline krtm-min-height-44px-1df5" data-testid="item-handover-open" data-trigger="open-modal-display" data-modal-id="item-handover-modal"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clipboard-check"/></svg> <span th:text="#{orders.detail.itemHandover}">Item-Übergabe protokollieren</span></button>
+            <a th:href="@{/orders/{id}/material-collection(id=${order.id})}" class="btn btn-ghost krtm-min-height-44px-display-inline-flex-align-it-37c8"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-list"/></svg> <span th:text="#{orders.detail.materialCollection}">Materialsammelübersicht</span></a>
         </div>
-        <p sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:unless="${hasOutstandingItemLines}" class="text-muted" style="margin-top: 1rem;" th:text="#{orders.detail.itemHandover.allDelivered}">Alle Items wurden vollständig übergeben.</p>
+        <p sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:unless="${hasOutstandingItemLines}" class="text-muted krtm-margin-top-1rem-a6cb" th:text="#{orders.detail.itemHandover.allDelivered}">Alle Items wurden vollständig übergeben.</p>
 
         <div th:if="${order.itemHandovers != null and !order.itemHandovers.isEmpty()}" class="mt-2">
             <div class="table-responsive">
@@ -731,7 +731,7 @@
                         <td class="handover-time-span" th:data-utc="${ho.handoverTime}"></td>
                         <td th:text="${ho.recipientHandle}"></td>
                         <td>
-                            <ul style="list-style-type: none; padding: 0; margin: 0;">
+                            <ul class="krtm-list-style-type-none-padding-0-margin-0-449e">
                                 <li th:each="entry : ${ho.entries}">
                                     <span th:text="${entry.gameItem != null ? entry.gameItem.name() : '-'}"></span>:
                                     <span th:text="${#numbers.formatInteger(entry.amount, 1)}"></span>
@@ -758,10 +758,10 @@
     </div>
 </main>
 
-<div th:if="${isLogistician or requesterView}" id="edit-modal" class="modal" style="display: none;">
-    <div class="modal-content hud-box" style="width: 100%; max-width: 800px; max-height: 90vh; overflow-y: auto; position: relative;">
-        <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-gray-1); font-size: 1.5rem; cursor: pointer;" data-trigger="close-modal-display" data-modal-id="edit-modal">&times;</button>
-        <h2 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: var(--font-headline);" th:text="#{orders.detail.edit}">Auftrag bearbeiten</h2>
+<div th:if="${isLogistician or requesterView}" id="edit-modal" class="modal krtm-display-none-5790">
+    <div class="modal-content hud-box krtm-width-100-max-width-800px-max-height-90vh-ov-e53a">
+        <button type="button" class="btn-close krtm-position-absolute-right-1rem-top-1rem-backgr-0703" data-trigger="close-modal-display" data-modal-id="edit-modal">&times;</button>
+        <h2 class="krtm-color-var-color-primary-margin-bottom-1-5rem-c7ac" th:text="#{orders.detail.edit}">Auftrag bearbeiten</h2>
         
         <form id="edit-order-form" th:data-order-id="${order.id}" th:data-requester-view="${requesterView}" th:action="${requesterView} ? @{/orders/{id}/requested-update(id=${order.id})} : @{/orders/{id}/update(id=${order.id})}" method="post" th:object="${jobOrderForm}" class="krt-form">
             <input type="hidden" th:field="*{version}">
@@ -797,7 +797,7 @@
                 <span class="squadron-badge squadron-badge-muted"
                       th:title="${order.responsibleOrgUnit.name()}"
                       th:text="${order.responsibleOrgUnit.shorthand()}">IRI</span>
-                <span style="display: inline-block; margin-left: 0.5rem; color: var(--color-gray-2); font-size: 0.85rem;"
+                <span class="krtm-display-inline-block-margin-left-0-5rem-colo-d973"
                       th:text="#{orders.detail.responsible.readonly_hint}">(nur über Umschreiben)</span>
             </div>
 
@@ -811,19 +811,19 @@
                 <textarea id="edit-comment" th:field="*{comment}" rows="4" maxlength="1000" class="w-full"></textarea>
             </div>
 
-            <h3 style="color: var(--color-primary); margin-top: 2rem; margin-bottom: 1rem;" th:text="#{orders.detail.materials.title}">Materialien</h3>
+            <h3 class="krtm-color-var-color-primary-margin-top-2rem-marg-a8e8" th:text="#{orders.detail.materials.title}">Materialien</h3>
             <div id="materials-container">
-                <div th:each="mat, stat : *{materials}" class="material-row" style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 1rem; align-items: end; margin-bottom: 1rem; background: var(--color-surface-input); padding: 1rem; border: 1px solid var(--color-gray-3);">
+                <div th:each="mat, stat : *{materials}" class="material-row krtm-display-grid-grid-template-columns-2fr-1fr-1-450e">
                     <div>
                         <label th:text="#{orders.material.name}" class="form-label-sm">Material</label>
-                        <select th:field="*{materials[__${stat.index}__].materialId}" data-role="material-select" required style="width: 100%; padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
+                        <select class="krtm-width-100-padding-0-5rem-background-var-colo-11f1" th:field="*{materials[__${stat.index}__].materialId}" data-role="material-select" required>
                             <option value="" disabled selected>-- Material wählen --</option>
                             <option th:each="m : ${materials}" th:value="${m.id}" th:data-quantity-type="${m.quantityType}" th:text="${m.name}"></option>
                         </select>
                     </div>
                     <div>
                         <label th:text="#{orders.material.minQuality}" class="form-label-sm">Min. Qualität</label>
-                        <select th:field="*{materials[__${stat.index}__].minQuality}" style="width: 100%; padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
+                        <select class="krtm-width-100-padding-0-5rem-background-var-colo-11f1" th:field="*{materials[__${stat.index}__].minQuality}">
                             <option th:value="650" th:text="650">650</option>
                             <option value="" th:text="#{orders.material.minQuality.none}">Keine</option>
                         </select>
@@ -834,17 +834,17 @@
                             <span data-role="amount-unit"></span>
                             <th:block th:replace="~{fragments/scu-hint :: scuHint(null, true)}"></th:block>
                         </label>
-                        <input type="text" inputmode="decimal" data-scu-decimal step="0.001" data-role="material-amount" th:field="*{materials[__${stat.index}__].amount}" min="0.001" required style="width: 100%; padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
+                        <input class="krtm-width-100-padding-0-5rem-background-var-colo-11f1" type="text" inputmode="decimal" data-scu-decimal step="0.001" data-role="material-amount" th:field="*{materials[__${stat.index}__].amount}" min="0.001" required>
                     </div>
                     <div>
-                        <button type="button" class="btn btn-quiet-danger btn-icon remove-material-btn" style="padding: 0.5rem;" th:title="#{orders.detail.material.remove}" th:aria-label="#{orders.detail.material.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                        <button type="button" class="btn btn-quiet-danger btn-icon remove-material-btn krtm-padding-0-5rem-2fc7" th:title="#{orders.detail.material.remove}" th:aria-label="#{orders.detail.material.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                     </div>
                 </div>
             </div>
             
             <button type="button" id="add-material-btn" class="btn btn-outline mb-2" th:text="#{orders.create.addMaterial}">+ Material hinzufügen</button>
 
-            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1rem;">
+            <div class="krtm-display-flex-gap-1rem-justify-content-flex-e-c9de">
                 <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="edit-modal" th:text="#{orders.detail.cancel}">Abbrechen</button>
                 <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.detail.save}">Speichern</span></button>
             </div>
@@ -852,22 +852,22 @@
     </div>
 </div>
 
-<div id="status-warning-modal" class="modal" style="display: none; z-index: 1060;">
-    <div class="modal-content hud-box" style="width: 100%; max-width: 480px; position: relative; text-align: center;">
-        <h3 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: var(--font-headline); text-transform: uppercase; letter-spacing: 0.08em;" th:text="#{orders.status.warning.title}">STATUSWECHSEL BESTÄTIGEN</h3>
-        <p style="margin-bottom: 2rem; font-family: 'Lato', sans-serif; font-weight: 300; line-height: 1.6;" th:text="#{orders.status.warning.body}">Wenn Sie den Status auf Abgeschlossen oder Abgelehnt setzen, werden alle verknüpften Lagereinträge vom Auftrag getrennt. Diese Aktion kann nicht rückgängig gemacht werden.</p>
-        <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
-            <button type="button" class="btn btn-ghost" style="min-height: 44px; min-width: 120px;" data-trigger="od-cancel-status" th:text="#{orders.status.warning.cancel}">Abbrechen</button>
-            <button type="button" class="btn btn--cta" style="min-height: 44px; min-width: 120px;" data-trigger="od-confirm-status" th:text="#{orders.status.warning.confirm}">Bestätigen</button>
+<div id="status-warning-modal" class="modal krtm-display-none-z-index-1060-9a40">
+    <div class="modal-content hud-box krtm-width-100-max-width-480px-position-relative-e40c">
+        <h3 class="krtm-color-var-color-primary-margin-bottom-1-5rem-fe52" th:text="#{orders.status.warning.title}">STATUSWECHSEL BESTÄTIGEN</h3>
+        <p class="krtm-margin-bottom-2rem-font-family-lato-sans-ser-fdf3" th:text="#{orders.status.warning.body}">Wenn Sie den Status auf Abgeschlossen oder Abgelehnt setzen, werden alle verknüpften Lagereinträge vom Auftrag getrennt. Diese Aktion kann nicht rückgängig gemacht werden.</p>
+        <div class="krtm-display-flex-gap-1rem-justify-content-center-868d">
+            <button type="button" class="btn btn-ghost krtm-min-height-44px-min-width-120px-c0f4" data-trigger="od-cancel-status" th:text="#{orders.status.warning.cancel}">Abbrechen</button>
+            <button type="button" class="btn btn--cta krtm-min-height-44px-min-width-120px-c0f4" data-trigger="od-confirm-status" th:text="#{orders.status.warning.confirm}">Bestätigen</button>
         </div>
     </div>
 </div>
 
-<div id="material-delete-confirm-modal" class="modal" style="display: none; z-index: 1050;">
-    <div class="modal-content hud-box" style="width: 100%; max-width: 400px; position: relative; text-align: center;">
-        <h3 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: var(--font-headline);" th:text="#{orders.detail.material.removeConfirmTitle}">Material entfernen</h3>
+<div id="material-delete-confirm-modal" class="modal krtm-display-none-z-index-1050-1075">
+    <div class="modal-content hud-box krtm-width-100-max-width-400px-position-relative-1a1b">
+        <h3 class="krtm-color-var-color-primary-margin-bottom-1-5rem-c7ac" th:text="#{orders.detail.material.removeConfirmTitle}">Material entfernen</h3>
         <p class="mb-2" th:text="#{orders.detail.material.removeConfirmText}">Möchten Sie dieses Material wirklich aus dem Auftrag entfernen?</p>
-        <div style="display: flex; gap: 1rem; justify-content: center;">
+        <div class="krtm-display-flex-gap-1rem-justify-content-center-c890">
             <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="material-delete-confirm-modal" th:text="#{orders.detail.cancel}">Abbrechen</button>
             <button type="button" class="btn btn-outline-danger" data-trigger="od-confirm-remove-material" th:text="#{orders.detail.material.removeConfirmBtn}">Ja, entfernen</button>
         </div>
@@ -876,11 +876,11 @@
 
 <!-- Claim ("Eintragung") create/edit modal (Phase 6, #346) — only rendered for logisticians+; the
      backend still enforces the per-squadron / responsible-SK / admin matrix on the relayed call. -->
-<div sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" id="claim-modal" class="modal" style="display: none; z-index: 1060;">
-    <div class="modal-content hud-box" style="width: 100%; max-width: 480px; position: relative;">
-        <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-gray-1); font-size: 1.5rem; cursor: pointer;" data-trigger="close-modal-display" data-modal-id="claim-modal">&times;</button>
-        <h3 id="claim-modal-title" style="color: var(--color-primary); margin-bottom: 0.5rem; font-family: var(--font-headline); text-transform: uppercase; letter-spacing: 0.08em;" th:text="#{orders.claim.modal.title.add}">Eintragung</h3>
-        <p id="claim-modal-bucket" class="text-muted" style="margin-bottom: 1.5rem;"></p>
+<div sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" id="claim-modal" class="modal krtm-display-none-z-index-1060-9a40">
+    <div class="modal-content hud-box krtm-width-100-max-width-480px-position-relative-dbba">
+        <button type="button" class="btn-close krtm-position-absolute-right-1rem-top-1rem-backgr-0703" data-trigger="close-modal-display" data-modal-id="claim-modal">&times;</button>
+        <h3 class="krtm-color-var-color-primary-margin-bottom-0-5rem-abc7" id="claim-modal-title" th:text="#{orders.claim.modal.title.add}">Eintragung</h3>
+        <p id="claim-modal-bucket" class="text-muted krtm-margin-bottom-1-5rem-92cb"></p>
         <input type="hidden" id="claim-order-id" th:value="${order.id}">
         <input type="hidden" id="claim-material-id">
         <input type="hidden" id="claim-quality">
@@ -888,7 +888,7 @@
         <input type="hidden" id="claim-max">
         <div class="form-group mb-2">
             <label for="claim-squadron" class="form-label" th:text="#{orders.claim.squadron}">Staffel</label>
-            <select id="claim-squadron" style="width: 100%; padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white; min-height: 44px;">
+            <select class="krtm-width-100-padding-0-5rem-background-var-colo-f7a4" id="claim-squadron">
                 <option value="" th:text="#{orders.claim.squadron.choose}">Bitte wählen…</option>
                 <!-- Only Profit-side squadrons sign up for SK-order material; the backend rejects a
                      non-profit claimant, so the picker is filtered to the profit-eligible subset. -->
@@ -900,13 +900,13 @@
                 <span th:text="#{orders.claim.amount}">Menge</span>
                 <th:block th:replace="~{fragments/scu-hint :: scuHint('claim-scu-hint', true)}"></th:block>
             </label>
-            <input type="text" inputmode="decimal" data-scu-decimal id="claim-amount" step="0.001" min="0.001" style="width: 100%; padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white; min-height: 44px;">
+            <input class="krtm-width-100-padding-0-5rem-background-var-colo-f7a4" type="text" inputmode="decimal" data-scu-decimal id="claim-amount" step="0.001" min="0.001">
             <small id="claim-open-hint" class="text-muted"></small>
         </div>
-        <div style="display: flex; gap: 0.5rem; justify-content: flex-end; flex-wrap: wrap; margin-top: 1.5rem;">
-            <button type="button" id="claim-withdraw-btn" class="btn btn-outline-danger" style="display: none; min-height: 44px;" data-trigger="claim-withdraw" th:text="#{orders.claim.withdraw}">Zurückziehen</button>
-            <button type="button" class="btn btn-ghost" style="min-height: 44px;" data-trigger="close-modal-display" data-modal-id="claim-modal" th:text="#{orders.detail.cancel}">Abbrechen</button>
-            <button type="button" id="claim-submit-btn" class="btn btn--cta" style="min-height: 44px;" data-trigger="claim-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.claim.submit}">Speichern</span></button>
+        <div class="krtm-display-flex-gap-0-5rem-justify-content-flex-9f87">
+            <button type="button" id="claim-withdraw-btn" class="btn btn-outline-danger krtm-display-none-min-height-44px-603e" data-trigger="claim-withdraw" th:text="#{orders.claim.withdraw}">Zurückziehen</button>
+            <button type="button" class="btn btn-ghost krtm-min-height-44px-1df5" data-trigger="close-modal-display" data-modal-id="claim-modal" th:text="#{orders.detail.cancel}">Abbrechen</button>
+            <button type="button" id="claim-submit-btn" class="btn btn--cta krtm-min-height-44px-1df5" data-trigger="claim-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.claim.submit}">Speichern</span></button>
         </div>
     </div>
 </div>
@@ -914,19 +914,19 @@
 <!-- Assignee-note create/edit modal. Lives outside #assignees-section so it survives the fragment
      swap. Opened by the per-row pencil; saves via AJAX PUT and re-renders the Bearbeiter section.
      The backend enforces the self-or-logistician rule and the per-edge optimistic lock. -->
-<div id="assignee-note-modal" class="modal" style="display: none; z-index: 1060;">
-    <div class="modal-content hud-box" style="width: 100%; max-width: 540px; position: relative;">
-        <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-gray-1); font-size: 1.5rem; cursor: pointer;" data-trigger="close-modal-display" data-modal-id="assignee-note-modal" th:aria-label="#{orders.detail.cancel}">&times;</button>
-        <h3 style="color: var(--color-primary); margin-bottom: 0.5rem; font-family: var(--font-headline); text-transform: uppercase; letter-spacing: 0.08em;" th:text="#{orders.detail.assignees.note.modalTitle}">Notiz bearbeiten</h3>
-        <p id="assignee-note-for" class="text-muted" style="margin-bottom: 1.25rem;"></p>
+<div id="assignee-note-modal" class="modal krtm-display-none-z-index-1060-9a40">
+    <div class="modal-content hud-box krtm-width-100-max-width-540px-position-relative-fdcf">
+        <button type="button" class="btn-close krtm-position-absolute-right-1rem-top-1rem-backgr-0703" data-trigger="close-modal-display" data-modal-id="assignee-note-modal" th:aria-label="#{orders.detail.cancel}">&times;</button>
+        <h3 class="krtm-color-var-color-primary-margin-bottom-0-5rem-abc7" th:text="#{orders.detail.assignees.note.modalTitle}">Notiz bearbeiten</h3>
+        <p id="assignee-note-for" class="text-muted krtm-margin-bottom-1-25rem-c33b"></p>
         <input type="hidden" id="assignee-note-user-id">
         <input type="hidden" id="assignee-note-version">
         <div class="form-group mb-1">
             <label for="assignee-note-text" class="form-label" th:text="#{orders.detail.assignees.note.label}">Notiz</label>
-            <textarea id="assignee-note-text" rows="4" maxlength="500" class="w-full" th:placeholder="#{orders.detail.assignees.note.placeholder}" style="padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;"></textarea>
-            <small id="assignee-note-counter" class="text-muted" style="display: block; text-align: right;">0 / 500</small>
+            <textarea id="assignee-note-text" rows="4" maxlength="500" class="w-full krtm-padding-0-5rem-background-var-color-surface-6388" th:placeholder="#{orders.detail.assignees.note.placeholder}"></textarea>
+            <small id="assignee-note-counter" class="text-muted krtm-display-block-text-align-right-63ff">0 / 500</small>
         </div>
-        <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1rem; flex-wrap: wrap;">
+        <div class="krtm-display-flex-gap-1rem-justify-content-flex-e-1385">
             <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="assignee-note-modal" th:text="#{orders.detail.cancel}">Abbrechen</button>
             <button type="button" class="btn btn--cta" data-trigger="oa-save-note"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.detail.save}">Speichern</span></button>
         </div>
@@ -934,18 +934,18 @@
 </div>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
-<div sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" id="handover-modal" class="modal" style="display: none;">
-    <div class="modal-content hud-box" style="width: 100%; max-width: 800px; max-height: 90vh; overflow-y: auto; position: relative;">
-        <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-gray-1); font-size: 1.5rem; cursor: pointer;" data-trigger="close-modal-display" data-modal-id="handover-modal">&times;</button>
-        <h2 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: var(--font-headline);" th:text="#{orders.detail.handover}">Übergabe protokollieren</h2>
+<div sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" id="handover-modal" class="modal krtm-display-none-5790">
+    <div class="modal-content hud-box krtm-width-100-max-width-800px-max-height-90vh-ov-e53a">
+        <button type="button" class="btn-close krtm-position-absolute-right-1rem-top-1rem-backgr-0703" data-trigger="close-modal-display" data-modal-id="handover-modal">&times;</button>
+        <h2 class="krtm-color-var-color-primary-margin-bottom-1-5rem-c7ac" th:text="#{orders.detail.handover}">Übergabe protokollieren</h2>
 
         <form data-testid="order-handover-form" id="handover-form" th:data-order-id="${order.id}" th:action="@{/orders/{id}/handovers(id=${order.id})}" method="post" th:object="${handoverForm}" class="krt-form">
             <div class="form-group datetime-split-group mb-1" th:attr="data-validate-not-past='false', data-error-past=#{validation.datetime.past}">
                 <label for="handoverTime" th:text="#{orders.handover.time}" class="form-label">Zeitpunkt der Übergabe</label>
                 <input type="hidden" id="handoverTime" th:field="*{handoverTime}">
                 <div class="datetime-split-inputs">
-                    <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}" required style="padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
-                    <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}" required style="padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
+                    <input type="date" class="date-part krtm-padding-0-5rem-background-var-color-surface-6388" th:aria-label="#{a11y.datetime.date}" required>
+                    <input type="time" class="time-part krtm-padding-0-5rem-background-var-color-surface-6388" th:aria-label="#{a11y.datetime.time}" required>
                 </div>
             </div>
 
@@ -962,13 +962,13 @@
                 </select>
             </div>
 
-            <h3 style="color: var(--color-primary); margin-top: 2rem; margin-bottom: 1rem;" th:text="#{orders.handover.materials}">Übergebenes Material</h3>
+            <h3 class="krtm-color-var-color-primary-margin-top-2rem-marg-a8e8" th:text="#{orders.handover.materials}">Übergebenes Material</h3>
             <div id="handover-items-container">
             </div>
 
             <button type="button" id="add-handover-item-btn" class="btn btn-outline mb-2" data-trigger="od-add-handover-item" th:text="#{orders.handover.addItem}">+ Material auswählen</button>
 
-            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1rem; flex-wrap: wrap;">
+            <div class="krtm-display-flex-gap-1rem-justify-content-flex-e-1385">
                 <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="handover-modal" th:text="#{orders.detail.cancel}">Abbrechen</button>
                 <button type="button" class="btn btn-ghost"
                        
@@ -984,18 +984,18 @@
 <!-- Item-handover modal (ITEM orders). One row per still-outstanding ordered-item line; each row's
      amount input is capped at that line's outstanding quantity. Submits as a normal form POST so the
      page reloads on success and the refreshed @Version is picked up (no stale-version 409). -->
-<div sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:if="${order.type == 'ITEM' and hasOutstandingItemLines}" id="item-handover-modal" class="modal" style="display: none;">
-    <div class="modal-content hud-box" style="width: 100%; max-width: 700px; max-height: 90vh; overflow-y: auto; position: relative;">
-        <button type="button" class="btn-close" style="position: absolute; right: 1rem; top: 1rem; background: none; border: none; color: var(--color-gray-1); font-size: 1.5rem; cursor: pointer;" data-trigger="close-modal-display" data-modal-id="item-handover-modal">&times;</button>
-        <h2 style="color: var(--color-primary); margin-bottom: 1.5rem; font-family: var(--font-headline);" th:text="#{orders.detail.itemHandover}">Item-Übergabe protokollieren</h2>
+<div sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:if="${order.type == 'ITEM' and hasOutstandingItemLines}" id="item-handover-modal" class="modal krtm-display-none-5790">
+    <div class="modal-content hud-box krtm-width-100-max-width-700px-max-height-90vh-ov-0acc">
+        <button type="button" class="btn-close krtm-position-absolute-right-1rem-top-1rem-backgr-0703" data-trigger="close-modal-display" data-modal-id="item-handover-modal">&times;</button>
+        <h2 class="krtm-color-var-color-primary-margin-bottom-1-5rem-c7ac" th:text="#{orders.detail.itemHandover}">Item-Übergabe protokollieren</h2>
 
         <form data-testid="item-handover-form" id="item-handover-form" th:data-order-id="${order.id}" th:action="@{/orders/{id}/item-handovers(id=${order.id})}" method="post" th:object="${itemHandoverForm}" class="krt-form">
             <div class="form-group datetime-split-group mb-1" th:attr="data-validate-not-past='false', data-error-past=#{validation.datetime.past}">
                 <label for="itemHandoverTime" th:text="#{orders.handover.time}" class="form-label">Zeitpunkt der Übergabe</label>
                 <input type="hidden" id="itemHandoverTime" th:field="*{handoverTime}">
                 <div class="datetime-split-inputs">
-                    <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}" required style="padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
-                    <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}" required style="padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
+                    <input type="date" class="date-part krtm-padding-0-5rem-background-var-color-surface-6388" th:aria-label="#{a11y.datetime.date}" required>
+                    <input type="time" class="time-part krtm-padding-0-5rem-background-var-color-surface-6388" th:aria-label="#{a11y.datetime.time}" required>
                 </div>
             </div>
 
@@ -1004,8 +1004,8 @@
                 <input type="text" id="itemRecipientHandle" th:field="*{recipientHandle}" required class="w-full">
             </div>
 
-            <h3 style="color: var(--color-primary); margin-top: 2rem; margin-bottom: 1rem;" th:text="#{orders.detail.itemHandover.lines}">Übergebene Items</h3>
-            <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 1rem;" th:text="#{orders.detail.itemHandover.hint}">Trage je Item die übergebene Stückzahl ein (maximal die ausstehende Menge).</p>
+            <h3 class="krtm-color-var-color-primary-margin-top-2rem-marg-a8e8" th:text="#{orders.detail.itemHandover.lines}">Übergebene Items</h3>
+            <p class="text-muted krtm-font-size-0-85rem-margin-bottom-1rem-f3e3" th:text="#{orders.detail.itemHandover.hint}">Trage je Item die übergebene Stückzahl ein (maximal die ausstehende Menge).</p>
 
             <!-- The outstanding-line rows are an in-place swap target (#575): an item handover
                  re-renders them (fresh max=) via GET /orders/{id}?fragment=item-handover-lines so a
@@ -1019,10 +1019,10 @@
                  th:each) so the inner th:if and the cap can both read it. -->
             <th:block th:each="item, stat : ${order.items}"
                       th:with="outstanding=${(item.amount != null ? item.amount : 0) - (item.deliveredAmount != null ? item.deliveredAmount : 0)}">
-                <div th:if="${outstanding > 0}" class="item-handover-line" style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; align-items: end; margin-bottom: 1rem; background: var(--color-surface-input); padding: 1rem; border: 1px solid var(--color-gray-3);">
+                <div th:if="${outstanding > 0}" class="item-handover-line krtm-display-grid-grid-template-columns-2fr-1fr-g-b40a">
                     <div>
                         <label class="form-label-sm" th:text="${item.gameItem != null ? item.gameItem.name() : '-'}">Item</label>
-                        <div class="text-muted" style="font-size: 0.8rem;">
+                        <div class="text-muted krtm-font-size-0-8rem-0fed">
                             <span th:text="#{orders.detail.item.outstanding}">Ausstehend</span>:
                             <span th:text="${#numbers.formatInteger(outstanding, 1)}">0</span>
                         </div>
@@ -1030,15 +1030,15 @@
                     </div>
                     <div>
                         <label class="form-label-sm" th:text="#{orders.detail.itemHandover.amount}">Menge</label>
-                        <input type="number" step="1" min="1" th:max="${outstanding}" th:name="|entries[${stat.index}].amount|" value="" style="width: 100%; min-height: 44px; padding: 0.5rem; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: white;">
+                        <input class="krtm-width-100-min-height-44px-padding-0-5rem-bac-c018" type="number" step="1" min="1" th:max="${outstanding}" th:name="|entries[${stat.index}].amount|" value="">
                     </div>
                 </div>
             </th:block>
             </th:block></div>
 
-            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1rem; flex-wrap: wrap;">
-                <button type="button" class="btn btn-ghost" style="min-height: 44px;" data-trigger="close-modal-display" data-modal-id="item-handover-modal" th:text="#{orders.detail.cancel}">Abbrechen</button>
-                <button type="submit" class="btn btn--cta" style="min-height: 44px;" data-testid="item-handover-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.detail.save}">Speichern</span></button>
+            <div class="krtm-display-flex-gap-1rem-justify-content-flex-e-1385">
+                <button type="button" class="btn btn-ghost krtm-min-height-44px-1df5" data-trigger="close-modal-display" data-modal-id="item-handover-modal" th:text="#{orders.detail.cancel}">Abbrechen</button>
+                <button type="submit" class="btn btn--cta krtm-min-height-44px-1df5" data-testid="item-handover-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.detail.save}">Speichern</span></button>
             </div>
         </form>
     </div>

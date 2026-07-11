@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.util.List;
@@ -408,7 +409,7 @@ public class UserService {
    */
   public List<User> searchByUsername(@NotNull String query) {
     java.util.Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
-    return userRepository.searchScopedList(query, scope);
+    return userRepository.searchScopedList(LikePatterns.escapeNullable(query), scope);
   }
 
   /**
@@ -421,7 +422,7 @@ public class UserService {
    */
   public Page<User> searchByUsername(@NotNull String query, @NotNull Pageable pageable) {
     java.util.Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
-    return userRepository.searchScoped(query, scope, pageable);
+    return userRepository.searchScoped(LikePatterns.escapeNullable(query), scope, pageable);
   }
 
   /**

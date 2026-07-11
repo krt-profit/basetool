@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import jakarta.validation.constraints.AssertTrue;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
@@ -47,9 +48,36 @@ import org.springframework.validation.annotation.Validated;
 public class DiscordSpiPrecheckProperties {
 
   /**
+   * Minimum accepted length of a configured (non-blank) shared secret. The account-existence
+   * endpoint is {@code permitAll} and deliberately exempt from the {@code /api/**} rate limiter, so
+   * the shared secret is its <em>only</em> credential; requiring at least this many characters
+   * keeps a short, online-guessable value from ever being deployed. {@code .env.example} already
+   * instructs operators to generate a long random value — this makes that a fail-fast invariant.
+   */
+  private static final int MIN_SECRET_LENGTH = 32;
+
+  /**
    * Shared secret the Keycloak SPI must present to call the account-existence endpoint. Blank (the
    * default) disables the endpoint, which fail-open-skips the precheck on the SPI side. Not a
    * {@code @NotBlank} so a non-Discord deployment boots without it.
    */
   private String sharedSecret = "";
+
+  /**
+   * Enforces shared-secret strength at startup (via {@link Validated} on this properties class): a
+   * configured secret must be at least {@link #MIN_SECRET_LENGTH} characters, while a blank secret
+   * stays valid because it disables the endpoint. A weak operator-supplied secret therefore fails
+   * the context startup instead of shipping a brute-forceable sole-credential endpoint.
+   *
+   * @return {@code true} when the secret is blank (disabled) or meets the minimum length
+   */
+  @AssertTrue(
+      message =
+          "app.discord.spi-precheck.shared-secret must be blank (to disable the endpoint) or at"
+              + " least 32 characters")
+  public boolean isSharedSecretBlankOrStrong() {
+    return sharedSecret == null
+        || sharedSecret.isBlank()
+        || sharedSecret.length() >= MIN_SECRET_LENGTH;
+  }
 }

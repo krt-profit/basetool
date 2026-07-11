@@ -27,8 +27,8 @@
     </div>
 
     <div class="hud-box mt-2">
-        <form id="refinery-filter-form" class="no-track" method="get" th:action="@{/refinery-orders}" style="display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap;">
-            <span th:text="#{orders.index.filter.status}" style="font-weight: 700; font-size: 0.8rem; color: var(--color-gray-1);">Status:</span>
+        <form id="refinery-filter-form" class="no-track krtm-display-flex-gap-1rem-margin-bottom-1rem-ali-e265" method="get" th:action="@{/refinery-orders}">
+            <span th:text="#{orders.index.filter.status}" class="krtm-font-weight-700-font-size-0-8rem-color-var-c-eed8">Status:</span>
             <label class="flex-gap-2xs">
                 <input type="checkbox" name="status" value="OPEN" th:checked="${selectedStatuses != null and selectedStatuses.contains('OPEN')}">
                 <span th:text="#{refineryorder.status.OPEN}">Offen</span>
@@ -45,11 +45,11 @@
                 <input type="checkbox" name="status" value="CANCELED" th:checked="${selectedStatuses != null and selectedStatuses.contains('CANCELED')}">
                 <span th:text="#{refineryorder.status.CANCELED}">Abgebrochen</span>
             </label>
-            <label style="display: flex; align-items: center; gap: 0.25rem; padding-left: 1rem; border-left: 1px solid var(--color-gray-3);">
+            <label class="krtm-display-flex-align-items-center-gap-0-25rem-675b">
                 <input type="checkbox" name="onlyMine" value="true" th:checked="${onlyMine}">
                 <span th:text="#{refineryorder.index.filter.onlyMine}">Meine Aufträge</span>
             </label>
-            <button type="submit" class="btn btn-ghost" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;" th:text="#{orders.index.filter.apply}">Filtern</button>
+            <button type="submit" class="btn btn-ghost krtm-padding-0-25rem-0-75rem-font-size-0-8rem-e5f2" th:text="#{orders.index.filter.apply}">Filtern</button>
         </form>
 
         <div id="refinery-orders-results">
@@ -60,7 +60,7 @@
             <tr>
                 <th th:text="#{refineryorder.index.id}">ID</th>
                 <th th:text="#{refineryorder.index.owner}">Besitzer</th>
-                <th class="nowrap" style="width: 1%;" th:text="#{refineryorder.index.endsAt}">Ende</th>
+                <th class="nowrap krtm-width-1-bd93" th:text="#{refineryorder.index.endsAt}">Ende</th>
                 <th th:text="#{refineryorder.index.location}">Ort</th>
                 <th th:text="#{refineryorder.index.mission}">Einsatz</th>
                 <th th:text="#{refineryorder.index.materials}">Materialien</th>

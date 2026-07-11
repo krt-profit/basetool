@@ -23,7 +23,6 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderMapper;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
-import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
@@ -235,14 +234,14 @@ public class JobOrderQueryService {
    */
   public List<de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto>
       getInventoryItemsForJobOrderMaterial(UUID jobOrderId, UUID materialId) {
-    JobOrder jobOrder =
-        jobOrderRepository
-            .findById(jobOrderId)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
-    Material material =
-        materialRepository
-            .findById(materialId)
-            .orElseThrow(() -> new NotFoundException("Material not found: " + materialId));
+    // Existence guards: load only to surface a 404 for an unknown order / material; the query below
+    // filters by the ids directly, so the entities themselves are not needed (#1256 review).
+    jobOrderRepository
+        .findById(jobOrderId)
+        .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
+    materialRepository
+        .findById(materialId)
+        .orElseThrow(() -> new NotFoundException("Material not found: " + materialId));
 
     return inventoryItemRepository.findByJobOrderIdAndMaterialId(jobOrderId, materialId).stream()
         .map(inventoryItemMapper::toDto)

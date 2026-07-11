@@ -34,8 +34,8 @@
     <!-- Information / announcement: spans the full width and is only as tall as its content —
          minimal (just the header) when collapsed, expanding to the text height when open. -->
     <div sec:authorize="isAuthenticated()" class="hud-box mt-2" th:if="${announcement}" id="info-section">
-        <div style="display:flex; justify-content:space-between; align-items:center; gap: var(--space-4); cursor: pointer;" id="info-header" data-trigger="index-toggle-info">
-             <div style="display:flex; align-items:center; gap: 0.5rem;">
+        <div class="krtm-display-flex-justify-content-space-between-a-a0eb" id="info-header" data-trigger="index-toggle-info">
+             <div class="krtm-display-flex-align-items-center-gap-0-5rem-be72">
                  <span id="info-toggle-icon" th:text="${unreadAnnouncement ? '▼' : '▶'}">▼</span>
                  <h2 th:text="#{info.title}" class="m-0">Information</h2>
              </div>
@@ -45,7 +45,7 @@
              </form>
         </div>
 
-        <div id="info-body" class="mt-1" th:style="${unreadAnnouncement ? 'display:block;' : 'display:none;'}">
+        <div id="info-body" class="mt-1" th:classappend="${!unreadAnnouncement} ? 'krtm-hidden' : ''">
             <!-- th:utext is safe here: @markdown escapes raw HTML in the source and strips unsafe
                  link protocols. Bean call bound via th:with — th:utext is a restricted expression
                  context in Thymeleaf 3.1 where @bean references are forbidden (cf. @moneyFormat). -->
