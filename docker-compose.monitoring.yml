@@ -43,7 +43,7 @@ services:
   prometheus:
     <<: *mon-base
     container_name: prometheus
-    image: prom/prometheus:v3.13.0
+    image: prom/prometheus:v3.13.1
     cap_drop: [ALL]
     # GOMEMLIMIT (Go soft memory limit): as the Go heap nears this, the runtime GC gets aggressive
     # to stay under it, so a WAL-replay / peak spike trades CPU for memory instead of hitting the
@@ -91,7 +91,7 @@ services:
   grafana:
     <<: *mon-base
     container_name: grafana
-    image: grafana/grafana-oss:13.0.2
+    image: grafana/grafana-oss:13.1.0
     cap_drop: [ALL]
     environment:
       GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-https://grafana.profit-base.online/}
@@ -310,7 +310,7 @@ services:
   node-exporter:
     <<: *mon-base
     container_name: node-exporter
-    image: quay.io/prometheus/node-exporter:v1.11.1
+    image: quay.io/prometheus/node-exporter:v1.12.0
     pid: host
     command:
       - --path.rootfs=/host
@@ -340,7 +340,7 @@ services:
   cadvisor:
     <<: *mon-base
     container_name: cadvisor
-    image: ghcr.io/google/cadvisor:v0.60.3
+    image: ghcr.io/google/cadvisor:v0.60.5
     command:
       - --docker=tcp://socket-proxy:2375
       - --docker_only
@@ -414,7 +414,7 @@ services:
   postgres-exporter-backend:
     <<: *mon-base
     container_name: postgres-exporter-backend
-    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.0
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
     cap_drop: [ALL]
     command:
       - --no-collector.stat_replication
@@ -434,7 +434,7 @@ services:
   postgres-exporter-keycloak:
     <<: *mon-base
     container_name: postgres-exporter-keycloak
-    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.0
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
     cap_drop: [ALL]
     # --no-collector.stat_replication: see the backend exporter above — upstream slot_name bug.
     # --collector.database_wraparound + --collector.long_running_transactions: see the backend exporter.
