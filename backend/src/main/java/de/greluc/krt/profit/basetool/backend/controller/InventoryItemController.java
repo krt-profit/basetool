@@ -504,7 +504,7 @@ public class InventoryItemController {
     @ApiResponse(responseCode = "403", description = "Caller is not an admin")
   })
   @DeleteMapping("/all")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public org.springframework.http.ResponseEntity<Void> deleteAllGlobalInventory() {
     inventoryItemService.deleteAllGlobalInventory();
     return org.springframework.http.ResponseEntity.noContent().build();

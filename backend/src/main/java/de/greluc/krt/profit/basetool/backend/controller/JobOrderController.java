@@ -991,7 +991,7 @@ public class JobOrderController {
   @Operation(
       summary = "Delete a job order",
       description = "Deletes a job order and shifts priorities.")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public void deleteJobOrder(@PathVariable UUID id) {
     jobOrderService.deleteJobOrder(id);
   }

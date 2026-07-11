@@ -91,7 +91,7 @@ public class StarSystemController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public StarSystemDto createStarSystem(@RequestBody @NotNull StarSystemDto starSystem) {
     var toCreate = starSystemMapper.toEntity(starSystem);
     // L-7: never honour a client-supplied id/version on create — a non-null id routes save() to
@@ -109,7 +109,7 @@ public class StarSystemController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public StarSystemDto updateStarSystem(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull StarSystemDto starSystem) {
     return starSystemMapper.toDto(
@@ -122,7 +122,7 @@ public class StarSystemController {
    * @param id star system id
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public void deleteStarSystem(@PathVariable @NotNull UUID id) {
     starSystemService.deleteStarSystem(id);
   }

@@ -86,7 +86,7 @@ public class JobTypeController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public JobTypeDto createJobType(@RequestBody @Valid JobTypeDto jobTypeDto) {
     JobType toCreate = jobTypeMapper.toEntity(jobTypeDto);
     // L-7: strip client-supplied id/version so create cannot become a merge()-UPSERT of another
@@ -104,7 +104,7 @@ public class JobTypeController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public JobTypeDto updateJobType(
       @PathVariable @NotNull UUID id, @RequestBody @Valid JobTypeDto jobTypeDto) {
     return jobTypeMapper.toDto(jobTypeService.updateJobType(id, jobTypeDto));
@@ -117,7 +117,7 @@ public class JobTypeController {
    * @param id job type id
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public void deleteJobType(@PathVariable @NotNull UUID id) {
     jobTypeService.deleteJobType(id);
   }
@@ -128,7 +128,7 @@ public class JobTypeController {
    * @param id job type id
    */
   @PostMapping("/{id}/activate")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public void activateJobType(@PathVariable @NotNull UUID id) {
     jobTypeService.activateJobType(id);
   }

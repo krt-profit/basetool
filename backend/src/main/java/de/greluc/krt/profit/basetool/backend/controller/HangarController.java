@@ -240,7 +240,7 @@ public class HangarController {
    * @return paged ship DTOs
    */
   @GetMapping("/users/{userId}/ships")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Transactional(readOnly = true)
   public PageResponse<ShipDto> getUserShips(
       @PathVariable @NotNull UUID userId,
@@ -256,7 +256,7 @@ public class HangarController {
 
   /** Admin-only: adds a ship to a target user's hangar. */
   @PostMapping("/users/{userId}/ships")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Transactional
   public ShipDto addUserShip(
       @PathVariable @NotNull UUID userId, @RequestBody @Valid ShipRequestDto shipRequest) {
@@ -265,7 +265,7 @@ public class HangarController {
 
   /** Admin-only: updates a target user's ship. */
   @PutMapping("/users/{userId}/ships/{shipId}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Transactional
   public ShipDto updateUserShip(
       @PathVariable @NotNull UUID userId,
@@ -276,7 +276,7 @@ public class HangarController {
 
   /** Admin-only: deletes a target user's ship. */
   @DeleteMapping("/users/{userId}/ships/{shipId}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public void deleteUserShip(
       @PathVariable @NotNull UUID userId, @PathVariable @NotNull UUID shipId) {
     hangarService.deleteShip(userId, shipId);

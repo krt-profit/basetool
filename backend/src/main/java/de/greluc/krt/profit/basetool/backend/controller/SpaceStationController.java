@@ -51,7 +51,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/space-stations")
 @RequiredArgsConstructor
 @Transactional
-@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+@PreAuthorize(Roles.HAS_ROLE_ADMIN)
 public class SpaceStationController {
 
   private final SpaceStationService spaceStationService;
@@ -97,7 +97,7 @@ public class SpaceStationController {
    * @return the persisted space-station DTO
    */
   @PatchMapping("/{id}/loading-dock")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public SpaceStationDto setLoadingDockOverride(
       @PathVariable @NotNull UUID id, @RequestParam boolean value) {
     return spaceStationMapper.toDto(spaceStationService.setLoadingDockOverride(id, value));
@@ -111,7 +111,7 @@ public class SpaceStationController {
    * @return the persisted space-station DTO
    */
   @DeleteMapping("/{id}/loading-dock-override")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public SpaceStationDto clearLoadingDockOverride(@PathVariable @NotNull UUID id) {
     return spaceStationMapper.toDto(spaceStationService.clearLoadingDockOverride(id));
   }

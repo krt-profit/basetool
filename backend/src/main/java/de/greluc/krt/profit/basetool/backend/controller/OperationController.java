@@ -437,7 +437,7 @@ public class OperationController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
+  @PreAuthorize(Roles.HAS_ROLE_MISSION_MANAGER)
   @Operation(summary = "Create a new operation")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Operation created."),

@@ -477,7 +477,7 @@ public class MissionController {
    * @return 204 No Content
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Operation(summary = "Delete a mission")
   public ResponseEntity<Void> deleteMission(@PathVariable @NotNull UUID id) {
     missionService.deleteMission(id);

@@ -91,7 +91,7 @@ public class ShipTypeController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}/visibility")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public ShipTypeDto updateShipTypeVisibility(
       @PathVariable @NotNull UUID id, @RequestParam boolean hidden) {
     return shipMapper.shipTypeToDto(shipTypeService.updateShipTypeVisibility(id, hidden));

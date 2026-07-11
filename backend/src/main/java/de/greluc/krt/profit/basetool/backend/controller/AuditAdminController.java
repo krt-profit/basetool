@@ -63,7 +63,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/audit")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+@PreAuthorize(Roles.HAS_ROLE_ADMIN)
 public class AuditAdminController {
 
   private static final Set<String> AUDIT_SORT_FIELDS = Set.of("occurredAt", "id");

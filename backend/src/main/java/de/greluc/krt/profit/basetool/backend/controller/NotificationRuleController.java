@@ -51,7 +51,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/notification-rules")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+@PreAuthorize(Roles.HAS_ROLE_ADMIN)
 @Tag(name = "Notification Rules", description = "Admin-managed notification recipient rules.")
 @SecurityRequirement(name = "bearerAuth")
 public class NotificationRuleController {

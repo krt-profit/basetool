@@ -71,7 +71,7 @@ public class BankBookingController {
    */
   @Operation(summary = "Read the current in-game transfer-fee rate")
   @GetMapping("/transfer-fee-rate")
-  @PreAuthorize("hasRole('" + Roles.BANK_EMPLOYEE + "')")
+  @PreAuthorize(Roles.HAS_ROLE_BANK_EMPLOYEE)
   @Transactional(readOnly = true)
   public BankTransferFeeRateDto getTransferFeeRate() {
     return new BankTransferFeeRateDto(bankTransferFeeService.resolveTransferFeeRate());
@@ -154,7 +154,7 @@ public class BankBookingController {
    */
   @Operation(summary = "Reverse a transaction (management)")
   @PostMapping("/transactions/{id}/reversal")
-  @PreAuthorize("hasRole('" + Roles.BANK_MANAGEMENT + "')")
+  @PreAuthorize(Roles.HAS_ROLE_BANK_MANAGEMENT)
   @Transactional
   @ResponseStatus(HttpStatus.CREATED)
   public BankTransactionDto reverseTransaction(

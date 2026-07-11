@@ -57,7 +57,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/bank/requests")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('" + Roles.BANK_EMPLOYEE + "')")
+@PreAuthorize(Roles.HAS_ROLE_BANK_EMPLOYEE)
 public class BankRequestController {
 
   private static final Set<String> QUEUE_SORT_FIELDS = Set.of("createdAt", "amount", "id");

@@ -87,4 +87,38 @@ public final class Roles {
    * annotation value — collapses ~24 identical splices into one referenced literal.
    */
   public static final String ADMIN_OR_OFFICER = "hasAnyRole('" + ADMIN + "','" + OFFICER + "')";
+
+  /**
+   * Pre-built {@code @PreAuthorize} SpEL for the single-role {@code hasRole('ADMIN')} gate — a
+   * compile-time constant per JLS 4.12.4/15.28, so {@code @PreAuthorize(Roles.HAS_ROLE_ADMIN)} is a
+   * legal annotation value and the literal it inlines to is exactly what the security ArchUnit
+   * rules read from the bytecode. Collapses the {@code "hasRole('" + Roles.ADMIN + "')"} splice
+   * that was repeated verbatim at ~98 admin-gated endpoints into one named literal, mirroring
+   * {@link #ADMIN_OR_OFFICER}.
+   */
+  public static final String HAS_ROLE_ADMIN = "hasRole('" + ADMIN + "')";
+
+  /**
+   * Single-role {@code hasRole('BANK_MANAGEMENT')} gate; a compile-time constant like {@link
+   * #HAS_ROLE_ADMIN}.
+   */
+  public static final String HAS_ROLE_BANK_MANAGEMENT = "hasRole('" + BANK_MANAGEMENT + "')";
+
+  /**
+   * Single-role {@code hasRole('BANK_EMPLOYEE')} gate; a compile-time constant like {@link
+   * #HAS_ROLE_ADMIN}.
+   */
+  public static final String HAS_ROLE_BANK_EMPLOYEE = "hasRole('" + BANK_EMPLOYEE + "')";
+
+  /**
+   * Single-role {@code hasRole('KRT_MEMBER')} gate; a compile-time constant like {@link
+   * #HAS_ROLE_ADMIN}.
+   */
+  public static final String HAS_ROLE_KRT_MEMBER = "hasRole('" + KRT_MEMBER + "')";
+
+  /**
+   * Single-role {@code hasRole('MISSION_MANAGER')} gate; a compile-time constant like {@link
+   * #HAS_ROLE_ADMIN}.
+   */
+  public static final String HAS_ROLE_MISSION_MANAGER = "hasRole('" + MISSION_MANAGER + "')";
 }

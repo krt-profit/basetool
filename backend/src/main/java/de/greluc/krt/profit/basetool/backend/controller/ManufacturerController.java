@@ -93,7 +93,7 @@ public class ManufacturerController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}/visibility")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public ManufacturerDto updateManufacturerVisibility(
       @PathVariable @NotNull UUID id, @RequestParam boolean hidden) {
     return manufacturerMapper.toDto(manufacturerService.updateManufacturerVisibility(id, hidden));

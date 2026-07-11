@@ -61,7 +61,7 @@ public class DiscordRegistrationAdminController {
    * @return the pending registrations
    */
   @GetMapping
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public List<PendingRegistrationDto> listPending() {
     return userService.findPendingRegistrations().stream().map(this::toDto).toList();
   }
@@ -75,7 +75,7 @@ public class DiscordRegistrationAdminController {
    * @return the now-active user (with its bumped version)
    */
   @PostMapping("/{id}/approve")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public PendingRegistrationDto approve(
       @PathVariable UUID id,
       @AuthenticationPrincipal Jwt jwt,
@@ -93,7 +93,7 @@ public class DiscordRegistrationAdminController {
    * @return the now-rejected user (with its bumped version)
    */
   @PostMapping("/{id}/reject")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public PendingRegistrationDto reject(
       @PathVariable UUID id,
       @AuthenticationPrincipal Jwt jwt,

@@ -75,7 +75,7 @@ public class BankHolderController {
    */
   @Operation(summary = "List the bank holder registry")
   @GetMapping
-  @PreAuthorize("hasRole('" + Roles.BANK_EMPLOYEE + "')")
+  @PreAuthorize(Roles.HAS_ROLE_BANK_EMPLOYEE)
   @Transactional(readOnly = true)
   public List<BankHolderDto> getHolders() {
     return bankHolderService.getHolders();
@@ -134,7 +134,7 @@ public class BankHolderController {
    */
   @Operation(summary = "Register a user as bank holder (management)")
   @PostMapping
-  @PreAuthorize("hasRole('" + Roles.BANK_MANAGEMENT + "')")
+  @PreAuthorize(Roles.HAS_ROLE_BANK_MANAGEMENT)
   @Transactional
   @ResponseStatus(HttpStatus.CREATED)
   public BankHolderDto registerHolder(@RequestBody @Valid RegisterBankHolderRequest request) {
@@ -150,7 +150,7 @@ public class BankHolderController {
    */
   @Operation(summary = "Activate or deactivate a bank holder (management)")
   @PatchMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.BANK_MANAGEMENT + "')")
+  @PreAuthorize(Roles.HAS_ROLE_BANK_MANAGEMENT)
   @Transactional
   public BankHolderDto updateHolder(
       @PathVariable @NotNull UUID id, @RequestBody @Valid UpdateBankHolderRequest request) {
@@ -168,7 +168,7 @@ public class BankHolderController {
    */
   @Operation(summary = "Book a holder-to-holder Umbuchung")
   @PostMapping("/transfer")
-  @PreAuthorize("hasRole('" + Roles.BANK_EMPLOYEE + "')")
+  @PreAuthorize(Roles.HAS_ROLE_BANK_EMPLOYEE)
   @Transactional
   @ResponseStatus(HttpStatus.CREATED)
   public BankTransactionDto transfer(@RequestBody @Valid BankHolderTransferRequest request) {

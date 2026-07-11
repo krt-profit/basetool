@@ -129,7 +129,7 @@ public class SpecialCommandController {
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException if no SK matches.
    */
   @GetMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Operation(
       summary = "Get a Spezialkommando by id",
       description = "Returns the full DTO for the requested Spezialkommando. ADMIN-only.")
@@ -149,7 +149,7 @@ public class SpecialCommandController {
    * @return the persisted DTO.
    */
   @PostMapping
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Operation(
       summary = "Create a Spezialkommando",
       description = "Creates a new Spezialkommando. Name must be unique across all org units.")
@@ -177,7 +177,7 @@ public class SpecialCommandController {
    * @return the persisted DTO with the bumped version.
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Operation(
       summary = "Update a Spezialkommando",
       description =
@@ -204,7 +204,7 @@ public class SpecialCommandController {
    * @param id Spezialkommando id.
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Operation(
       summary = "Soft-delete a Spezialkommando",
       description =
@@ -225,7 +225,7 @@ public class SpecialCommandController {
    * @param id Spezialkommando id.
    */
   @PostMapping("/{id}/activate")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Operation(
       summary = "Activate a soft-deleted Spezialkommando",
       description = "Flips active=true on a previously soft-deleted Spezialkommando.")
@@ -250,7 +250,7 @@ public class SpecialCommandController {
    * @return the updated DTO with the new flag value.
    */
   @PatchMapping("/{id}/profit-eligible")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Operation(
       summary = "Toggle Spezialkommando profit-eligibility",
       description =

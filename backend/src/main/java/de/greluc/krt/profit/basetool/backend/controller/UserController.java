@@ -106,7 +106,7 @@ public class UserController {
    * @return the number of users reconciled this run
    */
   @PostMapping("/sync")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public UserSyncResultDto syncUsersNow() {
     int syncedCount =
@@ -532,7 +532,7 @@ public class UserController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}/attributes")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public UserDto updateUserAttributes(
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid UserAttributesRequest request) {
@@ -565,7 +565,7 @@ public class UserController {
    * @return the user's complete post-write membership list.
    */
   @PatchMapping("/{id}/memberships")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public MembershipDeltaResponse patchMemberships(
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid MembershipDeltaRequest request) {
@@ -586,7 +586,7 @@ public class UserController {
    *     wrapped in the same response shape the membership-delta PATCH returns.
    */
   @GetMapping("/{id}/memberships/detail")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public MembershipDeltaResponse getMembershipsDetail(@PathVariable @NotNull UUID id) {
     return new MembershipDeltaResponse(orgUnitMembershipService.findAllMembershipDtosForUser(id));
   }
@@ -598,7 +598,7 @@ public class UserController {
    * @param id user id
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public void deleteUser(@PathVariable @NotNull UUID id) {
     userService.deleteUser(id);
   }

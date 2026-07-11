@@ -52,7 +52,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/bank/grants")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('" + Roles.BANK_MANAGEMENT + "')")
+@PreAuthorize(Roles.HAS_ROLE_BANK_MANAGEMENT)
 public class BankGrantController {
 
   private final BankGrantService bankGrantService;

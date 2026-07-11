@@ -97,7 +97,7 @@ public class TerminalController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public TerminalDto updateTerminal(
       @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull TerminalDto terminalDto) {
     // Here we just allow toggling visibility according to the requirement,
@@ -114,7 +114,7 @@ public class TerminalController {
    * @return the persisted terminal DTO
    */
   @PatchMapping("/{id}/loading-dock")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public TerminalDto setLoadingDockOverride(
       @PathVariable @NotNull UUID id, @RequestParam boolean value) {
     return terminalMapper.toDto(terminalService.setLoadingDockOverride(id, value));
@@ -129,7 +129,7 @@ public class TerminalController {
    * @return the persisted terminal DTO
    */
   @DeleteMapping("/{id}/loading-dock-override")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public TerminalDto clearLoadingDockOverride(@PathVariable @NotNull UUID id) {
     return terminalMapper.toDto(terminalService.clearLoadingDockOverride(id));
   }
@@ -143,7 +143,7 @@ public class TerminalController {
    * @return the persisted terminal DTO
    */
   @PatchMapping("/{id}/auto-load")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public TerminalDto setAutoLoadOverride(
       @PathVariable @NotNull UUID id, @RequestParam boolean value) {
     return terminalMapper.toDto(terminalService.setAutoLoadOverride(id, value));
@@ -158,7 +158,7 @@ public class TerminalController {
    * @return the persisted terminal DTO
    */
   @DeleteMapping("/{id}/auto-load-override")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public TerminalDto clearAutoLoadOverride(@PathVariable @NotNull UUID id) {
     return terminalMapper.toDto(terminalService.clearAutoLoadOverride(id));
   }

@@ -89,7 +89,7 @@ public class OrgChartController {
    * @return the persisted position as a flat DTO.
    */
   @PostMapping("/positions")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Operation(
       summary = "Assign a user to an org-chart position",
       description =
@@ -127,7 +127,7 @@ public class OrgChartController {
    * @return the updated position with the bumped version.
    */
   @PutMapping("/positions/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Operation(
       summary = "Reassign or reorder an org-chart position",
       description =
@@ -159,7 +159,7 @@ public class OrgChartController {
    * @return the updated, now-leaderless Kommando with the bumped version.
    */
   @DeleteMapping("/positions/{id}/leader")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Operation(
       summary = "Vacate a Kommando's Kommandoleiter",
       description =
@@ -187,7 +187,7 @@ public class OrgChartController {
    * @param id the position id.
    */
   @DeleteMapping("/positions/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Operation(
       summary = "Remove an org-chart position",
       description =

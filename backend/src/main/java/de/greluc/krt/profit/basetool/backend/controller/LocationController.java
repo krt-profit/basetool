@@ -144,7 +144,7 @@ public class LocationController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public LocationDto createLocation(@RequestBody @Valid @NotNull LocationDto location) {
     // stripServerManaged drops client-supplied id / version so JPA performs an INSERT
     // and the client cannot mass-assign onto an existing row through this endpoint.
@@ -160,7 +160,7 @@ public class LocationController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public LocationDto updateLocation(
       @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull LocationDto location) {
     return locationMapper.toDto(locationService.updateLocation(id, location));
@@ -174,7 +174,7 @@ public class LocationController {
    * @param id location id
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public void deleteLocation(@PathVariable @NotNull UUID id) {
     locationService.deleteLocation(id);
   }

@@ -226,7 +226,7 @@ public class MaterialController {
    * @return the persisted DTO
    */
   @PostMapping
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public MaterialDto createMaterial(@RequestBody @Valid @NotNull MaterialCreateDto material) {
     return materialMapper.toDto(materialService.createMaterial(material));
   }
@@ -240,7 +240,7 @@ public class MaterialController {
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public MaterialDto updateMaterial(
       @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull MaterialDto material) {
     return materialMapper.toDto(
@@ -253,7 +253,7 @@ public class MaterialController {
    * @param id material id
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public void deleteMaterial(@PathVariable @NotNull UUID id) {
     materialService.deleteMaterial(id);
   }
