@@ -12,6 +12,8 @@
 
 ### Changed
 
+- **Sicherheit: PostgreSQL-JDBC-Treiber auf 42.7.12 angehoben (CVE-2026-54291).** Der von Spring Boot vorgegebene Treiber 42.7.11 konnte einen mit `channelBinding=require` angeforderten SCRAM-Handshake stillschweigend auf die Variante ohne Kanalbindung herabstufen und so den Schutz vor Man-in-the-Middle-Angriffen verlieren; die gepatchte Version 42.7.12 wird jetzt erzwungen. Der wöchentliche OWASP-Abhängigkeits-Scan ist damit wieder grün — die parallel gemeldeten httpcore-4.4.x-Funde (CVE-2026-54399/-54428) waren Fehlalarme, da die CVEs nur die nicht ausgelieferte HttpCore-5.x-Reihe betreffen, und wurden begründet unterdrückt.
+
 - **Navigation: „Blueprint-Verfügbarkeit" liegt jetzt unter „Flotte & Logistik".** Der Menüpunkt wanderte aus der Gruppe „Handel" in die Gruppe „Flotte & Logistik" und steht dort direkt unter „Auftragsverwaltung".
 
 - **Härtung: Metrik- und Health-Endpunkte der öffentlichen Dienste laufen jetzt auf einem eigenen, nur intern erreichbaren Port.** Frontend und Ingest-Gateway liefern `/actuator/**` (Health und Prometheus-Metriken) in Produktion nicht mehr über den öffentlichen App-Port aus, sondern über einen dedizierten Management-Port (Frontend 18091, Ingest 11272), der weder auf dem Host noch über den Reverse-Proxy veröffentlicht wird — erreichbar nur vom Monitoring-Netz (Prometheus) und vom containerinternen Health-Check. Der öffentliche Port beantwortet `/actuator/**` damit auf Anwendungsebene mit 404, unabhängig von der Edge-Sperre — analog zum bereits so betriebenen Keycloak-Management-Port. Backend bleibt unverändert (ohnehin nicht aus dem Internet erreichbar). Nur Produktion betroffen; Entwicklungs-/Test-/E2E-Umgebungen bleiben unverändert (ADR-0090, REQ-OBS-005).

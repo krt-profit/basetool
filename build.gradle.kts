@@ -171,6 +171,19 @@ subprojects {
       jvmArgs("--enable-native-access=ALL-UNNAMED")
       systemProperty("spring.profiles.active", "dev")
     }
+
+    // Security override for a Spring-Boot-BOM-managed transitive (so it lives here, not in
+    // versions.properties, which refreshVersions only owns for directly-declared coordinates).
+    // The Boot 4 BOM pins the PostgreSQL JDBC driver to 42.7.11, which is vulnerable to
+    // CVE-2026-54291 (CVSS >= 7.0): a `channelBinding=require` SCRAM handshake can be silently
+    // downgraded from SCRAM-SHA-256-PLUS to plain SCRAM-SHA-256 - losing the MITM protection the
+    // setting promises - when the server certificate's signature algorithm carries no
+    // tls-server-end-point channel-binding hash (Ed25519/Ed448/PQC). Fixed in 42.7.12. Overriding
+    // the Boot BOM `postgresql.version` property is the conflict-free path: io.spring.dependency-
+    // management emits the managed version as a `{strictly ...}` constraint, so a competing plain
+    // Gradle constraint would collide instead of winning. Remove once the Boot BOM ships
+    // >= 42.7.12 (the OWASP dependencyCheckAggregate gate will keep this honest either way).
+    extra["postgresql.version"] = "42.7.12"
   }
 
   // JaCoCo coverage. Both modules want the same setup: emit XML + CSV + HTML
