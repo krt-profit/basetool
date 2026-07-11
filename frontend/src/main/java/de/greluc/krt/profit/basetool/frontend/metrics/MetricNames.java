@@ -61,6 +61,19 @@ public final class MetricNames {
   public static final String LIVESYNC_SOCKET_REJECTED = "basetool.livesync.socket.rejected";
 
   /**
+   * Counter {@code basetool_livesync_invalid_topic_total} (unlabelled) — a multiplexed {@code
+   * /ws/sync} subscribe to an unknown / unparseable topic ({@code LiveSyncTopic.parse(...) == null}
+   * in {@code LiveSyncWebSocketHandler.handleSubscribe}). Carries <b>no</b> {@code topic_class} —
+   * the topic did not parse, so it belongs to no known class — for the same reason {@link
+   * #LIVESYNC_SOCKET_REJECTED} carries none: rather than inflate the bounded {@code topic_class}
+   * set with an {@code unknown} sentinel, a dedicated unlabelled meter keeps that set to the real
+   * classes (REQ-OBS-011 design call, #1239). A sustained stream is the signature of a
+   * client/server topic-vocabulary skew — a client subscribing to a topic this server no longer
+   * knows (REQ-FE-015, ADR-0094).
+   */
+  public static final String LIVESYNC_INVALID_TOPIC = "basetool.livesync.invalid.topic";
+
+  /**
    * Counter {@code basetool_livesync_redis_published_total} — tag {@code topic_class}; {@code
    * changed} signals this instance published to the cross-replica Redis channel (ADR-0094).
    */

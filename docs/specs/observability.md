@@ -519,14 +519,20 @@ counters carry a bounded `topic_class` label (one of the eight `LiveSyncTopicCla
 the meter names stay put — a rename would break the `07` panels and this alert set. A `changed`-frame
 flatline (overall on panel 28, or per surface on the `topic_class` breakdown) while `snapshot` frames
 keep flowing is the early indicator for that defect class (panels only, baselined before alerting).
-The tool-wide live-sync relay adds four more meters: `basetool_livesync_subscriptions{topic_class}`
+The tool-wide live-sync relay adds five more meters: `basetool_livesync_subscriptions{topic_class}`
 (open `/ws/sync` subscriptions per topic class — the live per-surface load denominator),
 `basetool_livesync_subscribe_total{topic_class,outcome}` (`outcome` = `allowed` / `denied`, the
 subscribe-authorization verdict; a saturated-executor fail-open is instead a `authorize_saturated`
 relay drop), `basetool_livesync_socket_rejected_total{reason}` (`reason` = `user_cap`; a `/ws/sync`
 socket refused at connect because the user is already at the per-user socket cap — F2/#1243, no
 `topic_class` because a rejected socket has bound no topic; plotted alongside the relay drops on the
-`07` "Presence relay drops/hour" panel), and the cross-replica fan-out counters
+`07` "Presence relay drops/hour" panel), the unlabelled `basetool_livesync_invalid_topic_total`
+(a `/ws/sync` subscribe to an unknown/unparseable topic — `LiveSyncTopic.parse(...) == null` — the
+signature of a client/server topic-vocabulary skew where a client subscribes to a topic this server
+no longer knows; no `topic_class` because the topic did not parse into a class — a dedicated
+unlabelled meter rather than an `unknown` sentinel keeps the bounded `topic_class` set to the real
+classes, the REQ-OBS-011 design call deferred from #1102 step 11 and resolved in #1239; plotted on
+the same `07` "Presence relay drops/hour" panel), and the cross-replica fan-out counters
 `basetool_livesync_redis_published_total{topic_class}` / `basetool_livesync_redis_consumed_total{topic_class}`
 (`changed` signals published to / consumed from the `basetool:livesync:changed` Redis channel;
 own-origin excluded) plus `basetool_livesync_redis_errors_total{op}` (`publish` / `consume`, a

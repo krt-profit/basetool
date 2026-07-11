@@ -1540,6 +1540,15 @@
             "type": "prometheus",
             "uid": "prometheus"
           }
+        },
+        {
+          "expr": "sum (rate(basetool_livesync_invalid_topic_total[1h])) * 3600",
+          "refId": "C",
+          "legendFormat": "invalid_topic",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         }
       ]
     },
