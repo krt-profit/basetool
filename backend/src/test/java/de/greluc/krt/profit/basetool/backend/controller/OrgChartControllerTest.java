@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.service.OrgChartReadService;
 import de.greluc.krt.profit.basetool.backend.service.OrgChartService;
 import java.util.List;
 import java.util.UUID;
@@ -49,6 +50,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class OrgChartControllerTest {
 
   @Mock private OrgChartService orgChartService;
+  @Mock private OrgChartReadService orgChartReadService;
 
   @InjectMocks private OrgChartController controller;
 
@@ -61,10 +63,10 @@ class OrgChartControllerTest {
             new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
             List.of(),
             List.of());
-    when(orgChartService.getOrgChart()).thenReturn(chart);
+    when(orgChartReadService.getOrgChart()).thenReturn(chart);
 
     assertSame(chart, controller.getOrgChart());
-    verify(orgChartService).getOrgChart();
+    verify(orgChartReadService).getOrgChart();
   }
 
   @Test

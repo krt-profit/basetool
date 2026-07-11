@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionCreateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgChartPositionUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.service.OrgChartReadService;
 import de.greluc.krt.profit.basetool.backend.service.OrgChartService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
@@ -58,6 +59,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class OrgChartController {
 
   private final OrgChartService orgChartService;
+  private final OrgChartReadService orgChartReadService;
 
   /**
    * Returns the entire org chart (Bereichsleitung plus every active, profit-eligible Staffel and
@@ -78,7 +80,7 @@ public class OrgChartController {
     @ApiResponse(responseCode = "401", description = "Caller is not authenticated.")
   })
   public OrgChartDto getOrgChart() {
-    return orgChartService.getOrgChart();
+    return orgChartReadService.getOrgChart();
   }
 
   /**
