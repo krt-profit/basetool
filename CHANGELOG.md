@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.3.2](https://github.com/krt-profit/basetool/releases/tag/v1.3.2) - 2026-07-11
+
 ### Fixed
 
 - **Materialbörse: Beim Freigeben eines Materials wird kein zweites Mengenfeld mehr angezeigt.** Der Freigabe-Dialog (aus „Mein Lager" heraus wie über „Material anbieten") blendete unter dem korrekten Feld „Menge anbieten" fälschlich noch das Item-Mengenfeld „Menge (Stück)" ein, das eigentlich nur beim Anbieten craftbarer Items gilt. Ursache war eine CSS-Regel, die das per `hidden` versteckte Feld überstimmte (REQ-MARKET-002/012).
