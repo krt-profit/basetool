@@ -86,6 +86,37 @@ const MISSION_SECTIONS = {
     },
 };
 
+// #1241: a mission's core (name/status) and its finance also render on the PARENT OPERATION's
+// detail page — in the embedded missions table and the finance roll-up — which live on the
+// operation:{id} live-sync room, a different topic this page never subscribes to. When such a
+// section changes here, cross-publish the affected operation sections to that room (publishing
+// needs no subscription) so a peer viewing the operation refreshes them in place without a reload.
+// Mapping: mission 'overview' (the core: name/status) -> operation 'missions'; mission 'finance' ->
+// operation 'finance'. Only fires for a mission that belongs to an operation (missionOperationId
+// set); other mission sections (crew/steps/objectives/organisation/…) do not surface on the
+// operation and are not forwarded. Wiring tracked in #1241 (REQ-FE-015).
+function crossPublishToParentOperation(keys) {
+    const operationId = window.missionOperationId;
+    if (
+        !operationId ||
+        !window.krtLiveSync ||
+        typeof window.krtLiveSync.sendChanged !== 'function'
+    ) {
+        return;
+    }
+    const changed = Array.isArray(keys) ? keys : [keys];
+    const operationSections = [];
+    if (changed.indexOf('overview') !== -1) {
+        operationSections.push('missions');
+    }
+    if (changed.indexOf('finance') !== -1) {
+        operationSections.push('finance');
+    }
+    if (operationSections.length) {
+        window.krtLiveSync.sendChanged('operation:' + operationId, operationSections);
+    }
+}
+
 const missionSeam = window.krtFetch.sectionWrite({
     dict: function () {
         return window.MISSION_SUBRES_I18N || {};
@@ -121,6 +152,7 @@ const missionSeam = window.krtFetch.sectionWrite({
         if (window.missionPresence && typeof window.missionPresence.sendChanged === 'function') {
             window.missionPresence.sendChanged(keys);
         }
+        crossPublishToParentOperation(keys);
     },
 });
 window.krtMissionWrite = missionSeam.write;

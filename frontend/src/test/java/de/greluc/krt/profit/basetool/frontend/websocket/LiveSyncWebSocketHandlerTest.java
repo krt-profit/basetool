@@ -481,17 +481,16 @@ class LiveSyncWebSocketHandlerTest {
     bob.sent.clear();
     FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
 
-    // "crew" is a mission section, not an operation section — dropped; the two operation-surface
-    // sections "overview"/"payout" are kept ("missions"/"finance" are not in the OPERATION
-    // whitelist — see #1241).
+    // "crew" is a mission section, not an operation section — dropped; "overview"/"finance" kept
+    // ("finance" is cross-published from the mission surface, #1241).
     handler.handleTextMessage(
         alice,
         new TextMessage(
             "{\"type\":\"changed\",\"topic\":\""
                 + topic
-                + "\",\"sections\":[\"overview\",\"crew\",\"payout\"]}"));
+                + "\",\"sections\":[\"overview\",\"crew\",\"finance\"]}"));
 
-    assertThat(sectionsOf(lastBroadcast(bob))).containsExactly("overview", "payout");
+    assertThat(sectionsOf(lastBroadcast(bob))).containsExactly("overview", "finance");
   }
 
   @Test

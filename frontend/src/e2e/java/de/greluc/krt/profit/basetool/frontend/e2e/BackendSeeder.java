@@ -1353,6 +1353,37 @@ public final class BackendSeeder {
   }
 
   /**
+   * Creates a Mission that belongs to the given operation via {@code POST /api/v1/missions}, so the
+   * operation detail page's embedded missions table and finance roll-up render this mission — the
+   * setup the {@code operation:{id}} {@code missions}/{@code finance} cross-publish e2e (#1241)
+   * needs. Same auto-stamping and planned-start semantics as {@link #createMission(String, String,
+   * String, boolean)}, with {@code operationId} added to the request.
+   *
+   * @param username the Keycloak username of the creating user (a member of the owning Staffel)
+   * @param password the Keycloak password
+   * @param name the mission name
+   * @param isInternal {@code true} for an internal (staffel-private) mission, {@code false} for a
+   *     public one
+   * @param operationId the id of the parent operation the mission is linked to
+   * @return the created mission's id
+   */
+  public String createMissionInOperation(
+      String username, String password, String name, boolean isInternal, String operationId) {
+    String plannedStart = Instant.now().plus(Duration.ofDays(7)).toString();
+    String body =
+        "{\"name\":\""
+            + name
+            + "\",\"status\":\"PLANNED\",\"isInternal\":"
+            + isInternal
+            + ",\"plannedStartTime\":\""
+            + plannedStart
+            + "\",\"operationId\":\""
+            + operationId
+            + "\"}";
+    return seedEntity(username, password, "/api/v1/missions", body);
+  }
+
+  /**
    * Adds a guest participant to a mission via {@code POST /api/v1/missions/{id}/participants/add},
    * so the mission's finance "Neuer Eintrag" modal has a selectable entry in its {@code required}
    * participant dropdown (a finance entry must be attributed to a participant). A free-text {@code

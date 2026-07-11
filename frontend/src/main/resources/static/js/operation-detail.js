@@ -39,13 +39,15 @@
 // for every other viewer, over the shared /ws/sync socket. Only opaque section keys cross the wire;
 // each viewer re-pulls its own authorization-checked fragment. OPERATION_SECTIONS is the single
 // source of truth shared by the write-side broadcast and the receive-side refresh (the three-mirror-
-// points rule): its keys mirror the server-side LiveSyncTopicClass.OPERATION whitelist, so it only
-// lists the two sections the operation surface itself mutates. The embedded missions table and the
-// finance roll-up change on the mission surface, which does not yet cross-publish to the operation
-// room; re-adding 'missions'/'finance' here in lockstep with the whitelist is tracked in #1241.
+// points rule): its keys mirror the server-side LiveSyncTopicClass.OPERATION whitelist. 'overview'
+// and 'payout' are broadcast from this operation page; 'missions' and 'finance' are cross-published
+// from the mission detail page when a child mission's core/finance changes (#1241) — an operation
+// viewer refreshes the embedded missions table / finance roll-up in place without a reload.
 const OPERATION_SECTIONS = {
     overview: { container: '#op-overview-results', fragmentValue: 'overview' },
+    missions: { container: '#op-missions-results', fragmentValue: 'missions' },
     payout: { container: '#op-payout-results', fragmentValue: 'payout' },
+    finance: { container: '#op-finance-results', fragmentValue: 'finance' },
 };
 
 (function () {
@@ -540,8 +542,8 @@ document.addEventListener('change', function (ev) {
     // Document-delegated on the CAPTURE phase: the `toggle` event does not bubble, so a plain
     // bubbling delegation would never fire — capture catches it at the document. Binding at the
     // document (not on each <details>) also means it survives any DOM replacement of the <details>
-    // elements — a tab re-render today, and the peer-driven finance fragment swap once #1241 wires
-    // the mission -> operation finance cross-publish (REQ-FE-015).
+    // elements — a tab re-render, or the peer-driven finance fragment swap when a child mission's
+    // finance changes and the mission page cross-publishes operation 'finance' (#1241, REQ-FE-015).
     document.addEventListener(
         'toggle',
         function (ev) {

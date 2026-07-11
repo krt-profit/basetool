@@ -958,6 +958,15 @@ key whose container does not exist on the receiving page (guest redaction, reque
 vs ITEM orders, staff vs org-unit bank pages) is silently skipped — that asymmetry is the
 authorization model, not an error.
 
+A topic's sections are not always broadcast from a single page. The `operation:{id}` room is the
+canonical cross-surface case: `overview`/`payout` are broadcast from the operation detail page
+itself, while `missions` (the embedded child-missions table) and `finance` (the roll-up) are
+**cross-published from the mission detail page** — a child mission's core/finance edit maps mission
+`overview → missions` / `finance → finance` onto its parent `operation:{id}` (publishing needs no
+subscription), so an operation viewer refreshes those two sections in place without a reload (#1241).
+The mission page reads its parent operation id from `window.missionOperationId`; a mission with no
+operation forwards nothing.
+
 **Authorization is asymmetric by design (ADR-0093).** *Subscribing* to a topic requires the same
 authenticated read the page itself performs (table above), checked asynchronously off the WS
 container thread; an explicit 403/404 denies, transient failures and authorizer saturation fail

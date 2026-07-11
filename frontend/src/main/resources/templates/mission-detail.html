@@ -2079,6 +2079,11 @@
     const missionId = /*[[${mission?.id?.toString()}]]*/ null;
     window.missionId = missionId;
     window.missionCanEdit = /*[[${!isNew and mission != null and mission.canEdit}]]*/ false;
+    // #1241: the parent operation id (or null when the mission belongs to no operation), so a
+    // mission core/finance edit can cross-publish to the operation:{id} live-sync room whose
+    // embedded missions table and finance roll-up render this mission.
+    window.missionOperationId =
+        /*[[${mission?.operation?.id?.toString()}]]*/ null;
 </script>
 <script th:src="@{/js/mission-detail.js}" th:attr="nonce=${cspNonce}"></script>
     <script th:inline="javascript" th:if="${!isNew}" th:attr="nonce=${cspNonce}">
