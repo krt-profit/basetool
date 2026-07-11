@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerUexCompanyRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
+import de.greluc.krt.profit.basetool.backend.support.UexValues;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -132,7 +133,7 @@ public class UexVehicleService {
       return false;
     }
 
-    UUID externalUuid = parseUuid(dto.uuid());
+    UUID externalUuid = UexValues.parseUuid(dto.uuid());
 
     Optional<ShipType> existingOpt = Optional.empty();
     if (externalUuid != null) {
@@ -218,42 +219,42 @@ public class UexVehicleService {
     shipType.setDescriptionEn(dto.descriptionEn());
     // descriptionDe stays from a prior R4 Wiki sync; UEX does not expose a DE description.
 
-    shipType.setIsAddon(asBoolean(dto.isAddon()));
-    shipType.setIsBoarding(asBoolean(dto.isBoarding()));
-    shipType.setIsBomber(asBoolean(dto.isBomber()));
-    shipType.setIsCargo(asBoolean(dto.isCargo()));
-    shipType.setIsCarrier(asBoolean(dto.isCarrier()));
-    shipType.setIsCivilian(asBoolean(dto.isCivilian()));
-    shipType.setIsConcept(asBoolean(dto.isConcept()));
-    shipType.setIsConstruction(asBoolean(dto.isConstruction()));
-    shipType.setIsDatarunner(asBoolean(dto.isDatarunner()));
-    shipType.setIsDocking(asBoolean(dto.isDocking()));
-    shipType.setIsEmp(asBoolean(dto.isEmp()));
-    shipType.setIsExploration(asBoolean(dto.isExploration()));
-    shipType.setIsGroundVehicle(asBoolean(dto.isGroundVehicle()));
-    shipType.setIsHangar(asBoolean(dto.isHangar()));
-    shipType.setIsIndustrial(asBoolean(dto.isIndustrial()));
-    shipType.setIsInterdiction(asBoolean(dto.isInterdiction()));
-    shipType.setIsLoadingDock(asBoolean(dto.isLoadingDock()));
-    shipType.setIsMedical(asBoolean(dto.isMedical()));
-    shipType.setIsMilitary(asBoolean(dto.isMilitary()));
-    shipType.setIsMining(asBoolean(dto.isMining()));
-    shipType.setIsPassenger(asBoolean(dto.isPassenger()));
-    shipType.setIsQed(asBoolean(dto.isQed()));
-    shipType.setIsQuantumCapable(asBoolean(dto.isQuantumCapable()));
-    shipType.setIsRacing(asBoolean(dto.isRacing()));
-    shipType.setIsRefinery(asBoolean(dto.isRefinery()));
-    shipType.setIsRefuel(asBoolean(dto.isRefuel()));
-    shipType.setIsRepair(asBoolean(dto.isRepair()));
-    shipType.setIsResearch(asBoolean(dto.isResearch()));
-    shipType.setIsSalvage(asBoolean(dto.isSalvage()));
-    shipType.setIsScanning(asBoolean(dto.isScanning()));
-    shipType.setIsScience(asBoolean(dto.isScience()));
-    shipType.setIsShowdownWinner(asBoolean(dto.isShowdownWinner()));
-    shipType.setIsSpaceship(asBoolean(dto.isSpaceship()));
-    shipType.setIsStarter(asBoolean(dto.isStarter()));
-    shipType.setIsStealth(asBoolean(dto.isStealth()));
-    shipType.setIsTractorBeam(asBoolean(dto.isTractorBeam()));
+    shipType.setIsAddon(UexValues.asBooleanOrNull(dto.isAddon()));
+    shipType.setIsBoarding(UexValues.asBooleanOrNull(dto.isBoarding()));
+    shipType.setIsBomber(UexValues.asBooleanOrNull(dto.isBomber()));
+    shipType.setIsCargo(UexValues.asBooleanOrNull(dto.isCargo()));
+    shipType.setIsCarrier(UexValues.asBooleanOrNull(dto.isCarrier()));
+    shipType.setIsCivilian(UexValues.asBooleanOrNull(dto.isCivilian()));
+    shipType.setIsConcept(UexValues.asBooleanOrNull(dto.isConcept()));
+    shipType.setIsConstruction(UexValues.asBooleanOrNull(dto.isConstruction()));
+    shipType.setIsDatarunner(UexValues.asBooleanOrNull(dto.isDatarunner()));
+    shipType.setIsDocking(UexValues.asBooleanOrNull(dto.isDocking()));
+    shipType.setIsEmp(UexValues.asBooleanOrNull(dto.isEmp()));
+    shipType.setIsExploration(UexValues.asBooleanOrNull(dto.isExploration()));
+    shipType.setIsGroundVehicle(UexValues.asBooleanOrNull(dto.isGroundVehicle()));
+    shipType.setIsHangar(UexValues.asBooleanOrNull(dto.isHangar()));
+    shipType.setIsIndustrial(UexValues.asBooleanOrNull(dto.isIndustrial()));
+    shipType.setIsInterdiction(UexValues.asBooleanOrNull(dto.isInterdiction()));
+    shipType.setIsLoadingDock(UexValues.asBooleanOrNull(dto.isLoadingDock()));
+    shipType.setIsMedical(UexValues.asBooleanOrNull(dto.isMedical()));
+    shipType.setIsMilitary(UexValues.asBooleanOrNull(dto.isMilitary()));
+    shipType.setIsMining(UexValues.asBooleanOrNull(dto.isMining()));
+    shipType.setIsPassenger(UexValues.asBooleanOrNull(dto.isPassenger()));
+    shipType.setIsQed(UexValues.asBooleanOrNull(dto.isQed()));
+    shipType.setIsQuantumCapable(UexValues.asBooleanOrNull(dto.isQuantumCapable()));
+    shipType.setIsRacing(UexValues.asBooleanOrNull(dto.isRacing()));
+    shipType.setIsRefinery(UexValues.asBooleanOrNull(dto.isRefinery()));
+    shipType.setIsRefuel(UexValues.asBooleanOrNull(dto.isRefuel()));
+    shipType.setIsRepair(UexValues.asBooleanOrNull(dto.isRepair()));
+    shipType.setIsResearch(UexValues.asBooleanOrNull(dto.isResearch()));
+    shipType.setIsSalvage(UexValues.asBooleanOrNull(dto.isSalvage()));
+    shipType.setIsScanning(UexValues.asBooleanOrNull(dto.isScanning()));
+    shipType.setIsScience(UexValues.asBooleanOrNull(dto.isScience()));
+    shipType.setIsShowdownWinner(UexValues.asBooleanOrNull(dto.isShowdownWinner()));
+    shipType.setIsSpaceship(UexValues.asBooleanOrNull(dto.isSpaceship()));
+    shipType.setIsStarter(UexValues.asBooleanOrNull(dto.isStarter()));
+    shipType.setIsStealth(UexValues.asBooleanOrNull(dto.isStealth()));
+    shipType.setIsTractorBeam(UexValues.asBooleanOrNull(dto.isTractorBeam()));
   }
 
   /**
@@ -280,38 +281,5 @@ public class UexVehicleService {
       return null;
     }
     return manufacturerRepository.findByNameIgnoreCase(dto.companyName()).orElse(null);
-  }
-
-  /**
-   * Parses a UEX-emitted UUID string. UEX returns an empty string for ~31% of vehicles (concepts,
-   * capital ships, retired variants). Returns {@code null} on empty / malformed input.
-   *
-   * @param raw raw UUID string from the DTO
-   * @return parsed UUID, or {@code null}
-   */
-  private static UUID parseUuid(String raw) {
-    if (!StringUtils.hasText(raw)) {
-      return null;
-    }
-    try {
-      return UUID.fromString(raw.trim());
-    } catch (IllegalArgumentException e) {
-      log.debug("Skipping malformed UEX uuid '{}': {}", raw, e.getMessage());
-      return null;
-    }
-  }
-
-  /**
-   * Normalises UEX's integer 0/1 flag into a {@link Boolean}. Distinguishes between {@code null}
-   * (UEX didn't carry the flag) and {@code false} (UEX carried 0).
-   *
-   * @param flag UEX-style integer
-   * @return {@code true} / {@code false} / {@code null}
-   */
-  private static Boolean asBoolean(Integer flag) {
-    if (flag == null) {
-      return null;
-    }
-    return flag == 1;
   }
 }
