@@ -118,6 +118,53 @@ class LiveSyncSubscriptionAuthorizerTest {
     assertThat(authorizer.authorize(operationTopic, TOKEN, PIN)).isEqualTo(Decision.ALLOW);
   }
 
+  // ── F1: a PRESENCE-enabled class (mission) fails CLOSED on every indeterminate verdict, because
+  // an allowed subscribe immediately exposes the editor-identity presence snapshot. ─────────────
+
+  @Test
+  void authorize_missionPresence_2xx_allows() throws Exception {
+    // Positive control: a definitive backend 2xx still allows a mission subscribe — fail-closed
+    // only
+    // changes the INDETERMINATE outcomes, not a genuine authorization.
+    LiveSyncTopic mission = LiveSyncTopic.parse("mission:" + UUID.randomUUID());
+    server.enqueue(new MockResponse().setResponseCode(200).setBody("{}"));
+    assertThat(authorizer.authorize(mission, TOKEN, PIN)).isEqualTo(Decision.ALLOW);
+  }
+
+  @Test
+  void authorize_missionPresence_401_failsClosed() {
+    // A lapsed captured token is indeterminate; for the presence class it must DENY (not admit the
+    // editor snapshot of a mission the caller may not read).
+    LiveSyncTopic mission = LiveSyncTopic.parse("mission:" + UUID.randomUUID());
+    server.enqueue(new MockResponse().setResponseCode(401));
+    assertThat(authorizer.authorize(mission, TOKEN, PIN)).isEqualTo(Decision.DENY);
+  }
+
+  @Test
+  void authorize_missionPresence_5xx_failsClosed() {
+    LiveSyncTopic mission = LiveSyncTopic.parse("mission:" + UUID.randomUUID());
+    server.enqueue(new MockResponse().setResponseCode(503));
+    assertThat(authorizer.authorize(mission, TOKEN, PIN)).isEqualTo(Decision.DENY);
+  }
+
+  @Test
+  void authorize_missionPresence_nullToken_failsClosedWithoutProbing() {
+    // No captured token: the presence class denies without a probe (the non-presence classes fail
+    // open here — authorize_nullToken_allowsWithoutProbing).
+    LiveSyncTopic mission = LiveSyncTopic.parse("mission:" + UUID.randomUUID());
+    assertThat(authorizer.authorize(mission, null, PIN)).isEqualTo(Decision.DENY);
+    assertThat(server.getRequestCount()).isZero();
+  }
+
+  @Test
+  void authorize_missionPresence_403_denies() {
+    // An explicit refusal denies for every class (unchanged); asserted here for the presence class
+    // so the DENY path is anchored alongside the fail-closed indeterminate ones.
+    LiveSyncTopic mission = LiveSyncTopic.parse("mission:" + UUID.randomUUID());
+    server.enqueue(new MockResponse().setResponseCode(403));
+    assertThat(authorizer.authorize(mission, TOKEN, PIN)).isEqualTo(Decision.DENY);
+  }
+
   @Test
   void authorize_omitsPinHeader_whenNoActivePin() throws Exception {
     server.enqueue(new MockResponse().setResponseCode(200).setBody("{}"));

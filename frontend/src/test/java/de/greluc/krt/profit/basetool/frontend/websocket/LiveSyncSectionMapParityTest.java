@@ -23,11 +23,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -116,6 +123,140 @@ class LiveSyncSectionMapParityTest {
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.ORGUNIT_BANK.allowedSections());
   }
 
+  /** The materialboard broadcast whitelist is exactly the single {@code board} key (F4). */
+  @Test
+  void materialboardTopicClass_pinsTheSingleBoardSection() {
+    assertThat(LiveSyncTopicClass.MATERIALBOARD.allowedSections())
+        .as("MATERIALBOARD whitelist is exactly {board}")
+        .containsExactly("board");
+  }
+
+  /**
+   * The Materialbörse board uses {@code subscribe(topic, {onChanged})} + {@code swapList} rather
+   * than a {@code {container}} seam map, so the generic seam-map parity tests do not cover it (F4).
+   * Pin its <em>broadcast</em> side directly: every {@code
+   * krtLiveSync.sendChanged('materialboard'|MATERIALBOARD_TOPIC, [...])} call across the three
+   * materialboerse modules must send only keys in {@link LiveSyncTopicClass#MATERIALBOARD}'s
+   * whitelist — so a stray out-of-whitelist key (silently dropped by the relay → stale peer) fails
+   * the build instead.
+   */
+  @Test
+  void materialboardBroadcasts_onlyEverSendWhitelistedKeys() throws IOException {
+    Set<String> whitelist = LiveSyncTopicClass.MATERIALBOARD.allowedSections();
+    Pattern sendChanged =
+        Pattern.compile(
+            "sendChanged\\(\\s*(?:'materialboard'|\"materialboard\"|MATERIALBOARD_TOPIC)\\s*,"
+                + "\\s*\\[([^\\]]*)\\]");
+    int callsSeen = 0;
+    for (String module :
+        List.of(
+            "/static/js/materialboerse.js",
+            "/static/js/materialboerse-release.js",
+            "/static/js/inventory-materialboerse.js")) {
+      Matcher matcher = sendChanged.matcher(readResource(module));
+      while (matcher.find()) {
+        callsSeen++;
+        for (String rawKey : matcher.group(1).split(",")) {
+          String key = rawKey.trim().replaceAll("^['\"]|['\"]$", "");
+          if (key.isEmpty()) {
+            continue;
+          }
+          assertThat(whitelist)
+              .as("materialboard sendChanged key '%s' in %s must be whitelisted", key, module)
+              .contains(key);
+        }
+      }
+    }
+    assertThat(callsSeen)
+        .as("at least one materialboard sendChanged(...) call must exist (guards a silent rename)")
+        .isPositive();
+  }
+
+  /**
+   * Build-enforces the <em>broadcast</em> side of the three-mirror-points rule for the bank surface
+   * (F5). Unlike the JS {@code *_SECTIONS} receiver maps (covered above), the bank publish side is
+   * driven by {@code data-livesync="topic/sec,sec …"} HTML attributes evaluated in {@code
+   * publishBankLiveSync} — so a stray out-of-whitelist section there is silently dropped by the
+   * server with no red build. This scans every template for those attributes and asserts each
+   * section key is inside its topic class's whitelist.
+   *
+   * @throws IOException if a template cannot be read
+   * @throws URISyntaxException if the templates classpath root cannot be resolved
+   */
+  @Test
+  void dataLivesyncBroadcastKeys_areAllWithinTheirTopicClassWhitelist()
+      throws IOException, URISyntaxException {
+    Pattern attribute = Pattern.compile("data-livesync=\"([^\"]*)\"");
+    // Anchor on a KNOWN template file rather than the bare `/templates` directory resource
+    // (getResource on a directory is not portable); its parent is the real templates root on the
+    // classpath, and Files.walk covers the subdirectories (admin/, fragments/, …).
+    URL anchor = LiveSyncSectionMapParityTest.class.getResource("/templates/bank-grants.html");
+    assertThat(anchor).as("/templates/bank-grants.html classpath resource").isNotNull();
+    Path templatesRoot = Paths.get(anchor.toURI()).getParent();
+    int entriesChecked = 0;
+    try (Stream<Path> tree = Files.walk(templatesRoot)) {
+      List<Path> templates =
+          tree.filter(Files::isRegularFile)
+              .filter(p -> p.getFileName().toString().endsWith(".html"))
+              .toList();
+      for (Path template : templates) {
+        String html = Files.readString(template, StandardCharsets.UTF_8);
+        Matcher matcher = attribute.matcher(html);
+        while (matcher.find()) {
+          for (String entry : matcher.group(1).trim().split("\\s+")) {
+            if (entry.isEmpty()) {
+              continue;
+            }
+            int slash = entry.indexOf('/');
+            assertThat(slash)
+                .as("data-livesync entry '%s' in %s has a topic/sections shape", entry, template)
+                .isPositive();
+            String topic = entry.substring(0, slash);
+            LiveSyncTopicClass topicClass = resolveTopicClass(topic);
+            assertThat(topicClass)
+                .as("data-livesync topic '%s' in %s resolves to a known class", topic, template)
+                .isNotNull();
+            for (String section : entry.substring(slash + 1).split(",")) {
+              if (section.isEmpty()) {
+                continue;
+              }
+              entriesChecked++;
+              assertThat(topicClass.allowedSections())
+                  .as(
+                      "data-livesync section '%s' (topic %s) in %s must be whitelisted",
+                      section, topic, template)
+                  .contains(section);
+            }
+          }
+        }
+      }
+    }
+    assertThat(entriesChecked)
+        .as("at least one data-livesync section must be checked (guards a silent attribute rename)")
+        .isPositive();
+  }
+
+  /**
+   * Resolves a {@code data-livesync} topic token (its account-id placeholder stripped) to its
+   * {@link LiveSyncTopicClass} by prefix and whether it carries an id segment — so {@code
+   * bank:@account} resolves to the scoped {@link LiveSyncTopicClass#BANK_ACCOUNT} while the bare
+   * {@code bank} resolves to {@link LiveSyncTopicClass#BANK_STAFF}.
+   *
+   * @param topic the topic token (e.g. {@code bank:@account}, {@code bank}, {@code orgunit-bank})
+   * @return the matching class, or {@code null} if none matches
+   */
+  private static LiveSyncTopicClass resolveTopicClass(String topic) {
+    int colon = topic.indexOf(':');
+    String prefix = colon < 0 ? topic : topic.substring(0, colon);
+    boolean scoped = colon >= 0;
+    for (LiveSyncTopicClass topicClass : LiveSyncTopicClass.values()) {
+      if (topicClass.prefix().equals(prefix) && topicClass.scoped() == scoped) {
+        return topicClass;
+      }
+    }
+    return null;
+  }
+
   /**
    * Extracts the top-level keys of a JS object literal assigned to {@code variableName} in the
    * given classpath resource.
@@ -145,15 +286,23 @@ class LiveSyncSectionMapParityTest {
    * Returns the brace-balanced object-literal body assigned to {@code variableName} (excluding the
    * outer braces), so nested objects do not terminate the scan early.
    *
+   * <p>Anchored on the <em>assignment</em> — the first {@code <NAME> = &#123;} — not on the first
+   * bare occurrence of the name (F6). The seam-map name typically appears first in a preceding
+   * comment; a plain {@code indexOf(name)} then {@code indexOf('{')} would silently mis-scan the
+   * wrong span if that comment ever contained a brace (e.g. an {@code operation:&#123;id&#125;}
+   * example), extracting garbage instead of failing loudly.
+   *
    * @param js the full module source
    * @param variableName the seam-map variable name
    * @return the object-literal body between its outer braces
    */
   private static String extractObjectLiteral(String js, String variableName) {
-    int nameAt = js.indexOf(variableName);
-    assertThat(nameAt).as("%s declaration present", variableName).isNotNegative();
-    int open = js.indexOf('{', nameAt);
-    assertThat(open).as("%s object-literal opening brace", variableName).isNotNegative();
+    Matcher declaration =
+        Pattern.compile("\\b" + Pattern.quote(variableName) + "\\s*=\\s*\\{").matcher(js);
+    assertThat(declaration.find())
+        .as("%s = { assignment present (not just a comment mention)", variableName)
+        .isTrue();
+    int open = declaration.end() - 1; // the '{' the assignment regex matched
     int depth = 0;
     for (int i = open; i < js.length(); i++) {
       char c = js.charAt(i);

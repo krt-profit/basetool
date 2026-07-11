@@ -285,10 +285,14 @@
             if (pill) {
                 return;
             }
+            // Shared fallback comes from the bundle-sourced global set in head.html (F8) — no
+            // hardcoded user-visible string here. A page-specific pillCfg.label() still wins.
+            const fallbackLabel =
+                (window.krtLiveSyncI18n && window.krtLiveSyncI18n.updatesAvailable) || '';
             const label =
                 typeof pillCfg.label === 'function'
-                    ? pillCfg.label() || 'Aktualisierungen verfügbar'
-                    : 'Aktualisierungen verfügbar';
+                    ? pillCfg.label() || fallbackLabel
+                    : fallbackLabel;
             pill = document.createElement('button');
             pill.id = pillId;
             pill.type = 'button';

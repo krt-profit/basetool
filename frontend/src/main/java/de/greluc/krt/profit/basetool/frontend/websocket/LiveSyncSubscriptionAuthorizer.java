@@ -51,16 +51,20 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  *
  * <p><b>Decision.</b> For a resource-scoped class the authorizer issues the class's {@link
  * LiveSyncTopicClass#authProbePath()} read (e.g. {@code GET /api/v1/operations/{id}}): a 2xx allows
- * the subscribe, an explicit {@code 403}/{@code 404} denies it, and anything else — a {@code 401}
- * from an expired captured token, a {@code 5xx}, a timeout, a transport error — <b>fails open</b>.
- * Failing open is safe because no resource data ever crosses the socket: a subscriber only receives
- * opaque section keys, and every fragment it then re-pulls is independently authorized per viewer
- * through the servlet path (with a fresh token and pin), so a stale-token or backend-blip false
- * allow leaks at most "some section of resource X changed", never its contents. A global-room class
- * either requires a capability (a capabilities read whose {@link
- * LiveSyncTopicClass#capabilityField} must be {@code true} — a withheld flag, e.g. a non-profit
- * requester lacking {@code canViewJobOrders}, denies; a failed read fails open) or, with no probe
- * path at all, is authorized by the socket's authentication alone.
+ * the subscribe, an explicit {@code 403}/{@code 404} denies it, and anything <em>indeterminate</em>
+ * — a {@code 401} from an expired captured token, a {@code 5xx}, a timeout, a transport error — is
+ * resolved by {@link #failOpen(LiveSyncTopic)}: <b>open</b> for a non-presence class, <b>closed</b>
+ * for a presence-enabled one. Failing open is safe for a non-presence class because no resource
+ * data ever crosses the socket — a subscriber only receives opaque section keys, and every fragment
+ * it then re-pulls is independently authorized per viewer through the servlet path (with a fresh
+ * token and pin), so a stale-token or backend-blip false allow leaks at most "some section of
+ * resource X changed", never its contents. A presence-enabled class ({@link
+ * LiveSyncTopicClass#MISSION}) fails <b>closed</b> instead: its allowed subscribe immediately emits
+ * an editor-presence snapshot (ids + callsigns), which is cross-user identity data the opaque-keys
+ * argument does not cover (F1). A global-room class either requires a capability (a capabilities
+ * read whose {@link LiveSyncTopicClass#capabilityField} must be {@code true} — a withheld flag,
+ * e.g. a non-profit requester lacking {@code canViewJobOrders}, denies; a failed read fails open)
+ * or, with no probe path at all, is authorized by the socket's authentication alone.
  */
 @Slf4j
 @Component
@@ -73,6 +77,29 @@ public class LiveSyncSubscriptionAuthorizer {
     ALLOW,
     /** The subscribe is refused by an explicit backend authorization denial. */
     DENY
+  }
+
+  /**
+   * The verdict for an <em>indeterminate</em> authorization outcome — no captured token, a
+   * transient backend failure (401/5xx/timeout/transport), auth-executor saturation, or a probe
+   * that threw: fail <b>open</b> for a non-presence class, fail <b>closed</b> for a
+   * presence-enabled one (F1).
+   *
+   * <p>Failing open is safe for a non-presence class because only opaque section keys ever cross
+   * the socket and every fragment the subscriber then re-pulls is independently re-authorized per
+   * viewer. But a presence-enabled class ({@link LiveSyncTopicClass#MISSION}) immediately emits a
+   * presence snapshot carrying each editor's pseudonymous id and callsign, so an indeterminate
+   * <em>allow</em> there would disclose <em>who</em> is editing a resource the caller may not be
+   * able to read — a cross-user identity leak the opaque-keys argument does not cover. Such a topic
+   * therefore fails closed: an indeterminate verdict denies rather than admits.
+   *
+   * @param topic the topic whose class decides the fail direction
+   * @return {@link Decision#ALLOW} for a non-presence class, {@link Decision#DENY} for a presence
+   *     one
+   */
+  @NotNull
+  static Decision failOpen(@NotNull LiveSyncTopic topic) {
+    return topic.topicClass().presenceEnabled() ? Decision.DENY : Decision.ALLOW;
   }
 
   /**
@@ -133,10 +160,11 @@ public class LiveSyncSubscriptionAuthorizer {
     Set<String> requiredAnyRole = topic.topicClass().requiredAnyRole();
     if (requiredAnyRole != null) {
       // Local, backend-free role check against the handshake-captured authorities (bank staff /
-      // orgunit-bank). A missing capture fails open (opaque keys only; each fragment re-pull
-      // re-authorizes per viewer through the servlet path).
+      // orgunit-bank). A missing capture is indeterminate — fail open for these non-presence rooms
+      // (opaque keys only; each fragment re-pull re-authorizes per viewer through the servlet
+      // path).
       if (authorities == null) {
-        return Decision.ALLOW;
+        return failOpen(topic);
       }
       for (String role : requiredAnyRole) {
         if (authorities.contains(role)) {
@@ -155,9 +183,13 @@ public class LiveSyncSubscriptionAuthorizer {
       return Decision.ALLOW;
     }
     if (accessToken == null || accessToken.isBlank()) {
-      // No captured token snapshot (e.g. a session that lost its authorized client): fail open. The
-      // subscriber still only ever receives opaque keys; each fragment re-pull re-authorizes.
-      return Decision.ALLOW;
+      // No captured token snapshot (e.g. a session whose token lapsed — the snapshot is never
+      // refreshed, so this is a steady state, not a blip): indeterminate. Non-presence classes fail
+      // open (opaque keys only; each fragment re-pull re-authorizes); a presence class fails closed
+      // so a lapsed-token caller cannot pull the editor-identity snapshot of a mission it can't
+      // read
+      // (F1).
+      return failOpen(topic);
     }
     if (topic.resourceId() != null) {
       String resource = topic.resourceId().toString();
@@ -236,16 +268,17 @@ public class LiveSyncSubscriptionAuthorizer {
         return Decision.DENY;
       }
       log.debug(
-          "Live-sync subscribe allowed despite transient backend status {} for topic {}",
+          "Live-sync subscribe indeterminate on transient backend status {} for topic {}",
           status,
           topic.canonical());
-      return Decision.ALLOW;
+      return failOpen(topic);
     } catch (RuntimeException e) {
       log.debug(
-          "Live-sync subscribe authorization probe failed for topic {}; allowing (fail-open)",
+          "Live-sync subscribe authorization probe failed for topic {} (fail-open direction by"
+              + " class)",
           topic.canonical(),
           e);
-      return Decision.ALLOW;
+      return failOpen(topic);
     }
   }
 
@@ -285,10 +318,10 @@ public class LiveSyncSubscriptionAuthorizer {
       return Decision.ALLOW;
     } catch (RuntimeException e) {
       log.debug(
-          "Live-sync capability probe failed for topic {}; allowing (fail-open)",
+          "Live-sync capability probe failed for topic {} (fail-open direction by class)",
           topic.canonical(),
           e);
-      return Decision.ALLOW;
+      return failOpen(topic);
     }
   }
 

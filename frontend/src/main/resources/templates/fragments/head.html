@@ -129,6 +129,17 @@
     -->
     <script th:src="@{/js/krt-live-sync.js}" th:attr="nonce=${cspNonce}"></script>
     <!--
+      Shared localised label for the live-sync "updates available" pill, on a dedicated global (like
+      window.krtComboboxI18n below) so krt-live-sync.js has a BUNDLE-sourced default instead of a
+      hardcoded string when a page-specific pill label() is not supplied (F8). Pages that pass their
+      own label() still win; this is only the shared fallback.
+    -->
+    <script th:inline="javascript" th:attr="nonce=${cspNonce}">
+        window.krtLiveSyncI18n = {
+            updatesAvailable: /*[[#{livesync.updates_available}]]*/ 'Updates available'
+        };
+    </script>
+    <!--
       Shared default labels for the searchable combobox (krt-searchable-select.js). Defined on a
       dedicated global, like `window.krtScuI18n` above, so they are localised in ONE place and the
       ~20 user-selection pickers across the app need only the `data-krt-combobox` marker (a single

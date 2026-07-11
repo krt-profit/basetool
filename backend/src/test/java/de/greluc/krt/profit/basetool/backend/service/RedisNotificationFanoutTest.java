@@ -114,6 +114,26 @@ class RedisNotificationFanoutTest {
     assertThat(errorCount(MetricNames.OP_CONSUME)).isEqualTo(1.0);
   }
 
+  @Test
+  void onMessage_skipsAMalformedRecipient_butStillDeliversTheValidOnes() {
+    // F7: one bad UUID in the recipients array must not abort the whole batch (as it would if the
+    // per-element parse threw to the outer catch) — the valid recipients are still delivered, and
+    // it is not counted as a consume error.
+    UUID other = UUID.fromString("5f1d2c3b-0000-0000-0000-000000000002");
+    String body =
+        "{\"v\":1,\"origin\":\"backend-B\",\"recipients\":[\"not-a-uuid\",\""
+            + USER
+            + "\",\""
+            + other
+            + "\"]}";
+
+    fanout.onMessage(message(body), null);
+
+    verify(streamService).publish(List.of(USER, other));
+    assertThat(consumedCount()).isEqualTo(1.0);
+    assertThat(errorCount(MetricNames.OP_CONSUME)).isZero();
+  }
+
   private static DefaultMessage message(String body) {
     return new DefaultMessage(
         CHANNEL.getBytes(StandardCharsets.UTF_8), body.getBytes(StandardCharsets.UTF_8));

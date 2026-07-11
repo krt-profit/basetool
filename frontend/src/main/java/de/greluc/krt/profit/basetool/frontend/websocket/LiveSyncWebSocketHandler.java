@@ -613,16 +613,21 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     try {
       authExecutor.execute(() -> authorizeAndRegister(session, topic, token, pin, authorities));
     } catch (RejectedExecutionException e) {
-      // Auth executor saturated: fail open (opaque keys only; each fragment re-pull re-authorizes).
+      // Auth executor saturated: indeterminate verdict. Fail in the class's direction — open for a
+      // non-presence class (opaque keys only; each fragment re-pull re-authorizes), closed for a
+      // presence class so the editor-identity snapshot is never leaked on an unverified subscribe
+      // (F1).
       droppedCounter(topic, MetricNames.DROPPED_AUTHORIZE_SATURATED).increment();
-      completeSubscribe(session, topic, LiveSyncSubscriptionAuthorizer.Decision.ALLOW);
+      completeSubscribe(session, topic, LiveSyncSubscriptionAuthorizer.failOpen(topic));
     }
   }
 
   /**
    * Runs the subscribe-authorization probe (on {@link #authExecutor}) and applies its verdict. A
-   * probe that throws unexpectedly fails open — consistent with the authorizer's own fail-open on
-   * transient errors and safe because only opaque keys cross the socket.
+   * probe that throws unexpectedly is an indeterminate verdict, resolved in the class's fail
+   * direction ({@link LiveSyncSubscriptionAuthorizer#failOpen(LiveSyncTopic)}) — open for a
+   * non-presence class, closed for a presence one (F1) — consistent with the authorizer's own
+   * transient-error handling.
    *
    * @param session the subscribing session
    * @param topic the topic being authorized
@@ -641,8 +646,10 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       decision = authorizer.authorize(topic, token, pin, authorities);
     } catch (RuntimeException e) {
       log.debug(
-          "Live-sync subscribe authorization threw for {}; failing open", topic.canonical(), e);
-      decision = LiveSyncSubscriptionAuthorizer.Decision.ALLOW;
+          "Live-sync subscribe authorization threw for {} (fail direction by class)",
+          topic.canonical(),
+          e);
+      decision = LiveSyncSubscriptionAuthorizer.failOpen(topic);
     }
     completeSubscribe(session, topic, decision);
   }

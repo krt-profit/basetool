@@ -265,7 +265,11 @@ case — a requester poking the staff queue it may not read), only an authentica
 topic class, the class's section whitelist and a per-session rate limit. Only opaque section keys ever
 cross the socket; every fragment a peer then re-pulls is independently authorized per viewer through
 the servlet path, so a transient subscribe fail-open (a backend blip during the probe) leaks at most
-"some section of resource X changed", never its contents.
+"some section of resource X changed", never its contents. The one exception is the presence-enabled
+`mission` class: an allowed subscribe there immediately returns an editor-presence snapshot
+(pseudonymous ids + callsigns), which is cross-user identity data rather than an opaque key, so that
+class **fails closed** on any indeterminate verdict (lapsed token / transient error / executor
+saturation) — an unverified presence subscribe is refused, not admitted.
 
 ### REQ-SEC-008 — Frontend bot protection & silent re-auth
 

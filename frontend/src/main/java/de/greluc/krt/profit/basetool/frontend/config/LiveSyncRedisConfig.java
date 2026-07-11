@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncWebSocketHandler
 import de.greluc.krt.profit.basetool.frontend.websocket.RedisLiveSyncFanout;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.UUID;
+import java.util.concurrent.ThreadPoolExecutor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -33,6 +34,7 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
  * Wires the cross-replica Redis pub/sub fan-out behind the live-sync relay (ADR-0093).
@@ -83,18 +85,47 @@ public class LiveSyncRedisConfig {
   }
 
   /**
+   * Bounded dispatch executor for consumed {@code changed} messages (F3). Without an explicit
+   * executor a {@link RedisMessageListenerContainer} defaults to a {@code SimpleAsyncTaskExecutor}
+   * — a <b>new, unbounded thread per dispatched message</b> — so a cross-replica burst could spawn
+   * threads without limit (the native-thread-OOM shape). This caps concurrency and, when the small
+   * queue is full, runs the dispatch on the container's own thread ({@link
+   * ThreadPoolExecutor.CallerRunsPolicy}) — backpressure, never an unbounded spawn and never a
+   * dropped frame (a dropped relay would leave a peer stale until the next change).
+   *
+   * @return the bounded listener dispatch executor (shut down with the context)
+   */
+  @Bean(destroyMethod = "shutdown")
+  public ThreadPoolTaskExecutor liveSyncRedisListenerExecutor() {
+    ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+    executor.setCorePoolSize(2);
+    executor.setMaxPoolSize(8);
+    executor.setQueueCapacity(1000);
+    executor.setThreadNamePrefix("livesync-redis-");
+    executor.setDaemon(true);
+    executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+    executor.initialize();
+    return executor;
+  }
+
+  /**
    * Subscribes the Redis fan-out to its channel so this instance relays peer replicas' {@code
-   * changed} signals to its local rooms.
+   * changed} signals to its local rooms, dispatching consumed messages on the bounded {@link
+   * #liveSyncRedisListenerExecutor()} rather than the default unbounded per-message executor (F3).
    *
    * @param connectionFactory the auto-configured Redis connection factory
    * @param fanout the Redis fan-out (also the message listener)
+   * @param listenerExecutor the bounded dispatch executor
    * @return the message-listener container
    */
   @Bean
   public RedisMessageListenerContainer liveSyncRedisMessageListenerContainer(
-      RedisConnectionFactory connectionFactory, RedisLiveSyncFanout fanout) {
+      RedisConnectionFactory connectionFactory,
+      RedisLiveSyncFanout fanout,
+      ThreadPoolTaskExecutor listenerExecutor) {
     RedisMessageListenerContainer container = new RedisMessageListenerContainer();
     container.setConnectionFactory(connectionFactory);
+    container.setTaskExecutor(listenerExecutor);
     container.addMessageListener(fanout, new ChannelTopic(fanout.channel()));
     return container;
   }

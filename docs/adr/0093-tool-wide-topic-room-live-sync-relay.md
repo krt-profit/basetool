@@ -58,9 +58,14 @@ no channel at all, and the bank surfaces would need 3–4 parallel sockets per a
   capabilities `canViewJobOrders` for the queue, the bank staff/org-unit account reads with
   a try-both fallback, local role checks for the global staff/member rooms). Checks run
   **asynchronously** on a dedicated bounded executor (8 threads, queue 500) — never on the
-  WS container thread — answering `subscribed` / `denied`. Explicit 403/404 denies;
-  transient errors and executor saturation **fail open** (ADR-0031 semantics: only opaque
-  section keys cross the socket, every fragment re-fetch re-authorizes per viewer).
+  WS container thread — answering `subscribed` / `denied`. Explicit 403/404 denies; an
+  indeterminate verdict (a lapsed captured token, a transient backend error, executor
+  saturation, a probe that threw) resolves in the class's fail direction: **open** for a
+  non-presence class (ADR-0031 semantics: only opaque section keys cross the socket, every
+  fragment re-fetch re-authorizes per viewer) but **closed** for the one presence-enabled
+  class (`mission`), because an allowed subscribe there immediately emits an editor-presence
+  snapshot (pseudonymous ids + callsigns) — cross-user identity data the opaque-keys argument
+  does not cover, so an unverified presence subscribe is refused (F1).
 - **Publish** (`changed`) requires only an authenticated socket, a known topic, the topic
   class's section whitelist and the per-session token bucket (burst 20, refill 10/s) — **no
   subscription**. This widens ADR-0031's trust delta from "viewers of the resource can emit

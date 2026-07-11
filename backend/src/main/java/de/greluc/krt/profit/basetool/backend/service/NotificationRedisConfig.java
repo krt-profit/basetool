@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.support.NotificationFanoutProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.UUID;
+import java.util.concurrent.ThreadPoolExecutor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -30,6 +31,7 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
  * Wires the cross-replica Redis pub/sub fan-out behind the notification SSE push (ADR-0093),
@@ -85,18 +87,51 @@ public class NotificationRedisConfig {
   }
 
   /**
+   * Bounded dispatch executor for consumed notification messages (F3). Without an explicit executor
+   * a {@link RedisMessageListenerContainer} defaults to a {@code SimpleAsyncTaskExecutor} — a
+   * <b>new, unbounded thread per dispatched message</b>. On this path the consume then does a
+   * blocking {@code SseEmitter.send()} to each local subscriber, so a cross-replica burst to
+   * slow/half-open SSE clients would otherwise spawn unbounded threads that each block until the
+   * write drains — exactly the native-thread-OOM shape (pid cap) seen in the July incident. This
+   * caps concurrency; when the queue is full the dispatch runs on the container's own thread
+   * ({@link ThreadPoolExecutor.CallerRunsPolicy}) — backpressure rather than an unbounded spawn. A
+   * dropped notification would only delay a badge until the REQ-NOTIF-006 polling fallback corrects
+   * it, but backpressure avoids even that.
+   *
+   * @return the bounded listener dispatch executor (shut down with the context)
+   */
+  @Bean(destroyMethod = "shutdown")
+  public ThreadPoolTaskExecutor notificationRedisListenerExecutor() {
+    ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+    executor.setCorePoolSize(2);
+    executor.setMaxPoolSize(8);
+    executor.setQueueCapacity(1000);
+    executor.setThreadNamePrefix("notify-redis-");
+    executor.setDaemon(true);
+    executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+    executor.initialize();
+    return executor;
+  }
+
+  /**
    * Subscribes the Redis notification fan-out to its channel so this instance delivers peer
-   * replicas' signals to its local emitters.
+   * replicas' signals to its local emitters, dispatching consumed messages on the bounded {@link
+   * #notificationRedisListenerExecutor()} rather than the default unbounded per-message executor
+   * (F3).
    *
    * @param connectionFactory the auto-configured Redis connection factory
    * @param fanout the Redis fan-out (also the message listener)
+   * @param listenerExecutor the bounded dispatch executor
    * @return the message-listener container
    */
   @Bean
   public RedisMessageListenerContainer notificationRedisMessageListenerContainer(
-      RedisConnectionFactory connectionFactory, RedisNotificationFanout fanout) {
+      RedisConnectionFactory connectionFactory,
+      RedisNotificationFanout fanout,
+      ThreadPoolTaskExecutor listenerExecutor) {
     RedisMessageListenerContainer container = new RedisMessageListenerContainer();
     container.setConnectionFactory(connectionFactory);
+    container.setTaskExecutor(listenerExecutor);
     container.addMessageListener(fanout, new ChannelTopic(fanout.channel()));
     return container;
   }

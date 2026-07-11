@@ -620,6 +620,57 @@ class LiveSyncWebSocketHandlerTest {
   }
 
   @Test
+  void multiplexedSubscribe_presenceClassAuthorizerThrows_failsClosed() throws Exception {
+    // F1: for a PRESENCE class (mission), an indeterminate verdict (the probe throwing) fails
+    // CLOSED — the socket is refused and never joins, so no editor-identity snapshot is emitted and
+    // a later peer change reaches it with nothing. Contrast the operation topic above (fails open).
+    LiveSyncSubscriptionAuthorizer throwing = mock(LiveSyncSubscriptionAuthorizer.class);
+    when(throwing.authorize(any(), any(), any(), any()))
+        .thenThrow(new IllegalStateException("probe blew up"));
+    SimpleMeterRegistry reg = new SimpleMeterRegistry();
+    LiveSyncPresenceService svc = new LiveSyncPresenceService(reg);
+    LiveSyncWebSocketHandler h =
+        new LiveSyncWebSocketHandler(svc, fanout, objectMapper, reg, throwing, Runnable::run);
+
+    String topic = missionTopic();
+    FakeSession bob = multiplexedSession(oidcUser("user-2", "Bob"));
+    h.afterConnectionEstablished(bob);
+    h.handleTextMessage(bob, subscribeFrame(topic));
+
+    assertThat(lastBroadcast(bob).get("type").asString()).isEqualTo("denied");
+    bob.sent.clear();
+    FakeSession alice = multiplexedSession(oidcUser("user-1", "Alice"));
+    h.afterConnectionEstablished(alice);
+    h.handleTextMessage(alice, changedFrame(topic, "crew"));
+    assertThat(bob.sent).isEmpty();
+  }
+
+  @Test
+  void multiplexedSubscribe_presenceClassExecutorSaturated_failsClosed() throws Exception {
+    // F1: auth-executor saturation is indeterminate; a presence class fails CLOSED (the operation
+    // topic in multiplexedSubscribe_executorSaturated_failsOpenAndCounts fails open instead).
+    SimpleMeterRegistry reg = new SimpleMeterRegistry();
+    LiveSyncPresenceService svc = new LiveSyncPresenceService(reg);
+    LiveSyncWebSocketHandler saturated =
+        new LiveSyncWebSocketHandler(
+            svc,
+            fanout,
+            objectMapper,
+            reg,
+            authorizer,
+            runnable -> {
+              throw new RejectedExecutionException("auth executor full");
+            });
+
+    String topic = missionTopic();
+    FakeSession bob = multiplexedSession(oidcUser("user-2", "Bob"));
+    saturated.afterConnectionEstablished(bob);
+    saturated.handleTextMessage(bob, subscribeFrame(topic));
+
+    assertThat(lastBroadcast(bob).get("type").asString()).isEqualTo("denied");
+  }
+
+  @Test
   void multiplexedSubscribe_socketClosedDuringProbe_dropsAndDoesNotJoin() throws Exception {
     // Close-during-probe race branch (a): the async probe returns ALLOW, but the socket closed
     // while it ran. The slot was reserved synchronously at subscribe time; completeSubscribe must

@@ -138,7 +138,14 @@ public class RedisNotificationFanout implements NotificationFanout, MessageListe
       if (recipientsNode != null && recipientsNode.isArray()) {
         for (JsonNode element : recipientsNode) {
           if (element != null && element.isString()) {
-            recipients.add(UUID.fromString(element.asString()));
+            // Skip a single malformed UUID rather than letting it abort the whole batch (F7): one
+            // bad entry from a future/older or tampered peer must not drop every other recipient's
+            // push. Matches the frontend consume path's per-element defensiveness.
+            try {
+              recipients.add(UUID.fromString(element.asString()));
+            } catch (IllegalArgumentException e) {
+              log.debug("Skipping malformed recipient sub in notification fan-out message", e);
+            }
           }
         }
       }
