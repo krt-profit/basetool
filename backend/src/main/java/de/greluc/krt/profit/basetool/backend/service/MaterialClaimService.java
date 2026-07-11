@@ -109,7 +109,7 @@ public class MaterialClaimService {
    * {@link ObjectOptimisticLockingFailureException} poisons the whole transaction (Postgres marks
    * it aborted), so no same-transaction retry could ever commit. An {@link ObjectProvider} defers
    * the lookup, avoiding an eager self-injection cycle at construction. Mirrors {@code
-   * OperationService.setPayoutStatus} (#1111).
+   * OperationPayoutService.setPayoutStatus} (#1111).
    */
   private final ObjectProvider<MaterialClaimService> self;
 
