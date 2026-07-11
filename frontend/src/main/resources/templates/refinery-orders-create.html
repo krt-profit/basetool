@@ -266,7 +266,7 @@
                         <label for="profitPreview" th:text="#{refineryorder.form.profit}">Gewinn/Verlust (aUEC)</label>
                         <input type="text" id="profitPreview" readonly tabindex="-1"
                                th:title="#{refineryorder.form.profit.help}"
-                               style="background-color: var(--color-gray-4); color: var(--color-gray-1); border: 1px solid var(--color-primary); border-left-width: 4px; min-height: 44px;">
+                               class="krtm-background-color-var-color-gray-4-color-var-deb9">
                     </div>
                 </div>
 
@@ -279,7 +279,7 @@
                                 <input type="date" class="date-part" th:aria-label="#{a11y.datetime.date}">
                                 <input type="time" class="time-part" th:aria-label="#{a11y.datetime.time}">
                             </div>
-                            <button type="button" class="btn btn-ghost" data-trigger="rfc-set-started-now" th:text="#{refineryorder.form.now}" style="padding: 0.5rem 1rem;">Jetzt</button>
+                            <button type="button" class="btn btn-ghost krtm-padding-0-5rem-1rem-c865" data-trigger="rfc-set-started-now" th:text="#{refineryorder.form.now}">Jetzt</button>
                         </div>
                     </div>
                     
@@ -295,7 +295,7 @@
 
                     <div class="form-group flex-1 mb-0">
                         <label th:text="#{refineryorder.form.endsAt}">Fertig am</label>
-                        <div id="endsAtDisplay" style="padding: 0.75rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; min-height: 44px; display: flex; align-items: center;">
+                        <div id="endsAtDisplay" class="krtm-padding-0-75rem-background-color-var-color-g-3181">
                             <span>-</span>
                         </div>
                     </div>
@@ -339,7 +339,7 @@
                                 th:attr="data-yield=${method.ratingYield},data-cost=${method.ratingCost},data-speed=${method.ratingSpeed}"></option>
                         </select>
                     </div>
-                    <div id="methodRatings" style="flex: 3; display: none; align-items: center; gap: 1.5rem; padding: 0.5rem 1rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); border-radius: var(--radius-none); min-height: 44px;">
+                    <div id="methodRatings" class="krtm-flex-3-display-none-align-items-center-gap-1-5b34">
                         <div class="stat-label">
                             <span th:text="#{refineryorder.rating.yield}">Ertrag</span>
                             <span id="ratingYieldVal" class="stat-value">-</span>
@@ -355,18 +355,18 @@
                     </div>
                 </div>
 
-                <div style="margin-top: 2rem; margin-bottom: 1rem;">
-                    <h3 style="color: var(--color-gray-1); font-family: var(--font-body); font-weight: bold; margin: 0;" th:text="#{refineryorder.form.materials.title}">Materialien</h3>
+                <div class="krtm-margin-top-2rem-margin-bottom-1rem-72de">
+                    <h3 class="krtm-color-var-color-gray-1-font-family-var-font-1f0d" th:text="#{refineryorder.form.materials.title}">Materialien</h3>
                 </div>
 
                 <div id="materials-container">
                     <!-- importRowIssues is keyed by the STRING form of the goods index: the flash
                          map round-trips through the JSON Redis session, which stringifies map
                          keys — an Integer key would silently never match after the redirect. -->
-                    <div th:each="good, stat : *{goods}" class="material-entry" th:classappend="${importRowIssues != null and importRowIssues.containsKey('' + stat.index)} ? 'import-flagged-row'" style="border: 1px solid var(--color-gray-3); padding: 1rem; border-radius: var(--radius-none); background-color: var(--color-gray-4); margin-bottom: 1rem;">
+                    <div th:each="good, stat : *{goods}" class="material-entry krtm-border-1px-solid-var-color-gray-3-padding-1r-9df9" th:classappend="${importRowIssues != null and importRowIssues.containsKey('' + stat.index)} ? 'import-flagged-row'">
                         <div class="material-entry-header">
                             <span class="material-entry-title" th:text="#{refineryorder.form.material.entryTitle} + ' #' + ${stat.index + 1}">Material #1</span>
-                            <button th:if="${stat.index > 0}" type="button" class="btn btn-quiet-danger remove-btn btn-icon" data-trigger="rfc-remove-material" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;" th:title="#{refineryorder.form.material.remove}" th:aria-label="#{refineryorder.form.material.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                            <button th:if="${stat.index > 0}" type="button" class="btn btn-quiet-danger remove-btn btn-icon krtm-padding-0-25rem-0-5rem-font-size-0-8rem-ba3b" data-trigger="rfc-remove-material" th:title="#{refineryorder.form.material.remove}" th:aria-label="#{refineryorder.form.material.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                         </div>
 
                         <!-- Inline import review flags (#435): findings anchored to this draft row,
@@ -414,8 +414,8 @@
                         <div class="material-row mt-1-5">
                             <div class="form-group flex-2 mb-0">
                                 <label th:text="#{refineryorder.form.material.output}">Ausgangsmaterial</label>
-                                <div class="output-material-display" style="padding: 0.75rem; background-color: var(--color-gray-4); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; min-height: 44px; display: flex; align-items: center;">
-                                    <span th:id="'outputMaterialDisplay_' + ${stat.index}" style="opacity: 0.7;">-</span>
+                                <div class="output-material-display krtm-padding-0-75rem-background-color-var-color-g-3181">
+                                    <span th:id="'outputMaterialDisplay_' + ${stat.index}" class="krtm-opacity-0-7-ffc8">-</span>
                                 </div>
                             </div>
 
@@ -428,7 +428,7 @@
 
                             <div class="form-group flex-1 mb-0">
                                 <label th:for="'outputQuantityScu_' + ${stat.index}" th:text="#{refineryorder.form.material.outputQtyScu}">Erwartete Ausgangsmenge (SCU)</label>
-                                <input type="text" th:id="'outputQuantityScu_' + ${stat.index}" readonly style="background-color: var(--color-gray-4); cursor: not-allowed;">
+                                <input type="text" th:id="'outputQuantityScu_' + ${stat.index}" readonly class="krtm-background-color-var-color-gray-4-cursor-not-108c">
                             </div>
                         </div>
                     </div>
@@ -438,7 +438,7 @@
 
                 <div class="mt-2-flex-gap">
                     <button type="submit" class="btn btn--cta" data-testid="refinery-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.create.save}">Speichern</span></button>
-                    <a th:href="@{/refinery-orders}" class="btn btn-ghost" style="text-align:center; display:flex; align-items:center; justify-content:center;" th:text="#{orders.create.cancel}">Abbrechen</a>
+                    <a th:href="@{/refinery-orders}" class="btn btn-ghost krtm-text-align-center-display-flex-align-items-c-a651" th:text="#{orders.create.cancel}">Abbrechen</a>
                 </div>
             </form>
         </div>

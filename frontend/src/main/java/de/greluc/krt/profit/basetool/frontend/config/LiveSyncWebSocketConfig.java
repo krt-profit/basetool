@@ -45,7 +45,7 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Wires the live-sync WebSocket endpoints (REQ-FE-015, ADR-0093).
+ * Wires the live-sync WebSocket endpoints (REQ-FE-015, ADR-0094).
  *
  * <p>Registers the shared {@link LiveSyncWebSocketHandler} on three paths: the two legacy
  * per-surface aliases {@code /ws/missions/{missionId}/presence} (the {@link
@@ -81,7 +81,7 @@ public class LiveSyncWebSocketConfig implements WebSocketConfigurer {
    * within this pool plus its queue and never saturates — saturation is an indeterminate verdict
    * that would fail a presence-class subscribe <em>closed</em> (F1), so keeping the pool from ever
    * filling is what stops a legitimate mission viewer being briefly denied their presence dots
-   * (ADR-0093 capacity model).
+   * (ADR-0094 capacity model).
    */
   private static final int SUBSCRIBE_AUTH_THREADS = 16;
 

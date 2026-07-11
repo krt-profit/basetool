@@ -27,7 +27,7 @@
     <div class="greeting hud-box flex-between">
         <div>
             <h1 th:text="#{bank.requests.title}">Buchungsantr&auml;ge</h1>
-            <p class="text-muted" style="margin: 0.25rem 0 0; font-size: 0.8rem;"
+            <p class="text-muted krtm-margin-0-25rem-0-0-font-size-0-8rem-cb15"
                th:text="#{bank.requests.subtitle}">Antr&auml;ge der Org-Einheiten best&auml;tigen oder ablehnen.</p>
         </div>
         <div class="bank-requests-head-right">
@@ -117,7 +117,7 @@
                     <td>
                         <span th:text="${r.accountName()}">Staffel IRIDIUM</span>
                         <br>
-                        <span class="text-muted" style="font-size: 0.8rem;" th:text="${r.accountNo()}">KB-0001</span>
+                        <span class="text-muted krtm-font-size-0-8rem-0fed" th:text="${r.accountNo()}">KB-0001</span>
                     </td>
                     <td>
                         <span th:text="#{'bank.request.type.' + ${r.type()}}">Einzahlung</span>

@@ -36,7 +36,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * Two-context live-sync coverage for the mission → operation cross-publish (#1241, REQ-FE-015 /
- * ADR-0093): a child mission's core edit made on the mission detail page must refresh the parent
+ * ADR-0094): a child mission's core edit made on the mission detail page must refresh the parent
  * operation's embedded missions table on another viewer of the <em>operation</em> page — without a
  * manual reload.
  *

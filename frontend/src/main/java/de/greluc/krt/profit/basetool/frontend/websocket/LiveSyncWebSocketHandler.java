@@ -61,7 +61,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Generic native-WebSocket relay for the tool-wide live-sync feature (REQ-FE-015, ADR-0093).
+ * Generic native-WebSocket relay for the tool-wide live-sync feature (REQ-FE-015, ADR-0094).
  *
  * <p>Generalises the former per-mission presence relay into a topic-room relay: a socket is bound
  * to a {@link LiveSyncTopic} (its {@link LiveSyncTopicClass} fixes the section whitelist and
@@ -88,7 +88,7 @@ import tools.jackson.databind.node.ObjectNode;
  * local room first, then handed to {@link LiveSyncFanout#publish(String, List)} so peer replicas
  * relay it to their local rooms; {@link #deliverFromFanout(String, List)} is the consume-side entry
  * a Redis subscriber calls. Because local relay happens first, a fan-out outage degrades to
- * single-instance behaviour, never worse (ADR-0093).
+ * single-instance behaviour, never worse (ADR-0094).
  *
  * <p><b>Abuse bounds</b> (F2 / #1243). Publishing needs no subscription, so two levers are capped
  * independently: a <b>per-user socket cap</b> ({@link #MAX_SOCKETS_PER_USER}) bounds how many
@@ -126,6 +126,27 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
 
   /** Token-bucket refill rate for inbound {@code changed} frames, in tokens per second. */
   private static final double CHANGED_REFILL_PER_SEC = 20.0;
+
+  /**
+   * Hard cap on the accepted length of a client-supplied presence {@code sectionKey}. Legitimate
+   * keys are short panel identifiers; anything longer is a crafted client trying to bloat the
+   * per-topic presence map's memory footprint and is dropped (#1245 presence-WS hardening).
+   */
+  private static final int MAX_SECTION_KEY_LENGTH = 64;
+
+  /**
+   * Token-bucket capacity for inbound presence control frames ({@code focus} / {@code heartbeat} /
+   * {@code blur}) per session. Legitimate presence traffic is sparse — a {@code focus} on entering
+   * a panel plus a heartbeat once a minute — so this burst sits far above any human cadence and
+   * only bounds a crafted client emitting presence frames in a loop (which each insert a per-topic
+   * presence entry and force a full-map snapshot rebuild + broadcast: O(N²) amplification). The
+   * {@code changed} path had a bucket; the presence path did not until #1245. Package-private for
+   * the test.
+   */
+  static final int PRESENCE_BURST = 20;
+
+  /** Token-bucket refill rate for inbound presence control frames, in tokens per second. */
+  private static final double PRESENCE_REFILL_PER_SEC = 10.0;
 
   /**
    * Per-<em>topic</em> token-bucket capacity for accepted {@code changed} frames (F2 / #1243). The
@@ -247,6 +268,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
 
   private static final String ATTR_DISPLAY_NAME = "livesync.displayName";
   private static final String ATTR_CHANGED_RATE = "livesync.changedRate";
+  private static final String ATTR_PRESENCE_RATE = "livesync.presenceRate";
 
   /**
    * Session-attribute key holding the {@link ConcurrentWebSocketSessionDecorator} wrapping the raw
@@ -542,7 +564,17 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       return;
     }
     String sectionKey = textValue(node, "sectionKey");
-    if (sectionKey == null || sectionKey.isBlank()) {
+    if (sectionKey == null
+        || sectionKey.isBlank()
+        || sectionKey.length() > MAX_SECTION_KEY_LENGTH) {
+      return;
+    }
+    // Rate-limit the presence path per session (#1245): a crafted client looping focus frames with
+    // unique section keys would otherwise insert an entry per frame and force a full-map snapshot
+    // rebuild + broadcast to every viewer (O(N²) amplification). The service's distinct-section cap
+    // bounds absolute map size; this bounds the rate.
+    if (!allowPresenceFrame(session)) {
+      droppedCounter(topic, MetricNames.DROPPED_THROTTLED).increment();
       return;
     }
     boolean mutated;
@@ -834,7 +866,14 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       return;
     }
     String sectionKey = textValue(node, "sectionKey");
-    if (sectionKey == null || sectionKey.isBlank()) {
+    if (sectionKey == null
+        || sectionKey.isBlank()
+        || sectionKey.length() > MAX_SECTION_KEY_LENGTH) {
+      return;
+    }
+    // Rate-limit the presence path per session (#1245) — see handleLegacyMessage for the rationale.
+    if (!allowPresenceFrame(session)) {
+      droppedCounter(topic, MetricNames.DROPPED_THROTTLED).increment();
       return;
     }
     boolean mutated;
@@ -1007,7 +1046,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Relays a {@code changed} signal that arrived from a peer replica via the fan-out (ADR-0093) to
+   * Relays a {@code changed} signal that arrived from a peer replica via the fan-out (ADR-0094) to
    * this instance's local room. No origin session is excluded — the originator lives on another
    * replica — and nothing is re-published (that would loop).
    *
@@ -1034,7 +1073,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Publishes a <em>server-originated</em> {@code changed} signal (REQ-FE-015, ADR-0093): relays it
+   * Publishes a <em>server-originated</em> {@code changed} signal (REQ-FE-015, ADR-0094): relays it
    * to this instance's local room (no origin to exclude — there is no acting socket) and hands it
    * to the cross-replica fan-out. This is the seam a controller uses when the mutating actor has no
    * socket to publish from — chiefly an <b>anonymous guest order create</b>, which must still poke
@@ -1206,23 +1245,54 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    * Per-session token-bucket rate limit on inbound {@code changed} frames. Consumes and returns
    * {@code true} when a token is available, or returns {@code false} (dropping the frame) once the
    * session exceeds {@link #CHANGED_BURST} frames refilled at {@link #CHANGED_REFILL_PER_SEC}/s.
-   * Frames from one session are delivered serially by the container, so the unsynchronised bucket
-   * state held in the session attributes needs no locking.
    *
    * @param session the session that sent the frame
    * @return {@code true} to relay the frame, {@code false} to drop it as throttled
    */
   private boolean allowChangedFrame(@NotNull WebSocketSession session) {
+    return allowFrame(session, ATTR_CHANGED_RATE, CHANGED_BURST, CHANGED_REFILL_PER_SEC);
+  }
+
+  /**
+   * Per-session token-bucket rate limit on inbound presence control frames ({@code focus} / {@code
+   * heartbeat} / {@code blur}), mirroring {@link #allowChangedFrame} (#1245). Bounds the per-topic
+   * presence-map growth rate and the snapshot-broadcast amplification a crafted client could drive
+   * by looping {@code focus} frames with unique section keys; {@link
+   * LiveSyncPresenceService#MAX_SECTIONS_PER_TOPIC} bounds the absolute map size, this bounds the
+   * rate.
+   *
+   * @param session the session that sent the frame
+   * @return {@code true} to process the frame, {@code false} to drop it as throttled
+   */
+  private boolean allowPresenceFrame(@NotNull WebSocketSession session) {
+    return allowFrame(session, ATTR_PRESENCE_RATE, PRESENCE_BURST, PRESENCE_REFILL_PER_SEC);
+  }
+
+  /**
+   * Shared token-bucket primitive backing {@link #allowChangedFrame} and {@link
+   * #allowPresenceFrame}. Consumes and returns {@code true} when a token is available, or {@code
+   * false} once the session exceeds {@code burst} frames refilled at {@code refillPerSec}/s. Frames
+   * from one session are delivered serially by the container, so the unsynchronised bucket state
+   * held in the session attributes under {@code attrKey} needs no locking.
+   *
+   * @param session the session that sent the frame
+   * @param attrKey the session-attribute key holding this bucket's state
+   * @param burst the bucket capacity (maximum tokens)
+   * @param refillPerSec the token refill rate per second
+   * @return {@code true} to process the frame, {@code false} to drop it as throttled
+   */
+  private boolean allowFrame(
+      @NotNull WebSocketSession session, @NotNull String attrKey, int burst, double refillPerSec) {
     long now = System.nanoTime();
     ChangedRateState state;
-    if (session.getAttributes().get(ATTR_CHANGED_RATE) instanceof ChangedRateState existing) {
+    if (session.getAttributes().get(attrKey) instanceof ChangedRateState existing) {
       state = existing;
     } else {
-      state = new ChangedRateState(CHANGED_BURST, now);
-      session.getAttributes().put(ATTR_CHANGED_RATE, state);
+      state = new ChangedRateState(burst, now);
+      session.getAttributes().put(attrKey, state);
     }
     double elapsedSeconds = (now - state.lastRefillNanos) / 1_000_000_000.0;
-    state.tokens = Math.min(CHANGED_BURST, state.tokens + elapsedSeconds * CHANGED_REFILL_PER_SEC);
+    state.tokens = Math.min(burst, state.tokens + elapsedSeconds * refillPerSec);
     state.lastRefillNanos = now;
     if (state.tokens >= 1.0) {
       state.tokens -= 1.0;

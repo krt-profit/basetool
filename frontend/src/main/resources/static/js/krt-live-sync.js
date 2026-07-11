@@ -1,5 +1,5 @@
 /*
- * Shared tool-wide live-sync client (REQ-FE-015, ADR-0093).
+ * Shared tool-wide live-sync client (REQ-FE-015, ADR-0094).
  *
  * Exposes window.krtLiveSync with the reusable receiver factory extracted from the mission-detail
  * live-sync receiver, so every peer-synced surface (mission, operation, orders, bank, materialboard)
@@ -46,7 +46,7 @@
         );
     }
 
-    // ---- Multiplexed /ws/sync transport (REQ-FE-015, ADR-0093) ---------------------------------
+    // ---- Multiplexed /ws/sync transport (REQ-FE-015, ADR-0094) ---------------------------------
     // One lazily-opened WebSocket per tab carries every peer-synced topic. subscribe(topic, …)
     // registers an inbound-change handler for a room (authorized async server-side); sendChanged(
     // topic, sections) publishes a change (no subscription needed — the cross-topic case, e.g. a

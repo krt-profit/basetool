@@ -117,6 +117,14 @@ public final class MetricNames {
    */
   public static final String RATELIMIT_REQUESTS = "basetool.ratelimit.requests";
 
+  /**
+   * Counter {@code basetool_request_body_rejected_total} — incremented by {@code
+   * RequestBodySizeLimitFilter} each time a non-multipart request body on a capped import path is
+   * refused with 413 before Jackson binds it (security review, memory-DoS). Unlabelled: the capped
+   * path set is tiny and fixed.
+   */
+  public static final String REQUEST_BODY_REJECTED = "basetool.request.body.rejected";
+
   // --- Discord SPI precheck (DiscordAccountExistenceController) ---------------------------
 
   /**
@@ -215,7 +223,7 @@ public final class MetricNames {
 
   /**
    * Counter {@code basetool_sse_redis_published_total} — real-time notification signals this
-   * instance published to the cross-replica Redis channel (ADR-0093).
+   * instance published to the cross-replica Redis channel (ADR-0094).
    */
   public static final String SSE_REDIS_PUBLISHED = "basetool.sse.redis.published";
 
@@ -229,7 +237,7 @@ public final class MetricNames {
    * Counter {@code basetool_sse_redis_errors_total} — tag {@code op} ({@link #OP_PUBLISH} / {@link
    * #OP_CONSUME}); a Redis fan-out publish or consume that failed (swallowed — local delivery
    * already happened, so the failure only degrades cross-replica push; polling remains the
-   * fallback, ADR-0093).
+   * fallback, ADR-0094).
    */
   public static final String SSE_REDIS_ERRORS = "basetool.sse.redis.errors";
 

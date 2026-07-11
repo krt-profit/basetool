@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import jakarta.persistence.EntityManager;
 import java.util.List;
@@ -152,7 +153,8 @@ public class HangarService {
    */
   public Page<Ship> getMyShipsFiltered(
       @NotNull UUID userId, String search, @NotNull Pageable pageable) {
-    String normalizedSearch = search == null || search.isBlank() ? null : search.trim();
+    String normalizedSearch =
+        search == null || search.isBlank() ? null : LikePatterns.escape(search.trim());
     return shipRepository.findByOwnerIdFiltered(userId, normalizedSearch, pageable);
   }
 

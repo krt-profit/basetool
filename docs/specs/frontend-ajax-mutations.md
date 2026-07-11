@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-10.
-> **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0031, ADR-0053, ADR-0069, ADR-0071, ADR-0093
+> **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0031, ADR-0053, ADR-0069, ADR-0071, ADR-0094
 
 # Frontend AJAX mutations — krtFetch, krtCsrf & fragment swaps
 
@@ -600,7 +600,7 @@ edit, an Ablauf-step, Ziele-objective or frequency/custom-frequency edit) must a
 is the in-place sibling of the bfcache gap (REQ-FE-008): the other viewer's DOM is stale until they
 reload.
 
-> **Amendment (#1102 / ADR-0093):** the mission detail page is the **first instance of the
+> **Amendment (#1102 / ADR-0094):** the mission detail page is the **first instance of the
 > tool-wide live-sync standard REQ-FE-015**. The transport described below now rides the
 > `mission:{id}` topic room on the shared multiplexed socket (`/ws/sync`, `krt-live-sync.js`); the
 > legacy `/ws/missions/{id}/presence` path stays aliased for one release. Everything else in this
@@ -636,14 +636,20 @@ the write seam but not the receiver or the whitelist. The
 `overview` fragment (Tab-1 + a `#overview-head-meta` carrier that patches the sticky header title /
 status pill / facts) is added by this requirement so core/schedule/status edits propagate too.
 
-Two server-side guards bound the abuse surface the socket adds. Joining the mission room is
+Three server-side guards bound the abuse surface the socket adds. Joining the mission room is
 **authorized against mission access** — the topic authorizer issues the same authenticated
 `GET /api/v1/missions/{id}` the page does (per REQ-FE-015 this now happens at `subscribe` time on the
 shared socket; the legacy alias path keeps the handshake-time check), so an authenticated user cannot
 join the presence room of a mission they may not see (an explicit backend 403/404 refuses; a transient
 backend error fails open so a blip never kills presence). Inbound `changed` frames are **rate-limited
 per session** (a token bucket sized far above any human edit cadence), so a crafted client cannot
-drive sustained re-fetch amplification even within a mission it can see.
+drive sustained re-fetch amplification even within a mission it can see. The **presence control
+frames** (`focus` / `heartbeat` / `blur`) carry the same bounds (#1245, ported onto the generalized
+handler): an over-length `sectionKey` is dropped, the frames share an equivalent per-session token
+bucket, and `LiveSyncPresenceService` caps the number of distinct sections tracked per topic — so a
+single authenticated socket cannot grow the per-topic presence map without limit, nor force the O(N²)
+full-map snapshot rebuild-and-broadcast blow-up that looping `focus` frames with unique section keys
+would otherwise drive.
 
 An incoming refresh must **never yank a section out from under an active edit**: while a modal is open
 (or focus sits inside the target section's container) the refresh is deferred behind a DS-styled
@@ -653,7 +659,7 @@ random()*COALESCE_MS` — so peers that all received the same `changed` frame wi
 not fire their fragment refetches in one synchronized spike, #1125), and a dropped-then-reconnected
 socket triggers a one-shot resync of every visible section to recover signals missed while offline.
 
-**Multi-instance via Redis pub/sub (ADR-0093).** The `changed` relay fans out across frontend
+**Multi-instance via Redis pub/sub (ADR-0094).** The `changed` relay fans out across frontend
 replicas through the shared Redis channel described in REQ-FE-015 (local-relay first, so a Redis
 outage degrades to single-instance behaviour, never worse). The **presence dots remain
 per-instance** — an accepted, follow-up-tracked limitation: viewers on different replicas may see
@@ -685,6 +691,9 @@ notification SSE registry carries the same two fixes (#1157 / #1156, see REQ-NOT
   does not refresh twice.
 - [ ] An authenticated user cannot open the presence socket for a mission the backend forbids
   (handshake refused), and a flood of `changed` frames from one session is rate-limited.
+- [ ] A flood of presence `focus`/`heartbeat` frames from one session — including frames carrying
+  unique or over-length `sectionKey`s — is rate-limited and cannot grow the per-mission presence map
+  beyond its distinct-section cap.
 
 Coverage note: `MissionLiveSyncE2eTest` exercises the representative path end-to-end twice — a
 participant add propagating to a second viewer in place (no reload), and a Ziele-objective add
@@ -697,18 +706,22 @@ live-sync case.
 
 **Enforced by:** `LiveSyncWebSocketHandlerTest` (relay to peers, origin exclusion, key
 sanitising/dedup, full seam-map whitelist relay for the mission topic, no-op on empty, per-session
-rate limit — the 17 mission cases ported 1:1 from `MissionPresenceWebSocketHandlerTest`) ·
+`changed` rate limit, per-session presence-frame rate limit + over-length `sectionKey` dropped —
+
+# 1245) · `LiveSyncPresenceServiceTest` (distinct-section-per-topic cap) ·
+
 `LiveSyncSubscriptionAuthorizerTest` (mission: allowed on authorized read, refused on 403/404,
 fail-open on transient, malformed topic rejected) · `LiveSyncSectionMapParityTest` (seam map ↔
 registry whitelist set-equality) · `MissionLiveSyncE2eTest` (two-context live participant-add
-propagation + no-reload assertion) · **Code:** `LiveSyncWebSocketHandler` / `LiveSyncTopicClass`
-(mission row),
+propagation + no-reload assertion) · **Code:** `LiveSyncWebSocketHandler` (`allowChangedFrame` /
+`allowPresenceFrame` / `MAX_SECTION_KEY_LENGTH`) / `LiveSyncTopicClass` (mission row),
+`LiveSyncPresenceService` (`MAX_SECTIONS_PER_TOPIC`),
 `mission-presence.js` (adapter: `sendChanged` / `krt:mission-changed` / `krt:mission-resync`),
 `krt-live-sync.js` (shared receiver factory), `mission-detail.js` (`krtRefreshMissionSection`
 broadcast + receiver config — its container map derived from the `MISSION_SECTIONS` seam map — with
 flush-time busy re-check + finance-badge `krt:swapped` listener), `mission-detail.html`
 (`overviewSection` fragment), `MissionPageController` (`overview` fragment case) · **ADR:** ADR-0031,
-ADR-0069, ADR-0093
+ADR-0069, ADR-0094
 
 ### REQ-FE-011 — User-selection fields are searchable comboboxes (username + display name)
 
@@ -967,7 +980,7 @@ subscription), so an operation viewer refreshes those two sections in place with
 The mission page reads its parent operation id from `window.missionOperationId`; a mission with no
 operation forwards nothing.
 
-**Authorization is asymmetric by design (ADR-0093).** *Subscribing* to a topic requires the same
+**Authorization is asymmetric by design (ADR-0094).** *Subscribing* to a topic requires the same
 authenticated read the page itself performs (table above), checked asynchronously off the WS
 container thread; an explicit 403/404 denies, transient failures and authorizer saturation fail
 open (safe: no data rides the socket, every fragment re-fetch re-authorizes per viewer).
@@ -991,7 +1004,7 @@ refused socket is closed with an app close code the client backs off on; every b
 bounded re-fetch rate, never data loss.
 
 **Pill, coalescing and resync follow REQ-FE-010 unchanged**, with one sizing addition (5000
-accounts / ≥200 concurrent, ADR-0093): detail-topic receivers keep the 400 ms jittered coalesce
+accounts / ≥200 concurrent, ADR-0094): detail-topic receivers keep the 400 ms jittered coalesce
 window; **global-room receivers (`orders`, `bank`, `orgunit-bank`) use 1500 ms** so a change seen by
 up to ~200 viewers spreads its fragment re-fetch herd instead of spiking. Peer-driven re-fetches
 always preserve the **peer's own** query state (filters, paging, view toggles — the page-URL getter
@@ -1032,7 +1045,7 @@ requester-refused queue + bank dual-auth matrix) · `RedisLiveSyncFanoutTest` +
 `LiveSyncLocalBus`, `RedisLiveSyncFanout`, `krt-live-sync.js`, the per-page seam maps
 (`MISSION_SECTIONS`, `OPERATION_SECTIONS`, `ORDER_SECTIONS`, orders-queue seam, bank
 `BANK_ACCOUNT_SECTIONS` / `ORGUNIT_ACCOUNT_SECTIONS` / `BANK_STAFF_SECTIONS` /
-`ORGUNIT_BANK_SECTIONS`, materialboard) · **ADR:** ADR-0093 · **Issues:** #1102, #1115, #1120
+`ORGUNIT_BANK_SECTIONS`, materialboard) · **ADR:** ADR-0094 · **Issues:** #1102, #1115, #1120
 
 ## Out of scope
 
@@ -1042,7 +1055,7 @@ requester-refused queue + bank dual-auth matrix) · `RedisLiveSyncFanoutTest` +
   explicitly rejected in ADR-0012.
 - Live-collaboration features beyond the section-refresh sync of REQ-FE-010/-015
   (operational-transform text co-editing, server-pushed conflict resolution). Cross-replica fan-out
-  via Redis pub/sub moved **in scope** with REQ-FE-015 / ADR-0093; cross-replica **presence dots**
+  via Redis pub/sub moved **in scope** with REQ-FE-015 / ADR-0094; cross-replica **presence dots**
   remain out of scope (tracked follow-up).
 - Backend business-logic changes beyond adding JSON proxy endpoints that reuse existing backend
   APIs/DTOs.

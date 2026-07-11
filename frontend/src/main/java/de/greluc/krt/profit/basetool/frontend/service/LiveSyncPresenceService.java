@@ -37,7 +37,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * In-memory editor-presence store for live-sync topics that carry presence dots (REQ-FE-015,
- * ADR-0093) — today only the mission surface.
+ * ADR-0094) — today only the mission surface.
  *
  * <p>Tracks, per topic and per section key, which users are currently editing that section. Entries
  * decay after {@link #ENTRY_TTL} since the last heartbeat — a client that closes its tab or
@@ -45,7 +45,7 @@ import org.springframework.stereotype.Service;
  * by the scheduled cleanup in {@code LiveSyncWebSocketHandler}.
  *
  * <p><b>Per-instance only.</b> The state lives in a {@link ConcurrentHashMap} local to this JVM.
- * Unlike the {@code changed} relay — which fans out across replicas via Redis pub/sub (ADR-0093) —
+ * Unlike the {@code changed} relay — which fans out across replicas via Redis pub/sub (ADR-0094) —
  * presence dots are deliberately <em>not</em> mirrored across instances: they are a best-effort
  * awareness cue, and cross-replica dots would need shared TTL state or presence-frame mirroring for
  * a cosmetic feature. Consequence: viewers on different replicas may see different dot sets. This
@@ -70,6 +70,15 @@ public class LiveSyncPresenceService {
    * actively heartbeating.
    */
   public static final Duration ENTRY_TTL = Duration.ofSeconds(120);
+
+  /**
+   * Upper bound on the number of distinct section keys tracked per topic. A detail page exposes
+   * roughly a dozen editable panels, so this cap sits well above legitimate use while bounding the
+   * per-topic presence-map memory a crafted client could otherwise grow by looping {@code focus}
+   * frames with unique section keys. The WebSocket handler's per-session token bucket bounds the
+   * growth <em>rate</em>; this bounds the absolute <em>size</em>. Package-private for the test.
+   */
+  static final int MAX_SECTIONS_PER_TOPIC = 64;
 
   private final Map<String, Map<String, Map<String, Entry>>> byTopic = new ConcurrentHashMap<>();
 
@@ -109,8 +118,18 @@ public class LiveSyncPresenceService {
       @NotNull String displayName) {
     Map<String, Map<String, Entry>> sections =
         byTopic.computeIfAbsent(topic, ignored -> new ConcurrentHashMap<>());
-    Map<String, Entry> editors =
-        sections.computeIfAbsent(sectionKey, ignored -> new ConcurrentHashMap<>());
+    Map<String, Entry> editors = sections.get(sectionKey);
+    if (editors == null) {
+      // Refuse a first-seen section once the topic is already at the distinct-section cap, rather
+      // than growing the map. Guards against a crafted client looping focus frames with unique
+      // section keys to exhaust memory (the handler additionally rate-limits and length-caps the
+      // key). A concurrent pair of first-sightings may overshoot the cap by a small constant, which
+      // is harmless — the bound is a memory ceiling, not an exact count.
+      if (sections.size() >= MAX_SECTIONS_PER_TOPIC) {
+        return false;
+      }
+      editors = sections.computeIfAbsent(sectionKey, ignored -> new ConcurrentHashMap<>());
+    }
     Instant now = Instant.now();
     Entry prev = editors.put(userId, new Entry(userId, displayName, now));
     return prev == null;

@@ -69,14 +69,14 @@
         </div>
 
         <div th:if="${material != null}">
-            <div style="margin-bottom: 2rem; color: var(--color-gray-1); font-family: var(--font-body);">
+            <div class="krtm-margin-bottom-2rem-color-var-color-gray-1-fo-c8dd">
                 <p th:if="${material.description != null && !material.description.isEmpty()}" th:text="${material.description}">Beschreibung...</p>
             </div>
 
             <div class="data-section">
                 <div class="flex-between-mb">
-                    <h2 style="color: var(--color-primary); font-family: var(--font-headline); font-size: 1.2rem; margin: 0;" th:text="#{materials.detail.pricesTitle}">Preise und Terminals</h2>
-                    <div class="form-group" style="margin: 0; position: relative;">
+                    <h2 class="krtm-color-var-color-primary-font-family-var-font-1e8a" th:text="#{materials.detail.pricesTitle}">Preise und Terminals</h2>
+                    <div class="form-group krtm-margin-0-position-relative-9ca0">
                         <label for="terminalFilter" class="visually-hidden" th:text="#{materials.detail.filterPlaceholder}">Terminal suchen</label>
                         <input type="text" id="terminalFilter" th:placeholder="#{materials.detail.filterPlaceholder}" placeholder="Terminal suchen..." data-trigger="material-detail-filter-terminals" autocomplete="off">
                         <!--/*
@@ -89,7 +89,7 @@
                           would silently never bind. Keep the datalist; do NOT move
                           this back into the <script> block.
                         */-->
-                        <datalist id="terminalNames-data" style="display: none;">
+                        <datalist id="terminalNames-data" class="krtm-display-none-5790">
                             <option th:if="${prices != null}" th:each="p : ${prices}" th:value="${p.terminalName}"></option>
                         </datalist>
                     </div>
@@ -99,22 +99,22 @@
                 <table class="data-table" id="priceTable">
                     <thead>
                         <tr>
-                            <th class="sortable-header" data-trigger="material-detail-sort" data-sort-column="0" style="cursor: pointer; user-select: none;" title="Klicken zum Sortieren">
-                                <div style="display: flex; align-items: center; justify-content: flex-start;">
+                            <th class="sortable-header krtm-cursor-pointer-user-select-none-5942" data-trigger="material-detail-sort" data-sort-column="0" title="Klicken zum Sortieren">
+                                <div class="krtm-display-flex-align-items-center-justify-cont-43da">
                                     <span th:text="#{materials.detail.th.terminal}">Terminal</span>
-                                    <span class="sort-icon" id="sort-icon-0" style="margin-left: 0.5rem; color: var(--color-gray-2); font-size: 0.8em;">↕</span>
+                                    <span class="sort-icon krtm-margin-left-0-5rem-color-var-color-gray-2-fo-60ed" id="sort-icon-0">↕</span>
                                 </div>
                             </th>
-                            <th class="sortable-header" data-trigger="material-detail-sort" data-sort-column="1" style="cursor: pointer; user-select: none;" title="Klicken zum Sortieren">
+                            <th class="sortable-header krtm-cursor-pointer-user-select-none-5942" data-trigger="material-detail-sort" data-sort-column="1" title="Klicken zum Sortieren">
                                 <div class="flex-end">
                                     <span th:text="#{materials.detail.th.priceBuy}">Einkaufspreis</span>
-                                    <span class="sort-icon" id="sort-icon-1" style="margin-left: 0.5rem; color: var(--color-gray-2); font-size: 0.8em;">↕</span>
+                                    <span class="sort-icon krtm-margin-left-0-5rem-color-var-color-gray-2-fo-60ed" id="sort-icon-1">↕</span>
                                 </div>
                             </th>
-                            <th class="sortable-header" data-trigger="material-detail-sort" data-sort-column="2" style="cursor: pointer; user-select: none;" title="Klicken zum Sortieren">
+                            <th class="sortable-header krtm-cursor-pointer-user-select-none-5942" data-trigger="material-detail-sort" data-sort-column="2" title="Klicken zum Sortieren">
                                 <div class="flex-end">
                                     <span th:text="#{materials.detail.th.priceSell}">Verkaufspreis</span>
-                                    <span class="sort-icon" id="sort-icon-2" style="margin-left: 0.5rem; color: var(--color-gray-2); font-size: 0.8em;">↕</span>
+                                    <span class="sort-icon krtm-margin-left-0-5rem-color-var-color-gray-2-fo-60ed" id="sort-icon-2">↕</span>
                                 </div>
                             </th>
                         </tr>
@@ -126,10 +126,10 @@
                             <td class="number-cell" th:text="${price.priceSell != null && price.priceSell > 0 ? #numbers.formatInteger(price.priceSell, 1, 'POINT') + ' aUEC' : '-'}">-</td>
                         </tr>
                         <tr id="noDataRow" th:if="${prices == null || prices.isEmpty()}">
-                            <td colspan="3" style="text-align: center; font-style: italic;" th:text="#{materials.detail.noData}">Keine Preisdaten verfügbar.</td>
+                            <td colspan="3" class="krtm-text-align-center-font-style-italic-d125" th:text="#{materials.detail.noData}">Keine Preisdaten verfügbar.</td>
                         </tr>
-                        <tr id="noResultsRow" style="display: none;" th:unless="${prices == null || prices.isEmpty()}">
-                            <td colspan="3" style="text-align: center; font-style: italic; color: var(--color-gray-2);" th:text="#{materials.detail.noResults}">Keine Terminals gefunden.</td>
+                        <tr id="noResultsRow" class="krtm-display-none-5790" th:unless="${prices == null || prices.isEmpty()}">
+                            <td colspan="3" class="krtm-text-align-center-font-style-italic-color-va-46f9" th:text="#{materials.detail.noResults}">Keine Terminals gefunden.</td>
                         </tr>
                     </tbody>
                 </table>

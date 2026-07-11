@@ -52,7 +52,7 @@
         <div class="data-section">
             <div class="flex-between-mb">
                 <h2 th:text="#{admin.locations.locations}">Orte</h2>
-                <div class="form-group" style="margin-bottom: 0; width: 300px; position: relative;">
+                <div class="form-group krtm-margin-bottom-0-width-300px-position-relativ-70af">
                     <input type="text" id="filterLocations" th:placeholder="#{general.filter.name.placeholder}" data-trigger="filter-table" data-table-id="locationsTable" autocomplete="off">
                     <!--/*
                       Location names are exposed to JavaScript via this server-
@@ -63,7 +63,7 @@
                       defined further down would silently never be reached.
                       Keep the datalist; do NOT move this back into <script>.
                     */-->
-                    <datalist id="locationNames-data" style="display: none;">
+                    <datalist id="locationNames-data" class="krtm-display-none-5790">
                         <option th:each="loc : ${locations}" th:value="${loc.name}"></option>
                     </datalist>
                 </div>

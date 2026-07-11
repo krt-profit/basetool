@@ -26,7 +26,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Server-side seam for publishing a live-sync {@code changed} signal from a controller rather than
- * from a client socket (REQ-FE-015, ADR-0093).
+ * from a client socket (REQ-FE-015, ADR-0094).
  *
  * <p>Most {@code changed} signals originate from the acting user's own {@code /ws/sync} socket. But
  * some mutations have no socket to publish from — chiefly an <b>anonymous guest order create</b>,

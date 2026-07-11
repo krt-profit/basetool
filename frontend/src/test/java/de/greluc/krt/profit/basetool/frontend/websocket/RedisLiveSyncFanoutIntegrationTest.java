@@ -46,7 +46,7 @@ import org.testcontainers.utility.DockerImageName;
 
 /**
  * End-to-end integration test for {@link RedisLiveSyncFanout} against a real Redis in
- * Testcontainers (ADR-0093): a {@code changed} signal published by one instance reaches a peer
+ * Testcontainers (ADR-0094): a {@code changed} signal published by one instance reaches a peer
  * instance's handler, while the publisher skips its own looped-back message.
  */
 @Testcontainers

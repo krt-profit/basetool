@@ -121,7 +121,7 @@
     -->
     <script th:src="@{/js/krt-fetch.js}" th:attr="nonce=${cspNonce}"></script>
     <!--
-      Shared tool-wide live-sync client (REQ-FE-015, ADR-0093): window.krtLiveSync.createReceiver,
+      Shared tool-wide live-sync client (REQ-FE-015, ADR-0094): window.krtLiveSync.createReceiver,
       the coalescing / busy-guard / deferred-pill receiver reused by every peer-synced surface
       (mission, operation, orders, bank, materialboard). Loaded globally right after krt-fetch.js —
       like it, a small non-deferred dependency page modules use at load — so a page's inline seam
@@ -177,6 +177,12 @@
     <script th:src="@{/js/notifications.js}" defer th:attr="nonce=${cspNonce}"></script>
     <script th:src="@{/js/datetime-splitter.js}" defer th:attr="nonce=${cspNonce}"></script>
     <script th:src="@{/js/scu-decimal-input.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <!--
+      Applies data-driven inline styles that cannot be a static class (progress-bar widths, formerly
+      `th:style="width:<expr>%"`) via the CSSOM, so no inline `style` attribute remains and the CSP
+      can drop `style-src-attr 'unsafe-inline'`. Deferred; re-runs after krtFetch fragment swaps.
+    -->
+    <script th:src="@{/js/inline-style-apply.js}" defer th:attr="nonce=${cspNonce}"></script>
 
     <title th:replace="${titleContent}"></title>
     <!--
@@ -189,5 +195,13 @@
     <th:block th:if="${additionalLinks != null}">
         <th:block th:replace="${additionalLinks}"></th:block>
     </th:block>
+    <!--
+      Inline-style migration classes (CSP hardening): one class per former inline `style="..."`
+      value, declarations preserved verbatim. Loaded LAST — after styles.css and any per-page
+      additionalLinks — so a migrated declaration wins an equal-specificity tie, replicating the
+      "inline style always wins" behaviour it replaced. Lets the CSP drop
+      `style-src-attr 'unsafe-inline'` (no inline style attributes remain in the templates).
+    -->
+    <link rel="stylesheet" th:href="@{/css/inline-migration.css}">
 </head>
 </html>

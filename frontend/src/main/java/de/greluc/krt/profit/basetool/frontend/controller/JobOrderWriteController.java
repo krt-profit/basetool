@@ -118,7 +118,7 @@ public class JobOrderWriteController {
   private final FrontendAuthHelperService authHelper;
 
   /**
-   * Server-side live-sync publish seam (REQ-FE-015, ADR-0093). An order create pokes the staff
+   * Server-side live-sync publish seam (REQ-FE-015, ADR-0094). An order create pokes the staff
    * {@code orders} queue room from here rather than the client, because an <b>anonymous guest</b>
    * create has no {@code /ws/sync} socket to publish from — yet every logged-in queue viewer must
    * still see the new order appear in place.

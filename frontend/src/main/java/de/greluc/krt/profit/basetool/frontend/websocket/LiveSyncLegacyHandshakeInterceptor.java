@@ -40,7 +40,7 @@ import org.springframework.web.socket.server.HandshakeInterceptor;
 
 /**
  * Authorizes the legacy per-resource live-sync WebSocket handshakes and binds each socket to its
- * implicit topic (REQ-FE-015, ADR-0093).
+ * implicit topic (REQ-FE-015, ADR-0094).
  *
  * <p>The multiplexed {@code /ws/sync} socket authorizes each topic at {@code subscribe} time; the
  * legacy per-resource endpoints (today {@code /ws/missions/{id}/presence}) instead authorize at

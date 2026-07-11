@@ -38,7 +38,7 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
- * Wires the cross-replica Redis pub/sub fan-out behind the live-sync relay (ADR-0093).
+ * Wires the cross-replica Redis pub/sub fan-out behind the live-sync relay (ADR-0094).
  *
  * <p>Active only outside the {@code test} profile (which runs no Redis) and only while {@code
  * app.livesync.redis.enabled} is true (default). When absent, {@code LiveSyncWebSocketConfig} falls

@@ -33,7 +33,7 @@
     <div class="greeting hud-box flex-between">
         <div>
             <h1 th:text="#{bank.orgUnit.title}">Bank meiner Org-Einheit</h1>
-            <p class="text-muted" style="margin: 0.25rem 0 0; font-size: 0.8rem;"
+            <p class="text-muted krtm-margin-0-25rem-0-0-font-size-0-8rem-cb15"
                th:text="#{bank.orgUnit.subtitle}">Kontostand und Ein-/Auszahlungsantr&auml;ge deiner Org-Einheit.</p>
         </div>
         <div class="bank-head-actions" th:if="${canRequestAny}">
@@ -232,9 +232,8 @@
                                       class="chip chip--success" data-testid="org-unit-bank-foreign-granted"
                                       th:text="#{bank.approvalLimit.granted}">Freigegeben</span>
                                 <form th:if="${r.requiresOwnerApproval() and !r.ownerApprovalGranted() and r.status() == 'PENDING'}"
-                                      class="bank-ajax-form no-track" data-refresh="orgUnitBank" data-livesync="bank/requestQueue orgunit-bank/orgUnitBank"
-                                      data-endpoint="/api/proxy/org-units/bank/requests/{id}/owner-approval" data-method="POST"
-                                      style="display:inline;">
+                                      class="bank-ajax-form no-track krtm-display-inline-2f87" data-refresh="orgUnitBank" data-livesync="bank/requestQueue orgunit-bank/orgUnitBank"
+                                      data-endpoint="/api/proxy/org-units/bank/requests/{id}/owner-approval" data-method="POST">
                                     <input type="hidden" name="_id" th:value="${r.id()}">
                                     <button type="submit" class="btn btn-xs btn-outline"
                                             data-testid="org-unit-bank-grant-approval-btn"

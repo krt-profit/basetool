@@ -35,7 +35,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Two-context live-sync coverage for the operation detail page (#1115, REQ-FE-015 / ADR-0093): a
+ * Two-context live-sync coverage for the operation detail page (#1115, REQ-FE-015 / ADR-0094): a
  * core-data save one viewer makes on the Verwaltung tab must appear on another viewer's sticky
  * header without a manual reload — the {@code overview} section key crossing the {@code
  * operation:{id}} room.

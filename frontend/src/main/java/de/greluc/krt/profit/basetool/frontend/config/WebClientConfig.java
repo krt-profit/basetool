@@ -512,7 +512,7 @@ public class WebClientConfig {
 
   /**
    * Backend WebClient for the {@code /ws/sync} subscribe-authorization probe (REQ-FE-015,
-   * ADR-0093).
+   * ADR-0094).
    *
    * <p>Deliberately carries <b>no</b> OAuth2 exchange filter: a subscribe is authorized on a
    * WebSocket message / auth-executor thread that has no servlet request context, so {@code

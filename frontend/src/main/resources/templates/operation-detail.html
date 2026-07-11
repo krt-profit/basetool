@@ -153,7 +153,7 @@
         <div class="facts-bar">
             <span><span class="fact-k" th:text="#{operation.facts.missions}">Eins&auml;tze</span><span class="fact-v" th:text="${missionsPage != null ? missionsPage.totalElements : 0}">0</span></span>
             <span sec:authorize="isAuthenticated()"><span class="fact-k" th:text="#{operation.finances.total}">Gesamtergebnis</span><span class="fact-v" th:classappend="${operationFinance != null and operationFinance.totalSum != null and operationFinance.totalSum.signum() >= 0 ? 'pos' : 'neg'}" th:text="${(operationFinance != null and operationFinance.totalSum != null ? #numbers.formatInteger(@moneyFormat.round(operationFinance.totalSum), 1, 'POINT') : '0')} + ' aUEC'">0 aUEC</span></span>
-            <span sec:authorize="isAuthenticated()" th:if="${operationDonationTotal != null and operationDonationTotal.signum() > 0}"><span class="fact-k" th:text="#{operation.finances.donations}">Gespendet</span><span class="fact-v" style="color: var(--color-dept-profit, #239E33);" th:text="${#numbers.formatInteger(@moneyFormat.round(operationDonationTotal), 1, 'POINT')} + ' aUEC'">0 aUEC</span></span>
+            <span sec:authorize="isAuthenticated()" th:if="${operationDonationTotal != null and operationDonationTotal.signum() > 0}"><span class="fact-k" th:text="#{operation.finances.donations}">Gespendet</span><span class="fact-v krtm-color-var-color-dept-profit-239e33-551e" th:text="${#numbers.formatInteger(@moneyFormat.round(operationDonationTotal), 1, 'POINT')} + ' aUEC'">0 aUEC</span></span>
         </div>
         <div class="tab-nav" role="tablist" th:aria-label="#{operation.details}">
             <button class="tab" id="optab-ueb" type="button" role="tab" aria-selected="false" aria-controls="pane-op-ueb" data-tab="ueb" th:text="#{operation.tab.overview}">&Uuml;bersicht</button>
@@ -192,7 +192,7 @@
                                     <dd><span class="data-value" th:text="${(operationFinance != null and operationFinance.totalSum != null ? #numbers.formatInteger(@moneyFormat.round(operationFinance.totalSum), 1, 'POINT') : '0')} + ' aUEC'">0 aUEC</span></dd>
                                     <th:block th:if="${operationDonationTotal != null and operationDonationTotal.signum() > 0}">
                                         <dt th:text="#{operation.finances.donations}">Gespendet</dt>
-                                        <dd><span class="data-value" style="color: var(--color-dept-profit, #239E33);" th:text="${#numbers.formatInteger(@moneyFormat.round(operationDonationTotal), 1, 'POINT')} + ' aUEC'">0 aUEC</span></dd>
+                                        <dd><span class="data-value krtm-color-var-color-dept-profit-239e33-551e" th:text="${#numbers.formatInteger(@moneyFormat.round(operationDonationTotal), 1, 'POINT')} + ' aUEC'">0 aUEC</span></dd>
                                     </th:block>
                                 </th:block>
                                 <dt th:text="#{general.created}">Erstellt</dt>
@@ -206,14 +206,13 @@
                         <div class="kpanel-body">
                             <div th:each="msnFin : ${operationFinance.missions}" class="holder-row">
                                 <span class="holder-name" th:text="${msnFin.missionName}" th:title="${msnFin.missionName}">Einsatz</span>
-                                <span class="holder-bar"><i th:style="'width:' + ${(msnFin.totalSum != null and msnFin.totalSum.signum() > 0 and operationMaxMissionResult != null and operationMaxMissionResult.signum() > 0) ? (msnFin.totalSum.doubleValue() * 100 / operationMaxMissionResult.doubleValue()) : 0} + '%'"></i></span>
-                                <span class="holder-value" th:classappend="${msnFin.totalSum != null and msnFin.totalSum.signum() < 0} ? 'neg'"
-                                      th:style="${msnFin.totalSum != null and msnFin.totalSum.signum() < 0} ? 'color: var(--color-danger-text);'"
+                                <span class="holder-bar"><i th:attr="data-krtm-width=${(msnFin.totalSum != null and msnFin.totalSum.signum() > 0 and operationMaxMissionResult != null and operationMaxMissionResult.signum() > 0) ? (msnFin.totalSum.doubleValue() * 100 / operationMaxMissionResult.doubleValue()) : 0}"></i></span>
+                                <span class="holder-value" th:classappend="${msnFin.totalSum != null and msnFin.totalSum.signum() < 0} ? 'neg krtm-color-danger'"
                                       th:text="${#numbers.formatInteger(@moneyFormat.round(msnFin.totalSum), 1, 'POINT')}">0</span>
                             </div>
                             <div class="holder-sum">
                                 <span th:text="#{operation.finances.total}">Gesamtergebnis</span>
-                                <span style="color: var(--color-success);" th:text="${#numbers.formatInteger(@moneyFormat.round(operationFinance.totalSum), 1, 'POINT')} + ' aUEC'">0 aUEC</span>
+                                <span class="krtm-color-var-color-success-ad21" th:text="${#numbers.formatInteger(@moneyFormat.round(operationFinance.totalSum), 1, 'POINT')} + ' aUEC'">0 aUEC</span>
                             </div>
                         </div>
                     </div>
@@ -239,10 +238,10 @@
                     </div>
                 </div>
             </div>
-            <details class="hud-details" th:if="${!#strings.isEmpty(operation.description)}" style="margin-top: 12px;">
+            <details class="hud-details krtm-margin-top-12px-4bb9" th:if="${!#strings.isEmpty(operation.description)}">
                 <summary><span th:text="#{operation.overview.details_collapse}">Detaillierte Beschreibung anzeigen</span></summary>
                 <!-- th:utext is safe: @markdown escapes raw HTML and strips unsafe link protocols. -->
-                <div class="markdown-content" style="margin-top: 10px;"
+                <div class="markdown-content krtm-margin-top-10px-e5a6"
                      th:with="descriptionHtml=${@markdown.render(operation.description)}"
                      th:utext="${descriptionHtml}">Beschreibung</div>
             </details>
@@ -378,18 +377,18 @@
                      GET /operations/{id}/finance/{missionId} (injected into .op-finance-detail-body
                      by operation-detail.js), so the full render no longer materializes every finance
                      entry / refinery order across every child mission. -->
-                <details class="hud-details" th:each="msnFin : ${operationFinance.missions}" style="margin-top: 12px;"
+                <details class="hud-details krtm-margin-top-12px-4bb9" th:each="msnFin : ${operationFinance.missions}"
                          th:attr="data-op-finance-mission=${msnFin.missionId}">
                     <summary>
                         <span th:text="${msnFin.missionName}">Einsatz</span>
-                        <span class="data-value" th:classappend="${msnFin.totalSum != null and msnFin.totalSum.signum() < 0} ? 'neg'"
+                        <span class="data-value" th:classappend="${msnFin.totalSum != null and msnFin.totalSum.signum() < 0} ? 'neg krtm-color-danger'"
                               th:text="${#numbers.formatInteger(@moneyFormat.round(msnFin.totalSum), 1, 'POINT')} + ' aUEC'">0 aUEC</span>
                     </summary>
                     <div class="op-finance-detail-body" data-loaded="false">
-                        <p class="desc" style="padding-top: 8px;" th:text="#{operation.finance.detail.loading}">Details werden geladen&hellip;</p>
+                        <p class="desc krtm-padding-top-8px-bd36" th:text="#{operation.finance.detail.loading}">Details werden geladen&hellip;</p>
                     </div>
                 </details>
-                <p th:if="${operationFinance.truncated}" class="desc" style="margin-top: 8px;"
+                <p th:if="${operationFinance.truncated}" class="desc krtm-margin-top-8px-0d69"
                    th:text="#{operation.finance.truncated}">Es werden nur die ersten Eins&auml;tze angezeigt.</p>
             </th:block>
             <p th:if="${operationFinance == null or operationFinance.missions == null or operationFinance.missions.isEmpty()}" class="desc" th:text="#{mission.empty}">Keine Missionen vorhanden.</p>
@@ -399,11 +398,11 @@
                  full page render (financeDetail + financeDetailError unset), so this th:block emits
                  nothing inline. -->
             <th:block th:fragment="financeDetail">
-                <p th:if="${financeDetailError != null}" class="desc" style="padding-top: 8px; color: var(--color-danger-text);"
+                <p th:if="${financeDetailError != null}" class="desc krtm-padding-top-8px-color-var-color-danger-text-81d0"
                    th:text="#{operation.finance.detail.error}">Details konnten nicht geladen werden.</p>
                 <th:block th:if="${financeDetailError == null and financeDetail != null}">
                     <div class="table-responsive">
-                        <table style="margin-top: 8px;">
+                        <table class="krtm-margin-top-8px-0d69">
                             <thead>
                                 <tr>
                                     <th th:text="#{general.type}">Typ</th>
@@ -425,13 +424,13 @@
                                 <tr th:each="order : ${financeDetail.refineryOrders}" th:if="${order.expenses != null and order.expenses > 0}">
                                     <td><span class="chip chip--danger chip-xs" th:text="#{mission.finance.type.expense}">Ausgabe</span></td>
                                     <td th:text="${order.owner != null ? order.owner.effectiveName : '-'}">User</td>
-                                    <td><a th:href="@{/refinery-orders/{id}(id=${order.id})}" th:text="#{mission.finance.refinery_order}" style="color: var(--color-dept-profit); text-decoration: underline;">Raffinerieauftrag</a></td>
+                                    <td><a th:href="@{/refinery-orders/{id}(id=${order.id})}" th:text="#{mission.finance.refinery_order}" class="krtm-color-var-color-dept-profit-text-decoration-b5e5">Raffinerieauftrag</a></td>
                                     <td class="num" th:text="'&minus;' + ${#numbers.formatInteger(@moneyFormat.roundNumber(order.expenses), 1, 'POINT')} + ' aUEC'">0 aUEC</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
-                    <p th:if="${(financeDetail.entries == null or financeDetail.entries.isEmpty()) and (financeDetail.refineryOrders == null or financeDetail.refineryOrders.isEmpty())}" class="desc" style="padding-top: 8px;" th:text="#{mission.finance.empty}">Keine Eintr&auml;ge.</p>
+                    <p th:if="${(financeDetail.entries == null or financeDetail.entries.isEmpty()) and (financeDetail.refineryOrders == null or financeDetail.refineryOrders.isEmpty())}" class="desc krtm-padding-top-8px-bd36" th:text="#{mission.finance.empty}">Keine Eintr&auml;ge.</p>
                 </th:block>
             </th:block>
             </th:block>
@@ -466,9 +465,9 @@
                              server-side via POST /operations/markdown-preview so it matches the saved
                              output exactly. -->
                         <div class="form-group" id="op-md-editor">
-                            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
-                                <label for="op-desc" style="margin: 0;" th:text="#{operation.description}">Beschreibung</label>
-                                <span class="tab-nav" style="position: static; padding: 0;" role="tablist" th:if="${canEdit}" th:aria-label="#{operation.description}">
+                            <div class="krtm-display-flex-justify-content-space-between-a-77e2">
+                                <label for="op-desc" class="krtm-margin-0-2a0c" th:text="#{operation.description}">Beschreibung</label>
+                                <span class="tab-nav krtm-position-static-padding-0-c7b4" role="tablist" th:if="${canEdit}" th:aria-label="#{operation.description}">
                                     <button type="button" class="tab on" data-md-view="edit" th:text="#{operation.md.edit}">Bearbeiten</button>
                                     <button type="button" class="tab" data-md-view="preview" th:text="#{operation.md.preview}">Vorschau</button>
                                 </span>
@@ -481,13 +480,13 @@
                                 <button type="button" class="btn btn-ghost btn-xs2" data-md-link th:title="#{operation.md.link}" th:text="#{operation.md.link}">Link</button>
                             </div>
                             <textarea id="op-desc" name="description" class="md-input" rows="9" th:disabled="${!canEdit}" th:text="${operation.description}"></textarea>
-                            <div id="op-md-preview" class="md-preview markdown-content" style="display: none;" th:attr="data-empty=#{operation.md.preview.empty}"></div>
+                            <div id="op-md-preview" class="md-preview markdown-content krtm-display-none-5790" th:attr="data-empty=#{operation.md.preview.empty}"></div>
                         </div>
                     </form>
                 </div>
             </div>
             <div class="footacts">
-                <button th:if="${canEdit}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" type="button" class="btn btn-quiet-danger" style="margin-right: auto;"
+                <button th:if="${canEdit}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" type="button" class="btn btn-quiet-danger krtm-margin-right-auto-1424"
                         th:data-id="${operation.id}" data-trigger="operation-open-delete"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{operation.delete}">L&ouml;schen</span></button>
                 <button th:if="${canEdit}" type="submit" form="operation-form" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{general.save}">Speichern</span></button>
                 <a th:href="@{/operations}" class="btn btn-ghost" th:text="#{general.back}">Zur&uuml;ck</a>
@@ -503,10 +502,10 @@
 </div> <!-- End page-wrapper -->
 
 <!-- Delete Modal -->
-<div id="delete-operation-modal" class="modal" style="display:none;">
-    <div class="modal-content hud-box" style="max-width:500px; border-color: var(--color-danger);">
+<div id="delete-operation-modal" class="modal krtm-display-none-5790">
+    <div class="modal-content hud-box krtm-max-width-500px-border-color-var-color-dange-49f0">
         <h2 th:text="#{general.confirm}" class="text-danger">Confirm Delete</h2>
-        <p th:text="#{operation.delete.confirm}" style="margin: 1.5rem 0;">Confirm that you want to delete this operation.</p>
+        <p th:text="#{operation.delete.confirm}" class="krtm-margin-1-5rem-0-6813">Confirm that you want to delete this operation.</p>
         <form id="delete-operation-form" th:action="@{/operations/delete}" method="post">
             <div class="mt-2-flex-gap">
                 <button type="submit" class="btn btn-danger"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{general.delete}">Delete</span></button>

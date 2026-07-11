@@ -37,7 +37,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 /**
  * Tests for {@link LiveSyncSubscriptionAuthorizer} driven by {@link MockWebServer}: a 2xx probe
  * allows the subscribe (replaying the captured bearer + pin), an explicit 403/404 denies it, and a
- * 401 / 5xx / transport error / missing token all fail open (ADR-0093).
+ * 401 / 5xx / transport error / missing token all fail open (ADR-0094).
  */
 class LiveSyncSubscriptionAuthorizerTest {
 

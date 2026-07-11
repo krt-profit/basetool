@@ -20,7 +20,7 @@
     }
 
     let SERIALIZE_KEY = 'materialboerse';
-    // REQ-FE-015 (ADR-0093): the global live-sync room a release/edit publishes to over the shared
+    // REQ-FE-015 (ADR-0094): the global live-sync room a release/edit publishes to over the shared
     // multiplexed /ws/sync socket (window.krtLiveSync), so board viewers re-pull the list.
     let MATERIALBOARD_TOPIC = 'materialboard';
     let state = {
@@ -63,7 +63,10 @@
      * not the hidden attribute.
      */
     function isModalOpen() {
-        return modal.style.display !== '' && modal.style.display !== 'none';
+        return (
+            window.getComputedStyle(modal).display !== '' &&
+            window.getComputedStyle(modal).display !== 'none'
+        );
     }
 
     function setText(sel, text) {

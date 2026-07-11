@@ -1898,7 +1898,7 @@
       },
       "type": "timeseries",
       "title": "Live-sync subscribe outcomes/hour by topic class",
-      "description": "Multiplexed /ws/sync subscribe-authorization verdicts per topic class (REQ-FE-015, ADR-0093). A rising `denied` rate on a room every viewer should reach hints at an auth/gate regression; `allowed` includes transient fail-open.",
+      "description": "Multiplexed /ws/sync subscribe-authorization verdicts per topic class (REQ-FE-015, ADR-0094). A rising `denied` rate on a room every viewer should reach hints at an auth/gate regression; `allowed` includes transient fail-open.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -2045,7 +2045,7 @@
       },
       "type": "timeseries",
       "title": "Redis fan-out pub/sub & errors/hour",
-      "description": "Cross-replica Redis fan-out for live delivery (ADR-0093): the live-sync changed-relay (basetool_livesync_redis_*) and the notification SSE fan-out (basetool_sse_redis_*). Publishing is fire-and-forget after the local relay, so a rising `errors` stream means cross-replica delivery is silently degraded to single-instance — watched by the LiveSyncRedisFanoutBroken alert.",
+      "description": "Cross-replica Redis fan-out for live delivery (ADR-0094): the live-sync changed-relay (basetool_livesync_redis_*) and the notification SSE fan-out (basetool_sse_redis_*). Publishing is fire-and-forget after the local relay, so a rising `errors` stream means cross-replica delivery is silently degraded to single-instance — watched by the LiveSyncRedisFanoutBroken alert.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

@@ -318,6 +318,13 @@ x-backend: &backend-template
     SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:?POSTGRES_USER must be set in .env}
     SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
     KEYCLOAK_ISSUER_URI: https://keycloak.profit-base.online/realms/iri
+    # JWT audience enforcement (security review, audit L-1). Empty by default so dev / e2e stay off
+    # (those realms do not stamp aud). Set IRI_BACKEND_EXPECTED_AUDIENCES=basetool-backend in the prod
+    # .env — together with IRI_INGEST_EXPECTED_AUDIENCES — ONLY after confirming the realm stamps
+    # aud=basetool-backend on frontend tokens (the `extractor-ingest` default client scope does).
+    # Enabling it before that rejects every token and breaks the app; set the var back to empty to
+    # disable instantly.
+    APP_SECURITY_JWT_EXPECTED_AUDIENCES: ${IRI_BACKEND_EXPECTED_AUDIENCES:-}
     # Internal admin / user-sync path: direct backend→Keycloak over the isolated
     # net-backend-keycloak network, now TLS because the prod Keycloak serves HTTPS only. Trust is
     # pinned to the shared self-signed cert via the `keycloak-trust` SSL bundle
@@ -342,7 +349,7 @@ x-backend: &backend-template
     APP_MAIL_ENABLED: ${APP_MAIL_ENABLED:-true}
     APP_MAIL_FROM_ADDRESS: ${APP_MAIL_FROM_ADDRESS:-no-reply@profit-base.online}
     APP_MAIL_FROM_NAME: ${APP_MAIL_FROM_NAME:-Profit Basetool}
-    # Redis for the cross-replica notification SSE fan-out (ADR-0093). Same secret the frontend /
+    # Redis for the cross-replica notification SSE fan-out (ADR-0094). Same secret the frontend /
     # ingest already use for Spring Session / handoff staging. The connection is lazy and only
     # opened when the fan-out is enabled (prod, application-prod.yml); a Redis outage degrades to
     # local-only SSE + the polling fallback (REQ-NOTIF-006).
@@ -467,7 +474,7 @@ x-frontend: &frontend-template
     - no-new-privileges:true
   cap_drop: [ALL]
   stop_grace_period: 30s
-  # File-descriptor ceiling. Since the tool-wide live-sync epic (REQ-FE-015 / ADR-0093) the frontend
+  # File-descriptor ceiling. Since the tool-wide live-sync epic (REQ-FE-015 / ADR-0094) the frontend
   # holds many long-lived sockets per instance — one /ws/sync WebSocket per tab plus a browser→backend
   # notification SSE relay per viewer — and each is an fd, on top of the inbound HTTP keep-alives and
   # the WebClient pool. At the ≥200-concurrent target that is only ~2-3k fds, but the limit was
@@ -551,9 +558,11 @@ x-ingest: &ingest-template
     REDIS_HOST: redis
     REDIS_PORT: 6379
     REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
-    # Audience enforcement stays OFF until the Keycloak runbook (#641, docs/INGEST_KEYCLOAK_SETUP.md)
-    # has BOTH the extractor and frontend tokens carrying aud=basetool-backend. Only then set this to
-    # basetool-backend — enabling it earlier rejects every frontend token and breaks the app.
+    # JWT audience enforcement (security review). Empty by default so dev / e2e stay off. Enforce in
+    # prod by setting IRI_INGEST_EXPECTED_AUDIENCES=basetool-backend — together with the backend's
+    # IRI_BACKEND_EXPECTED_AUDIENCES — ONLY after the realm stamps aud=basetool-backend on both the
+    # extractor and frontend tokens (#641, docs/INGEST_KEYCLOAK_SETUP.md); enabling it earlier rejects
+    # every token and breaks the app. Unset the var to disable instantly.
     APP_SECURITY_JWT_EXPECTED_AUDIENCES: ${IRI_INGEST_EXPECTED_AUDIENCES:-}
     # Monitoring plane (epic #936, REQ-OBS-005/-009) — see the backend template for the full
     # rationale. Everything defaults OFF/empty so dev/test/e2e stay inert; the prod .env supplies the
@@ -594,7 +603,7 @@ services:
     # restricted `monitoring` user; `--requirepass` below is kept only as redundant belt-and-braces.
     # A missing/empty ACL file makes redis exit at startup, which the deploy health-gate turns into a
     # clean rollback rather than a silent breakage. Untouched for redis-dev.
-    # ADR-0093: the live-sync + notification fan-outs PUBLISH/SUBSCRIBE on the pub/sub channels
+    # ADR-0094: the live-sync + notification fan-outs PUBLISH/SUBSCRIBE on the pub/sub channels
     # `basetool:livesync:changed` (frontend) and `basetool:notify:published` (backend). The `default`
     # user's `&*` grant (above) already covers these; the restricted `monitoring` user must NOT gain
     # `&*`. Pub/sub adds no keys, so the 384mb noeviction budget (ADR-0079) is unaffected.
@@ -607,7 +616,7 @@ services:
     networks:
       - net-redis-frontend
       - net-redis-ingest
-      # The backend joins for the notification SSE cross-replica fan-out (ADR-0093).
+      # The backend joins for the notification SSE cross-replica fan-out (ADR-0094).
       - net-redis-backend
 
   redis-dev:
@@ -740,7 +749,7 @@ services:
       - net-backend-frontend
       - net-backend-keycloak
       - net-backend-ingest
-      # Notification SSE cross-replica fan-out (ADR-0093) — reaches the `redis` service.
+      # Notification SSE cross-replica fan-out (ADR-0094) — reaches the `redis` service.
       - net-redis-backend
       # Prometheus scrapes /actuator/prometheus (HTTPS) and Alloy receives OTLP spans here (epic #936).
       - net-monitoring-scrape
@@ -755,7 +764,7 @@ services:
         condition: service_healthy
       keycloak-dev:
         condition: service_healthy
-      # The x-backend anchor enables the notification Redis fan-out (ADR-0093) for every backend
+      # The x-backend anchor enables the notification Redis fan-out (ADR-0094) for every backend
       # service, so the dev stack's backend opens the RedisMessageListenerContainer at boot — wait for
       # redis-dev to be healthy first so the full `docker compose --profile dev up` starts cleanly
       # instead of racing the fan-out connection (#1246). Prod's fan-out degrades gracefully on a Redis
@@ -1071,7 +1080,7 @@ networks:
       config:
         - subnet: 172.28.9.0/24
           gateway: 172.28.9.1
-  # Backend ↔ Redis for the notification SSE cross-replica fan-out (ADR-0093). A dedicated network
+  # Backend ↔ Redis for the notification SSE cross-replica fan-out (ADR-0094). A dedicated network
   # (like net-redis-ingest) rather than widening net-redis-frontend, so no new lateral path opens.
   # Explicit `name:` for parity with the other pinned redis nets. Subnet continues the pinned
   # 172.28.0.0/16 block (.11).

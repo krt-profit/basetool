@@ -287,9 +287,11 @@
     });
 
     /**
-     * Toggle a target element's {@code style.display} between {@code 'none'} and an empty
-     * string. {@code data-target} carries the target element's id. Used for collapsible
-     * info-boxes and "show details" reveals.
+     * Toggle a target element's visibility via the {@code krtm-hidden} class ({@code display:none}
+     * in inline-migration.css). {@code data-target} carries the target element's id. Migrated from
+     * the former inline {@code style.display} toggle so no inline style attribute is written (CSP:
+     * {@code style-src-attr} no longer needs {@code 'unsafe-inline'}). Used for collapsible
+     * info-boxes and "show details" reveals; the shown state is the element's own CSS display.
      */
     on('click', 'toggle-display', function (el, event) {
         let id = el.getAttribute('data-target');
@@ -297,17 +299,15 @@
         let target = document.getElementById(id);
         if (!target) return;
         event.preventDefault();
-        target.style.display = target.style.display === 'none' ? '' : 'none';
+        target.classList.toggle('krtm-hidden');
     });
 
     /**
-     * Set a target element's {@code style.display} to an explicit value declared in
-     * {@code data-display}. Used by the legacy {@code style.display='flex'} /
-     * {@code style.display='none'} modals (operation-detail, operations-index, several
-     * older admin pages) that pre-date the {@code .active} class convention. Keeping a
-     * separate trigger means we do not have to migrate those modal CSS rules in lockstep
-     * with the JS migration — the templates can stay byte-identical except for the
-     * handler attribute.
+     * Set a target element's visibility from {@code data-display} via classes instead of an inline
+     * {@code style.display} (CSP migration). {@code none} hides it ({@code krtm-hidden}); {@code
+     * flex} shows it as a flex modal ({@code krtm-modal-open}); any other/empty value clears both so
+     * the element falls back to its own CSS display. Legacy trigger predating the {@code .active}
+     * modal convention.
      */
     on('click', 'set-display', function (el, event) {
         let id = el.getAttribute('data-target');
@@ -315,14 +315,25 @@
         let target = document.getElementById(id);
         if (!target) return;
         event.preventDefault();
-        target.style.display = el.getAttribute('data-display') || '';
+        let dv = el.getAttribute('data-display') || '';
+        if (dv === 'none') {
+            target.classList.add('krtm-hidden');
+            target.classList.remove('krtm-modal-open');
+        } else if (dv === 'flex') {
+            target.classList.add('krtm-modal-open');
+            target.classList.remove('krtm-hidden');
+        } else {
+            target.classList.remove('krtm-hidden');
+            target.classList.remove('krtm-modal-open');
+        }
     });
 
     /**
-     * Convenience over {@code set-display} for "open this modal" buttons on the
-     * {@code style.display}-based modal pattern. Sets the modal to {@code data-modal-display}
-     * (default {@code flex}). The accompanying close button can use {@code set-display} with
-     * {@code data-display="none"}, or its own {@code close-modal-display}.
+     * "Open this modal" for the display-based modal pattern, migrated to classes (CSP): adds {@code
+     * krtm-modal-open} ({@code display:flex}) and clears {@code krtm-hidden}. Works for both modal
+     * families because inline-migration.css is loaded last — {@code krtm-modal-open} wins the
+     * default-none {@code .krt-modal-overlay} and clearing {@code krtm-hidden} un-hides the
+     * default-flex {@code .modal}. {@code data-modal-id} carries the modal's id.
      */
     on('click', 'open-modal-display', function (el, event) {
         let id = el.getAttribute('data-modal-id');
@@ -330,12 +341,15 @@
         let modal = document.getElementById(id);
         if (!modal) return;
         event.preventDefault();
-        modal.style.display = el.getAttribute('data-modal-display') || 'flex';
+        modal.classList.add('krtm-modal-open');
+        modal.classList.remove('krtm-hidden');
     });
 
     /**
-     * Convenience over {@code set-display} for "close this modal" buttons on the
-     * {@code style.display}-based modal pattern.
+     * "Close this modal" for the display-based modal pattern, migrated to classes (CSP): removes
+     * {@code krtm-modal-open} and adds {@code krtm-hidden} ({@code display:none}). Adding
+     * {@code krtm-hidden} is required to hide the default-flex {@code .modal} family and is a
+     * harmless no-op over the default-none {@code .krt-modal-overlay} family.
      */
     on('click', 'close-modal-display', function (el, event) {
         let id = el.getAttribute('data-modal-id');
@@ -343,6 +357,7 @@
         let modal = document.getElementById(id);
         if (!modal) return;
         event.preventDefault();
-        modal.style.display = 'none';
+        modal.classList.remove('krtm-modal-open');
+        modal.classList.add('krtm-hidden');
     });
 })();

@@ -41,7 +41,7 @@
         <p th:text="#{admin.discordRegistrations.subtitle}">Neue Discord-Anmeldungen freigeben oder ablehnen.</p>
     </div>
 
-    <div th:if="${error}" class="hud-box mt-2" style="border-color: var(--color-danger);">
+    <div th:if="${error}" class="hud-box mt-2 krtm-border-color-var-color-danger-b169">
         <p th:text="#{${error}}">Fehler beim Laden.</p>
     </div>
 
@@ -83,12 +83,12 @@
     </div>
 
     <!-- Reject reason modal (no native dialogs, REQ-UI) -->
-    <div id="reject-modal" class="modal" style="display:none; z-index: 3100;">
-        <div class="modal-content hud-box" style="max-width: 520px;">
+    <div id="reject-modal" class="modal krtm-display-none-z-index-3100-25fb">
+        <div class="modal-content hud-box krtm-max-width-520px-acb4">
             <h2 class="mt-0" th:text="#{admin.discordRegistrations.reject.modal.title}">Registrierung ablehnen</h2>
             <label for="reject-reason" th:text="#{admin.discordRegistrations.reject.modal.reasonLabel}">Begründung (optional)</label>
             <textarea id="reject-reason" maxlength="1000"></textarea>
-            <div class="flex-center-gap" style="margin-top: 1rem;">
+            <div class="flex-center-gap krtm-margin-top-1rem-a6cb">
                 <button type="button" class="btn btn-ghost" id="reject-cancel" th:text="#{general.cancel}">Abbrechen</button>
                 <button type="button" class="btn btn-danger" id="reject-confirm" th:text="#{admin.discordRegistrations.reject}">Ablehnen</button>
             </div>

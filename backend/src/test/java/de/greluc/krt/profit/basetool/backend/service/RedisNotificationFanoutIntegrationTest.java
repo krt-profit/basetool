@@ -47,7 +47,7 @@ import org.testcontainers.utility.DockerImageName;
 
 /**
  * End-to-end integration test for {@link RedisNotificationFanout} against a real Redis in
- * Testcontainers (ADR-0093): a notification pushed on one backend instance reaches a peer
+ * Testcontainers (ADR-0094): a notification pushed on one backend instance reaches a peer
  * instance's emitters, while the publisher delivers locally and skips its own looped-back message.
  */
 @Testcontainers

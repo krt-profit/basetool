@@ -55,6 +55,23 @@ class LiveSyncPresenceServiceTest {
   }
 
   @Test
+  void touch_refusesAFirstSeenSection_onceTheTopicIsAtTheDistinctSectionCap() {
+    // Fill the topic up to the distinct-section cap with unique first-seen sections (#1245): each
+    // is
+    // a new sighting.
+    for (int i = 0; i < LiveSyncPresenceService.MAX_SECTIONS_PER_TOPIC; i++) {
+      assertThat(service.touch(topicA, "sec-" + i, "user-1", "Alice")).isTrue();
+    }
+    // A further first-seen section is refused (not tracked) rather than growing the map unbounded.
+    assertThat(service.touch(topicA, "one-too-many", "user-1", "Alice")).isFalse();
+    assertThat(service.get(topicA, "one-too-many", "user-1")).isNull();
+    // An already-tracked section still accepts (heartbeat / a second editor), and a different topic
+    // has its own independent budget.
+    assertThat(service.get(topicA, "sec-0", "user-1")).isNotNull();
+    assertThat(service.touch(topicB, "core", "user-2", "Bob")).isTrue();
+  }
+
+  @Test
   void presenceGauge_reflectsTheNumberOfTopicsWithLiveEditors() {
     assertThat(presenceGauge()).isEqualTo(0.0d);
 

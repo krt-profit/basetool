@@ -74,14 +74,15 @@ class SecurityHeadersTest {
    * Audit finding L-3 (2026-05-20): the CSP {@code style-src} directive must be nonce-gated and
    * must NOT carry {@code 'unsafe-inline'} — every {@code <style>} block in the templates now
    * renders with {@code th:attr="nonce=${cspNonce}"}, so an injected {@code <style>} tag (stored
-   * XSS via mission name / finance note / …) cannot be evaluated by the browser. The {@code
-   * style=""} attributes on individual elements remain allowed via the explicit {@code
-   * style-src-attr 'unsafe-inline'} fallback — that is a separate CSP3 directive and is pinned here
-   * so future tightening (e.g. moving to {@code 'unsafe-hashes' 'sha256-…'}) can land on
-   * style-src-attr without touching style-src.
+   * XSS via mission name / finance note / …) cannot be evaluated by the browser. Inline {@code
+   * style=""} attributes are now locked out too: {@code style-src-attr} is {@code 'none'} because
+   * every inline style attribute was migrated out of the templates (static values to {@code
+   * inline-migration.css} classes; data-driven ones to {@code th:classappend} classes or a {@code
+   * data-krtm-width} attribute applied via the CSSOM), so an injected inline style attribute is
+   * blocked rather than merely restricted to visual harm.
    */
   @Test
-  void cspStyleSrcIsNonceGated_andStyleSrcAttrIsExplicit() throws Exception {
+  void cspStyleSrcIsNonceGated_andStyleSrcAttrIsNone() throws Exception {
     String csp =
         mockMvc
             .perform(get("/"))
@@ -99,11 +100,13 @@ class SecurityHeadersTest {
     assertThat(csp)
         .as("style-src must NOT carry 'unsafe-inline' (would defeat the nonce gate)")
         .doesNotContain("style-src 'self' 'unsafe-inline'");
-    // style-src-attr stays unsafe-inline for now — pinned explicitly so a future tightening can
-    // move from 'unsafe-inline' to an 'unsafe-hashes' allow-list incrementally.
+    // style-src-attr is now 'none': all inline style="" attributes were migrated out of the
+    // templates (static -> inline-migration.css classes; dynamic -> th:classappend classes /
+    // data-krtm-width applied via the CSSOM), so an injected inline style attribute is blocked.
     assertThat(csp)
-        .as("style-src-attr fallback for 859 style='…' attributes")
-        .contains("style-src-attr 'unsafe-inline'");
+        .as("style-src-attr locked to 'none' — no inline style attributes remain")
+        .contains("style-src-attr 'none'")
+        .doesNotContain("style-src-attr 'unsafe-inline'");
     // script-src stays nonce-gated as before — regression-pin.
     assertThat(csp).contains("script-src 'nonce-").contains("'strict-dynamic'");
   }

@@ -19,7 +19,7 @@
     }
 
     let SERIALIZE_KEY = 'materialboerse';
-    // REQ-FE-015 (ADR-0093): the global live-sync room the board publishes to / subscribes from,
+    // REQ-FE-015 (ADR-0094): the global live-sync room the board publishes to / subscribes from,
     // multiplexed over the shared /ws/sync socket (window.krtLiveSync). Replaces the retired
     // per-board materialboerse-presence.js socket.
     let MATERIALBOARD_TOPIC = 'materialboard';
@@ -329,7 +329,11 @@
             // in-progress dialog is not disrupted. The modal is shown via inline
             // display:flex (DS contract), so read that, not a hidden attribute.
             let modal = document.getElementById('mb-modal');
-            if (modal && modal.style.display !== '' && modal.style.display !== 'none') {
+            if (
+                modal &&
+                window.getComputedStyle(modal).display !== '' &&
+                window.getComputedStyle(modal).display !== 'none'
+            ) {
                 return;
             }
             swapList();

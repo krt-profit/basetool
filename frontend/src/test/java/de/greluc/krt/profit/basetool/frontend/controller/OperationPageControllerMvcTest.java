@@ -336,7 +336,7 @@ class OperationPageControllerMvcTest {
             anyBoolean());
   }
 
-  // ── Live-sync section fragments (REQ-FE-015, ADR-0093) — the peer-refresh swap targets ──────
+  // ── Live-sync section fragments (REQ-FE-015, ADR-0094) — the peer-refresh swap targets ──────
   // overview / payout / finance each render only their own fragment and load only the reads that
   // fragment needs (ADR-0078/ADR-0081 fragment-gating); an unknown fragment or a backend failure
   // degrades to the inline section error, never a redirect.

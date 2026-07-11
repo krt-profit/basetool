@@ -377,7 +377,7 @@ function toggleBox(event, boxId) {
     const content = box.querySelector('.box-content');
     const icon = box.querySelector('.toggle-icon');
     if (content && icon) {
-        if (content.style.display === 'none') {
+        if (window.getComputedStyle(content).display === 'none') {
             content.style.display = 'block';
             icon.textContent = '-';
             localStorage.setItem(boxId + '-collapsed', 'false');

@@ -41,7 +41,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 /**
  * Verifies that a successful order create pokes the staff live-sync queue room server-side
- * (REQ-FE-015, ADR-0093) — the guest-create path has no socket, so {@code JobOrderWriteController}
+ * (REQ-FE-015, ADR-0094) — the guest-create path has no socket, so {@code JobOrderWriteController}
  * publishes {@code orders / [queue]} through {@link LiveSyncLocalBus} rather than relying on a
  * client broadcast.
  *

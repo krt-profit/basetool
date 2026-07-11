@@ -42,7 +42,7 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
-  # The Redis connection for the notification SSE fan-out (ADR-0093) now lives in the base
+  # The Redis connection for the notification SSE fan-out (ADR-0094) now lives in the base
   # application.yml (host from REDIS_HOST, which the compose anchor sets to the `redis` service). Prod
   # only flips the fan-out and the Redis health indicator ON (below); the connection config is shared.
   lifecycle:
@@ -80,7 +80,7 @@ springdoc:
     enabled: false
 
 management:
-  # Prod turns the notification SSE Redis fan-out ON (ADR-0093), so a notification pushed on one
+  # Prod turns the notification SSE Redis fan-out ON (ADR-0094), so a notification pushed on one
   # backend replica reaches a user connected to another. The Redis health indicator is re-enabled
   # for monitoring visibility of an outage; Redis stays OUT of the readiness group (base config), so
   # a Redis blip surfaces in the root health aggregate + metrics without flipping the container
@@ -117,6 +117,14 @@ app:
       # Recommended value once verified on the host:
       #   https://keycloak:18443/realms/iri/protocol/openid-connect/certs
       jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:}
+      # Audit L-1 / security review: enforce the JWT `aud` claim so the backend accepts only tokens
+      # minted for it (aud=basetool-backend), not any validly-signed token from the realm. The value
+      # comes from the compose env (IRI_BACKEND_EXPECTED_AUDIENCES), EMPTY by default so dev / e2e
+      # stay off (their realms don't stamp the audience). Enable it in the prod .env ONLY after
+      # confirming every token the backend receives carries aud=basetool-backend — the realm's
+      # `extractor-ingest` client scope (a DEFAULT scope on the basetool-frontend client,
+      # realm-config.reference.json) stamps it. A premature/wrong value rejects every token.
+      expected-audiences: ${APP_SECURITY_JWT_EXPECTED_AUDIENCES:}
 
 # SC Wiki catalogue sync. The per-sync feature flags default to false in code
 # (ScWikiProperties -- "ships dark"); enabled here so each scheduler step runs on the

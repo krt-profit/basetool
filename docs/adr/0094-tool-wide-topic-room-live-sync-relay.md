@@ -1,4 +1,4 @@
-# ADR-0093 — Tool-wide topic-room live sync over one multiplexed WebSocket with Redis pub/sub fan-out
+# ADR-0094 — Tool-wide topic-room live sync over one multiplexed WebSocket with Redis pub/sub fan-out
 
 - **Status:** Accepted
 - **Date:** 2026-07-10
@@ -172,7 +172,7 @@ toward the `pids: 2048` cap — that cap now bounds only the fixed platform-thre
 carriers, NIO pollers, the bounded subscribe-auth / Redis-listener executors, GC/JIT), a few
 hundred threads with the F2/#1243 widening still leaving generous headroom; the July
 native-thread-OOM (unbounded per-message spawn) is structurally gone. Frontend heap (~768 MB of
-the 1024 MB limit) absorbs the ADR-0093 150 MB decorator-backpressure worst case; backend heap
+the 1024 MB limit) absorbs the ADR-0094 150 MB decorator-backpressure worst case; backend heap
 and `db-backend`'s `max_connections=150` (over the 100-slot Hikari pool) are unchanged by
 live-sync (the socket carries no data; refetches hit existing, coalesce-bounded endpoints). The
 one envelope gap the epic introduces is **file descriptors**: the frontend now holds one

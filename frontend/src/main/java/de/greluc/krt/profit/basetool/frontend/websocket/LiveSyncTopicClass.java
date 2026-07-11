@@ -26,7 +26,7 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * The bounded set of live-sync topic <em>classes</em> — the single source of truth for the
- * tool-wide peer-sync relay (REQ-FE-015, ADR-0093).
+ * tool-wide peer-sync relay (REQ-FE-015, ADR-0094).
  *
  * <p>A concrete topic string is either the bare {@link #prefix} (a global room, e.g. {@code
  * orders}) or {@code prefix:{uuid}} (a per-resource room, e.g. {@code mission:5f…}). Each class

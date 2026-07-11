@@ -548,6 +548,17 @@ groups:
           summary: "Ingest oversized-payload rejections spiking"
           description: "The ingest gateway is refusing oversized /v1 request bodies (413) at an elevated rate — likely an oversized-body probing / DoS attempt against the public ingest surface, or a misconfigured client. Check the NPM edge and the fail2ban jails."
 
+      # Backend oversized-JSON-body rejections (RequestBodySizeLimitFilter) on the capped import
+      # endpoints (refinery import-extract). baseline-tune: >0.2/s sustained is a probing/DoS pattern.
+      - alert: RequestBodyRejectedSpike
+        expr: rate(basetool_request_body_rejected_total[5m]) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Backend oversized request-body rejections spiking"
+          description: "The backend is refusing oversized non-multipart JSON request bodies (413) on a capped import path at an elevated rate — likely a memory-DoS probing attempt against the refinery import-extract endpoint, or a misconfigured client bypassing the frontend proxy cap."
+
       # Keycloak login errors / Discord IdP broker error spike (primary login path).
       - alert: KeycloakLoginErrorSpike
         expr: rate(keycloak_user_events_total{event=~"login_error|identity_provider_login_error"}[5m]) > 0.2
@@ -570,7 +581,7 @@ groups:
           summary: "Keycloak user-event metrics absent while Keycloak is up"
           description: "keycloak_user_events_total is not being exported while the Keycloak scrape is up — KeycloakLoginErrorSpike is blind. Check the Keycloak metrics/event listener config."
 
-      # (#1102, REQ-FE-015 / ADR-0093) Redis fan-out for cross-replica live delivery is erroring.
+      # (#1102, REQ-FE-015 / ADR-0094) Redis fan-out for cross-replica live delivery is erroring.
       # Both the live-sync changed-relay (basetool_livesync_redis_errors_total, frontend) and the
       # notification SSE fan-out (basetool_sse_redis_errors_total, backend) publish each locally-relayed
       # signal onto a Redis pub/sub channel so peer replicas relay it to their own rooms. The publish is

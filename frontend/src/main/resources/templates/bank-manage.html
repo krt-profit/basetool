@@ -27,7 +27,7 @@
     <div class="greeting hud-box flex-between">
         <div>
             <h1 th:text="#{bank.manage.title}">Bank-Verwaltung</h1>
-            <p class="text-muted" style="margin: 0.25rem 0 0; font-size: 0.8rem;"
+            <p class="text-muted krtm-margin-0-25rem-0-0-font-size-0-8rem-cb15"
                th:text="#{bank.manage.subtitle}">Konten-Lebenszyklus und Halter-Registry der Kartellbank.</p>
         </div>
         <div class="bank-head-actions">
@@ -141,7 +141,7 @@
                         th:attr="data-account-no=${a.accountNo()}">
                         <td><a th:href="@{'/bank/accounts/' + ${a.id()}}" th:text="${a.accountNo()}">KB-0001</a></td>
                         <td th:text="${a.name()}">Staffel IRIDIUM</td>
-                        <td><span class="chip" style="font-size: 0.55rem;"
+                        <td><span class="chip krtm-font-size-0-55rem-eff3"
                                   th:text="#{'bank.account.type.' + ${a.type()}}">Staffel</span></td>
                         <td th:text="${a.orgUnit() != null ? a.orgUnit().name() : (a.areaName() != null ? a.areaName() : '—')}">IRIDIUM</td>
                         <td class="text-right"
@@ -178,7 +178,7 @@
                                     th:attr="data-field-_id=${a.id()},data-field-version=${a.version()}"
                                     data-testid="bank-reopen-open" th:text="#{bank.manage.account.reopen}">Wieder&ouml;ffnen</button>
                             </th:block>
-                            <span class="text-muted" th:unless="${management}" style="font-size: 0.7rem;">&mdash;</span>
+                            <span class="text-muted krtm-font-size-0-7rem-3921" th:unless="${management}">&mdash;</span>
                         </td>
                     </tr>
                     </tbody>
@@ -222,7 +222,7 @@
                         <td class="text-right"
                             th:text="${#numbers.formatInteger(@moneyFormat.round(h.totalHeld()), 1, 'POINT')}">1.000.000</td>
                         <td>
-                            <span class="chip" style="font-size: 0.55rem;"
+                            <span class="chip krtm-font-size-0-55rem-eff3"
                                   th:text="${h.roleManaged()} ? #{bank.holder.source.auto} : #{bank.holder.source.manual}">Auto</span>
                         </td>
                         <td class="text-right">
@@ -240,7 +240,7 @@
                                     data-testid="bank-holder-reactivate-open"
                                     th:text="#{bank.manage.holder.reactivate}">Reaktivieren</button>
                             </th:block>
-                            <span class="text-muted" th:unless="${management}" style="font-size: 0.7rem;">&mdash;</span>
+                            <span class="text-muted krtm-font-size-0-7rem-3921" th:unless="${management}">&mdash;</span>
                         </td>
                     </tr>
                     </tbody>

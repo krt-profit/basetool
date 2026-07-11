@@ -75,4 +75,42 @@ public class RateLimitingConfig {
     registration.addUrlPatterns("/*");
     return registration;
   }
+
+  /**
+   * The request-body-size cap for the heavy JSON import endpoints (security review, memory-DoS).
+   *
+   * @param properties the {@code app.request-body-limit.*} configuration
+   * @param problemProperties supplies the RFC-7807 {@code type} base URI for the 413 body
+   * @param meterRegistry counts each rejection on {@code basetool_request_body_rejected_total}
+   * @return the filter (registered by {@link #requestBodySizeLimitFilterRegistration})
+   */
+  @Bean
+  public de.greluc.krt.profit.basetool.backend.filter.RequestBodySizeLimitFilter
+      requestBodySizeLimitFilter(
+          de.greluc.krt.profit.basetool.backend.support.RequestBodyLimitProperties properties,
+          AppProblemProperties problemProperties,
+          MeterRegistry meterRegistry) {
+    return new de.greluc.krt.profit.basetool.backend.filter.RequestBodySizeLimitFilter(
+        properties, problemProperties, meterRegistry);
+  }
+
+  /**
+   * Registers {@link #requestBodySizeLimitFilter} just after the rate limiter (highest precedence +
+   * 15) so an oversized body is refused before Spring Security and MVC binding, but a flood still
+   * trips the per-IP rate limit first.
+   *
+   * @param filter the body-size filter
+   * @return the servlet registration
+   */
+  @Bean
+  public org.springframework.boot.web.servlet.FilterRegistrationBean<jakarta.servlet.Filter>
+      requestBodySizeLimitFilterRegistration(
+          de.greluc.krt.profit.basetool.backend.filter.RequestBodySizeLimitFilter filter) {
+    org.springframework.boot.web.servlet.FilterRegistrationBean<jakarta.servlet.Filter>
+        registration = new org.springframework.boot.web.servlet.FilterRegistrationBean<>();
+    registration.setFilter(filter);
+    registration.setOrder(org.springframework.core.Ordered.HIGHEST_PRECEDENCE + 15);
+    registration.addUrlPatterns("/*");
+    return registration;
+  }
 }

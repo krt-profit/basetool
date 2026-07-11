@@ -28,7 +28,7 @@ import org.springframework.web.socket.server.HandshakeInterceptor;
 
 /**
  * Binds the legacy Materialbörse board WebSocket handshake ({@code /ws/materialboerse/board}) to
- * its implicit global {@code materialboard} topic (REQ-FE-015, ADR-0093).
+ * its implicit global {@code materialboard} topic (REQ-FE-015, ADR-0094).
  *
  * <p>Since the board migrated to the multiplexed {@code /ws/sync} relay, new page loads subscribe
  * to the {@code materialboard} room over {@code /ws/sync}; this interceptor keeps the pre-rollout

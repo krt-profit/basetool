@@ -154,9 +154,22 @@ with `data-trigger="open-modal-display"` and **close with the single standardize
 `data-modal-dismiss` convention is being migrated onto it. The overlay's hidden default comes from
 the **global** `.krt-modal-overlay { display:none }` in `styles.css` (loaded on every page;
 `bank.css` duplicates it as defense-in-depth), so the fragment injects no inline style. A modal is
-made visible only by an inline `display:flex` (`open-modal-display`, or a server-rendered
-`th:style`); the global default must never be `display:flex`, or a page whose scoped stylesheet
-fails to load would render every no-inline-style modal open on load (#1003 WebKit flake).
+made visible by adding the `krtm-modal-open` class (`display:flex`, in `inline-migration.css` which
+is loaded last so it wins) — at runtime via `open-modal-display` (which toggles `classList`, not an
+inline `style.display`) or a server-rendered `th:classappend`; the global default must never be
+`display:flex`, or a page whose scoped stylesheet fails to load would render every closed modal open
+on load (#1003 WebKit flake).
+
+**No inline `style=""` attributes (CSP hardening).** Templates must not use inline `style=""`
+attributes: the CSP pins `style-src-attr 'none'`, so an inline style attribute is blocked by the
+browser (closing the CSS-injection residual). Static styling goes in a CSS class; a former inline
+value already has a `krtm-*` class in `inline-migration.css` (generated, one class per distinct
+value, loaded last). Data-driven values use a class toggle (`th:classappend`, e.g. the modal
+`krtm-modal-open`/`krtm-hidden` pair, `krtm-opacity-05/06`, `krtm-color-danger`) or, when the value
+is genuinely dynamic (progress-bar widths), a `data-krtm-width` attribute applied to `style.width`
+via the CSSOM in `inline-style-apply.js` — the CSSOM is not governed by `style-src-attr`. Setting a
+style through JavaScript (`element.style.x = …`) stays allowed; only literal `style=""` attributes in
+the rendered HTML are forbidden (ADR-0093).
 
 **Acceptance**
 

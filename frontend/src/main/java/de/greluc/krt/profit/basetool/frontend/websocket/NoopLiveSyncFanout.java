@@ -24,7 +24,7 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * Single-instance {@link LiveSyncFanout}: publishing is a no-op because the handler's local relay
- * is the whole story when the frontend runs as one replica (ADR-0093).
+ * is the whole story when the frontend runs as one replica (ADR-0094).
  *
  * <p>Instantiated as the fallback in {@code LiveSyncWebSocketConfig} via {@code
  * fanoutProvider.getIfAvailable(NoopLiveSyncFanout::new)}, so a registered {@link LiveSyncFanout}

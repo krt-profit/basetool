@@ -35,7 +35,7 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
- * Wires the cross-replica Redis pub/sub fan-out behind the notification SSE push (ADR-0093),
+ * Wires the cross-replica Redis pub/sub fan-out behind the notification SSE push (ADR-0094),
  * discharging the ADR-0016 single-instance follow-up.
  *
  * <p>Lives in the {@code service} package (not {@code config}) on purpose: its {@code @Bean}

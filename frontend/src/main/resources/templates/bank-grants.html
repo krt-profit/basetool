@@ -27,7 +27,7 @@
     <div class="greeting hud-box flex-between">
         <div>
             <h1 th:text="#{bank.grants.title}">Berechtigungen</h1>
-            <p class="text-muted" style="margin: 0.25rem 0 0; font-size: 0.8rem;"
+            <p class="text-muted krtm-margin-0-25rem-0-0-font-size-0-8rem-cb15"
                th:text="#{bank.grants.subtitle}">Pro Mitarbeiter und Konto: Einzahlen, Auszahlen, Transfer.</p>
         </div>
         <div class="bank-head-actions">
@@ -98,7 +98,7 @@
                         th:attr="data-user-id=${g.userId()},data-account-id=${g.accountId()},data-version=${g.version()},data-can-deposit=${g.canDeposit()},data-can-withdraw=${g.canWithdraw()},data-can-transfer=${g.canTransfer()},data-user-handle=${g.userHandle()}">
                         <td>
                             <span th:text="${g.userHandle()}">greluc</span>
-                            <span class="chip chip--muted" style="font-size: 0.55rem;"
+                            <span class="chip chip--muted krtm-font-size-0-55rem-eff3"
                                   th:if="${!g.granteeHasBankRole()}"
                                   th:title="#{bank.grants.missingRole.hint}"
                                   th:text="#{bank.grants.missingRole}">Rolle fehlt</span>

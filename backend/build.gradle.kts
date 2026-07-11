@@ -187,3 +187,16 @@ tasks {
     includeBuildSystem = true
   }
 }
+
+// Restrict the SBOM to the shipped runtime classpath so the signed BOM reflects only what actually
+// ships in the bootJar/image — not build/test-scoped components (test, checkstyle, spotbugs,
+// annotationProcessor, compileOnly), which otherwise inflate the BOM with tooling that never runs
+// in
+// production and produce false-positive CVE hits for downstream scanners against a service that
+// does
+// not actually carry the flagged library. The dependency scan runs in `cyclonedxDirectBom`
+// (CyclonedxDirectTask, cyclonedx-gradle 3.x); `includeConfigs` is an allow-list of
+// configuration-name regexes, so only the resolved runtime graph is enumerated.
+tasks.named<org.cyclonedx.gradle.CyclonedxDirectTask>("cyclonedxDirectBom") {
+  includeConfigs.set(listOf("^runtimeClasspath$"))
+}

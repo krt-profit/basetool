@@ -213,13 +213,15 @@ tasks.cyclonedxBom {
   includeBuildSystem = true
 }
 
-// Keep the e2e (Playwright / Testcontainers) source-set dependencies out of the shipped SBOM:
-// they are test-only and never enter the bootJar or the published image. In cyclonedx-gradle 3.x
-// the dependency scan runs in the `cyclonedxDirectBom` task (CyclonedxDirectTask), which exposes
-// `skipConfigs` (regexes matched against configuration names); the aggregate `cyclonedxBom` task
-// only formats the output. Skipping every `e2e*` configuration there stops Playwright from
-// polluting `frontend-bom.*`.
+// Restrict the SBOM to the shipped runtime classpath so the signed BOM reflects only what actually
+// ships in the bootJar/image — not build/test-scoped components (e2e Playwright/Testcontainers,
+// test, checkstyle, spotbugs, annotationProcessor, compileOnly), which otherwise inflate the BOM
+// with tooling that never runs in production and produce false-positive CVE hits for downstream
+// scanners. In cyclonedx-gradle 3.x the dependency scan runs in the `cyclonedxDirectBom` task
+// (CyclonedxDirectTask); `includeConfigs` is an allow-list of configuration-name regexes, so only
+// the resolved runtime graph is enumerated. The explicit `^e2e.*` skip is kept as belt-and-braces.
 tasks.named<org.cyclonedx.gradle.CyclonedxDirectTask>("cyclonedxDirectBom") {
+  includeConfigs.set(listOf("^runtimeClasspath$"))
   skipConfigs.set(listOf("^e2e.*"))
 }
 

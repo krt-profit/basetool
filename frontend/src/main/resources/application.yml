@@ -143,7 +143,7 @@ app:
     read-timeout: 3s
     write-timeout: 3s
   livesync:
-    # Cross-replica live-sync fan-out (REQ-FE-015, ADR-0093). Reuses the Redis the frontend already
+    # Cross-replica live-sync fan-out (REQ-FE-015, ADR-0094). Reuses the Redis the frontend already
     # runs for Spring Session: the changed relay publishes to a pub/sub channel and every instance
     # relays it to its own local WebSocket rooms. On by default (and disabled entirely under the
     # test profile, which runs no Redis). Set false to force purely local, single-instance relay.

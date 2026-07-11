@@ -128,7 +128,7 @@
                         <tr th:each="cat : ${categories}" data-category-row>
                             <td th:text="${cat.name}">Category Name</td>
                             <td>
-                                <form method="post" th:action="@{/admin/materials/categories/{id}/delete(id=${cat.id})}" style="display:inline;"
+                                <form method="post" th:action="@{/admin/materials/categories/{id}/delete(id=${cat.id})}" class="krtm-display-inline-2f87"
                                       data-krt-confirm th:data-krt-confirm-message="#{admin.materials.categories.delete.confirm}"
                                       th:data-category-id="${cat.id}">
                                     <button type="submit" class="btn btn-quiet-danger btn-icon" th:title="#{general.delete}" th:aria-label="#{general.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
@@ -146,11 +146,11 @@
 
     <div class="hud-box mt-2">
         <div class="data-section">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
+            <div class="krtm-display-flex-justify-content-space-between-a-3a17">
                 <h2 th:text="#{admin.materials.subtitle}">Materialien</h2>
-                <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                <div class="krtm-display-flex-align-items-center-gap-0-75rem-5618">
                     <button type="button" class="btn btn--cta" data-trigger="materials-open-create-modal" th:text="#{admin.materials.create.button}">Material anlegen</button>
-                    <div class="form-group" style="margin-bottom: 0; width: 300px; max-width: 100%; position: relative;">
+                    <div class="form-group krtm-margin-bottom-0-width-300px-max-width-100-po-85dc">
                         <input type="text" id="filterMaterials" th:placeholder="#{general.filter.name.placeholder}" data-trigger="filter-table" data-table-id="materialsTable" autocomplete="off">
                         <!--/*
                           Material names are exposed to JavaScript via this server-
@@ -163,7 +163,7 @@
                           be wired. Keep the datalist; do NOT move this back into
                           the <script> block.
                         */-->
-                        <datalist id="materialNames-data" style="display: none;">
+                        <datalist id="materialNames-data" class="krtm-display-none-5790">
                             <option th:each="mat : ${materials}" th:value="${mat.name}"></option>
                         </datalist>
                     </div>
@@ -186,27 +186,27 @@
                 <tbody>
                     <tr th:each="mat : ${materials}" th:data-mat-id="${mat.id}" th:data-version="${mat.version}">
                         <td>
-                            <span th:if="${mat?.isManualEntry == true}" class="material-manual-badge" th:title="#{admin.material.manual_entry.tooltip}" th:text="#{admin.material.manual_entry}">Manuell</span><span th:if="${mat?.isVisible == false}" class="material-hidden-badge" th:title="#{admin.material.hidden.tooltip}" th:text="#{admin.material.hidden}">Versteckt</span><span th:if="${mat?.isIllegal == true}" class="text-danger" style="margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_illegal}">&#9888;</span><span th:if="${mat?.isVolatileQt == true}" class="text-warning" style="color: var(--color-warning); margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_qt}">&#9888;</span><span th:if="${mat?.isVolatileTime == true}" class="text-warning" style="color: var(--color-warning); margin-right: 0.5rem; font-weight: bold;" th:title="#{material.is_volatile_time}">&#9888;</span><span th:text="${mat?.name}">Name</span>
+                            <span th:if="${mat?.isManualEntry == true}" class="material-manual-badge" th:title="#{admin.material.manual_entry.tooltip}" th:text="#{admin.material.manual_entry}">Manuell</span><span th:if="${mat?.isVisible == false}" class="material-hidden-badge" th:title="#{admin.material.hidden.tooltip}" th:text="#{admin.material.hidden}">Versteckt</span><span th:if="${mat?.isIllegal == true}" class="text-danger krtm-margin-right-0-5rem-font-weight-bold-4522" th:title="#{material.is_illegal}">&#9888;</span><span th:if="${mat?.isVolatileQt == true}" class="text-warning krtm-color-var-color-warning-margin-right-0-5rem-9316" th:title="#{material.is_volatile_qt}">&#9888;</span><span th:if="${mat?.isVolatileTime == true}" class="text-warning krtm-color-var-color-warning-margin-right-0-5rem-9316" th:title="#{material.is_volatile_time}">&#9888;</span><span th:text="${mat?.name}">Name</span>
                         </td>
                         <td>
                             <div class="nowrap">
                                 <span th:text="${mat?.type != null ? #messages.msg('material.type.' + mat.type) : '-'}">Type</span>
                             </div>
-                            <div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" style="margin-top: 0.5rem; font-size: 0.85em; white-space: nowrap;">
-                                <label style="margin-bottom: 0; cursor: pointer; min-height: 44px; display: flex; align-items: center;">
-                                    <input type="checkbox" name="isManualRawMaterial" data-update-type="MANUAL_RAW" th:checked="${mat.isManualRawMaterial == true}" data-trigger="admin-materials-update" style="margin-right: 0.25rem;" />
+                            <div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" class="krtm-margin-top-0-5rem-font-size-0-85em-white-spa-0ed1">
+                                <label class="krtm-margin-bottom-0-cursor-pointer-min-height-44-daca">
+                                    <input type="checkbox" name="isManualRawMaterial" data-update-type="MANUAL_RAW" th:checked="${mat.isManualRawMaterial == true}" data-trigger="admin-materials-update" class="krtm-margin-right-0-25rem-945d" />
                                     <span th:text="#{admin.material.manual_raw}">Manuelles Rohmaterial</span>
                                 </label>
                             </div>
-                            <div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" style="margin-top: 0.5rem; font-size: 0.85em; white-space: nowrap;">
-                                <label style="margin-bottom: 0; cursor: pointer; min-height: 44px; display: flex; align-items: center;">
-                                    <input type="checkbox" name="isJobOrder" data-update-type="JOB_ORDER" th:checked="${mat.isJobOrder == true}" data-trigger="admin-materials-update" style="margin-right: 0.25rem;" />
+                            <div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" class="krtm-margin-top-0-5rem-font-size-0-85em-white-spa-0ed1">
+                                <label class="krtm-margin-bottom-0-cursor-pointer-min-height-44-daca">
+                                    <input type="checkbox" name="isJobOrder" data-update-type="JOB_ORDER" th:checked="${mat.isJobOrder == true}" data-trigger="admin-materials-update" class="krtm-margin-right-0-25rem-945d" />
                                     <span th:text="#{admin.material.job_order}">Auftrag</span>
                                 </label>
                             </div>
-                            <div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" style="margin-top: 0.5rem; font-size: 0.85em; white-space: nowrap;">
-                                <label style="margin-bottom: 0; cursor: pointer; min-height: 44px; display: flex; align-items: center;">
-                                    <input type="checkbox" name="isVisible" data-update-type="VISIBILITY" th:checked="${mat.isVisible != false}" data-trigger="admin-materials-update" style="margin-right: 0.25rem;" />
+                            <div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" class="krtm-margin-top-0-5rem-font-size-0-85em-white-spa-0ed1">
+                                <label class="krtm-margin-bottom-0-cursor-pointer-min-height-44-daca">
+                                    <input type="checkbox" name="isVisible" data-update-type="VISIBILITY" th:checked="${mat.isVisible != false}" data-trigger="admin-materials-update" class="krtm-margin-right-0-25rem-945d" />
                                     <span th:text="#{admin.material.visible}">Sichtbar</span>
                                 </label>
                             </div>
@@ -247,7 +247,7 @@
 <div id="modal-create-material" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-create-material-title">
     <div class="modal-box modal-box-create-material">
         <div id="modal-create-material-title" class="modal-title" th:text="#{admin.materials.create.modal.title}">Neues Material anlegen</div>
-        <p class="form-hint" style="margin-bottom: 1rem;" th:text="#{admin.materials.create.modal.intro}">Für Materialien, die noch nicht in UEX vorhanden sind.</p>
+        <p class="form-hint krtm-margin-bottom-1rem-c2c0" th:text="#{admin.materials.create.modal.intro}">Für Materialien, die noch nicht in UEX vorhanden sind.</p>
 
         <div class="form-group">
             <label class="form-label" for="cm-name" th:text="#{admin.materials.create.field.name}">Name</label>

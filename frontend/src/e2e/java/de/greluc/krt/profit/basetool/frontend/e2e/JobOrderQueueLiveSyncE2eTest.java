@@ -34,7 +34,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Live-sync coverage for the global job-order queue (#1102, REQ-FE-015 / ADR-0093): a viewer of the
+ * Live-sync coverage for the global job-order queue (#1102, REQ-FE-015 / ADR-0094): a viewer of the
  * {@code /orders} queue must gain a newly-created order IN PLACE, no manual reload — the {@code
  * queue} section key crossing the global {@code orders} room.
  *

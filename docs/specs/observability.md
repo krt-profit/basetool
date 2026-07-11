@@ -485,7 +485,7 @@ transaction per pass) rather than per-scrape.
   all recipients (unlabelled — `sub` is PII); the counter is bumped at each drop-on-send-failure
   branch with a fixed `event` (`connected` / `notification` / `heartbeat`). Zero connections while
   the frontend still reports active sessions drives `SsePushChannelDead` (a dead push channel, e.g.
-  reverse-proxy buffering drift). The cross-replica SSE fan-out (#1102, REQ-FE-015 / ADR-0093) adds
+  reverse-proxy buffering drift). The cross-replica SSE fan-out (#1102, REQ-FE-015 / ADR-0094) adds
   `basetool_sse_redis_published_total` / `basetool_sse_redis_consumed_total` (real-time notification
   signals this replica published to / consumed from the `basetool:notify:published` Redis channel;
   own-origin messages are excluded) and `basetool_sse_redis_errors_total{op}` (`publish` / `consume`
@@ -513,7 +513,7 @@ counters at the previously-silent throttle, send-failure, topic-cap, subscribe-s
 per-topic-throttle branches of the relay — the `topic_throttled` reason (F2/#1243) fires when a
 room's *aggregate* publish rate exceeds its per-topic token bucket regardless of the per-session
 limit —
-the component that shipped the REQ-FE-010 staleness defect. Since #1102 (REQ-FE-015 / ADR-0093) both
+the component that shipped the REQ-FE-010 staleness defect. Since #1102 (REQ-FE-015 / ADR-0094) both
 counters carry a bounded `topic_class` label (one of the eight `LiveSyncTopicClass` labels: `mission`,
 `operation`, `order`, `orders`, `bank_account`, `bank_staff`, `orgunit_bank`, `materialboard`), and
 the meter names stay put — a rename would break the `07` panels and this alert set. A `changed`-frame
@@ -572,7 +572,11 @@ item 19 with `basetool_ratelimit_requests_total{bucket}` on the per-IP filter an
 limiter, feeding the same `RateLimitRejectionRatioHigh` ratio alert.
 `basetool_ingest_payload_rejected_total` (untagged, `PayloadSizeLimitFilter`) counts each
 oversized-body 413 the INGEST-DOS-1 guard refuses — previously silent (no log, no metric) unlike the
-sibling bot / rate-limit filters — and backs `IngestPayloadRejectedSpike` (logging audit). The
+sibling bot / rate-limit filters — and backs `IngestPayloadRejectedSpike` (logging audit). Its
+backend twin `basetool_request_body_rejected_total` (untagged, `RequestBodySizeLimitFilter`) counts
+each oversized non-multipart JSON body the backend refuses with 413 on a capped import path (the
+refinery `import-extract`, before Jackson binds it — security review, memory-DoS) and backs
+`RequestBodyRejectedSpike`. The
 gateway also now emits one INFO access-log line per `/v1` request (`RequestLoggingFilter`; method /
 path / status / duration), matching the backend/frontend one-line-per-request contract
 (REQ-OBS-001).

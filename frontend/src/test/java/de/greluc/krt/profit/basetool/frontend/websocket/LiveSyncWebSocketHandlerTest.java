@@ -917,6 +917,42 @@ class LiveSyncWebSocketHandlerTest {
     assertThat(handler.topicBucketCount()).isZero();
   }
 
+  // ── Presence-frame hardening (#1245, ported onto the generalized handler) ──────────────────────
+
+  @Test
+  void presenceFrames_areRateLimitedPerSession() throws Exception {
+    String topic = missionTopic();
+    FakeSession alice = openSession(topic, oidcUser("user-1", "Alice"));
+    openSession(topic, oidcUser("user-2", "Bob"));
+
+    // Flood focus frames (distinct section keys, under the section cap) far past the presence
+    // burst,
+    // simulating a crafted client looping presence frames.
+    int emitted = LiveSyncWebSocketHandler.PRESENCE_BURST + 20;
+    for (int i = 0; i < emitted; i++) {
+      handler.handleTextMessage(
+          alice, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"sec-" + i + "\"}"));
+    }
+
+    // Every presence frame past the per-session token bucket is counted as a throttled drop.
+    assertThat(dropCounter(MetricNames.DROPPED_THROTTLED)).isGreaterThan(0.0);
+  }
+
+  @Test
+  void presenceFrame_withOverLongSectionKey_isDropped() throws Exception {
+    String topic = missionTopic();
+    FakeSession alice = openSession(topic, oidcUser("user-1", "Alice"));
+
+    // A section key longer than MAX_SECTION_KEY_LENGTH (64) is a crafted memory-bloat attempt and
+    // is
+    // dropped before it can insert a presence entry.
+    String longKey = "x".repeat(65);
+    handler.handleTextMessage(
+        alice, new TextMessage("{\"type\":\"focus\",\"sectionKey\":\"" + longKey + "\"}"));
+
+    assertThat(service.get(topic, longKey, "user-1")).isNull();
+  }
+
   // ── Materialbörse board (legacy /ws/materialboerse/board alias + multiplexed materialboard) ───
 
   @Test

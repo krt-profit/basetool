@@ -302,7 +302,7 @@
 <div class="page-wrapper">
 
     <!-- Create page: plain greeting head, the form pane below is the only content. -->
-    <main th:if="${isNew}" style="padding-bottom: 0;">
+    <main th:if="${isNew}" class="krtm-padding-bottom-0-a32f">
         <div class="greeting hud-box flex-between">
             <h1 class="m-0" th:text="#{mission.create}">New Mission</h1>
             <a th:href="@{/missions}" class="btn btn-ghost" th:text="#{general.back}">Zur&uuml;ck</a>
@@ -316,7 +316,7 @@
                 <h1 th:text="#{mission.prefix} + ' ' + ${mission.name}">Mission Name</h1>
                 <!-- Stable slot (display:contents adds no flex gap when empty) so the owning-org-unit
                      reassignment (REQ-ORG-018) can patch this badge in place without a reload. -->
-                <span id="mission-head-org-badge-slot" style="display: contents;"><span th:if="${mission?.owningSquadron != null}" class="squadron-badge"
+                <span id="mission-head-org-badge-slot" class="krtm-display-contents-ddf5"><span th:if="${mission?.owningSquadron != null}" class="squadron-badge"
                       th:title="${mission.owningSquadron.name()}"
                       th:text="${mission.owningSquadron.shorthand()}">IRI</span></span>
                 <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(mission.status)}"
@@ -449,7 +449,7 @@
                         <div class="kpanel-body">
                             <div class="attendance" th:with="reg=${mission.registeredParticipants != null ? mission.registeredParticipants : 0}, chk=${mission.checkedInParticipants != null ? mission.checkedInParticipants : 0}">
                                 <div class="attendance-count"><span class="att-n" th:text="${reg}">0</span><span class="att-label" th:text="#{mission.participants}">Teilnehmer</span></div>
-                                <div class="attendance-meter"><i th:style="'width:' + ${reg > 0 ? (chk * 100 / reg) : 0} + '%'"></i></div>
+                                <div class="attendance-meter"><i th:attr="data-krtm-width=${reg > 0 ? (chk * 100 / reg) : 0}"></i></div>
                                 <div class="attendance-sub">
                                     <span th:text="${#messages.msg('mission.overview.attendance.checked_in', chk)}">davon 0 eingecheckt</span>
                                     &middot;
@@ -499,7 +499,7 @@
                                     <span th:if="${mission.partyLeadUser == null and (mission.partyLeadGuestName == null or mission.partyLeadGuestName.isEmpty())}" th:text="#{general.none}">Keine</span>
                                 </dd>
                             </dl>
-                            <div class="chiprow" th:if="${myParticipant != null}" style="margin-top: 10px;">
+                            <div class="chiprow krtm-margin-top-10px-e5a6" th:if="${myParticipant != null}">
                                 <span class="chip chip--success" th:text="#{mission.overview.signed_up} + (${myParticipant.desiredMissionJobType != null} ? ' &middot; ' + ${myParticipant.desiredMissionJobType.name} : '')">Du bist angemeldet</span>
                                 <span class="chip" th:if="${assignedUnitByParticipantId[myParticipant.id] != null}" th:text="#{mission.overview.aboard} + ' ' + ${assignedUnitByParticipantId[myParticipant.id]}">an Bord</span>
                             </div>
@@ -729,7 +729,7 @@
                                     <td class="num" th:text="${(entry.type.name() == 'INCOME' ? '+' : '&minus;') + #numbers.formatInteger(@moneyFormat.round(entry.amount), 1, 'POINT')} + ' aUEC'">1.000</td>
                                     <td th:text="${entry.note}" th:title="${entry.note}">Notiz</td>
                                     <td sec:authorize="isAuthenticated()">
-                                        <div class="flex-gap-xs" style="justify-content: flex-end;">
+                                        <div class="flex-gap-xs krtm-justify-content-flex-end-177c">
                                             <!-- Edit button. The rounded amount is bound via th:with
                                                  (an unrestricted expression context) and only the
                                                  resulting variable is read in th:data-amount: Thymeleaf
@@ -762,7 +762,7 @@
                                         <a th:href="@{/refinery-orders/{id}(id=${order.id})}" th:text="#{mission.finance.refinery_order}" class="reflink">Raffinerieauftrag</a>
                                     </td>
                                     <td sec:authorize="isAuthenticated()">
-                                        <div class="flex-gap-xs" style="justify-content: flex-end;">
+                                        <div class="flex-gap-xs krtm-justify-content-flex-end-177c">
                                             <span class="auto-marker" th:title="#{mission.finance.auto.tooltip}" th:text="#{mission.finance.auto}">auto</span>
                                         </div>
                                     </td>
@@ -839,27 +839,27 @@
                                               th:text="${order.endsAt != null ? #temporals.format(order.endsAt, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '-'}">Ende</span>
                                     </td>
                                     <td th:text="${order.status != null ? #messages.msgOrNull('refinery.status.' + order.status) ?: order.status : '-'}">Status</td>
-                                    <td style="padding: 0.5rem;">
-                                        <table th:if="${order.goods != null and !#lists.isEmpty(order.goods)}" style="margin: 0; background: transparent;">
+                                    <td class="krtm-padding-0-5rem-2fc7">
+                                        <table th:if="${order.goods != null and !#lists.isEmpty(order.goods)}" class="krtm-margin-0-background-transparent-0b9a">
                                             <thead>
                                                 <tr>
-                                                    <th th:text="#{refinery.material}" style="background: transparent; padding: 0.25rem 0.5rem;">Material</th>
-                                                    <th th:text="#{refinery.amount}" style="background: transparent; padding: 0.25rem 0.5rem;">Menge</th>
-                                                    <th th:text="#{refinery.quality}" style="background: transparent; padding: 0.25rem 0.5rem;">Qualit&auml;t</th>
+                                                    <th th:text="#{refinery.material}" class="krtm-background-transparent-padding-0-25rem-0-5re-b99e">Material</th>
+                                                    <th th:text="#{refinery.amount}" class="krtm-background-transparent-padding-0-25rem-0-5re-b99e">Menge</th>
+                                                    <th th:text="#{refinery.quality}" class="krtm-background-transparent-padding-0-25rem-0-5re-b99e">Qualit&auml;t</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                <tr th:each="good : ${order.goods}" style="background: transparent;">
-                                                    <td th:text="${good.outputMaterial != null ? good.outputMaterial.name : '-'}" style="padding: 0.25rem 0.5rem; border-bottom: none;">Material</td>
-                                                    <td th:switch="${good.outputMaterial?.quantityType}" style="padding: 0.25rem 0.5rem; border-bottom: none;">
+                                                <tr th:each="good : ${order.goods}" class="krtm-background-transparent-529a">
+                                                    <td th:text="${good.outputMaterial != null ? good.outputMaterial.name : '-'}" class="krtm-padding-0-25rem-0-5rem-border-bottom-none-5890">Material</td>
+                                                    <td th:switch="${good.outputMaterial?.quantityType}" class="krtm-padding-0-25rem-0-5rem-border-bottom-none-5890">
                                                         <span th:case="'PIECE'" th:text="${good.outputQuantity != null} ? |${#numbers.formatInteger(good.outputQuantity, 1)} #{material.quantity.piece}| : '-'">10 St&uuml;ck</span>
                                                         <span th:case="*" th:text="${good.outputQuantity != null} ? |${#numbers.formatDecimal(good.outputQuantity / 100.0, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}| : '-'">10.500 SCU</span>
                                                     </td>
-                                                    <td th:text="${good.quality != null ? good.quality : '-'}" style="padding: 0.25rem 0.5rem; border-bottom: none;">Qualit&auml;t</td>
+                                                    <td th:text="${good.quality != null ? good.quality : '-'}" class="krtm-padding-0-25rem-0-5rem-border-bottom-none-5890">Qualit&auml;t</td>
                                                 </tr>
                                             </tbody>
                                         </table>
-                                        <span th:if="${order.goods == null or #lists.isEmpty(order.goods)}" style="padding: 0.5rem; display: block;">-</span>
+                                        <span th:if="${order.goods == null or #lists.isEmpty(order.goods)}" class="krtm-padding-0-5rem-display-block-2e6a">-</span>
                                     </td>
                                 </tr>
                             </tbody>
@@ -947,9 +947,9 @@
                 <div class="kpanel">
                     <div class="kpanel-body">
                         <div class="ae-list" id="mission-create-objective-list"></div>
-                        <button type="button" class="btn btn-ghost btn-xs2" id="mission-create-objective-add"
-                                data-trigger="create-objective-add" style="margin-top: 12px;"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.objective.add}">Ziel hinzuf&uuml;gen</span></button>
-                        <p class="form-hint" style="margin-top: 10px;" th:text="#{mission.objective.editor.hint}">Titel + Klassifizierung frei editierbar.</p>
+                        <button type="button" class="btn btn-ghost btn-xs2 krtm-margin-top-12px-4bb9" id="mission-create-objective-add"
+                                data-trigger="create-objective-add"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.objective.add}">Ziel hinzuf&uuml;gen</span></button>
+                        <p class="form-hint krtm-margin-top-10px-e5a6" th:text="#{mission.objective.editor.hint}">Titel + Klassifizierung frei editierbar.</p>
                     </div>
                 </div>
                 <input type="hidden" name="objectivesJson" id="mission-objectives-json" th:value="*{objectivesJson}">
@@ -982,9 +982,9 @@
                 <div class="kpanel">
                     <div class="kpanel-body">
                         <div class="ae-list" id="mission-create-step-list"></div>
-                        <button type="button" class="btn btn-ghost btn-xs2" id="mission-create-step-add"
-                                data-trigger="create-step-add" style="margin-top: 12px;"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.step.add}">Schritt hinzuf&uuml;gen</span></button>
-                        <p class="form-hint" style="margin-top: 10px;" th:text="#{mission.step.editor.hint}">Titel + optionale Zeit/Ort frei editierbar.</p>
+                        <button type="button" class="btn btn-ghost btn-xs2 krtm-margin-top-12px-4bb9" id="mission-create-step-add"
+                                data-trigger="create-step-add"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.step.add}">Schritt hinzuf&uuml;gen</span></button>
+                        <p class="form-hint krtm-margin-top-10px-e5a6" th:text="#{mission.step.editor.hint}">Titel + optionale Zeit/Ort frei editierbar.</p>
                     </div>
                 </div>
                 <input type="hidden" name="stepsJson" id="mission-steps-json" th:value="*{stepsJson}">
@@ -1047,9 +1047,9 @@
             </div>
 
             <div class="form-row">
-                <div class="form-group" style="flex-direction: row; align-items: center; gap: 0.5rem; justify-content: flex-start;" th:if="${isNew or mission.canEdit}">
-                    <input type="checkbox" id="isInternal" th:field="*{isInternal}" style="margin: 0; flex: 0 0 auto;" th:disabled="${!isNew and !mission.canEdit}">
-                    <label for="isInternal" th:text="#{mission.is_internal}" style="margin: 0; flex: 0 0 auto; display: inline-block;">Intern</label>
+                <div class="form-group krtm-flex-direction-row-align-items-center-gap-0-7454" th:if="${isNew or mission.canEdit}">
+                    <input type="checkbox" id="isInternal" th:field="*{isInternal}" class="krtm-margin-0-flex-0-0-auto-fa3b" th:disabled="${!isNew and !mission.canEdit}">
+                    <label for="isInternal" th:text="#{mission.is_internal}" class="krtm-margin-0-flex-0-0-auto-display-inline-block-418c">Intern</label>
                 </div>
             </div>
 
@@ -1178,8 +1178,8 @@
                                             th:title="#{mission.objective.remove}" th:aria-label="#{mission.objective.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                                 </div>
                             </div>
-                            <button type="button" class="btn btn-ghost btn-xs2" id="mission-objective-add" data-trigger="mission-objective-add" style="margin-top: 12px;"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.objective.add}">Ziel hinzuf&uuml;gen</span></button>
-                            <p class="form-hint" style="margin-top: 10px;" th:text="#{mission.objective.editor.hint}">Reihenfolge per Ziehen oder Pfeilen; Titel + Klassifizierung frei editierbar.</p>
+                            <button type="button" class="btn btn-ghost btn-xs2 krtm-margin-top-12px-4bb9" id="mission-objective-add" data-trigger="mission-objective-add"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.objective.add}">Ziel hinzuf&uuml;gen</span></button>
+                            <p class="form-hint krtm-margin-top-10px-e5a6" th:text="#{mission.objective.editor.hint}">Reihenfolge per Ziehen oder Pfeilen; Titel + Klassifizierung frei editierbar.</p>
                         </div>
                     </div>
                     </th:block></div>
@@ -1220,8 +1220,8 @@
                                             th:title="#{mission.step.remove}" th:aria-label="#{mission.step.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                                 </div>
                             </div>
-                            <button type="button" class="btn btn-ghost btn-xs2" id="mission-step-add" data-trigger="mission-step-add" style="margin-top: 12px;"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.step.add}">Schritt hinzuf&uuml;gen</span></button>
-                            <p class="form-hint" style="margin-top: 10px;" th:text="#{mission.step.editor.hint}">Reihenfolge per Ziehen oder Pfeilen; Titel + optionale Zeit/Ort frei editierbar.</p>
+                            <button type="button" class="btn btn-ghost btn-xs2 krtm-margin-top-12px-4bb9" id="mission-step-add" data-trigger="mission-step-add"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.step.add}">Schritt hinzuf&uuml;gen</span></button>
+                            <p class="form-hint krtm-margin-top-10px-e5a6" th:text="#{mission.step.editor.hint}">Reihenfolge per Ziehen oder Pfeilen; Titel + optionale Zeit/Ort frei editierbar.</p>
                         </div>
                     </div>
                     </th:block></div>
@@ -1240,18 +1240,18 @@
                             <div id="mission-organisation-results"><th:block th:fragment="organisationPanel">
                             <div class="form-group">
                                 <label th:text="#{mission.party_lead}">Partyleiter</label>
-                                <div style="display: flex; gap: 0.5rem; flex-direction: column;">
-                                    <div id="party-lead-display" class="data-value" style="background: var(--color-surface-input); padding: 0.5rem; display: block;" th:data-none-label="#{general.none}">
+                                <div class="krtm-display-flex-gap-0-5rem-flex-direction-colum-3289">
+                                    <div id="party-lead-display" class="data-value krtm-background-var-color-surface-input-padding-0-fd20" th:data-none-label="#{general.none}">
                                         <span th:if="${mission.partyLeadUser != null}" th:text="${mission.partyLeadUser.effectiveName}">Lead Name</span>
                                         <span th:if="${mission.partyLeadUser == null and mission.partyLeadGuestName != null and !mission.partyLeadGuestName.isEmpty()}" th:text="${mission.partyLeadGuestName}">Guest Lead</span>
                                         <span th:if="${mission.partyLeadUser == null and (mission.partyLeadGuestName == null or mission.partyLeadGuestName.isEmpty())}" th:text="#{general.none}">Keine</span>
                                     </div>
                                     <form th:if="${mission.canEdit}" id="party-lead-form" autocomplete="off"
                                           th:action="@{/missions/{id}/party-lead(id=${mission.id})}" method="post"
-                                          style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: flex-start;">
+                                          class="krtm-display-flex-gap-0-5rem-flex-wrap-wrap-align-ce5b">
                                         <input type="hidden" id="party-lead-version" name="version" th:value="${mission.partyLeadVersion}">
                                         <input type="hidden" id="party-lead-user-id" name="userId" th:value="${mission.partyLeadUser != null ? mission.partyLeadUser.id : ''}">
-                                        <div style="position: relative; flex: 1; min-width: 12rem;">
+                                        <div class="krtm-position-relative-flex-1-min-width-12rem-4175">
                                             <input type="text" id="party-lead-search-input" name="guestName" autocomplete="off"
                                                    th:value="${mission.partyLeadUser != null ? mission.partyLeadUser.effectiveName : mission.partyLeadGuestName}"
                                                    th:placeholder="#{mission.party_lead.placeholder}">
@@ -1266,9 +1266,9 @@
                             <div class="form-group">
                                 <label th:text="#{admin.mission_data.frequency_types}">Frequenz&uuml;bersicht</label>
                                 <div class="flex-col-gap">
-                                    <div th:each="freqType : ${frequencyTypes}" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--color-surface-input); padding-bottom: 0.5rem;">
+                                    <div th:each="freqType : ${frequencyTypes}" class="krtm-display-flex-justify-content-space-between-a-09ca">
                                         <div>
-                                            <strong th:text="${freqType.name}" style="color: var(--color-gray-1); font-family: var(--font-body);">Freq</strong>
+                                            <strong th:text="${freqType.name}" class="krtm-color-var-color-gray-1-font-family-var-font-bcf9">Freq</strong>
                                         </div>
                                         <div class="flex-gap-sm"
                                              th:with="f=${frequencyByTypeId[freqType.id]}"
@@ -1276,7 +1276,7 @@
                                             <span class="freq-value-display data-value data-value--mono"
                                                   th:attr="data-freq-type-id=${freqType.id}"
                                                   th:text="${f != null ? #strings.replace(#numbers.formatDecimal(f.value, 3, 'NONE', 2, 'DEFAULT'), ',', '.') : ''}"
-                                                  th:style="${f != null ? '' : 'display:none;'}">123.45</span>
+                                                  th:classappend="${f == null} ? 'krtm-hidden' : ''">123.45</span>
 
                                             <button th:if="${!isNew and mission.canEdit}" type="button" class="btn btn-sm btn-ghost btn-icon set-freq-btn"
                                                     th:data-action="@{/missions/{id}/frequencies/ajax(id=${mission.id})}"
@@ -1297,13 +1297,13 @@
                                  swaps. Persisting a frequency is @OptimisticLock(excluded) on the
                                  mission, so it never 409s a concurrent core/schedule/flags edit. -->
                             <div id="mission-frequencies-results"><th:block th:fragment="frequenciesEditor">
-                            <div class="form-group" style="margin-bottom: 0;" th:if="${!isNew}">
+                            <div class="form-group krtm-margin-bottom-0-5043" th:if="${!isNew}">
                                 <label th:text="#{mission.frequency.custom.section}">Weitere Frequenzen</label>
                                 <div class="flex-col-gap" id="mission-custom-freq-list">
-                                    <div th:each="cf : ${customFrequencies}" class="custom-freq-row" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--color-surface-input); padding-bottom: 0.5rem;"
+                                    <div th:each="cf : ${customFrequencies}" class="custom-freq-row krtm-display-flex-justify-content-space-between-a-09ca"
                                          th:attr="data-custom-freq-id=${cf.id}, data-version=${cf.version}, data-name=${cf.name}, data-value=${cf.value}">
                                         <div>
-                                            <strong th:text="${cf.name}" style="color: var(--color-gray-1); font-family: var(--font-body);">Name</strong>
+                                            <strong th:text="${cf.name}" class="krtm-color-var-color-gray-1-font-family-var-font-bcf9">Name</strong>
                                         </div>
                                         <div class="flex-gap-sm">
                                             <span class="data-value data-value--mono" th:text="${#strings.replace(#numbers.formatDecimal(cf.value, 3, 'NONE', 2, 'DEFAULT'), ',', '.')}">123.45</span>
@@ -1313,9 +1313,9 @@
                                                     th:title="#{general.delete}" th:aria-label="#{general.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                                         </div>
                                     </div>
-                                    <p th:if="${customFrequencies == null or customFrequencies.isEmpty()}" class="form-hint" style="margin: 0;" th:text="#{mission.frequency.custom.empty}">Noch keine weiteren Frequenzen.</p>
+                                    <p th:if="${customFrequencies == null or customFrequencies.isEmpty()}" class="form-hint krtm-margin-0-2a0c" th:text="#{mission.frequency.custom.empty}">Noch keine weiteren Frequenzen.</p>
                                 </div>
-                                <button th:if="${!isNew and mission.canEdit}" type="button" class="btn btn-ghost btn-xs2" id="mission-custom-freq-add" data-trigger="custom-freq-add" style="margin-top: 12px;"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.frequency.custom.add}">Frequenz hinzuf&uuml;gen</span></button>
+                                <button th:if="${!isNew and mission.canEdit}" type="button" class="btn btn-ghost btn-xs2 krtm-margin-top-12px-4bb9" id="mission-custom-freq-add" data-trigger="custom-freq-add"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.frequency.custom.add}">Frequenz hinzuf&uuml;gen</span></button>
                             </div>
                             </th:block></div>
                         </div>
@@ -1331,8 +1331,8 @@
                         <div class="kpanel-body">
                             <div class="form-group">
                                 <label th:text="#{mission.owner}">Besitzer</label>
-                                <div style="display: flex; gap: 0.5rem; flex-direction: column;">
-                                    <div class="data-value" style="background: var(--color-surface-input); padding: 0.5rem; display: block;">
+                                <div class="krtm-display-flex-gap-0-5rem-flex-direction-colum-3289">
+                                    <div class="data-value krtm-background-var-color-surface-input-padding-0-fd20">
                                         <span th:text="${mission.owner != null ? mission.owner.effectiveName : '-'}">Besitzer Name</span>
                                     </div>
                                     <div th:if="${mission.canEdit}" class="flex-gap-xs">
@@ -1352,8 +1352,8 @@
                                  attribute carries the section-scoped optimistic-lock counter. -->
                             <div class="form-group">
                                 <label th:text="#{mission.owningOrgUnit}">Verantwortliche Einheit</label>
-                                <div style="display: flex; gap: 0.5rem; flex-direction: column;">
-                                    <div class="data-value" style="background: var(--color-surface-input); padding: 0.5rem; display: block;">
+                                <div class="krtm-display-flex-gap-0-5rem-flex-direction-colum-3289">
+                                    <div class="data-value krtm-background-var-color-surface-input-padding-0-fd20">
                                         <span th:if="${mission.owningSquadron != null}" th:text="${mission.owningSquadron.name()}">Einheit</span>
                                         <span th:if="${mission.owningSquadron == null}" th:text="#{mission.owningOrgUnit.none}">Keine</span>
                                     </div>
@@ -1370,17 +1370,17 @@
                                 </div>
                             </div>
 
-                            <div class="form-group" style="margin-bottom: 0;">
+                            <div class="form-group krtm-margin-bottom-0-5043">
                                 <label th:text="#{mission.managers}">Co-Manager</label>
-                                <div class="chiprow" style="margin-bottom: 1rem;">
+                                <div class="chiprow krtm-margin-bottom-1rem-c2c0">
                                     <span th:each="manager : ${mission.managers}" class="manager-chip">
-                                        <span th:text="${manager.effectiveName}" style="color: var(--color-gray-1);">Manager Name</span>
-                                        <button th:if="${mission.canEdit}" type="button" class="btn btn-sm btn-quiet-danger" style="padding: 0 0.3rem; line-height: 1;"
+                                        <span th:text="${manager.effectiveName}" class="krtm-color-var-color-gray-1-23b4">Manager Name</span>
+                                        <button th:if="${mission.canEdit}" type="button" class="btn btn-sm btn-quiet-danger krtm-padding-0-0-3rem-line-height-1-0101"
                                                 th:data-manager-id="${manager.id}"
                                                 data-trigger="mission-remove-manager"
                                                 th:title="#{mission.managers}" th:aria-label="#{mission.managers}">&times;</button>
                                     </span>
-                                    <span th:if="${mission.managers == null or mission.managers.isEmpty()}" th:text="#{general.none}" style="color: var(--color-gray-3);">Keine</span>
+                                    <span th:if="${mission.managers == null or mission.managers.isEmpty()}" th:text="#{general.none}" class="krtm-color-var-color-gray-3-f5bd">Keine</span>
                                 </div>
 
                                 <div th:if="${mission.canEdit}" class="flex-gap-xs">
@@ -1398,7 +1398,7 @@
             </div>
 
             <div class="footacts">
-                <button th:if="${!isNew}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" type="button" class="btn btn-quiet-danger delete-mission-btn" style="margin-right: auto;"
+                <button th:if="${!isNew}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" type="button" class="btn btn-quiet-danger delete-mission-btn krtm-margin-right-auto-1424"
                         th:data-action="@{/missions/{id}/delete(id=${mission.id})}"
                         th:data-name="${mission.name}"
                         data-sub-section="mission"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{info.delete}">Delete</span></button>
@@ -1466,10 +1466,10 @@
                   class="crew-jobs-static" th:text="${#strings.listJoin(crew.jobTypes.![name], ', ')}"
                   th:title="${#strings.listJoin(crew.jobTypes.![name], ', ')}">Pilot</span>
             <div class="row-actions" th:if="${mission.canEdit or own or p?.user == null}">
-                <form th:action="@{/missions/{id}/participants/{pId}/check-in(id=${mission.id}, pId=${p?.id})}" method="post" style="display:inline;" th:if="${p?.startTime == null and mission.actualStartTime != null and mission.actualEndTime == null}" class="participant-action-form" data-participant-action="check-in" th:data-participant-id="${p?.id}">
+                <form th:action="@{/missions/{id}/participants/{pId}/check-in(id=${mission.id}, pId=${p?.id})}" method="post" th:if="${p?.startTime == null and mission.actualStartTime != null and mission.actualEndTime == null}" class="participant-action-form krtm-display-inline-2f87" data-participant-action="check-in" th:data-participant-id="${p?.id}">
                     <button type="submit" class="btn btn-success btn-icon" th:title="#{mission.participant.checkin.tooltip}" th:aria-label="#{mission.participant.checkin}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-login"/></svg></button>
                 </form>
-                <form th:action="@{/missions/{id}/participants/{pId}/check-out(id=${mission.id}, pId=${p?.id})}" method="post" style="display:inline;" th:if="${p?.startTime != null and p?.endTime == null}" class="participant-action-form" data-participant-action="check-out" th:data-participant-id="${p?.id}">
+                <form th:action="@{/missions/{id}/participants/{pId}/check-out(id=${mission.id}, pId=${p?.id})}" method="post" th:if="${p?.startTime != null and p?.endTime == null}" class="participant-action-form krtm-display-inline-2f87" data-participant-action="check-out" th:data-participant-id="${p?.id}">
                     <button type="submit" class="btn btn-ghost btn-icon" th:title="#{mission.participant.checkout}" th:aria-label="#{mission.participant.checkout}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-logout"/></svg></button>
                 </form>
                 <button type="button" class="btn btn-ghost btn-icon edit-participant-btn"
@@ -1503,7 +1503,7 @@
     <!-- ===== Modals (KRT modal frame: orange top edge + HUD corner brackets) ===== -->
 
     <!-- Add Participant Modal -->
-    <div id="participant-modal" class="krt-modal-overlay" th:style="${openModal == 'participant-modal' ? 'display:flex;' : 'display:none;'}" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{mission.participant.add}">
+    <div id="participant-modal" class="krt-modal-overlay" th:classappend="${openModal == 'participant-modal'} ? 'krtm-modal-open' : 'krtm-hidden'" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{mission.participant.add}">
         <div class="krt-modal krt-modal--wide">
             <div class="krt-modal-head">
                 <h2 th:text="#{mission.participant.add}">Anmelden</h2>
@@ -1516,7 +1516,7 @@
                     <input type="text" name="guestName" th:value="*{guestName}" required>
                     <div th:if="${#fields.hasErrors('guestName')}" th:errors="*{guestName}" class="field-error"></div>
                 </div>
-                <div class="form-group" style="position: relative;" sec:authorize="isAuthenticated()">
+                <div class="form-group krtm-position-relative-a8a9" sec:authorize="isAuthenticated()">
                     <label th:text="#{mission.participant.name}">Name</label>
                     <input type="text" id="participant-search-input" name="guestName" autocomplete="off" th:value="*{guestName}" th:placeholder="#{mission.participant.guest_name_placeholder}">
                     <input type="hidden" id="participant-user-id" name="userId" th:value="*{userId}">
@@ -1553,7 +1553,7 @@
                 </div>
                 </div>
 
-                <div class="form-group" style="margin-bottom: 0;">
+                <div class="form-group krtm-margin-bottom-0-5043">
                     <label th:text="#{mission.participant.comment}">Kommentar</label>
                     <textarea name="comment" rows="3" th:text="*{comment}"></textarea>
                     <div th:if="${#fields.hasErrors('comment')}" th:errors="*{comment}" class="field-error"></div>
@@ -1568,7 +1568,7 @@
     </div>
 
     <!-- Edit Participant Modal -->
-    <div id="edit-participant-modal" class="krt-modal-overlay" style="display:none;" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{members.edit}">
+    <div id="edit-participant-modal" class="krt-modal-overlay krtm-display-none-5790" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{members.edit}">
         <div class="krt-modal krt-modal--wide">
             <div class="krt-modal-head">
                 <h2 id="edit-participant-title" th:text="#{members.edit}">Bearbeiten</h2>
@@ -1605,7 +1605,7 @@
                 <!-- Registered members get their org units from their account (never selected). JS
                      shows this read-only list (populated from the row's data-org-unit-names) and hides
                      the picker above for a member, or does the reverse for a guest. -->
-                <div class="form-group" id="edit-org-units-readonly-group" style="display:none;">
+                <div class="form-group krtm-display-none-5790" id="edit-org-units-readonly-group">
                     <label th:text="#{mission.participant.org_units}">Org-Einheiten</label>
                     <div id="edit-org-units-readonly" class="chiprow"></div>
                     <small class="form-hint" th:text="#{mission.participant.org_units.member_hint}">Aus dem Account abgeleitet.</small>
@@ -1648,7 +1648,7 @@
                 </div>
                 </div>
                 <div class="krt-modal-foot">
-                    <button type="button" class="btn btn-quiet-danger delete-participant-btn" id="edit-participant-unregister-btn" style="margin-right: auto;" data-sub-section="participant"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{mission.participant.unregister}">Abmelden</span></button>
+                    <button type="button" class="btn btn-quiet-danger delete-participant-btn krtm-margin-right-auto-1424" id="edit-participant-unregister-btn" data-sub-section="participant"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{mission.participant.unregister}">Abmelden</span></button>
                     <button type="button" class="btn btn-ghost" data-modal-dismiss th:text="#{general.cancel}">Abbrechen</button>
                     <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{members.save}">Speichern</span></button>
                 </div>
@@ -1657,7 +1657,7 @@
     </div>
 
     <!-- Add Unit Modal -->
-    <div id="add-unit-modal" class="krt-modal-overlay" th:style="${openModal == 'unit-modal' ? 'display:flex;' : 'display:none;'}" th:if="${!isNew and mission.canEdit}" role="dialog" aria-modal="true" th:aria-label="#{mission.unit.add}">
+    <div id="add-unit-modal" class="krt-modal-overlay" th:classappend="${openModal == 'unit-modal'} ? 'krtm-modal-open' : 'krtm-hidden'" th:if="${!isNew and mission.canEdit}" role="dialog" aria-modal="true" th:aria-label="#{mission.unit.add}">
         <div class="krt-modal krt-modal--wide"
              th:data-init-shiptype="${unitForm.shipTypeId != null ? unitForm.shipTypeId : ''}"
              th:data-init-ship="${unitForm.shipId != null ? unitForm.shipId : ''}">
@@ -1712,7 +1712,7 @@
                     <input type="checkbox" name="highValueUnit" id="hvu-check" value="true" th:checked="*{highValueUnit}">
                     <label for="hvu-check" class="m-0"><span th:text="#{mission.unit.hvu}">HVU</span> <span class="chip chip--warning chip-xs" th:title="#{mission.unit.hvu.tooltip}" th:text="#{mission.unit.hvu.short}">HVU</span></label>
                 </div>
-                <div class="form-group" style="margin-bottom: 0;">
+                <div class="form-group krtm-margin-bottom-0-5043">
                     <label th:text="#{mission.unit.note}">Notiz</label>
                     <input type="text" name="note" th:value="*{note}" th:placeholder="#{mission.unit.note.placeholder}">
                     <div th:if="${#fields.hasErrors('note')}" th:errors="*{note}" class="field-error"></div>
@@ -1727,7 +1727,7 @@
     </div>
 
     <!-- Frequency Modal -->
-    <div id="frequency-modal" class="krt-modal-overlay" style="display:none;" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{admin.mission_data.frequency_types}">
+    <div id="frequency-modal" class="krt-modal-overlay krtm-display-none-5790" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{admin.mission_data.frequency_types}">
         <div class="krt-modal">
             <div class="krt-modal-head">
                 <h2 th:text="#{admin.mission_data.frequency_types}">Frequenz zuweisen</h2>
@@ -1736,7 +1736,7 @@
             <form id="frequency-form" method="post" th:action="@{/missions}">
                 <div class="krt-modal-body">
                 <input type="hidden" name="frequencyTypeId" id="freq-type-id" value="">
-                <div class="form-group" style="margin-bottom: 0;">
+                <div class="form-group krtm-margin-bottom-0-5043">
                     <label th:text="#{mission.unit.frequency}">Frequenz (z.B. 123.45)</label>
                     <input type="text" inputmode="decimal" class="freq-input" pattern="^\d{1,3}([.,]\d{1,2})?$" name="value" id="freq-value" required>
                 </div>
@@ -1753,7 +1753,7 @@
          id/version discriminate (empty id = add). Pure-JS submit against the /frequencies/custom
          AJAX proxies; on success the "Weitere Frequenzen" editor + overview Funk panel refresh in
          place. Lives outside every swap fragment so its .freq-input listener persists across swaps. -->
-    <div id="custom-frequency-modal" class="krt-modal-overlay" style="display:none;" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{mission.frequency.custom.section}">
+    <div id="custom-frequency-modal" class="krt-modal-overlay krtm-display-none-5790" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{mission.frequency.custom.section}">
         <div class="krt-modal">
             <div class="krt-modal-head">
                 <h2 id="custom-frequency-modal-title" th:text="#{mission.frequency.custom.add}">Frequenz hinzuf&uuml;gen</h2>
@@ -1768,7 +1768,7 @@
                     <input type="text" id="custom-freq-name" maxlength="100" required th:placeholder="#{mission.frequency.custom.name.placeholder}">
                     <div class="field-error" id="custom-freq-name-error"></div>
                 </div>
-                <div class="form-group" style="margin-bottom: 0;">
+                <div class="form-group krtm-margin-bottom-0-5043">
                     <label th:text="#{mission.frequency.custom.value}">Frequenz (z.B. 123.45)</label>
                     <input type="text" inputmode="decimal" class="freq-input" pattern="^\d{1,3}([.,]\d{1,2})?$" id="custom-freq-value" required>
                 </div>
@@ -1782,7 +1782,7 @@
     </div>
 
     <!-- Edit Unit Modal -->
-    <div id="edit-unit-modal" class="krt-modal-overlay" th:style="${openModal == 'edit-unit-modal' ? 'display:flex;' : 'display:none;'}" th:if="${!isNew and mission.canEdit}" role="dialog" aria-modal="true" th:aria-label="#{mission.unit.edit}">
+    <div id="edit-unit-modal" class="krt-modal-overlay" th:classappend="${openModal == 'edit-unit-modal'} ? 'krtm-modal-open' : 'krtm-hidden'" th:if="${!isNew and mission.canEdit}" role="dialog" aria-modal="true" th:aria-label="#{mission.unit.edit}">
         <div class="krt-modal krt-modal--wide"
              th:data-init-shiptype="${unitForm.shipTypeId != null ? unitForm.shipTypeId : ''}"
              th:data-init-ship="${unitForm.shipId != null ? unitForm.shipId : ''}">
@@ -1835,7 +1835,7 @@
                     <input type="checkbox" name="highValueUnit" id="edit-unit-hvu" value="true" th:checked="*{highValueUnit}">
                     <label for="edit-unit-hvu" class="m-0"><span th:text="#{mission.unit.hvu}">HVU</span> <span class="chip chip--warning chip-xs" th:title="#{mission.unit.hvu.tooltip}" th:text="#{mission.unit.hvu.short}">HVU</span></label>
                 </div>
-                <div class="form-group" style="margin-bottom: 0;">
+                <div class="form-group krtm-margin-bottom-0-5043">
                     <label th:text="#{mission.unit.note}">Notiz</label>
                     <input type="text" name="note" id="edit-unit-note" th:value="*{note}" th:placeholder="#{mission.unit.note.placeholder}">
                     <div th:if="${#fields.hasErrors('note')}" th:errors="*{note}" class="field-error"></div>
@@ -1850,7 +1850,7 @@
     </div>
 
     <!-- Edit Crew Modal (multi function selection; quick single change runs via the board chip-select) -->
-    <div id="edit-crew-modal" class="krt-modal-overlay" th:style="${openModal == 'edit-crew-modal' ? 'display:flex;' : 'display:none;'}" th:if="${!isNew and mission.canEdit}" role="dialog" aria-modal="true" th:aria-label="#{mission.unit.edit_crew}">
+    <div id="edit-crew-modal" class="krt-modal-overlay" th:classappend="${openModal == 'edit-crew-modal'} ? 'krtm-modal-open' : 'krtm-hidden'" th:if="${!isNew and mission.canEdit}" role="dialog" aria-modal="true" th:aria-label="#{mission.unit.edit_crew}">
         <div class="krt-modal">
             <div class="krt-modal-head">
                 <h2 th:text="#{mission.unit.edit_crew}">Crew bearbeiten</h2>
@@ -1858,9 +1858,9 @@
             </div>
             <form id="edit-crew-form" method="post" th:action="${modalAction != null && openModal == 'edit-crew-modal'} ? ${modalAction} : @{/missions}" th:object="${crewForm}">
                 <div class="krt-modal-body">
-                <div class="form-group" style="margin-bottom: 0;">
+                <div class="form-group krtm-margin-bottom-0-5043">
                     <label th:text="#{admin.mission_data.job_types}">Aufgaben</label>
-                    <select name="jobTypeIds" id="edit-crew-jobs" multiple style="height: 100px;">
+                    <select name="jobTypeIds" id="edit-crew-jobs" multiple class="krtm-height-100px-eebc">
                         <option th:each="job : ${crewJobTypes}" th:value="${job.id}" th:text="${job.name}" th:selected="${crewForm.jobTypeIds != null and crewForm.jobTypeIds.contains(job.id)}">Gunner</option>
                     </select>
                     <small class="text-muted" th:text="#{general.multiselect}">Strg+Klick f&uuml;r Mehrfachauswahl</small>
@@ -1876,7 +1876,7 @@
     </div>
 
     <!-- Add Finance Entry Modal -->
-    <div id="finance-modal" class="krt-modal-overlay" th:style="${openModal == 'finance-entry-modal' ? 'display:flex;' : 'display:none;'}" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{mission.finance.add}">
+    <div id="finance-modal" class="krt-modal-overlay" th:classappend="${openModal == 'finance-entry-modal'} ? 'krtm-modal-open' : 'krtm-hidden'" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{mission.finance.add}">
         <div class="krt-modal krt-modal--wide">
             <div class="krt-modal-head">
                 <h2 th:text="#{mission.finance.add}">Finanzeintrag hinzuf&uuml;gen</h2>
@@ -1912,7 +1912,7 @@
                     <div th:if="${#fields.hasErrors('amount')}" th:errors="*{amount}" class="field-error"></div>
                 </div>
 
-                <div class="form-group" style="margin-bottom: 0;">
+                <div class="form-group krtm-margin-bottom-0-5043">
                     <label th:text="#{mission.finance.note}">Notiz</label>
                     <textarea name="note" rows="2" th:text="*{note}"></textarea>
                 </div>
@@ -1926,7 +1926,7 @@
     </div>
 
     <!-- Edit Finance Entry Modal -->
-    <div id="edit-finance-entry-modal" class="krt-modal-overlay" th:style="${openModal == 'edit-finance-entry-modal' ? 'display:flex;' : 'display:none;'}" sec:authorize="isAuthenticated()" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{mission.finance.edit}">
+    <div id="edit-finance-entry-modal" class="krt-modal-overlay" th:classappend="${openModal == 'edit-finance-entry-modal'} ? 'krtm-modal-open' : 'krtm-hidden'" sec:authorize="isAuthenticated()" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{mission.finance.edit}">
         <div class="krt-modal krt-modal--wide">
             <div class="krt-modal-head">
                 <h2 th:text="#{mission.finance.edit}">Finanzeintrag bearbeiten</h2>
@@ -1950,7 +1950,7 @@
                     <input type="number" step="1" min="0" inputmode="numeric" name="amount" id="edit-finance-amount" required>
                 </div>
 
-                <div class="form-group" style="margin-bottom: 0;">
+                <div class="form-group krtm-margin-bottom-0-5043">
                     <label th:text="#{mission.finance.note}">Notiz</label>
                     <textarea name="note" id="edit-finance-note" rows="2"></textarea>
                 </div>
@@ -1964,14 +1964,14 @@
     </div>
 
     <!-- Delete Confirmation Modal (danger variant; the body names the consequence per sub-section) -->
-    <div id="delete-confirm-modal" class="krt-modal-overlay" style="display:none; z-index: 3100;" role="dialog" aria-modal="true" th:aria-label="#{info.delete.confirm.title}">
+    <div id="delete-confirm-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb" role="dialog" aria-modal="true" th:aria-label="#{info.delete.confirm.title}">
         <div class="krt-modal krt-modal--danger">
             <div class="krt-modal-head">
                 <h2 th:text="#{info.delete.confirm.title}">L&ouml;schen best&auml;tigen</h2>
                 <button type="button" class="btn btn-ghost btn-icon close-delete-modal" data-modal-dismiss th:title="#{general.cancel}" th:aria-label="#{general.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
             </div>
             <div class="krt-modal-body">
-                <p id="delete-confirm-message" style="margin: 0; font-size: 0.85rem; font-weight: 300;" th:text="#{info.delete.confirm.message}">Wirklich l&ouml;schen?</p>
+                <p id="delete-confirm-message" class="krtm-margin-0-font-size-0-85rem-font-weight-300-771b" th:text="#{info.delete.confirm.message}">Wirklich l&ouml;schen?</p>
             </div>
             <div class="krt-modal-foot">
                 <button type="button" class="btn btn-ghost close-delete-modal" data-modal-dismiss th:text="#{general.cancel}">Abbrechen</button>
