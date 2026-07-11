@@ -838,6 +838,12 @@ from masquerading as an application outage (the failure mode that drove the fron
   and counted on `basetool_http_error_total{code="SERVICE_UNAVAILABLE"}`.
 - [ ] An expired/invalid bearer token still yields `401`; a caller lacking the required role still
   yields `403` (the 503 re-map never swallows an auth decision).
+- [ ] Optional `aud` enforcement (audit L-1) is available on both resource servers via
+  `app.security.jwt.expected-audiences` (wired to `IRI_BACKEND_EXPECTED_AUDIENCES` /
+  `IRI_INGEST_EXPECTED_AUDIENCES`), sharing the same `resourceServerJwtDecoder` bean. It is **empty
+  by default** (off) so dev / e2e realms — which do not stamp the audience — are unaffected;
+  enabling it in prod requires the realm to stamp `aud=basetool-backend` (the `extractor-ingest`
+  default client scope), or every token is rejected.
 
 **Enforced by (both resource servers):** backend `SecurityConfig#resourceServerJwtDecoder` +
 `KeycloakTrustSupport` + `IdentityProviderUnavailableFilter` (tests:
