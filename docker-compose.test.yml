@@ -47,13 +47,15 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: dev
       # Disable the notification Redis fan-out for the test/e2e stack. The base compose anchor
-      # force-enables it (APP_NOTIFICATIONS_REDIS_FANOUT_ENABLED:-true) for prod, but this is a
-      # single-instance stack (no peer replica to fan out to) and the dev profile does not configure
-      # spring.data.redis.host (only application-prod.yml does), so an enabled fan-out would open the
-      # RedisMessageListenerContainer against localhost:6379 and crash the backend on startup — which
-      # is what took the whole e2e stack down. The enabled path is covered off the container by
-      # RedisNotificationFanoutIntegrationTest (real Redis) and NotificationRedisConfigContextTest
-      # (wiring); prod is unaffected (prod runs the prod profile with host=redis).
+      # force-enables it (APP_NOTIFICATIONS_REDIS_FANOUT_ENABLED:-true) for every backend service, but
+      # this is a single-instance stack: there is no peer replica to fan out to, so the fan-out is a
+      # pure no-op here. Keeping it off avoids coupling the e2e boot to a healthy redis-dev for zero
+      # test value; the enabled path is covered off the container by the dedicated fan-out tests (unit,
+      # real-Redis integration, and config wiring). Since #1246 the backend resolves
+      # spring.data.redis.host from REDIS_HOST in the base config (the anchor sets it to `redis`), so an
+      # enabled fan-out here would connect to redis-dev rather than crash against localhost:6379 — but a
+      # single-instance stack still has nothing to gain from it. Prod is unaffected (prod profile keeps
+      # the fan-out on with host=redis).
       APP_NOTIFICATIONS_REDIS_FANOUT_ENABLED: "false"
       # Override the prod-target issuer URI baked into the base template.
       KEYCLOAK_ISSUER_URI: http://host.docker.internal:18080/realms/iri

@@ -126,6 +126,18 @@ spring:
       jakarta.persistence.query.timeout: ${APP_DB_QUERY_TIMEOUT_MS:30000}
     hibernate:
       ddl-auto: validate
+  # Redis for the cross-replica notification SSE fan-out (REQ-FE-015, ADR-0093). Kept in the BASE
+  # config (not only application-prod.yml) so every profile and Docker stack resolves the connection
+  # from REDIS_HOST — the compose x-backend anchor sets it to the `redis` service, so the containerised
+  # dev stack (`docker compose --profile dev up`) reaches the real Redis instead of the JVM's own
+  # localhost. The localhost default applies only to a bare `bootRun`/CI run with no REDIS_HOST set.
+  # The connection is lazy: it is opened only when the fan-out (app.notifications.redis-fanout.enabled)
+  # or the Redis health indicator is turned on (prod), so dev/test/CI with both off never contact Redis.
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
 
 logging:
   level:

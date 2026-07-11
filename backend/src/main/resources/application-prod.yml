@@ -42,14 +42,9 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
-  # Redis for the cross-replica notification SSE fan-out (ADR-0093). The backend reaches the same
-  # `redis` service the frontend uses (net-redis-backend); the connection is lazy and only exercised
-  # when the fan-out is enabled below.
-  data:
-    redis:
-      host: ${REDIS_HOST:redis}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD}
+  # The Redis connection for the notification SSE fan-out (ADR-0093) now lives in the base
+  # application.yml (host from REDIS_HOST, which the compose anchor sets to the `redis` service). Prod
+  # only flips the fan-out and the Redis health indicator ON (below); the connection config is shared.
   lifecycle:
     timeout-per-shutdown-phase: 20s
   security:

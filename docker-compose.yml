@@ -755,6 +755,13 @@ services:
         condition: service_healthy
       keycloak-dev:
         condition: service_healthy
+      # The x-backend anchor enables the notification Redis fan-out (ADR-0093) for every backend
+      # service, so the dev stack's backend opens the RedisMessageListenerContainer at boot — wait for
+      # redis-dev to be healthy first so the full `docker compose --profile dev up` starts cleanly
+      # instead of racing the fan-out connection (#1246). Prod's fan-out degrades gracefully on a Redis
+      # outage (REQ-NOTIF-006), so the prod `backend` service intentionally keeps no hard redis gate.
+      redis-dev:
+        condition: service_healthy
     networks:
       net-db-backend:
         aliases:
