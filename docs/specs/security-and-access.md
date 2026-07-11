@@ -118,6 +118,13 @@ The following must always hold and are enforced as ArchUnit rules in
 - No controller depends on `OrgUnitMembershipMapper` — the membership entity→DTO projection runs
   inside `OrgUnitMembershipService`'s own transactions, never controller-side after commit
   (`controllersMustNotInjectTheLazyMembershipMapper`, ADR-0067).
+- Every org-unit bank **settings mutation** (`OrgUnitBankAccessService` public `set*`/`add*`/`remove*`/
+  `clear*` method returning `OrgUnitBankAccountSettingsDto` — balance target, view-visibility grants,
+  per-tier approval limits) invokes a `requireCan*` authorization helper
+  (`orgUnitBankSettingsMutationsMustCallAnAuthorizationHelper`). Those mutations are gated only in-body
+  (the controller and frontend proxy require merely `isAuthenticated()`), so this rule fails a future
+  mutation that drops the check — which would otherwise ship reachable by any authenticated member —
+  at build time rather than in production (security review, INFO regression guard).
 - The frontend does not depend on Spring Data JPA.
 
 ### REQ-SEC-004 — Roles & hierarchy
