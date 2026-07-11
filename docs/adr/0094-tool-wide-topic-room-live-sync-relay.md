@@ -138,8 +138,8 @@ no channel at all, and the bank surfaces would need 3–4 parallel sockets per a
 
   `/ws/missions/**` and `/ws/materialboerse/**` `SecurityConfig` matchers dropped, and
   `mission-presence.js` migrated fully onto the `mission:{id}` topic room of `/ws/sync`. The
-  generic handler keeps its per-resource (legacy-mode) branch as an internal capability
-  (exercised by tests) but no path registers it any more.
+  generic handler's per-resource (legacy-mode) branch was dead once no path registered it and
+  was removed in #1182, so the handler now supports only the multiplexed `/ws/sync` socket.
 
 - The per-frame section count is bounded by two independent gates: each class's section
   whitelist (a `changed` frame keeps only keys in `LiveSyncTopicClass.allowedSections()`, so
