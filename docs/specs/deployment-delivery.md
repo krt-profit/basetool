@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-07.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-12.
 > **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md)
 
 # Deployment delivery & promotion
@@ -439,6 +439,36 @@ maxmemory was unset), and `RedisEvictions` is a misconfiguration tripwire (any e
 
 **Enforced by:** `docker-compose.yml` (`x-redis` template + `redis` prod override) ·
 `monitoring/prometheus/alerts/infrastructure.yml` (Redis memory/persistence alerts) · **Decision:** ADR-0079
+
+### REQ-OPS-019 — JVM app containers reap orphaned subprocesses (PID-1 zombie reaping)
+
+Every JVM app service (`backend`, `frontend`, `ingest`) runs with a zombie-reaping init as PID 1
+(`init: true`, Docker's bundled tini). The image entrypoint `exec java …` makes the JVM PID 1, and a
+bare JVM does **not** `wait()` on children reparented to it. The Docker HEALTHCHECK probes the
+internal management port with BusyBox `wget --no-check-certificate https://…` every 30 s; BusyBox
+`wget` forks an `ssl_client` TLS helper it does not reap, which on exit reparents to PID 1 and, with
+no reaper, lingers as a `<defunct>` zombie. One zombie accumulates **per probe** (≈1 / 30 s) until the
+container's `pids` cgroup ceiling (REQ-OPS-014, 2048) is exhausted — at which point the JVM can no
+longer create an OS thread (`pthread_create failed (EAGAIN)`, a native-thread OOM) at ≈17 h uptime,
+**independent of heap and of `jvm_threads_live`** (which stays flat, so `JvmThreadsHigh` never catches
+it — the leak is non-JVM pids). `init: true` inserts tini as PID 1, which reaps these orphans while
+still `exec`-ing the JVM and forwarding signals (graceful shutdown and `stop_grace_period` unchanged);
+it needs no capability and is compatible with `no-new-privileges` + `cap_drop: [ALL]` (REQ-OPS-014).
+Keycloak (bash `/dev/tcp` probe), Postgres (`pg_isready`) and Redis (`redis-cli`) fork no TLS helper
+and are unaffected. Incident precedent: 2026-07-12, `ingest` (the longest-lived continuous uptime of
+the three) exhausted its `pids` cap this way and entered a restart loop; `716` container processes
+were `712 × (ssl_client) Z`.
+
+**Acceptance**
+
+- [ ] `backend`, `frontend` and `ingest` (via their `x-*` compose templates) set `init: true`; a
+  prod app container whose PID 1 is the bare JVM is a regression.
+- [ ] A long-lived (>17 h) app container's `pids` count stays flat instead of climbing ≈1 per 30 s
+  healthcheck — no `<defunct>` `ssl_client` accumulation (spot-check: `docker exec <svc> sh -c 'cut
+  -d" " -f3 /proc/[0-9]*/stat | sort | uniq -c'` shows no growing `Z` count).
+
+**Enforced by:** `docker-compose.yml` (`x-backend` / `x-frontend` / `x-ingest` templates, `init:
+true`) · verification recipe in the `x-backend` service comment
 
 ## Out of scope
 
