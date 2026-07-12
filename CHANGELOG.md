@@ -7,6 +7,10 @@
 - **Monitoring: Live-Sync-Abo-Metriken der Auftragsräume klarer benannt.** Im Grafana-Panel „Live-sync subscriptions (live) by topic class" tauchten die Auftrags-Detailseite und die Auftrags-Warteschlange als `order` und `orders` auf — nur durch das Plural-s unterscheidbar und dadurch wie ein versehentliches Duplikat lesbar. Das `topic_class`-Label heißt jetzt `order_detail` bzw. `orders_queue` (analog zu `bank_account`/`bank_staff`). Reine Label-Umbenennung; der Wire-Topic (`order:{id}` / `orders`) bleibt unverändert (REQ-OBS-011).
 - **Monitoring: Der Alarm `BankAuditSilenceAnomaly` schlägt erst nach 60 Tagen ohne Bank-Audit-Ereignis an (vorher 5 Tage).** Das Bank-Audit-Volumen ist naturgemäß niedrig, sodass eine mehrtägige Stille normal ist und den Warnalarm bislang fälschlich auslöste. Das breitere 60-Tage-Fenster meldet nur noch eine echte, langanhaltende Bank-Audit-Stille (mögliche REQ-AUDIT-001-Regression).
 
+### Fixed
+
+- **Monitoring: Der Alarm `SyncZeroItems` schlägt beim SC-Wiki-Sync nicht mehr fälschlich an, wenn der Katalog stabil ist.** Die SC-Wiki-Clients nutzen bedingte GETs (ETag/`304 Not Modified`); ein unveränderter Katalog liefert für jeden Endpunkt eine 304-Antwort und schreibt nichts — bisher als 0 Items gezählt und damit nach 48 h nicht von einem echten Ausfall (leere 200er) unterscheidbar. Jeder SC-Wiki-Schritt (Commodity, Vehicle, Blueprint, Manufacturer, Item) meldet bei einem reinen 304-Lauf jetzt seinen Live-Zeilenbestand statt 0, sodass nur noch ein echter Leerlauf den Alarm auslöst (analog zur `uex_sync`-Korrektur; REQ-OBS-011, #1182).
+
 ## [v1.3.3](https://github.com/krt-profit/basetool/releases/tag/v1.3.3) - 2026-07-12
 
 ### Added

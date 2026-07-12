@@ -111,7 +111,7 @@ class ScWikiItemSyncServiceClosureTest {
     // Closure mode hits GET /api/items/{uuid} exactly for the two scoped uuids — never a list walk.
     verify(scWikiClient).fetchOne(eq("/api/items/" + a), eq(ScWikiItemDto.class), any());
     verify(scWikiClient).fetchOne(eq("/api/items/" + b), eq(ScWikiItemDto.class), any());
-    verify(scWikiClient, never()).fetchAllPages(any(), any(), any());
+    verify(scWikiClient, never()).fetchAllPagesResult(any(), any(), any());
   }
 
   @Test

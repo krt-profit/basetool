@@ -83,11 +83,17 @@ public class ScWikiManufacturerSyncService {
    * <p>Returns the number of {@code manufacturer} rows this run wrote — first-time links plus
    * refreshed links (conflicts and unmatched rows excluded, since they leave the row untouched) —
    * which {@link ScWikiScheduler} accumulates into {@code
-   * basetool_scheduled_job_items_total{job="scwiki_sync"}}. The disabled and empty-response
-   * short-circuits return {@code 0} so a Wiki outage surfaces as a zero-item run ({@code
-   * SyncZeroItems}, #1041 item 2).
+   * basetool_scheduled_job_items_total{job="scwiki_sync"}}. The disabled and <em>genuine</em>
+   * empty-response short-circuits return {@code 0} so a Wiki outage surfaces as a zero-item run
+   * ({@code SyncZeroItems}, #1041 item 2). A {@code 304 Not Modified} response is <b>not</b> such
+   * an outage — the catalogue is merely unchanged — so this reports {@link
+   * ManufacturerRepository#countLiveScwikiManufacturers() the live reconciled-manufacturer count}
+   * instead of {@code 0}, keeping a fully-cached healthy run from false-firing {@code
+   * SyncZeroItems} (#1182).
    *
-   * @return the number of {@code manufacturer} rows written this run ({@code linked + refreshed})
+   * @return the number of {@code manufacturer} rows written this run ({@code linked + refreshed}),
+   *     or the live reconciled-manufacturer count on a {@code 304 Not Modified} (unchanged)
+   *     catalogue
    */
   @Transactional
   public int syncManufacturers() {
@@ -99,11 +105,24 @@ public class ScWikiManufacturerSyncService {
     }
 
     log.info("Starting SC Wiki manufacturer reconciliation...");
-    List<ScWikiManufacturerDto> fetched =
-        scWikiClient.fetchAllPages(
+    ScWikiClient.FetchResult<ScWikiManufacturerDto> result =
+        scWikiClient.fetchAllPagesResult(
             properties.getManufacturersEndpoint(),
             new ParameterizedTypeReference<ScWikiResponseDto<ScWikiManufacturerDto>>() {},
             "manufacturers");
+    if (result.notModified()) {
+      // Catalogue unchanged since the last sync (ETag 304): nothing to reconcile, but this is a
+      // healthy run — report the live reconciled-manufacturer count so an all-304 run is not read
+      // as a zero-item outage (#1182). A genuine empty-200 falls through to isEmpty() and reports
+      // 0.
+      long live = manufacturerRepository.countLiveScwikiManufacturers();
+      log.info(
+          "SC Wiki manufacturer catalogue unchanged since last sync (304) — reporting {} live"
+              + " reconciled manufacturer row(s) instead of 0.",
+          live);
+      return (int) live;
+    }
+    List<ScWikiManufacturerDto> fetched = result.data();
     if (fetched.isEmpty()) {
       log.warn("No manufacturers received from SC Wiki API. Aborting reconciliation (no sweep).");
       return 0;

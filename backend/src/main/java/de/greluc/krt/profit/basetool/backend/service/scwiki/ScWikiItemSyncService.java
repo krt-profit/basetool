@@ -269,9 +269,17 @@ public class ScWikiItemSyncService {
    * when every pass succeeded (returned non-empty, non-capped data) and the seen set is non-empty —
    * mirroring the {@code clearStalePrices} non-empty gate so an outage never wipes local data.
    *
+   * <p><b>All-304 carve-out (#1182):</b> a {@code 304 Not Modified} pass ingests nothing (the pool
+   * is unchanged), so an all-cached healthy run would write {@code 0} rows — indistinguishable from
+   * an empty-catalogue outage to {@code SyncZeroItems}. When nothing was written but at least one
+   * pass came back 304, this reports {@link GameItemRepository#countLiveScwikiItems() the live
+   * Wiki-linked item count} instead of {@code 0}. A run with no 304 at all (a genuine empty-200
+   * outage) still reports {@code 0} and correctly fires.
+   *
    * @return the number of {@code game_item} rows written this run — new {@code WIKI_ONLY} rows
    *     created, existing rows linked {@code UEX_ONLY → BOTH}, and uuid-less UEX rows reconciled by
-   *     name/slug ({@code ctx.created + ctx.linked + ctx.reconciled})
+   *     name/slug ({@code ctx.created + ctx.linked + ctx.reconciled}) — or the live Wiki-linked
+   *     item count when nothing was written but at least one pass came back 304
    */
   private int syncItemsBackfill() {
     log.info("Starting SC Wiki item sync (FULL BACKFILL mode) — paging every kind endpoint...");
@@ -322,14 +330,30 @@ public class ScWikiItemSyncService {
     log.info(
         "Finished SC Wiki item sync (full backfill): {} created WIKI_ONLY, {} linked"
             + " UEX_ONLY→BOTH, {} reconciled (uuid-less UEX merged by name/slug), {} skipped"
-            + " (junk), {} deferred (lock collision), {} pass(es) empty/capped.",
+            + " (junk), {} deferred (lock collision), {} pass(es) empty/capped ({} of them"
+            + " unchanged 304).",
         ctx.created,
         ctx.linked,
         ctx.reconciled,
         ctx.skipped,
         ctx.deferred,
-        ctx.failedPasses);
-    return ctx.created + ctx.linked + ctx.reconciled;
+        ctx.failedPasses,
+        ctx.notModifiedPasses);
+
+    int written = ctx.created + ctx.linked + ctx.reconciled;
+    if (written == 0 && ctx.notModifiedPasses > 0) {
+      // Nothing written, but at least one pass came back 304 (catalogue unchanged) — a fully-cached
+      // healthy run, not an outage. Report the live Wiki-linked game_item count so an all-304
+      // backfill is not read as a zero-item outage (#1182). A run with no 304 at all (a genuine
+      // empty-200) keeps written==0 and correctly reports 0.
+      long live = gameItemRepository.countLiveScwikiItems();
+      log.info(
+          "SC Wiki item backfill: every fetched kind pass was unchanged (304) and nothing was"
+              + " written — reporting {} live Wiki-linked game_item row(s) instead of 0.",
+          live);
+      return (int) live;
+    }
+    return written;
   }
 
   /**
@@ -405,12 +429,29 @@ public class ScWikiItemSyncService {
             ? Map.of("classification", pass.classificationFilter())
             : null;
     String label = pass.kind().name().toLowerCase(Locale.ROOT) + " items";
-    List<ScWikiItemDto> fetched =
-        scWikiClient.fetchAllPages(pass.endpoint(), ITEM_PAGE_TYPE, label, null, filters);
+    ScWikiClient.FetchResult<ScWikiItemDto> result =
+        scWikiClient.fetchAllPagesResult(pass.endpoint(), ITEM_PAGE_TYPE, label, null, filters);
 
+    if (result.notModified()) {
+      // This kind endpoint is unchanged since the last sync (ETag 304): nothing to ingest, and the
+      // pool was NOT enumerated — so the cross-kind orphan sweep must still be suppressed
+      // (failedPasses++). Record it as a 304 as well so a run where EVERY fetched pass was
+      // unchanged
+      // reports the live Wiki-linked item count rather than 0 (#1182), instead of reading as a
+      // zero-item outage.
+      log.debug(
+          "Wiki kind pass {} ({}) unchanged since last sync (304) — skipping ingest; no orphan"
+              + " sweep this run.",
+          pass.endpoint(),
+          pass.kind());
+      ctx.notModifiedPasses++;
+      ctx.failedPasses++;
+      return false;
+    }
+    List<ScWikiItemDto> fetched = result.data();
     if (fetched.isEmpty()) {
       log.warn(
-          "Wiki kind pass {} ({}) returned no rows (empty / 304) — skipping it; no orphan sweep"
+          "Wiki kind pass {} ({}) returned no rows (empty-200) — skipping it; no orphan sweep"
               + " this run.",
           pass.endpoint(),
           pass.kind());
@@ -748,6 +789,14 @@ public class ScWikiItemSyncService {
     private int skipped;
     private int deferred;
     private int failedPasses;
+
+    /**
+     * Count of passes that returned {@code 304 Not Modified} (a subset of {@link #failedPasses},
+     * which also counts genuine empty-200 / sanity-capped passes). Drives the all-304 live-count
+     * carve-out in {@link #syncItemsBackfill()}: nothing written + at least one 304 = a healthy
+     * fully-cached run, reported as the live item count rather than {@code 0} (#1182).
+     */
+    private int notModifiedPasses;
 
     /**
      * Captures the run id and timestamp, indexes the manufacturer table by Wiki UUID and by

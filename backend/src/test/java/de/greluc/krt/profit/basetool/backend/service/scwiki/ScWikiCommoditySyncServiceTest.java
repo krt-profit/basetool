@@ -87,7 +87,8 @@ class ScWikiCommoditySyncServiceTest {
 
   @Test
   void syncCommodities_emptyResponse_skipsOrphanSweep() {
-    when(scWikiClient.fetchAllPages(any(), any(), eq("commodities"))).thenReturn(List.of());
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("commodities")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of()));
 
     int written = service.syncCommodities();
 
@@ -96,6 +97,24 @@ class ScWikiCommoditySyncServiceTest {
     // An empty Wiki response writes no rows → 0 items, the signal SyncZeroItems watches (#1041
     // item 2).
     assertEquals(0, written, "an empty Wiki response must report zero written rows");
+  }
+
+  @Test
+  void syncCommodities_notModified_reportsLiveCount_andSkipsMergeAndSweep() {
+    // A 304 (unchanged) catalogue merges nothing, but is healthy — it must report the live linked-
+    // material count, NOT 0, so an all-304 run is not read as a zero-item outage (#1182).
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("commodities")))
+        .thenReturn(ScWikiClient.FetchResult.unchanged());
+    when(materialRepository.countLiveScwikiMaterials()).thenReturn(1234L);
+
+    int written = service.syncCommodities();
+
+    assertEquals(
+        1234, written, "a 304 (unchanged) catalogue must report the live linked-material count");
+    verify(materialRepository, never()).save(any());
+    verify(materialRepository, never()).markScwikiDeleted(any(), any());
+    // No merge run is opened on a 304 — it short-circuits before beginRun().
+    verify(syncReportService, never()).beginRun();
   }
 
   // ─── junk filter ────────────────────────────────────────────────────────
@@ -123,7 +142,8 @@ class ScWikiCommoditySyncServiceTest {
   @Test
   void syncCommodities_junkRow_emitsSkipJunkAndNeverSaves() {
     ScWikiCommodityDto junk = commodity("<= PLACEHOLDER =>");
-    when(scWikiClient.fetchAllPages(any(), any(), eq("commodities"))).thenReturn(List.of(junk));
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("commodities")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(junk)));
 
     service.syncCommodities();
 
@@ -151,7 +171,8 @@ class ScWikiCommoditySyncServiceTest {
     ScWikiCommodityDto dto = commodity("Agricium");
     Material existing = uexMaterial("Agricium");
     existing.setScwikiUuid(dto.uuid());
-    when(scWikiClient.fetchAllPages(any(), any(), eq("commodities"))).thenReturn(List.of(dto));
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("commodities")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
     when(materialRepository.findByScwikiUuid(dto.uuid())).thenReturn(Optional.of(existing));
     when(materialRepository.findAll()).thenReturn(List.of(existing));
     when(materialRepository.save(any(Material.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -167,7 +188,8 @@ class ScWikiCommoditySyncServiceTest {
   void resolve_viaAlias_emitsLinkedViaAliasAndDoesNotOverwriteUexName() {
     ScWikiCommodityDto dto = commodity("Raw Silicon");
     Material uex = uexMaterial("Silicon (Raw)");
-    when(scWikiClient.fetchAllPages(any(), any(), eq("commodities"))).thenReturn(List.of(dto));
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("commodities")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
     when(materialRepository.findByScwikiUuid(dto.uuid())).thenReturn(Optional.empty());
     when(aliasService.resolveMaterialByAlias(MaterialExternalAliasSource.SCWIKI, "Raw Silicon"))
         .thenReturn(uex);
@@ -190,7 +212,8 @@ class ScWikiCommoditySyncServiceTest {
   void resolve_byExactName_flipsUexOnlyToBoth() {
     ScWikiCommodityDto dto = commodity("Agricium");
     Material uex = uexMaterial("Agricium");
-    when(scWikiClient.fetchAllPages(any(), any(), eq("commodities"))).thenReturn(List.of(dto));
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("commodities")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
     when(materialRepository.findByScwikiUuid(dto.uuid())).thenReturn(Optional.empty());
     when(aliasService.resolveMaterialByAlias(any(), any())).thenReturn(null);
     when(materialRepository.findByName("Agricium")).thenReturn(Optional.of(uex));
@@ -210,7 +233,8 @@ class ScWikiCommoditySyncServiceTest {
     ScWikiCommodityDto dto = commodity("Iron");
     Material a = uexMaterial("Iron Ore");
     Material b = uexMaterial("Iron (Refined)");
-    when(scWikiClient.fetchAllPages(any(), any(), eq("commodities"))).thenReturn(List.of(dto));
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("commodities")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
     when(materialRepository.findByScwikiUuid(dto.uuid())).thenReturn(Optional.empty());
     when(aliasService.resolveMaterialByAlias(any(), any())).thenReturn(null);
     when(materialRepository.findByName("Iron")).thenReturn(Optional.empty());
@@ -231,7 +255,8 @@ class ScWikiCommoditySyncServiceTest {
   @Test
   void resolve_noMatch_createsWikiOnlyInvisibleRow_andEmitsCreatedWikiOnly() {
     ScWikiCommodityDto dto = commodity("Bluemoon Fungus");
-    when(scWikiClient.fetchAllPages(any(), any(), eq("commodities"))).thenReturn(List.of(dto));
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("commodities")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
     when(materialRepository.findByScwikiUuid(dto.uuid())).thenReturn(Optional.empty());
     when(aliasService.resolveMaterialByAlias(any(), any())).thenReturn(null);
     when(materialRepository.findByName("Bluemoon Fungus")).thenReturn(Optional.empty());
@@ -255,7 +280,8 @@ class ScWikiCommoditySyncServiceTest {
   @Test
   void looksLikeItem_emitsLooksLikeItemEvent_andStaysInvisible() {
     ScWikiCommodityDto dto = commodity("MedGel");
-    when(scWikiClient.fetchAllPages(any(), any(), eq("commodities"))).thenReturn(List.of(dto));
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("commodities")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
     when(materialRepository.findByScwikiUuid(dto.uuid())).thenReturn(Optional.empty());
     when(aliasService.resolveMaterialByAlias(any(), any())).thenReturn(null);
     when(materialRepository.findByName("MedGel")).thenReturn(Optional.empty());
@@ -277,7 +303,8 @@ class ScWikiCommoditySyncServiceTest {
   void orphanSweep_runs_whenAtLeastOneCommodityMerged() {
     ScWikiCommodityDto dto = commodity("Agricium");
     Material uex = uexMaterial("Agricium");
-    when(scWikiClient.fetchAllPages(any(), any(), eq("commodities"))).thenReturn(List.of(dto));
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("commodities")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
     when(materialRepository.findByScwikiUuid(dto.uuid())).thenReturn(Optional.empty());
     when(aliasService.resolveMaterialByAlias(any(), any())).thenReturn(null);
     when(materialRepository.findByName("Agricium")).thenReturn(Optional.of(uex));

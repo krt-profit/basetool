@@ -88,6 +88,11 @@ groups:
       # (task)` guard matches the two series solely on the job name (their __name__/instance
       # labels differ). The items series only exists once a counting run has recorded it, so this
       # cannot fire before the job's first successful run.
+      # 304 carve-out (#1182): both catalogue clients do ETag conditional-GET, so an UNCHANGED (but
+      # healthy) catalogue answers 304 for every endpoint and upserts nothing. To avoid a false zero-
+      # item flatline on a stable catalogue, uex_sync and each scwiki_sync step report their live row
+      # count instead of 0 when the fetch came back 304 — so this alert only sees 0 on a genuine
+      # empty-200 outage, not on a fully-cached run.
       # baseline-tune: 48h zero-items window is the issue's initial threshold (daily sync cadence).
       - alert: SyncZeroItems
         expr: |

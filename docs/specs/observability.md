@@ -378,7 +378,16 @@ transaction per pass) rather than per-scrape.
   > falsely-stale `0`. The items counter is present only for jobs that report a count: user sync,
   > notification retention, default-blueprint provisioning, and — since #1041 item 2 — `uex_sync` (the
   > `UexItemSyncService` `game_item` upsert tally) and `scwiki_sync` (the sum of the five SC-Wiki step
-  > counts, a failing step contributing `0`). For the two catalogue syncs it is populated from the same
+  > counts, a failing step contributing `0`). **304 carve-out (#1182):** both catalogue clients do
+  > ETag conditional-GET, so an *unchanged* catalogue answers `304 Not Modified` for every endpoint
+  > and upserts nothing — a `0` that is healthy, not an outage, and would false-fire `SyncZeroItems`
+  > once uptime passes the alert window. So each catalogue sync reports a representative **live row
+  > count** instead of `0` when its fetch came back 304 and nothing was written: `uex_sync` reports
+  > the live UEX catalogue size, and each `scwiki_sync` step reports its live linked-row count
+  > (`MaterialRepository.countLiveScwikiMaterials` for commodities, plus `countLiveScwikiShipTypes` /
+  > `countLiveScwikiBlueprints` / `countLiveScwikiManufacturers` / `countLiveScwikiItems` for the
+  > other steps) — so only a genuine empty-200 (which still reports `0`) reads as a zero-item run. For
+  > the two catalogue syncs it is populated from the same
   > per-run tallies the sync-report summary uses and backs the `SyncZeroItems` alert, which fires when
   > a sync keeps succeeding but has processed zero rows for 48 h — the empty-200 catalogue outage that
   > neither `ExternalSyncStale` (last-success stays fresh) nor `ExternalFetchErrors` (an empty 200 is

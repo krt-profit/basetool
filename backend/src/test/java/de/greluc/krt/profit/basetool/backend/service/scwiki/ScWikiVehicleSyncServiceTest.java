@@ -93,7 +93,8 @@ class ScWikiVehicleSyncServiceTest {
             2.0,
             Map.of("en_EN", "Wiki English desc", "de_DE", "Wiki Deutsch"));
 
-    when(scWikiClient.fetchAllPages(any(), any(), eq("vehicles"))).thenReturn(List.of(dto));
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
     when(shipTypeRepository.findByExternalUuid(uuid)).thenReturn(Optional.of(uexShip));
     when(shipTypeRepository.save(any(ShipType.class))).thenAnswer(inv -> inv.getArgument(0));
     when(shipTypeRepository.markScwikiDeletedExcept(any(), any())).thenReturn(0);
@@ -120,7 +121,8 @@ class ScWikiVehicleSyncServiceTest {
     ScWikiVehicleDto dto =
         new ScWikiVehicleDto(
             uuid, "wiki-only-ship", "Wiki Only Ship", null, null, null, Map.of("en_EN", "x"));
-    when(scWikiClient.fetchAllPages(any(), any(), eq("vehicles"))).thenReturn(List.of(dto));
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
     when(shipTypeRepository.findByExternalUuid(uuid)).thenReturn(Optional.empty());
     when(shipTypeRepository.findByNameIgnoreCase("Wiki Only Ship")).thenReturn(Optional.empty());
     when(shipTypeRepository.save(any(ShipType.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -144,7 +146,8 @@ class ScWikiVehicleSyncServiceTest {
     // legacy: externalUuid null (pre-R2 row never UUID-stamped)
     ScWikiVehicleDto dto =
         new ScWikiVehicleDto(uuid, "drake-cutlass", "Cutlass Black", null, null, null, null);
-    when(scWikiClient.fetchAllPages(any(), any(), eq("vehicles"))).thenReturn(List.of(dto));
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
     when(shipTypeRepository.findByExternalUuid(uuid)).thenReturn(Optional.empty());
     when(shipTypeRepository.findByNameIgnoreCase("Cutlass Black")).thenReturn(Optional.of(legacy));
     when(shipTypeRepository.save(any(ShipType.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -161,7 +164,8 @@ class ScWikiVehicleSyncServiceTest {
 
   @Test
   void syncVehicles_emptyResponse_skipsOrphanSweep() {
-    when(scWikiClient.fetchAllPages(any(), any(), eq("vehicles"))).thenReturn(List.of());
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of()));
 
     int written = service.syncVehicles();
 
@@ -169,5 +173,20 @@ class ScWikiVehicleSyncServiceTest {
     verify(shipTypeRepository, never()).save(any());
     // An empty Wiki response writes no rows → 0 items (#1041 item 2, SyncZeroItems).
     assertEquals(0, written, "an empty Wiki response must report zero written rows");
+  }
+
+  @Test
+  void syncVehicles_notModified_reportsLiveCount_andSkipsSyncAndSweep() {
+    // A 304 (unchanged) catalogue must report the live Wiki-linked ship_type count, NOT 0 — an
+    // all-304 run is healthy, not a zero-item outage (#1182).
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles")))
+        .thenReturn(ScWikiClient.FetchResult.unchanged());
+    when(shipTypeRepository.countLiveScwikiShipTypes()).thenReturn(42L);
+
+    int written = service.syncVehicles();
+
+    assertEquals(42, written, "a 304 (unchanged) catalogue must report the live ship_type count");
+    verify(shipTypeRepository, never()).save(any());
+    verify(shipTypeRepository, never()).markScwikiDeletedExcept(any(), any());
   }
 }

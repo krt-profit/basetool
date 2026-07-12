@@ -187,21 +187,55 @@ public class ScWikiClient {
   }
 
   /**
+   * List-returning convenience over {@link #fetchAllPagesResult(String, ParameterizedTypeReference,
+   * String, String, Map)} — drops the {@code notModified} flag and returns just the merged rows
+   * (empty on 304 / error). Retained so callers that do not need to tell an unchanged catalogue
+   * from an empty one stay source-compatible.
+   *
+   * @param <T> per-row payload type inside {@link ScWikiResponseDto#data()}
+   * @param endpoint Wiki endpoint path
+   * @param typeRef typed wrapper carrying the parametric envelope type
+   * @param resourceLabel human-readable label for log lines
+   * @param include optional value for the {@code ?include=…} parameter; {@code null} / blank means
+   *     no include
+   * @param filters optional {@code filter[<key>]=<value>} pairs; {@code null} / empty means none
+   * @return merged list of rows across all pages, or an empty list on 304 / error
+   */
+  public <T> List<T> fetchAllPages(
+      String endpoint,
+      ParameterizedTypeReference<ScWikiResponseDto<T>> typeRef,
+      String resourceLabel,
+      String include,
+      Map<String, String> filters) {
+    return fetchAllPagesResult(endpoint, typeRef, resourceLabel, include, filters).data();
+  }
+
+  /**
    * Walks every page of a paginated Wiki endpoint and returns the concatenated {@code data[]}
-   * across all pages. Behaviour:
+   * across all pages, together with whether page 1 answered {@code 304 Not Modified}. Behaviour:
    *
    * <ol>
    *   <li>Send page 1 with {@code If-None-Match} if we cached the ETag from a previous run. A
-   *       {@code 304 Not Modified} short-circuits the entire call and returns an empty list — sync
-   *       services treat that as "skip this run".
+   *       {@code 304 Not Modified} short-circuits the entire call and returns {@link
+   *       FetchResult#notModified()} (empty data, {@code notModified == true}) — sync services
+   *       treat that as "catalogue unchanged; skip the re-import but report the live row count".
    *   <li>On a 2xx response, store the new ETag (if any) for the next call, accumulate {@code
    *       data[]} into the running list, and read {@code meta.last_page} to learn the page count.
    *   <li>For pages 2..N, sleep via {@link #paceForRateLimit()} between requests, fetch without an
    *       {@code If-None-Match} (fresh content this run), and append their {@code data[]}.
    *   <li>Any error / 5xx / timeout returns whatever has been accumulated so far (which may be an
-   *       empty list if the failure was on page 1). The caller sees an empty list on total failure,
-   *       matching the {@code UexClient} contract.
+   *       empty list if the failure was on page 1) with {@code notModified == false}. A genuine
+   *       empty-200 also returns an empty list with {@code notModified == false} — matching the
+   *       {@code UexClient} contract so a real outage still reports zero rows to the caller.
    * </ol>
+   *
+   * <p><b>Why the flag matters (#1182):</b> a 304 and a genuine empty-200 both yield an empty list,
+   * so a caller that only sees the list cannot tell an <em>unchanged</em> (healthy) catalogue from
+   * an <em>outage</em>. Because the {@code scwiki_sync} step counts upserts, an all-304 run would
+   * report {@code 0} items — indistinguishable from an empty-catalogue outage — and false-fire the
+   * {@code SyncZeroItems} alert once uptime exceeds its window. The {@code notModified} flag lets
+   * the step report its live row count on a fully-cached run instead, so only a genuine empty-200
+   * reads as zero. Mirrors the {@code UexClient.FetchResult} carve-out added for {@code uex_sync}.
    *
    * <p>Each non-blank {@code filters} entry is emitted as a {@code &filter[<key>]=<value>} query
    * parameter — the R5 Mode-B item backfill passes {@code filter[classification]=…} per kind
@@ -218,9 +252,11 @@ public class ScWikiClient {
    *     "blueprints,items"}); {@code null} or blank means no include
    * @param filters optional {@code filter[<key>]=<value>} pairs; {@code null} / empty means none,
    *     and any entry with a blank value is skipped
-   * @return merged list of rows across all pages, or an empty list on 304 / error
+   * @return the merged rows across all pages plus the page-1 {@code notModified} flag; the data is
+   *     empty both on a 304 (flag {@code true}) and on a genuine empty-200 / error (flag {@code
+   *     false})
    */
-  public <T> List<T> fetchAllPages(
+  public <T> FetchResult<T> fetchAllPagesResult(
       String endpoint,
       ParameterizedTypeReference<ScWikiResponseDto<T>> typeRef,
       String resourceLabel,
@@ -231,10 +267,19 @@ public class ScWikiClient {
     String firstPageUri = buildPagedUri(endpoint, 1, include, filters);
     String previousEtag = etagByFirstPageUri.get(firstPageUri);
 
-    ScWikiResponseDto<T> first =
+    PageOutcome<T> firstOutcome =
         fetchSinglePage(firstPageUri, typeRef, resourceLabel, previousEtag);
+    if (firstOutcome.notModified()) {
+      // Page-1 304: the catalogue is byte-identical to the last successful fetch. Surface it as a
+      // distinct outcome (empty data + notModified=true) so the caller reports its live row count
+      // rather than 0 — an unchanged catalogue must not read as a zero-item outage (#1182).
+      return FetchResult.unchanged();
+    }
+    ScWikiResponseDto<T> first = firstOutcome.body();
     if (first == null) {
-      return Collections.emptyList();
+      // Genuine empty-200 / network / parse failure (NOT a 304) — an empty list with the flag
+      // cleared so a real outage still surfaces as zero items to SyncZeroItems.
+      return FetchResult.of(Collections.emptyList());
     }
 
     List<T> accumulated = new ArrayList<>();
@@ -249,7 +294,7 @@ public class ScWikiClient {
     for (int page = 2; page <= lastPage; page++) {
       paceForRateLimit();
       String pageUri = buildPagedUri(endpoint, page, include, filters);
-      ScWikiResponseDto<T> next = fetchSinglePage(pageUri, typeRef, resourceLabel, null);
+      ScWikiResponseDto<T> next = fetchSinglePage(pageUri, typeRef, resourceLabel, null).body();
       if (next == null) {
         log.warn(
             "Page {} of {} failed mid-pagination; returning partial result of {} row(s).",
@@ -268,7 +313,27 @@ public class ScWikiClient {
         accumulated.size(),
         resourceLabel,
         Math.max(lastPage, 1));
-    return accumulated;
+    return FetchResult.of(accumulated);
+  }
+
+  /**
+   * Convenience overload of {@link #fetchAllPagesResult(String, ParameterizedTypeReference, String,
+   * String, Map)} with no {@code include} and no {@code filter[...]} params. Used by the commodity
+   * / vehicle / blueprint / manufacturer list syncs, which need the {@code notModified} flag to
+   * distinguish an unchanged catalogue (report the live row count) from a genuine empty response
+   * (report 0) for the {@code SyncZeroItems} alert (#1182).
+   *
+   * @param <T> per-row payload type inside {@link ScWikiResponseDto#data()}
+   * @param endpoint Wiki endpoint path (e.g. {@code "/api/commodities"})
+   * @param typeRef typed wrapper carrying the parametric envelope type
+   * @param resourceLabel human-readable label for log lines
+   * @return the merged rows plus whether page 1 answered 304 Not Modified
+   */
+  public <T> FetchResult<T> fetchAllPagesResult(
+      String endpoint,
+      ParameterizedTypeReference<ScWikiResponseDto<T>> typeRef,
+      String resourceLabel) {
+    return fetchAllPagesResult(endpoint, typeRef, resourceLabel, null, null);
   }
 
   /**
@@ -348,9 +413,10 @@ public class ScWikiClient {
    * @param typeRef typed envelope reference
    * @param resourceLabel log label
    * @param previousEtag optional value for {@code If-None-Match}; {@code null} to skip
-   * @return parsed envelope, or {@code null} on 304 / error
+   * @return the page outcome: a parsed envelope on 2xx, a {@link PageOutcome#notModified()} marker
+   *     on 304, or a null-bodied {@link PageOutcome#error()} on empty / error
    */
-  private <T> ScWikiResponseDto<T> fetchSinglePage(
+  private <T> PageOutcome<T> fetchSinglePage(
       String requestUri,
       ParameterizedTypeReference<ScWikiResponseDto<T>> typeRef,
       String resourceLabel,
@@ -371,7 +437,7 @@ public class ScWikiClient {
                 log.debug(
                     "SC Wiki {} page unchanged since last sync (304 Not Modified) — skipping.",
                     resourceLabel);
-                return Mono.<ScWikiResponseDto<T>>empty();
+                return Mono.just(PageOutcome.<T>unchanged());
               }
               if (!response.statusCode().is2xxSuccessful()) {
                 return response.createError();
@@ -380,17 +446,17 @@ public class ScWikiClient {
               if (etag != null && !etag.isBlank()) {
                 etagByFirstPageUri.put(requestUri, etag);
               }
-              return response.bodyToMono(typeRef);
+              return response.bodyToMono(typeRef).map(PageOutcome::ok);
             })
         .timeout(CALL_TIMEOUT)
         .onErrorResume(
             e -> {
               log.warn("Failed to fetch {} from SC Wiki API ({})", resourceLabel, requestUri, e);
               recordFetchError();
-              return Mono.<ScWikiResponseDto<T>>empty();
+              return Mono.just(PageOutcome.<T>error());
             })
         .blockOptional()
-        .orElse(null);
+        .orElse(PageOutcome.error());
   }
 
   /**
@@ -455,6 +521,94 @@ public class ScWikiClient {
       Thread.sleep(sleepMillis);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
+    }
+  }
+
+  /**
+   * Outcome of a paginated Wiki fetch: the merged rows plus whether the upstream answered {@code
+   * 304 Not Modified} on page 1. A 304 short-circuits the whole call (the class contract: "page 1
+   * 304 ⇒ skip the whole run"), so {@link #data()} is empty in that case — but {@link
+   * #notModified()} lets a caller tell an <em>unchanged</em> catalogue (healthy, nothing to
+   * re-import) apart from a genuine empty-200 / error, which also yields an empty list. The {@code
+   * scwiki_sync} step services use the flag to report their live row count instead of {@code 0} on
+   * a fully-cached run so a healthy stable catalogue does not read as a zero-item outage to {@code
+   * SyncZeroItems} (#1182 — mirrors the {@code UexClient.FetchResult} carve-out for {@code
+   * uex_sync}).
+   *
+   * @param <T> per-row payload type inside {@link ScWikiResponseDto#data()}
+   * @param data the merged rows across all pages; empty on 304 / error
+   * @param notModified {@code true} iff page 1 answered 304 Not Modified
+   */
+  public record FetchResult<T>(List<T> data, boolean notModified) {
+
+    /**
+     * Wraps a fetched (or empty-on-error / empty-200) list as a <em>modified</em> result.
+     *
+     * @param <T> per-row payload type
+     * @param data the merged rows (possibly empty)
+     * @return a result carrying {@code data} with {@code notModified == false}
+     */
+    public static <T> FetchResult<T> of(List<T> data) {
+      return new FetchResult<>(data, false);
+    }
+
+    /**
+     * The {@code 304 Not Modified} result: empty data with {@code notModified == true}. Named
+     * {@code unchanged} (not {@code notModified}) so the factory does not clash with the record's
+     * generated {@link #notModified()} accessor.
+     *
+     * @param <T> per-row payload type
+     * @return a not-modified result with an empty data list
+     */
+    public static <T> FetchResult<T> unchanged() {
+      return new FetchResult<>(List.of(), true);
+    }
+  }
+
+  /**
+   * Internal outcome of a single page fetch: the parsed envelope (or {@code null}) plus whether the
+   * upstream answered {@code 304 Not Modified}. Distinguishing a 304 from a {@code null} body
+   * (empty / error) at the page level is what lets {@link #fetchAllPagesResult} carry the {@code
+   * notModified} signal up to the sync services without conflating an unchanged catalogue with an
+   * outage.
+   *
+   * @param <T> per-row payload type
+   * @param body the parsed page envelope, or {@code null} on 304 / empty / error
+   * @param notModified {@code true} iff the upstream answered 304 Not Modified
+   */
+  private record PageOutcome<T>(ScWikiResponseDto<T> body, boolean notModified) {
+
+    /**
+     * A successful 2xx page carrying a parsed envelope.
+     *
+     * @param <T> per-row payload type
+     * @param body the parsed page envelope
+     * @return an outcome wrapping {@code body} with {@code notModified == false}
+     */
+    private static <T> PageOutcome<T> ok(ScWikiResponseDto<T> body) {
+      return new PageOutcome<>(body, false);
+    }
+
+    /**
+     * A {@code 304 Not Modified} page: no body, {@code notModified == true}. Named {@code
+     * unchanged} (not {@code notModified}) so the factory does not clash with the record's
+     * generated {@link #notModified()} accessor.
+     *
+     * @param <T> per-row payload type
+     * @return a not-modified outcome
+     */
+    private static <T> PageOutcome<T> unchanged() {
+      return new PageOutcome<>(null, true);
+    }
+
+    /**
+     * A failed / empty page: no body, {@code notModified == false}.
+     *
+     * @param <T> per-row payload type
+     * @return an error outcome
+     */
+    private static <T> PageOutcome<T> error() {
+      return new PageOutcome<>(null, false);
     }
   }
 }

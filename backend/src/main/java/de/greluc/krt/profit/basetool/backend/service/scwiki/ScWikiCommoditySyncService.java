@@ -115,11 +115,16 @@ public class ScWikiCommoditySyncService {
    * <p>Returns the number of {@code material} rows this run wrote — matched rows linked plus fresh
    * {@code WIKI_ONLY} rows created (junk- and ambiguous-skips excluded) — which {@link
    * ScWikiScheduler} accumulates into {@code
-   * basetool_scheduled_job_items_total{job="scwiki_sync"}}. The disabled and empty-response
-   * short-circuits return {@code 0} so a Wiki outage surfaces as a zero-item run ({@code
-   * SyncZeroItems}, #1041 item 2) rather than a fresh success.
+   * basetool_scheduled_job_items_total{job="scwiki_sync"}}. The disabled and <em>genuine</em>
+   * empty-response short-circuits return {@code 0} so a Wiki outage surfaces as a zero-item run
+   * ({@code SyncZeroItems}, #1041 item 2) rather than a fresh success. A {@code 304 Not Modified}
+   * response is <b>not</b> such an outage — the catalogue is merely unchanged — so this reports
+   * {@link MaterialRepository#countLiveScwikiMaterials() the live linked-material count} instead of
+   * {@code 0}, keeping a fully-cached healthy run from false-firing {@code SyncZeroItems} (#1182).
    *
-   * @return the number of {@code material} rows written this run ({@code linked + createdWikiOnly})
+   * @return the number of {@code material} rows written this run ({@code linked +
+   *     createdWikiOnly}), or the live linked-material count on a {@code 304 Not Modified}
+   *     (unchanged) catalogue
    */
   @Transactional
   public int syncCommodities() {
@@ -131,11 +136,23 @@ public class ScWikiCommoditySyncService {
     }
 
     log.info("Starting SC Wiki commodity merge...");
-    List<ScWikiCommodityDto> fetched =
-        scWikiClient.fetchAllPages(
+    ScWikiClient.FetchResult<ScWikiCommodityDto> fetchResult =
+        scWikiClient.fetchAllPagesResult(
             properties.getCommoditiesEndpoint(),
             new ParameterizedTypeReference<ScWikiResponseDto<ScWikiCommodityDto>>() {},
             "commodities");
+    if (fetchResult.notModified()) {
+      // Catalogue unchanged since the last sync (ETag 304): nothing to merge, but this is a healthy
+      // run — report the live linked-material count so an all-304 run is not read as a zero-item
+      // outage (#1182). A genuine empty-200 falls through to the isEmpty() branch and reports 0.
+      long live = materialRepository.countLiveScwikiMaterials();
+      log.info(
+          "SC Wiki commodity catalogue unchanged since last sync (304) — reporting {} live linked"
+              + " material row(s) instead of 0.",
+          live);
+      return (int) live;
+    }
+    List<ScWikiCommodityDto> fetched = fetchResult.data();
     if (fetched.isEmpty()) {
       log.warn("No commodities received from SC Wiki API. Aborting merge (no orphan sweep).");
       return 0;
