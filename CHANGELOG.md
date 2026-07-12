@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- **Ingest-Gateway (Ein-Klick-Import) stürzt nicht mehr nach ~17 h Laufzeit ab.** Der HTTPS-Healthcheck der JVM-Dienste erzeugte über BusyBox-`wget` alle 30 s einen nicht abgeräumten `ssl_client`-Zombie-Prozess; da die JVM als PID 1 lief und Waisen nicht abräumt, füllte sich der `pids`-Cgroup-Grenzwert (2048) nach rund 17 h und die JVM konnte keine Threads mehr anlegen — Absturz, Neustart-Schleife und Alarm-Mails. Backend, Frontend und Ingest laufen jetzt mit `init: true` (tini als PID 1 räumt die Zombies ab; REQ-OPS-019).
 - **Preis-Übersicht wird wieder angezeigt.** Nach der CSP-Härtung (`style-src-attr 'none'`, ADR-0093) blieb die Handelsmatrix unter „Preis-Übersicht" unsichtbar: Die Tabelle wurde per CSS-Klasse ausgeblendet, das Skript blendete sie aber noch über das inzwischen wirkungslose `style.display` ein, und die dynamischen Abstandszeilen des virtuellen Scrollens trugen ein vom Browser blockiertes `style="height:…"`. Sichtbarkeit läuft jetzt über das Umschalten der Klasse, die Zeilenhöhe über das CSSOM — die Seite funktioniert wieder.
 
 ## [v1.3.2](https://github.com/krt-profit/basetool/releases/tag/v1.3.2) - 2026-07-11

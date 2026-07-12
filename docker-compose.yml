@@ -279,6 +279,17 @@ x-backend: &backend-template
   # docker-compose.build.yml as an override to add `build:` back in.
   image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-backend:${IRI_BASETOOL_VERSION:-stable}
   restart: always
+  # Reap orphaned zombie processes. The container runs the JVM as PID 1 (Dockerfile ENTRYPOINT
+  # `exec java`), and a bare JVM does NOT reap children reparented to it. The Docker HEALTHCHECK runs
+  # BusyBox `wget --no-check-certificate https://...` every 30s, and BusyBox wget forks an
+  # `ssl_client` helper for the TLS which it does not wait on; on exit that helper reparents to PID 1
+  # and, unreaped, lingers as a `<defunct>` zombie. One accumulates per 30s probe until the `pids`
+  # cgroup cap (2048, below) is exhausted and the JVM can no longer create an OS thread
+  # (`pthread_create failed (EAGAIN)` → native-thread OOM at ~17h uptime — the 2026-07-12 ingest
+  # incident; heap and jvm_threads_live stay healthy, so JvmThreadsHigh never catches it). `init:
+  # true` runs Docker's bundled tini as PID 1, which reaps these orphans. All three JVM app services
+  # (backend/frontend/ingest) share the wget-HTTPS probe, so all three carry this.
+  init: true
   logging: *default-logging
   # Runtime-hardening baseline (REQ-OPS-014). The image runs as the fixed non-root uid 10001 and
   # binds only a high port (11261), so the JVM needs NO Linux capabilities — drop them all and forbid
@@ -468,6 +479,10 @@ x-frontend: &frontend-template
   # rebuilds happen via docker-compose.build.yml.
   image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-frontend:${IRI_BASETOOL_VERSION:-stable}
   restart: always
+  # Zombie-reaping init (tini) as PID 1 — see x-backend: the wget-HTTPS healthcheck forks an
+  # `ssl_client` TLS helper that reparents to the JVM (PID 1) and, unreaped, accumulates one
+  # `<defunct>` per 30s probe until the `pids` cap is exhausted (the 2026-07-12 native-thread-OOM).
+  init: true
   logging: *default-logging
   # Runtime-hardening baseline (REQ-OPS-014). Non-root uid 10001, high port (18081) only → no caps.
   security_opt:
@@ -530,6 +545,11 @@ x-ingest: &ingest-template
   # IRI_BASETOOL_VERSION rationale; local rebuilds use docker-compose.build.yml.
   image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-ingest:${IRI_BASETOOL_VERSION:-stable}
   restart: always
+  # Zombie-reaping init (tini) as PID 1 — see x-backend: the wget-HTTPS healthcheck forks an
+  # `ssl_client` TLS helper that reparents to the JVM (PID 1) and, unreaped, accumulates one
+  # `<defunct>` per 30s probe until the `pids: 2048` cap is exhausted. This gateway is where the
+  # 2026-07-12 native-thread-OOM incident first surfaced (longest continuous uptime of the three).
+  init: true
   logging: *default-logging
   # Runtime-hardening baseline (REQ-OPS-014). Non-root uid 10001, high port (11262) only → no caps.
   # This is the only new internet-reachable service, so dropping caps + forbidding escalation here is
