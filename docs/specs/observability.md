@@ -755,20 +755,24 @@ therefore alerts on:
   miss.
 - **cgroup-pids exhaustion.** The `pids` cgroup cap (2048 for the four JVM containers
   backend/frontend/ingest/keycloak) limits **every** task in the container, not just JVM threads —
-  unreaped child-process zombies (the `ssl_client` processes the `wget`-HTTPS docker healthcheck
-  spawned) and the OS carrier threads behind virtual threads both count against it yet are invisible
-  to Micrometer's `jvm_threads_live_threads`. In the 2026-07-12 ingest native-thread OOM the cap was
-  exhausted while that JVM-only gauge stayed flat (~36), so `JvmThreadsHigh` never fired and only the
-  post-crash `TargetDown` / `DeployHealthRestartFailing` paged — no leading warning at all.
-  `ContainerPidsHigh` (warning) closes that blind spot: it fires when cAdvisor's `container_threads`
-  (the cgroup `pids.current` task count; companion `container_threads_max` = `pids.max`) exceeds 80%
-  (1638) of the 2048 cap for 10m. It is the cgroup-level companion to `JvmThreadsHigh` and additionally
-  covers keycloak, which shares the cap and the `wget`-HTTPS healthcheck but exports no `basetool-*`
-  Micrometer series here. The signal exists **only because** the cadvisor `process` metric group is
-  enabled in `docker-compose.monitoring.yml` (`--disable_metrics` set to cadvisor's default minus
-  `process`; `--enable_metrics=process` is wrong — it *replaces* the whole set and would blind the
-  memory/cpu container alerts). The 2048 cap is hardcoded to stay in lockstep with `JvmThreadsHigh` and
-  the compose `pids` limit; do **not** raise the cap to silence the alert.
+  unreaped child-process zombies and the OS carrier threads behind virtual threads both count against
+  it yet are invisible to Micrometer's `jvm_threads_live_threads`. In the 2026-07-12 ingest
+  native-thread OOM the cap was exhausted (by `ssl_client` healthcheck zombies) while that JVM-only
+  gauge stayed flat (~36), so `JvmThreadsHigh` never fired and only the post-crash `TargetDown` /
+  `DeployHealthRestartFailing` paged — no leading warning at all. That specific zombie source is now
+  fixed at the root by **REQ-OPS-019** (`init: true` PID-1 reaping on backend/frontend/ingest);
+  `ContainerPidsHigh` (warning) is the observability complement that closes the *monitoring* blind
+  spot and catches **any future** pids/task leak (a different zombie source, a thread runaway) before
+  the cap is hit. It fires when cAdvisor's `container_threads` (the cgroup `pids.current` task count;
+  companion `container_threads_max` = `pids.max`) exceeds 80% (1638) of the 2048 cap for 10m. It is
+  the cgroup-level companion to `JvmThreadsHigh` and additionally covers keycloak as defense-in-depth
+  — keycloak carries the same 2048 cap but exports no `basetool-*` Micrometer series, so
+  `JvmThreadsHigh` cannot see a pids/thread runaway in it at all. The signal exists **only because**
+  the cadvisor `process` metric group is enabled in `docker-compose.monitoring.yml`
+  (`--disable_metrics` set to cadvisor's default minus `process`; `--enable_metrics=process` is wrong
+  — it *replaces* the whole set and would blind the memory/cpu container alerts). The 2048 cap is
+  hardcoded to stay in lockstep with `JvmThreadsHigh` and the compose `pids` limit; do **not** raise
+  the cap to silence the alert.
 
 All labels stay bounded (REQ-OBS-006): these alerts read only the exporters' own low-cardinality
 series (`job` / `instance` / `reason` / `name` / `path` / `health_type`), never per-user or
