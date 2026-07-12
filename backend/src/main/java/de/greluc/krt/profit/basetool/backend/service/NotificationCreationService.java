@@ -55,25 +55,37 @@ public class NotificationCreationService {
   private final NotificationParamsCodec notificationParamsCodec;
 
   /**
-   * Resolves recipients for the event and writes one notification per recipient per produced type.
+   * Clears the notifications the event supersedes, then resolves recipients and writes one
+   * notification per recipient per produced type.
+   *
+   * <p>Removal runs <em>first</em> (REQ-NOTIF-018): a lifecycle-terminating event (deciding or
+   * withdrawing a bank booking request) deletes the now-stale {@code BANK_BOOKING_REQUEST_CREATED}
+   * items the bank staff were shown before any new decision notification is created. The two touch
+   * disjoint rows (different type, different recipients), so order only matters for correctness of
+   * the returned recipient set, not the data.
    *
    * <p>Deliberately does NOT push the real-time SSE signal here (#1152): the push fires from {@link
    * NotificationEventListener} <em>after</em> this transaction commits, so the client's
    * unread-count refetch reads the committed rows (not a pre-commit stale count) and no Hikari
-   * connection is pinned across the blocking SSE fan-out. This method returns the recipients the
-   * listener publishes to.
+   * connection is pinned across the blocking SSE fan-out. This method returns every recipient the
+   * listener publishes to — the new-notification recipients <em>and</em> the recipients whose stale
+   * items were removed, so a staff member's badge/inbox refreshes live the moment a request is
+   * decided.
    *
    * @param event the fired event
-   * @return the deduplicated recipient {@code sub}s that received a notification (empty when none)
+   * @return the deduplicated recipient {@code sub}s whose inbox changed (created or cleared); empty
+   *     when nothing changed
    */
   @Transactional
   public Set<UUID> createFromEvent(@NotNull NotificationEvent event) {
+    Set<UUID> affected = new HashSet<>(removeSupersededNotifications(event));
+
     Map<NotificationType, Set<UUID>> recipientsByType =
         ruleEvaluationService.resolveRecipients(event);
     if (recipientsByType.isEmpty()) {
       log.debug(
           "Event {} for entity {} resolved no recipients", event.eventType(), event.entityId());
-      return Set.of();
+      return affected;
     }
     String paramsJson = notificationParamsCodec.serialize(event.renderParams());
     List<Notification> toCreate = new ArrayList<>();
@@ -97,8 +109,44 @@ public class NotificationCreationService {
         toCreate.size(),
         event.eventType(),
         event.entityId());
-    Set<UUID> recipientSubs = new HashSet<>();
-    recipientsByType.values().forEach(recipientSubs::addAll);
-    return recipientSubs;
+    recipientsByType.values().forEach(affected::addAll);
+    return affected;
+  }
+
+  /**
+   * Deletes the notifications the event marks obsolete for its entity (REQ-NOTIF-018) and returns
+   * the recipients who held one, so the caller can push a live refresh to their now-changed
+   * inboxes. A no-op returning an empty set when the event supersedes nothing or carries no entity
+   * reference.
+   *
+   * @param event the fired event
+   * @return the recipient subs whose stale notifications were removed; empty when none
+   */
+  @NotNull
+  private Set<UUID> removeSupersededNotifications(@NotNull NotificationEvent event) {
+    Set<NotificationType> supersededTypes = event.resolvesNotificationTypes();
+    if (supersededTypes.isEmpty() || event.entityType() == null || event.entityId() == null) {
+      return Set.of();
+    }
+    // Snapshot the affected recipients BEFORE the delete (the delete clears the persistence
+    // context) so their badge/inbox can be refreshed live after commit.
+    Set<UUID> affected =
+        new HashSet<>(
+            notificationRepository.findRecipientSubsByTypeInAndEntity(
+                supersededTypes, event.entityType(), event.entityId()));
+    if (affected.isEmpty()) {
+      return Set.of();
+    }
+    int deleted =
+        notificationRepository.deleteByTypeInAndEntity(
+            supersededTypes, event.entityType(), event.entityId());
+    log.info(
+        "Removed {} superseded notification(s) of {} for {} {} on event {}",
+        deleted,
+        supersededTypes,
+        event.entityType(),
+        event.entityId(),
+        event.eventType());
+    return affected;
   }
 }

@@ -21,10 +21,12 @@ package de.greluc.krt.profit.basetool.backend.event;
 
 import de.greluc.krt.profit.basetool.backend.model.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
+import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import de.greluc.krt.profit.basetool.backend.util.BankAmounts;
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
@@ -84,5 +86,16 @@ public record BankBookingRequestConfirmedEvent(
     params.put("accountNo", accountNo);
     params.put("amount", BankAmounts.plain(amount));
     return params;
+  }
+
+  /**
+   * Confirming the request settles its lifecycle, so the "new booking request" items the bank staff
+   * were shown are now stale and get cleared (REQ-NOTIF-018).
+   *
+   * @return the singleton {@link NotificationType#BANK_BOOKING_REQUEST_CREATED}
+   */
+  @Override
+  public Set<NotificationType> resolvesNotificationTypes() {
+    return Set.of(NotificationType.BANK_BOOKING_REQUEST_CREATED);
   }
 }

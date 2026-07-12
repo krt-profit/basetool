@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.model.Notification;
 import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,6 +60,20 @@ class NotificationRepositoryIntegrationTest {
                   .build();
           return repository.save(n);
         });
+  }
+
+  private Notification save(
+      UUID recipient, NotificationType type, String entityType, UUID entityId) {
+    return transactionTemplate.execute(
+        status ->
+            repository.save(
+                Notification.builder()
+                    .recipientSub(recipient)
+                    .type(type)
+                    .entityType(entityType)
+                    .entityId(entityId)
+                    .read(false)
+                    .build()));
   }
 
   @Test
@@ -131,5 +146,59 @@ class NotificationRepositoryIntegrationTest {
     assertThat(repository.findByIdAndRecipientSub(old.getId(), a)).isEmpty();
     assertThat(repository.findByIdAndRecipientSub(recent.getId(), a)).isPresent();
     assertThat(repository.findByIdAndRecipientSub(unread.getId(), a)).isPresent();
+  }
+
+  @Test
+  void supersedeByTypeAndEntityMatchesTypeAndEntityOnly() {
+    // REQ-NOTIF-018: clearing the created-notifications of a decided request must match by type +
+    // loose entity, span all recipients, and leave other types / other entities untouched.
+    UUID staffA = UUID.randomUUID();
+    UUID staffB = UUID.randomUUID();
+    UUID requestId = UUID.randomUUID();
+    UUID otherRequestId = UUID.randomUUID();
+    Set<NotificationType> created = Set.of(NotificationType.BANK_BOOKING_REQUEST_CREATED);
+
+    Notification a =
+        save(
+            staffA,
+            NotificationType.BANK_BOOKING_REQUEST_CREATED,
+            "BANK_BOOKING_REQUEST",
+            requestId);
+    Notification b =
+        save(
+            staffB,
+            NotificationType.BANK_BOOKING_REQUEST_CREATED,
+            "BANK_BOOKING_REQUEST",
+            requestId);
+    // Different type, same entity — must survive (the requester's decision notification).
+    Notification decision =
+        save(
+            staffA,
+            NotificationType.BANK_BOOKING_REQUEST_CONFIRMED,
+            "BANK_BOOKING_REQUEST",
+            requestId);
+    // Same type, different entity — must survive (another still-open request).
+    Notification otherRequest =
+        save(
+            staffA,
+            NotificationType.BANK_BOOKING_REQUEST_CREATED,
+            "BANK_BOOKING_REQUEST",
+            otherRequestId);
+
+    assertThat(
+            repository.findRecipientSubsByTypeInAndEntity(
+                created, "BANK_BOOKING_REQUEST", requestId))
+        .containsExactlyInAnyOrder(staffA, staffB);
+
+    int deleted =
+        transactionTemplate.execute(
+            status ->
+                repository.deleteByTypeInAndEntity(created, "BANK_BOOKING_REQUEST", requestId));
+
+    assertThat(deleted).isEqualTo(2);
+    assertThat(repository.findByIdAndRecipientSub(a.getId(), staffA)).isEmpty();
+    assertThat(repository.findByIdAndRecipientSub(b.getId(), staffB)).isEmpty();
+    assertThat(repository.findByIdAndRecipientSub(decision.getId(), staffA)).isPresent();
+    assertThat(repository.findByIdAndRecipientSub(otherRequest.getId(), staffA)).isPresent();
   }
 }

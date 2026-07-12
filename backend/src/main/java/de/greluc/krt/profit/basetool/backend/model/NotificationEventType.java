@@ -61,6 +61,14 @@ public enum NotificationEventType {
   BANK_BOOKING_REQUEST_REJECTED,
 
   /**
+   * A requester withdrew (cancelled) their own still-pending bank booking request (REQ-BANK-022,
+   * REQ-NOTIF-018). No default rule notifies anyone — the requester is the actor; the event exists
+   * solely so the pipeline clears the now-stale {@code BANK_BOOKING_REQUEST_CREATED} items the bank
+   * staff were shown.
+   */
+  BANK_BOOKING_REQUEST_CANCELLED,
+
+  /**
    * A new Discord user registered and is awaiting admin approval (epic #720, Track 1,
    * REQ-NOTIF-012). The default rule notifies every admin.
    */
