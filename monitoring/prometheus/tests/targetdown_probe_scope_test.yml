@@ -1,0 +1,78 @@
+# promtool unit test for the TargetDown /probe-scoping (REQ-OBS-008/-012, 2026-07-12 false-critical fix).
+#
+# Proves the scoped expr `up{job!~"blackbox-(http|edge|force|hsts|internal|dns).*"} == 0`:
+#   - does NOT fire TargetDown for any of the 11 blackbox /probe jobs whose scrape timed out (up==0 is a
+#     scrape-timeout artifact there, not a target-down signal — see the alert comment);
+#   - STILL fires for the blackbox-exporter self-scrape (the exporter's own /metrics liveness) and for
+#     every non-probe scrape job (app scrapes, infra exporters, monitoring-plane self health).
+#
+# Run locally (no promtool installed on the host — use an ephemeral container, see
+# monitoring/README.md monitoring-config lint recipe):
+#   docker run --rm -v "$PWD/monitoring/prometheus:/work" -w /work \
+#     prom/prometheus:v3.13.0 promtool test rules tests/targetdown_probe_scope_test.yml
+
+rule_files:
+  - ../alerts/infrastructure.yml
+
+evaluation_interval: 30s
+
+tests:
+  - name: TargetDown excludes blackbox /probe jobs, keeps exporter + real scrapes
+    interval: 30s
+    input_series:
+      # --- 11 blackbox /probe jobs, all scrape-timed-out (up==0): MUST NOT page TargetDown ---
+      - series: 'up{job="blackbox-http", instance="https://profit-base.online"}'
+        values: "0x10"
+      - series: 'up{job="blackbox-http-auth", instance="https://ingest.profit-base.online"}'
+        values: "0x10"
+      - series: 'up{job="blackbox-edge-deny", instance="https://profit-base.online/actuator/health"}'
+        values: "0x10"
+      - series: 'up{job="blackbox-force-ssl", instance="http://profit-base.online"}'
+        values: "0x10"
+      - series: 'up{job="blackbox-hsts", instance="https://profit-base.online"}'
+        values: "0x10"
+      - series: 'up{job="blackbox-internal-tls", instance="https://backend:11261"}'
+        values: "0x10"
+      - series: 'up{job="blackbox-internal-tls-grafana", instance="https://grafana:3000"}'
+        values: "0x10"
+      - series: 'up{job="blackbox-http-ipv6", instance="https://grafana.profit-base.online"}'
+        values: "0x10"
+      - series: 'up{job="blackbox-http-auth-ipv6", instance="https://ingest.profit-base.online"}'
+        values: "0x10"
+      - series: 'up{job="blackbox-dns-a", instance="1.1.1.1"}'
+        values: "0x10"
+      - series: 'up{job="blackbox-dns-aaaa", instance="1.1.1.1"}'
+        values: "0x10"
+      # --- kept in scope (up==0 here IS a real down signal): MUST page TargetDown ---
+      - series: 'up{job="blackbox-exporter", instance="blackbox-exporter:9115"}'
+        values: "0x10"
+      - series: 'up{job="basetool-backend", instance="backend:11261", application="basetool-backend"}'
+        values: "0x10"
+      - series: 'up{job="tempo", instance="tempo:3200"}'
+        values: "0x10"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: TargetDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: blackbox-exporter
+              instance: blackbox-exporter:9115
+            exp_annotations:
+              summary: "Scrape target down: blackbox-exporter"
+              description: "Prometheus cannot scrape blackbox-exporter / blackbox-exporter:9115 for 3 minutes. For scratch-image monitoring services this is their only liveness signal. (Blackbox /probe jobs are excluded — their real failures page via probe_success alerts, not this one.)"
+          - exp_labels:
+              severity: critical
+              job: basetool-backend
+              instance: backend:11261
+              application: basetool-backend
+            exp_annotations:
+              summary: "Scrape target down: basetool-backend"
+              description: "Prometheus cannot scrape basetool-backend / backend:11261 for 3 minutes. For scratch-image monitoring services this is their only liveness signal. (Blackbox /probe jobs are excluded — their real failures page via probe_success alerts, not this one.)"
+          - exp_labels:
+              severity: critical
+              job: tempo
+              instance: tempo:3200
+            exp_annotations:
+              summary: "Scrape target down: tempo"
+              description: "Prometheus cannot scrape tempo / tempo:3200 for 3 minutes. For scratch-image monitoring services this is their only liveness signal. (Blackbox /probe jobs are excluded — their real failures page via probe_success alerts, not this one.)"

@@ -697,6 +697,22 @@ pages once via `BlackboxProbeFailed`); `DnsResolutionFailed` (warning) fires whe
 resolving an A or AAAA record. These are reachability probes, not posture assertions — a v6-only or
 DNS-only regression is invisible to the IPv4 liveness job.
 
+**Probe scrape timeout + `TargetDown` scoping (probe-liveness semantics).** Every blackbox `/probe`
+job carries its own `scrape_timeout: 15s` (> the 10s module timeout, well under the 30s interval), and
+the generic `TargetDown` alert is scoped to `up{job!~"blackbox-(http|edge|force|hsts|internal|dns).*"}
+== 0` — excluding all 11 `/probe` jobs while keeping the `blackbox-exporter` self-scrape and every
+non-probe target in scope. On a `/probe` job `up==0` is a **scrape-timeout artifact**, not a
+target-down signal: the module timeout previously equalled the global `scrape_timeout` (both 10s), so a
+probe that ran to its deadline (an IPv6 connect with no v4 fallback that black-holes, or a slow
+internal-TLS handshake under the host's designed memory pressure) tipped the Prometheus→exporter scrape
+past the window → `up==0` → a false-critical `TargetDown`. A **genuine** probe failure is
+`probe_success==0` while `up` stays 1, caught fast by the dedicated probe alerts above
+(`BlackboxProbeFailed` / `EdgeActuatorDenyBroken` / `EdgeForceSslRedirectBroken` /
+`EdgeHstsHeaderMissing` / `EdgeIpv6Unreachable` / `DnsResolutionFailed`) and by `CertificateExpiringSoon`
+for the internal-TLS jobs; app-down liveness for the `blackbox-internal-tls` targets is paged by the
+`basetool-backend` / `-frontend` / `-ingest` scrape jobs, not by their probe. So scoping `TargetDown`
+off the probe jobs removes only the false page, not any real signal. (2026-07-12 false-critical fix.)
+
 **Acceptance**
 
 - [ ] `EdgeActuatorDenyBroken` fires when a public app host stops answering 404 on
@@ -706,14 +722,19 @@ DNS-only regression is invisible to the IPv4 liveness job.
 - [ ] The scheduled `edge-deny-probe` workflow fails when
   `https://keycloak.profit-base.online/admin/` answers 2xx/3xx from a GitHub runner or the
   `/actuator` paths stop answering 404 externally.
+- [ ] `TargetDown` does **not** fire for any blackbox `/probe` job whose `up==0` (scrape-timeout
+  artifact), but still fires for the `blackbox-exporter` self-scrape and every non-probe job
+  (`targetdown_probe_scope_test.yml`).
 
 **Enforced by:** `monitoring/blackbox/blackbox.yml` (`http_deny_404` / `http_force_ssl_redirect` /
 `http_2xx_hsts`; the `http_2xx_ipv6` / `http_2xx_or_401_ipv6` / `dns_apex_a` / `dns_apex_aaaa`
 reachability modules) · `monitoring/prometheus/prometheus.yml` (the three posture jobs; the
 `blackbox-http-ipv6` / `blackbox-http-auth-ipv6` / `blackbox-dns-a` / `blackbox-dns-aaaa` reachability
-jobs) · `monitoring/prometheus/alerts/infrastructure.yml` (`EdgeActuatorDenyBroken`,
-`EdgeForceSslRedirectBroken`, `EdgeHstsHeaderMissing`, `EdgeIpv6Unreachable`, `DnsResolutionFailed`,
-scoped `BlackboxProbeFailed`) · `.github/workflows/edge-deny-probe.yml`
+jobs; the per-`/probe`-job `scrape_timeout: 15s`) · `monitoring/prometheus/alerts/infrastructure.yml`
+(`EdgeActuatorDenyBroken`, `EdgeForceSslRedirectBroken`, `EdgeHstsHeaderMissing`, `EdgeIpv6Unreachable`,
+`DnsResolutionFailed`, scoped `BlackboxProbeFailed`, and the `TargetDown` regex that excludes the
+`/probe` jobs) · `monitoring/prometheus/tests/targetdown_probe_scope_test.yml` (promtool unit test) ·
+`.github/workflows/edge-deny-probe.yml`
 
 ### REQ-OBS-013 — Telemetry-sink failures are not application errors
 
