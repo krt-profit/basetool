@@ -291,8 +291,9 @@ Tracing on the OTel SDK) behind a hard master gate:
   processor → Prometheus `remote_write` (#1041 item 22a, ADR-0076 amendment): it authenticates as the
   shared `grafana` web-auth user (Tempo runs `-config.expand-env`), Prometheus adds
   `--web.enable-remote-write-receiver`, cardinality is capped by `max_active_series`, and
-  `TempoGeneratorRemoteWriteFailing` / `TempoGeneratorSeriesLimited` alert on a credential drift or a
-  cardinality-cap hit. Span-metrics remote-write stays a non-goal.
+  `TempoGeneratorRemoteWriteFailing` / `TempoGeneratorSeriesLimited` alert on a credential or
+  stale-loaded-config drift (a `prometheus-web.yml` change not picked up until Prometheus/Tempo are
+  recreated) or a cardinality-cap hit. Span-metrics remote-write stays a non-goal.
 
 ### REQ-OBS-010 — Edge / host-auth log streams: 31-day IP retention + privacy-policy linkage
 

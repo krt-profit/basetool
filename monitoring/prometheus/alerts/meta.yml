@@ -218,9 +218,13 @@ groups:
 
       # (#1041 item 22a) Metrics-generator remote_write to Prometheus is failing — the service-graph
       # series (traces_service_graph_*) are not reaching Prometheus, so the Grafana serviceMap/nodeGraph
-      # go stale. The most likely cause is the shared `grafana` basic-auth credential drifting (rotated
-      # in prometheus-web.yml but not in Tempo's env). Metric verified on a live 3.0.2 generator; it is
-      # the generator's embedded Prometheus agent, scraped on the Tempo target.
+      # go stale. Two causes seen in practice, both surface as HTTP 401: (a) the shared `grafana`
+      # basic-auth credential drifted (rotated in prometheus-web.yml but not in Tempo's env); (b) the
+      # credential is CORRECT everywhere on disk but prometheus-web.yml was (re)provisioned WITHOUT
+      # recreating the running Prometheus (it keeps validating the stale loaded bcrypt hash) and/or Tempo
+      # (its remote-write client wedges on a cached 401) — the single-file-bind-mount staleness trap; the
+      # fix is `--force-recreate` of BOTH prometheus and tempo. Metric verified on a live 3.0.2 generator;
+      # it is the generator's embedded Prometheus agent, scraped on the Tempo target.
       - alert: TempoGeneratorRemoteWriteFailing
         expr: sum(rate(prometheus_remote_storage_samples_failed_total[15m])) > 0
         for: 10m
@@ -228,7 +232,7 @@ groups:
           severity: warning
         annotations:
           summary: "Tempo metrics-generator remote_write failing"
-          description: "The Tempo metrics-generator has been failing to remote_write service-graph samples to Prometheus for 10 minutes — the service map/node graph will go stale. Check the shared `grafana` web-auth credential (PROMETHEUS_WEB_PASSWORD in Tempo's env vs prometheus-web.yml) and Prometheus's remote-write receiver."
+          description: "The Tempo metrics-generator has been failing to remote_write service-graph samples to Prometheus for 10 minutes — the service map/node graph will go stale. Triage in order: (1) the shared `grafana` web-auth credential matches — PROMETHEUS_WEB_PASSWORD in Tempo's env vs the bcrypt hash in prometheus-web.yml; (2) Prometheus AND Tempo were recreated after prometheus-web.yml last changed — a stale loaded hash or a wedged remote-write client both give 401 despite a correct password, fixed by `--force-recreate` of both; (3) Prometheus's remote-write receiver is enabled. Quick check from net-monitoring-core: an authenticated empty POST (HTTP basic auth as user grafana) to http://prometheus:9090/api/v1/write returns 400 = auth+receiver OK, 401 = auth, 404 = receiver off."
 
       # Cardinality cap hit: the generator dropped series once the max_active_series limit was reached,
       # so the service graph is incomplete. The plan's tempo_metrics_generator_registry_collections_failed_total
