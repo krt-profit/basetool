@@ -158,7 +158,18 @@ made visible by adding the `krtm-modal-open` class (`display:flex`, in `inline-m
 is loaded last so it wins) — at runtime via `open-modal-display` (which toggles `classList`, not an
 inline `style.display`) or a server-rendered `th:classappend`; the global default must never be
 `display:flex`, or a page whose scoped stylesheet fails to load would render every closed modal open
-on load (#1003 WebKit flake).
+on load (#1003 WebKit flake). A page script that **closes** a modal after an in-place AJAX write
+(e.g. the bank confirm/reject modal on success, `bank.js`) must close it the **same** class-based
+way — remove `krtm-modal-open` (and add `krtm-hidden`), never write an inline `modal.style.display =
+'none'`. An inline `display` outranks the non-`!important` class rule, so an inline close leaves a
+stale inline style that the class-toggling `open-modal-display` cannot beat, and the modal can never
+be re-opened without a full page reload (a bank staffer confirming a second request straight after
+the first got a dead button). The inverse also holds: a modal a page script OPENS with an
+inline `style.display = 'flex'` must not be closed through the class-only `close-modal-display`
+alone, or the inline `display:flex` outranks `krtm-hidden` and the modal stays on screen (the
+`delete-operation-modal` Cancel button). As a defensive backstop **both** shared handlers clear any
+inline `display` on the modal — `open-modal-display` before showing it, `close-modal-display` before
+hiding it — so the class always wins regardless of how the other side toggled visibility.
 
 **No inline `style=""` attributes (CSP hardening).** Templates must not use inline `style=""`
 attributes: the CSP pins `style-src-attr 'none'`, so an inline style attribute is blocked by the
@@ -189,7 +200,14 @@ rows via `el.style.display` (no class) is fine; only the reveal-over-class case 
 - [ ] A new/migrated `.krt-modal-overlay` modal renders through `modal-wrapper :: modal(...)` with
   its body projected exactly once and closes via `close-modal-display` (no `data-modal-dismiss`).
 - [ ] `.krt-modal-overlay` is `display:none` by default in the global `styles.css` (not only in a
-  page-scoped stylesheet); a modal is shown solely via an inline `display:flex`.
+  page-scoped stylesheet); a modal is shown by adding the `krtm-modal-open` class (`display:flex`),
+  never an inline `style.display`.
+- [ ] A modal a script closes after an in-place AJAX write toggles its class (`krtm-modal-open` off,
+  `krtm-hidden` on), not an inline `style.display = 'none'`, so the next `open-modal-display` re-opens
+  it in the same session without a page reload.
+- [ ] A modal a script opens with an inline `style.display = 'flex'` still closes via
+  `close-modal-display` (the shared handlers clear the inline `display` on both open and close, so the
+  visibility class always wins) — e.g. the `delete-operation-modal` Cancel button.
 
 **Enforced by:** per-screen render MvcTest (shell + single-projection assertion) + e2e smoke.
 

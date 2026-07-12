@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Kartellbank: Ein zweiter Buchungsantrag lässt sich direkt nach dem ersten wieder bestätigen oder ablehnen.** Nach dem Bestätigen bzw. Ablehnen eines Antrags blieb der „Bestätigen"-/„Ablehnen"-Knopf des nächsten Antrags ohne Wirkung — der Dialog öffnete sich nicht mehr, bis die Seite neu geladen wurde. Der Dialog wurde nach dem Absenden über einen Inline-Stil geschlossen, der das inzwischen klassenbasierte Wieder-Öffnen (CSP-Umstellung, ADR-0093) überstimmte; er schließt jetzt über dieselbe CSS-Klasse und öffnet dadurch zuverlässig erneut (REQ-UI-013, REQ-FE-005).
+
+- **Dieselbe Dialog-Störung an weiteren Stellen behoben.** Die gemeinsamen Öffnen-/Schließen-Handler räumen jetzt einen alten Inline-Anzeigestil beim Öffnen und Schließen weg, sodass jeder Dialog unabhängig davon, wie die Gegenseite ihn ein-/ausblendet, zuverlässig auf- und zugeht. Betraf u. a.: „Operation erstellen" ließ sich nach dem Anlegen einer Operation erst nach Neuladen erneut öffnen, und im Lösch-Bestätigungsdialog einer Operation schloss der „Abbrechen"-Knopf das Fenster nicht (REQ-UI-013).
+
+- **Operationen: Die Fehlermeldung eines nicht ladbaren Abschnitts wird wieder rot dargestellt.** Der Hinweis „Abschnitt konnte nicht geladen werden" trug seit der CSP-Härtung (`style-src-attr 'none'`, ADR-0093) noch einen wirkungslosen Inline-Stil für die Warnfarbe; die Farbe läuft jetzt über eine CSS-Klasse (REQ-UI-013).
+
 ### Changed
 
 - **Kartellbank: Die Benachrichtigung über einen neuen Buchungsantrag verschwindet jetzt, sobald der Antrag bearbeitet ist.** Bank-Mitarbeiter und -Verantwortliche behielten bisher die „Neuer Buchungsantrag"-Benachrichtigung im Postfach, auch nachdem der Antrag längst freigegeben, abgelehnt oder vom Antragsteller zurückgezogen war. Wird ein Antrag entschieden oder zurückgezogen, werden diese nun veralteten Benachrichtigungen jetzt automatisch aus allen betroffenen Postfächern entfernt; Glocke und Liste aktualisieren sich live.
