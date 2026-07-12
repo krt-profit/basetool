@@ -356,31 +356,27 @@ public class UexClient {
    * changed between sync runs short-circuits via {@code 304 Not Modified} without re-parsing the
    * payload.
    *
+   * <p>Unlike the other endpoints this returns the full {@link FetchResult} rather than a bare
+   * list: {@code UexItemSyncService} needs the {@link FetchResult#notModified() notModified} flag
+   * to tell a healthy unchanged catalogue (empty {@code data}, served as {@code 304}) apart from an
+   * empty-200 catalogue outage (empty {@code data}, {@code notModified = false}). Both produce the
+   * same zero-upsert run, but only the outage must trip the {@code SyncZeroItems} alert (#1041 item
+   * 2).
+   *
    * @param categoryId UEX integer category id (from {@code /categories[].id})
-   * @return items in this category, or an empty list on error / 304
+   * @return the items in this category plus the {@code 304} outcome; {@code data} is empty on error
+   *     / 304 / empty-200
    */
-  public List<UexItemDto> getItemsForCategory(int categoryId) {
+  public FetchResult<UexItemDto> getItemsForCategory(int categoryId) {
     String endpoint = uexProperties.getItemsEndpoint() + "?id_category=" + categoryId;
-    return fetchList(
+    return fetchListWithOutcome(
         endpoint, new ParameterizedTypeReference<>() {}, "items (category=" + categoryId + ")");
   }
 
   /**
-   * Shared request pipeline for every UEX list endpoint. Implements the conditional GET (M-5)
-   * behaviour and the unified error / empty-list fallback.
-   *
-   * <ol>
-   *   <li>If we have a previous ETag for {@code endpoint}, attach it as {@code If-None-Match}.
-   *   <li>If the response is {@code 304 Not Modified}, log at DEBUG and return an empty list — sync
-   *       services treat this as "skip this run", exactly the right behaviour for unchanged data.
-   *   <li>On {@code 2xx}, store the response's ETag (if any) keyed by endpoint URL for the next
-   *       call, then deserialise the body into {@code UexResponseDto<T>} and unwrap the data list.
-   *   <li>On non-2xx (and non-304) responses, propagate the {@link
-   *       org.springframework.web.reactive.function.client.WebClientResponseException} through
-   *       {@code .createError()} into the unified {@code onErrorResume} fallback.
-   *   <li>On any error (timeout, decoding failure, server error), log at ERROR and return an empty
-   *       list — the caller MUST treat the result as "skip this run", not as "the table is empty".
-   * </ol>
+   * Thin {@code List}-returning wrapper over {@link #fetchListWithOutcome} for the endpoints that
+   * do not care whether an empty result came from a {@code 304} or from an empty/errored response.
+   * See that method for the full conditional-GET and error/empty-list fallback contract.
    *
    * @param <T> the per-row payload type inside {@code UexResponseDto.data}
    * @param endpoint UEX endpoint path (e.g. {@code /commodities}); also serves as the cache key
@@ -389,6 +385,41 @@ public class UexClient {
    * @return parsed list of {@code T}, or an empty list on error / 304
    */
   private <T> List<T> fetchList(
+      String endpoint,
+      ParameterizedTypeReference<UexResponseDto<T>> typeRef,
+      String resourceLabel) {
+    return fetchListWithOutcome(endpoint, typeRef, resourceLabel).data();
+  }
+
+  /**
+   * Shared request pipeline for every UEX list endpoint. Implements the conditional GET (M-5)
+   * behaviour and the unified error / empty-list fallback, returning both the parsed rows and
+   * whether the upstream answered {@code 304 Not Modified}.
+   *
+   * <ol>
+   *   <li>If we have a previous ETag for {@code endpoint}, attach it as {@code If-None-Match}.
+   *   <li>If the response is {@code 304 Not Modified}, log at DEBUG and return an empty list
+   *       flagged {@code notModified = true} — sync services treat this as "skip this run" but must
+   *       NOT treat it as an empty catalogue (the unchanged feed is healthy, not an outage).
+   *   <li>On {@code 2xx}, store the response's ETag (if any) keyed by endpoint URL for the next
+   *       call, then deserialise the body into {@code UexResponseDto<T>} and unwrap the data list
+   *       ({@code notModified = false}).
+   *   <li>On non-2xx (and non-304) responses, propagate the {@link
+   *       org.springframework.web.reactive.function.client.WebClientResponseException} through
+   *       {@code .createError()} into the unified {@code onErrorResume} fallback.
+   *   <li>On any error (timeout, decoding failure, server error), log at ERROR and return an empty
+   *       list flagged {@code notModified = false} — the caller MUST treat the result as "skip this
+   *       run", not as "the table is empty".
+   * </ol>
+   *
+   * @param <T> the per-row payload type inside {@code UexResponseDto.data}
+   * @param endpoint UEX endpoint path (e.g. {@code /commodities}); also serves as the cache key
+   * @param typeRef typed wrapper carrying the parametric envelope type
+   * @param resourceLabel human-readable label for log messages (singular/plural to taste)
+   * @return the parsed rows plus the {@code 304} outcome; {@code data} is empty on error / 304 /
+   *     empty-200
+   */
+  private <T> FetchResult<T> fetchListWithOutcome(
       String endpoint,
       ParameterizedTypeReference<UexResponseDto<T>> typeRef,
       String resourceLabel) {
@@ -405,7 +436,7 @@ public class UexClient {
                 log.debug(
                     "UEX {} unchanged since last sync (304 Not Modified) — skipping",
                     resourceLabel);
-                return Mono.just(Collections.<T>emptyList());
+                return Mono.just(new FetchResult<>(Collections.<T>emptyList(), true));
               }
               if (!response.statusCode().is2xxSuccessful()) {
                 return response.createError();
@@ -416,7 +447,11 @@ public class UexClient {
               }
               return response
                   .bodyToMono(typeRef)
-                  .map(body -> body.data() == null ? Collections.<T>emptyList() : body.data());
+                  .map(
+                      body ->
+                          new FetchResult<>(
+                              body.data() == null ? Collections.<T>emptyList() : body.data(),
+                              false));
             })
         .timeout(CALL_TIMEOUT)
         .onErrorResume(
@@ -428,9 +463,24 @@ public class UexClient {
                       MetricNames.TAG_SOURCE,
                       MetricNames.SOURCE_UEX)
                   .increment();
-              return Mono.just(Collections.<T>emptyList());
+              return Mono.just(new FetchResult<>(Collections.<T>emptyList(), false));
             })
         .blockOptional()
-        .orElse(Collections.emptyList());
+        .orElse(new FetchResult<>(Collections.<T>emptyList(), false));
   }
+
+  /**
+   * Outcome of a single UEX list fetch: the parsed rows plus whether the upstream answered {@code
+   * 304 Not Modified} (the feed is unchanged since the last sync, served from the {@link
+   * #etagByEndpoint} conditional-GET cache). The {@code notModified} flag lets a caller tell a
+   * healthy unchanged catalogue ({@code data} empty, {@code notModified = true}) apart from a
+   * genuine empty-200 outage or a swallowed fetch error ({@code data} empty, {@code notModified =
+   * false}) — the distinction that keeps the {@code SyncZeroItems} alert from firing on a
+   * fully-cached UEX item sync.
+   *
+   * @param <T> the per-row payload type
+   * @param data the parsed rows, or an empty list on {@code 304} / empty-200 / error
+   * @param notModified {@code true} only when the upstream returned {@code 304 Not Modified}
+   */
+  public record FetchResult<T>(List<T> data, boolean notModified) {}
 }

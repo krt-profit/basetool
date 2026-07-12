@@ -28,6 +28,7 @@ import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.backend.config.UexProperties;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexCommodityDto;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexCommodityPriceDto;
+import de.greluc.krt.profit.basetool.backend.dto.uex.UexItemDto;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexStarSystemDto;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -429,6 +430,64 @@ class UexClientTest {
         "\"keep-me\"",
         thirdReq.getHeader("If-None-Match"),
         "a server error in between must not clear the stored ETag (it was not invalidated)");
+  }
+
+  // ─── getItemsForCategory (304 outcome) ──────────────────────────────────
+  // getItemsForCategory returns the full FetchResult (not a bare list) so
+  // UexItemSyncService can tell a healthy unchanged catalogue (empty data,
+  // notModified=true) apart from an empty-200 outage (empty data,
+  // notModified=false) — the distinction that keeps SyncZeroItems honest.
+
+  @Test
+  void getItemsForCategory_freshResponse_returnsDataFlaggedModified() throws Exception {
+    server.enqueue(
+        jsonOk("{\"status\":\"ok\",\"data\":[{\"id\":42,\"name\":\"Helmet\"}]}")
+            .setHeader("ETag", "\"cat3-v1\""));
+
+    UexClient.FetchResult<UexItemDto> result = client.getItemsForCategory(3);
+
+    assertFalse(result.notModified(), "a fresh 200 must not be flagged notModified");
+    assertEquals(1, result.data().size());
+    assertEquals(42, result.data().get(0).id());
+
+    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+    assertNotNull(req);
+    assertEquals("/items?id_category=3", req.getPath());
+  }
+
+  @Test
+  void getItemsForCategory_unchanged304_returnsEmptyDataFlaggedNotModified() throws Exception {
+    // First call primes the ETag; the second gets a 304 and must surface notModified=true so the
+    // sync service reports the unchanged catalogue as healthy (non-zero items), not as an outage.
+    server.enqueue(
+        jsonOk("{\"status\":\"ok\",\"data\":[{\"id\":42,\"name\":\"Helmet\"}]}")
+            .setHeader("ETag", "\"cat3-v1\""));
+    server.enqueue(new MockResponse().setResponseCode(304).setHeader("ETag", "\"cat3-v1\""));
+
+    client.getItemsForCategory(3); // primes the ETag
+    UexClient.FetchResult<UexItemDto> second = client.getItemsForCategory(3);
+
+    assertTrue(second.notModified(), "a 304 must be flagged notModified");
+    assertTrue(second.data().isEmpty(), "a 304 carries no rows");
+
+    server.takeRequest(1, TimeUnit.SECONDS); // discard the first
+    RecordedRequest secondReq = server.takeRequest(1, TimeUnit.SECONDS);
+    assertEquals(
+        "\"cat3-v1\"",
+        secondReq.getHeader("If-None-Match"),
+        "the per-category item feed must still send If-None-Match (conditional GET stays on)");
+  }
+
+  @Test
+  void getItemsForCategory_empty200_returnsEmptyDataFlaggedModified() {
+    // An empty-200 (genuine catalogue outage) must NOT be flagged notModified — that is what lets
+    // the sync service report 0 items and trip SyncZeroItems on a real outage.
+    server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":[]}"));
+
+    UexClient.FetchResult<UexItemDto> result = client.getItemsForCategory(7);
+
+    assertFalse(result.notModified(), "an empty-200 must not be mistaken for an unchanged 304");
+    assertTrue(result.data().isEmpty());
   }
 
   // ─── helpers ────────────────────────────────────────────────────────────
