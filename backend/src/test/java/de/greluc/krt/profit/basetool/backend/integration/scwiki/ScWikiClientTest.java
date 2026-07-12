@@ -191,6 +191,59 @@ class ScWikiClientTest {
         "the no-include call must NOT receive the include=blueprints ETag");
   }
 
+  // ─── fetchAllPagesResult 304 vs empty/error flag (#1182) ────────────────
+
+  @Test
+  void fetchAllPagesResult_304OnFirstPage_isFlaggedNotModified() throws Exception {
+    server.enqueue(jsonOk(pageBody(1, 1, "")).setHeader("ETag", "\"wiki-v1\""));
+    server.enqueue(new MockResponse().setResponseCode(304).setHeader("ETag", "\"wiki-v1\""));
+
+    client.fetchAllPagesResult(
+        "/api/commodities", commodityTypeRef(), "commodities"); // primes ETag
+    ScWikiClient.FetchResult<ScWikiCommodityDto> second =
+        client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
+
+    assertTrue(second.notModified(), "a 304 on page 1 must be surfaced as notModified");
+    assertTrue(second.data().isEmpty(), "a 304 carries no rows");
+  }
+
+  @Test
+  void fetchAllPagesResult_emptyDataAndError_areNotFlaggedNotModified() throws Exception {
+    // A genuine empty-200 is a real (if empty) response, NOT a 304 — it must stay a zero-item
+    // signal to SyncZeroItems.
+    server.enqueue(jsonOk(pageBody(1, 1, "")));
+    ScWikiClient.FetchResult<ScWikiCommodityDto> empty200 =
+        client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
+    assertFalse(empty200.notModified(), "an empty-200 must not be flagged notModified");
+    assertTrue(empty200.data().isEmpty());
+
+    // A 5xx error is likewise not a 304.
+    server.enqueue(new MockResponse().setResponseCode(500).setBody("boom"));
+    ScWikiClient.FetchResult<ScWikiCommodityDto> err =
+        client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
+    assertFalse(err.notModified(), "an error must not be flagged notModified");
+    assertTrue(err.data().isEmpty());
+  }
+
+  @Test
+  void fetchAllPagesResult_2xxWithRows_isFlaggedModifiedWithData() throws Exception {
+    server.enqueue(
+        jsonOk(
+            pageBody(
+                1,
+                1,
+                """
+                {"uuid":"00000000-0000-0000-0000-0000000000f1","name":"Gold"}
+                """)));
+
+    ScWikiClient.FetchResult<ScWikiCommodityDto> result =
+        client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
+
+    assertFalse(result.notModified(), "a 2xx with rows is a modified response");
+    assertEquals(1, result.data().size());
+    assertEquals("Gold", result.data().get(0).name());
+  }
+
   // ─── Rate-limit pacing hook ─────────────────────────────────────────────
 
   @Test

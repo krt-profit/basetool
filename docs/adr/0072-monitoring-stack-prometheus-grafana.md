@@ -141,3 +141,26 @@ phase checklists. This ADR records the architectural decisions and their trade-o
 - Every future feature change must keep the monitoring in sync — a binding CLAUDE.md rule
   ships with the Phase-2 PR (wording recorded in epic #936).
 
+## Amendment 2026-07-12 — `stop_grace_period: 45s` on the two dskit stores (Loki + Tempo)
+
+`loki` and `tempo` are both Grafana **dskit** servers that flush chunks / drain their write-ahead
+log on `SIGTERM` during a graceful shutdown bounded by `server.graceful_shutdown_timeout` (default
+**30s**; neither `loki-config.yml` nor `tempo.yaml` overrides it). Both services carried **no**
+`stop_grace_period` in `docker-compose.monitoring.yml`, so they ran on Docker's **10s** default.
+
+The routine way to apply a `loki-config.yml` / `tempo.yaml` change is `deploy.sh --force-recreate
+<svc>` — the only way past the inode-pinned single-file bind mount (the same trap documented for
+Prometheus in the v1.3.3 config-reload fix). With a 10s grace, Docker `SIGKILL`s the service ~20s
+into its 30s drain: Loki's ingester chunk-flush/WAL and Tempo's live-store WAL are truncated
+mid-write, forcing a WAL replay on the next start and risking loss of recently-ingested log lines /
+spans. For Tempo this is the exact failure mode the `TempoWritePathFailing` alert
+(`live-store` completion/flush failures) surfaces after an ungraceful restart.
+
+**Decision:** set `stop_grace_period: 45s` on both `loki` and `tempo` — comfortably above the 30s
+dskit drain, consistent with the app compose's DB (60s) / JVM (30s) grace periods. **Prometheus is
+deliberately excluded**: its TSDB WAL replay is crash-safe by design, so a hard stop loses at most
+the in-memory head that replay reconstructs. The stateless exporters, the socket proxy, Alertmanager
+and Alloy keep the 10s default (no persistent write path that an abrupt stop can corrupt). No alert,
+metric, dashboard or scrape target changes — this is a shutdown-timing hardening of the compose
+definition only.
+

@@ -60,6 +60,22 @@ public interface GameItemRepository extends JpaRepository<GameItem, UUID> {
   Optional<GameItem> findByUexItemId(Integer uexItemId);
 
   /**
+   * Counts the live UEX-sourced catalogue rows — every {@code game_item} carrying a {@code
+   * uex_item_id} whose UEX ownership is not soft-deleted ({@code uex_deleted_at IS NULL}). {@link
+   * de.greluc.krt.profit.basetool.backend.service.UexItemSyncService#syncItems()} reports this as
+   * the run's item tally when the entire UEX item catalogue came back {@code 304 Not Modified}
+   * (every category served from the conditional-GET cache): such a run upserts nothing, yet the
+   * catalogue is healthy and present, so reporting its size keeps {@code
+   * basetool_scheduled_job_items_total} non-zero and stops a false {@code SyncZeroItems} firing on
+   * an unchanged catalogue — only a genuine empty-200 outage (no {@code 304} at all) then reads as
+   * zero.
+   *
+   * @return the number of non-soft-deleted UEX-sourced {@code game_item} rows
+   */
+  @Query("SELECT COUNT(g) FROM GameItem g WHERE g.uexItemId IS NOT NULL AND g.uexDeletedAt IS NULL")
+  long countLiveUexItems();
+
+  /**
    * Case-insensitive {@code class_name} lookup driving the P4K import's secondary resolution step
    * (when an inbound item carries no matching {@code external_uuid}). Returns a {@code List} on
    * purpose: {@code class_name} is not UNIQUE, so the caller links the P4K row only when exactly
@@ -157,4 +173,22 @@ public interface GameItemRepository extends JpaRepository<GameItem, UUID> {
       """)
   int markScwikiDeletedExcept(
       @Param("seenExternalUuids") Collection<UUID> seenExternalUuids, @Param("now") Instant now);
+
+  /**
+   * Counts the live SC Wiki-written game items: every row the Wiki has actually written ({@code
+   * scwiki_synced_at IS NOT NULL}) and not tombstoned ({@code scwiki_deleted_at IS NULL}) — the
+   * same {@code scwiki_synced_at} gate {@link #markScwikiDeletedExcept} uses. The R5 Mode-B item
+   * backfill reports this as the representative non-zero count when every kind endpoint comes back
+   * {@code 304 Not Modified} (nothing upserted), so a fully-cached healthy run is not read as a
+   * zero-item outage by {@code SyncZeroItems} (#1182).
+   *
+   * @return the number of non-tombstoned game items the SC Wiki sync has written
+   */
+  @Query(
+      """
+      SELECT COUNT(g) FROM GameItem g
+      WHERE g.scwikiSyncedAt IS NOT NULL
+      AND g.scwikiDeletedAt IS NULL
+      """)
+  long countLiveScwikiItems();
 }

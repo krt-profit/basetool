@@ -287,15 +287,17 @@ Tracing on the OTel SDK) behind a hard master gate:
   (`tempo_receiver_accepted_spans` rate 0 for 1h while the counter is non-zero, so it stays quiet
   when tracing is disabled) and `TempoWritePathFailing` (live-store completion/flush failures) —
   metric names verified against a live Tempo 3.0.2 scrape, since REQ-OBS-013 keeps sink failures out
-  of the app logs. Because the live-store flushes its in-memory WAL on SIGTERM during Tempo's ~30s
-  dskit graceful shutdown, the Tempo container carries an explicit `stop_grace_period: 45s` so a
-  `deploy.sh` force-recreate cannot SIGKILL it mid-flush and truncate the WAL — the ungraceful-restart
-  cause of `TempoWritePathFailing` (ADR-0076 amendment 2026-07-12). The service-graph (node graph) is lit by the metrics-generator's `service-graphs`
+  of the app logs. An ungraceful container stop is a distinct trigger of this write-path failure
+  mode: the two dskit stores (`loki`, `tempo`) both set `stop_grace_period: 45s` so a routine
+  `deploy.sh --force-recreate` cannot `SIGKILL` them mid-drain (dskit
+  `server.graceful_shutdown_timeout` 30s) and truncate the write-ahead log (ADR-0072 amendment
+  2026-07-12). The service-graph (node graph) is lit by the metrics-generator's `service-graphs`
   processor → Prometheus `remote_write` (#1041 item 22a, ADR-0076 amendment): it authenticates as the
   shared `grafana` web-auth user (Tempo runs `-config.expand-env`), Prometheus adds
   `--web.enable-remote-write-receiver`, cardinality is capped by `max_active_series`, and
-  `TempoGeneratorRemoteWriteFailing` / `TempoGeneratorSeriesLimited` alert on a credential drift or a
-  cardinality-cap hit. Span-metrics remote-write stays a non-goal.
+  `TempoGeneratorRemoteWriteFailing` / `TempoGeneratorSeriesLimited` alert on a credential or
+  stale-loaded-config drift (a `prometheus-web.yml` change not picked up until Prometheus/Tempo are
+  recreated) or a cardinality-cap hit. Span-metrics remote-write stays a non-goal.
 
 ### REQ-OBS-010 — Edge / host-auth log streams: 31-day IP retention + privacy-policy linkage
 
@@ -380,12 +382,24 @@ transaction per pass) rather than per-scrape.
   > (`business_metrics`, > 10 min); it is registered lazily so a config-gated-off job never reports a
   > falsely-stale `0`. The items counter is present only for jobs that report a count: user sync,
   > notification retention, default-blueprint provisioning, and — since #1041 item 2 — `uex_sync` (the
-  > `UexItemSyncService` `game_item` upsert tally) and `scwiki_sync` (the sum of the five SC-Wiki step
-  > counts, a failing step contributing `0`). For the two catalogue syncs it is populated from the same
+  > `UexItemSyncService` `game_item` upsert tally, with the unchanged-catalogue carve-out below) and
+  > `scwiki_sync` (the sum of the five SC-Wiki step counts, a failing step contributing `0`; same
+  > carve-out below). For the two catalogue syncs it is populated from the same
   > per-run tallies the sync-report summary uses and backs the `SyncZeroItems` alert, which fires when
   > a sync keeps succeeding but has processed zero rows for 48 h — the empty-200 catalogue outage that
   > neither `ExternalSyncStale` (last-success stays fresh) nor `ExternalFetchErrors` (an empty 200 is
-  > not a fetch error) catches. The same success-with-zero-work idea backs `UserSyncZeroItems`
+  > not a fetch error) catches. **Unchanged-catalogue carve-out (`uex_sync` + `scwiki_sync`, #1182):**
+  > `UexClient` and `ScWikiClient` both do conditional GETs, so when the whole catalogue is unchanged
+  > every category/endpoint returns `304 Not Modified` and the run upserts nothing — a healthy no-op
+  > indistinguishable from an empty-200 outage by the raw upsert tally alone. To stop that false
+  > `SyncZeroItems` firing, `UexItemSyncService` reports the live catalogue size
+  > (`GameItemRepository.countLiveUexItems()`) instead of `0` when nothing was upserted but at least
+  > one category was served from the `304` cache, and each `scwiki_sync` step likewise reports its
+  > live linked-row count (`MaterialRepository.countLiveScwikiMaterials` for commodities, plus
+  > `countLiveScwikiShipTypes` / `countLiveScwikiBlueprints` / `countLiveScwikiManufacturers` /
+  > `countLiveScwikiItems` for the other steps) on an all-`304` fetch; a genuine empty-200 (no `304`
+  > at all) still reports `0` and correctly trips the alert. The same success-with-zero-work idea
+  > backs `UserSyncZeroItems`
   > (`user_sync` synced zero users for 30 min while successful runs happened — Keycloak returned an
   > empty roster; #1041 item 3).
 
@@ -580,8 +594,13 @@ OAuth2 success/failure handlers: `outcome` = `success` / `failure`; on failure `
 `invalid_state` / `provider_error` / `other`, **mapped from the exception type and bounded OAuth2
 error code — never the raw error description**; on success `reason` = `none`) and the unlabelled
 `basetool_csrf_rejections_total` (a custom `AccessDeniedHandler` counts CSRF-token rejections before
-the 403). They drive `FrontendLoginBroken` (failures with zero concurrent successes — the
-code-to-token / JWKS / state break `KeycloakLoginErrorSpike`'s event regex misses) and
+the 403). They drive `FrontendLoginBroken` (>= 3 `reason="provider_error"` failures in 15m with zero
+concurrent successes, sustained 10m — the code-to-token / JWKS / bad-IdP-response break
+`KeycloakLoginErrorSpike`'s event regex misses because it fails *after* the user already authenticated
+at Keycloak; the failure side is scoped to `provider_error` and floored so the benign `invalid_state`
+noise — unauthenticated bots hitting the OAuth callback, abandoned / expired-state logins — cannot trip
+it when fresh successes are naturally sparse under the 30-day login window, and a state/session-loss
+break surfaces as `invalid_state` and via the `redis` readiness indicator instead) and
 `CsrfRejectionSpike` (a systematic CSRF-wiring regression that `krtFetch`'s silent single-retry
 otherwise masks as intermittent failed writes). The pre-auth `BotProtectionFilter` adds
 `basetool_bot_blocked_total{rule}` (#1041 item 19; `rule` = `method` / `path_prefix` /

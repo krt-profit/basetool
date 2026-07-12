@@ -122,7 +122,8 @@ class ScWikiBlueprintSyncServiceTest {
     Material agricium = material("Agricium");
     GameItem hadanite = gameItem(itemUuid);
     GameItem output = gameItem(outputUuid);
-    when(scWikiClient.fetchAllPages(any(), any(), eq("blueprints"))).thenReturn(List.of(dto));
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("blueprints")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
     when(blueprintRepository.findByScwikiUuid(dto.uuid())).thenReturn(Optional.empty());
     when(gameItemRepository.findByExternalUuid(outputUuid)).thenReturn(Optional.of(output));
     when(materialRepository.findByScwikiUuid(resourceUuid)).thenReturn(Optional.of(agricium));
@@ -240,7 +241,8 @@ class ScWikiBlueprintSyncServiceTest {
     Material agricium = material("Agricium");
     GameItem hadanite = gameItem(itemUuid);
     GameItem output = gameItem(outputUuid);
-    when(scWikiClient.fetchAllPages(any(), any(), eq("blueprints"))).thenReturn(List.of(listDto));
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("blueprints")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(listDto)));
     when(scWikiClient.fetchOne(anyString(), eq(ScWikiBlueprintDto.class), eq("blueprint")))
         .thenReturn(detail);
     when(blueprintRepository.findByScwikiUuid(bpUuid)).thenReturn(Optional.empty());
@@ -295,7 +297,8 @@ class ScWikiBlueprintSyncServiceTest {
         new ScWikiBlueprintIngredientDto("Unobtanium", "resource", resourceUuid, null, 1.0, null);
     ScWikiBlueprintDto dto = blueprint(null, List.of(resource), List.of());
 
-    when(scWikiClient.fetchAllPages(any(), any(), eq("blueprints"))).thenReturn(List.of(dto));
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("blueprints")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
     when(blueprintRepository.findByScwikiUuid(dto.uuid())).thenReturn(Optional.empty());
     when(materialRepository.findByScwikiUuid(resourceUuid)).thenReturn(Optional.empty());
     when(aliasService.resolveMaterialByAlias(any(), any())).thenReturn(null);
@@ -354,7 +357,8 @@ class ScWikiBlueprintSyncServiceTest {
             null,
             null);
 
-    when(scWikiClient.fetchAllPages(any(), any(), eq("blueprints"))).thenReturn(List.of(dto));
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("blueprints")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
     when(blueprintRepository.findByScwikiUuid(bpUuid)).thenReturn(Optional.of(existing));
     when(materialRepository.findByScwikiUuid(any())).thenReturn(Optional.empty());
     when(aliasService.resolveMaterialByAlias(any(), any())).thenReturn(null);
@@ -368,7 +372,8 @@ class ScWikiBlueprintSyncServiceTest {
 
   @Test
   void syncBlueprints_emptyResponse_skipsOrphanSweep() {
-    when(scWikiClient.fetchAllPages(any(), any(), eq("blueprints"))).thenReturn(List.of());
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("blueprints")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of()));
 
     int written = service.syncBlueprints();
 
@@ -379,9 +384,28 @@ class ScWikiBlueprintSyncServiceTest {
   }
 
   @Test
+  void syncBlueprints_notModified_reportsLiveCount_andSkipsDetailFetchAndSweep() {
+    // A 304 on the blueprint list upserts nothing (the per-UUID detail fetches never run), but is
+    // healthy — it must report the live blueprint count, NOT 0, so an all-304 run is not read as a
+    // zero-item outage (#1182).
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("blueprints")))
+        .thenReturn(ScWikiClient.FetchResult.unchanged());
+    when(blueprintRepository.countLiveScwikiBlueprints()).thenReturn(1559L);
+
+    int written = service.syncBlueprints();
+
+    assertEquals(1559, written, "a 304 (unchanged) list must report the live blueprint count");
+    // The 304 short-circuits before the per-UUID detail walk and the orphan sweep.
+    verify(scWikiClient, never()).fetchOne(any(), any(), any());
+    verify(blueprintRepository, never()).save(any());
+    verify(blueprintRepository, never()).markScwikiDeleted(any(), any());
+  }
+
+  @Test
   void syncBlueprints_runsOrphanSweep_whenAtLeastOneProcessed() {
     ScWikiBlueprintDto dto = blueprint(null, List.of(), List.of());
-    when(scWikiClient.fetchAllPages(any(), any(), eq("blueprints"))).thenReturn(List.of(dto));
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("blueprints")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
     when(blueprintRepository.findByScwikiUuid(dto.uuid())).thenReturn(Optional.empty());
     when(blueprintRepository.save(any(Blueprint.class))).thenAnswer(inv -> inv.getArgument(0));
     when(blueprintRepository.markScwikiDeleted(any(), any())).thenReturn(0);
@@ -403,8 +427,8 @@ class ScWikiBlueprintSyncServiceTest {
         blueprintWithKeyAndName(UUID.randomUUID(), ARMS_KEY, "Antium Helmet Jet");
     ScWikiBlueprintDto helmet =
         blueprintWithKeyAndName(UUID.randomUUID(), HELMET_KEY, "Antium Core Jet");
-    when(scWikiClient.fetchAllPages(any(), any(), eq("blueprints")))
-        .thenReturn(List.of(arms, helmet));
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("blueprints")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(arms, helmet)));
     when(blueprintRepository.findByScwikiUuid(any())).thenReturn(Optional.empty());
     when(blueprintRepository.save(any(Blueprint.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -435,7 +459,8 @@ class ScWikiBlueprintSyncServiceTest {
     // Given the wrong name arrives with different case and whitespace.
     ScWikiBlueprintDto dto =
         blueprintWithKeyAndName(UUID.randomUUID(), ARMS_KEY, "  antium   HELMET jet ");
-    when(scWikiClient.fetchAllPages(any(), any(), eq("blueprints"))).thenReturn(List.of(dto));
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("blueprints")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
     when(blueprintRepository.findByScwikiUuid(any())).thenReturn(Optional.empty());
     when(blueprintRepository.save(any(Blueprint.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -453,7 +478,8 @@ class ScWikiBlueprintSyncServiceTest {
     // Given CIG fixed the name (the feed now sends the in-game-correct name for the same key).
     ScWikiBlueprintDto dto =
         blueprintWithKeyAndName(UUID.randomUUID(), ARMS_KEY, "Antium Arms Maroon");
-    when(scWikiClient.fetchAllPages(any(), any(), eq("blueprints"))).thenReturn(List.of(dto));
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("blueprints")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
     when(blueprintRepository.findByScwikiUuid(any())).thenReturn(Optional.empty());
     when(blueprintRepository.save(any(Blueprint.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -471,7 +497,8 @@ class ScWikiBlueprintSyncServiceTest {
     // Given an unrelated key whose name happens to equal a wrong name registered under another key.
     ScWikiBlueprintDto dto =
         blueprintWithKeyAndName(UUID.randomUUID(), "BP_CRAFT_unrelated_01", "Antium Helmet Jet");
-    when(scWikiClient.fetchAllPages(any(), any(), eq("blueprints"))).thenReturn(List.of(dto));
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("blueprints")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
     when(blueprintRepository.findByScwikiUuid(any())).thenReturn(Optional.empty());
     when(blueprintRepository.save(any(Blueprint.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -493,7 +520,8 @@ class ScWikiBlueprintSyncServiceTest {
     // expected wrong name (here: to the already-correct name) — the guard no longer fires.
     ScWikiBlueprintDto dto =
         blueprintWithKeyAndName(UUID.randomUUID(), ARMS_KEY, "Antium Arms Maroon");
-    when(scWikiClient.fetchAllPages(any(), any(), eq("blueprints"))).thenReturn(List.of(dto));
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("blueprints")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
     when(blueprintRepository.findByScwikiUuid(any())).thenReturn(Optional.empty());
     when(blueprintRepository.save(any(Blueprint.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -558,7 +586,8 @@ class ScWikiBlueprintSyncServiceTest {
             null);
 
     Material agricium = material("Agricium");
-    when(scWikiClient.fetchAllPages(any(), any(), eq("blueprints"))).thenReturn(List.of(listDto));
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("blueprints")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(listDto)));
     when(scWikiClient.fetchOne(anyString(), eq(ScWikiBlueprintDto.class), eq("blueprint")))
         .thenReturn(null);
     when(blueprintRepository.findByScwikiUuid(bpUuid)).thenReturn(Optional.of(existing));
@@ -596,7 +625,8 @@ class ScWikiBlueprintSyncServiceTest {
     ScWikiBlueprintDto dto = blueprint(null, List.of(resource), List.of());
 
     Material aliasMaterial = material("Agricium");
-    when(scWikiClient.fetchAllPages(any(), any(), eq("blueprints"))).thenReturn(List.of(dto));
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("blueprints")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
     when(blueprintRepository.findByScwikiUuid(dto.uuid())).thenReturn(Optional.empty());
     when(materialRepository.findByScwikiUuid(resourceUuid)).thenReturn(Optional.empty());
     when(aliasService.resolveMaterialByAlias(MaterialExternalAliasSource.SCWIKI, "Agricium"))

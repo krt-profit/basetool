@@ -98,6 +98,19 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
       @Param("seenScwikiUuids") Collection<UUID> seenScwikiUuids, @Param("now") Instant now);
 
   /**
+   * Counts the live (non-soft-deleted) blueprints — every {@code Blueprint} carries a {@code
+   * scwiki_uuid} (its upsert key), so {@code scwiki_deleted_at IS NULL} is the whole live
+   * population {@link #markScwikiDeleted} maintains. The R4 blueprint sync reports this as the
+   * representative non-zero count when the Wiki blueprint list comes back {@code 304 Not Modified},
+   * so a fully-cached healthy run is not read as a zero-item outage by {@code SyncZeroItems}
+   * (#1182).
+   *
+   * @return the number of non-tombstoned blueprints
+   */
+  @Query("SELECT COUNT(b) FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL")
+  long countLiveScwikiBlueprints();
+
+  /**
    * Unfiltered page of active (non-soft-deleted) blueprints for the admin blueprint page when no
    * search term is supplied. Kept separate from {@link #searchActive(String, Pageable)} so the
    * common no-filter load stays a plain indexed predicate and never binds a {@code null} into a

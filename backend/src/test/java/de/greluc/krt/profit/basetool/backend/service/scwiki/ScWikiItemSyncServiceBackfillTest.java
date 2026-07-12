@@ -102,6 +102,14 @@ class ScWikiItemSyncServiceBackfillTest {
             self);
     lenient().when(self.getObject()).thenReturn(service);
     lenient().when(syncReportService.beginRun()).thenReturn(UUID.randomUUID());
+    // fetchAllPagesResult returns a FetchResult record (not a List), so Mockito's unstubbed default
+    // is null rather than an empty list. Restore the old "unstubbed endpoint -> empty page"
+    // behaviour that stubPass relies on: Mode B pages every kind endpoint, and a test stubs only
+    // the
+    // one(s) it cares about — the rest must resolve to an empty, non-304 page, not NPE (#1182).
+    lenient()
+        .when(scWikiClient.fetchAllPagesResult(any(), any(), any(), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of()));
   }
 
   // ---- mode selection -------------------------------------------------------------------------
@@ -114,7 +122,7 @@ class ScWikiItemSyncServiceBackfillTest {
 
     // Mode B walks list endpoints; it must never fall back to the per-UUID closure fetch.
     verify(scWikiClient, never()).fetchOne(any(), any(), any());
-    verify(scWikiClient).fetchAllPages(eq(WEAPONS), any(), any(), any(), any());
+    verify(scWikiClient).fetchAllPagesResult(eq(WEAPONS), any(), any(), any(), any());
   }
 
   @Test
@@ -128,7 +136,7 @@ class ScWikiItemSyncServiceBackfillTest {
     service.syncItems();
 
     verify(scWikiClient).fetchOne(eq(ITEMS + "/" + uuid), eq(ScWikiItemDto.class), any());
-    verify(scWikiClient, never()).fetchAllPages(any(), any(), any(), any(), any());
+    verify(scWikiClient, never()).fetchAllPagesResult(any(), any(), any(), any(), any());
   }
 
   @Test
@@ -137,8 +145,26 @@ class ScWikiItemSyncServiceBackfillTest {
 
     service.syncItems();
 
-    verify(scWikiClient, never()).fetchAllPages(any(), any(), any(), any(), any());
+    verify(scWikiClient, never()).fetchAllPagesResult(any(), any(), any(), any(), any());
     verify(scWikiClient, never()).fetchOne(any(), any(), any());
+  }
+
+  @Test
+  void backfill_everyPassNotModified_reportsLiveCount_andSkipsSweep() {
+    // Every kind endpoint + the residual /api/items come back 304 (unchanged) — a fully-cached,
+    // healthy backfill that upserts nothing. It must report the live Wiki-linked game_item count,
+    // NOT 0, so an all-304 run is not read as a zero-item outage (#1182). A genuine empty-200 (no
+    // 304) still reports 0 and correctly fires.
+    when(scWikiClient.fetchAllPagesResult(any(), any(), any(), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.unchanged());
+    when(gameItemRepository.countLiveScwikiItems()).thenReturn(9000L);
+
+    int written = service.syncItems();
+
+    assertEquals(9000, written, "an all-304 backfill must report the live item count, not 0");
+    verify(gameItemRepository, never()).save(any());
+    // A 304 pass never enumerates the pool, so the cross-kind orphan sweep stays suppressed.
+    verify(gameItemRepository, never()).markScwikiDeletedExcept(any(), any());
   }
 
   // ---- per-endpoint kind derivation + WIKI_ONLY creation ---------------------------------------
@@ -235,8 +261,10 @@ class ScWikiItemSyncServiceBackfillTest {
     UUID weaponUuid = UUID.randomUUID();
     // Armor comes back pool-sized (3 > cap 2) — the §3.4 full-pool quirk; it must be skipped whole.
     lenient()
-        .when(scWikiClient.fetchAllPages(eq(ARMOR), any(), any(), any(), any()))
-        .thenReturn(List.of(itemDto(a, "A"), itemDto(b, "B"), itemDto(c, "C")));
+        .when(scWikiClient.fetchAllPagesResult(eq(ARMOR), any(), any(), any(), any()))
+        .thenReturn(
+            ScWikiClient.FetchResult.of(
+                List.of(itemDto(a, "A"), itemDto(b, "B"), itemDto(c, "C"))));
     stubPass(WEAPONS, itemDto(weaponUuid, "Rifle"));
     when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
 
@@ -342,8 +370,10 @@ class ScWikiItemSyncServiceBackfillTest {
     UUID deadlocked = UUID.randomUUID();
     UUID healthy = UUID.randomUUID();
     lenient()
-        .when(scWikiClient.fetchAllPages(eq(WEAPONS), any(), any(), any(), any()))
-        .thenReturn(List.of(itemDto(deadlocked, "Bad Rifle"), itemDto(healthy, "Good Rifle")));
+        .when(scWikiClient.fetchAllPagesResult(eq(WEAPONS), any(), any(), any(), any()))
+        .thenReturn(
+            ScWikiClient.FetchResult.of(
+                List.of(itemDto(deadlocked, "Bad Rifle"), itemDto(healthy, "Good Rifle"))));
     when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
     when(gameItemRepository.save(any(GameItem.class)))
         .thenAnswer(
@@ -440,8 +470,10 @@ class ScWikiItemSyncServiceBackfillTest {
     when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
     when(gameItemRepository.findById(uexRowId)).thenReturn(Optional.of(uexRow));
     lenient()
-        .when(scWikiClient.fetchAllPages(eq(VEHICLE_ITEMS), any(), any(), any(), any()))
-        .thenReturn(List.of(itemDto(firstWiki, "Cooler"), itemDto(secondWiki, "Cooler")));
+        .when(scWikiClient.fetchAllPagesResult(eq(VEHICLE_ITEMS), any(), any(), any(), any()))
+        .thenReturn(
+            ScWikiClient.FetchResult.of(
+                List.of(itemDto(firstWiki, "Cooler"), itemDto(secondWiki, "Cooler"))));
 
     service.syncItems();
 
@@ -463,8 +495,8 @@ class ScWikiItemSyncServiceBackfillTest {
     // Lenient: Mode B always pages every endpoint, so the per-endpoint stubs that a given test does
     // not exercise (other kinds return the default empty list) must not trip strict stubbing.
     lenient()
-        .when(scWikiClient.fetchAllPages(eq(endpoint), any(), any(), any(), any()))
-        .thenReturn(List.of(row));
+        .when(scWikiClient.fetchAllPagesResult(eq(endpoint), any(), any(), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(row)));
   }
 
   /**

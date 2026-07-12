@@ -79,8 +79,12 @@ import org.springframework.web.util.UriUtils;
  *
  * <p>Orphan handling: rows whose {@code uex_item_id} no longer appears in any category response get
  * their {@code uex_deleted_at} stamped via {@link
- * GameItemRepository#markUexDeletedExcept(java.util.Collection, Instant)}. The sweep is gated on a
- * non-empty seen-id set so a sync that fails on every category never wipes the local catalogue.
+ * GameItemRepository#markUexDeletedExcept(java.util.Collection, Instant)}. The sweep is gated twice
+ * so it never wipes a still-present item: it is skipped when the seen-id set is empty (a sync that
+ * fetched nothing) AND when any category came back {@code 304 Not Modified} (the seen-id set is
+ * then an incomplete view of the catalogue — a cached category's items are missing from it only
+ * because they were not re-fetched, so sweeping would soft-delete every unchanged item). Orphans
+ * are reconciled on the next run that fetches every category fresh.
  *
  * <p><strong>Per-item isolation (REQ-DATA-004).</strong> Each item is upserted in its own {@code
  * REQUIRES_NEW} transaction via {@link #upsertItemWithinTransaction(UexItemDto, UexCategory,
@@ -127,7 +131,17 @@ public class UexItemSyncService {
    * while the sweep still "succeeds" is visible through the {@code SyncZeroItems} alert (#1041 item
    * 2).
    *
-   * @return the number of {@code game_item} rows upserted across all categories this run
+   * <p><strong>Unchanged-catalogue carve-out.</strong> {@link UexClient} does conditional GETs:
+   * when the whole item catalogue is unchanged every category returns {@code 304 Not Modified}, so
+   * the run legitimately upserts nothing. That healthy no-op must NOT read as the empty-200 outage
+   * the alert targets, so when nothing was upserted but at least one category was served from the
+   * {@code 304} cache this returns the live catalogue size ({@link
+   * GameItemRepository#countLiveUexItems()}) to keep the items metric non-zero. A genuine empty-200
+   * outage (no {@code 304} at all) still returns {@code 0} and correctly trips the alert.
+   *
+   * @return the number of {@code game_item} rows upserted across all categories this run, or — when
+   *     nothing was upserted because the catalogue came back unchanged ({@code 304}) — the live UEX
+   *     catalogue size
    */
   @Transactional
   public int syncItems() {
@@ -142,6 +156,7 @@ public class UexItemSyncService {
     int itemsProcessed = 0;
     int itemsCreated = 0;
     int sharedUuidDeclined = 0;
+    boolean anyCategoryUnchanged = false;
     Instant now = Instant.now();
 
     for (UexCategory category : categories) {
@@ -151,7 +166,21 @@ public class UexItemSyncService {
       if (!"item".equalsIgnoreCase(category.getType())) {
         continue;
       }
-      List<UexItemDto> dtos = uexClient.getItemsForCategory(category.getId());
+      UexClient.FetchResult<UexItemDto> fetched = uexClient.getItemsForCategory(category.getId());
+      if (fetched.notModified()) {
+        // UEX served this category from the conditional-GET cache (304 Not Modified): its items are
+        // unchanged since the last sync — a HEALTHY no-op, not an empty catalogue. Remember it so a
+        // fully-cached run still reports a non-zero item tally (see the return below); reporting 0
+        // would be indistinguishable from the empty-200 outage the SyncZeroItems alert targets.
+        anyCategoryUnchanged = true;
+        log.debug(
+            "UEX category {} ({}/{}) unchanged since last sync (304 Not Modified)",
+            category.getId(),
+            category.getSection(),
+            category.getName());
+        continue;
+      }
+      List<UexItemDto> dtos = fetched.data();
       if (dtos.isEmpty()) {
         log.debug(
             "No items received for UEX category {} ({}/{})",
@@ -192,6 +221,20 @@ public class UexItemSyncService {
       log.warn(
           "Skipping orphan sweep — no UEX item was processed across {} category response(s).",
           categoriesProcessed);
+    } else if (anyCategoryUnchanged) {
+      // At least one category was served from the 304 cache, so seenUexItemIds is an INCOMPLETE
+      // view
+      // of the catalogue: a cached category's items are absent from it only because they were not
+      // re-fetched, NOT because UEX dropped them. Running markUexDeletedExcept now would
+      // soft-delete
+      // every still-present item in every unchanged category. Defer the sweep to a run that fetched
+      // all categories fresh (e.g. after a restart repopulates the ETag cache), where the seen-set
+      // is complete — orphan detection is delayed but never wrongly deletes a cached item.
+      log.debug(
+          "Skipping orphan sweep — {} item(s) seen but at least one category was unchanged (304),"
+              + " so the seen-set is incomplete and a sweep could wrongly soft-delete cached"
+              + " items.",
+          seenUexItemIds.size());
     } else {
       marked = gameItemRepository.markUexDeletedExcept(seenUexItemIds, now);
       if (marked > 0) {
@@ -228,6 +271,23 @@ public class UexItemSyncService {
                 marked,
                 sharedUuidDeclined));
     syncReportService.pruneRuns(SyncSourceSystem.UEX);
+
+    // basetool_scheduled_job_items_total (SyncZeroItems, #1041 item 2) must stay non-zero on a
+    // HEALTHY run. When the whole item catalogue is unchanged, every category comes back 304 and
+    // the
+    // run upserts nothing — so the raw upsert tally (0) would look exactly like the empty-200
+    // catalogue outage the alert targets. When at least one category was served from the 304 cache
+    // and nothing was upserted, report the live catalogue size instead; a genuine empty-200 (no 304
+    // at all) still reports 0 and correctly trips the alert.
+    if (itemsProcessed == 0 && anyCategoryUnchanged) {
+      long liveCatalogue = gameItemRepository.countLiveUexItems();
+      log.info(
+          "UEX item sync upserted no rows but the catalogue was unchanged (at least one category"
+              + " returned 304 Not Modified) — reporting live catalogue size {} for the items"
+              + " metric instead of 0.",
+          liveCatalogue);
+      return (int) liveCatalogue;
+    }
     return itemsProcessed;
   }
 
