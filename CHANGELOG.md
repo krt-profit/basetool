@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Monitoring: Neuer Alarm `ContainerPidsHigh` warnt, bevor ein Container sein Task-Limit (cgroup-`pids`) erschöpft.** Beim Ingest-Vorfall am 12.07.2026 füllte sich das 2048er-`pids`-Limit durch nicht abgeräumte Healthcheck-Zombie-Prozesse, während die JVM-Thread-Metrik flach blieb — daher schlug `JvmThreadsHigh` nicht an und nur der Absturz danach meldete sich. Ergänzend zur Ursachenbehebung (`init: true`, REQ-OPS-019) überwacht der neue Alarm die cAdvisor-Metrik `container_threads` (>80 % = 1638 der 2048er-Grenze) für die vier JVM-Container backend/frontend/ingest/keycloak und fängt so jede künftige `pids`-Erschöpfung ab; dafür wird die cAdvisor-`process`-Metrikgruppe aktiviert (REQ-OBS-014).
+
 ### Fixed
 
 - **Ingest-Gateway (Ein-Klick-Import) stürzt nicht mehr nach ~17 h Laufzeit ab.** Der HTTPS-Healthcheck der JVM-Dienste erzeugte über BusyBox-`wget` alle 30 s einen nicht abgeräumten `ssl_client`-Zombie-Prozess; da die JVM als PID 1 lief und Waisen nicht abräumt, füllte sich der `pids`-Cgroup-Grenzwert (2048) nach rund 17 h und die JVM konnte keine Threads mehr anlegen — Absturz, Neustart-Schleife und Alarm-Mails. Backend, Frontend und Ingest laufen jetzt mit `init: true` (tini als PID 1 räumt die Zombies ab; REQ-OPS-019).
