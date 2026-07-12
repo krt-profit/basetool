@@ -590,8 +590,13 @@ OAuth2 success/failure handlers: `outcome` = `success` / `failure`; on failure `
 `invalid_state` / `provider_error` / `other`, **mapped from the exception type and bounded OAuth2
 error code — never the raw error description**; on success `reason` = `none`) and the unlabelled
 `basetool_csrf_rejections_total` (a custom `AccessDeniedHandler` counts CSRF-token rejections before
-the 403). They drive `FrontendLoginBroken` (failures with zero concurrent successes — the
-code-to-token / JWKS / state break `KeycloakLoginErrorSpike`'s event regex misses) and
+the 403). They drive `FrontendLoginBroken` (>= 3 `reason="provider_error"` failures in 15m with zero
+concurrent successes, sustained 10m — the code-to-token / JWKS / bad-IdP-response break
+`KeycloakLoginErrorSpike`'s event regex misses because it fails *after* the user already authenticated
+at Keycloak; the failure side is scoped to `provider_error` and floored so the benign `invalid_state`
+noise — unauthenticated bots hitting the OAuth callback, abandoned / expired-state logins — cannot trip
+it when fresh successes are naturally sparse under the 30-day login window, and a state/session-loss
+break surfaces as `invalid_state` and via the `redis` readiness indicator instead) and
 `CsrfRejectionSpike` (a systematic CSRF-wiring regression that `krtFetch`'s silent single-retry
 otherwise masks as intermittent failed writes). The pre-auth `BotProtectionFilter` adds
 `basetool_bot_blocked_total{rule}` (#1041 item 19; `rule` = `method` / `path_prefix` /
