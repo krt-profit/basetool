@@ -3,14 +3,26 @@
 groups:
   - name: infrastructure-critical
     rules:
+      # Scoped OFF the 11 blackbox /probe jobs (blackbox-http*, -edge-deny, -force-ssl, -hsts,
+      # -internal-tls*, -dns-*). On a /probe job `up==0` does NOT mean the probed target is down — it
+      # means the Prometheus->exporter scrape itself timed out, because the blackbox module timeout
+      # equalled scrape_timeout (2026-07-12 false-critical: blackbox-internal-tls + blackbox-http-ipv6
+      # paged critical for backend/frontend/ingest + all three public hosts at once, while every
+      # service was healthy). Those probes now carry scrape_timeout:15s, and a genuine failure surfaces
+      # FAST as `probe_success==0` (up stays 1) via the dedicated probe alerts — BlackboxProbeFailed,
+      # EdgeActuatorDenyBroken, EdgeForceSslRedirectBroken, EdgeHstsHeaderMissing, EdgeIpv6Unreachable,
+      # DnsResolutionFailed, CertificateExpiringSoon — and app-down liveness for the internal-tls
+      # targets is already paged by the basetool-backend/frontend/ingest scrape jobs. The `!~` regex
+      # KEEPS the blackbox-exporter self-scrape (the exporter's own /metrics liveness) and every
+      # non-probe job in scope. REQ-OBS-008/-012.
       - alert: TargetDown
-        expr: up == 0
+        expr: up{job!~"blackbox-(http|edge|force|hsts|internal|dns).*"} == 0
         for: 3m
         labels:
           severity: critical
         annotations:
           summary: "Scrape target down: {{ $labels.job }}"
-          description: "Prometheus cannot scrape {{ $labels.job }} / {{ $labels.instance }} for 3 minutes. For scratch-image monitoring services this is their only liveness signal."
+          description: "Prometheus cannot scrape {{ $labels.job }} / {{ $labels.instance }} for 3 minutes. For scratch-image monitoring services this is their only liveness signal. (Blackbox /probe jobs are excluded — their real failures page via probe_success alerts, not this one.)"
 
       # Scoped to the two liveness jobs (blackbox-http + the 401-accepting blackbox-http-auth):
       # the deny/posture jobs (blackbox-edge-deny/-force-ssl/-hsts, REQ-OBS-012) have their own
