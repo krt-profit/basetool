@@ -91,7 +91,12 @@ services:
   grafana:
     <<: *mon-base
     container_name: grafana
-    image: grafana/grafana-oss:13.1.0
+    # OSS variant (README/runbook posture). grafana/grafana-oss can lag the Enterprise `grafana/grafana`
+    # repo on patch tags: 13.1.0 exists ONLY for grafana/grafana, so a Dependabot bump to
+    # grafana-oss:13.1.0 pinned a tag that does not exist and broke every Grafana `--force-recreate`
+    # ("not found"). Pin to the newest tag actually published for grafana-oss (13.0.2); do NOT switch to
+    # grafana/grafana. Dependabot advances this forward once the OSS repo publishes a newer tag.
+    image: grafana/grafana-oss:13.0.2
     cap_drop: [ALL]
     environment:
       GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-https://grafana.profit-base.online/}
@@ -166,6 +171,15 @@ services:
     image: grafana/loki:3.7.3
     cap_drop: [ALL]
     command: -config.file=/etc/loki/loki-config.yml
+    # Docker's default 10s stop-grace SIGKILLs Loki ~20s into its dskit graceful shutdown
+    # (server.graceful_shutdown_timeout default 30s; loki-config.yml does not override it),
+    # truncating the ingester's chunk flush / WAL and forcing a replay — with possible loss of
+    # recently-ingested log lines — on the next start. A `deploy.sh --force-recreate loki` (the
+    # routine way to apply a loki-config.yml change past the inode-pinned single-file bind mount)
+    # hits exactly this. 45s clears the 30s drain with margin; mirrors the tempo grace below and
+    # the app-compose DB(60s)/JVM(30s) grace periods (ADR-0072 amendment 2026-07-12). Prometheus
+    # is deliberately left on the 10s default (crash-safe WAL replay by design).
+    stop_grace_period: 45s
     volumes:
       - ./monitoring/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
       - ./monitoring/loki/rules:/etc/loki/rules:ro
@@ -203,6 +217,13 @@ services:
       # Consumed by the metrics-generator remote_write basic_auth (reuses the Prometheus `grafana`
       # web-auth user — owner decision, #1041 item 22a). Same value Grafana uses for its datasource.
       PROMETHEUS_WEB_PASSWORD: ${PROMETHEUS_WEB_PASSWORD:?PROMETHEUS_WEB_PASSWORD must be set for the monitoring stack}
+    # Same 10s-default < 30s-drain mismatch as Loki above: Docker's default 10s stop-grace
+    # SIGKILLs Tempo ~20s into its dskit graceful shutdown (server.graceful_shutdown_timeout
+    # default 30s; tempo.yaml does not override it), truncating the live-store WAL and forcing a
+    # replay on restart — the failure mode behind the 2026-07-12 TempoWritePathFailing incident,
+    # since a `--force-recreate tempo` mid-flush is the routine config-apply path. 45s clears the
+    # drain (ADR-0072 amendment 2026-07-12).
+    stop_grace_period: 45s
     volumes:
       - ./monitoring/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
       - /var/iri/monitoring/data/tempo:/var/tempo
