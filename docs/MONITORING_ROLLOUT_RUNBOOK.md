@@ -241,6 +241,8 @@ echo "prometheus-web.yml written; hash: ${BCRYPT:0:7}..."
 
 > Sanity: the hash must start with `$2y$10$` (htpasswd) or `$2b$10$` (python bcrypt). If your shell
 > ate the `$` signs, re-run inside single quotes or paste the hash by hand.
+>
+> **Changing this file on a running stack needs a container recreate, not a reload.** Like `prometheus.yml`, `prometheus-web.yml` is a single-file bind mount: replacing it on the host creates a new inode while the container mount stays pinned to the old one, so Prometheus keeps validating the bcrypt hash it loaded at start. After changing this file (or rotating the password) `--force-recreate` **both** Prometheus and every basic-auth client that reuses the `grafana` credential — Tempo's metrics-generator remote_write and Grafana's Prometheus datasource — otherwise the server rejects the *correct* password with 401 and a client can wedge on the cached 401 (symptom: `TempoGeneratorRemoteWriteFailing` firing while `PROMETHEUS_WEB_PASSWORD` still matches the secret file on disk). Fix: `docker compose -p iri-monitoring -f /var/iri/code/docker-compose.monitoring.yml up -d --force-recreate prometheus tempo grafana`.
 
 ### 3.5 `alertmanager.yml` — rendered from the template with `envsubst`
 

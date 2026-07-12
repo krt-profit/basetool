@@ -91,7 +91,12 @@ services:
   grafana:
     <<: *mon-base
     container_name: grafana
-    image: grafana/grafana-oss:13.1.0
+    # OSS variant (README/runbook posture). grafana/grafana-oss can lag the Enterprise `grafana/grafana`
+    # repo on patch tags: 13.1.0 exists ONLY for grafana/grafana, so a Dependabot bump to
+    # grafana-oss:13.1.0 pinned a tag that does not exist and broke every Grafana `--force-recreate`
+    # ("not found"). Pin to the newest tag actually published for grafana-oss (13.0.2); do NOT switch to
+    # grafana/grafana. Dependabot advances this forward once the OSS repo publishes a newer tag.
+    image: grafana/grafana-oss:13.0.2
     cap_drop: [ALL]
     environment:
       GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-https://grafana.profit-base.online/}

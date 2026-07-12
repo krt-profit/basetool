@@ -295,8 +295,9 @@ Tracing on the OTel SDK) behind a hard master gate:
   processor → Prometheus `remote_write` (#1041 item 22a, ADR-0076 amendment): it authenticates as the
   shared `grafana` web-auth user (Tempo runs `-config.expand-env`), Prometheus adds
   `--web.enable-remote-write-receiver`, cardinality is capped by `max_active_series`, and
-  `TempoGeneratorRemoteWriteFailing` / `TempoGeneratorSeriesLimited` alert on a credential drift or a
-  cardinality-cap hit. Span-metrics remote-write stays a non-goal.
+  `TempoGeneratorRemoteWriteFailing` / `TempoGeneratorSeriesLimited` alert on a credential or
+  stale-loaded-config drift (a `prometheus-web.yml` change not picked up until Prometheus/Tempo are
+  recreated) or a cardinality-cap hit. Span-metrics remote-write stays a non-goal.
 
 ### REQ-OBS-010 — Edge / host-auth log streams: 31-day IP retention + privacy-policy linkage
 
@@ -381,12 +382,20 @@ transaction per pass) rather than per-scrape.
   > (`business_metrics`, > 10 min); it is registered lazily so a config-gated-off job never reports a
   > falsely-stale `0`. The items counter is present only for jobs that report a count: user sync,
   > notification retention, default-blueprint provisioning, and — since #1041 item 2 — `uex_sync` (the
-  > `UexItemSyncService` `game_item` upsert tally) and `scwiki_sync` (the sum of the five SC-Wiki step
+  > `UexItemSyncService` `game_item` upsert tally, with the unchanged-catalogue carve-out below) and
+  > `scwiki_sync` (the sum of the five SC-Wiki step
   > counts, a failing step contributing `0`). For the two catalogue syncs it is populated from the same
   > per-run tallies the sync-report summary uses and backs the `SyncZeroItems` alert, which fires when
   > a sync keeps succeeding but has processed zero rows for 48 h — the empty-200 catalogue outage that
   > neither `ExternalSyncStale` (last-success stays fresh) nor `ExternalFetchErrors` (an empty 200 is
-  > not a fetch error) catches. The same success-with-zero-work idea backs `UserSyncZeroItems`
+  > not a fetch error) catches. **Unchanged-catalogue carve-out (`uex_sync`):** `UexClient` does
+  > conditional GETs, so when the whole item catalogue is unchanged every category returns `304 Not
+  > Modified` and the run upserts nothing — a healthy no-op indistinguishable from an empty-200 outage
+  > by the raw upsert tally alone. To stop that false `SyncZeroItems` firing, `UexItemSyncService`
+  > reports the live catalogue size (`GameItemRepository.countLiveUexItems()`) instead of `0` when
+  > nothing was upserted but at least one category was served from the `304` cache; a genuine
+  > empty-200 (no `304` at all) still reports `0` and correctly trips the alert. The same
+  > success-with-zero-work idea backs `UserSyncZeroItems`
   > (`user_sync` synced zero users for 30 min while successful runs happened — Keycloak returned an
   > empty roster; #1041 item 3).
 
