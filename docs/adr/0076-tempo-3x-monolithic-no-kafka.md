@@ -130,3 +130,27 @@ status (a failed DB/outbound span that didn't surface as 5xx) — but that broad
 the **Error traces** Tempo table. `local-blocks` remains the option if per-span-level RED
 (DB/outbound/ad-hoc grouping, client-perceived latency) is ever wanted, at the documented memory cost.
 
+## Amendment 2026-07-12 — the live-store needs a graceful-shutdown window (`stop_grace_period: 45s`)
+
+The 3.x rewrite moved the write path into the **live-store**, which holds recent traces in memory and,
+on SIGTERM, flushes them to its local WAL and finishes cutting in-flight blocks as part of Tempo's
+dskit graceful shutdown (`server.graceful_shutdown_timeout`, default **30s**; Tempo's shutdown
+"always takes at least 30 seconds", grafana/tempo#2353). The monitoring compose set **no**
+`stop_grace_period`, so Docker's **10s** default applied — a `docker compose up -d --force-recreate
+tempo` (deploy.sh's routine way to apply a `tempo.yaml` change past the inode-pinned single-file bind
+mount) **SIGKILLed Tempo ~20s into its 30s drain**, truncating the live-store WAL mid-flush. On the
+next start the partial block fails to complete/flush, incrementing
+`tempo_live_store_failed_completions_total` / `tempo_live_store_local_failed_flushes_total` and firing
+**`TempoWritePathFailing`** ("accepted traces lost before a persisted block") until Tempo discards the
+bad block and self-heals — a self-resolving warning with **no** `ContainerOomKilled` / `HostDisk*`
+co-alert. Observed in prod on 2026-07-12, right after the remote_write-401 fix force-recreated Tempo.
+
+**Fix:** `tempo` gets an explicit `stop_grace_period: 45s` (docker-compose.monitoring.yml) — comfortably
+above the 30s internal drain with disk-flush headroom, and (because Docker stops the instant the
+process exits) a ceiling rather than a fixed wait, so routine force-recreates cost no extra time.
+This mirrors the app stack's existing explicit grace periods (docker-compose.yml: DBs 60s, JVM apps
+30s); the monitoring plane simply never carried them. No `live_store:` config block is added — its WAL
+already defaults under the mounted `/var/tempo/live-store/traces`, and the corruption window was the
+truncated shutdown, not the path. Loki (the other Grafana dskit store on the same 10s default) shares
+the pattern; left as a scoped follow-up since it did not alert.
+

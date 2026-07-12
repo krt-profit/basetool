@@ -207,6 +207,11 @@ groups:
 
       # 3.x write-path health (replaces the removed 2.x ingester metrics): live-store blocks failing to
       # complete or flush locally means accepted traces are lost before they reach a backend block.
+      # Most common (self-resolving) cause: an UNGRACEFUL restart truncated the live-store WAL. A
+      # `--force-recreate tempo` (deploy.sh's inode-pin config-apply) SIGKILLs Tempo before its 30s
+      # dskit drain finishes if the container grace is too short — the compose now sets
+      # stop_grace_period: 45s to prevent that (docker-compose.monitoring.yml, ADR-0076). A firing here
+      # with no ContainerOomKilled / HostDisk* co-alert is almost always that restart transient.
       - alert: TempoWritePathFailing
         expr: sum(increase(tempo_live_store_failed_completions_total[15m])) > 0 or sum(increase(tempo_live_store_local_failed_flushes_total[15m])) > 0
         for: 5m
@@ -214,7 +219,7 @@ groups:
           severity: warning
         annotations:
           summary: "Tempo live-store write path failing"
-          description: "Tempo's live-store failed to complete or locally flush blocks in the last 15 minutes — accepted traces are being lost before they reach a persisted block. Check the Tempo log, disk space and I/O on the trace volume."
+          description: "Tempo's live-store failed to complete or locally flush blocks in the last 15 minutes — accepted traces are being lost before they reach a persisted block. If this coincides with a Tempo restart/force-recreate and no ContainerOomKilled/HostDisk* alert, it is the ungraceful-shutdown WAL-truncation transient (self-heals; the 45s stop_grace_period is the fix). Otherwise check the Tempo log (Loki app=\"mon-tempo\"), disk space and I/O on the trace volume."
 
       # (#1041 item 22a) Metrics-generator remote_write to Prometheus is failing — the service-graph
       # series (traces_service_graph_*) are not reaching Prometheus, so the Grafana serviceMap/nodeGraph

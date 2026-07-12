@@ -208,6 +208,19 @@ services:
       - /var/iri/monitoring/data/tempo:/var/tempo
     # No Docker healthcheck: the Tempo image is distroless (no shell/wget) — same rationale as Loki.
     # Liveness = the Prometheus `up` metric on the tempo scrape target (meta-monitoring).
+    # Graceful-shutdown window. Tempo's dskit server drains on SIGTERM up to its own
+    # `server.graceful_shutdown_timeout` (default 30s; grafana/tempo#2353 — shutdown "always takes at
+    # least 30 seconds"), during which the 3.x LIVE-STORE flushes in-memory traces to its WAL and
+    # finishes cutting in-flight blocks. Docker's DEFAULT `stop_grace_period` is only 10s, so a plain
+    # `docker compose up -d --force-recreate tempo` — deploy.sh's routine way to apply a tempo.yaml
+    # change past the inode-pinned single-file bind mount — SIGKILLs Tempo ~20s into that drain,
+    # truncating the live-store WAL mid-flush. The next start then fails to complete/flush that partial
+    # block, incrementing tempo_live_store_failed_completions_total / _local_failed_flushes_total and
+    # firing TempoWritePathFailing (accepted traces lost before a persisted block) until Tempo discards
+    # the bad block and self-heals. 45s clears the 30s internal drain with disk-flush headroom (Docker
+    # stops the moment Tempo exits, so this is a ceiling, not a fixed wait). Mirrors the app stack's
+    # explicit grace periods (docker-compose.yml: DBs 60s, JVM apps 30s). See ADR-0076.
+    stop_grace_period: 45s
     deploy:
       resources:
         limits:
