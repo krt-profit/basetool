@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -75,6 +76,14 @@ class LiveSyncWebSocketHandlerTest {
   private SimpleMeterRegistry registry;
   private LiveSyncSubscriptionAuthorizer authorizer;
 
+  /**
+   * Frozen monotonic clock the handler's token buckets read, so a burst never refills mid-test.
+   * Keeping it fixed makes the throttle assertions exact (relayed count == the burst) instead of
+   * tolerating wall-clock refill, which flakes under CI load. Tests that need time to pass advance
+   * it explicitly.
+   */
+  private AtomicLong nanoClock;
+
   @BeforeEach
   void setUp() {
     registry = new SimpleMeterRegistry();
@@ -82,6 +91,7 @@ class LiveSyncWebSocketHandlerTest {
     objectMapper = JsonMapper.builder().build();
     fanout = new CapturingFanout();
     authorizer = mock(LiveSyncSubscriptionAuthorizer.class);
+    nanoClock = new AtomicLong();
     // Default: authorize any subscribe. Individual tests override to DENY where they need it. The
     // executor is direct (Runnable::run) so an async subscribe-authorize completes synchronously in
     // the test thread — the saturation path uses a throwing executor instead.
@@ -89,7 +99,7 @@ class LiveSyncWebSocketHandlerTest {
         .thenReturn(LiveSyncSubscriptionAuthorizer.Decision.ALLOW);
     handler =
         new LiveSyncWebSocketHandler(
-            service, fanout, objectMapper, registry, authorizer, Runnable::run);
+            service, fanout, objectMapper, registry, authorizer, Runnable::run, nanoClock::get);
   }
 
   @Test
@@ -263,20 +273,16 @@ class LiveSyncWebSocketHandlerTest {
     bob.sent.clear();
     FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
 
-    // Emit far more than the per-session burst in a tight synchronous loop (well under one token's
-    // refill interval), simulating a crafted flooding client.
+    // Emit far more than the per-session burst, simulating a crafted flooding client. The clock is
+    // frozen (see nanoClock), so the bucket never refills mid-loop and exactly the burst passes.
     int emitted = LiveSyncWebSocketHandler.CHANGED_BURST + 40;
     for (int i = 0; i < emitted; i++) {
       handler.handleTextMessage(alice, changedFrame(topic, "crew"));
     }
 
-    // The token bucket caps relayed frames at the burst (a negligible refill may add at most ~1),
-    // so
-    // the peer receives far fewer frames than were emitted.
-    assertThat(bob.sent.size())
-        .isGreaterThan(0)
-        .isLessThanOrEqualTo(LiveSyncWebSocketHandler.CHANGED_BURST + 1)
-        .isLessThan(emitted);
+    // The token bucket caps relayed frames at exactly the burst, so the peer receives far fewer
+    // frames than were emitted.
+    assertThat(bob.sent.size()).isEqualTo(LiveSyncWebSocketHandler.CHANGED_BURST);
   }
 
   @Test
@@ -828,12 +834,13 @@ class LiveSyncWebSocketHandlerTest {
     }
     int emitted = publishers * perPublisher;
 
-    // The room's relayed frames are capped near the per-topic burst (a negligible refill may add a
-    // few), far below the total emitted; the overflow is counted as topic_throttled.
-    assertThat(subscriber.sent.size())
-        .isGreaterThan(0)
-        .isLessThanOrEqualTo(LiveSyncWebSocketHandler.TOPIC_CHANGED_BURST + 5)
-        .isLessThan(emitted);
+    // The room's relayed frames are capped at exactly the per-topic burst — the clock is frozen
+    // (see
+    // nanoClock) so the bucket never refills across the publishers — far below the total emitted;
+    // the
+    // overflow is counted as topic_throttled.
+    assertThat(emitted).isGreaterThan(LiveSyncWebSocketHandler.TOPIC_CHANGED_BURST);
+    assertThat(subscriber.sent.size()).isEqualTo(LiveSyncWebSocketHandler.TOPIC_CHANGED_BURST);
     assertThat(dropCounter(MetricNames.DROPPED_TOPIC_THROTTLED, "operation")).isGreaterThan(0.0);
   }
 
@@ -848,7 +855,7 @@ class LiveSyncWebSocketHandlerTest {
     // Reaping with a clock well past the idle window drops the idle bucket; recreating it full on
     // the next publish is behaviourally identical, so the map stays bounded to active rooms.
     handler.reapIdleTopicBuckets(
-        System.nanoTime() + LiveSyncWebSocketHandler.TOPIC_BUCKET_IDLE_REAP_NANOS * 3);
+        nanoClock.get() + LiveSyncWebSocketHandler.TOPIC_BUCKET_IDLE_REAP_NANOS * 3);
     assertThat(handler.topicBucketCount()).isZero();
   }
 

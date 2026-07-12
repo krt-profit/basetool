@@ -42,6 +42,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.LongSupplier;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -274,6 +275,15 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   private final LiveSyncSubscriptionAuthorizer authorizer;
   private final Executor authExecutor;
 
+  /**
+   * Monotonic nanosecond clock backing every token-bucket refill and the idle-bucket reaper.
+   * Production wires {@link System#nanoTime()}; the throttle tests inject a frozen/steppable
+   * supplier so a burst's refill is deterministic (real wall-clock elapsed during the emit loop
+   * otherwise refills a few tokens and makes an exact per-topic-burst assertion flaky under CI
+   * load).
+   */
+  private final LongSupplier nanoClock;
+
   private final Map<String, Set<WebSocketSession>> sessionsByTopic = new ConcurrentHashMap<>();
 
   /**
@@ -312,12 +322,48 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       @NotNull MeterRegistry meterRegistry,
       @NotNull LiveSyncSubscriptionAuthorizer authorizer,
       @NotNull Executor authExecutor) {
+    this(
+        presenceService,
+        fanout,
+        objectMapper,
+        meterRegistry,
+        authorizer,
+        authExecutor,
+        System::nanoTime);
+  }
+
+  /**
+   * Test seam of {@link #LiveSyncWebSocketHandler(LiveSyncPresenceService, LiveSyncFanout,
+   * ObjectMapper, MeterRegistry, LiveSyncSubscriptionAuthorizer, Executor)} that additionally
+   * injects the monotonic {@code nanoClock} backing the token-bucket refills and idle-bucket
+   * reaper, so a throttle test can freeze time and assert an exact per-topic-burst bound rather
+   * than tolerating wall-clock refill. Behaviour is otherwise identical.
+   *
+   * @param presenceService in-memory editor-presence store
+   * @param fanout cross-replica fan-out seam (no-op when single-instance)
+   * @param objectMapper Jackson mapper for the minimal {@code {type, sections}} wire format
+   * @param meterRegistry the Micrometer registry the gauges and relay counters bind to
+   * @param authorizer authorizes a multiplexed {@code /ws/sync} subscribe to a resource topic
+   * @param authExecutor executor that runs subscribe-authorization probes off the WebSocket
+   *     container thread; a {@link RejectedExecutionException} (saturation) fails the subscribe
+   *     open
+   * @param nanoClock monotonic nanosecond source ({@link System#nanoTime()} in production)
+   */
+  LiveSyncWebSocketHandler(
+      @NotNull LiveSyncPresenceService presenceService,
+      @NotNull LiveSyncFanout fanout,
+      @NotNull ObjectMapper objectMapper,
+      @NotNull MeterRegistry meterRegistry,
+      @NotNull LiveSyncSubscriptionAuthorizer authorizer,
+      @NotNull Executor authExecutor,
+      @NotNull LongSupplier nanoClock) {
     this.presenceService = presenceService;
     this.fanout = fanout;
     this.objectMapper = objectMapper;
     this.meterRegistry = meterRegistry;
     this.authorizer = authorizer;
     this.authExecutor = authExecutor;
+    this.nanoClock = nanoClock;
     Gauge.builder(
             MetricNames.PRESENCE_WS_SESSIONS,
             sessionsByTopic,
@@ -922,7 +968,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    */
   void tickReaper() {
     try {
-      reapIdleTopicBuckets(System.nanoTime());
+      reapIdleTopicBuckets(nanoClock.getAsLong());
       List<LiveSyncPresenceService.TopicSectionRef> affected =
           presenceService.reapExpired(Instant.now());
       if (affected.isEmpty()) {
@@ -1078,7 +1124,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    */
   private boolean allowFrame(
       @NotNull WebSocketSession session, @NotNull String attrKey, int burst, double refillPerSec) {
-    long now = System.nanoTime();
+    long now = nanoClock.getAsLong();
     ChangedRateState state;
     if (session.getAttributes().get(attrKey) instanceof ChangedRateState existing) {
       state = existing;
@@ -1135,7 +1181,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    * @return {@code true} to relay the frame, {@code false} to drop it as per-topic throttled
    */
   private boolean allowTopicChanged(@NotNull LiveSyncTopic topic) {
-    long now = System.nanoTime();
+    long now = nanoClock.getAsLong();
     TopicRateState state =
         changedRateByTopic.computeIfAbsent(
             topic.canonical(), ignored -> new TopicRateState(TOPIC_CHANGED_BURST, now));
