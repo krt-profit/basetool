@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Monitoring: JVM-Absturzursachen landen jetzt in Loki.** Native Fehler wie `pthread_create failed` / `unable to create native thread`, die die JVM direkt auf die Container-Ausgabe schreibt (außerhalb von Logback) und die deshalb bisher nie in Loki ankamen, werden jetzt zusätzlich als eigener, shipper-seitig maskierter Stream (`app="<dienst>-stdout"`) versendet — so ist die Ursache eines native-Thread-Absturzes auch nachträglich in Grafana sichtbar. Die zugehörige Regel `JvmNativeThreadExhaustion` ist vorbereitet, bleibt aber bis zur Verifikation auf der Teststrecke deaktiviert (REQ-OBS-007/-014, ADR-0095).
+
 ### Fixed
 
 - **Preis-Übersicht wird wieder angezeigt.** Nach der CSP-Härtung (`style-src-attr 'none'`, ADR-0093) blieb die Handelsmatrix unter „Preis-Übersicht" unsichtbar: Die Tabelle wurde per CSS-Klasse ausgeblendet, das Skript blendete sie aber noch über das inzwischen wirkungslose `style.display` ein, und die dynamischen Abstandszeilen des virtuellen Scrollens trugen ein vom Browser blockiertes `style="height:…"`. Sichtbarkeit läuft jetzt über das Umschalten der Klasse, die Zeilenhöhe über das CSSOM — die Seite funktioniert wieder.

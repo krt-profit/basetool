@@ -7,11 +7,14 @@
 //   2. Ship logs to Loki with the per-stream masking rules. Container logs are read via the GET-only
 //      docker-socket-proxy (tcp://socket-proxy:2375), never the raw docker socket.
 //
-// Per-stream privacy (REQ-OBS-007): app JSON is PII-masked AT SOURCE (no shipper masking); the
-// Keycloak file log is masked HERE (username= / ipAddress=); NPM access/error, host auth.log and the
-// host security logs (auditd file-integrity, fail2ban bans) are ingested WITH client IPs/usernames
-// (the deliberate, owner-approved 31-day retention). Stream labels stay low-cardinality: app (+ level
-// for the JSON apps).
+// Per-stream privacy (REQ-OBS-007): app JSON is PII-masked AT SOURCE (no shipper masking) under
+// app=backend/frontend/ingest; ADDITIONALLY the same three apps' raw container stdout/stderr is now
+// shipped under the DISTINCT app=<svc>-stdout labels and masked HERE (ADR-0095) — this captures the
+// JVM/glibc native errors (pthread_create failed / unable to create native thread, hs_err preamble)
+// that bypass logback and so never reach the JSON file. The Keycloak file log is masked HERE
+// (username= / ipAddress=); NPM access/error, host auth.log and the host security logs (auditd
+// file-integrity, fail2ban bans) are ingested WITH client IPs/usernames (the deliberate, owner-approved
+// 31-day retention). Stream labels stay low-cardinality: app (+ level for the JSON apps).
 
 logging {
 	level  = "info"
@@ -183,15 +186,21 @@ discovery.relabel "containers" {
 
 	// Keep only the container streams we ingest via the docker API (NPM stdout = operational logs
 	// — nginx reloads, cert renewals, [emerg]/[error]; NOT admin-UI logins, which NPM never writes
-	// to stdout; postgres runs with log_error_verbosity=terse). The ingest gateway is deliberately
-	// NOT kept here: it ships its prod JSON via the file path above (loki.source.file -> app_json),
-	// exactly like backend/frontend, so its `level` field becomes a Loki label.
-	// (#1041 item 24) The monitoring plane's OWN stdout is now shipped too: Grafana/Tempo have
-	// OOM-looped in prod, and that evidence otherwise lived only in host docker-json logs (lost after
-	// 5x10MB rotation, SSH-only). The regex is fully anchored, so `redis` never matches `redis-exporter`.
+	// to stdout; postgres runs with log_error_verbosity=terse).
+	// (ADR-0095) backend/frontend/ingest ARE now kept — reversing the original REQ-OBS-007 decision to
+	// ship these three via the masked JSON file ONLY. Their container stdout/stderr is shipped here IN
+	// ADDITION to that file path, under the DISTINCT app=<svc>-stdout label (see the mapping rule below)
+	// so it never muddies the JSON stream's {app="backend",level=...} queries, and masked in the shipper
+	// (loki.process.container_mask). Motive: JVM/glibc native errors (pthread_create failed / unable to
+	// create native thread) print to the container's stderr OUTSIDE logback, so they land in `docker
+	// logs` but never in the masked JSON file — this stream is the only place Loki can see them.
+	// (#1041 item 24) The monitoring plane's OWN stdout is shipped too: Grafana/Tempo have OOM-looped in
+	// prod, and that evidence otherwise lived only in host docker-json logs (lost after 5x10MB rotation,
+	// SSH-only). The regex is fully anchored, so `redis` never matches `redis-exporter` and the exact
+	// `backend` alternative never matches `db-backend` / `postgres-exporter-backend`.
 	rule {
 		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
-		regex         = "npm|redis|db-backend|db-keycloak|prometheus|grafana|loki|tempo|alloy|alertmanager|node-exporter|cadvisor|socket-proxy|postgres-exporter-backend|postgres-exporter-keycloak|redis-exporter|blackbox-exporter"
+		regex         = "backend|frontend|ingest|npm|redis|db-backend|db-keycloak|prometheus|grafana|loki|tempo|alloy|alertmanager|node-exporter|cadvisor|socket-proxy|postgres-exporter-backend|postgres-exporter-keycloak|redis-exporter|blackbox-exporter"
 		action        = "keep"
 	}
 	// (#1041 item 24) Map every monitoring-plane service to a bounded `mon-<service>` app label.
@@ -222,19 +231,28 @@ discovery.relabel "containers" {
 		target_label  = "app"
 		replacement   = "$1"
 	}
+	// (ADR-0095) The three JVM apps' container stdout/stderr -> app=<svc>-stdout, kept DISTINCT from the
+	// masked-JSON `app=backend|frontend|ingest` file streams so a mixed masked-JSON / raw-stdout label
+	// never confuses the {app="backend",level="error"} JSON queries. Anchored, so `db-backend` is unaffected.
+	rule {
+		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+		regex         = "(backend|frontend|ingest)"
+		target_label  = "app"
+		replacement   = "$1-stdout"
+	}
 }
 
 loki.source.docker "containers" {
 	host       = "tcp://socket-proxy:2375"
 	targets    = discovery.relabel.containers.output
-	forward_to = [loki.process.mon_mask.receiver]
+	forward_to = [loki.process.container_mask.receiver]
 }
 
-// (#1041 item 24) Shipper-side masking for the two monitoring streams that can carry PII
-// (REQ-OBS-004/-007), mirroring the Keycloak file-log mask above. Every other kept stream (the app
-// / edge / postgres operational logs) passes through untouched — the stage.match selectors gate the
-// replaces to the grafana / alertmanager apps only. The app JSON stays masked at source.
-loki.process "mon_mask" {
+// (#1041 item 24 / ADR-0095) Shipper-side masking for the kept container streams that can carry PII
+// (REQ-OBS-004/-007), mirroring the Keycloak file-log mask above. Every other kept stream (the edge /
+// postgres operational logs) passes through untouched — the stage.match selectors gate the replaces to
+// the grafana / alertmanager / <svc>-stdout apps only. The app JSON file streams stay masked at source.
+loki.process "container_mask" {
 	forward_to = [loki.write.default.receiver]
 
 	// Grafana logs its Keycloak-OIDC admin logins with `uname=` and the user's e-mail.
@@ -259,6 +277,30 @@ loki.process "mon_mask" {
 		stage.replace {
 			expression = "([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})"
 			replace    = "***"
+		}
+	}
+
+	// (ADR-0095) The <svc>-stdout container streams are NOT masked at source (the logback console layout
+	// masks the app's own lines, but the raw JVM/glibc stderr — native errors, the pre-logback banner, a
+	// default-uncaught-handler stack trace — bypasses it). Mirror the source-side PiiMasker (JWT / e-mail
+	// / bearer-token keyword) here as defense-in-depth so this reversal of the file-only decision cannot
+	// leak a token or address the source masker would have caught. RE2 patterns (no possessive groups).
+	stage.match {
+		selector = "{app=~\"(backend|frontend|ingest)-stdout\"}"
+
+		stage.replace {
+			expression = "(eyJ[a-zA-Z0-9_-]{5,}\\.eyJ[a-zA-Z0-9_-]{5,}\\.[a-zA-Z0-9_-]{5,})"
+			replace    = "JWT_***"
+		}
+
+		stage.replace {
+			expression = "([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})"
+			replace    = "***"
+		}
+
+		stage.replace {
+			expression = "(?i)(bearer\\s+|token\\s*[:=]?\\s*|session[-_]?id\\s*[:=]?\\s*|authorization\\s*[:=]?\\s*(?:bearer\\s+)?)([a-zA-Z0-9\\-_.+/=]+)"
+			replace    = "${1}***"
 		}
 	}
 }

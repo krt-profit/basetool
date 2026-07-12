@@ -48,6 +48,28 @@ groups:
           summary: "PostgreSQL FATAL/PANIC in logs"
           description: "A PostgreSQL container logged FATAL or PANIC lines."
 
+      # JVM native-thread exhaustion breadcrumb (ADR-0095). The `<svc>-stdout` streams carry the
+      # JVM/glibc native errors that bypass logback and never reach the masked JSON file — including the
+      # `pthread_create failed (EAGAIN)` / `unable to create native thread` line of the 2026-07-12 ingest
+      # pids-cap OOM. This is a LAGGING forensic complement: the LEADING indicator is JvmThreadsHigh
+      # (apps.yml) and the root cause is fixed by init:true zombie reaping (#1274), so a crash should not
+      # recur — this only leaves the native line in Loki when one does.
+      #
+      # STAGED, NOT ACTIVE (dead-alert guard, REQ-OBS-014): enable ONLY after verifying on the test/prod
+      # stack that the native line actually lands in this stream once <svc>-stdout is shipped — i.e. that
+      # `{app=~"(backend|frontend|ingest)-stdout"}` returns the `docker logs` stderr line (the JVM console
+      # appender is active in prod, so the stream flows, but the native line is emitted outside logback
+      # and its presence in the shipped stream must be confirmed, not assumed). See the Alloy stdout-stream
+      # verification step in docs/MONITORING_ROLLOUT_RUNBOOK.md. Uncomment once confirmed.
+      # - alert: JvmNativeThreadExhaustion
+      #   expr: 'sum(count_over_time({app=~"(backend|frontend|ingest)-stdout"} |~ "pthread_create failed|unable to create native thread" [5m])) > 0'
+      #   for: 0m
+      #   labels:
+      #     severity: critical
+      #   annotations:
+      #     summary: "JVM native-thread exhaustion in a container ({{ $labels.app }})"
+      #     description: "A JVM app's container stderr logged 'pthread_create failed' / 'unable to create native thread' — the container hit its cgroup pids cap and the JVM can no longer create OS threads (the 2026-07-12 native-thread OOM). Check the pids trend and container restarts; the leading warning is JvmThreadsHigh."
+
   - name: log-alerts-warning
     rules:
       # Fail-open Discord SPI: a persistently erroring precheck silently disables a security gate

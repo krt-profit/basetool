@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-06.
-> **Owner area:** OBS · **Related:** [`security-and-access.md`](security-and-access.md), [`org-unit-tenancy.md`](org-unit-tenancy.md), [ADR-0072](../adr/0072-monitoring-stack-prometheus-grafana.md), monitoring epic [#936](https://github.com/krt-profit/basetool/issues/936)
+> **Owner area:** OBS · **Related:** [`security-and-access.md`](security-and-access.md), [`org-unit-tenancy.md`](org-unit-tenancy.md), [ADR-0072](../adr/0072-monitoring-stack-prometheus-grafana.md), [ADR-0095](../adr/0095-ship-app-container-stdout-to-loki.md), monitoring epic [#936](https://github.com/krt-profit/basetool/issues/936)
 
 # Observability & logging
 
@@ -139,8 +139,26 @@ the future `basetool_*` business metrics (epic #936 Phase 1c).
 When log streams are shipped to Loki (epic #936 Phase 2), each stream obeys its own recorded
 rule — no blanket "everything is masked" claim:
 
-- **backend / frontend / ingest JSON** — PII-masked **at the source** (REQ-OBS-003/-004);
-  the shipper adds no further masking.
+- **backend / frontend / ingest JSON** (`app="backend"` / `"frontend"` / `"ingest"`) — the masked
+  JSON file sinks, PII-masked **at the source** (REQ-OBS-003/-004); the shipper adds no further
+  masking. These carry the `level` label.
+- **backend / frontend / ingest container stdout/stderr** (`app="backend-stdout"` /
+  `"frontend-stdout"` / `"ingest-stdout"`; ADR-0095) — the raw container console, shipped via
+  `loki.source.docker` **in addition to** the JSON file above and kept under a **distinct** `app`
+  label so a mixed masked-JSON / raw-stdout label never muddies the JSON stream's
+  `{app="backend",level="error"}` queries. Motive: JVM/glibc native errors (`pthread_create failed` /
+  `unable to create native thread`, the `hs_err` preamble) print to the container's stderr **outside
+  logback**, so they land in `docker logs` but never in the JSON file — this stream is the only place
+  Loki can see them. The app's own console lines *are* masked at source (the prod logback CONSOLE
+  appender runs through `PiiMaskingPatternLayout`), but the truly-raw non-logback stderr is not, so
+  the shipper masks these streams **in Alloy** (`loki.process.container_mask`) mirroring the
+  source-side `PiiMasker` (JWT / e-mail / bearer-token keyword) as defense-in-depth. No client IPs or
+  usernames by design → PII-free operational logging (like the `mon-*` streams below), global 744h
+  retention, **no** REQ-OBS-010 IP-retention impact. This **reverses** the original file-only shipping
+  decision for these three modules (ADR-0072); the reversal has owner sign-off (2026-07-12) and its
+  rationale/cost live in ADR-0095. The `JvmNativeThreadExhaustion` Loki rule that consumes this stream
+  ships **staged** (commented) until the native line is verified present on the test stack (REQ-OBS-014
+  dead-alert guard).
 - **Keycloak file log** — masked **in the shipper** (Alloy stages scrub `username=` /
   `ipAddress=` before ingestion).
 - **NPM access logs, SSH/host-auth logs, and the host security logs
@@ -744,7 +762,10 @@ therefore alerts on:
   the file's `loki_source_file_read_lines_total` series — a tailed file keeps its series present even
   when quiet, so absence means the file is not being tailed at all, the permission-drift failure
   `config.alloy` warns about) and `LokiWriteFailing` (shipper-side entry drops) — all warning — cover
-  it.
+  it. The `<svc>-stdout` container streams (ADR-0095) are deliberately given **no** per-stream liveness
+  alert: a native-error breadcrumb is rare by design, so a `rate()`/`absent()` liveness check on such a
+  quiet stream would be a permanent false alarm — whole-pipeline silence is still caught by
+  `LokiIngestSilent`.
 - **Container-metric blackout.** cAdvisor can stay "up" while emitting zero name-labelled series (a
   real incident, CHANGELOG v1.1.1), silently blinding the container alerts. `ContainerMetricsMissing`
   (critical) and `CoreContainerMetricsMissing` (warning) guard the named-series count;
