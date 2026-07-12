@@ -474,16 +474,16 @@ groups:
 
       # (#1041 item 10) Bank audit silence. The bank — the most sensitive audited area — keeps its own
       # bank_audit_event table (deliberately excluded from AuditDomain), so AuditSilenceAnomaly above
-      # is blind to it. Same 5-day-silence-while-up shape on the dedicated bank counter (counts only,
-      # no amounts). Resolves on the first bank audit event within any 5-day window.
+      # is blind to it. Same 60-day-silence-while-up shape on the dedicated bank counter (counts only,
+      # no amounts). Resolves on the first bank audit event within any 60-day window.
       - alert: BankAuditSilenceAnomaly
-        expr: (sum(increase(basetool_bank_audit_events_total[5d])) == 0) and on() (up{job="basetool-backend"} == 1)
+        expr: (sum(increase(basetool_bank_audit_events_total[60d])) == 0) and on() (up{job="basetool-backend"} == 1)
         for: 30m
         labels:
           severity: warning
         annotations:
-          summary: "No bank audit events recorded in 5d while backend is up"
-          description: "The backend has been up but recorded zero bank audit events for 5 days — possible bank audit-logging regression (REQ-AUDIT-001). Every bank mutation must write a bank_audit_event row."
+          summary: "No bank audit events recorded in 60d while backend is up"
+          description: "The backend has been up but recorded zero bank audit events for 60 days — possible bank audit-logging regression (REQ-AUDIT-001). Every bank mutation must write a bank_audit_event row."
 
       # (#1041 item 10) Per-domain audit silence. AuditSilenceAnomaly sums across all domains, so one
       # domain losing its audit wiring in a refactor (the exact REQ-AUDIT-001 failure mode) is masked
