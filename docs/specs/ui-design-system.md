@@ -174,11 +174,15 @@ the rendered HTML are forbidden (ADR-0093).
 The prohibition covers `style=""` attributes emitted by **JavaScript**, not just server-rendered
 templates: a `style="…"` inside an `innerHTML` string is parsed as an inline style attribute and
 blocked exactly the same way (this is what broke the `/materials/overview` virtual-scroll spacer
-rows — a JS-built `style="height:…"` — after the CSP was pinned). A genuinely dynamic value a script
-computes goes through the same `data-krtm-*` → CSSOM path (`element.style.x = …`) instead. And when
-a script toggles the visibility of an element whose hidden state is a **class** (e.g. the skeleton
-hides it with `krtm-display-none-*`), it must toggle that class — clearing `element.style.display`
-does not override a class rule, so `el.style.display = ''` leaves a class-hidden element hidden.
+rows — a JS-built `style="height:…"` — after the CSP was pinned). A value a script computes goes
+through a CSS class (static) or the same `data-krtm-*` → CSSOM path (`element.style.x = …`, genuinely
+dynamic — e.g. the `/materials/overview` virtual-scroll spacer heights) instead. And when a script
+toggles the visibility of an element whose hidden state is a **class** (e.g. the skeleton hides it
+with `krtm-display-none-*`, or the scu-hint fragment with `krtm-hidden`), it must **toggle that
+class** — clearing `element.style.display` does not override a class rule, so `el.style.display = ''`
+leaves a class-hidden element hidden. Setting a non-empty display (`el.style.display = 'flex'`) still
+works (inline beats a non-`!important` class), and a pure JS filter loop that both hides and reveals
+rows via `el.style.display` (no class) is fine; only the reveal-over-class case is the trap.
 
 **Acceptance**
 

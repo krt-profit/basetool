@@ -68,15 +68,15 @@ function updateAmountFieldForMaterial(selectElement) {
     if (qtType === 'PIECE') {
         amountInput.setAttribute('step', '1');
         unitSpan.textContent = '(' + MSG_UNIT_PIECE + ')';
-        if (scuHint) scuHint.style.display = 'none';
+        if (scuHint) scuHint.classList.add('krtm-hidden');
     } else if (qtType === 'SCU') {
         amountInput.setAttribute('step', '0.001');
         unitSpan.textContent = '(' + MSG_UNIT_SCU + ')';
-        if (scuHint) scuHint.style.display = '';
+        if (scuHint) scuHint.classList.remove('krtm-hidden');
     } else {
         amountInput.setAttribute('step', '0.001');
         unitSpan.textContent = '';
-        if (scuHint) scuHint.style.display = 'none';
+        if (scuHint) scuHint.classList.add('krtm-hidden');
     }
 }
 

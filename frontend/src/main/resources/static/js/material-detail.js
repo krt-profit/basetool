@@ -151,10 +151,12 @@ function filterTerminals() {
 
     const noResults = document.getElementById('noResultsRow');
     if (noResults) {
+        // #noResultsRow starts hidden via the krtm-display-none-5790 class (ADR-0093); a
+        // `style.display = ''` reveal cannot override the class, so toggle the class instead.
         if (visibleCount === 0 && tr.length > (document.getElementById('noDataRow') ? 1 : 0)) {
-            noResults.style.display = '';
+            noResults.classList.remove('krtm-display-none-5790');
         } else {
-            noResults.style.display = 'none';
+            noResults.classList.add('krtm-display-none-5790');
         }
     }
 }

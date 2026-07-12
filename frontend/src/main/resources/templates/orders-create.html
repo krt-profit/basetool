@@ -68,6 +68,33 @@
         details.scmdb-import[open] summary::before {
             transform: rotate(90deg);
         }
+        /*
+         * Classes for the item-line rows that orders-create.js builds via innerHTML. They replace
+         * the former inline style="" attributes on those elements: an inline style inside a JS
+         * innerHTML string is blocked by the CSP style-src-attr 'none' pin just like a template one
+         * (ADR-0093). Flex-item widths reuse the global .flex-1 / .flex-2 utilities, nowrap reuses
+         * .nowrap, and the SCU hint / unresolved box toggle the runtime .krtm-hidden class.
+         */
+        .oc-line-fields {
+            display: flex;
+            gap: 1rem;
+            align-items: flex-end;
+        }
+        .oc-derived-block {
+            margin-top: 0.75rem;
+        }
+        .oc-note-block {
+            margin-top: 0.5rem;
+        }
+        .oc-material-line {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            margin-top: 0.4rem;
+        }
+        .oc-label-strong {
+            color: var(--color-gray-1);
+        }
     </style>
     </th:block>
 </head>

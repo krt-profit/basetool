@@ -208,11 +208,11 @@ async function updateProfitCalculation() {
     const body = document.getElementById('profitBody');
 
     if (!shipId) {
-        body.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--color-gray-2);">${window.krtProfitI18n.selectShip}</td></tr>`;
+        body.innerHTML = `<tr><td colspan="7" class="profit-msg">${window.krtProfitI18n.selectShip}</td></tr>`;
         return;
     }
 
-    body.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--color-primary);">${window.krtProfitI18n.loading}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="7" class="profit-msg-loading">${window.krtProfitI18n.loading}</td></tr>`;
 
     try {
         let url = `/api/proxy/materials/profit-calculation?shipId=${shipId}`;
@@ -231,7 +231,7 @@ async function updateProfitCalculation() {
         const data = await response.json();
 
         if (data.length === 0) {
-            body.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--color-gray-2);">${window.krtProfitI18n.noData}</td></tr>`;
+            body.innerHTML = `<tr><td colspan="7" class="profit-msg">${window.krtProfitI18n.noData}</td></tr>`;
             return;
         }
 
@@ -263,7 +263,7 @@ async function updateProfitCalculation() {
         }
     } catch (error) {
         console.error('Error fetching profit calculation:', error);
-        body.innerHTML = `<tr><td colspan="7" class="text-danger" style="text-align: center; padding: 2rem;">${window.krtProfitI18n.fetchError}</td></tr>`;
+        body.innerHTML = `<tr><td colspan="7" class="text-danger profit-msg-error">${window.krtProfitI18n.fetchError}</td></tr>`;
     }
 }
 
