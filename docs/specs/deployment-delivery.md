@@ -226,10 +226,33 @@ the deployed stack). Incident precedent: 2026-07-02, a pre-V199 backend started 
 off the stale local `:stable` tag against a V201-migrated database crash-looped while
 `deploy.sh` reported "no change" and exited 0.
 
+Even this fast-exit path (and the config-changing apply, and every healthy tick in between) runs a
+**self-healing monitoring-config reconcile** when the monitoring stack is enabled: Prometheus, Alloy
+and the blackbox exporter serve their config from single-file bind mounts, so `deploy.sh` diffs each
+component's on-disk config subtree against a persisted per-service snapshot of what it was last
+applied (`${STATE_DIR}/monitoring-reload/<svc>`) and **force-recreates** the service on any drift,
+refreshing the snapshot only after a successful recreate. A `SIGHUP` is deliberately *not* used: the
+new config is written by `mirror_dir`/`rsync` as a fresh inode, and a single-file bind mount is
+pinned to the inode it was created with, so the container keeps reading the old file until recreated
+(a SIGHUP would just re-read the stale inode). This is decoupled from whether *this* tick swapped a
+config bundle in: an apply that was skipped, lost, or bypassed by a rollback is retried on the next
+tick until the running config matches on disk — the reason the 2026-07-11 ingest `TargetDown` (a
+stale `11262` scrape target after the ADR-0090 port move, held through Prometheus's pinned inode even
+though the on-disk file was already correct) could not have persisted. On a Prometheus recreate
+`deploy.sh` stamps `basetool_monitoring_config_applied_timestamp{component="prometheus"}`, which backs
+the `PrometheusConfigStale` alert (REQ-OBS-014). The reconcile is best-effort and **never gates** the
+deploy — a stopped monitoring service or a failed recreate only logs — and force-recreates only on an
+actual content change (config edits are rare, so the brief scrape gap is negligible). It is a no-op
+on a host without the monitoring stack (`IRI_MONITORING_ENABLED` unset).
+
 **Acceptance**
 
 - [ ] A matching marker over a converged, healthy stack exits 0 without pulling or restarting
   anything ("no change", running stack verified).
+- [ ] On a host with monitoring enabled, a tick whose on-disk Prometheus config differs from the
+  last applied snapshot force-recreates Prometheus — including on the converged no-op fast-exit —
+  without pulling or re-applying the app stack; a component whose on-disk config already matches its
+  snapshot is left untouched, and the reconcile never gates the deploy.
 - [ ] A matching marker over a container running a non-target image digest, an
   unhealthy/restarting container, or a missing container triggers a logged drift re-apply of
   the same digest set.
@@ -241,7 +264,7 @@ off the stale local `:stable` tag against a V201-migrated database crash-looped 
   non-target image digest does, even during the start period); a one-off `compose run`
   container never does.
 
-**Enforced by:** `scripts/deploy.sh` (`running_stack_drift`, idempotence check) · `scripts/deploy.test.sh` (self-tests, run by `.github/workflows/deploy-script.yml`) · **Runbook:** `docs/deployment.md` → *What happens on the server*, *Restarting the stack manually*
+**Enforced by:** `scripts/deploy.sh` (`running_stack_drift`, idempotence check, `reconcile_monitoring_reload(s)`) · `scripts/deploy.test.sh` (self-tests, run by `.github/workflows/deploy-script.yml`) · **Runbook:** `docs/deployment.md` → *What happens on the server*, *Restarting the stack manually*
 
 ### REQ-OPS-014 — Every prod service runs with a hardened runtime baseline
 
