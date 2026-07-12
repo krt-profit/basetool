@@ -118,8 +118,19 @@
     align-items: start;
     margin-top: 0;
 }
+/*
+ * The offer list scrolls internally and stretches down to just above the fixed
+ * footer (`.krt-footer` in styles.css, `position: fixed; bottom: 0`) instead of
+ * stopping at a short fixed cap — mirrors the pattern used for the matrix in
+ * materials-overview.css. `--krt-footer-height` is published by sidebar.html JS
+ * (falls back to 5rem before DOMContentLoaded); the extra ~22rem reserves the
+ * sticky header, the page head + CTA row and the toolbar (tabs + filters) that
+ * sit above the list at top-of-page scroll, and leaves a small gap between the
+ * list's bottom edge and the footer for visual separation. `max(...)` floors the
+ * height so the list never collapses on very short viewports.
+ */
 .mb-mlist {
-    max-height: 560px;
+    max-height: max(16rem, calc(100vh - var(--krt-footer-height, 5rem) - 22rem));
     overflow-y: auto;
     border: none;
 }

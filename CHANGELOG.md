@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Materialbörse: Die Angebotsliste reicht jetzt bis kurz vor die Fußzeile.** Bisher endete die Liste an einer festen Höhe und ließ darunter eine große leere Fläche bis zur Fußzeile. Sie füllt jetzt die verfügbare Höhe bis knapp über die Fußzeile (mit kleinem Abstand zur optischen Trennung) und scrollt bei vielen Angeboten intern.
+
+- **Materialbörse: Die Sortier-Option „Material A–Z" heißt jetzt „Name A–Z".** Die Börse enthält auch Items (nicht nur Materialien); die alphabetische Sortierung greift auf den angezeigten Namen zu, daher der treffendere Name.
+
 ### Fixed
 
 - **Monitoring: Die kritischen Alarme `TargetDown` für `blackbox-internal-tls` und `blackbox-http-ipv6` schlagen nicht mehr fälschlich an.** Bei einem Blackbox-`/probe`-Job heißt `up==0` nicht, dass das Ziel unten ist, sondern dass der Prometheus-zu-Exporter-Scrape selbst das Zeitlimit riss — das Blackbox-Modul-Timeout (10 s) war identisch mit dem globalen `scrape_timeout` (10 s), sodass ein bis zur Frist laufender Probe (IPv6 ohne v4-Fallback, langsamer interner TLS-Handshake unter dem gewollten Speicherdruck des Hosts) den Scrape über die Grenze kippte. Jeder `/probe`-Job trägt jetzt ein eigenes `scrape_timeout: 15s`, und `TargetDown` ist auf die Nicht-Probe-Jobs eingegrenzt (der `blackbox-exporter`-Selbst-Scrape und alle App-/Infra-Scrapes bleiben in Reichweite). Ein echter Probe-Ausfall meldet weiterhin sofort über die dedizierten `probe_success`-Alarme (`BlackboxProbeFailed` / `EdgeIpv6Unreachable` / `DnsResolutionFailed` / `CertificateExpiringSoon`) (REQ-OBS-008/-012).
