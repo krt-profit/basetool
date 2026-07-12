@@ -394,19 +394,38 @@ groups:
           summary: "Frontend session store growing unbounded (>2000 active sessions)"
           description: "basetool_active_sessions has held above 2000 for 1h. Expected steady state is a few hundred; a sustained climb means anonymous/orphan sessions are accreting again (REQ-SEC-025 two-tier TTL regressed) and Redis is heading for its maxmemory noeviction ceiling. Check the session store size (redis SCAN 'basetool:session:sessions:*') and the created-vs-login ratio."
 
-      # (#1041 item 18) Frontend login broken. A code-to-token / JWKS / state failure breaks ALL
-      # logins with no other frontend signal, and KeycloakLoginErrorSpike's event regex misses
-      # code-to-token errors. Fire when there are login failures but ZERO successes in the window.
-      # `unless` (not `and ... == 0`) so the absent success series — no successful login has happened
-      # at all, the total-breakage case — still trips it instead of silently evaluating to no-data.
+      # (#1041 item 18) Frontend login broken. This alert exists to catch the ONE break mode no other
+      # signal sees: the code-to-token / JWKS / bad-IdP-response failure that hits AFTER the user has
+      # already authenticated at Keycloak, so Keycloak emits no login_error user event and
+      # KeycloakLoginErrorSpike's regex misses it. That failure class maps to reason="provider_error"
+      # in LoginFailureMetricsHandler — so the failure side is scoped to that bucket.
+      #
+      # It is deliberately NOT scoped to all failures. The earlier `failure > 0 unless success > 0`
+      # false-fired (2026-07-12): members hold 30-day "stay logged in" sessions, so genuinely fresh
+      # successful logins are sparse — frequently ZERO per 15m window, especially off-hours — while a
+      # single benign failure is trivial to produce. Unauthenticated bots/scanners hitting the OAuth
+      # callback /login/oauth2/code/keycloak (BotProtectionFilter does NOT shield it), plus
+      # abandoned / expired-state / back-button logins, all raise reason="invalid_state". So
+      # "failures>0 with zero successes" is a NORMAL healthy state here, not a break. A genuine
+      # all-users state/session-loss break (SameSite or cookie-domain regression, Redis unreachable,
+      # broken session deserialisation) also shows as invalid_state, but it is corroborated by the
+      # frontend `redis` readiness indicator / TargetDown / deploy-time e2e — folding it in here is
+      # exactly what made this alert noisy.
+      #
+      # >= 3 over 15m + for:10m: a real code-to-token/JWKS break fails EVERY attempt so provider_error
+      # climbs fast and stays, while a lone transient token-endpoint blip (one flaky exchange, a brief
+      # Keycloak restart) stays under the floor or does not sustain 10m. The `unless success > 0` guard
+      # remains: any fresh success in the window proves login is not broken for everyone (a genuine
+      # total break yields zero successes), so `unless` (not `and ... == 0`) still trips on the absent
+      # success series instead of evaluating to no-data.
       - alert: FrontendLoginBroken
-        expr: sum(increase(basetool_login_total{outcome="failure"}[15m])) > 0 unless sum(increase(basetool_login_total{outcome="success"}[15m])) > 0
-        for: 5m
+        expr: sum(increase(basetool_login_total{outcome="failure", reason="provider_error"}[15m])) >= 3 unless sum(increase(basetool_login_total{outcome="success"}[15m])) > 0
+        for: 10m
         labels:
           severity: warning
         annotations:
-          summary: "Frontend logins failing with zero successes"
-          description: "The frontend recorded login failures but no successful logins in the last 15 minutes — OAuth2 login is likely broken for everyone (code-to-token, JWKS or state failure). Check the frontend logs, Keycloak reachability and the OIDC client config."
+          summary: "Frontend logins failing at the token exchange with zero successes"
+          description: "The frontend recorded repeated OAuth2 provider errors (failed code-to-token exchange, JWKS or bad IdP response) and no successful logins in the last 15 minutes — login is likely broken for everyone at the token-exchange step. Check the frontend logs, Keycloak reachability from the frontend (issuer-uri / JWKS endpoint) and the OIDC client config. State/session-loss breaks surface as invalid_state and via the frontend redis readiness indicator instead."
 
       # (#1041 item 18) CSRF rejection spike. krtFetch's silent single-retry self-heal masks a
       # systematic CSRF-wiring regression as intermittent failed writes; the counter makes the rate
