@@ -104,9 +104,10 @@ public enum LiveSyncTopicClass {
    * authorized by the same authenticated {@code GET /api/v1/orders/{id}} the page performs — a
    * requesting owner who reaches the order through the requester escape (REQ-ORDERS-023) gets a
    * redacted 2xx and is allowed, while a foreign order answers 403/404 and is denied. Distinct from
-   * the {@link #ORDERS_QUEUE} global room despite the shared {@code order}/{@code orders} stem:
-   * {@link LiveSyncTopic#parse(String)} keys them apart by prefix and the presence of the id
-   * segment.
+   * the {@link #ORDERS_QUEUE} global room despite the shared {@code order}/{@code orders} wire
+   * stem: {@link LiveSyncTopic#parse(String)} keys them apart by prefix and the id segment. Its
+   * {@code topic_class} metric label is {@code order_detail} (the queue's is {@code orders_queue})
+   * so the two never read as one accidental duplicate series on the ops dashboard.
    */
   ORDER(
       "order",
@@ -122,7 +123,7 @@ public enum LiveSyncTopicClass {
           "blueprint-owners",
           "assignees"),
       false,
-      "order",
+      "order_detail",
       "/api/v1/orders/{id}",
       null),
 
@@ -130,14 +131,16 @@ public enum LiveSyncTopicClass {
    * Global job-order queue room: the {@code /orders} list (#1102). A subscribe is authorized by the
    * caller's {@code canViewJobOrders} capability (a non-profit requester / guest who only sees
    * their own orders is refused), so the {@link #authProbePath} is the capabilities endpoint and
-   * {@link #capabilityField} the boolean to require rather than a per-resource read.
+   * {@link #capabilityField} the boolean to require rather than a per-resource read. Its {@code
+   * topic_class} metric label is {@code orders_queue} (the per-order room's is {@code
+   * order_detail}) so the two never read as one accidental duplicate series on the ops dashboard.
    */
   ORDERS_QUEUE(
       "orders",
       false,
       Set.of("queue"),
       false,
-      "orders",
+      "orders_queue",
       "/api/v1/me/capabilities",
       "canViewJobOrders"),
 

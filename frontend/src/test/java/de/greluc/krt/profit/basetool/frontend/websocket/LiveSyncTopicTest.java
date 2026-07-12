@@ -182,4 +182,13 @@ class LiveSyncTopicTest {
         java.util.Arrays.stream(classes).map(LiveSyncTopicClass::metricLabel).distinct().count();
     assertThat(distinctLabels).isEqualTo(classes.length);
   }
+
+  @Test
+  void orderRoomsCarryDistinctlyNamedMetricLabels() {
+    // The per-order detail room and the global orders queue share the order/orders wire stem but
+    // must surface as clearly distinct `topic_class` series on the ops dashboard — not `order` vs
+    // `orders`, which read as one accidental duplicate. Pin the disambiguated labels.
+    assertThat(LiveSyncTopicClass.ORDER.metricLabel()).isEqualTo("order_detail");
+    assertThat(LiveSyncTopicClass.ORDERS_QUEUE.metricLabel()).isEqualTo("orders_queue");
+  }
 }
