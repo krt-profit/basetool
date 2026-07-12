@@ -2,10 +2,14 @@
 
 ## [Unreleased]
 
+## [v1.3.4](https://github.com/krt-profit/basetool/releases/tag/v1.3.4) - 2026-07-12
+
 ### Changed
 
 - **Monitoring: Live-Sync-Abo-Metriken der Auftragsräume klarer benannt.** Im Grafana-Panel „Live-sync subscriptions (live) by topic class" tauchten die Auftrags-Detailseite und die Auftrags-Warteschlange als `order` und `orders` auf — nur durch das Plural-s unterscheidbar und dadurch wie ein versehentliches Duplikat lesbar. Das `topic_class`-Label heißt jetzt `order_detail` bzw. `orders_queue` (analog zu `bank_account`/`bank_staff`). Reine Label-Umbenennung; der Wire-Topic (`order:{id}` / `orders`) bleibt unverändert (REQ-OBS-011).
+
 - **Monitoring: Der Alarm `BankAuditSilenceAnomaly` schlägt erst nach 60 Tagen ohne Bank-Audit-Ereignis an (vorher 5 Tage).** Das Bank-Audit-Volumen ist naturgemäß niedrig, sodass eine mehrtägige Stille normal ist und den Warnalarm bislang fälschlich auslöste. Das breitere 60-Tage-Fenster meldet nur noch eine echte, langanhaltende Bank-Audit-Stille (mögliche REQ-AUDIT-001-Regression).
+
 - **Monitoring: Der Alarm `FrontendLoginBroken` meldet nur noch einen echten Login-Ausfall statt harmloser Fehlversuche.** Bisher schlug er an, sobald es im 15-Minuten-Fenster Login-Fehlversuche, aber keinen erfolgreichen Login gab — bei überwiegend dauerhaft angemeldeten Mitgliedern (30-Tage-Sitzung) sind frische Logins jedoch oft null, während ein einzelner harmloser Fehlversuch (etwa ein Bot am OAuth-Callback, Abbruch oder abgelaufener State → `invalid_state`) genügte, um den Warnalarm auszulösen. Der Alarm wertet jetzt nur wiederholte `provider_error`-Fehler (fehlgeschlagener Code-to-Token-/JWKS-/IdP-Schritt — genau die Bruchstelle, die `KeycloakLoginErrorSpike` nicht sieht) bei gleichzeitig null Erfolgen aus (REQ-OBS-011).
 
 ### Fixed
