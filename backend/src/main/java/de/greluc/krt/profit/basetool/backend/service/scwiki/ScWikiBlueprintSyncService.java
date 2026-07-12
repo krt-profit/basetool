@@ -138,10 +138,15 @@ public class ScWikiBlueprintSyncService {
    *
    * <p>Returns the number of blueprints upserted this run, which {@link ScWikiScheduler}
    * accumulates into {@code basetool_scheduled_job_items_total{job="scwiki_sync"}}. The disabled
-   * and empty-response short-circuits return {@code 0} so a Wiki outage surfaces as a zero-item run
-   * ({@code SyncZeroItems}, #1041 item 2).
+   * and <em>genuine</em> empty-response short-circuits return {@code 0} so a Wiki outage surfaces
+   * as a zero-item run ({@code SyncZeroItems}, #1041 item 2). A {@code 304 Not Modified} on the
+   * blueprint list is <b>not</b> such an outage — the catalogue is merely unchanged — so this
+   * reports {@link BlueprintRepository#countLiveScwikiBlueprints() the live blueprint count}
+   * instead of {@code 0}, keeping a fully-cached healthy run from false-firing {@code
+   * SyncZeroItems} (#1182).
    *
-   * @return the number of blueprint rows upserted this run
+   * @return the number of blueprint rows upserted this run, or the live blueprint count on a {@code
+   *     304 Not Modified} (unchanged) list
    */
   public int syncBlueprints() {
     if (!Boolean.TRUE.equals(properties.getBlueprintSyncEnabled())) {
@@ -152,11 +157,24 @@ public class ScWikiBlueprintSyncService {
     }
 
     log.info("Starting SC Wiki blueprint sync...");
-    List<ScWikiBlueprintDto> fetched =
-        scWikiClient.fetchAllPages(
+    ScWikiClient.FetchResult<ScWikiBlueprintDto> listResult =
+        scWikiClient.fetchAllPagesResult(
             properties.getBlueprintsEndpoint(),
             new ParameterizedTypeReference<ScWikiResponseDto<ScWikiBlueprintDto>>() {},
             "blueprints");
+    if (listResult.notModified()) {
+      // Blueprint list unchanged since the last sync (ETag 304): the per-UUID detail fetches are
+      // never reached (they only run for the enumerated list), so nothing is upserted — but this is
+      // a healthy run. Report the live blueprint count so an all-304 run is not read as a zero-item
+      // outage (#1182). A genuine empty-200 falls through to isEmpty() and reports 0.
+      long live = blueprintRepository.countLiveScwikiBlueprints();
+      log.info(
+          "SC Wiki blueprint list unchanged since last sync (304) — reporting {} live blueprint"
+              + " row(s) instead of 0.",
+          live);
+      return (int) live;
+    }
+    List<ScWikiBlueprintDto> fetched = listResult.data();
     if (fetched.isEmpty()) {
       log.warn("No blueprints received from SC Wiki API. Aborting sync (no orphan sweep).");
       return 0;

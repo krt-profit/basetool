@@ -91,4 +91,22 @@ public interface ManufacturerRepository extends LookupTableRepository<Manufactur
       """)
   int markScwikiDeletedExcept(
       @Param("seenScwikiUuids") Collection<UUID> seenScwikiUuids, @Param("now") Instant now);
+
+  /**
+   * Counts the live SC Wiki-reconciled manufacturers: every row the Wiki reconciliation has written
+   * ({@code scwiki_synced_at IS NOT NULL}) and not tombstoned ({@code scwiki_deleted_at IS NULL}) —
+   * the same {@code scwiki_synced_at} gate {@link #markScwikiDeletedExcept} uses. The R6
+   * manufacturer reconciliation reports this as the representative non-zero count when the Wiki
+   * manufacturer catalogue comes back {@code 304 Not Modified}, so a fully-cached healthy run is
+   * not read as a zero-item outage by {@code SyncZeroItems} (#1182).
+   *
+   * @return the number of non-tombstoned manufacturers the SC Wiki reconciliation has linked
+   */
+  @Query(
+      """
+      SELECT COUNT(m) FROM Manufacturer m
+      WHERE m.scwikiSyncedAt IS NOT NULL
+      AND m.scwikiDeletedAt IS NULL
+      """)
+  long countLiveScwikiManufacturers();
 }

@@ -115,6 +115,24 @@ public interface ShipTypeRepository extends LookupTableRepository<ShipType, UUID
       @Param("seenExternalUuids") Collection<UUID> seenExternalUuids, @Param("now") Instant now);
 
   /**
+   * Counts the live SC Wiki-written ship types: every row the Wiki has actually written ({@code
+   * scwiki_synced_at IS NOT NULL}) and not tombstoned ({@code scwiki_deleted_at IS NULL}) — the
+   * same {@code scwiki_synced_at} gate {@link #markScwikiDeletedExcept} uses, so the two agree on
+   * what "Wiki-linked" means. The R4 vehicle sync reports this as the representative non-zero count
+   * when the Wiki vehicle catalogue comes back {@code 304 Not Modified}, so a fully-cached healthy
+   * run is not read as a zero-item outage by {@code SyncZeroItems} (#1182).
+   *
+   * @return the number of non-tombstoned ship types the SC Wiki sync has written
+   */
+  @Query(
+      """
+      SELECT COUNT(s) FROM ShipType s
+      WHERE s.scwikiSyncedAt IS NOT NULL
+      AND s.scwikiDeletedAt IS NULL
+      """)
+  long countLiveScwikiShipTypes();
+
+  /**
    * Derived Spring-Data check - returns {@code true} iff at least one row matches {@code
    * ManufacturerId}.
    */

@@ -139,6 +139,25 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
       @Param("seenScwikiUuids") Collection<UUID> seenScwikiUuids, @Param("now") Instant now);
 
   /**
+   * Counts the live SC Wiki-linked materials: every row that carries a {@code scwiki_uuid} and is
+   * not tombstoned ({@code scwiki_deleted_at IS NULL}) — the same population {@link
+   * #markScwikiDeleted} maintains, minus its {@code NOT IN seen} exclusion. Used by the R3
+   * commodity sync as the representative non-zero count to report when the Wiki catalogue comes
+   * back {@code 304 Not Modified}: a fully-cached healthy run merges nothing, so reporting {@code
+   * 0} would false-fire {@code SyncZeroItems}; reporting the live linked-row count instead keeps a
+   * genuine empty-200 outage (which reports 0) as the only zero-item signal (#1182).
+   *
+   * @return the number of non-tombstoned materials carrying a SC Wiki UUID
+   */
+  @Query(
+      """
+      SELECT COUNT(m) FROM Material m
+      WHERE m.scwikiUuid IS NOT NULL
+      AND m.scwikiDeletedAt IS NULL
+      """)
+  long countLiveScwikiMaterials();
+
+  /**
    * Candidate set of the refinery screenshot import's material matching (#434): every visible
    * material the existing refinery-order create path accepts as an input — {@code type == RAW} or
    * the admin-curated {@code isManualRawMaterial} escape hatch. The gate must mirror the create

@@ -173,4 +173,22 @@ public interface GameItemRepository extends JpaRepository<GameItem, UUID> {
       """)
   int markScwikiDeletedExcept(
       @Param("seenExternalUuids") Collection<UUID> seenExternalUuids, @Param("now") Instant now);
+
+  /**
+   * Counts the live SC Wiki-written game items: every row the Wiki has actually written ({@code
+   * scwiki_synced_at IS NOT NULL}) and not tombstoned ({@code scwiki_deleted_at IS NULL}) — the
+   * same {@code scwiki_synced_at} gate {@link #markScwikiDeletedExcept} uses. The R5 Mode-B item
+   * backfill reports this as the representative non-zero count when every kind endpoint comes back
+   * {@code 304 Not Modified} (nothing upserted), so a fully-cached healthy run is not read as a
+   * zero-item outage by {@code SyncZeroItems} (#1182).
+   *
+   * @return the number of non-tombstoned game items the SC Wiki sync has written
+   */
+  @Query(
+      """
+      SELECT COUNT(g) FROM GameItem g
+      WHERE g.scwikiSyncedAt IS NOT NULL
+      AND g.scwikiDeletedAt IS NULL
+      """)
+  long countLiveScwikiItems();
 }

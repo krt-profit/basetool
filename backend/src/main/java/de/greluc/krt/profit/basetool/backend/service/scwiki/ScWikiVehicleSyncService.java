@@ -74,12 +74,16 @@ public class ScWikiVehicleSyncService {
    *
    * <p>Returns the number of {@code ship_type} rows this run wrote — matched rows linked plus fresh
    * {@code WIKI_ONLY} rows created — which {@link ScWikiScheduler} accumulates into {@code
-   * basetool_scheduled_job_items_total{job="scwiki_sync"}}. The disabled and empty-response
-   * short-circuits return {@code 0} so a Wiki outage surfaces as a zero-item run ({@code
-   * SyncZeroItems}, #1041 item 2).
+   * basetool_scheduled_job_items_total{job="scwiki_sync"}}. The disabled and <em>genuine</em>
+   * empty-response short-circuits return {@code 0} so a Wiki outage surfaces as a zero-item run
+   * ({@code SyncZeroItems}, #1041 item 2). A {@code 304 Not Modified} response is <b>not</b> such
+   * an outage — the catalogue is merely unchanged — so this reports {@link
+   * ShipTypeRepository#countLiveScwikiShipTypes() the live Wiki-linked ship-type count} instead of
+   * {@code 0}, keeping a fully-cached healthy run from false-firing {@code SyncZeroItems} (#1182).
    *
    * @return the number of {@code ship_type} rows written this run ({@code linked} plus {@code
-   *     createdWikiOnly})
+   *     createdWikiOnly}), or the live Wiki-linked ship-type count on a {@code 304 Not Modified}
+   *     (unchanged) catalogue
    */
   @Transactional
   public int syncVehicles() {
@@ -91,11 +95,23 @@ public class ScWikiVehicleSyncService {
     }
 
     log.info("Starting SC Wiki vehicle sync...");
-    List<ScWikiVehicleDto> fetched =
-        scWikiClient.fetchAllPages(
+    ScWikiClient.FetchResult<ScWikiVehicleDto> result =
+        scWikiClient.fetchAllPagesResult(
             properties.getVehiclesEndpoint(),
             new ParameterizedTypeReference<ScWikiResponseDto<ScWikiVehicleDto>>() {},
             "vehicles");
+    if (result.notModified()) {
+      // Catalogue unchanged since the last sync (ETag 304): nothing to fill, but this is a healthy
+      // run — report the live Wiki-linked ship-type count so an all-304 run is not read as a
+      // zero-item outage (#1182). A genuine empty-200 falls through to isEmpty() and reports 0.
+      long live = shipTypeRepository.countLiveScwikiShipTypes();
+      log.info(
+          "SC Wiki vehicle catalogue unchanged since last sync (304) — reporting {} live"
+              + " Wiki-linked ship_type row(s) instead of 0.",
+          live);
+      return (int) live;
+    }
+    List<ScWikiVehicleDto> fetched = result.data();
     if (fetched.isEmpty()) {
       log.warn("No vehicles received from SC Wiki API. Aborting sync (no orphan sweep).");
       return 0;

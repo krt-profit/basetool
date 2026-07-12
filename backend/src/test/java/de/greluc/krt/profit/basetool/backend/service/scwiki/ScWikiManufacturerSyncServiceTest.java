@@ -85,7 +85,8 @@ class ScWikiManufacturerSyncServiceTest {
 
   @Test
   void syncManufacturers_abortsWithoutSweep_whenWikiReturnsEmpty() {
-    when(scWikiClient.fetchAllPages(eq(ENDPOINT), any(), any())).thenReturn(List.of());
+    when(scWikiClient.fetchAllPagesResult(eq(ENDPOINT), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of()));
 
     int written = service.syncManufacturers();
 
@@ -97,11 +98,27 @@ class ScWikiManufacturerSyncServiceTest {
   }
 
   @Test
+  void syncManufacturers_notModified_reportsLiveCount_andSkipsReconciliationAndSweep() {
+    // A 304 (unchanged) catalogue reconciles nothing, but is healthy — it must report the live
+    // reconciled-manufacturer count, NOT 0, so an all-304 run is not a zero-item outage (#1182).
+    when(scWikiClient.fetchAllPagesResult(eq(ENDPOINT), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.unchanged());
+    when(manufacturerRepository.countLiveScwikiManufacturers()).thenReturn(7L);
+
+    int written = service.syncManufacturers();
+
+    assertEquals(7, written, "a 304 (unchanged) catalogue must report the live manufacturer count");
+    verify(syncReportService, never()).beginRun();
+    verify(manufacturerRepository, never()).save(any());
+    verify(manufacturerRepository, never()).markScwikiDeletedExcept(any(), any());
+  }
+
+  @Test
   void linksByName_firstTime_stampsScwikiColumns_logsLinked_runsSweep() {
     UUID uuid = UUID.randomUUID();
     Manufacturer local = manufacturer("Aegis Dynamics", "AEGS");
-    when(scWikiClient.fetchAllPages(eq(ENDPOINT), any(), any()))
-        .thenReturn(List.of(dto(uuid, "Aegis Dynamics", "AEGS")));
+    when(scWikiClient.fetchAllPagesResult(eq(ENDPOINT), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto(uuid, "Aegis Dynamics", "AEGS"))));
     when(manufacturerRepository.findByScwikiUuid(uuid)).thenReturn(Optional.empty());
     when(manufacturerRepository.findByNameIgnoreCase("Aegis Dynamics"))
         .thenReturn(Optional.of(local));
@@ -133,8 +150,9 @@ class ScWikiManufacturerSyncServiceTest {
     UUID uuid = UUID.randomUUID();
     Manufacturer local = manufacturer("Roberts Space Industries", "RSI");
     local.setScwikiUuid(uuid); // already linked on a prior run
-    when(scWikiClient.fetchAllPages(eq(ENDPOINT), any(), any()))
-        .thenReturn(List.of(dto(uuid, "Roberts Space Industries", "RSI")));
+    when(scWikiClient.fetchAllPagesResult(eq(ENDPOINT), any(), any()))
+        .thenReturn(
+            ScWikiClient.FetchResult.of(List.of(dto(uuid, "Roberts Space Industries", "RSI"))));
     when(manufacturerRepository.findByScwikiUuid(uuid)).thenReturn(Optional.of(local));
 
     service.syncManufacturers();
@@ -150,8 +168,10 @@ class ScWikiManufacturerSyncServiceTest {
   void fallsBackToAbbreviationCode_whenNameMisses() {
     UUID uuid = UUID.randomUUID();
     Manufacturer local = manufacturer("Aegis Dynamics", "AEGS");
-    when(scWikiClient.fetchAllPages(eq(ENDPOINT), any(), any()))
-        .thenReturn(List.of(dto(uuid, "Aegis", "AEGS"))); // wiki name differs from UEX name
+    when(scWikiClient.fetchAllPagesResult(eq(ENDPOINT), any(), any()))
+        .thenReturn(
+            ScWikiClient.FetchResult.of(
+                List.of(dto(uuid, "Aegis", "AEGS")))); // wiki name differs from UEX name
     when(manufacturerRepository.findByScwikiUuid(uuid)).thenReturn(Optional.empty());
     when(manufacturerRepository.findByNameIgnoreCase("Aegis")).thenReturn(Optional.empty());
     when(manufacturerRepository.findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc("AEGS"))
@@ -170,8 +190,9 @@ class ScWikiManufacturerSyncServiceTest {
     UUID alreadyLinked = UUID.randomUUID();
     Manufacturer local = manufacturer("Drake Interplanetary", "DRAK");
     local.setScwikiUuid(alreadyLinked);
-    when(scWikiClient.fetchAllPages(eq(ENDPOINT), any(), any()))
-        .thenReturn(List.of(dto(incoming, "Drake Interplanetary", "DRAK")));
+    when(scWikiClient.fetchAllPagesResult(eq(ENDPOINT), any(), any()))
+        .thenReturn(
+            ScWikiClient.FetchResult.of(List.of(dto(incoming, "Drake Interplanetary", "DRAK"))));
     when(manufacturerRepository.findByScwikiUuid(incoming)).thenReturn(Optional.empty());
     when(manufacturerRepository.findByNameIgnoreCase("Drake Interplanetary"))
         .thenReturn(Optional.of(local));
@@ -195,8 +216,8 @@ class ScWikiManufacturerSyncServiceTest {
   @Test
   void unmatchedWikiManufacturer_isSkipped_noEvent_noSweep() {
     UUID uuid = UUID.randomUUID();
-    when(scWikiClient.fetchAllPages(eq(ENDPOINT), any(), any()))
-        .thenReturn(List.of(dto(uuid, "Some Indie Studio", "INDIE")));
+    when(scWikiClient.fetchAllPagesResult(eq(ENDPOINT), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto(uuid, "Some Indie Studio", "INDIE"))));
     when(manufacturerRepository.findByScwikiUuid(uuid)).thenReturn(Optional.empty());
     when(manufacturerRepository.findByNameIgnoreCase("Some Indie Studio"))
         .thenReturn(Optional.empty());

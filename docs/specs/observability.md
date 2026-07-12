@@ -383,19 +383,23 @@ transaction per pass) rather than per-scrape.
   > falsely-stale `0`. The items counter is present only for jobs that report a count: user sync,
   > notification retention, default-blueprint provisioning, and — since #1041 item 2 — `uex_sync` (the
   > `UexItemSyncService` `game_item` upsert tally, with the unchanged-catalogue carve-out below) and
-  > `scwiki_sync` (the sum of the five SC-Wiki step
-  > counts, a failing step contributing `0`). For the two catalogue syncs it is populated from the same
+  > `scwiki_sync` (the sum of the five SC-Wiki step counts, a failing step contributing `0`; same
+  > carve-out below). For the two catalogue syncs it is populated from the same
   > per-run tallies the sync-report summary uses and backs the `SyncZeroItems` alert, which fires when
   > a sync keeps succeeding but has processed zero rows for 48 h — the empty-200 catalogue outage that
   > neither `ExternalSyncStale` (last-success stays fresh) nor `ExternalFetchErrors` (an empty 200 is
-  > not a fetch error) catches. **Unchanged-catalogue carve-out (`uex_sync`):** `UexClient` does
-  > conditional GETs, so when the whole item catalogue is unchanged every category returns `304 Not
-  > Modified` and the run upserts nothing — a healthy no-op indistinguishable from an empty-200 outage
-  > by the raw upsert tally alone. To stop that false `SyncZeroItems` firing, `UexItemSyncService`
-  > reports the live catalogue size (`GameItemRepository.countLiveUexItems()`) instead of `0` when
-  > nothing was upserted but at least one category was served from the `304` cache; a genuine
-  > empty-200 (no `304` at all) still reports `0` and correctly trips the alert. The same
-  > success-with-zero-work idea backs `UserSyncZeroItems`
+  > not a fetch error) catches. **Unchanged-catalogue carve-out (`uex_sync` + `scwiki_sync`, #1182):**
+  > `UexClient` and `ScWikiClient` both do conditional GETs, so when the whole catalogue is unchanged
+  > every category/endpoint returns `304 Not Modified` and the run upserts nothing — a healthy no-op
+  > indistinguishable from an empty-200 outage by the raw upsert tally alone. To stop that false
+  > `SyncZeroItems` firing, `UexItemSyncService` reports the live catalogue size
+  > (`GameItemRepository.countLiveUexItems()`) instead of `0` when nothing was upserted but at least
+  > one category was served from the `304` cache, and each `scwiki_sync` step likewise reports its
+  > live linked-row count (`MaterialRepository.countLiveScwikiMaterials` for commodities, plus
+  > `countLiveScwikiShipTypes` / `countLiveScwikiBlueprints` / `countLiveScwikiManufacturers` /
+  > `countLiveScwikiItems` for the other steps) on an all-`304` fetch; a genuine empty-200 (no `304`
+  > at all) still reports `0` and correctly trips the alert. The same success-with-zero-work idea
+  > backs `UserSyncZeroItems`
   > (`user_sync` synced zero users for 30 min while successful runs happened — Keycloak returned an
   > empty roster; #1041 item 3).
 
