@@ -83,9 +83,13 @@ groups:
       # `OutOfMemoryError: unable to create native thread` REGARDLESS of heap/RAM headroom. This is the
       # leading indicator that was missing on 2026-07-09: the backend hit the pids cap (readiness +
       # Keycloak token calls failed at ~55% memory) and the deploy loop thrashed against the resulting
-      # `unhealthy` container for ~2h. No metric exports the cgroup pids limit, so the 2048 cap is
-      # hardcoded; >80% (=1638) is the early warning and a steady climb is a thread leak. Companion to
-      # ContainerPidsHigh (infrastructure.yml), which catches non-JVM threads in the same container.
+      # `unhealthy` container for ~2h. No JVM/Micrometer metric exports the cgroup pids limit, so the
+      # 2048 cap is hardcoded; >80% (=1638) is the early warning and a steady climb is a thread leak.
+      # This gauge counts only JVM-managed threads: the cgroup-level companion ContainerPidsHigh
+      # (infrastructure.yml, cAdvisor container_threads) catches the tasks this cannot see — unreaped
+      # child-process zombies and the OS carrier threads behind virtual threads (the 2026-07-12 ingest
+      # native-thread OOM, where the pids cap was exhausted while this gauge stayed flat) — and also
+      # covers keycloak, which shares the 2048 cap but exports no basetool-* Micrometer series here.
       - alert: JvmThreadsHigh
         expr: jvm_threads_live_threads > 1638
         for: 10m

@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-07-12
 - **Deciders:** @greluc
-- **Related:** REQ-OBS-007 (amended here) · REQ-OBS-014 · REQ-OBS-004 · ADR-0072 (established the file-only shipping decision this amends) · #1274 (`init: true` zombie-reaping root-cause fix) · #1041 item 24 (`mon-*` stdout shipping precedent) · the 2026-07-12 ingest native-thread pids-cap OOM
+- **Related:** REQ-OBS-007 (amended here) · REQ-OBS-014 · REQ-OBS-004 · ADR-0072 (established the file-only shipping decision this amends) · #1274 (`init: true` zombie-reaping root-cause fix) · #1275 (`ContainerPidsHigh` leading indicator) · #1041 item 24 (`mon-*` stdout shipping precedent) · the 2026-07-12 ingest native-thread pids-cap OOM
 
 ## Context
 
@@ -27,9 +27,12 @@ rotation), not Loki.
 Two facts bound the value:
 
 - The **root cause of that specific incident is fixed** (`init: true` reaps the healthcheck
-  `ssl_client` zombies, #1274) and **`JvmThreadsHigh`** (`apps.yml`) is the **leading** indicator, so
-  a native-thread crash should not recur. This stream is therefore a **lagging forensic breadcrumb**,
-  not a prevention — but it also closes the *general* blind spot for any future JVM/native crash.
+  `ssl_client` zombies, #1274) and **`ContainerPidsHigh`** (`infrastructure.yml`, #1275) is the
+  **leading** indicator — it watches the cgroup `pids.current` (`container_threads`), so it sees the
+  zombie/task leak that `JvmThreadsHigh` was blind to (that JVM-only gauge stayed ~36 through the
+  incident). A native-thread crash should therefore not recur. This stream is a **lagging forensic
+  breadcrumb**, not a prevention — but it also closes the *general* blind spot for any future
+  JVM/native crash whose stderr line never reaches logback.
 - The apps' **own** console lines *are* masked at source: the prod logback config keeps the CONSOLE
   appender active and it runs through `PiiMaskingPatternLayout` → `PiiMasker`. Only the truly-raw,
   non-logback stderr is unmasked.

@@ -347,6 +347,20 @@ services:
       - --housekeeping_interval=30s
       - --listen_ip=0.0.0.0
       - --port=8080
+      # Enable the `process` metric group so container_processes / container_threads /
+      # container_threads_max (the cgroup pids.current / pids.max task counts) are scraped — the
+      # cgroup-pids signal ContainerPidsHigh (infrastructure.yml) alerts on. cAdvisor disables
+      # `process` by default; the JVM's own jvm_threads_live_threads gauge cannot see non-JVM pids or
+      # the OS carrier threads behind virtual threads, so the 2026-07-12 ingest native-thread OOM
+      # (unreaped ssl_client zombies from the wget-https healthcheck exhausting the 2048 pids cap) hit
+      # the cgroup cap while jvm_threads_live_threads stayed flat (~36) and JvmThreadsHigh never fired
+      # — only post-crash TargetDown paged (REQ-OBS-014). This is the default --disable_metrics set
+      # with `process` REMOVED — do NOT switch to --enable_metrics=process: that flag REPLACES the
+      # whole set (help: "If set, overrides 'disable_metrics'"), which would drop cpu/memory/network
+      # and blind ContainerWorkingSetHigh / ContainerCpuThrottledHigh / ContainerMetricsMissing.
+      # Verified on cadvisor v0.60.5: container_threads{name=...} appears while container_last_seen /
+      # container_memory_working_set_bytes stay present.
+      - --disable_metrics=advtcp,cpu_topology,cpuset,hugetlb,memory_numa,referenced_memory,resctrl,sched,tcp,udp
     volumes:
       - /:/rootfs:ro
       - /sys:/sys:ro

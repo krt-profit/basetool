@@ -51,9 +51,10 @@ groups:
       # JVM native-thread exhaustion breadcrumb (ADR-0095). The `<svc>-stdout` streams carry the
       # JVM/glibc native errors that bypass logback and never reach the masked JSON file — including the
       # `pthread_create failed (EAGAIN)` / `unable to create native thread` line of the 2026-07-12 ingest
-      # pids-cap OOM. This is a LAGGING forensic complement: the LEADING indicator is JvmThreadsHigh
-      # (apps.yml) and the root cause is fixed by init:true zombie reaping (#1274), so a crash should not
-      # recur — this only leaves the native line in Loki when one does.
+      # pids-cap OOM. This is a LAGGING forensic complement: the LEADING indicator is ContainerPidsHigh
+      # (infrastructure.yml, #1275 — watches the cgroup pids count, so it sees the zombie/task leak that
+      # the JVM-only JvmThreadsHigh was blind to) and the root cause is fixed by init:true zombie reaping
+      # (#1274), so a crash should not recur — this only leaves the native line in Loki when one does.
       #
       # STAGED, NOT ACTIVE (dead-alert guard, REQ-OBS-014): enable ONLY after verifying on the test/prod
       # stack that the native line actually lands in this stream once <svc>-stdout is shipped — i.e. that
@@ -68,7 +69,7 @@ groups:
       #     severity: critical
       #   annotations:
       #     summary: "JVM native-thread exhaustion in a container ({{ $labels.app }})"
-      #     description: "A JVM app's container stderr logged 'pthread_create failed' / 'unable to create native thread' — the container hit its cgroup pids cap and the JVM can no longer create OS threads (the 2026-07-12 native-thread OOM). Check the pids trend and container restarts; the leading warning is JvmThreadsHigh."
+      #     description: "A JVM app's container stderr logged 'pthread_create failed' / 'unable to create native thread' — the container hit its cgroup pids cap and the JVM can no longer create OS threads (the 2026-07-12 native-thread OOM). Check the pids trend and container restarts; the leading warning is ContainerPidsHigh."
 
   - name: log-alerts-warning
     rules:
