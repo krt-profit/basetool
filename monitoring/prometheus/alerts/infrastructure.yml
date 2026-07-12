@@ -266,6 +266,32 @@ groups:
           summary: "Container CPU throttled >25%: {{ $labels.name }}"
           description: "Container {{ $labels.name }} had more than 25% of its CFS periods throttled for 15 minutes — it is CPU-starved against its limit, degrading latency. Consider raising its cpus limit."
 
+      # Container cgroup-pids exhaustion (2026-07-12 ingest native-thread OOM). The `pids` cgroup cap
+      # (2048 for the four JVM containers backend/frontend/ingest/keycloak — docker-compose.yml) limits
+      # EVERY task in the container, not just JVM threads: unreaped child processes (the ssl_client
+      # zombies the wget-https docker healthcheck spawned in the incident) and the OS carrier threads
+      # behind virtual threads both count against it yet are INVISIBLE to Micrometer's
+      # jvm_threads_live_threads — which stayed flat (~36) while ingest exhausted the cap, so
+      # JvmThreadsHigh (apps.yml) never fired and only post-crash TargetDown / DeployHealthRestartFailing
+      # paged. This is the JVM-blind companion that catches non-JVM pids and virtual-thread carriers.
+      # cAdvisor's container_threads is the cgroup pids.current task count (its companion
+      # container_threads_max = pids.max); the `process` metric group that emits it is enabled in
+      # docker-compose.monitoring.yml. Scoped to the four containers that carry the 2048 pids cap —
+      # keycloak is included because it shares that cap AND the wget-https healthcheck yet is NOT covered
+      # by JvmThreadsHigh (which only sees the basetool-* Micrometer apps), so it would otherwise stay
+      # entirely blind to pids exhaustion. The 2048 cap is hardcoded here to stay in lockstep with
+      # JvmThreadsHigh and the compose pids limit (container_threads_max would export it, but the
+      # hardcode keeps both alerts trivially comparable); >80% (=1638) is the early warning and a steady
+      # climb is a task/zombie leak. Verified against cadvisor v0.60.5.
+      - alert: ContainerPidsHigh
+        expr: container_threads{name=~"backend|frontend|ingest|keycloak"} > 1638
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container pids >80% of the cgroup cap: {{ $labels.name }}"
+          description: "Container {{ $labels.name }} holds more than 1638 tasks (>80% of its 2048 pids cgroup cap — container_threads is the cgroup pids.current count). At the cap the kernel refuses new tasks: the JVM throws 'unable to create native thread' and child-process spawns (healthcheck wget, ssl_client) fail — the 2026-07-12 ingest native-thread OOM, where unreaped zombies exhausted the cap while jvm_threads_live_threads (JVM-only) stayed flat and JvmThreadsHigh never fired. A steady climb is a task/zombie leak — investigate before it reaches 2048; do not raise the cap to silence it."
+
       - alert: RedisEvictions
         expr: increase(redis_evicted_keys_total[15m]) > 0
         for: 15m

@@ -412,8 +412,10 @@ transaction per pass) rather than per-scrape.
   (`process_files_open_files` > 85% of max — FD leaks kill a JVM with confusing symptoms),
   `JvmThreadsHigh` (`jvm_threads_live_threads` > 1638 = 80% of the container's hardcoded 2048 `pids`
   cap — at the cap the JVM throws `OutOfMemoryError: unable to create native thread` regardless of
-  heap/RAM headroom, the 2026-07-09 native-thread exhaustion root cause; the cgroup pids limit is not
-  an exported series so the cap is hardcoded) and
+  heap/RAM headroom, the 2026-07-09 native-thread exhaustion root cause; no JVM/Micrometer metric
+  exports the cgroup pids limit so the cap is hardcoded, and the cgroup-level `ContainerPidsHigh`
+  companion (REQ-OBS-014, below) catches the non-JVM tasks this JVM-only gauge cannot see — unreaped
+  child-process zombies and virtual-thread OS carriers) and
   `JvmGcOverheadHigh` (`rate(jvm_gc_pause_seconds_sum)` > 20% — GC thrash degrades latency before
   `JvmHeapHigh`'s 90% trips). No metaspace rule (nonheap max is often -1 → NaN). Deepened
   `03-spring-apps.json`: per-pool heap, GC pause max by action/cause, thread states, open FDs vs max,
@@ -751,14 +753,32 @@ therefore alerts on:
   `ContainerOomKilled` and `ContainerCpuThrottledHigh` (warning) surface a single OOM kill and
   sustained CFS throttling that the coarse `ContainerRestartLoop` / `ContainerWorkingSetHigh` alerts
   miss.
+- **cgroup-pids exhaustion.** The `pids` cgroup cap (2048 for the four JVM containers
+  backend/frontend/ingest/keycloak) limits **every** task in the container, not just JVM threads —
+  unreaped child-process zombies (the `ssl_client` processes the `wget`-HTTPS docker healthcheck
+  spawned) and the OS carrier threads behind virtual threads both count against it yet are invisible
+  to Micrometer's `jvm_threads_live_threads`. In the 2026-07-12 ingest native-thread OOM the cap was
+  exhausted while that JVM-only gauge stayed flat (~36), so `JvmThreadsHigh` never fired and only the
+  post-crash `TargetDown` / `DeployHealthRestartFailing` paged — no leading warning at all.
+  `ContainerPidsHigh` (warning) closes that blind spot: it fires when cAdvisor's `container_threads`
+  (the cgroup `pids.current` task count; companion `container_threads_max` = `pids.max`) exceeds 80%
+  (1638) of the 2048 cap for 10m. It is the cgroup-level companion to `JvmThreadsHigh` and additionally
+  covers keycloak, which shares the cap and the `wget`-HTTPS healthcheck but exports no `basetool-*`
+  Micrometer series here. The signal exists **only because** the cadvisor `process` metric group is
+  enabled in `docker-compose.monitoring.yml` (`--disable_metrics` set to cadvisor's default minus
+  `process`; `--enable_metrics=process` is wrong — it *replaces* the whole set and would blind the
+  memory/cpu container alerts). The 2048 cap is hardcoded to stay in lockstep with `JvmThreadsHigh` and
+  the compose `pids` limit; do **not** raise the cap to silence the alert.
 
 All labels stay bounded (REQ-OBS-006): these alerts read only the exporters' own low-cardinality
 series (`job` / `instance` / `reason` / `name` / `path` / `health_type`), never per-user or
 free-text values.
 
 **Enforced by:** `monitoring/prometheus/alerts/meta.yml` (`meta-self-health` + `meta-log-pipeline`
-groups) · `monitoring/prometheus/alerts/infrastructure.yml` (container guards) ·
-`monitoring/prometheus/prometheus.yml` (the `blackbox-exporter` self-metrics scrape job) ·
+groups) · `monitoring/prometheus/alerts/infrastructure.yml` (container guards, incl.
+`ContainerPidsHigh`) · `docker-compose.monitoring.yml` (cadvisor `process` metric group enabling
+`container_threads`/`container_processes`) · `monitoring/prometheus/prometheus.yml` (the
+`blackbox-exporter` self-metrics scrape job) ·
 `scripts/deploy.sh` (`reconcile_monitoring_reload(s)` self-healing force-recreate + the
 `basetool_monitoring_config_applied_timestamp` textfile metric) · `scripts/deploy.test.sh`
 (config-apply / self-heal self-tests) · `monitoring/grafana/dashboards/13-meta-monitoring.json`
