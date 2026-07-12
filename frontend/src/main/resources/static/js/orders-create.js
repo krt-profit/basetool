@@ -35,12 +35,15 @@
 
 // Inline "?" SCU-hint marker for JS-built rows (the Thymeleaf fragment cannot be used here).
 // The hint text is a trusted message constant with no HTML-special characters, so it is safe
-// to inline without escaping. Starts hidden; refreshMaterialUnit() reveals it for SCU materials.
+// to inline without escaping. Starts hidden via the runtime `krtm-hidden` class (mirroring the
+// scu-hint fragment's `th:classappend`); refreshMaterialUnit() toggles it for SCU materials. The
+// former inline `style="display:none;"` is blocked by the CSP style-src-attr 'none' pin (ADR-0093),
+// and a `style.display = ''` reveal cannot override a class, so visibility is class-based throughout.
 function scuHintMarkup() {
     return (
-        '<span class="scu-hint" data-role="scu-hint" tabindex="0" role="img" aria-label="' +
+        '<span class="scu-hint krtm-hidden" data-role="scu-hint" tabindex="0" role="img" aria-label="' +
         SCU_HINT_TEXT +
-        '" style="display:none;"><span aria-hidden="true">?</span>' +
+        '"><span aria-hidden="true">?</span>' +
         '<span class="scu-hint__bubble" aria-hidden="true">' +
         SCU_HINT_TEXT +
         '</span></span>'
@@ -66,15 +69,15 @@ function refreshMaterialUnit(row) {
     if (qt === 'PIECE') {
         amountInput.setAttribute('step', '1');
         if (unitSpan) unitSpan.textContent = '(' + MSG_UNIT_PIECE + ')';
-        if (hint) hint.style.display = 'none';
+        if (hint) hint.classList.add('krtm-hidden');
     } else if (qt === 'SCU') {
         amountInput.setAttribute('step', '0.001');
         if (unitSpan) unitSpan.textContent = '(' + MSG_UNIT_SCU + ')';
-        if (hint) hint.style.display = '';
+        if (hint) hint.classList.remove('krtm-hidden');
     } else {
         amountInput.setAttribute('step', '0.001');
         if (unitSpan) unitSpan.textContent = '';
-        if (hint) hint.style.display = 'none';
+        if (hint) hint.classList.add('krtm-hidden');
     }
 }
 
@@ -266,7 +269,7 @@ function addItemLine(prefill) {
     row.innerHTML = `
         <input type="hidden" name="items[${idx}].clientLineId" value="${idx}">
         <input type="hidden" name="items[${idx}].parentClientLineId" value="${prefill.parentId != null ? prefill.parentId : ''}">
-        <div style="display:flex; gap:1rem; align-items:flex-end;">
+        <div class="oc-line-fields">
             <div class="form-group flex-2 mb-0">
                 <label>${ITEM_I18N.item}</label>
                 <select name="items[${idx}].gameItemId" data-role="item-select" data-testid="order-item-combobox" required>${options}</select>
@@ -279,11 +282,11 @@ function addItemLine(prefill) {
                 <label>${ITEM_I18N.amount}</label>
                 <input type="number" step="1" name="items[${idx}].amount" data-role="amount" min="1" value="${prefill.amount || 1}" required>
             </div>
-            <button type="button" class="btn btn-quiet-danger mb-0" data-trigger="orders-remove-item" style="white-space:nowrap;">${ITEM_I18N.remove}</button>
+            <button type="button" class="btn btn-quiet-danger mb-0 nowrap" data-trigger="orders-remove-item">${ITEM_I18N.remove}</button>
         </div>
-        <div data-role="derived" style="margin-top:0.75rem;"></div>
-        <div data-role="unresolved" class="hud-box hud-box-error" style="margin-top:0.5rem; display:none;"></div>
-        <div data-role="subassemblies" style="margin-top:0.5rem;"></div>
+        <div data-role="derived" class="oc-derived-block"></div>
+        <div data-role="unresolved" class="hud-box hud-box-error oc-note-block krtm-hidden"></div>
+        <div data-role="subassemblies" class="oc-note-block"></div>
     `;
     container.appendChild(row);
     // Seed the chosen item as a selected <option> BEFORE enhancing, so the combobox shows its
@@ -322,7 +325,7 @@ function addItemLine(prefill) {
 function clearDerived(row) {
     row.querySelector('[data-role="derived"]').innerHTML = '';
     const u = row.querySelector('[data-role="unresolved"]');
-    u.style.display = 'none';
+    u.classList.add('krtm-hidden');
     u.innerHTML = '';
     row.querySelector('[data-role="subassemblies"]').innerHTML = '';
 }
@@ -385,7 +388,7 @@ function loadDerivation(row, qualities) {
                 clearDerived(row);
                 return;
             }
-            let html = `<strong style="color:var(--color-gray-1);">${ITEM_I18N.materialsTitle}</strong>`;
+            let html = `<strong class="oc-label-strong">${ITEM_I18N.materialsTitle}</strong>`;
             (d.materials || []).forEach((m, mi) => {
                 const mat = m.material || {};
                 const unit = mat.quantityType === 'PIECE' ? 'Stk' : 'SCU';
@@ -399,11 +402,11 @@ function loadDerivation(row, qualities) {
                 const goodSel = storedQ === 'GOOD' ? ' selected' : '';
                 const noneSel = storedQ !== 'GOOD' ? ' selected' : '';
                 html += `
-                    <div style="display:flex; gap:1rem; align-items:center; margin-top:0.4rem;">
+                    <div class="oc-material-line">
                         <input type="hidden" name="items[${idx}].materials[${mi}].materialId" value="${mat.id}">
-                        <span style="flex:2;">${escapeName(mat.name || '')}</span>
-                        <span style="flex:1;">${qty} ${unit}</span>
-                        <select name="items[${idx}].materials[${mi}].quality" style="flex:1;">
+                        <span class="flex-2">${escapeName(mat.name || '')}</span>
+                        <span class="flex-1">${qty} ${unit}</span>
+                        <select name="items[${idx}].materials[${mi}].quality" class="flex-1">
                             <option value="GOOD"${goodSel}>${ITEM_I18N.qualityGood}</option>
                             <option value="NONE"${noneSel}>${ITEM_I18N.qualityNone}</option>
                         </select>
@@ -411,18 +414,18 @@ function loadDerivation(row, qualities) {
             });
             derived.innerHTML = (d.materials || []).length ? html : '';
             if ((d.unresolvedIngredients || []).length) {
-                unresolved.style.display = 'block';
+                unresolved.classList.remove('krtm-hidden');
                 unresolved.innerHTML = `<p>${ITEM_I18N.unresolved} ${d.unresolvedIngredients.map(escapeName).join(', ')}</p>`;
             } else {
-                unresolved.style.display = 'none';
+                unresolved.classList.add('krtm-hidden');
                 unresolved.innerHTML = '';
             }
             if ((d.subAssemblies || []).length) {
-                let s = `<strong style="color:var(--color-gray-1);">${ITEM_I18N.subTitle}</strong>`;
+                let s = `<strong class="oc-label-strong">${ITEM_I18N.subTitle}</strong>`;
                 d.subAssemblies.forEach((sa) => {
                     const gi = sa.gameItem || {};
-                    s += `<div style="display:flex; gap:1rem; align-items:center; margin-top:0.4rem;">
-                        <span style="flex:2;">${escapeName(gi.name || '')} &times; ${sa.quantity}</span>
+                    s += `<div class="oc-material-line">
+                        <span class="flex-2">${escapeName(gi.name || '')} &times; ${sa.quantity}</span>
                         <button type="button" class="btn btn-ghost mb-0" data-trigger="orders-adopt-sub" data-game-item-id="${gi.id}" data-game-item-name="${escapeName(gi.name || '')}" data-amount="${sa.quantity}" data-parent="${idx}">${ITEM_I18N.subAdopt}</button>
                     </div>`;
                 });

@@ -162,6 +162,27 @@
                     min-width: 100%;
                 }
             }
+            /*
+             * Full-width status rows that materials-profit-calculation.js renders into the results
+             * table body (ship-not-selected placeholder, loading, no-data, fetch error). These
+             * replace the former inline style="" attributes on those <td>s: an inline style inside
+             * a JS innerHTML string is blocked by the CSP style-src-attr 'none' pin exactly like a
+             * template one (ADR-0093). The error row additionally keeps the global .text-danger.
+             */
+            .profit-msg {
+                text-align: center;
+                padding: 2rem;
+                color: var(--color-gray-2);
+            }
+            .profit-msg-loading {
+                text-align: center;
+                padding: 2rem;
+                color: var(--color-primary);
+            }
+            .profit-msg-error {
+                text-align: center;
+                padding: 2rem;
+            }
         </style>
     </th:block>
 </head>

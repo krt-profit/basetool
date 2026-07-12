@@ -236,7 +236,9 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         const edit = view !== 'preview';
         input.style.display = edit ? '' : 'none';
         toolbar.style.display = edit ? '' : 'none';
-        preview.style.display = edit ? 'none' : '';
+        // The preview pane's hidden default is the krtm-display-none-5790 class (ADR-0093): a
+        // `style.display = ''` reveal cannot override it, so toggle the class to show the Vorschau.
+        preview.classList.toggle('krtm-display-none-5790', edit);
         viewTabs.forEach((t) => {
             const on = t.getAttribute('data-md-view') === view;
             t.classList.toggle('on', on);

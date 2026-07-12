@@ -623,8 +623,8 @@ function openUmbuchenModal(id, amount, version, materialId, userId, locationId, 
     targetEl.setAttribute('step', isScu ? '0.001' : '1');
     const targetHint = document.getElementById('umbuchen-target-scu-hint');
     const amountHint = document.getElementById('umbuchen-amount-scu-hint');
-    if (targetHint) targetHint.style.display = isScu ? '' : 'none';
-    if (amountHint) amountHint.style.display = isScu ? '' : 'none';
+    if (targetHint) targetHint.classList.toggle('krtm-hidden', !isScu);
+    if (amountHint) amountHint.classList.toggle('krtm-hidden', !isScu);
     amountEl.value = amount;
     amountEl.max = amount;
     targetEl.value = 0;
@@ -774,8 +774,8 @@ function openBookOutModal(id, amount, version, materialId, userId, locationId, q
     }
     const targetScuHint = document.getElementById('bookout-target-scu-hint');
     const amountScuHint = document.getElementById('bookout-amount-scu-hint');
-    if (targetScuHint) targetScuHint.style.display = isScu ? '' : 'none';
-    if (amountScuHint) amountScuHint.style.display = isScu ? '' : 'none';
+    if (targetScuHint) targetScuHint.classList.toggle('krtm-hidden', !isScu);
+    if (amountScuHint) amountScuHint.classList.toggle('krtm-hidden', !isScu);
 
     amountInput.value = amount;
     document.getElementById('amount').max = amount;
