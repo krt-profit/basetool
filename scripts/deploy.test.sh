@@ -670,12 +670,13 @@ scenario_starting_grace() {
 # ---------------------------------------------------------------------------
 # Scenario 11: a config-bundle change that touches ONLY the prometheus slice of
 # the monitoring tree, monitoring enabled. After the health-gated app `up` and
-# the non-gating monitoring `up -d`, deploy.sh must SIGHUP-reload ONLY the
-# service whose slice changed (prometheus); Alloy and blackbox, whose slices are
-# byte-identical across the apply, must be left running untouched.
+# the non-gating monitoring `up -d`, deploy.sh must FORCE-RECREATE ONLY the
+# service whose slice changed (prometheus) — re-resolving its inode-pinned
+# single-file config mount; Alloy and blackbox, whose slices are byte-identical
+# across the apply, must be left running untouched.
 # ---------------------------------------------------------------------------
 scenario_monitoring_config_reload() {
-  echo "Scenario: config change touches only prometheus/ → reload prometheus, not alloy/blackbox"
+  echo "Scenario: config change touches only prometheus/ → recreate prometheus, not alloy/blackbox"
   local tmp rc=0
   tmp="$(mktmp)"
   setup_host "${tmp}"
@@ -712,22 +713,22 @@ scenario_monitoring_config_reload() {
     "IRI_MONITORING_ENABLED=true" \
     "FAKE_CONFIG_BUNDLE=${bundle}" \
     "FAKE_REMOTE_CONFIG=sha256:config-next" || rc=$?
-  assert_exit 0 "$rc" "config-change deploy with a monitoring reload succeeds"
+  assert_exit 0 "$rc" "config-change deploy with a monitoring recreate succeeds"
   assert_docker "monitoring.yml up -d" "the monitoring stack is reconciled"
-  assert_docker "kill -s SIGHUP prometheus" "prometheus is SIGHUP-reloaded (its slice changed)"
-  assert_no_docker "kill -s SIGHUP alloy" "alloy is left alone (its slice is unchanged)"
-  assert_no_docker "kill -s SIGHUP blackbox-exporter" "blackbox is left alone (its slice is unchanged)"
+  assert_docker "force-recreate --no-deps prometheus" "prometheus is force-recreated (its slice changed)"
+  assert_no_docker "force-recreate --no-deps alloy" "alloy is left alone (its slice is unchanged)"
+  assert_no_docker "force-recreate --no-deps blackbox-exporter" "blackbox is left alone (its slice is unchanged)"
   rm -rf "${tmp}"
 }
 
 # ---------------------------------------------------------------------------
 # Scenario 12: monitoring enabled, a normal image re-apply, and the running
-# monitoring config already MATCHES the last reloaded snapshot (steady state).
-# The monitoring stack is reconciled (up -d) but nothing is SIGHUP-reloaded — a
+# monitoring config already MATCHES the last applied snapshot (steady state).
+# The monitoring stack is reconciled (up -d) but nothing is force-recreated — a
 # plain tick over a converged monitoring config must never bounce it.
 # ---------------------------------------------------------------------------
 scenario_monitoring_reload_no_drift() {
-  echo "Scenario: monitoring enabled, config already converged → reconcile but no SIGHUP reload"
+  echo "Scenario: monitoring enabled, config already converged → reconcile but no recreate"
   local tmp rc=0
   tmp="$(mktmp)"
   setup_host "${tmp}"
@@ -749,21 +750,22 @@ scenario_monitoring_reload_no_drift() {
     "FAKE_REPODIGESTS_backend=ghcr.io/krt-profit/basetool-backend@sha256:backend-stale" || rc=$?
   assert_exit 0 "$rc" "monitoring-enabled deploy over a converged config succeeds"
   assert_docker "monitoring.yml up -d" "the monitoring stack is still reconciled"
-  assert_no_docker "kill -s SIGHUP" "no service is reloaded when on-disk matches the reloaded snapshot"
+  assert_no_docker "--force-recreate" "no service is recreated when on-disk matches the applied snapshot"
   rm -rf "${tmp}"
 }
 
 # ---------------------------------------------------------------------------
 # Scenario 12b: the 2026-07-11 ingest TargetDown regression. A converged no-op
 # (marker matches, stack healthy) with monitoring enabled, but the on-disk
-# Prometheus config differs from the snapshot the running Prometheus was last
-# reloaded for — a prior tick's SIGHUP was lost, or a rollback bypassed it. Even
-# on the fast-exit no-op path deploy.sh must SELF-HEAL: SIGHUP prometheus so the
-# committed config lands, WITHOUT pulling/restarting the app stack and without a
-# heavy monitoring `up -d`; alloy/blackbox, already converged, stay untouched.
+# Prometheus config differs from the snapshot Prometheus was last recreated for —
+# a prior tick's recreate was lost, or a rollback bypassed it. Even on the
+# fast-exit no-op path deploy.sh must SELF-HEAL: force-recreate prometheus so the
+# committed config lands (re-resolving its inode-pinned single-file mount),
+# WITHOUT pulling or re-applying the app stack; alloy/blackbox, already converged,
+# stay untouched.
 # ---------------------------------------------------------------------------
 scenario_monitoring_reload_self_heals_on_noop() {
-  echo "Scenario: converged no-op but Prometheus config drifted → self-healing SIGHUP on the fast exit"
+  echo "Scenario: converged no-op but Prometheus config drifted → self-healing recreate on the fast exit"
   local tmp rc=0
   tmp="$(mktmp)"
   setup_host "${tmp}"
@@ -786,10 +788,10 @@ scenario_monitoring_reload_self_heals_on_noop() {
   assert_exit 0 "$rc" "the self-healing no-op tick exits 0"
   assert_contains "no change" "it is still the idempotence no-op for the app stack"
   assert_no_docker " pull " "the app stack is not pulled on the fast exit"
-  assert_no_docker " up -d" "neither the app nor a heavy monitoring up -d runs on the fast exit"
-  assert_docker "kill -s SIGHUP prometheus" "the stale Prometheus config is self-healed (SIGHUP)"
-  assert_no_docker "kill -s SIGHUP alloy" "alloy is already converged — left alone"
-  assert_no_docker "kill -s SIGHUP blackbox-exporter" "blackbox is already converged — left alone"
+  assert_no_docker "profile prod up" "the app stack is not re-applied on the fast exit"
+  assert_docker "force-recreate --no-deps prometheus" "the stale Prometheus config is self-healed (force-recreate)"
+  assert_no_docker "force-recreate --no-deps alloy" "alloy is already converged — left alone"
+  assert_no_docker "force-recreate --no-deps blackbox-exporter" "blackbox is already converged — left alone"
   if grep -q '^basetool_monitoring_config_applied_timestamp{component="prometheus"} [1-9]' \
        "${T_STATE_DIR}/textfile/monitoring-config.prom" 2>/dev/null; then
     record 1 "the config-applied timestamp metric is emitted for PrometheusConfigStale"
