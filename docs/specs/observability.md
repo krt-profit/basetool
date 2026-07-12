@@ -287,7 +287,11 @@ Tracing on the OTel SDK) behind a hard master gate:
   (`tempo_receiver_accepted_spans` rate 0 for 1h while the counter is non-zero, so it stays quiet
   when tracing is disabled) and `TempoWritePathFailing` (live-store completion/flush failures) —
   metric names verified against a live Tempo 3.0.2 scrape, since REQ-OBS-013 keeps sink failures out
-  of the app logs. The service-graph (node graph) is lit by the metrics-generator's `service-graphs`
+  of the app logs. An ungraceful container stop is a distinct trigger of this write-path failure
+  mode: the two dskit stores (`loki`, `tempo`) both set `stop_grace_period: 45s` so a routine
+  `deploy.sh --force-recreate` cannot `SIGKILL` them mid-drain (dskit
+  `server.graceful_shutdown_timeout` 30s) and truncate the write-ahead log (ADR-0072 amendment
+  2026-07-12). The service-graph (node graph) is lit by the metrics-generator's `service-graphs`
   processor → Prometheus `remote_write` (#1041 item 22a, ADR-0076 amendment): it authenticates as the
   shared `grafana` web-auth user (Tempo runs `-config.expand-env`), Prometheus adds
   `--web.enable-remote-write-receiver`, cardinality is capped by `max_active_series`, and
