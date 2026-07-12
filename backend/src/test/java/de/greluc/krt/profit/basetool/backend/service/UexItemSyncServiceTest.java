@@ -137,7 +137,7 @@ class UexItemSyncServiceTest {
             null);
 
     when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
-    when(uexClient.getItemsForCategory(3)).thenReturn(List.of(helmet));
+    when(uexClient.getItemsForCategory(3)).thenReturn(fetched(helmet));
     when(gameItemRepository.findByUexItemId(42)).thenReturn(Optional.empty());
     when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
     when(manufacturerAliasRepository.findManufacturerByUexCompanyId(1))
@@ -171,7 +171,7 @@ class UexItemSyncServiceTest {
     helmetsCategory.setName("Flight Blade");
 
     when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
-    when(uexClient.getItemsForCategory(3)).thenReturn(List.of(avionics));
+    when(uexClient.getItemsForCategory(3)).thenReturn(fetched(avionics));
     when(gameItemRepository.findByUexItemId(99)).thenReturn(Optional.empty());
     when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -199,7 +199,7 @@ class UexItemSyncServiceTest {
     prior.setScwikiSyncedAt(java.time.Instant.now());
 
     when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
-    when(uexClient.getItemsForCategory(3)).thenReturn(List.of(helmet));
+    when(uexClient.getItemsForCategory(3)).thenReturn(fetched(helmet));
     when(gameItemRepository.findByUexItemId(7)).thenReturn(Optional.empty());
     when(gameItemRepository.findByExternalUuid(externalUuid)).thenReturn(Optional.of(prior));
     when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -238,7 +238,7 @@ class UexItemSyncServiceTest {
     uuidOwner.setExternalUuid(sharedUuid);
 
     when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
-    when(uexClient.getItemsForCategory(3)).thenReturn(List.of(skin));
+    when(uexClient.getItemsForCategory(3)).thenReturn(fetched(skin));
     when(gameItemRepository.findByUexItemId(4752)).thenReturn(Optional.of(skinRow));
     when(gameItemRepository.findByExternalUuid(sharedUuid)).thenReturn(Optional.of(uuidOwner));
     when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -286,7 +286,7 @@ class UexItemSyncServiceTest {
     prior.setScwikiSyncedAt(java.time.Instant.now());
 
     when(categoryRefService.syncCategories()).thenReturn(List.of(liveriesCategory));
-    when(uexClient.getItemsForCategory(75)).thenReturn(List.of(paint));
+    when(uexClient.getItemsForCategory(75)).thenReturn(fetched(paint));
     when(gameItemRepository.findByUexItemId(21)).thenReturn(Optional.empty());
     when(gameItemRepository.findByExternalUuid(externalUuid)).thenReturn(Optional.of(prior));
     when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -304,14 +304,72 @@ class UexItemSyncServiceTest {
   @Test
   void syncItems_skipsOrphanSweep_whenNoItemsWereProcessed() {
     when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
-    when(uexClient.getItemsForCategory(3)).thenReturn(List.of());
+    when(uexClient.getItemsForCategory(3)).thenReturn(fetched());
 
     int upserted = service.syncItems();
 
     verify(gameItemRepository, never()).markUexDeletedExcept(any(), any());
     // Zero upserts is the tally fed to basetool_scheduled_job_items_total{job=uex_sync} — a UEX
-    // catalogue outage returning empty responses shows here as 0 (#1041 item 2, SyncZeroItems).
+    // catalogue outage returning empty 200 responses shows here as 0 (#1041 item 2, SyncZeroItems).
     assertEquals(0, upserted, "an empty UEX catalogue must report zero upserts");
+  }
+
+  @Test
+  void syncItems_reportsLiveCatalogueSize_whenCatalogueUnchanged304() {
+    // Healthy no-op: UEX serves every category from the conditional-GET cache (304 Not Modified),
+    // so
+    // the run upserts nothing. Reporting 0 would be indistinguishable from the empty-200 outage
+    // SyncZeroItems targets, so the run reports the live catalogue size instead — keeping
+    // basetool_scheduled_job_items_total{job=uex_sync} non-zero on an unchanged catalogue.
+    when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
+    when(uexClient.getItemsForCategory(3)).thenReturn(unchanged());
+    when(gameItemRepository.countLiveUexItems()).thenReturn(4200L);
+
+    int reported = service.syncItems();
+
+    assertEquals(
+        4200, reported, "an unchanged (all-304) catalogue must report its live size, not 0");
+    verify(gameItemRepository, never()).save(any(GameItem.class));
+    verify(gameItemRepository, never()).markUexDeletedExcept(any(), any());
+  }
+
+  @Test
+  void syncItems_reportsZeroWithoutCatalogueFallback_whenEmpty200Outage() {
+    // A genuine empty-200 outage (no 304 anywhere) must still report 0 so SyncZeroItems fires — the
+    // live-catalogue fallback must never mask a real outage.
+    when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
+    when(uexClient.getItemsForCategory(3)).thenReturn(fetched());
+
+    int reported = service.syncItems();
+
+    assertEquals(
+        0, reported, "an empty-200 catalogue outage must report zero, not the catalogue size");
+    verify(gameItemRepository, never()).countLiveUexItems();
+  }
+
+  @Test
+  void syncItems_skipsOrphanSweep_whenAnyCategoryUnchanged304_evenWithFreshItems() {
+    // Mixed run: category 3 returns a fresh item, category 75 is unchanged (304). seenUexItemIds
+    // then holds only category 3's item — an INCOMPLETE view of the catalogue. Running the orphan
+    // sweep would wrongly soft-delete category 75's cached items, so it must be skipped this run.
+    // The upsert count still reflects the fresh item (non-zero), so the catalogue-size fallback for
+    // the all-unchanged case does not apply.
+    UexItemDto helmet =
+        helmetDto(11, "Venture Helmet", UUID.randomUUID().toString(), helmetsCategory);
+    when(categoryRefService.syncCategories())
+        .thenReturn(List.of(helmetsCategory, liveriesCategory));
+    when(uexClient.getItemsForCategory(3)).thenReturn(fetched(helmet));
+    when(uexClient.getItemsForCategory(75)).thenReturn(unchanged());
+    when(gameItemRepository.findByUexItemId(anyInt())).thenReturn(Optional.empty());
+    when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
+    when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    int upserted = service.syncItems();
+
+    verify(gameItemRepository, never()).markUexDeletedExcept(any(), any());
+    verify(gameItemRepository, never()).countLiveUexItems();
+    assertEquals(
+        1, upserted, "the fresh item is counted; the 304 category defers the orphan sweep");
   }
 
   @Test
@@ -319,7 +377,7 @@ class UexItemSyncServiceTest {
     UexItemDto helmet =
         helmetDto(11, "Venture Helmet", UUID.randomUUID().toString(), helmetsCategory);
     when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
-    when(uexClient.getItemsForCategory(3)).thenReturn(List.of(helmet));
+    when(uexClient.getItemsForCategory(3)).thenReturn(fetched(helmet));
     when(gameItemRepository.findByUexItemId(anyInt())).thenReturn(Optional.empty());
     when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
     when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -338,7 +396,7 @@ class UexItemSyncServiceTest {
     UexItemDto helmet =
         helmetDto(11, "Venture Helmet", UUID.randomUUID().toString(), helmetsCategory);
     when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
-    when(uexClient.getItemsForCategory(3)).thenReturn(List.of(helmet));
+    when(uexClient.getItemsForCategory(3)).thenReturn(fetched(helmet));
     when(gameItemRepository.findByUexItemId(anyInt())).thenReturn(Optional.empty());
     when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
     when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -423,7 +481,7 @@ class UexItemSyncServiceTest {
     UexItemDto surviving = helmetDto(200, "Surviving Helmet", "", helmetsCategory);
 
     when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
-    when(uexClient.getItemsForCategory(3)).thenReturn(List.of(colliding, surviving));
+    when(uexClient.getItemsForCategory(3)).thenReturn(fetched(colliding, surviving));
     when(gameItemRepository.findByUexItemId(anyInt())).thenReturn(Optional.empty());
     when(gameItemRepository.save(any(GameItem.class)))
         .thenAnswer(
@@ -499,7 +557,7 @@ class UexItemSyncServiceTest {
     existing.setSourceSystems(GameItemSourceSystem.BOTH);
 
     when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
-    when(uexClient.getItemsForCategory(3)).thenReturn(List.of(helmet));
+    when(uexClient.getItemsForCategory(3)).thenReturn(fetched(helmet));
     when(gameItemRepository.findByUexItemId(500)).thenReturn(Optional.of(existing));
     when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -527,6 +585,29 @@ class UexItemSyncServiceTest {
     c.setSection(section);
     c.setName(name);
     return c;
+  }
+
+  /**
+   * Wraps the given item DTOs as a normal {@code 200} fetch result (data present, {@code
+   * notModified = false}) — the shape {@link UexClient#getItemsForCategory(int)} returns for a
+   * fresh response.
+   *
+   * @param items the DTOs the category returns (none = an empty-200 response)
+   * @return a {@link UexClient.FetchResult} carrying the items with {@code notModified = false}
+   */
+  private static UexClient.FetchResult<UexItemDto> fetched(UexItemDto... items) {
+    return new UexClient.FetchResult<>(List.of(items), false);
+  }
+
+  /**
+   * A {@code 304 Not Modified} fetch result — empty data flagged {@code notModified = true}, the
+   * shape {@link UexClient#getItemsForCategory(int)} returns when the category is unchanged since
+   * the last sync and served from the conditional-GET cache.
+   *
+   * @return an empty {@link UexClient.FetchResult} flagged {@code notModified = true}
+   */
+  private static UexClient.FetchResult<UexItemDto> unchanged() {
+    return new UexClient.FetchResult<>(List.of(), true);
   }
 
   private UexItemDto helmetDto(int id, String name, String uuid, UexCategory cat) {

@@ -12,6 +12,10 @@
 
 - **Monitoring: `TempoGeneratorRemoteWriteFailing` nennt jetzt die zweite reale Ursache.** Der Alarm verwies bisher nur auf „Credential-Drift". Tatsächlich kann der Remote-Write auch bei überall korrektem Passwort mit 401 scheitern, wenn `prometheus-web.yml` host-seitig neu provisioniert, der Prometheus-Container aber nicht neu erzeugt wurde (er validiert weiter den alten Hash) — der bekannte Single-File-Bind-Mount-Effekt. Die Alarmbeschreibung führt jetzt Triage-Schritte samt curl-Probe auf und der Fix ist ein `--force-recreate` von Prometheus **und** Tempo (REQ-OBS-014).
 
+### Fixed
+
+- **Monitoring: Der Alarm `SyncZeroItems` schlägt für `uex_sync` nicht mehr fälschlich bei einem unveränderten Katalog an.** Der UEX-Client nutzt bedingte GETs (ETag): Ist der Item-Katalog seit dem letzten Lauf unverändert, liefert jede Kategorie `304 Not Modified`, der Lauf schreibt nichts — für die Metrik bislang nicht von einem echten Leer-Ausfall (leere 200er) unterscheidbar. Der Item-Sync meldet in diesem Fall jetzt die aktuelle Größe des Katalogs statt `0`, sodass der Alarm nur noch bei einem echten leeren UEX-Feed auslöst (REQ-OBS-011, #1041).
+
 ## [v1.3.3](https://github.com/krt-profit/basetool/releases/tag/v1.3.3) - 2026-07-12
 
 ### Added
