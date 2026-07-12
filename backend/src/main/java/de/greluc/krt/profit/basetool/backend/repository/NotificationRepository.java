@@ -20,9 +20,11 @@
 package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.Notification;
+import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -116,4 +118,46 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
   @Modifying
   @Query("delete from Notification n where n.read = true and n.readAt < :cutoff")
   int deleteReadOlderThan(@Param("cutoff") Instant cutoff);
+
+  /**
+   * The recipient {@code sub}s holding an outstanding notification of one of the given types for a
+   * loose entity reference — collected <em>before</em> {@link #deleteByTypeInAndEntity} so the
+   * caller can push a live inbox/badge refresh to exactly those recipients once their now-stale
+   * items are removed (REQ-NOTIF-018).
+   *
+   * @param types the notification types to match (any-of)
+   * @param entityType the loose entity-type tag
+   * @param entityId the loose entity id
+   * @return the distinct recipient subs; empty when none match
+   */
+  @Query(
+      """
+      select distinct n.recipientSub from Notification n
+      where n.type in :types and n.entityType = :entityType and n.entityId = :entityId
+      """)
+  List<UUID> findRecipientSubsByTypeInAndEntity(
+      @Param("types") Set<NotificationType> types,
+      @Param("entityType") String entityType,
+      @Param("entityId") UUID entityId);
+
+  /**
+   * Deletes every notification of one of the given types tagged with the loose entity reference in
+   * one atomic statement — clears the now-stale "action needed" items a lifecycle-terminating event
+   * supersedes (REQ-NOTIF-018). Clears the persistence context so callers re-read fresh state.
+   *
+   * @param types the notification types to delete (any-of)
+   * @param entityType the loose entity-type tag
+   * @param entityId the loose entity id
+   * @return the number of rows deleted
+   */
+  @Modifying(clearAutomatically = true)
+  @Query(
+      """
+      delete from Notification n
+      where n.type in :types and n.entityType = :entityType and n.entityId = :entityId
+      """)
+  int deleteByTypeInAndEntity(
+      @Param("types") Set<NotificationType> types,
+      @Param("entityType") String entityType,
+      @Param("entityId") UUID entityId);
 }

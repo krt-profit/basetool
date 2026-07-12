@@ -28,6 +28,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestCancelledEvent;
 import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestConfirmedEvent;
 import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestRejectedEvent;
@@ -44,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.model.BankHolder;
 import de.greluc.krt.profit.basetool.backend.model.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.model.BankTransaction;
 import de.greluc.krt.profit.basetool.backend.model.BankTransactionType;
+import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingRequestDto;
@@ -386,10 +388,10 @@ class BankBookingRequestServiceTest {
   @Test
   void cancelOwn_byRequester_flipsCancelled() {
     UUID requestId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
     UUID requester = UUID.randomUUID();
     BankBookingRequest request =
-        pending(
-            requestId, account(UUID.randomUUID()), BankBookingRequestType.DEPOSIT, requester, 0L);
+        pending(requestId, account(accountId), BankBookingRequestType.DEPOSIT, requester, 0L);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
     when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
 
@@ -405,6 +407,16 @@ class BankBookingRequestServiceTest {
             eq(null),
             eq(requester),
             any());
+    // REQ-NOTIF-018: withdrawing fires the cancelled event so the pipeline clears the staff's stale
+    // BANK_BOOKING_REQUEST_CREATED notifications.
+    ArgumentCaptor<BankBookingRequestCancelledEvent> event =
+        ArgumentCaptor.forClass(BankBookingRequestCancelledEvent.class);
+    verify(eventPublisher).publishEvent(event.capture());
+    assertThat(event.getValue().requestId()).isEqualTo(requestId);
+    assertThat(event.getValue().accountId()).isEqualTo(accountId);
+    assertThat(event.getValue().actorSub()).isEqualTo(requester);
+    assertThat(event.getValue().resolvesNotificationTypes())
+        .containsExactly(NotificationType.BANK_BOOKING_REQUEST_CREATED);
   }
 
   @Test
@@ -500,6 +512,10 @@ class BankBookingRequestServiceTest {
     // REQ-BANK-026/-034: the event carries the account id so the ACCOUNT_RESPONSIBLE selector can
     // notify the account's responsible holder.
     assertThat(event.getValue().contextAccountId()).isEqualTo(accountId);
+    // REQ-NOTIF-018: confirming clears the staff's stale BANK_BOOKING_REQUEST_CREATED
+    // notifications.
+    assertThat(event.getValue().resolvesNotificationTypes())
+        .containsExactly(NotificationType.BANK_BOOKING_REQUEST_CREATED);
   }
 
   @Test
@@ -624,6 +640,9 @@ class BankBookingRequestServiceTest {
     assertThat(event.getValue().reason()).isEqualTo("duplicate");
     // REQ-BANK-026/-034: the event carries the account id for the ACCOUNT_RESPONSIBLE selector.
     assertThat(event.getValue().contextAccountId()).isEqualTo(accountId);
+    // REQ-NOTIF-018: rejecting clears the staff's stale BANK_BOOKING_REQUEST_CREATED notifications.
+    assertThat(event.getValue().resolvesNotificationTypes())
+        .containsExactly(NotificationType.BANK_BOOKING_REQUEST_CREATED);
   }
 
   @Test

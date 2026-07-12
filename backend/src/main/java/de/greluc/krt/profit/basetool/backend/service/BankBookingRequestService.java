@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static de.greluc.krt.profit.basetool.backend.util.BankAmounts.plain;
 
+import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestCancelledEvent;
 import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestConfirmedEvent;
 import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestRejectedEvent;
@@ -268,7 +269,9 @@ public class BankBookingRequestService {
   /**
    * Cancels the caller's own pending request (REQ-BANK-022). A request that does not belong to the
    * caller is reported as not found (per-user isolation never reveals foreign requests); a request
-   * that is no longer pending yields a 409.
+   * that is no longer pending yields a 409. Fires {@link BankBookingRequestCancelledEvent} so the
+   * now-stale "new booking request" notifications the bank staff were shown are cleared
+   * (REQ-NOTIF-018).
    *
    * @param requestId the request to cancel
    * @param version the echoed optimistic-locking version
@@ -294,6 +297,12 @@ public class BankBookingRequestService {
         null,
         caller,
         "cancelled request " + shortId(request.getId()));
+    // REQ-NOTIF-018: withdrawing the request clears the now-stale "new booking request"
+    // notifications the bank staff were shown for it. The event notifies nobody itself (the actor
+    // is the requester); its sole pipeline effect is that removal.
+    eventPublisher.publishEvent(
+        new BankBookingRequestCancelledEvent(
+            request.getId(), request.getAccount().getId(), caller));
     return toDto(request);
   }
 

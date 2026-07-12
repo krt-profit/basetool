@@ -21,7 +21,9 @@ package de.greluc.krt.profit.basetool.backend.event;
 
 import de.greluc.krt.profit.basetool.backend.model.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
+import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -100,4 +102,24 @@ public interface NotificationEvent {
    * @return the i18n render parameters; never {@code null}, possibly empty
    */
   Map<String, String> renderParams();
+
+  /**
+   * Notification types this event marks obsolete for its {@link #entityId()}: the creation pipeline
+   * deletes every outstanding notification of one of these types tagged with this event's {@link
+   * #entityType()} + {@link #entityId()} pair, across <em>all</em> recipients, when the event is
+   * processed (REQ-NOTIF-018). Default: none.
+   *
+   * <p>Lets a lifecycle-terminating event clear the now-stale "action needed" notifications an
+   * earlier event in the same lifecycle produced — e.g. deciding (confirm/reject) or withdrawing
+   * (cancel) a bank booking request removes the {@code BANK_BOOKING_REQUEST_CREATED} inbox items
+   * the bank staff were shown. The removal runs regardless of whether this event itself resolves
+   * any recipients, so a purely-terminating event (a self-service cancel that notifies nobody)
+   * still clears the stale items.
+   *
+   * @return the notification types superseded for this event's entity; never {@code null}, possibly
+   *     empty
+   */
+  default Set<NotificationType> resolvesNotificationTypes() {
+    return Set.of();
+  }
 }

@@ -21,10 +21,13 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestCancelledEvent;
+import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestConfirmedEvent;
 import de.greluc.krt.profit.basetool.backend.event.JobOrderCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.event.OrgUnitRef;
 import de.greluc.krt.profit.basetool.backend.model.Notification;
@@ -32,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRepository;
 import de.greluc.krt.profit.basetool.backend.support.NotificationParamsCodec;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -102,6 +106,102 @@ class NotificationCreationServiceTest {
     Set<UUID> recipients = service.createFromEvent(event);
 
     assertThat(recipients).isEmpty();
+    verify(notificationRepository, never()).saveAll(any());
+  }
+
+  @Test
+  void plainEventDoesNotTouchSupersedeQueries() {
+    // REQ-NOTIF-018: an event that supersedes nothing (JobOrderCreatedEvent) never runs the
+    // supersede find/delete — its resolvesNotificationTypes() is empty.
+    JobOrderCreatedEvent event = event();
+    when(ruleEvaluationService.resolveRecipients(event)).thenReturn(Map.of());
+
+    service.createFromEvent(event);
+
+    verify(notificationRepository, never()).findRecipientSubsByTypeInAndEntity(any(), any(), any());
+    verify(notificationRepository, never()).deleteByTypeInAndEntity(any(), any(), any());
+  }
+
+  @Test
+  void decisionEventRemovesSupersededCreatedNotificationsAndReturnsTheirRecipients() {
+    // REQ-NOTIF-018: confirming a booking request clears the BANK_BOOKING_REQUEST_CREATED items the
+    // staff were shown and notifies the requester; the returned set is the union of both so both
+    // inboxes refresh live.
+    UUID requestId = UUID.fromString("00000000-0000-0000-0000-00000000e777");
+    UUID requester = UUID.fromString("00000000-0000-0000-0000-0000000000c1");
+    UUID staffA = UUID.fromString("00000000-0000-0000-0000-0000000000d1");
+    UUID staffB = UUID.fromString("00000000-0000-0000-0000-0000000000d2");
+    BankBookingRequestConfirmedEvent event =
+        new BankBookingRequestConfirmedEvent(
+            requestId, UUID.randomUUID(), "KB-0001", new BigDecimal("500"), requester, staffA);
+    Set<NotificationType> superseded = Set.of(NotificationType.BANK_BOOKING_REQUEST_CREATED);
+    when(notificationRepository.findRecipientSubsByTypeInAndEntity(
+            superseded, "BANK_BOOKING_REQUEST", requestId))
+        .thenReturn(List.of(staffA, staffB));
+    when(notificationRepository.deleteByTypeInAndEntity(
+            superseded, "BANK_BOOKING_REQUEST", requestId))
+        .thenReturn(2);
+    when(ruleEvaluationService.resolveRecipients(event))
+        .thenReturn(Map.of(NotificationType.BANK_BOOKING_REQUEST_CONFIRMED, Set.of(requester)));
+    when(notificationParamsCodec.serialize(any())).thenReturn("{}");
+
+    Set<UUID> affected = service.createFromEvent(event);
+
+    // The removed-notification holders (staff) plus the new-notification recipient (requester).
+    assertThat(affected).containsExactlyInAnyOrder(staffA, staffB, requester);
+    verify(notificationRepository)
+        .deleteByTypeInAndEntity(superseded, "BANK_BOOKING_REQUEST", requestId);
+    ArgumentCaptor<List<Notification>> captor = ArgumentCaptor.captor();
+    verify(notificationRepository).saveAll(captor.capture());
+    assertThat(captor.getValue())
+        .singleElement()
+        .satisfies(
+            n -> {
+              assertThat(n.getType()).isEqualTo(NotificationType.BANK_BOOKING_REQUEST_CONFIRMED);
+              assertThat(n.getRecipientSub()).isEqualTo(requester);
+            });
+  }
+
+  @Test
+  void withdrawalEventOnlyRemovesAndCreatesNothing() {
+    // REQ-NOTIF-018: a cancel notifies nobody (empty rule result) but still clears the staff's
+    // stale created-notifications and returns their subs so their badge refreshes.
+    UUID requestId = UUID.fromString("00000000-0000-0000-0000-00000000e888");
+    UUID staff = UUID.fromString("00000000-0000-0000-0000-0000000000e1");
+    BankBookingRequestCancelledEvent event =
+        new BankBookingRequestCancelledEvent(requestId, UUID.randomUUID(), UUID.randomUUID());
+    Set<NotificationType> superseded = Set.of(NotificationType.BANK_BOOKING_REQUEST_CREATED);
+    when(notificationRepository.findRecipientSubsByTypeInAndEntity(
+            superseded, "BANK_BOOKING_REQUEST", requestId))
+        .thenReturn(List.of(staff));
+    when(notificationRepository.deleteByTypeInAndEntity(
+            superseded, "BANK_BOOKING_REQUEST", requestId))
+        .thenReturn(1);
+    when(ruleEvaluationService.resolveRecipients(event)).thenReturn(Map.of());
+
+    Set<UUID> affected = service.createFromEvent(event);
+
+    assertThat(affected).containsExactly(staff);
+    verify(notificationRepository, never()).saveAll(any());
+  }
+
+  @Test
+  void supersedeIsSkippedWhenNoStaleNotificationsExist() {
+    // No stale rows → no delete issued, no phantom recipients returned.
+    UUID requestId = UUID.fromString("00000000-0000-0000-0000-00000000e999");
+    BankBookingRequestCancelledEvent event =
+        new BankBookingRequestCancelledEvent(requestId, UUID.randomUUID(), UUID.randomUUID());
+    when(notificationRepository.findRecipientSubsByTypeInAndEntity(
+            eq(Set.of(NotificationType.BANK_BOOKING_REQUEST_CREATED)),
+            eq("BANK_BOOKING_REQUEST"),
+            eq(requestId)))
+        .thenReturn(List.of());
+    when(ruleEvaluationService.resolveRecipients(event)).thenReturn(Map.of());
+
+    Set<UUID> affected = service.createFromEvent(event);
+
+    assertThat(affected).isEmpty();
+    verify(notificationRepository, never()).deleteByTypeInAndEntity(any(), any(), any());
     verify(notificationRepository, never()).saveAll(any());
   }
 }

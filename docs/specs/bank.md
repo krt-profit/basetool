@@ -933,6 +933,15 @@ Both `ACCOUNT_GRANT` and `EVENT_RECIPIENT` read their context off the event and 
 columns (ADR-0022, REQ-NOTIF-011). The deciding/requesting actor is excluded; every rule is
 admin-editable at runtime.
 
+- **On decision or withdrawal, the staff's "new booking request" items are cleared.** Once a request
+  is **confirmed**, **rejected** (both by a bank employee) or **cancelled** (the requester withdraws
+  their own still-pending request), the `BANK_BOOKING_REQUEST_CREATED` notifications shown to the bank
+  management + the account's grant holders are stale and are **removed** from their inboxes via the
+  generic notification-supersede mechanism (REQ-NOTIF-018): the three lifecycle-terminating events
+  each `resolvesNotificationTypes() = {BANK_BOOKING_REQUEST_CREATED}`. Cancellation additionally fires
+  the notify-nobody `BANK_BOOKING_REQUEST_CANCELLED` event whose sole purpose is that removal. The
+  affected staff's badge/bell refresh live.
+
 **Acceptance**
 
 - [x] Creating a request fires `BANK_BOOKING_REQUEST_CREATED` after commit; the seeded rule
@@ -942,12 +951,20 @@ admin-editable at runtime.
   `BANK_BOOKING_REQUEST_REJECTED` after commit; the seeded rules notify the requester via the
   `EVENT_RECIPIENT` selector, excluding the deciding employee
   (`RuleEvaluationServiceTest`, `BankBookingRequestServiceTest`).
+- [x] Confirming / rejecting / cancelling a request (after commit) removes the
+  `BANK_BOOKING_REQUEST_CREATED` notifications for that request from the staff's inboxes
+  (REQ-NOTIF-018; `BankBookingRequestServiceTest`, `NotificationCreationServiceTest`).
 - [x] The `ACCOUNT_GRANT` / `EVENT_RECIPIENT` selectors read their context from the event and need
   no schema change to the selector table.
 - [x] The notifications render in the bell/inbox via `notifications.type.BANK_BOOKING_REQUEST_*`
   (i18n keys in all three bundles, named placeholders `{accountNo}`/`{amount}`/`{requester}`/`{reason}`).
 
-**Enforced by:** `RuleEvaluationServiceTest`, `BankBookingRequestServiceTest` · **Code:** `event/BankBookingRequest{Created,Confirmed,Rejected}Event`, `service/RecipientResolutionService#resolveAccountGrantHolders`, `model/SelectorKind#{ACCOUNT_GRANT,EVENT_RECIPIENT}`, `db/migration/V160`, `db/migration/V161` · **Issues:** #666, #673
+**Enforced by:** `RuleEvaluationServiceTest`, `BankBookingRequestServiceTest`,
+`NotificationCreationServiceTest` · **Code:**
+`event/BankBookingRequest{Created,Confirmed,Rejected,Cancelled}Event`,
+`service/RecipientResolutionService#resolveAccountGrantHolders`,
+`model/SelectorKind#{ACCOUNT_GRANT,EVENT_RECIPIENT}`, `db/migration/V160`, `db/migration/V161`;
+lifecycle-close removal in REQ-NOTIF-018 · **Issues:** #666, #673, #1252
 
 ### REQ-BANK-027 — Bereich/OL bank access via the OrgUnitBankAccessService seam (cascading view, view-based requests)
 

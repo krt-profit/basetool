@@ -406,6 +406,46 @@ never the editing member's personal name (no PII in params).
 `model/NotificationEventType`, `model/NotificationType`,
 `db/migration/V214__seed_job_order_requester_update_notification_rule.sql` · **Issues:** #1186
 
+### REQ-NOTIF-018 — Superseding: clear stale "action needed" notifications on lifecycle close
+
+An event may declare, via `NotificationEvent.resolvesNotificationTypes()`, notification **types it
+marks obsolete for its own entity**. When such an event is processed, the creation pipeline
+(`NotificationCreationService`) — **before** creating any new notification — deletes every
+outstanding notification of one of those types tagged with the event's `entity_type` + `entity_id`,
+across **all** recipients, in one atomic statement. This lets a lifecycle-terminating event clear the
+now-stale "action needed" items an earlier event in the same lifecycle produced. The removal runs
+**regardless of whether the event itself resolves any recipients**, so a purely-terminating event
+(one that notifies nobody) still clears the stale items. The removed-notification holders are unioned
+into the recipient set the after-commit listener pushes to, so their unread badge and open bell
+dropdown refresh **live** (REQ-NOTIF-010) the moment the item is cleared — the in-app poll
+(REQ-NOTIF-006) remains the guaranteed fallback. Removal and creation touch disjoint rows (different
+type, different recipients), so no notification is created and immediately deleted.
+
+**First wired use case:** the bank booking-request lifecycle (REQ-BANK-026, REQ-NOTIF-011). The three
+lifecycle-terminating events — `BANK_BOOKING_REQUEST_CONFIRMED`, `BANK_BOOKING_REQUEST_REJECTED`
+(both decided by a bank employee) and the new `BANK_BOOKING_REQUEST_CANCELLED` (the requester
+withdraws their own still-pending request) — each resolve `BANK_BOOKING_REQUEST_CREATED`, so once a
+request is decided or withdrawn the "new booking request" items shown to the bank management + the
+account's grant holders disappear from their inboxes. `BANK_BOOKING_REQUEST_CANCELLED` notifies
+nobody (the requester is the actor and seeds no rule); its sole pipeline effect is the removal.
+
+**Acceptance**
+
+- [x] A confirm / reject / cancel of a booking request (after commit) deletes the
+  `BANK_BOOKING_REQUEST_CREATED` notifications for that request across all recipients, and only those
+  (other types and other entities are untouched).
+- [x] The affected staff are included in the pushed recipient set so their badge/dropdown refresh
+  live; the removal runs even when the event resolves no new recipients (cancel).
+- [x] Adding the `BANK_BOOKING_REQUEST_CANCELLED` event type and the `resolvesNotificationTypes()`
+  hook needs no schema migration (open enum; behaviour is code + event-driven).
+
+**Enforced by:** `NotificationCreationServiceTest`, `NotificationRepositoryIntegrationTest`,
+`BankBookingRequestServiceTest` · **Code:** `event/NotificationEvent#resolvesNotificationTypes`,
+`event/BankBookingRequest{Confirmed,Rejected,Cancelled}Event`,
+`service/NotificationCreationService#removeSupersededNotifications`,
+`repository/NotificationRepository#{findRecipientSubsByTypeInAndEntity,deleteByTypeInAndEntity}`,
+`service/BankBookingRequestService#cancelOwn`, `model/NotificationEventType` · **Issues:** #1252
+
 ## Out of scope (v1)
 
 - Per-notification e-mail routing (generic fan-out of in-app notification types to e-mail), user
