@@ -188,6 +188,83 @@ class BankRequestsLiveSyncE2eTest {
   }
 
   /**
+   * Regression guard for the bank decision-modal reopen bug: after a bank employee decides one
+   * request, the shared decision modal must re-open for the very next request in the same session —
+   * without a page reload. The success path once closed the modal by writing an inline {@code
+   * style.display = 'none'}, which outranks the class-based {@code open-modal-display} re-open (a
+   * modal is shown via the {@code krtm-modal-open} class since the CSP class migration, ADR-0093),
+   * so the second request's button silently did nothing until the page was reloaded (REQ-UI-013).
+   */
+  @Test
+  void decidingOneRequestReopensTheModalForTheNextInPlace() {
+    String baseUrl = STACK.baseUrl();
+    String firstId =
+        seeder.raiseBankDepositRequest(OFFICER_USER, OFFICER_PASSWORD, accountId, 8101);
+    String secondId =
+        seeder.raiseBankDepositRequest(OFFICER_USER, OFFICER_PASSWORD, accountId, 8102);
+    String firstRejectBtn =
+        "[data-testid='bank-request-reject-btn'][data-field-_id='" + firstId + "']";
+    String secondRejectBtn =
+        "[data-testid='bank-request-reject-btn'][data-field-_id='" + secondId + "']";
+
+    Path storageState =
+        E2eSupport.authenticatedStorageState(browser, baseUrl, EMPLOYEE_USER, EMPLOYEE_PASSWORD);
+    try (BrowserContext context =
+        browser.newContext(
+            new Browser.NewContextOptions()
+                .setIgnoreHTTPSErrors(true)
+                .setStorageStatePath(storageState))) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.navigate(page, baseUrl + "/bank/requests");
+        page.waitForLoadState();
+
+        // Both pending requests are visible initially.
+        assertThat(page.locator(firstRejectBtn))
+            .hasCount(1, new LocatorAssertions.HasCountOptions().setTimeout(20_000));
+        assertThat(page.locator(secondRejectBtn)).hasCount(1);
+
+        // A full reload would reset this marker; the in-place swap after the decision leaves it
+        // set,
+        // so it also proves the second open goes through the live path, not an accidental reload.
+        page.evaluate("window.__krtNoReload = true;");
+        dropFooter(page);
+
+        // Decide the first request (a rejection books nothing and needs no holder).
+        page.locator(firstRejectBtn).click(new Locator.ClickOptions().setTimeout(20_000));
+        page.locator("[data-testid='bank-reject-reason']").fill("E2E first rejection");
+        page.waitForResponse(
+            r ->
+                r.url().contains("/api/proxy/bank/requests/" + firstId + "/reject")
+                    && "POST".equals(r.request().method()),
+            new Page.WaitForResponseOptions().setTimeout(60_000),
+            () -> page.locator("[data-testid='bank-reject-submit']").click());
+
+        // The decided request drops from the default pending-only queue in place; the second stays.
+        assertThat(page.locator(firstRejectBtn))
+            .hasCount(0, new LocatorAssertions.HasCountOptions().setTimeout(30_000));
+        assertThat(page.locator(secondRejectBtn)).hasCount(1);
+
+        // The regression assertion: clicking the second request's button must re-open the
+        // shared reject modal. Before the fix the inline display:none left from closing it after
+        // the
+        // first decision outranked the class-based re-open, so it stayed hidden and nothing
+        // happened.
+        page.locator(secondRejectBtn).click(new Locator.ClickOptions().setTimeout(20_000));
+        assertThat(page.locator("#bank-reject-request-modal"))
+            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
+        assertEquals(
+            Boolean.TRUE,
+            page.evaluate("window.__krtNoReload === true"),
+            "deciding a request and opening the next must not reload the page");
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "bank-requests-second-decision");
+        throw failure;
+      }
+    }
+  }
+
+  /**
    * Hides the {@code position:fixed} footer, which can intercept the trusted submit click on some
    * engines (the WebKit/Firefox footer-overlap flake the bank booking e2e also guards against).
    *
