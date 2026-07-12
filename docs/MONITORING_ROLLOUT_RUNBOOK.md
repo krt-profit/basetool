@@ -30,6 +30,7 @@ Epic #936, ADR-0072, REQ-OBS-005..011. Compose project: `iri-monitoring`
 13. [Restore drill (monthly) — extended scope](#restore-drill-monthly--extended-scope)
 14. [Keystore-rotation note (MUST update `docs/deployment.md`)](#keystore-rotation-note)
 15. [Appendix A — UI click-path verification log](#appendix-a--ui-click-path-verification-log)
+16. [Appendix B — Enabling the staged `JvmNativeThreadExhaustion` Loki rule](#appendix-b--enabling-the-staged-jvmnativethreadexhaustion-loki-rule)
 
 ---
 
@@ -830,3 +831,36 @@ and GitHub issue sources.
 - **healthchecks.io** — official docs confirm the concepts and the 20-check free tier but do **not**
 describe the **"Add Check"** button / Ping-URL copy affordance.
 source in this authoring session.
+
+---
+
+## Appendix B — Enabling the staged `JvmNativeThreadExhaustion` Loki rule
+
+ADR-0095 ships backend/frontend/ingest container stdout/stderr to Loki under the distinct
+`app="<svc>-stdout"` labels so the JVM/glibc **native** errors that bypass logback
+(`pthread_create failed` / `unable to create native thread`, the `hs_err` preamble) become visible.
+The consuming rule `JvmNativeThreadExhaustion` in
+`monitoring/loki/rules/fake/basetool-log-alerts.yml` ships **commented-out** to avoid a dead alert
+(REQ-OBS-014): a LogQL rule whose signature never appears would sit green forever and give false
+assurance. **Do not uncomment it until the steps below confirm the native line actually lands in the
+shipped stream.** The stream itself flows immediately (the prod logback CONSOLE appender is active),
+but the native line is emitted *outside* logback, so its presence must be observed, not assumed.
+
+1. **Confirm the stream ships.** After the `<svc>-stdout` shipping is deployed, in Grafana →
+   Explore → Loki datasource, run `{app="backend-stdout"}` (repeat for `frontend-stdout` /
+   `ingest-stdout`). You should see the container's masked console output. If empty, the Alloy
+   keep-list / relabel change did not take (check `config.alloy` and `AlloyComponentUnhealthy`).
+2. **Confirm the native line format.** The exact wording HotSpot/glibc writes to stderr must match the
+   rule's line filter `pthread_create failed|unable to create native thread`. Confirm it on the
+   **isolated test stack** (never prod) by provoking the failure — e.g. temporarily lower the app
+   container's `pids` cap (`--pids-limit`) well below its live thread count and start it, then read
+   `docker logs <svc>` and the Loki stream `{app="<svc>-stdout"} |~ "pthread_create failed|unable to
+   create native thread"`. The line must appear in **Loki**, not only in `docker logs`. Record the
+   exact line (JVM-version-dependent) here if it differs, and widen the filter accordingly. Restore
+   the pids cap afterwards and tear the test stack down with `down --volumes`.
+3. **Enable + verify load.** Once a real native line is confirmed under
+   `{app=~"(backend|frontend|ingest)-stdout"}` and matched by the filter, uncomment
+   `JvmNativeThreadExhaustion`, deploy, and confirm the Loki ruler loaded it without error
+   (`LokiRuleEvaluationFailures` stays green; the group appears in the ruler). Update the rule's
+   staging comment to record the verification date.
+

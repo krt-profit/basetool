@@ -5,6 +5,7 @@
 ### Added
 
 - **Monitoring: Neuer Alarm `ContainerPidsHigh` warnt, bevor ein Container sein Task-Limit (cgroup-`pids`) erschöpft.** Beim Ingest-Vorfall am 12.07.2026 füllte sich das 2048er-`pids`-Limit durch nicht abgeräumte Healthcheck-Zombie-Prozesse, während die JVM-Thread-Metrik flach blieb — daher schlug `JvmThreadsHigh` nicht an und nur der Absturz danach meldete sich. Ergänzend zur Ursachenbehebung (`init: true`, REQ-OPS-019) überwacht der neue Alarm die cAdvisor-Metrik `container_threads` (>80 % = 1638 der 2048er-Grenze) für die vier JVM-Container backend/frontend/ingest/keycloak und fängt so jede künftige `pids`-Erschöpfung ab; dafür wird die cAdvisor-`process`-Metrikgruppe aktiviert (REQ-OBS-014).
+- **Monitoring: JVM-Absturzursachen landen jetzt in Loki.** Native Fehler wie `pthread_create failed` / `unable to create native thread`, die die JVM direkt auf die Container-Ausgabe schreibt (außerhalb von Logback) und die deshalb bisher nie in Loki ankamen, werden jetzt zusätzlich als eigener, shipper-seitig maskierter Stream (`app="<dienst>-stdout"`) versendet — so ist die Ursache eines native-Thread-Absturzes auch nachträglich in Grafana sichtbar. Die zugehörige Regel `JvmNativeThreadExhaustion` ist vorbereitet, bleibt aber bis zur Verifikation auf der Teststrecke deaktiviert (REQ-OBS-007/-014, ADR-0095).
 
 ### Fixed
 
