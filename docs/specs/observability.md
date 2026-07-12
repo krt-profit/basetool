@@ -535,7 +535,7 @@ room's *aggregate* publish rate exceeds its per-topic token bucket regardless of
 limit —
 the component that shipped the REQ-FE-010 staleness defect. Since #1102 (REQ-FE-015 / ADR-0094) both
 counters carry a bounded `topic_class` label (one of the eight `LiveSyncTopicClass` labels: `mission`,
-`operation`, `order`, `orders`, `bank_account`, `bank_staff`, `orgunit_bank`, `materialboard`), and
+`operation`, `order_detail`, `orders_queue`, `bank_account`, `bank_staff`, `orgunit_bank`, `materialboard`), and
 the meter names stay put — a rename would break the `07` panels and this alert set. A `changed`-frame
 flatline (overall on panel 28, or per surface on the `topic_class` breakdown) while `snapshot` frames
 keep flowing is the early indicator for that defect class (panels only, baselined before alerting).
