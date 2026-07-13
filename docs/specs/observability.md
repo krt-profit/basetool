@@ -691,7 +691,14 @@ a full edge outage pages once (liveness), not once per posture assertion.
 so the edge is also probed over IPv6 and for public DNS resolution: the `blackbox-http-ipv6` /
 `blackbox-http-auth-ipv6` jobs re-run the liveness probes pinned to IPv6 (no v4 fallback), and the
 `blackbox-dns-a` / `blackbox-dns-aaaa` jobs query a public resolver (1.1.1.1) for the apex's A and AAAA
-records (NODATA fails the probe, not only NXDOMAIN). `EdgeIpv6Unreachable` (warning) fires only when a
+records (NODATA fails the probe, not only NXDOMAIN). For those v6-pinned probes to test the real edge,
+the `blackbox-exporter` container needs its own IPv6 egress: the two nets it otherwise joins
+(`net-monitoring-core`, `net-monitoring-scrape`) are IPv4-only, so before #1252 the container had **no
+v6 route** and every probe CONNECT-failed (`probe_success=0`) purely from the missing local route —
+making `EdgeIpv6Unreachable` a **structural false positive** that fired even while the edge answered over
+IPv6. The exporter now also joins a dedicated `net-blackbox-v6` bridge (`enable_ipv6: true`, ULA subnet
+masqueraded onto the host's global v6), so the probe exercises the real edge path and the alert is a
+**true** signal. `EdgeIpv6Unreachable` (warning) fires only when a
 vhost answers over IPv4 but not IPv6 (guarded `on(instance)` against the v4 probe, so a full outage
 pages once via `BlackboxProbeFailed`); `DnsResolutionFailed` (warning) fires when the apex stops
 resolving an A or AAAA record. These are reachability probes, not posture assertions — a v6-only or

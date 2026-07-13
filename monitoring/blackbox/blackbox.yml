@@ -89,6 +89,11 @@ modules:
   # broken IPv6 path is a real user-facing regression the IPv4 http_2xx job cannot see. These modules
   # pin the probe to IPv6 with NO v4 fallback, so probe_success flips to 0 when the endpoint is
   # unreachable over IPv6 while IPv4 still answers. Otherwise identical to their IPv4 counterparts.
+  # NOTE (issue #1252): this only measures the REAL edge because the blackbox-exporter container has its
+  # own IPv6 egress — the net-blackbox-v6 bridge in docker-compose.monitoring.yml. Without it the
+  # container has no v6 route and every probe here CONNECT-fails locally, a STRUCTURAL false
+  # EdgeIpv6Unreachable, not an edge regression. The modules are correct as-is; the v6 route is the
+  # load-bearing part — do not drop net-blackbox-v6 from the exporter's networks list.
   http_2xx_ipv6:
     prober: http
     timeout: 10s
