@@ -24,6 +24,8 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
+import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
+import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
@@ -459,6 +461,7 @@ public class InventoryItemService {
     item.setPersonal(isPersonal);
     item.setMission(mission);
     item.setJobOrder(jobOrder);
+    syncScalarAllocations(item);
 
     InventoryItem saved = inventoryItemRepository.save(item);
     auditService.record(
@@ -541,6 +544,7 @@ public class InventoryItemService {
     } else {
       item.setMission(null);
     }
+    syncScalarAllocations(item);
 
     // Append-only: an update edits the row in place and is never folded into another matching
     // stack.
@@ -561,6 +565,36 @@ public class InventoryItemService {
             .with("jobOrder", InventoryAuditLabels.jobOrderRef(item))
             .with("mission", item.getMission() != null ? item.getMission().getName() : "-"));
     return inventoryItemMapper.toDto(saved);
+  }
+
+  /**
+   * Mirrors the entry's single {@code jobOrder}/{@code mission} scalar into its allocation
+   * collections (Variante C soak, REQ-INV-027): each set scalar becomes one allocation carrying the
+   * entry's full amount, an unset scalar leaves that dimension empty. Called on create and the
+   * scalar-editing update so the allocation-reading views (stacking, fulfilment, the mapper's chips
+   * and rest) stay in step with the scalars until the per-allocation write endpoints and the column
+   * drop replace them entirely. Relies on cascade + orphan-removal: clearing the list deletes the
+   * obsolete slices, adding a managed child inserts the new one on flush.
+   *
+   * @param item the entry whose scalar assignments to mirror into allocations; never {@code null}.
+   */
+  private void syncScalarAllocations(InventoryItem item) {
+    item.getJobOrderAllocations().clear();
+    if (item.getJobOrder() != null) {
+      InventoryJobOrderAllocation allocation = new InventoryJobOrderAllocation();
+      allocation.setInventoryItem(item);
+      allocation.setJobOrder(item.getJobOrder());
+      allocation.setAmount(item.getAmount());
+      item.getJobOrderAllocations().add(allocation);
+    }
+    item.getMissionAllocations().clear();
+    if (item.getMission() != null) {
+      InventoryMissionAllocation allocation = new InventoryMissionAllocation();
+      allocation.setInventoryItem(item);
+      allocation.setMission(item.getMission());
+      allocation.setAmount(item.getAmount());
+      item.getMissionAllocations().add(allocation);
+    }
   }
 
   /**
