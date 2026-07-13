@@ -220,6 +220,18 @@ function collectMyChecked(className) {
     return values;
 }
 
+// The "Nur persönliche" / "Nur nicht-persönliche" toggles are mutually exclusive: checking one
+// clears the other (so they never intersect to an empty result), then re-runs the filter. Setting
+// .checked programmatically does not fire another change event, so this never re-enters itself.
+function togglePersonalFilter(el) {
+    if (el && el.checked) {
+        const otherId = el.id === 'personalOnly' ? 'nonPersonalOnly' : 'personalOnly';
+        const other = document.getElementById(otherId);
+        if (other) other.checked = false;
+    }
+    filterMyInventory();
+}
+
 function filterMyInventory() {
     const activeMaterials = collectMyChecked('matCheck');
     const activeJobOrders = collectMyChecked('jobOrderCheck');
@@ -228,6 +240,8 @@ function filterMyInventory() {
     const minQuality = minQualitySelect ? minQualitySelect.value : '';
     const personalOnlyEl = document.getElementById('personalOnly');
     const personalOnly = personalOnlyEl ? personalOnlyEl.checked : false;
+    const nonPersonalOnlyEl = document.getElementById('nonPersonalOnly');
+    const nonPersonalOnly = nonPersonalOnlyEl ? nonPersonalOnlyEl.checked : false;
 
     const container = document.getElementById('myInventoryTableContainer');
     if (!container) return;
@@ -241,6 +255,7 @@ function filterMyInventory() {
     activeJobOrders.forEach((j) => url.searchParams.append('jobOrderIds', j));
     activeMissions.forEach((m) => url.searchParams.append('missionIds', m));
     if (personalOnly) url.searchParams.append('personalOnly', 'true');
+    if (nonPersonalOnly) url.searchParams.append('nonPersonalOnly', 'true');
 
     const visibleUrl = new URL(window.location.origin + '/inventory/my');
     activeMaterials.forEach((m) => visibleUrl.searchParams.append('materialIds', m));
@@ -248,6 +263,7 @@ function filterMyInventory() {
     activeJobOrders.forEach((j) => visibleUrl.searchParams.append('jobOrderIds', j));
     activeMissions.forEach((m) => visibleUrl.searchParams.append('missionIds', m));
     if (personalOnly) visibleUrl.searchParams.append('personalOnly', 'true');
+    if (nonPersonalOnly) visibleUrl.searchParams.append('nonPersonalOnly', 'true');
     try {
         window.history.replaceState({}, '', visibleUrl.toString());
     } catch {
@@ -283,6 +299,8 @@ function resetMyInventoryFilter() {
     if (minQualitySelect) minQualitySelect.value = '';
     const personalOnlyEl = document.getElementById('personalOnly');
     if (personalOnlyEl) personalOnlyEl.checked = false;
+    const nonPersonalOnlyEl = document.getElementById('nonPersonalOnly');
+    if (nonPersonalOnlyEl) nonPersonalOnlyEl.checked = false;
     if (document.getElementById('materialHeader'))
         updateSelectState('matAll', 'matCheck', 'materialHeader');
     if (document.getElementById('jobOrderHeader'))
@@ -1198,6 +1216,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         filterMyInventory();
     });
     window.krtEvents.on('change', 'inv-my-filter', filterMyInventory);
+    window.krtEvents.on('change', 'inv-my-personal-filter', togglePersonalFilter);
     window.krtEvents.on('click', 'inv-my-reset-filter', resetMyInventoryFilter);
     window.krtEvents.on('click', 'inv-my-open-bulk', openBulkCheckoutModal);
     window.krtEvents.on('click', 'inv-my-toggle-group', function (el) {

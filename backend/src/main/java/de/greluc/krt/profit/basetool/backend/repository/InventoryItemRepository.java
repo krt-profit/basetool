@@ -234,10 +234,13 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * Per-user group-on-read variant of {@link #findUserByFilters}: collapses the user's filtered
    * inventory (shared and personal alike) into one {@link InventoryStackAggregate} per stock
    * identity in SQL. Entries are fetched lazily via {@link #findUserStackEntries}. Same
-   * optional-filter contract as {@link #findUserByFilters}, plus the {@code personalOnly} toggle:
-   * when {@code true} the result is narrowed to the caller's private stock ({@code personal = true}
-   * rows), powering the "Mein Lager" personal-entries-only filter; when {@code false} both shared
-   * and personal stacks are returned as before.
+   * optional-filter contract as {@link #findUserByFilters}, plus the mutually exclusive {@code
+   * personalOnly} / {@code nonPersonalOnly} toggles: {@code personalOnly = true} narrows to the
+   * caller's private stock ({@code personal = true} rows) and {@code nonPersonalOnly = true}
+   * narrows to the shared stock ({@code personal = false} rows) — the "Mein Lager" personal- /
+   * non-personal-entries-only filters. When both are {@code false} both shared and personal stacks
+   * are returned as before; the UI keeps them mutually exclusive so they are never both {@code
+   * true}, but were that to happen the two clauses simply intersect to the empty set.
    */
   @Query(
       """
@@ -246,6 +249,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       COALESCE(i.quality, 0)), MAX(COALESCE(i.quality, 0)), COUNT(i)) FROM InventoryItem i
       LEFT JOIN i.owningOrgUnit oou
       WHERE i.user.id = :userId AND (:personalOnly = false OR i.personal = true)
+      AND (:nonPersonalOnly = false OR i.personal = false)
       AND (:hasMaterials = false OR i.material.id IN :materialIds) AND (:minQuality IS NULL
       OR i.quality >= :minQuality) AND (:hasJobOrders = false OR EXISTS (SELECT 1 FROM
       InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrder.id IN
@@ -262,7 +266,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("jobOrderIds") List<UUID> jobOrderIds,
       @Param("hasMissions") boolean hasMissions,
       @Param("missionIds") List<UUID> missionIds,
-      @Param("personalOnly") boolean personalOnly);
+      @Param("personalOnly") boolean personalOnly,
+      @Param("nonPersonalOnly") boolean nonPersonalOnly);
 
   /**
    * Lazily loads one global stack's underlying entries, oldest-first, paginated — the per-stack

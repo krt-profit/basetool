@@ -180,28 +180,34 @@ beneath the Auftrag/Einsatz controls.
 `inventory-my.html` / `inventory-admin.html` (note-button DOM sync), `V143__add_inventory_item_stack_key_index.sql` ·
 **Issues:** #466
 
-### REQ-INV-006 — "Mein Lager" personal-entries-only filter
+### REQ-INV-006 — "Mein Lager" personal- / non-personal-entries-only filters
 
-The personal Lager view (`/inventory/my`) offers a **personal-entries-only** filter alongside the
-existing material / min-quality / job-order / mission filters. When enabled (query param
-`personalOnly=true`), the grouped result is narrowed to the caller's private stock (`personal =
-true` rows); when the param is absent or `false`, both the caller's shared contributions and their
-personal stock are returned — the unchanged default. The narrowing is applied **in SQL** by the
-same group-on-read query (`findUserStacks`), so the material-group aggregates (summed amount,
-amount-weighted mean quality, max quality, entry count) always reflect exactly the visible stacks
-rather than a client-side subset. The flag is URL-driven (a filtered view is shareable), composes
-with the other filters and the `fragment=true` in-place swap, and is reflected back into the page
-URL. It is a scope-**narrowing** concern only: it never widens visibility, and it exists solely on
-the owner-scoped `/my` view — there is no equivalent on the squadron-wide `/all` view.
+The personal Lager view (`/inventory/my`) offers two **mutually exclusive** stock-kind filters
+alongside the existing material / min-quality / job-order / mission filters: a **personal-entries-only**
+toggle (query param `personalOnly=true`) narrows the grouped result to the caller's private stock
+(`personal = true` rows), and a **non-personal-entries-only** toggle (query param
+`nonPersonalOnly=true`) narrows it to the caller's shared stock (`personal = false` rows). When both
+params are absent or `false`, the caller's shared contributions and their personal stock are both
+returned — the unchanged default. The UI keeps the two toggles mutually exclusive (checking one
+clears the other); the backend query intersects the two clauses, so were both ever `true` the result
+is simply empty. The narrowing is applied **in SQL** by the same group-on-read query
+(`findUserStacks`), so the material-group aggregates (summed amount, amount-weighted mean quality,
+max quality, entry count) always reflect exactly the visible stacks rather than a client-side subset.
+Both flags are URL-driven (a filtered view is shareable), compose with the other filters and the
+`fragment=true` in-place swap, and are reflected back into the page URL. They are scope-**narrowing**
+concerns only: they never widen visibility, and they exist solely on the owner-scoped `/my` view —
+there is no equivalent on the squadron-wide `/all` view.
 
 **Acceptance**
 
 - [ ] With `personalOnly=true`, only the caller's `personal = true` stacks appear; the caller's
   shared (non-personal) contributions are excluded.
-- [ ] With `personalOnly` absent or `false`, both shared and personal stacks appear (unchanged
-  behaviour).
+- [ ] With `nonPersonalOnly=true`, only the caller's `personal = false` (shared) stacks appear; the
+  caller's personal stock is excluded.
+- [ ] With both params absent or `false`, both shared and personal stacks appear (unchanged
+  behaviour); the two toggles are mutually exclusive in the UI.
 - [ ] The material-group aggregates reflect only the visible stacks under the active filter.
-- [ ] The flag composes with the material / min-quality / job-order / mission filters and is
+- [ ] Both flags compose with the material / min-quality / job-order / mission filters and are
   reflected in the page URL.
 
 **Enforced by:** `InventoryItemServiceTest`, `InventoryItemStackQueryDataTest`,

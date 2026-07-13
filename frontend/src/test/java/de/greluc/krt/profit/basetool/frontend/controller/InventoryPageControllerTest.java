@@ -124,7 +124,7 @@ class InventoryPageControllerTest {
         new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
-    String view = controller.viewMyInventory(null, null, null, null, false, false, model);
+    String view = controller.viewMyInventory(null, null, null, null, false, false, false, model);
 
     assertEquals("inventory-my", view);
     assertTrue(model.containsAttribute("items"));
@@ -144,7 +144,7 @@ class InventoryPageControllerTest {
     // When
     String view =
         controller.viewMyInventory(
-            List.of(materialId), 500, List.of(jobOrderId), null, false, false, model);
+            List.of(materialId), 500, List.of(jobOrderId), null, false, false, false, model);
 
     // Then
     assertEquals("inventory-my", view);
@@ -174,7 +174,7 @@ class InventoryPageControllerTest {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of());
 
     // When
-    String view = controller.viewMyInventory(null, null, null, null, true, false, model);
+    String view = controller.viewMyInventory(null, null, null, null, true, false, false, model);
 
     // Then
     assertEquals("inventory-my", view);
@@ -193,6 +193,32 @@ class InventoryPageControllerTest {
   }
 
   @Test
+  void viewMyInventory_nonPersonalOnly_forwardsFlagToBackendAndModel() {
+    // Given
+    Model model = new ConcurrentModel();
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of());
+
+    // When
+    String view = controller.viewMyInventory(null, null, null, null, false, true, false, model);
+
+    // Then
+    assertEquals("inventory-my", view);
+    assertEquals(true, model.getAttribute("selectedNonPersonalOnly"));
+    org.mockito.ArgumentCaptor<String> urlCaptor =
+        org.mockito.ArgumentCaptor.forClass(String.class);
+    org.mockito.Mockito.verify(backendApiClient, org.mockito.Mockito.atLeastOnce())
+        .get(urlCaptor.capture(), anyTypeRef());
+    String groupedUrl =
+        urlCaptor.getAllValues().stream()
+            .filter(u -> u.contains("/api/v1/inventory/my-inventory/grouped"))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Personal grouped endpoint was not called"));
+    assertTrue(
+        groupedUrl.contains("nonPersonalOnly=true"),
+        "nonPersonalOnly must be forwarded to the backend");
+  }
+
+  @Test
   void viewMyInventory_shouldReturnFragmentWhenRequested() {
     // Given
     Model model = new ConcurrentModel();
@@ -201,7 +227,7 @@ class InventoryPageControllerTest {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
     // When
-    String view = controller.viewMyInventory(null, null, null, null, false, true, model);
+    String view = controller.viewMyInventory(null, null, null, null, false, false, true, model);
 
     // Then
     assertEquals("inventory-my :: inventoryTableFragment", view);

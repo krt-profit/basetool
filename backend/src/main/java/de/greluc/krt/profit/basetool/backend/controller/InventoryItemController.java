@@ -155,6 +155,9 @@ public class InventoryItemController {
    * @param personalOnly when {@code true}, narrows the result to the caller's private stock ({@code
    *     personal = true} rows) — the "Mein Lager" personal-entries-only filter; defaults to {@code
    *     false} (both shared and personal stacks)
+   * @param nonPersonalOnly when {@code true}, narrows the result to the caller's shared stock
+   *     ({@code personal = false} rows) — the "Mein Lager" non-personal-entries-only filter;
+   *     defaults to {@code false} and is mutually exclusive with {@code personalOnly}
    * @return grouped DTOs
    */
   @GetMapping("/my-inventory/grouped")
@@ -166,14 +169,16 @@ public class InventoryItemController {
           @RequestParam(required = false) Integer minQuality,
           @RequestParam(required = false) List<UUID> jobOrderIds,
           @RequestParam(required = false) List<UUID> missionIds,
-          @RequestParam(required = false, defaultValue = "false") boolean personalOnly) {
+          @RequestParam(required = false, defaultValue = "false") boolean personalOnly,
+          @RequestParam(required = false, defaultValue = "false") boolean nonPersonalOnly) {
     return inventoryItemService.getMyAggregatedInventory(
         userService.getUserIdFromJwt(jwt),
         materialIds,
         minQuality,
         jobOrderIds,
         missionIds,
-        personalOnly);
+        personalOnly,
+        nonPersonalOnly);
   }
 
   /**

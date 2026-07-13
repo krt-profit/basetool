@@ -215,8 +215,11 @@ public class InventoryItemService {
    * @param jobOrderIds optional job order filter
    * @param missionIds optional mission filter
    * @param personalOnly when {@code true}, narrows the result to the caller's private stock ({@code
-   *     personal = true} rows) — the "Mein Lager" personal-entries-only filter; when {@code false},
-   *     both shared and personal stacks are returned
+   *     personal = true} rows) — the "Mein Lager" personal-entries-only filter
+   * @param nonPersonalOnly when {@code true}, narrows the result to the caller's shared stock
+   *     ({@code personal = false} rows) — the "Mein Lager" non-personal-entries-only filter;
+   *     mutually exclusive with {@code personalOnly}, and when both are {@code false} both shared
+   *     and personal stacks are returned
    * @return aggregated items
    * @throws NotFoundException when the user id is unknown
    */
@@ -227,9 +230,10 @@ public class InventoryItemService {
           Integer minQuality,
           List<UUID> jobOrderIds,
           List<UUID> missionIds,
-          boolean personalOnly) {
+          boolean personalOnly,
+          boolean nonPersonalOnly) {
     return inventoryAggregationService.getMyAggregatedInventory(
-        userId, materialIds, minQuality, jobOrderIds, missionIds, personalOnly);
+        userId, materialIds, minQuality, jobOrderIds, missionIds, personalOnly, nonPersonalOnly);
   }
 
   /**
