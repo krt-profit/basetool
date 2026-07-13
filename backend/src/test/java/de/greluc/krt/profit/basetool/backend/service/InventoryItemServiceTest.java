@@ -223,6 +223,9 @@ class InventoryItemServiceTest {
         2.0, item.getAmount(), "amount equals the DTO amount, never summed with a sibling");
     verify(inventoryItemRepository).saveAndFlush(item);
     verify(inventoryItemRepository, never()).delete(any());
+    // REQ-MARKET-013: an edit ratchets any active offer on the row down to the (possibly reduced)
+    // amount — pins the update clamp call site (the repository query itself no-ops on an increase).
+    verify(materialExchangeOfferRepository).clampOfferedAmountToStock(eq(itemId), eq(2.0));
   }
 
   @Test

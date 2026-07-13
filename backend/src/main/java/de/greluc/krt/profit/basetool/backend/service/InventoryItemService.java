@@ -442,10 +442,12 @@ public class InventoryItemService {
 
     // The owning org unit is the eighth dimension of an inventory stack's identity. Resolve it up
     // front (validating the picker output) so the new row is stamped with the correct org-unit
-    // pool. Inventory is append-only: every create inserts its own row and is never folded into an
-    // existing stack — rows that share the stack identity are grouped only for display
-    // (group-on-read, see aggregateInventoryItems). This also removes the read-add-write race the
-    // former merge path had to guard with a pessimistic lock.
+    // pool. Inventory is append-only by default: every create inserts its own row and rows that
+    // share the stack identity are grouped only for display (group-on-read, see
+    // aggregateInventoryItems). The scoped exception is the write-time stock merge below
+    // (REQ-INV-026, ADR-0097): a PIECE row (or an SCU row with the per-action opt-in) is folded
+    // into
+    // a matching stack, re-introducing the pessimistic merge lock only on that one path.
     final OrgUnit owningOrgUnit =
         ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, dto.owningOrgUnitId());
 
@@ -547,9 +549,11 @@ public class InventoryItemService {
       item.setMission(null);
     }
 
-    // Append-only: an update edits the row in place and is never folded into another matching
-    // stack.
-    // Rows that now share a stack identity are grouped only for display (group-on-read).
+    // Append-only by default: an update edits the row in place; rows that share a stack identity
+    // are grouped only for display (group-on-read). The scoped exception is the write-time stock
+    // merge below (REQ-INV-026, ADR-0097): when this edit makes the row match an existing stack, a
+    // PIECE row (or an SCU row with the per-action opt-in) is folded into it — see
+    // mergeStockIfRequested. The re-swap on the frontend association path depends on this.
     // saveAndFlush (not save): this method's @Transactional commits AFTER it returns, so a plain
     // save() leaves the @Version increment unflushed and the mapped DTO carries the STALE version.
     // The client writes that back, and the user's NEXT in-place edit of the same row then 409s.

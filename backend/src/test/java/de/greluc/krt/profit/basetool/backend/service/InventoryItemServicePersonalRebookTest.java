@@ -285,6 +285,9 @@ class InventoryItemServicePersonalRebookTest {
       assertEquals(6.0, item.getAmount(), "source keeps the remainder");
       verify(inventoryItemRepository).saveAndFlush(item);
       verify(inventoryItemRepository, never()).delete(any());
+      // REQ-MARKET-013: the reduced source row ratchets any active offer down to the remaining 6.0
+      // — pins the rebook clamp call site.
+      verify(materialExchangeOfferRepository).clampOfferedAmountToStock(eq(ITEM_ID), eq(6.0));
 
       // And: the de-personalize audit event is recorded.
       verify(auditService)

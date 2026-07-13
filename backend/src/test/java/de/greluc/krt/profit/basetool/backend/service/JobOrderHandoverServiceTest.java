@@ -130,6 +130,9 @@ class JobOrderHandoverServiceTest {
     verify(jobOrderHandoverRepository).save(any(JobOrderHandover.class));
     // findById called twice: initial load + re-fetch after clearAutomatically evicts session cache
     verify(jobOrderRepository, times(2)).findById(orderId);
+    // REQ-MARKET-013: the reduced (non-depleted) handed-over row ratchets any active offer down to
+    // the remaining 6.0 — pins the handover clamp call site.
+    verify(materialExchangeOfferRepository).clampOfferedAmountToStock(eq(inventoryId), eq(6.0));
   }
 
   @Test
@@ -164,6 +167,9 @@ class JobOrderHandoverServiceTest {
     assertEquals(0.0, jobOrderMaterial.getAmount());
     verify(inventoryItemRepository).delete(inventoryItem);
     verify(inventoryItemRepository, never()).save(any());
+    // REQ-MARKET-013: a depleted row was deleted and its offer cascade-removed (V210), so the
+    // handover must NOT clamp it — pins the depleted-skip branch.
+    verify(materialExchangeOfferRepository, never()).clampOfferedAmountToStock(any(), anyDouble());
     verify(inventoryItemRepository).unlinkJobOrderMaterial(orderId, materialId);
     // completeJobOrderWithinTransaction called with the re-fetched managed entity (same object in
     // unit test)

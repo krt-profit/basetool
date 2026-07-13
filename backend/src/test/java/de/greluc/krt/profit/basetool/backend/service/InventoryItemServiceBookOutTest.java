@@ -305,6 +305,9 @@ class InventoryItemServiceBookOutTest {
       // DISCARD -> source updated, no transfer-side new item created.
       verify(inventoryItemRepository, org.mockito.Mockito.times(1))
           .saveAndFlush(any(InventoryItem.class));
+      // REQ-MARKET-013: the partial decrement ratchets any active offer on the source down to the
+      // remaining 9.0 — pins the clamp call site so dropping it fails here.
+      verify(materialExchangeOfferRepository).clampOfferedAmountToStock(eq(ITEM_ID), eq(9.0));
     }
   }
 
@@ -499,6 +502,8 @@ class InventoryItemServiceBookOutTest {
       assertSame(item, source, "the flushed row is the original source");
       assertSame(targetUser, newItem.getUser());
       verify(inventoryItemRepository, never()).delete(any());
+      // REQ-MARKET-013: the reduced source row ratchets any active offer down to the remaining 7.0.
+      verify(materialExchangeOfferRepository).clampOfferedAmountToStock(eq(ITEM_ID), eq(7.0));
     }
 
     @Test

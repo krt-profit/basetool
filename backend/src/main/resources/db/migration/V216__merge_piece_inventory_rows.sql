@@ -8,8 +8,11 @@
 -- owning_org_unit_id, with NULLs in the three nullable dimensions compared as equal (a fixed
 -- sentinel UUID stands in for NULL in the PARTITION BY). `delivered` is NOT part of the identity;
 -- the surviving row is reset to not-delivered (matching the runtime merge). The notes of the folded
--- rows are concatenated (distinct, newline-joined, truncated to the 1000-char column). The survivor
--- is the oldest row of each group (created_at, then id).
+-- rows are concatenated distinct, in first-seen (created_at, then id) order and whitespace-trimmed,
+-- then newline-joined and truncated to the 1000-char column -- matching the runtime merge's
+-- LinkedHashSet + StringNormalization.trimToNull, so a backfilled survivor carries the same note
+-- text (and, past 1000 chars, the same retained lines) as a runtime-merged one. The survivor is the
+-- oldest row of each group (created_at, then id).
 --
 -- Materialbörse safety: rows referenced by a material_exchange_offer are excluded from the merge
 -- entirely (NOT EXISTS). Merging would otherwise change the offer's live-read material/amount or,
@@ -23,6 +26,7 @@ WITH mergeable AS (
     SELECT ii.id,
            ii.amount,
            ii.note,
+           ii.created_at,
            first_value(ii.id) OVER (
                PARTITION BY ii.user_id,
                             ii.material_id,
@@ -41,13 +45,33 @@ WITH mergeable AS (
         SELECT 1 FROM material_exchange_offer o WHERE o.inventory_item_id = ii.id
     )
 ),
-grp AS (
-    SELECT survivor_id,
-           SUM(amount) AS total_amount,
-           STRING_AGG(DISTINCT btrim(note), E'\n')
-               FILTER (WHERE note IS NOT NULL AND btrim(note) <> '') AS merged_note
+-- One row per (group, distinct trimmed note), keeping the FIRST occurrence (created_at, then id).
+-- regexp_replace strips leading/trailing whitespace (\s) to approximate the runtime's
+-- String.strip(); stored notes are already trimmed + NFC-normalized by the global binder, so this
+-- rarely changes anything.
+note_first_seen AS (
+    SELECT DISTINCT ON (survivor_id, regexp_replace(note, '^\s+|\s+$', '', 'g'))
+           survivor_id,
+           regexp_replace(note, '^\s+|\s+$', '', 'g') AS note_trimmed,
+           created_at,
+           id
     FROM mergeable
+    WHERE note IS NOT NULL AND regexp_replace(note, '^\s+|\s+$', '', 'g') <> ''
+    ORDER BY survivor_id, regexp_replace(note, '^\s+|\s+$', '', 'g'), created_at ASC, id ASC
+),
+merged_notes AS (
+    SELECT survivor_id,
+           LEFT(STRING_AGG(note_trimmed, E'\n' ORDER BY created_at ASC, id ASC), 1000) AS merged_note
+    FROM note_first_seen
     GROUP BY survivor_id
+),
+grp AS (
+    SELECT mg.survivor_id,
+           SUM(mg.amount) AS total_amount,
+           mn.merged_note AS merged_note
+    FROM mergeable mg
+    LEFT JOIN merged_notes mn ON mn.survivor_id = mg.survivor_id
+    GROUP BY mg.survivor_id, mn.merged_note
     HAVING COUNT(*) > 1
 ),
 folded AS (
