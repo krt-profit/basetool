@@ -44,6 +44,7 @@ commonmark = "0.29.0"
 # `node` pins the Node.js runtime downloaded by the node-gradle plugin and is not a Maven artifact, so
 # refreshVersions cannot track it — bump it by hand against the active Node LTS line.
 spotbugs = "6.5.8"
+##    ⬆ = "6.5.9"
 pitest = "1.19.0"
 pitestJunit5 = "1.2.3"
 nodeGradle = "7.1.0"
@@ -69,6 +70,7 @@ junit = "6.0.3"
 ## ⬆ = "6.1.0-RC1"
 ## ⬆ = "6.1.0"
 ## ⬆ = "6.1.1"
+## ⬆ = "6.1.2"
 
 [libraries]
 
