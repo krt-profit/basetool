@@ -47,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocationSync;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -1249,6 +1250,7 @@ class JobOrderServiceTest {
         new de.greluc.krt.profit.basetool.backend.model.InventoryItem();
     item.setId(inventoryItemId);
     item.setJobOrder(jobOrder);
+    InventoryAllocationSync.mirrorScalars(item);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(inventoryItemRepository.findById(inventoryItemId)).thenReturn(Optional.of(item));
@@ -1304,6 +1306,7 @@ class JobOrderServiceTest {
         new de.greluc.krt.profit.basetool.backend.model.InventoryItem();
     item.setId(inventoryItemId);
     item.setJobOrder(otherOrder);
+    InventoryAllocationSync.mirrorScalars(item);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(inventoryItemRepository.findById(inventoryItemId)).thenReturn(Optional.of(item));

@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocationSync;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -126,6 +127,7 @@ class JobOrderHandoverCompletionIntegrationTest {
           inv1.setQuality(800);
           inv1.setAmount(1.835);
           inv1.setJobOrder(jobOrder);
+          InventoryAllocationSync.mirrorScalars(inv1);
           inv1 = inventoryItemRepository.save(inv1);
 
           InventoryItem inv2 = new InventoryItem();
@@ -140,6 +142,7 @@ class JobOrderHandoverCompletionIntegrationTest {
           inv2.setQuality(900);
           inv2.setAmount(5.730999999999999);
           inv2.setJobOrder(jobOrder);
+          InventoryAllocationSync.mirrorScalars(inv2);
           inv2 = inventoryItemRepository.save(inv2);
 
           return new Fixture(jobOrder.getId(), inv1.getId(), inv2.getId());

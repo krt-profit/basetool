@@ -462,7 +462,7 @@ public class InventoryItemService {
             .with("q", item.getQuality())
             .with("personal", item.getPersonal())
             .with("jobOrder", InventoryAuditLabels.jobOrderRef(item))
-            .with("mission", item.getMission() != null ? item.getMission().getName() : "-"));
+            .with("mission", InventoryAuditLabels.missionName(item)));
     // Stock merge (REQ-INV-026): a PIECE row is folded into a matching stack unconditionally; an
     // SCU row only when the caller ticked the per-action opt-in. Returns the surviving row.
     InventoryItem merged =
@@ -559,7 +559,7 @@ public class InventoryItemService {
             .with("q", item.getQuality())
             .with("personal", item.getPersonal())
             .with("jobOrder", InventoryAuditLabels.jobOrderRef(item))
-            .with("mission", item.getMission() != null ? item.getMission().getName() : "-"));
+            .with("mission", InventoryAuditLabels.missionName(item)));
     // Ratchet any active Materialbörse offer on this row down to the (possibly reduced) amount
     // (REQ-MARKET-013); an increase is a no-op.
     inventoryCheckoutService.clampOffersToStock(saved.getId(), saved.getAmount());

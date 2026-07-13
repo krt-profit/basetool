@@ -26,8 +26,10 @@ import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.model.FinanceType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
+import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
+import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
@@ -200,7 +202,7 @@ public class InventoryCheckoutService {
       // target-less case), so the branch is unconditional on the type.
       return bookOutTransfer(
           item, dto, remainingAmount, sourceId, sourceLabel, materialName, depleted);
-    } else if (checkoutType == CheckoutType.SELL && item.getMission() != null) {
+    } else if (checkoutType == CheckoutType.SELL && !item.getMissionAllocations().isEmpty()) {
       financeEntryId = createSaleFinanceEntry(item, dto, currentUserId);
     }
 
@@ -357,16 +359,31 @@ public class InventoryCheckoutService {
    */
   private UUID createSaleFinanceEntry(
       InventoryItem item, InventoryItemBookOutDto dto, UUID currentUserId) {
+    // Variante C soak (REQ-INV-027): the sold row's mission lives in the allocation table — take
+    // its
+    // (single, during the soak) mission slice; the SELL guard already ensured one exists. A row
+    // with
+    // several mission allocations would warrant one proportional finance entry per slice — a
+    // follow-up once the multi-allocation write endpoints can produce such rows.
+    Mission mission =
+        item.getMissionAllocations().stream()
+            .map(InventoryMissionAllocation::getMission)
+            .filter(m -> m != null)
+            .findFirst()
+            .orElseThrow(
+                () ->
+                    new BadRequestException(
+                        "You must be a participant of the mission to sell its items"));
     MissionParticipant participant =
         missionParticipantRepository
-            .findByMissionIdAndUserId(item.getMission().getId(), currentUserId)
+            .findByMissionIdAndUserId(mission.getId(), currentUserId)
             .orElseThrow(
                 () ->
                     new BadRequestException(
                         "You must be a participant of the mission to sell its items"));
 
     MissionFinanceEntry entry = new MissionFinanceEntry();
-    entry.setMission(item.getMission());
+    entry.setMission(mission);
     entry.setParticipant(participant);
     entry.setType(FinanceType.INCOME);
     entry.setAmount(dto.sellAmount());
@@ -482,7 +499,8 @@ public class InventoryCheckoutService {
 
     // Personalize (shared -> personal): a personal row may never carry a job order or mission, so
     // refuse an assigned source rather than silently dropping the link.
-    if (targetPersonal && (item.getJobOrder() != null || item.getMission() != null)) {
+    if (targetPersonal
+        && (!item.getJobOrderAllocations().isEmpty() || !item.getMissionAllocations().isEmpty())) {
       throw new BadRequestException(
           "Stock assigned to a job order or mission cannot be marked personal");
     }

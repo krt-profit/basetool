@@ -191,13 +191,15 @@ public class JobOrderHandoverService {
               .findByIdForUpdate(itemDto.inventoryItemId())
               .orElseThrow(() -> new NotFoundException("Inventory item not found"));
 
-      if (inventoryItem.getJobOrder() == null
-          || !inventoryItem.getJobOrder().getId().equals(jobOrderId)) {
+      if (inventoryItem.getJobOrderAllocations().stream()
+          .noneMatch(a -> a.getJobOrder() != null && a.getJobOrder().getId().equals(jobOrderId))) {
         // Plan §4.4 cross-staffel pre-write guard: the handover may only mutate inventory items
-        // that are bound to the current order via job_order_id. A mismatch means either a stale
-        // client payload or a concurrent unlink — in both cases the handover cannot proceed and
-        // the application is in an inconsistent state for this request. GlobalExceptionHandler
-        // maps IllegalStateException to 400 so the wire format stays the same as before.
+        // that are bound to the current order — since Variante C (REQ-INV-027) that binding lives
+        // in
+        // the allocation table, so the item must carry a job-order slice for this order. A mismatch
+        // means either a stale client payload or a concurrent unlink — in both cases the handover
+        // cannot proceed and the application is in an inconsistent state for this request.
+        // GlobalExceptionHandler maps IllegalStateException to 400 so the wire format is unchanged.
         throw new IllegalStateException("Inventory item does not belong to this JobOrder");
       }
 

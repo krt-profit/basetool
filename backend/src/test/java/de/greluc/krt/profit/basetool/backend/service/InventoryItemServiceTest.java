@@ -48,6 +48,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepos
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocationSync;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -983,6 +984,7 @@ class InventoryItemServiceTest {
     existingItem.setUser(user);
     existingItem.setMission(mission);
     existingItem.setMaterial(material);
+    InventoryAllocationSync.mirrorScalars(existingItem);
 
     MissionParticipant participant = new MissionParticipant();
     participant.setUser(user);

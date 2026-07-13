@@ -56,6 +56,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepos
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocationSync;
 import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
@@ -683,6 +684,7 @@ class InventoryItemServiceBookOutTest {
 
       InventoryItem item = newItem(10.0, 1L);
       item.setMission(mission);
+      InventoryAllocationSync.mirrorScalars(item);
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       when(missionParticipantRepository.findByMissionIdAndUserId(mission.getId(), OWNER_ID))
@@ -719,6 +721,7 @@ class InventoryItemServiceBookOutTest {
 
       InventoryItem item = newItem(5.0, 1L);
       item.setMission(mission);
+      InventoryAllocationSync.mirrorScalars(item);
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       when(missionParticipantRepository.findByMissionIdAndUserId(mission.getId(), OWNER_ID))
@@ -757,6 +760,7 @@ class InventoryItemServiceBookOutTest {
       mission.setId(UUID.randomUUID());
       InventoryItem item = newItem(10.0, 1L);
       item.setMission(mission);
+      InventoryAllocationSync.mirrorScalars(item);
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       when(missionParticipantRepository.findByMissionIdAndUserId(mission.getId(), OWNER_ID))
@@ -909,6 +913,7 @@ class InventoryItemServiceBookOutTest {
 
       InventoryItem item = newItem(10.0, 1L);
       item.setMission(mission);
+      InventoryAllocationSync.mirrorScalars(item);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       when(missionParticipantRepository.findByMissionIdAndUserId(mission.getId(), OWNER_ID))
           .thenReturn(Optional.of(participant));

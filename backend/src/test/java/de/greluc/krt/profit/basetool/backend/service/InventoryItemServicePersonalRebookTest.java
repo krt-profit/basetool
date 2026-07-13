@@ -55,6 +55,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepos
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocationSync;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -390,6 +391,7 @@ class InventoryItemServicePersonalRebookTest {
       JobOrder jobOrder = new JobOrder();
       jobOrder.setId(UUID.randomUUID());
       item.setJobOrder(jobOrder);
+      InventoryAllocationSync.mirrorScalars(item);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
       // When / Then
@@ -412,6 +414,7 @@ class InventoryItemServicePersonalRebookTest {
       Mission mission = new Mission();
       mission.setId(UUID.randomUUID());
       item.setMission(mission);
+      InventoryAllocationSync.mirrorScalars(item);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
       // When / Then

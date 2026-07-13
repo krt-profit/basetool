@@ -932,7 +932,8 @@ public class JobOrderService {
             .orElseThrow(
                 () -> new NotFoundException("InventoryItem not found: " + inventoryItemId));
 
-    if (item.getJobOrder() == null || !item.getJobOrder().getId().equals(jobOrderId)) {
+    if (item.getJobOrderAllocations().stream()
+        .noneMatch(a -> a.getJobOrder() != null && a.getJobOrder().getId().equals(jobOrderId))) {
       throw new NotFoundException("InventoryItem not linked to job order: " + inventoryItemId);
     }
 

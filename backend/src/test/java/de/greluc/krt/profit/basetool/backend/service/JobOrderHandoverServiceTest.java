@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverReposito
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderMaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocationSync;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -99,6 +100,9 @@ class JobOrderHandoverServiceTest {
     inventoryItem.setJobOrder(order);
     inventoryItem.setMaterial(material);
     inventoryItem.setAmount(10.0);
+    // Variante C soak: the handover guard reads the job-order allocation, so mirror the scalar into
+    // a slice exactly as the real create path does.
+    InventoryAllocationSync.mirrorScalars(inventoryItem);
   }
 
   @Test
@@ -210,6 +214,7 @@ class JobOrderHandoverServiceTest {
     // eagerly fetching jobOrder (no @EntityGraph), causing jobOrder to be null even though
     // the item belongs to the order in the DB. The fix adds @EntityGraph to findByIdForUpdate.
     inventoryItem.setJobOrder(null);
+    InventoryAllocationSync.mirrorScalars(inventoryItem);
 
     JobOrderHandoverItemCreateDto itemDto = new JobOrderHandoverItemCreateDto(inventoryId, 5.0);
     JobOrderHandoverCreateDto createDto =
@@ -253,6 +258,7 @@ class JobOrderHandoverServiceTest {
     inventoryItem2.setJobOrder(order);
     inventoryItem2.setMaterial(material2);
     inventoryItem2.setAmount(8.0);
+    InventoryAllocationSync.mirrorScalars(inventoryItem2);
 
     // Hand over 5.0 of material1 (partial) and 8.0 of material2 (full)
     JobOrderHandoverItemCreateDto itemDto1 = new JobOrderHandoverItemCreateDto(inventoryId, 5.0);
@@ -325,6 +331,7 @@ class JobOrderHandoverServiceTest {
     inventoryItem2.setJobOrder(order);
     inventoryItem2.setMaterial(material2);
     inventoryItem2.setAmount(5.0);
+    InventoryAllocationSync.mirrorScalars(inventoryItem2);
 
     // First item is fully consumed (triggers unlinkJobOrderMaterial), second is partial
     JobOrderHandoverItemCreateDto itemDto1 = new JobOrderHandoverItemCreateDto(inventoryId, 10.0);
@@ -408,6 +415,7 @@ class JobOrderHandoverServiceTest {
     JobOrder otherOrder = new JobOrder();
     otherOrder.setId(UUID.randomUUID());
     inventoryItem.setJobOrder(otherOrder);
+    InventoryAllocationSync.mirrorScalars(inventoryItem);
 
     JobOrderHandoverItemCreateDto itemDto = new JobOrderHandoverItemCreateDto(inventoryId, 5.0);
     JobOrderHandoverCreateDto createDto =
@@ -606,6 +614,7 @@ class JobOrderHandoverServiceTest {
     inventoryItem2.setJobOrder(order);
     inventoryItem2.setMaterial(material2);
     inventoryItem2.setAmount(8.0);
+    InventoryAllocationSync.mirrorScalars(inventoryItem2);
 
     JobOrderHandoverItemCreateDto itemDto1 = new JobOrderHandoverItemCreateDto(inventoryId, 10.0);
     JobOrderHandoverItemCreateDto itemDto2 = new JobOrderHandoverItemCreateDto(inventoryId2, 8.0);
