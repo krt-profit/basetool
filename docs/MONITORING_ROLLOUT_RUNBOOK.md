@@ -727,8 +727,30 @@ docker compose -p iri-monitoring -f /var/iri/code/docker-compose.monitoring.yml 
 ```
 
 You can also just set `IRI_MONITORING_ENABLED=false` in `/var/iri/code/.env`; the next `deploy.sh`
-tick then stops applying the monitoring project (existing containers keep running until you `down`
-them).
+tick then stops applying the monitoring project.
+
+> **Do not leave the stack running with the flag off.** A monitoring stack that keeps running while
+> `IRI_MONITORING_ENABLED != true` is **unsupported**: `deploy.sh`'s config reconcile gates itself off,
+> but the config-bundle rsync keeps rewriting `monitoring/**` on disk every tick, so on-disk rule/scrape
+> changes silently never reach the running Prometheus (the 2026-07-13 drift). `deploy.sh` catches this
+> with a per-tick WARN and `basetool_monitoring_reconcile_disabled{component="deploy"} == 1`, which
+> fires **`MonitoringReconcileDisabled`** after 30m. So either keep the flag on, or actually `down` the
+> stack (above) — do not disable the flag and leave the containers up.
+
+**Triage — `MonitoringReconcileDisabled` (warning):** `deploy.sh` sees the `iri-monitoring` project
+running but `IRI_MONITORING_ENABLED` is unset. Re-arm the auto-reconcile with a systemd drop-in on the
+`iri-deploy` service, then reload:
+
+```bash
+sudo install -d -m 0755 /etc/systemd/system/iri-deploy.service.d
+printf '[Service]\nEnvironment=IRI_MONITORING_ENABLED=true\n' \
+  | sudo tee /etc/systemd/system/iri-deploy.service.d/monitoring.conf
+sudo systemctl daemon-reload
+```
+
+The next tick then emits the gauge as `0`, force-recreates any component whose on-disk config drifted,
+and the alert self-clears. (If you instead intend to retire monitoring on this host, `down` the stack
+per *Rollback* above so the gauge stops being scraped.)
 
 **Fully revert the app-side env/network/command changes** (the `MONITORING_SCRAPE_*`, `KC_*` tracing,
 Redis `--aclfile`, shared networks):

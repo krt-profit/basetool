@@ -130,6 +130,15 @@ case "${1:-}" in
       *) exit 0 ;;
     esac
     ;;
+  ps)
+    # Top-level `docker ps --filter label=com.docker.compose.project=iri-monitoring
+    # --format '{{.Names}}'` — model whether the monitoring compose project has running
+    # containers via FAKE_MON_PS (a container name means "running"; empty/unset means none).
+    if [[ "$*" == *"com.docker.compose.project=iri-monitoring"* && -n "${FAKE_MON_PS:-}" ]]; then
+      printf '%s\n' "${FAKE_MON_PS}"
+    fi
+    exit 0
+    ;;
   inspect)
     # inspect --format <fmt> <cid>; container ids are cid-<key>
     svc="${4#cid-}"
@@ -751,6 +760,12 @@ scenario_monitoring_reload_no_drift() {
   assert_exit 0 "$rc" "monitoring-enabled deploy over a converged config succeeds"
   assert_docker "monitoring.yml up -d" "the monitoring stack is still reconciled"
   assert_no_docker "--force-recreate" "no service is recreated when on-disk matches the applied snapshot"
+  if grep -q '^basetool_monitoring_reconcile_disabled{component="deploy"} 0' \
+       "${T_STATE_DIR}/textfile/monitoring-reconcile.prom" 2>/dev/null; then
+    record 1 "the reconcile-disabled gauge is 0 when the reconcile is enabled and runs"
+  else
+    record 0 "the reconcile-disabled gauge is 0 when the reconcile is enabled and runs"
+  fi
   rm -rf "${tmp}"
 }
 
@@ -797,6 +812,38 @@ scenario_monitoring_reload_self_heals_on_noop() {
     record 1 "the config-applied timestamp metric is emitted for PrometheusConfigStale"
   else
     record 0 "the config-applied timestamp metric is emitted for PrometheusConfigStale"
+  fi
+  rm -rf "${tmp}"
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 12c: the 2026-07-13 blind-spot. The iri-monitoring stack is RUNNING
+# but IRI_MONITORING_ENABLED is unset, so deploy.sh's monitoring reconcile is
+# gated off — on-disk config changes silently never reach the running Prometheus,
+# and PrometheusConfigStale cannot see it (its applied-stamp series is written
+# only from inside the gated reconcile). deploy.sh must make it LOUD: a per-tick
+# WARN and the self-standing basetool_monitoring_reconcile_disabled gauge = 1
+# (the signal MonitoringReconcileDisabled fires on), without recreating anything.
+# ---------------------------------------------------------------------------
+scenario_monitoring_reconcile_disabled_when_running() {
+  echo "Scenario: monitoring stack running but IRI_MONITORING_ENABLED unset → WARN + reconcile-disabled gauge=1"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_marker "${MARKER}"
+  mapfile -t fake < <(converged_env)
+  # No IRI_MONITORING_ENABLED (defaults to false); FAKE_MON_PS models a running iri-monitoring project.
+  run_deploy -- "${fake[@]}" "FAKE_MON_PS=prometheus" || rc=$?
+  assert_exit 0 "$rc" "the gated-but-running no-op tick still exits 0"
+  assert_contains "no change" "it is still the idempotence no-op"
+  assert_contains "iri-monitoring is RUNNING but IRI_MONITORING_ENABLED != 'true'" \
+    "the gated-off-but-running condition is logged as a loud WARN"
+  assert_no_docker "--force-recreate" "nothing is recreated while the reconcile is gated off"
+  if grep -q '^basetool_monitoring_reconcile_disabled{component="deploy"} 1' \
+       "${T_STATE_DIR}/textfile/monitoring-reconcile.prom" 2>/dev/null; then
+    record 1 "the reconcile-disabled gauge is 1 (MonitoringReconcileDisabled can fire)"
+  else
+    record 0 "the reconcile-disabled gauge is 1 (MonitoringReconcileDisabled can fire)"
   fi
   rm -rf "${tmp}"
 }
@@ -970,6 +1017,7 @@ scenario_starting_grace
 scenario_monitoring_config_reload
 scenario_monitoring_reload_no_drift
 scenario_monitoring_reload_self_heals_on_noop
+scenario_monitoring_reconcile_disabled_when_running
 scenario_signature_verified_on_apply
 scenario_signature_failure_aborts
 scenario_break_glass_skips_verify
