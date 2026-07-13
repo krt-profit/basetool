@@ -502,13 +502,53 @@ write_prometheus_config_applied_metric() {
   fi
 }
 
+# Emit basetool_monitoring_reconcile_disabled{component="deploy"} = 0 (reconcile enabled/OK) or 1
+# (the iri-monitoring stack is RUNNING but the reconcile is gated off). This gauge is written on its
+# OWN path — independent of write_prometheus_config_applied_metric — precisely so the "running but
+# gated off" state is catchable WITHOUT the applied-stamp series, which is itself produced only from
+# inside the enabled reconcile. That coupling is what blinded PrometheusConfigStale on 2026-07-13: a
+# host with IRI_MONITORING_ENABLED unset never recreated Prometheus, so no applied stamp was ever
+# written and the stale-config alarm had no data to fire on. Best-effort atomic replace into the
+# node_exporter textfile dir; never fails the deploy. $1 is 0 or 1.
+write_monitoring_reconcile_state_metric() {
+  local f tmp
+  install -d -m 0755 "${TEXTFILE_DIR}" 2>/dev/null || true
+  f="${TEXTFILE_DIR}/monitoring-reconcile.prom"
+  tmp="${f}.$$"
+  if {
+    echo "# HELP basetool_monitoring_reconcile_disabled 1 when the iri-monitoring stack is running but deploy.sh's monitoring reconcile is gated off (IRI_MONITORING_ENABLED != true), so on-disk monitoring config changes are never reloaded into the running Prometheus/alloy/blackbox."
+    echo "# TYPE basetool_monitoring_reconcile_disabled gauge"
+    echo "basetool_monitoring_reconcile_disabled{component=\"deploy\"} ${1}"
+  } > "${tmp}" 2>/dev/null; then
+    mv -f "${tmp}" "${f}" 2>/dev/null || true
+  else
+    log "  monitoring: WARN could not write monitoring-reconcile textfile metric (${TEXTFILE_DIR})"
+    rm -f "${tmp}" 2>/dev/null || true
+  fi
+}
+
 # Reconcile ALL bind-mounted monitoring components against on-disk, then refresh the config-applied
-# metric. Gated on the monitoring stack being present/enabled on this host. Called on every healthy
-# tick — the success block AND the idempotence no-op fast-exit — so a missed apply self-heals even
-# on a quiet host that never re-deploys. Cheap in steady state: a per-service content diff, and a
-# force-recreate only on actual drift.
+# metric. Called on every healthy tick — the success block AND the idempotence no-op fast-exit — so a
+# missed apply self-heals even on a quiet host that never re-deploys. Cheap in steady state: a
+# per-service content diff, and a force-recreate only on actual drift.
+#
+# When IRI_MONITORING_ENABLED != true the reconcile is gated off, but the config-bundle rsync still
+# rewrites monitoring/** on disk every tick — so on a host that IS running the monitoring stack, the
+# on-disk changes silently never reach the running Prometheus. That drift is invisible to
+# PrometheusConfigStale (its applied-stamp series is written only from the enabled path below), so we
+# make it loud: a per-tick WARN plus the self-standing basetool_monitoring_reconcile_disabled gauge
+# (=1), which backs the MonitoringReconcileDisabled alert. A host with no monitoring stack running
+# stays silent — nothing scrapes the textfile there anyway.
 reconcile_monitoring_reloads() {
-  [[ "${IRI_MONITORING_ENABLED:-false}" == "true" && -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" ]] || return 0
+  if [[ "${IRI_MONITORING_ENABLED:-false}" != "true" ]]; then
+    if docker ps --filter "label=com.docker.compose.project=iri-monitoring" --format '{{.Names}}' 2>/dev/null | grep -q .; then
+      log "  monitoring: WARN iri-monitoring is RUNNING but IRI_MONITORING_ENABLED != 'true' — on-disk monitoring config changes will NOT be reloaded into Prometheus/alloy/blackbox (set IRI_MONITORING_ENABLED=true in the iri-deploy service env)"
+      write_monitoring_reconcile_state_metric 1
+    fi
+    return 0
+  fi
+  [[ -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" ]] || return 0
+  write_monitoring_reconcile_state_metric 0
   reconcile_monitoring_reload prometheus prometheus
   reconcile_monitoring_reload alloy alloy
   reconcile_monitoring_reload blackbox-exporter blackbox

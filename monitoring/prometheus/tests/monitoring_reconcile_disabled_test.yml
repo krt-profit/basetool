@@ -1,0 +1,59 @@
+# promtool unit test for MonitoringReconcileDisabled (REQ-OBS-014, #1295).
+#
+# Proves the alert `basetool_monitoring_reconcile_disabled{component="deploy"} == 1` (for: 30m):
+#   - FIRES when deploy.sh reports the iri-monitoring stack running but the reconcile gated off
+#     (gauge == 1) — the 2026-07-13 blind-spot state PrometheusConfigStale could not see;
+#   - stays SILENT when the reconcile is enabled and runs (gauge == 0);
+#   - stays SILENT when the series is absent (a host with no monitoring stack — nothing emits it).
+#
+# Run locally (no promtool installed on the host — use an ephemeral container, see
+# monitoring/README.md monitoring-config lint recipe):
+#   docker run --rm -v "$PWD/monitoring/prometheus:/work" -w /work \
+#     prom/prometheus:v3.13.0 promtool test rules tests/monitoring_reconcile_disabled_test.yml
+
+rule_files:
+  - ../alerts/meta.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: fires when the stack runs but the reconcile is gated off (gauge == 1)
+    interval: 1m
+    input_series:
+      - series: 'basetool_monitoring_reconcile_disabled{component="deploy"}'
+        values: "1x40"
+    alert_rule_test:
+      # Below the 30m `for`: pending, not yet firing.
+      - eval_time: 20m
+        alertname: MonitoringReconcileDisabled
+        exp_alerts: []
+      # Past the 30m `for`: fires.
+      - eval_time: 31m
+        alertname: MonitoringReconcileDisabled
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: deploy
+            exp_annotations:
+              summary: "Monitoring reconcile is disabled while the stack is running"
+              description: "deploy.sh sees the iri-monitoring stack running but IRI_MONITORING_ENABLED != 'true', so on-disk monitoring config changes are never reloaded into the running Prometheus/alloy/blackbox — silent config drift, and PrometheusConfigStale cannot catch it (its applied-stamp metric is written only from inside the gated reconcile). Fix: add /etc/systemd/system/iri-deploy.service.d/monitoring.conf with `Environment=IRI_MONITORING_ENABLED=true`, then `systemctl daemon-reload`."
+
+  - name: silent when the reconcile is enabled and runs (gauge == 0)
+    interval: 1m
+    input_series:
+      - series: 'basetool_monitoring_reconcile_disabled{component="deploy"}'
+        values: "0x40"
+    alert_rule_test:
+      - eval_time: 40m
+        alertname: MonitoringReconcileDisabled
+        exp_alerts: []
+
+  - name: silent when the series is absent (host without a monitoring stack)
+    interval: 1m
+    input_series:
+      - series: 'up{job="prometheus", instance="prometheus:9090"}'
+        values: "1x40"
+    alert_rule_test:
+      - eval_time: 40m
+        alertname: MonitoringReconcileDisabled
+        exp_alerts: []

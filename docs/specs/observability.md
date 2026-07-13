@@ -794,6 +794,22 @@ therefore alerts on:
   recreate is failing, or the `iri-deploy` timer stopped). The acute case (a wrong/absent scrape
   target) still pages `TargetDown`; this is the complementary early signal that the running Prometheus
   config is out of date at all.
+- **A reconcile disabled while the stack runs.** `PrometheusConfigStale` has a blind spot of its own:
+  its `basetool_monitoring_config_applied_timestamp` stamp is written **only** from inside `deploy.sh`'s
+  monitoring reconcile, which returns early when `IRI_MONITORING_ENABLED != true`. On a host that runs
+  the monitoring stack but leaves that flag unset, the config-bundle rsync keeps rewriting
+  `monitoring/**` on disk every tick while the running containers are never recreated — on-disk
+  rule/scrape changes silently never reach the running Prometheus — yet no applied stamp is ever
+  produced, so `PrometheusConfigStale` has no data and cannot fire: **the same condition that causes the
+  drift disables its alarm** (the 2026-07-13 overnight false-positive re-fire, where the shipped-and-
+  promoted v1.3.6 rule fixes lived on disk but the running Prometheus kept the old rules). `deploy.sh`
+  closes this by emitting `basetool_monitoring_reconcile_disabled{component="deploy"}` (a node_exporter
+  textfile gauge) on its **own** path — `1` when the `iri-monitoring` compose project is running but the
+  reconcile is gated off, `0` when the reconcile is enabled and runs — plus a loud per-tick WARN;
+  `MonitoringReconcileDisabled` (warning) fires on the `== 1` gauge after 30m. Because that gauge is
+  written precisely in the failure state and never depends on the applied-stamp path, it cannot be
+  self-disabled the way `PrometheusConfigStale` was. The fix is a systemd drop-in on the `iri-deploy`
+  service (`Environment=IRI_MONITORING_ENABLED=true`).
 - **Rule-evaluation & notification failures.** The two independent alert evaluators (Prometheus and
   the Loki ruler) must keep evaluating and delivering. `PrometheusRuleEvaluationFailures`,
   `PrometheusNotificationsDropped`, `LokiRuleEvaluationFailures`, `LokiRulerNotificationsFailing`
@@ -839,18 +855,20 @@ therefore alerts on:
   the cap to silence the alert.
 
 All labels stay bounded (REQ-OBS-006): these alerts read only the exporters' own low-cardinality
-series (`job` / `instance` / `reason` / `name` / `path` / `health_type`), never per-user or
-free-text values.
+series (`job` / `instance` / `reason` / `name` / `path` / `health_type` / `component`), never per-user
+or free-text values.
 
 **Enforced by:** `monitoring/prometheus/alerts/meta.yml` (`meta-self-health` + `meta-log-pipeline`
-groups) · `monitoring/prometheus/alerts/infrastructure.yml` (container guards, incl.
-`ContainerPidsHigh`) · `docker-compose.monitoring.yml` (cadvisor `process` metric group enabling
-`container_threads`/`container_processes`) · `monitoring/prometheus/prometheus.yml` (the
-`blackbox-exporter` self-metrics scrape job) ·
+groups, incl. `MonitoringReconcileDisabled`) · `monitoring/prometheus/alerts/infrastructure.yml`
+(container guards, incl. `ContainerPidsHigh`) · `monitoring/prometheus/tests/` (`promtool test rules`
+units, incl. `monitoring_reconcile_disabled_test.yml`) · `docker-compose.monitoring.yml` (cadvisor
+`process` metric group enabling `container_threads`/`container_processes`) ·
+`monitoring/prometheus/prometheus.yml` (the `blackbox-exporter` self-metrics scrape job) ·
 `scripts/deploy.sh` (`reconcile_monitoring_reload(s)` self-healing force-recreate + the
-`basetool_monitoring_config_applied_timestamp` textfile metric) · `scripts/deploy.test.sh`
-(config-apply / self-heal self-tests) · `monitoring/grafana/dashboards/13-meta-monitoring.json`
-(log-pipeline panels) · `monitoring/README.md` (alert-response runbook).
+`basetool_monitoring_config_applied_timestamp` and `basetool_monitoring_reconcile_disabled` textfile
+metrics) · `scripts/deploy.test.sh` (config-apply / self-heal / reconcile-disabled self-tests) ·
+`monitoring/grafana/dashboards/13-meta-monitoring.json` (log-pipeline panels) · `monitoring/README.md`
+(alert-response runbook).
 
 ### REQ-OBS-015 — Framework false-positive log noise is removed at the source, not muted
 

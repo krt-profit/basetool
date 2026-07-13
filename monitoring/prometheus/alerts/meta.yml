@@ -87,6 +87,26 @@ groups:
           summary: "Prometheus running a stale config (an apply was missed)"
           description: "deploy.sh applied an on-disk Prometheus config more recently than Prometheus's last SUCCESSFUL reload — the running Prometheus is serving a stale config (scrape targets / alert rules out of date), which PrometheusConfigReloadFailed cannot see. Check the deploy.sh monitoring-reload logs, force-recreate Prometheus (`docker compose -p iri-monitoring -f docker-compose.monitoring.yml up -d --force-recreate prometheus`), and verify the iri-deploy timer is running."
 
+      # Catches the failure mode that made PrometheusConfigStale itself go blind (2026-07-13): a host
+      # runs the iri-monitoring stack but IRI_MONITORING_ENABLED is unset, so deploy.sh's monitoring
+      # reconcile returns early every tick. The config-bundle rsync keeps rewriting monitoring/** on
+      # disk, but the running containers are never recreated — on-disk rule/scrape changes never reach
+      # the running Prometheus (silent drift). PrometheusConfigStale cannot see this because its
+      # basetool_monitoring_config_applied_timestamp series is written ONLY from inside the gated
+      # reconcile: the same condition that causes the drift also disables its alarm. This alert instead
+      # reads basetool_monitoring_reconcile_disabled, a gauge deploy.sh emits on its OWN path precisely
+      # in the failure state (=1 when the stack is running but the reconcile is gated off; =0 when the
+      # reconcile is enabled and runs), so it cannot be self-disabled the same way. Keep
+      # PrometheusConfigStale too — it still covers the enabled-but-reload-missed case.
+      - alert: MonitoringReconcileDisabled
+        expr: basetool_monitoring_reconcile_disabled{component="deploy"} == 1
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Monitoring reconcile is disabled while the stack is running"
+          description: "deploy.sh sees the iri-monitoring stack running but IRI_MONITORING_ENABLED != 'true', so on-disk monitoring config changes are never reloaded into the running Prometheus/alloy/blackbox — silent config drift, and PrometheusConfigStale cannot catch it (its applied-stamp metric is written only from inside the gated reconcile). Fix: add /etc/systemd/system/iri-deploy.service.d/monitoring.conf with `Environment=IRI_MONITORING_ENABLED=true`, then `systemctl daemon-reload`."
+
       - alert: PrometheusRuleEvaluationFailures
         expr: rate(prometheus_rule_evaluation_failures_total[5m]) > 0
         for: 10m
