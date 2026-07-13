@@ -336,6 +336,29 @@
         });
     }
 
+    function setGrandAdmiral(btn) {
+        write({
+            url:
+                '/organisation/leitung/organisationsleitung/' +
+                btn.getAttribute('data-unit-id') +
+                '/grand-admiral/ajax',
+            method: 'PUT',
+            payload: { userId: btn.getAttribute('data-user-id') },
+            success: i18n.saved,
+        });
+    }
+
+    function removeGrandAdmiral(btn) {
+        write({
+            url:
+                '/organisation/leitung/organisationsleitung/' +
+                btn.getAttribute('data-unit-id') +
+                '/grand-admiral/ajax',
+            method: 'DELETE',
+            success: i18n.saved,
+        });
+    }
+
     function handleAction(action, btn) {
         if (action === 'save-rank') {
             saveRank(btn);
@@ -351,6 +374,10 @@
             removeMember(btn, 'bereiche');
         } else if (action === 'remove-ol-member') {
             removeMember(btn, 'organisationsleitung');
+        } else if (action === 'set-grand-admiral') {
+            setGrandAdmiral(btn);
+        } else if (action === 'remove-grand-admiral') {
+            removeGrandAdmiral(btn);
         }
     }
 

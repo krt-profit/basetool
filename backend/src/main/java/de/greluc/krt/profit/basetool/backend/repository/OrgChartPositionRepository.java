@@ -153,6 +153,19 @@ public interface OrgChartPositionRepository extends JpaRepository<OrgChartPositi
       UUID orgUnitId, OrgChartPositionType positionType);
 
   /**
+   * Returns every position of the given type in the given OrgUnit. Backs the free-text-placeholder
+   * reuse in the chart mirror (REQ-ROLE-006): when an account is appointed to a multi-holder post,
+   * a matching free-text placeholder of the same type is converted instead of leaving a duplicate,
+   * so the mirror scans the type's seats for a name match.
+   *
+   * @param orgUnitId the OrgUnit to look within; never {@code null}.
+   * @param positionType the rank to enumerate; never {@code null}.
+   * @return the positions of that type in the unit; never {@code null}, possibly empty.
+   */
+  List<OrgChartPosition> findByOrgUnitIdAndPositionType(
+      UUID orgUnitId, OrgChartPositionType positionType);
+
+  /**
    * Returns the child position of the given type hanging off the given parent, if any. Backs the
    * stellv.-Kommandoleiter reassign in the chart mirror (epic #800, REQ-ROLE-006): a Kommando has
    * at most one {@code DEPUTY_COMMAND_LEAD}, so re-appointing reuses that single child row.

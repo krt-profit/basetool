@@ -58,10 +58,22 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr th:each="m : ${ol.members()}">
+                                <tr th:each="m : ${ol.members()}"
+                                    th:with="isGa=${ol.grandAdmiralUserId() != null and ol.grandAdmiralUserId() == m.userId()}">
                                     <td th:text="${m.userDisplayName()}">Name</td>
-                                    <td><span class="chip chip--primary" th:text="#{'leitung.rank.' + ${m.role()}}">OL-Mitglied</span></td>
+                                    <td>
+                                        <span class="chip chip--primary" th:text="#{'leitung.rank.' + ${m.role()}}">OL-Mitglied</span>
+                                        <span class="chip chip--accent" th:if="${isGa}" th:text="#{leitung.grandAdmiral.badge}">Grand Admiral</span>
+                                    </td>
                                     <td class="leitung-col-action">
+                                        <!-- Grand Admiral toggle (REQ-ORG-021): promote any other OL member, or vacate the
+                                             current holder. Gated on canAppointLead (admin on the OL). -->
+                                        <button type="button" class="btn btn-quiet" th:if="${ol.canAppointLead() and !isGa}"
+                                                data-leitung-action="set-grand-admiral" th:data-unit-id="${ol.id()}" th:data-user-id="${m.userId()}"
+                                                th:title="#{leitung.grandAdmiral.set}" th:text="#{leitung.grandAdmiral.set}">Zum Grand Admiral</button>
+                                        <button type="button" class="btn btn-quiet-danger" th:if="${ol.canAppointLead() and isGa}"
+                                                data-leitung-action="remove-grand-admiral" th:data-unit-id="${ol.id()}"
+                                                th:title="#{leitung.grandAdmiral.remove}" th:text="#{leitung.grandAdmiral.remove}">Grand Admiral entfernen</button>
                                         <button type="button" class="btn btn-quiet-danger btn-icon" th:if="${ol.canAppointLead()}"
                                                 data-leitung-action="remove-ol-member" th:data-unit-id="${ol.id()}" th:data-user-id="${m.userId()}"
                                                 th:title="#{leitung.action.remove}" th:aria-label="#{leitung.action.remove}">

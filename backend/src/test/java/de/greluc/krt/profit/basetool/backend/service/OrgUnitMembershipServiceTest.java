@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -662,6 +663,55 @@ class OrgUnitMembershipServiceTest {
     when(membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, olId)).thenReturn(true);
 
     assertThrows(DuplicateEntityException.class, () -> membershipService.addOlMember(olId, userId));
+    verify(membershipRepository, never()).saveAndFlush(any());
+  }
+
+  @Test
+  void setGrandAdmiral_existingMember_designatesAndAudits() {
+    UUID olId = UUID.randomUUID();
+    Organisationsleitung ol = new Organisationsleitung();
+    ol.setId(olId);
+    when(orgUnitRepository.findById(olId)).thenReturn(Optional.of(ol));
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, olId)).thenReturn(true);
+
+    membershipService.setGrandAdmiral(olId, userId);
+
+    assertEquals(userId, ol.getGrandAdmiralUserId());
+    // Already an OL member (REQ-ORG-021 keeps the OL_MEMBER rank) — no auto-add membership write.
+    verify(membershipRepository, never()).saveAndFlush(any());
+    verify(auditService)
+        .record(eq(AuditEventType.ROLE_CHANGED), eq(olId), any(), eq(userId), any());
+  }
+
+  @Test
+  void removeGrandAdmiral_clearsDesignationAndAudits() {
+    UUID olId = UUID.randomUUID();
+    Organisationsleitung ol = new Organisationsleitung();
+    ol.setId(olId);
+    ol.setGrandAdmiralUserId(userId);
+    when(orgUnitRepository.findById(olId)).thenReturn(Optional.of(ol));
+
+    membershipService.removeGrandAdmiral(olId);
+
+    assertNull(ol.getGrandAdmiralUserId());
+    verify(auditService)
+        .record(eq(AuditEventType.ROLE_CHANGED), eq(olId), any(), eq(userId), any());
+  }
+
+  @Test
+  void setGrandAdmiralFreeText_setsTrimmedNameAndSupersedesAccount() {
+    UUID olId = UUID.randomUUID();
+    Organisationsleitung ol = new Organisationsleitung();
+    ol.setId(olId);
+    ol.setGrandAdmiralUserId(userId); // was an account Grand Admiral
+    when(orgUnitRepository.findById(olId)).thenReturn(Optional.of(ol));
+
+    membershipService.setGrandAdmiralFreeText(olId, "  Admiral ohne Account  ");
+
+    assertEquals("Admiral ohne Account", ol.getGrandAdmiralDisplayName());
+    assertNull(ol.getGrandAdmiralUserId());
+    // Free-text is a descriptive chart entry: no membership write (REQ-ORG-021).
     verify(membershipRepository, never()).saveAndFlush(any());
   }
 
