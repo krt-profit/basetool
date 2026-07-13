@@ -60,4 +60,12 @@ public class InventoryBookOutForm {
    * 100 % of users hit today).
    */
   private UUID targetOwningOrgUnitId;
+
+  /**
+   * Per-action stock-merge opt-in (REQ-INV-026) for a {@link CheckoutType#TRANSFER}: the modal
+   * checkbox to merge the moved SCU quantity into a matching target stack. Ignored for a {@code
+   * PIECE} material (which always merges) and for {@code DISCARD}/{@code SELL}; {@code null}/{@code
+   * false} keeps the moved row separate.
+   */
+  private Boolean mergeStock;
 }

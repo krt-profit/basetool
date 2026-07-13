@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-29.
-> **Owner area:** INV · **Related ADRs:** ADR-0003
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-13.
+> **Owner area:** INV · **Related ADRs:** ADR-0003, ADR-0097
 
 # Inventory Lager — append-only entries & group-on-read
 
@@ -17,34 +17,47 @@ contribution is its own row, and the UI collapses rows that share a stock identi
 display *stack* that expands to the individual entries. Tracked by issue #466 (milestone
 v0.4.0); the persistence-model decision is recorded in ADR-0003.
 
+**Amendment (#1182, ADR-0097).** Append-only is now the *default*, not an absolute: a **scoped
+write-time merge** re-consolidates rows that share a stock identity — automatically for a **`PIECE`**
+(Stück) material and, for an **`SCU`** material, only when the caller opts a single action in. SCU
+without the opt-in is unchanged (append-only). The rules live in
+[REQ-INV-026](#req-inv-026--write-time-stock-merge-for-piece-auto-and-scu-per-action-opt-in) below;
+REQ-INV-001 is amended accordingly.
+
 The **stock identity** ("stack key") is the inventory natural key: owner (`user`),
 `material`, `location`, `quality`, the optional `mission` / `jobOrder` association, the
 `personal` flag, and the owning org-unit pool (`owningOrgUnit`).
 
 ## Requirements
 
-### REQ-INV-001 — Inventory is append-only; no write path merges
+### REQ-INV-001 — Inventory is append-only by default (merge is the scoped exception)
 
-No write path may fold a new or edited `InventoryItem` into a different existing row. Each
-of create, update, book-out **TRANSFER** (the moved quantity at the target), refinery store
-and any future inbound path inserts (or edits in place) its own row. Two rows that share the
-stock identity coexist as separate rows; they are never summed in the database. The former
-read-add-write merge — and the pessimistic lock that guarded its lost-update race — are
-removed.
+A write path does **not** fold a new or edited `InventoryItem` into a different existing row
+**unless the scoped stock merge of [REQ-INV-026](#req-inv-026--write-time-stock-merge-for-piece-auto-and-scu-per-action-opt-in)
+applies** — a `PIECE` material always, an `SCU` material only on the caller's per-action opt-in.
+Outside that merge, each of create, update, book-out **TRANSFER** (the moved quantity at the
+target), refinery store and any future inbound path inserts (or edits in place) its own row; two
+rows that share the stock identity coexist as separate rows and are never summed in the database. In
+particular an **`SCU`** write with no opt-in stays append-only exactly as before. The former
+*unconditional* read-add-write merge — and the pessimistic lock that guarded its lost-update race —
+remain removed for the append-only paths; the merge re-introduces a pessimistic lock only on its own
+path (REQ-INV-026).
 
 **Acceptance**
 
-- [ ] Creating stock that matches an existing row's stock identity yields a second row; the
-  existing row's amount is unchanged.
-- [ ] Updating a row never deletes it in favour of a matching row; it is saved in place.
-- [ ] A partial TRANSFER decrements the source and inserts a new row at the target even when
-  an identical target stack already exists; the existing target row is unchanged.
-- [ ] Storing a refinery output inserts a new row with its own note; no existing row's amount
-  or note changes.
+- [ ] Creating **`SCU`** stock (no opt-in) that matches an existing row's stock identity yields a
+  second row; the existing row's amount is unchanged.
+- [ ] Updating an **`SCU`** row (no opt-in) never deletes it in favour of a matching row; it is saved
+  in place.
+- [ ] A partial **`SCU`** TRANSFER (no opt-in) decrements the source and inserts a new row at the
+  target even when an identical target stack already exists; the existing target row is unchanged.
+- [ ] Storing a refinery output inserts a new row with its own note; no existing row's amount or note
+  changes (refinery outputs are `SCU`).
+- [ ] A `PIECE` write, or an `SCU` write with the opt-in, merges per REQ-INV-026 instead of appending.
 
 **Enforced by:** `InventoryItemServiceTest`, `InventoryItemServiceBookOutTest`,
-`RefineryOrderServiceTest` · **Code:** `InventoryItemService`, `RefineryOrderService` ·
-**Issues:** #466
+`InventoryStockMergeTest`, `RefineryOrderServiceTest` · **Code:** `InventoryItemService`,
+`InventoryCheckoutService`, `RefineryOrderService` · **Issues:** #466, #1182
 
 ### REQ-INV-002 — Group-on-read display: Material → Stack
 
@@ -273,6 +286,71 @@ audit event, consistent with the audit contract that only committed state mutati
 **Enforced by:** `InventoryItemServiceBookOutTest` · **Code:**
 `InventoryCheckoutService#bookOutInventoryItem` (public façade
 `InventoryItemService#bookOutInventoryItem`) · **Issues:** —
+
+### REQ-INV-026 — Write-time stock merge for PIECE (auto) and SCU (per-action opt-in)
+
+A write that lands a row whose material's quantity type is **`PIECE`** (Stück) is merged into a
+single Lager entry with every existing row that shares its stock identity; a write whose material is
+**`SCU`** does the same **only when the caller opts in for that one action** — a modal checkbox that
+is per-transaction and **never persisted**. The merge runs on the four inbound write paths: create
+(Einbuchen), the association edit (Ändern — material / quality / location / job order / mission), the
+book-out **TRANSFER** target, and the personal-rebooking / transfer (Umbuchen). An `SCU` write
+without the opt-in stays append-only (REQ-INV-001); the opt-in checkbox is offered only on `SCU` rows
+(a `PIECE` row always merges, so no choice is shown).
+
+The **merge identity** is the append-only stack key *minus* `delivered`: owner · material · location
+· quality · `personal` · optional `jobOrder` / `mission` · owning org-unit pool (the three nullable
+dimensions match `NULL = NULL`). The just-written row is the **survivor**; every other row sharing
+that identity is folded into it — `amount`s summed and **distinct notes concatenated** (first-seen
+order, newline-joined, truncated to the 1000-char note column) — and then deleted. Because
+`delivered` is deliberately **not** part of the merge key, the merged survivor is reset to
+**not-delivered** (combining a delivered with a non-delivered contribution has no single truth; owner
+decision).
+
+**Materialbörse invariant.** A merge **never** changes a Materialbörse entry (see
+[`materialboerse.md`](materialboerse.md)). A row that backs *any* `MaterialExchangeOffer` (any status)
+is excluded from the merge — it is never a survivor whose amount changes and never folded away: the
+`inventory_item` FK is `ON DELETE CASCADE`, so deleting such a row would silently destroy the offer,
+and the offer reads its material/amount live from the row. The offered quantity is therefore never
+increased by a merge.
+
+**Concurrency.** The merge group is loaded `FOR UPDATE` (pessimistic write lock) so two racing
+same-stack writers serialise instead of double-counting or losing stock — this re-introduces, **only
+on the merge path**, the lost-update lock the append-only model (ADR-0003) had removed. The merge is
+a read-add-write that runs inside the caller's transaction (`Propagation.MANDATORY`).
+
+**Auditing.** Every merge that folds at least one row records an `INVENTORY_ITEM_MERGED` audit event
+(REQ-AUDIT-001) carrying the folded-row count, the resulting total and the `auto` (PIECE) / `manual`
+(SCU opt-in) trigger.
+
+**Deployment.** The change ships a one-time Flyway backfill (`V216__merge_piece_inventory_rows.sql`)
+that merges pre-existing `PIECE` rows under the same identity and offer-exclusion, so the deployed
+dataset matches the new write behaviour. `SCU` rows and offer-backed rows are left untouched.
+
+**Acceptance**
+
+- [ ] A `PIECE` create / edit / transfer / rebook that matches an existing stack folds the rows into
+  one: amounts summed, distinct notes combined, the survivor reset to not-delivered, the folded rows
+  deleted.
+- [ ] An `SCU` write merges only when the per-action opt-in is set; without it the row stays separate
+  (append-only). The opt-in checkbox renders only for `SCU` materials.
+- [ ] A row backing a Materialbörse offer is never merged (neither survivor nor folded), and the
+  offered quantity is unchanged by any merge.
+- [ ] Two concurrent same-stack writers do not double-count or lose stock (the `FOR UPDATE` group
+  serialises them).
+- [ ] The deployment backfill merges matching pre-existing `PIECE` rows and leaves `SCU` rows and
+  offer-backed rows untouched.
+- [ ] Each fold records one `INVENTORY_ITEM_MERGED` audit event; the unified viewer's Lager filter
+  lists it.
+
+**Enforced by:** `InventoryStockMergeTest`, `InventoryItemServiceTest`,
+`InventoryItemServiceBookOutTest`, `InventoryItemServicePersonalRebookTest` · **Code:**
+`InventoryCheckoutService#mergeStockIfRequested`, `InventoryItemRepository#findMergeGroupForUpdate`,
+`MaterialExchangeOfferRepository#existsByInventoryItemId`, `InventoryItemService`,
+`V216__merge_piece_inventory_rows.sql`, `inventory-input.html` / `inventory-input.js`,
+`inventory-my.html` / `inventory-my.js`, `inventory-admin.html` / `inventory-admin.js` · **Issues:**
+
+# 1182 · **ADR:** ADR-0097
 
 ## Out of scope
 

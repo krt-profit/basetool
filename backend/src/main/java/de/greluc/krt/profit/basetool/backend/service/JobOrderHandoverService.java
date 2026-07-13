@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderMaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import java.util.ArrayList;
@@ -66,6 +67,7 @@ public class JobOrderHandoverService {
   private final JobOrderRepository jobOrderRepository;
   private final JobOrderHandoverRepository jobOrderHandoverRepository;
   private final InventoryItemRepository inventoryItemRepository;
+  private final MaterialExchangeOfferRepository materialExchangeOfferRepository;
   private final JobOrderHandoverMapper jobOrderHandoverMapper;
   private final JobOrderMaterialRepository jobOrderMaterialRepository;
   private final JobOrderService jobOrderService;
@@ -308,6 +310,12 @@ public class JobOrderHandoverService {
     // user free text and is never written to the audit details. completeJobOrderWithinTransaction
     // already recorded JOB_ORDER_COMPLETED when the order was fulfilled, so this method does not.
     for (HandedItem h : handedItems) {
+      // Ratchet any active Materialbörse offer on a non-depleted handed-over row down to its
+      // reduced
+      // stock (REQ-MARKET-013); a depleted row was deleted and its offer cascade-removed (V210).
+      if (!h.depleted()) {
+        materialExchangeOfferRepository.clampOfferedAmountToStock(h.itemId(), h.remaining());
+      }
       auditService.record(
           AuditEventType.INVENTORY_HANDED_OVER,
           h.itemId(),

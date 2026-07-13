@@ -60,4 +60,11 @@ public class InventoryForm {
    * hidden and the backend stamps the user's home Staffel via the legacy path).
    */
   private UUID owningOrgUnitId;
+
+  /**
+   * Per-action stock-merge opt-in (REQ-INV-026): the modal checkbox the user ticks to merge this
+   * SCU book-in into a matching existing stack. Ignored for a {@code PIECE} material (which always
+   * merges); defaults to {@code false} so an untouched SCU book-in stays append-only.
+   */
+  private Boolean mergeStock = false;
 }

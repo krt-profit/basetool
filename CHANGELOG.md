@@ -4,6 +4,10 @@
 
 ### Changed
 
+- **Lager: Stückzahl-Materialien werden wieder zu einem Lagereintrag zusammengeführt.** Gleichartige Bestände desselben Stückzahl-Materials (gleiche Qualität, Lagerort, Auftrag und Einsatz) landen beim Einbuchen, Ändern und Umbuchen automatisch in einem einzigen Eintrag, wobei vorhandene Notizen zusammengeführt werden; bei SCU-Materialien lässt sich das Zusammenführen pro Aktion optional über eine Checkbox im Dialog aktivieren. Angebote in der Materialbörse bleiben dabei unverändert (die angebotene Menge steigt nicht), und bereits vorhandene passende Einträge werden beim Ausrollen der Änderung einmalig zusammengeführt.
+
+- **Materialbörse: Angebote werden automatisch verringert, wenn der zugehörige Lagerbestand kleiner wird.** Wird ein Lagereintrag ausgebucht, umgebucht, übergeben oder verringert und die angebotene Menge ist nicht mehr gedeckt, sinkt die angebotene Menge des Angebots dauerhaft auf den verbleibenden Bestand. Erhöht sich der Bestand später wieder, bleibt das Angebot unverändert — mehr anzubieten ist eine bewusste Entscheidung des Anbieters.
+
 - **Organigramm: Kopf-Kasten und Bereichsleiter optisch geschärft.** Der Kasten der Organisationsleitung ist nicht mehr auf die Rasterbreite fixiert, wächst auf seine Beschriftung und hat mehr Innenabstand, sodass „ORGANISATIONSLEITUNG" nicht mehr am Rand klebt; der Rahmen der Bereichsleiter ist einen Pixel kräftiger.
 
 - **Organigramm: Ansicht entrümpelt.** Die Markierung „Leitung" an kontogebundenen Sitzen entfällt (der schreibgeschützte Zustand zeigt sich im Bearbeitungsmodus bereits an den fehlenden Schaltflächen), und der Pflegehinweis „Kein Account" erscheint nur noch im Bearbeitungsmodus (REQ-ORG-010, REQ-ORG-013, REQ-ORG-020).

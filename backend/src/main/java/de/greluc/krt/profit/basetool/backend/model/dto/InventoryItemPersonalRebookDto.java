@@ -44,6 +44,13 @@ import org.jetbrains.annotations.Nullable;
  *     OwnerScopeService.resolveOrgUnitForPickerOutputNullable}. Ignored for the
  *     <em>personalize</em> direction, which carries the owner's existing stamp over to the private
  *     row.
+ * @param mergeStock per-action stock-merge opt-in (REQ-INV-026) for the newly inserted row. A
+ *     {@code PIECE} material merges the moved quantity into a matching stack unconditionally; an
+ *     {@code SCU} material merges only when this is {@code true}. {@code null} is treated as {@code
+ *     false}; the flag governs only this one Umbuchung and is never persisted.
  */
 public record InventoryItemPersonalRebookDto(
-    @NotNull @Min(0) Double amount, @NotNull Long version, @Nullable UUID targetOwningOrgUnitId) {}
+    @NotNull @Min(0) Double amount,
+    @NotNull Long version,
+    @Nullable UUID targetOwningOrgUnitId,
+    Boolean mergeStock) {}

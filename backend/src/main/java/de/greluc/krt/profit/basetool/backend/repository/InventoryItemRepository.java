@@ -457,6 +457,58 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   Optional<InventoryItem> findByIdForUpdate(@Param("id") UUID id);
 
   /**
+   * Loads every warehouse row that shares the stock identity of a just-written row — the merge
+   * candidates for the write-time stock merge (REQ-INV-026): a {@code PIECE} write merges
+   * automatically, an {@code SCU} write when the caller opted in. The identity is the append-only
+   * stack key <em>minus</em> {@code delivered} (the "Geliefert" marker is intentionally not part of
+   * the key; the merged survivor is reset to not-delivered), so a delivered and a non-delivered row
+   * of the same stock are merge candidates. The three nullable dimensions ({@code jobOrder}, {@code
+   * mission}, {@code owningOrgUnit}) match on {@code NULL = NULL}. Rows backing a {@link
+   * de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOffer} are excluded via {@code NOT
+   * EXISTS} so a merge never deletes stock the Materialbörse still references ({@code ON DELETE
+   * CASCADE}, V210) — the offer and its offered quantity stay untouched.
+   *
+   * <p>The rows are locked {@code PESSIMISTIC_WRITE} ({@code FOR UPDATE}) for the surrounding
+   * transaction so two racing writers to the same stack serialise: the merge reads, sums and
+   * deletes siblings, which is exactly the read-add-write the append-only model (ADR-0003) removed,
+   * so it re-introduces the lock only on this one path. Every stock-identity column is a
+   * foreign-key or scalar, so the lock targets only {@code inventory_item} rows. Ordered
+   * oldest-first for a deterministic survivor tie-break.
+   *
+   * @param userId the owning user of the stack; never {@code null}.
+   * @param materialId the stack's material; never {@code null}.
+   * @param locationId the stack's storage location; never {@code null}.
+   * @param quality the stack's quality grade; never {@code null}.
+   * @param personal the stack's personal flag; never {@code null}.
+   * @param jobOrderId the stack's job-order id, or {@code null} to match rows with no job order.
+   * @param missionId the stack's mission id, or {@code null} to match rows with no mission.
+   * @param owningOrgUnitId the stack's owning org-unit pool id, or {@code null} to match rows with
+   *     no owning org unit.
+   * @return the locked matching rows (excluding offer-backed rows), oldest-first; never {@code
+   *     null}.
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query(
+      """
+      SELECT i FROM InventoryItem i WHERE i.user.id = :userId AND i.material.id = :materialId AND
+      i.location.id = :locationId AND i.quality = :quality AND i.personal = :personal AND
+      ((:jobOrderId IS NULL AND i.jobOrder IS NULL) OR i.jobOrder.id = :jobOrderId) AND
+      ((:missionId IS NULL AND i.mission IS NULL) OR i.mission.id = :missionId) AND
+      ((:owningOrgUnitId IS NULL AND i.owningOrgUnit IS NULL) OR i.owningOrgUnit.id =
+      :owningOrgUnitId) AND NOT EXISTS (SELECT 1 FROM MaterialExchangeOffer o WHERE
+      o.inventoryItem = i) ORDER BY i.createdAt ASC, i.id ASC
+      """)
+  List<InventoryItem> findMergeGroupForUpdate(
+      @Param("userId") UUID userId,
+      @Param("materialId") UUID materialId,
+      @Param("locationId") UUID locationId,
+      @Param("quality") Integer quality,
+      @Param("personal") Boolean personal,
+      @Param("jobOrderId") UUID jobOrderId,
+      @Param("missionId") UUID missionId,
+      @Param("owningOrgUnitId") UUID owningOrgUnitId);
+
+  /**
    * Bulk-deletes every non-personal inventory item (the "globales Lager" stock). Personal rows
    * ({@code personal = true}) are explicitly left untouched so the admin "clear global inventory"
    * action does not nuke individual users' private entries. The {@code job_order_handover_item ->

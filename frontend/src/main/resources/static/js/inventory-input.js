@@ -78,6 +78,22 @@ function updateAmountFieldForMaterial(selectElement) {
         unitSpan.textContent = '';
         if (scuHint) scuHint.classList.add('krtm-hidden');
     }
+
+    updateMergeOptIn(qtType);
+}
+
+// REQ-INV-026: the per-action stock-merge opt-in is offered only for an SCU material — a PIECE
+// book-in always merges server-side, so the checkbox is hidden and reset for PIECE / no selection.
+function updateMergeOptIn(qtType) {
+    const mergeRow = document.getElementById('merge-stock-row');
+    const mergeCheckbox = document.getElementById('mergeStock');
+    if (!mergeRow) return;
+    if (qtType === 'SCU') {
+        mergeRow.classList.remove('krtm-hidden');
+    } else {
+        mergeRow.classList.add('krtm-hidden');
+        if (mergeCheckbox) mergeCheckbox.checked = false;
+    }
 }
 
 function filterJobOrdersByMaterial(matId) {

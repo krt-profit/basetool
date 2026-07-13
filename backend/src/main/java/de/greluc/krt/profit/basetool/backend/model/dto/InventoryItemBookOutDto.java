@@ -42,6 +42,12 @@ import org.jetbrains.annotations.Nullable;
  *
  * <p>Ignored for {@link CheckoutType#DISCARD} and {@link CheckoutType#SELL} — both terminate the
  * inventory row and never create a new ownership stamp.
+ *
+ * <p>{@link #mergeStock} is the per-action stock-merge opt-in (REQ-INV-026) and applies only to the
+ * {@link CheckoutType#TRANSFER} branch — the moved quantity lands as a new row at the target, and a
+ * {@code PIECE} material merges it into a matching target stack unconditionally while an {@code
+ * SCU} material merges only when this flag is {@code true}. It is never persisted and governs only
+ * this one transfer.
  */
 public record InventoryItemBookOutDto(
     @NotNull @Min(0) Double amount,
@@ -51,4 +57,5 @@ public record InventoryItemBookOutDto(
     String terminal,
     @Min(0) BigDecimal sellAmount,
     @NotNull Long version,
-    @Nullable UUID targetOwningOrgUnitId) {}
+    @Nullable UUID targetOwningOrgUnitId,
+    Boolean mergeStock) {}

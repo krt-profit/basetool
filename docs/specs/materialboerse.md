@@ -75,9 +75,16 @@ the row is partially booked out (ADR-0086, clamp-on-read). A **fully** booked-ou
 the inventory book-out paths (delete-on-depletion), which cascade-deletes the offer (V210 `ON DELETE
 CASCADE`) — so a dead, zero-stock offer never lingers; no separate "hide depleted" pass is needed.
 
+The Lager **stock merge** (REQ-INV-026, ADR-0097) **never** touches an offer: a row that backs any
+offer is excluded from the merge — it is never folded away (which would cascade-delete the offer) and
+never a survivor whose amount changes — so a merge never alters the offered quantity or the offer's
+live-read material/quality.
+
 **Acceptance**
 - [ ] Releasing another member's item is rejected (403).
 - [ ] The offer's quality always equals the item's current quality.
+- [ ] A stock merge never changes an offer: a row backing an offer is left out of the merge and its
+offered quantity is unchanged.
 - [ ] Offering a part of the row stores that part; offering more than the item's current stock is
 rejected (400).
 - [ ] The board never shows more than the item's current stock: after part of the row is booked out,
@@ -88,6 +95,35 @@ out it is deleted and its offer cascade-removed (no lingering zero-stock offer).
 **Enforced by:** `MaterialExchangeServiceTest`, `MaterialExchangeRepositoryDataTest` · **Code:**
 `MaterialExchangeService#release/updateOffer`, `MaterialExchangeReleaseRequest`,
 `MaterialExchangeOfferUpdateRequest`, `V212` offered-amount column, `V210` partial-unique index
+
+### REQ-MARKET-013 — Stock decrease ratchets the offer down (persisted); an increase never changes it
+
+When the Lager row backing an **active** offer is **reduced** — book-out (consume / sell / transfer),
+personal rebooking, amount edit, or job-order handover — and the stored `offeredAmount` is no longer
+covered, the offer's `offeredAmount` is **persisted down** to the row's new stock **in the same
+transaction as the decrement**, via the atomic conditional update
+`MaterialExchangeOfferRepository.clampOfferedAmountToStock` (`ACTIVE` offers only; only when
+`offeredAmount > newStock`). This is the *persisting* counterpart to the display-time clamp-on-read
+(REQ-MARKET-002, ADR-0086): the board already never *shows* more than is in stock, but without
+persisting the reduction the stored value would silently **recover** on a later stock increase.
+
+An **increase** of the backing row never changes the offer — the conditional update is a no-op when
+stock rises, so offering more stays an explicit owner decision (the owner raises the offered amount
+themselves). A **full** book-out deletes the row and cascade-removes the offer (V210), so no clamp is
+needed there. The offer's `@Version` is intentionally left untouched by the ratchet; a concurrent
+owner edit is guarded independently by the release/edit `offeredAmount <= current stock` validation.
+
+**Acceptance**
+- [ ] Reducing a backing row below its active offer's `offeredAmount` persists `offeredAmount` down to
+the new stock (book-out, transfer, rebooking, update, handover).
+- [ ] Increasing the backing row leaves the offer's `offeredAmount` unchanged (no auto-expand).
+- [ ] A deactivated offer is not touched by the ratchet.
+- [ ] A fully booked-out row's offer is cascade-removed (unchanged from REQ-MARKET-002).
+
+**Enforced by:** `MaterialExchangeOfferClampDataTest`, `InventoryItemServiceBookOutTest` · **Code:**
+`MaterialExchangeOfferRepository#clampOfferedAmountToStock`, `InventoryCheckoutService`
+(book-out / transfer / rebooking + `clampOffersToStock`), `InventoryItemService#updateInventoryItem`,
+`JobOrderHandoverService#createHandover` · **Issues:** #1182
 
 ### REQ-MARKET-003 — Signal-only
 

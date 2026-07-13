@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.*;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
@@ -75,6 +76,7 @@ class InventoryItemServiceTest {
   @Mock private MissionRepository missionRepository;
   @Mock private MissionFinanceEntryRepository missionFinanceEntryRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
+  @Mock private MaterialExchangeOfferRepository materialExchangeOfferRepository;
   @Mock private InventoryItemMapper inventoryItemMapper;
 
   @Mock private MaterialMapper materialMapper;
@@ -111,6 +113,7 @@ class InventoryItemServiceTest {
             locationRepository,
             missionFinanceEntryRepository,
             missionParticipantRepository,
+            materialExchangeOfferRepository,
             inventoryItemMapper,
             ownerScopeService,
             auditService);
@@ -181,7 +184,8 @@ class InventoryItemServiceTest {
             jobOrder.getId(), // jobOrderId
             null, // missionId
             1L // version
-            );
+            ,
+            null);
 
     InventoryItemDto mapped =
         new InventoryItemDto(
@@ -219,6 +223,9 @@ class InventoryItemServiceTest {
         2.0, item.getAmount(), "amount equals the DTO amount, never summed with a sibling");
     verify(inventoryItemRepository).saveAndFlush(item);
     verify(inventoryItemRepository, never()).delete(any());
+    // REQ-MARKET-013: an edit ratchets any active offer on the row down to the (possibly reduced)
+    // amount — pins the update clamp call site (the repository query itself no-ops on an increase).
+    verify(materialExchangeOfferRepository).clampOfferedAmountToStock(eq(itemId), eq(2.0));
   }
 
   @Test
@@ -516,7 +523,7 @@ class InventoryItemServiceTest {
 
     InventoryItemCreateDto dto =
         new InventoryItemCreateDto(
-            userId, materialId, locationId, 100, 10.0, false, null, null, null);
+            userId, materialId, locationId, 100, 10.0, false, null, null, null, null);
 
     User user = new User();
     user.setId(userId);
@@ -571,7 +578,7 @@ class InventoryItemServiceTest {
 
     InventoryItemCreateDto dto =
         new InventoryItemCreateDto(
-            userId, materialId, locationId, 100, 10.0, false, null, jobOrderId, null);
+            userId, materialId, locationId, 100, 10.0, false, null, jobOrderId, null, null);
 
     User user = new User();
     user.setId(userId);
@@ -605,7 +612,7 @@ class InventoryItemServiceTest {
 
     InventoryItemCreateDto dto =
         new InventoryItemCreateDto(
-            userId, materialId, locationId, 100, 10.0, false, null, jobOrderId, null);
+            userId, materialId, locationId, 100, 10.0, false, null, jobOrderId, null, null);
 
     User user = new User();
     user.setId(userId);
@@ -644,7 +651,8 @@ class InventoryItemServiceTest {
     UUID locationId = UUID.randomUUID();
 
     InventoryItemUpdateDto dto =
-        new InventoryItemUpdateDto(materialId, locationId, 100, 10.0, false, jobOrderId, null, 1L);
+        new InventoryItemUpdateDto(
+            materialId, locationId, 100, 10.0, false, jobOrderId, null, 1L, null);
 
     InventoryItem existingItem = new InventoryItem();
     existingItem.setId(itemId);
@@ -683,7 +691,7 @@ class InventoryItemServiceTest {
 
     InventoryItemCreateDto dto =
         new InventoryItemCreateDto(
-            userId, materialId, locationId, 100, inputAmount, false, null, null, null);
+            userId, materialId, locationId, 100, inputAmount, false, null, null, null, null);
 
     User user = new User();
     user.setId(userId);
@@ -717,7 +725,16 @@ class InventoryItemServiceTest {
     UUID targetUserId = UUID.randomUUID();
     InventoryItemCreateDto dto =
         new InventoryItemCreateDto(
-            targetUserId, UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, null);
+            targetUserId,
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            100,
+            10.0,
+            false,
+            null,
+            null,
+            null,
+            null);
 
     assertThrows(
         AccessDeniedException.class,
@@ -730,7 +747,8 @@ class InventoryItemServiceTest {
     UUID currentUserId = UUID.randomUUID();
 
     InventoryItemBookOutDto dto =
-        new InventoryItemBookOutDto(5.0, null, null, CheckoutType.DISCARD, null, null, 1L, null);
+        new InventoryItemBookOutDto(
+            5.0, null, null, CheckoutType.DISCARD, null, null, 1L, null, null);
 
     InventoryItem existingItem = new InventoryItem();
     existingItem.setId(itemId);
@@ -752,7 +770,8 @@ class InventoryItemServiceTest {
   void bookOutInventoryItem_shouldThrowOptimisticLockingFailure_whenVersionsMismatch() {
     UUID itemId = UUID.randomUUID();
     InventoryItemBookOutDto dto =
-        new InventoryItemBookOutDto(5.0, null, null, CheckoutType.DISCARD, null, null, 2L, null);
+        new InventoryItemBookOutDto(
+            5.0, null, null, CheckoutType.DISCARD, null, null, 2L, null, null);
 
     InventoryItem existingItem = new InventoryItem();
     existingItem.setId(itemId);
@@ -773,7 +792,7 @@ class InventoryItemServiceTest {
 
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
-            5.0, targetUserId, null, CheckoutType.TRANSFER, null, null, 1L, null);
+            5.0, targetUserId, null, CheckoutType.TRANSFER, null, null, 1L, null, null);
 
     InventoryItem existingItem = new InventoryItem();
     existingItem.setId(itemId);
@@ -788,6 +807,10 @@ class InventoryItemServiceTest {
 
     when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
     when(userRepository.findById(targetUserId)).thenReturn(Optional.of(targetUser));
+    // Realistic save: return the persisted entity (the transfer's new target row) so the post-write
+    // stock-merge check receives a non-null row (it no-ops here — the row carries no material).
+    when(inventoryItemRepository.save(any(InventoryItem.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
 
     inventoryItemService.bookOutInventoryItem(itemId, dto, adminId, true);
 
@@ -804,7 +827,8 @@ class InventoryItemServiceTest {
     UUID currentUserId = UUID.randomUUID();
 
     InventoryItemBookOutDto dto =
-        new InventoryItemBookOutDto(5.0, null, null, CheckoutType.DISCARD, null, null, 1L, null);
+        new InventoryItemBookOutDto(
+            5.0, null, null, CheckoutType.DISCARD, null, null, 1L, null, null);
 
     InventoryItem existingItem = new InventoryItem();
     existingItem.setId(itemId);
@@ -834,7 +858,8 @@ class InventoryItemServiceTest {
     existingItem.setUser(user);
 
     InventoryItemBookOutDto dto =
-        new InventoryItemBookOutDto(10.0, null, null, CheckoutType.DISCARD, null, null, 1L, null);
+        new InventoryItemBookOutDto(
+            10.0, null, null, CheckoutType.DISCARD, null, null, 1L, null, null);
 
     when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
 
@@ -857,7 +882,8 @@ class InventoryItemServiceTest {
     existingItem.setUser(user);
 
     InventoryItemBookOutDto dto =
-        new InventoryItemBookOutDto(15.0, null, null, CheckoutType.DISCARD, null, null, 1L, null);
+        new InventoryItemBookOutDto(
+            15.0, null, null, CheckoutType.DISCARD, null, null, 1L, null, null);
 
     when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
 
@@ -881,6 +907,7 @@ class InventoryItemServiceTest {
             "Terminal 1",
             new java.math.BigDecimal("100.50"),
             1L,
+            null,
             null);
 
     Mission mission = new Mission();
@@ -932,7 +959,8 @@ class InventoryItemServiceTest {
             false,
             newJobOrderId,
             newMissionId,
-            1L);
+            1L,
+            null);
 
     InventoryItem existingItem = new InventoryItem();
     existingItem.setId(itemId);
@@ -977,7 +1005,7 @@ class InventoryItemServiceTest {
 
     InventoryItemUpdateDto dto =
         new InventoryItemUpdateDto(
-            UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, 1L);
+            UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, 1L, null);
 
     InventoryItem existingItem = new InventoryItem();
     existingItem.setId(itemId);
@@ -1001,7 +1029,7 @@ class InventoryItemServiceTest {
 
     InventoryItemUpdateDto dto =
         new InventoryItemUpdateDto(
-            UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, 1L);
+            UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, 1L, null);
 
     InventoryItem existingItem = new InventoryItem();
     existingItem.setId(itemId);
@@ -1046,7 +1074,8 @@ class InventoryItemServiceTest {
             null,
             null,
             1L // outdated version
-            );
+            ,
+            null);
 
     InventoryItem existingItem = new InventoryItem();
     existingItem.setId(itemId);
@@ -1431,7 +1460,8 @@ class InventoryItemServiceTest {
             false,
             null,
             null,
-            pickedOrgUnitId);
+            pickedOrgUnitId,
+            null);
 
     User user = new User();
     user.setId(userId);
@@ -1471,7 +1501,8 @@ class InventoryItemServiceTest {
             false,
             null,
             null,
-            foreignOrgUnitId);
+            foreignOrgUnitId,
+            null);
 
     User user = new User();
     user.setId(userId);
@@ -1499,7 +1530,7 @@ class InventoryItemServiceTest {
 
     InventoryItemCreateDto dto =
         new InventoryItemCreateDto(
-            userId, materialId, locationId, 100, 10.0, false, null, null, pickedOrgUnitId);
+            userId, materialId, locationId, 100, 10.0, false, null, null, pickedOrgUnitId, null);
 
     User user = new User();
     user.setId(userId);

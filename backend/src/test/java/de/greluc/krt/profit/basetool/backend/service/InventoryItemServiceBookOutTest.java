@@ -50,6 +50,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
@@ -90,6 +91,7 @@ class InventoryItemServiceBookOutTest {
   @Mock private MissionRepository missionRepository;
   @Mock private MissionFinanceEntryRepository missionFinanceEntryRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
+  @Mock private MaterialExchangeOfferRepository materialExchangeOfferRepository;
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private MaterialMapper materialMapper;
   @Mock private OwnerScopeService ownerScopeService;
@@ -303,6 +305,9 @@ class InventoryItemServiceBookOutTest {
       // DISCARD -> source updated, no transfer-side new item created.
       verify(inventoryItemRepository, org.mockito.Mockito.times(1))
           .saveAndFlush(any(InventoryItem.class));
+      // REQ-MARKET-013: the partial decrement ratchets any active offer on the source down to the
+      // remaining 9.0 — pins the clamp call site so dropping it fails here.
+      verify(materialExchangeOfferRepository).clampOfferedAmountToStock(eq(ITEM_ID), eq(9.0));
     }
   }
 
@@ -497,6 +502,8 @@ class InventoryItemServiceBookOutTest {
       assertSame(item, source, "the flushed row is the original source");
       assertSame(targetUser, newItem.getUser());
       verify(inventoryItemRepository, never()).delete(any());
+      // REQ-MARKET-013: the reduced source row ratchets any active offer down to the remaining 7.0.
+      verify(materialExchangeOfferRepository).clampOfferedAmountToStock(eq(ITEM_ID), eq(7.0));
     }
 
     @Test
@@ -973,7 +980,7 @@ class InventoryItemServiceBookOutTest {
       BigDecimal sellAmount,
       Long version) {
     return new InventoryItemBookOutDto(
-        amount, targetUserId, targetLocationId, type, terminal, sellAmount, version, null);
+        amount, targetUserId, targetLocationId, type, terminal, sellAmount, version, null, null);
   }
 
   // --- R5.d.g TRANSFER picker delegation -----------------------------------
@@ -1024,7 +1031,7 @@ class InventoryItemServiceBookOutTest {
 
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
-            5.0, targetUserId, null, CheckoutType.TRANSFER, null, null, 1L, pickedOrgUnitId);
+            5.0, targetUserId, null, CheckoutType.TRANSFER, null, null, 1L, pickedOrgUnitId, null);
 
     service.bookOutInventoryItem(itemId, dto, owner.getId(), false);
 

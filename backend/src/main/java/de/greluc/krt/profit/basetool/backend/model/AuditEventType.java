@@ -37,6 +37,13 @@ public enum AuditEventType {
   /** A warehouse inventory row's associations / quality / amount were edited. */
   INVENTORY_ITEM_UPDATED(AuditDomain.INVENTORY),
 
+  /**
+   * Two or more matching warehouse rows were folded into one (stock merge): a {@code PIECE} write
+   * merged automatically, or an {@code SCU} write opted in for that single action. The surviving
+   * row absorbs the siblings' amounts and notes; offer-backed rows are never merged.
+   */
+  INVENTORY_ITEM_MERGED(AuditDomain.INVENTORY),
+
   /** A warehouse inventory row's free-text note was set or cleared. */
   INVENTORY_ITEM_NOTE_UPDATED(AuditDomain.INVENTORY),
 

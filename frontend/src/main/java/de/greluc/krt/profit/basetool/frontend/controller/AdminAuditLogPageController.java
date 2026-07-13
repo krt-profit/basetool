@@ -128,6 +128,7 @@ public class AdminAuditLogPageController {
           List.of(
               "INVENTORY_ITEM_CREATED",
               "INVENTORY_ITEM_UPDATED",
+              "INVENTORY_ITEM_MERGED",
               "INVENTORY_ITEM_NOTE_UPDATED",
               "INVENTORY_ITEM_CONSUMED",
               "INVENTORY_ITEM_TRANSFERRED",

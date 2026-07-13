@@ -53,6 +53,11 @@ import java.util.UUID;
  *     When present, must point at an org unit the target user is a member of (validated
  *     server-side). When {@code null}, the service stamps the target user's home Staffel —
  *     preserving today's behaviour for the single-membership case.
+ * @param mergeStock per-action stock-merge opt-in (REQ-INV-026). For a {@code PIECE} material the
+ *     new row is merged into a matching existing stack unconditionally, so this flag is ignored;
+ *     for an {@code SCU} material the merge happens only when this is {@code true} — the user ticks
+ *     the modal checkbox for this single book-in. {@code null} is treated as {@code false}. It is
+ *     never persisted: it governs only this one transaction.
  */
 @ValidQuantityAmount
 public record InventoryItemCreateDto(
@@ -64,5 +69,6 @@ public record InventoryItemCreateDto(
     Boolean personal,
     UUID missionId,
     UUID jobOrderId,
-    UUID owningOrgUnitId)
+    UUID owningOrgUnitId,
+    Boolean mergeStock)
     implements QuantityAware {}
