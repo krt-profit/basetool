@@ -42,6 +42,16 @@ the log during a routine backend restart/deploy and making an expected self-heal
 indistinguishable from a real incident (issue #1203). Genuine transport failures (timeout, connection
 reset) that *open* the breaker still log at `WARN` — those are the signal that the backend is down.
 
+The backend's `GlobalExceptionHandler` logs every mapped 4xx at `WARN` — method, URI, status, stable
+`code`, `correlationId` — **except a `401 UNAUTHENTICATED`, which logs at `DEBUG`.** A 401 is the
+expected, non-actionable default for any unauthenticated caller, and the app has no anonymous root
+handler, so the internal-TLS health probe (`blackbox-internal-tls`) alone — it GETs each app root
+every 30 s purely to read the cert-expiry — would emit ~2 WARN lines/minute (≈2 880/day) of pure
+probe noise, with bots, scanners and pre-login navigation adding more. The
+`basetool_http_error_total{code="UNAUTHENTICATED"}` counter is minted at the handler independent of
+log level, so the signal survives for the dashboard/alerts; every other 4xx — including `403
+ACCESS_DENIED`, the security-relevant "authenticated but not allowed" case — stays at `WARN`.
+
 ### REQ-OBS-002 — Correlation-id propagation
 
 `correlationId` comes from the inbound `X-Correlation-Id` header (configurable via
@@ -52,7 +62,8 @@ calls so both modules share one id per user interaction. `userId` is the JWT `su
 
 Errors raised **before** `CorrelationIdFilter` runs — the rate-limit 429, the pending-approval 403,
 and the Spring Security filter-level 401/403 — mint their own `correlationId`, put it in the MDC (so
-the problem body and the WARN log line share it), and echo it as the `X-Correlation-Id` response
+the problem body and the log line share it — `WARN` for the 403, `DEBUG` for the 401 per REQ-OBS-001),
+and echo it as the `X-Correlation-Id` response
 header themselves, because that filter never runs to echo it on a short-circuited request. Every
 error response therefore carries the header, not just the ones that reach the servlet. See
 [`api-conventions.md`](api-conventions.md) REQ-API-004 for the full producer list.

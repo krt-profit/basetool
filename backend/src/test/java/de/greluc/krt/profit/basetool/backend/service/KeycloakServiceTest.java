@@ -485,6 +485,55 @@ class KeycloakServiceTest {
   }
 
   /**
+   * Production regression guard (REQ-SEC-018): a {@code 403} on the realm-role listing ({@code GET
+   * /admin/realms/{realm}/roles}) — the exact failure seen when the {@code backend-service} service
+   * account holds {@code view-users} but not {@code view-realm} — must skip the whole run (empty
+   * roster, never a degraded persist) and increment the fetch-failure counter, exactly like any
+   * other transient role-read failure. The roster page succeeds first, so this isolates the
+   * realm-role listing as the rejecting call.
+   *
+   * @throws Exception if the mock server cannot be started or stopped.
+   */
+  @Test
+  void fetchUsers_realmRoleListForbidden_skipsRunAndIncrementsCounter() throws Exception {
+    when(sslBundles.getBundle("keycloak-trust"))
+        .thenThrow(new NoSuchSslBundleException("keycloak-trust", "no such bundle"));
+    MockWebServer server = new MockWebServer();
+    server.start();
+    try {
+      KeycloakSyncProperties properties = new KeycloakSyncProperties();
+      properties.setEnabled(true);
+      properties.setAdminUrl(server.url("/").toString().replaceAll("/+$", ""));
+      properties.setRealm("iri");
+      properties.setClientId("backend-service");
+      properties.setClientSecret("secret");
+      properties.setPageSize(100);
+
+      UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
+
+      // token, roster (A), then a 403 on GET /roles (missing view-realm) → skip the whole run.
+      server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
+      server.enqueue(
+          jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
+      server.enqueue(errorResponse(403));
+
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
+
+      List<KeycloakUserDto> users = service.fetchUsers(List.of("ADMIN"), Set.of());
+
+      assertTrue(
+          users.isEmpty(),
+          "a 403 on the realm-role listing must skip the run, not persist degraded roles");
+      assertEquals(
+          1.0,
+          meterRegistry.counter(MetricNames.KEYCLOAK_SYNC_FETCH_FAILURES).count(),
+          "the swallowed authorization failure must still increment the fetch-failure counter");
+    } finally {
+      server.shutdown();
+    }
+  }
+
+  /**
    * Incremental Discord back-fill: a roster user whose id is already known-linked locally must NOT
    * trigger a federated-identity read. With no role names and A pre-known-linked, only the token +
    * roster page are requested — no third call — and A's DTO carries a {@code null} Discord id

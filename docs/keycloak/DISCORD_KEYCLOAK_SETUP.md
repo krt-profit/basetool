@@ -132,7 +132,8 @@ federated-identity mapper (3b) was deployed, with no re-login — they appear wi
 after the next daily sync run (05:00). The read is incremental (ADR-0085): only accounts still
 missing a local link are checked each run, so an admin who needs the icon sooner can trigger "Sync
 now" on the member-management page. No extra Keycloak config is needed beyond the admin client
-already used for user sync (it needs `view-users`).
+already used for user sync (its service account needs `view-users` **and** `view-realm` — see
+[`README.md` &rarr; `backend-service` service-account roles](README.md#backend-service-service-account-roles-admin-api)).
 
 > **The approval gate (REQ-SEC-017) does NOT depend on these mappers.** Every brand-new non-admin
 > registration lands `PENDING` regardless of whether the `discord_user_id` claim is present — the
