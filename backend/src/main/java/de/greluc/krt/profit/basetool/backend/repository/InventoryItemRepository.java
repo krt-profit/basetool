@@ -63,7 +63,12 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * @return the mission's inventory rows; never {@code null}, possibly empty.
    */
   @EntityGraph(attributePaths = {"material", "location", "user", "jobOrder"})
-  List<InventoryItem> findByMissionId(UUID missionId);
+  @Query(
+      """
+      SELECT i FROM InventoryItem i WHERE EXISTS (SELECT 1 FROM InventoryMissionAllocation ma
+      WHERE ma.inventoryItem = i AND ma.mission.id = :missionId)
+      """)
+  List<InventoryItem> findByMissionId(@Param("missionId") UUID missionId);
 
   /**
    * Loads every non-personal (shared) inventory row owned by the given user as managed entities.
@@ -345,33 +350,37 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * fetches the configured relations via {@code @EntityGraph}.
    */
   @EntityGraph(attributePaths = {"user", "location", "material", "owningOrgUnit"})
-  List<InventoryItem> findByJobOrderIdAndMaterialId(UUID jobOrderId, UUID materialId);
+  @Query(
+      """
+      SELECT i FROM InventoryItem i WHERE i.material.id = :materialId AND EXISTS (SELECT 1 FROM
+      InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrder.id = :jobOrderId)
+      """)
+  List<InventoryItem> findByJobOrderIdAndMaterialId(
+      @Param("jobOrderId") UUID jobOrderId, @Param("materialId") UUID materialId);
 
   /** Derived Spring-Data query - returns entities matching {@code JobOrderIdOrdered}. */
   @EntityGraph(attributePaths = {"user", "location", "material", "owningOrgUnit"})
   @Query(
       """
-      SELECT i FROM InventoryItem i WHERE i.jobOrder.id = :jobOrderId ORDER BY i.user.username
+      SELECT i FROM InventoryItem i WHERE EXISTS (SELECT 1 FROM InventoryJobOrderAllocation ja
+      WHERE ja.inventoryItem = i AND ja.jobOrder.id = :jobOrderId) ORDER BY i.user.username
       ASC, i.location.name ASC, i.material.name ASC, i.quality DESC, i.amount DESC
       """)
   List<InventoryItem> findByJobOrderIdOrdered(@Param("jobOrderId") UUID jobOrderId);
 
   /**
-   * Returns the total {@code amount} of one material assigned to one job-order whose quality meets
-   * or exceeds the threshold; {@code 0.0} if there is no matching row. A {@code null} minQuality
-   * (Keine) imposes no quality floor — all qualities count. Native query because the {@code
-   * COALESCE} + {@code SUM} combination simplifies the null-handling at the call site (the
-   * job-order completion check would otherwise need a separate empty/null guard).
+   * Returns the total quantity of one material <em>allocated</em> to one job-order whose entry
+   * quality meets or exceeds the threshold; {@code 0.0} if there is no matching allocation. Since
+   * Variante C (REQ-INV-027) the sum is over the per-entry job-order allocation amounts, so an
+   * order is credited only its allocated share of a split entry, not the whole row. A {@code null}
+   * minQuality (Keine) imposes no quality floor — all qualities count.
    */
   @Query(
-      value =
-          """
-          SELECT COALESCE(SUM(amount), 0.0) FROM inventory_item
-          WHERE material_id = :materialId
-          AND job_order_id = :jobOrderId
-          AND (:minQuality IS NULL OR quality >= :minQuality)
-          """,
-      nativeQuery = true)
+      """
+      SELECT COALESCE(SUM(a.amount), 0.0) FROM InventoryJobOrderAllocation a
+      WHERE a.inventoryItem.material.id = :materialId AND a.jobOrder.id = :jobOrderId
+      AND (:minQuality IS NULL OR a.inventoryItem.quality >= :minQuality)
+      """)
   Double sumAmountByMaterialAndJobOrderAndMinQuality(
       @Param("materialId") UUID materialId,
       @Param("jobOrderId") UUID jobOrderId,
@@ -387,12 +396,12 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    *
    * @param jobOrderIds the orders whose linked stock to project; an empty collection yields an
    *     empty list.
-   * @return one {@link JobOrderMaterialStockRow} per linked inventory item, never {@code null}.
+   * @return one {@link JobOrderMaterialStockRow} per job-order allocation, never {@code null}.
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow(i.jobOrder.id, i.material.id, i.quality, i.amount)
-      FROM InventoryItem i WHERE i.jobOrder.id IN :jobOrderIds
+      SELECT new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow(a.jobOrder.id, a.inventoryItem.material.id, a.inventoryItem.quality, a.amount)
+      FROM InventoryJobOrderAllocation a WHERE a.jobOrder.id IN :jobOrderIds
       """)
   List<de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow>
       findMaterialStockRowsByJobOrderIds(@Param("jobOrderIds") Collection<UUID> jobOrderIds);

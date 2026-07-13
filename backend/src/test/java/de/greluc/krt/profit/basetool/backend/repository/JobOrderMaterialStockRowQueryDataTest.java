@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
+import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.Location;
@@ -183,6 +184,13 @@ class JobOrderMaterialStockRowQueryDataTest {
     inv.setPersonal(false);
     inv.setOwningOrgUnit(owner);
     inv.setJobOrder(order);
+    // Variante C (REQ-INV-027): the fulfilment queries read the per-entry job-order allocation, so
+    // the fixture mirrors the full amount into one allocation just as the service create path does.
+    InventoryJobOrderAllocation allocation = new InventoryJobOrderAllocation();
+    allocation.setInventoryItem(inv);
+    allocation.setJobOrder(order);
+    allocation.setAmount(amount);
+    inv.getJobOrderAllocations().add(allocation);
     inventoryItemRepository.save(inv);
   }
 }
