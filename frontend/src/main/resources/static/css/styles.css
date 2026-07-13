@@ -634,6 +634,125 @@ tbody tr:nth-child(even):hover {
     text-overflow: ellipsis;
 }
 
+/* Entry associations - split with amounts (Lager entry). Mirrors the design-system
+   "Entry associations - split with amounts" block (krt-components.css, DS commit
+   39b3d2a): per .tree-field the single Auftrag/Einsatz select is replaced by an
+   .assoc-split group of clickable .assoc-chip tokens (label + .assoc-chip__amt;
+   --order = orange, --mission = blue), a dashed .assoc-add in .assoc-add-wrap that
+   opens an .assoc-pop popover (combobox to add, or amount editor on chip click),
+   and a trailing rest .chip per group (Rest 0 = --success, Rest > 0 = --muted
+   "frei", over-allocation = --danger). rgba() values converted to the modern
+   rgb(r g b / a%) form required by the project Stylelint (equivalent). */
+.assoc-split {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    align-items: center;
+}
+
+.assoc-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.15rem 0.5rem;
+    font-family: var(--font-body);
+    font-weight: var(--fw-bold);
+    font-size: var(--fs-2xs);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border: 1px solid var(--color-gray-3);
+    background-color: var(--color-surface-input);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.assoc-chip--order {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+    background-color: rgb(231 126 35 / 10%);
+}
+
+.assoc-chip--mission {
+    color: var(--color-info);
+    border-color: var(--color-info);
+    background-color: rgb(53 93 220 / 15%);
+}
+
+.assoc-chip__amt {
+    color: var(--color-white);
+    font-variant-numeric: tabular-nums;
+}
+
+.assoc-chip:hover,
+.assoc-chip:focus-visible {
+    box-shadow: var(--glow-primary);
+    outline: none;
+}
+
+.assoc-add-wrap {
+    position: relative;
+    display: inline-flex;
+}
+
+.assoc-add {
+    all: unset;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    padding: 0.12rem 0.5rem;
+    font-family: var(--font-body);
+    font-weight: var(--fw-bold);
+    font-size: var(--fs-2xs);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-gray-2);
+    border: 1px dashed var(--color-gray-3);
+}
+
+.assoc-add:hover,
+.assoc-add:focus-visible {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+    outline: none;
+}
+
+.assoc-pop {
+    position: absolute;
+    top: calc(100% + 5px);
+    left: 0;
+    z-index: 60;
+    width: 260px;
+    background-color: var(--color-bg-dark-gray);
+    border: 1px solid var(--color-primary);
+    box-shadow: var(--shadow-dropdown, 0 4px 10px rgb(0 0 0 / 60%));
+}
+
+.assoc-pop .krt-combobox__listbox {
+    position: static;
+    border: none;
+    box-shadow: none;
+}
+
+.assoc-pop__menge {
+    padding: 0.6rem;
+    display: grid;
+    gap: 0.5rem;
+}
+
+.assoc-pop__menge label {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-gray-2);
+    font-weight: var(--fw-bold);
+}
+
+.assoc-pop__menge .assoc-menge-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
 /* Quality gauge (0-1000): number above a thin orange bar. */
 .tree-gauge {
     display: inline-flex;
@@ -3564,6 +3683,10 @@ details.hud-details[open] > summary::after {
     color: inherit;
     font-weight: var(--fw-bold);
     background-color: transparent;
+}
+
+.krt-combobox__option > .krt-combobox__label {
+    min-width: 0;
 }
 
 /* Non-selectable status rows (no matches / "keep typing"). */
