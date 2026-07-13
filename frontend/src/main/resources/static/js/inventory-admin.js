@@ -381,10 +381,6 @@ function buildStackEntriesUrl(headerRow, page) {
     params.set('locationId', headerRow.getAttribute('data-location-id'));
     const quality = headerRow.getAttribute('data-quality');
     if (quality !== null && quality !== '') params.set('quality', quality);
-    const jobOrderId = headerRow.getAttribute('data-job-order-id');
-    if (jobOrderId) params.set('jobOrderId', jobOrderId);
-    const missionId = headerRow.getAttribute('data-mission-id');
-    if (missionId) params.set('missionId', missionId);
     const owningOrgUnitId = headerRow.getAttribute('data-owning-org-unit-id');
     if (owningOrgUnitId) params.set('owningOrgUnitId', owningOrgUnitId);
     if (page != null) params.set('page', page);

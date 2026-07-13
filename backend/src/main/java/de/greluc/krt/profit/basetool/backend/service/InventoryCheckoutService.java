@@ -645,7 +645,8 @@ public class InventoryCheckoutService {
     row.setDelivered(false);
     // Variante C soak (REQ-INV-027): #1304's merge sums the scalar rows' amounts but is unaware of
     // the allocation tables. The survivor keeps its (unchanged) job-order/mission scalars while its
-    // amount grew, so re-mirror to bring its single allocation up to the summed amount; the victims'
+    // amount grew, so re-mirror to bring its single allocation up to the summed amount; the
+    // victims'
     // allocations vanish with them (FK ON DELETE CASCADE). The allocation-aware union merge that
     // drops the scalar key entirely follows in a later step.
     InventoryAllocationSync.mirrorScalars(row);

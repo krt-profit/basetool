@@ -253,6 +253,10 @@ class InventoryPageControllerTest {
             null,
             null,
             null,
+            java.util.List.of(),
+            null,
+            java.util.List.of(),
+            null,
             null,
             null,
             1L,
@@ -475,7 +479,24 @@ class InventoryPageControllerTest {
     InventoryItemNoteUpdateRequest request = new InventoryItemNoteUpdateRequest("hello", 1L);
     InventoryItemDto updated =
         new InventoryItemDto(
-            id, null, null, null, 100, 10.0, false, null, null, null, null, "hello", null, 2L,
+            id,
+            null,
+            null,
+            null,
+            100,
+            10.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            java.util.List.of(),
+            null,
+            java.util.List.of(),
+            null,
+            "hello",
+            null,
+            2L,
             null);
     when(backendApiClient.put(
             eq("/api/v1/inventory/" + id + "/note"), eq(request), eq(InventoryItemDto.class)))
@@ -569,7 +590,25 @@ class InventoryPageControllerTest {
             5.0, UUID.randomUUID(), null, CheckoutType.TRANSFER, null, null, 1L, null, null);
     InventoryItemDto remaining =
         new InventoryItemDto(
-            id, null, null, null, 100, 45.0, false, null, null, null, null, null, null, 2L, null);
+            id,
+            null,
+            null,
+            null,
+            100,
+            45.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            java.util.List.of(),
+            null,
+            java.util.List.of(),
+            null,
+            null,
+            null,
+            2L,
+            null);
     when(backendApiClient.post(
             eq("/api/v1/inventory/" + id + "/book-out"), eq(dto), eq(InventoryItemDto.class)))
         .thenReturn(remaining);
@@ -625,7 +664,25 @@ class InventoryPageControllerTest {
     UpdateDeliveredRequest request = new UpdateDeliveredRequest(true, 1L);
     InventoryItemDto updated =
         new InventoryItemDto(
-            id, null, null, null, 100, 10.0, false, null, null, null, null, null, null, 2L, null);
+            id,
+            null,
+            null,
+            null,
+            100,
+            10.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            java.util.List.of(),
+            null,
+            java.util.List.of(),
+            null,
+            null,
+            null,
+            2L,
+            null);
     when(backendApiClient.patch(
             eq("/api/v1/inventory/" + id + "/delivered"), eq(request), eq(InventoryItemDto.class)))
         .thenReturn(updated);
@@ -691,6 +748,10 @@ class InventoryPageControllerTest {
             null,
             null,
             null,
+            null,
+            java.util.List.of(),
+            null,
+            java.util.List.of(),
             null,
             null,
             null,

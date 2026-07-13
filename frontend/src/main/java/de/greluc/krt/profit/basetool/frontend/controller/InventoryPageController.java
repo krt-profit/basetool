@@ -465,15 +465,14 @@ public class InventoryPageController {
    * stack and this endpoint fetches that stack's entries oldest-first, paginated, from the
    * backend's {@code /api/v1/inventory/my-inventory/stack/entries}. The stack is addressed by the
    * stock-identity query params the grouped {@link InventoryStackDto} already exposes (a {@code
-   * null} job-order / mission / owning-org-unit selects the rows where that association is itself
-   * absent). Returns the {@code stackEntries} HTML fragment that replaces the stack's entries
-   * container.
+   * null} owning-org-unit selects the rows where that pool is itself absent). Since Variante C
+   * (REQ-INV-027) the job-order / mission link is no longer part of the stock identity — it lives
+   * per leaf entry as allocation chips — so it is not a stack-key param. Returns the {@code
+   * stackEntries} HTML fragment that replaces the stack's entries container.
    *
    * @param materialId the stack's material (from the enclosing group)
    * @param locationId the stack's storage location
    * @param quality the stack's quality grade, or {@code null}
-   * @param jobOrderId the stack's linked job-order id, or {@code null} for the unassigned slice
-   * @param missionId the stack's linked mission id, or {@code null} for the unassigned slice
    * @param personal whether the stack holds the caller's private stock
    * @param owningOrgUnitId the stack's owning org-unit pool, or {@code null}
    * @param page zero-based page index, or {@code null} for the first page
@@ -486,8 +485,6 @@ public class InventoryPageController {
       @RequestParam @NotNull UUID materialId,
       @RequestParam @NotNull UUID locationId,
       @RequestParam(required = false) Integer quality,
-      @RequestParam(required = false) UUID jobOrderId,
-      @RequestParam(required = false) UUID missionId,
       @RequestParam(required = false, defaultValue = "false") boolean personal,
       @RequestParam(required = false) UUID owningOrgUnitId,
       @RequestParam(required = false) Integer page,
@@ -501,12 +498,6 @@ public class InventoryPageController {
             .queryParam("personal", personal);
     if (quality != null) {
       uriBuilder.queryParam("quality", quality);
-    }
-    if (jobOrderId != null) {
-      uriBuilder.queryParam("jobOrderId", jobOrderId);
-    }
-    if (missionId != null) {
-      uriBuilder.queryParam("missionId", missionId);
     }
     if (owningOrgUnitId != null) {
       uriBuilder.queryParam("owningOrgUnitId", owningOrgUnitId);
@@ -570,8 +561,6 @@ public class InventoryPageController {
    * @param userId the stack's owning user
    * @param locationId the stack's storage location
    * @param quality the stack's quality grade, or {@code null}
-   * @param jobOrderId the stack's linked job-order id, or {@code null} for the unassigned slice
-   * @param missionId the stack's linked mission id, or {@code null} for the unassigned slice
    * @param owningOrgUnitId the stack's owning org-unit pool, or {@code null}
    * @param page zero-based page index, or {@code null} for the first page
    * @param size page size, or {@code null} for the backend default
@@ -584,8 +573,6 @@ public class InventoryPageController {
       @RequestParam @NotNull UUID userId,
       @RequestParam @NotNull UUID locationId,
       @RequestParam(required = false) Integer quality,
-      @RequestParam(required = false) UUID jobOrderId,
-      @RequestParam(required = false) UUID missionId,
       @RequestParam(required = false) UUID owningOrgUnitId,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
@@ -598,12 +585,6 @@ public class InventoryPageController {
             .queryParam("locationId", locationId);
     if (quality != null) {
       uriBuilder.queryParam("quality", quality);
-    }
-    if (jobOrderId != null) {
-      uriBuilder.queryParam("jobOrderId", jobOrderId);
-    }
-    if (missionId != null) {
-      uriBuilder.queryParam("missionId", missionId);
     }
     if (owningOrgUnitId != null) {
       uriBuilder.queryParam("owningOrgUnitId", owningOrgUnitId);

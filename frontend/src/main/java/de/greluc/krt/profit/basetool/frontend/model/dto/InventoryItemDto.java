@@ -20,11 +20,17 @@
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /**
  * Frontend mirror of the backend inventory-item projection. {@code createdAt} carries the row's
  * creation instant so the grouped-stack UI can order an append-only stack's entries oldest-first.
+ *
+ * <p>Since Variante C (REQ-INV-027) an entry's quantity is split independently across several job
+ * orders ({@code jobOrderAllocations}, unassigned {@code jobOrderRest}) and several missions
+ * ({@code missionAllocations}, unassigned {@code missionRest}) shown as chips. The scalar {@code
+ * jobOrderId} / {@code missionId} fields remain during the soak until the backend column drop.
  */
 public record InventoryItemDto(
     UUID id,
@@ -38,6 +44,10 @@ public record InventoryItemDto(
     Integer jobOrderDisplayId,
     UUID missionId,
     String missionName,
+    List<JobOrderAllocationDto> jobOrderAllocations,
+    Double jobOrderRest,
+    List<MissionAllocationDto> missionAllocations,
+    Double missionRest,
     String note,
     SquadronReferenceDto owningSquadron,
     Long version,

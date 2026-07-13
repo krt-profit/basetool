@@ -245,6 +245,10 @@ class InventoryPageControllerMvcTest {
             null,
             missionId,
             missionName,
+            java.util.List.of(),
+            null,
+            java.util.List.of(),
+            null,
             null,
             null,
             1L,
@@ -307,6 +311,10 @@ class InventoryPageControllerMvcTest {
             null,
             null,
             null,
+            null,
+            java.util.List.of(),
+            null,
+            java.util.List.of(),
             null,
             null,
             null,
@@ -379,6 +387,10 @@ class InventoryPageControllerMvcTest {
             null,
             missionId,
             missionName,
+            java.util.List.of(),
+            null,
+            java.util.List.of(),
+            null,
             null,
             null,
             1L,
@@ -426,7 +438,6 @@ class InventoryPageControllerMvcTest {
     UUID materialId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    UUID jobOrderId = UUID.randomUUID();
     String locationName = "Port Olisar Hangar 7";
 
     InventoryStackDto stack =
@@ -434,10 +445,6 @@ class InventoryPageControllerMvcTest {
             new UserReferenceDto(userId, "tester", "Tester", "Tester", null),
             new LocationReferenceDto(locationId, locationName),
             95,
-            jobOrderId,
-            4242,
-            null,
-            null,
             false,
             null,
             12.5,
@@ -491,7 +498,6 @@ class InventoryPageControllerMvcTest {
     UUID materialId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    UUID jobOrderId = UUID.randomUUID();
     String locationName = "Everus Harbor Storage";
     String ownerName = "Logi Owner";
 
@@ -500,10 +506,6 @@ class InventoryPageControllerMvcTest {
             new UserReferenceDto(userId, "owner", "Owner", ownerName, null),
             new LocationReferenceDto(locationId, locationName),
             80,
-            jobOrderId,
-            777,
-            null,
-            null,
             false,
             null,
             7.0,
