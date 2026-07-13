@@ -47,7 +47,7 @@ import lombok.ToString;
  * job-order split (each dimension's Σ amount must stay ≤ the owning entry's amount). The owning
  * {@link InventoryItem}'s {@code @Version} is the concurrency token for the whole split.
  *
- * <p>Both foreign keys are {@code ON DELETE CASCADE} (V216): deleting the entry removes its
+ * <p>Both foreign keys are {@code ON DELETE CASCADE} (V217): deleting the entry removes its
  * allocations, and deleting the mission removes the allocation while the entry survives — the
  * successor to the former {@code unlinkMissions} null-out.
  */

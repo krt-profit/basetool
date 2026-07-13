@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.model.Organisationsleitung;
 import de.greluc.krt.profit.basetool.backend.model.dto.AddBereichLeaderRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.AddOlMemberRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BereichDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.GrandAdmiralRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitNodeDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitParentUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrganisationsleitungDto;
@@ -47,6 +48,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -266,6 +268,48 @@ public class OrgHierarchyController {
       description = "Removes the user's Organisationsleitung membership. ADMIN-only.")
   public void removeOlMember(@PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
     orgUnitMembershipService.removeOlMember(id, userId);
+  }
+
+  /**
+   * Designates the Grand Admiral of the Organisationsleitung (REQ-ORG-021): the single OL member
+   * rendered at the top of the OL in the org chart. Auto-adds the user as an OL member when needed;
+   * their rights stay exactly those of an OL member.
+   *
+   * @param id the Organisationsleitung id.
+   * @param request the user to designate.
+   */
+  @PutMapping("/organisationsleitung/{id}/grand-admiral")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
+  @Operation(
+      summary = "Designate the Grand Admiral",
+      description =
+          "Designates the single Grand Admiral rendered at the top of the Organisationsleitung"
+              + " (REQ-ORG-021). Supply either a userId (an account holder, kept with OL-member"
+              + " rights, auto-adds OL membership) or a displayName (a free-text holder for a"
+              + " member without an account, grants nothing) — mutually exclusive. ADMIN-only.")
+  public void setGrandAdmiral(
+      @PathVariable @NotNull UUID id, @RequestBody @Valid GrandAdmiralRequest request) {
+    if (request.userId() != null) {
+      orgUnitMembershipService.setGrandAdmiral(id, request.userId());
+    } else {
+      orgUnitMembershipService.setGrandAdmiralFreeText(
+          id, request.displayName() == null ? "" : request.displayName());
+    }
+  }
+
+  /**
+   * Vacates the Grand Admiral post; the former holder stays a plain OL member.
+   *
+   * @param id the Organisationsleitung id.
+   */
+  @DeleteMapping("/organisationsleitung/{id}/grand-admiral")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
+  @Operation(
+      summary = "Vacate the Grand Admiral post",
+      description =
+          "Clears the Grand Admiral designation; the former holder stays an OL member. ADMIN-only.")
+  public void removeGrandAdmiral(@PathVariable @NotNull UUID id) {
+    orgUnitMembershipService.removeGrandAdmiral(id);
   }
 
   /**

@@ -56,7 +56,7 @@ public final class InventoryAllocationSync {
    * re-set); only slices for a different or now-absent assignment are removed, and a slice is
    * inserted only when the scalar is newly set. This deliberately avoids the delete-then-re-add of
    * the <em>same</em> {@code (inventory_item_id, job_order_id)} pair: the unique constraint is not
-   * deferrable (V216) and Hibernate flushes the fresh INSERT before the orphan DELETE, so a naive
+   * deferrable (V217) and Hibernate flushes the fresh INSERT before the orphan DELETE, so a naive
    * clear-and-re-add would violate the constraint whenever a <em>persisted</em> entry is
    * re-mirrored to the same assignment — precisely the checkout / handover amount-reduce paths.
    * Relies on the entry's {@code cascade = ALL} + {@code orphanRemoval}: a removed slice is deleted

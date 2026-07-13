@@ -45,7 +45,7 @@ import org.springframework.transaction.annotation.Transactional;
  * test schema (Testcontainers + Flyway via the {@code test} profile): that {@link
  * InventoryAllocationSync#mirrorScalars(InventoryItem)} re-mirrors a <em>persisted</em> entry to
  * the same job order <em>in place</em> without tripping the non-deferrable {@code
- * uq_inv_job_order_alloc} unique constraint (V216), and that the R2 allocation-drop queries release
+ * uq_inv_job_order_alloc} unique constraint (V217), and that the R2 allocation-drop queries release
  * an order's slice while the entry survives as unassigned stock.
  *
  * <p>The plain Mockito service tests cannot prove either: the constraint and the flush ordering

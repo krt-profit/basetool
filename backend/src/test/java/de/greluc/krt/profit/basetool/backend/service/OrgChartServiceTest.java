@@ -1541,6 +1541,34 @@ class OrgChartServiceTest {
   }
 
   @Test
+  void mirrorBereichRole_koordinator_reusesMatchingFreeTextPlaceholder() {
+    UUID bereichId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    User u = user(userId, "Max");
+    OrgChartPosition placeholder =
+        pos(
+            OrgChartPositionType.BEREICHSKOORDINATOR,
+            bereich(bereichId, "Profit", "PRF"),
+            null,
+            null);
+    placeholder.setDisplayName("Max");
+    when(positionRepository.findByOrgUnitIdAndUserId(bereichId, userId)).thenReturn(List.of());
+    when(userRepository.findById(userId)).thenReturn(Optional.of(u));
+    when(positionRepository.findByOrgUnitIdAndPositionType(
+            bereichId, OrgChartPositionType.BEREICHSKOORDINATOR))
+        .thenReturn(List.of(placeholder));
+    when(userRepository.getReferenceById(userId)).thenReturn(u);
+
+    service().mirrorBereichRole(bereichId, userId, BereichLeadershipRole.KOORDINATOR);
+
+    // The free-text placeholder for the same name is filled in place — no duplicate seat, no manual
+    // cleanup needed (REQ-ROLE-006).
+    assertSame(u, placeholder.getUser());
+    assertNull(placeholder.getDisplayName());
+    verify(positionRepository, never()).save(any());
+  }
+
+  @Test
   void mirrorBereichRole_changingRole_deletesPriorSeatThenCreatesNew() {
     UUID bereichId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();

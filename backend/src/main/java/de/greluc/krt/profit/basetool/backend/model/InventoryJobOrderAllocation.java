@@ -49,7 +49,7 @@ import lombok.ToString;
  * whole split — this child carries a {@code @Version} of its own only via {@link AbstractEntity}
  * and it is never echoed to the client.
  *
- * <p>Both foreign keys are {@code ON DELETE CASCADE} (V216): deleting the entry removes its
+ * <p>Both foreign keys are {@code ON DELETE CASCADE} (V217): deleting the entry removes its
  * allocations, and deleting the job order removes the allocation while the entry survives as
  * (partially) unassigned stock — the successor to the former {@code unlinkJobOrder} null-out.
  */

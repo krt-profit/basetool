@@ -750,6 +750,13 @@ function openUmbuchenModal(
     if (targetHint) targetHint.classList.toggle('krtm-hidden', !isScu);
     if (amountHint) amountHint.classList.toggle('krtm-hidden', !isScu);
 
+    // REQ-INV-026: the per-action stock-merge opt-in is offered only for an SCU material (a PIECE
+    // rebooking/transfer always merges server-side). Reset it on every open.
+    const mergeRow = document.getElementById('umbuchenMergeRow');
+    const mergeCheckbox = document.getElementById('umbuchenMergeStock');
+    if (mergeCheckbox) mergeCheckbox.checked = false;
+    if (mergeRow) mergeRow.classList.toggle('krtm-hidden', !isScu);
+
     amountEl.value = amount;
     amountEl.max = amount;
     targetEl.value = 0;
@@ -816,6 +823,9 @@ function submitUmbuchen(event) {
         : parseFloat(amountEl.value);
     const version = parseInt(document.getElementById('umbuchenVersion').value, 10);
     const submitBtn = document.getElementById('umbuchenSubmitBtn');
+    // REQ-INV-026: per-action stock-merge opt-in (only rendered for SCU; PIECE always merges).
+    const mergeCheckbox = document.getElementById('umbuchenMergeStock');
+    const mergeStock = !!(mergeCheckbox && mergeCheckbox.checked);
 
     let url, payload;
     if (mode === 'PERSONAL') {
@@ -826,7 +836,12 @@ function submitUmbuchen(event) {
             orgWrapper && window.getComputedStyle(orgWrapper).display !== 'none' && orgSelect
                 ? orgSelect.value || null
                 : null;
-        payload = { amount: amount, version: version, targetOwningOrgUnitId: orgUnitId };
+        payload = {
+            amount: amount,
+            version: version,
+            targetOwningOrgUnitId: orgUnitId,
+            mergeStock: mergeStock,
+        };
     } else {
         url = '/inventory/' + umbuchenItemId + '/transfer';
         payload = {
@@ -837,6 +852,7 @@ function submitUmbuchen(event) {
             targetOwningOrgUnitId:
                 document.getElementById('umbuchenTargetOwningOrgUnitId').value || null,
             version: version,
+            mergeStock: mergeStock,
         };
     }
 
@@ -1110,26 +1126,35 @@ async function doUpdateInventoryAssociation(selectElement, id) {
         }
 
         if (response.ok) {
-            // Propagate the AUTHORITATIVE new version (from the response DTO) to every
-            // data-version control in the leaf row via the shared syncVersion — replaces the
-            // brittle client-side version+1 on the selects + book-out button.
             let updated = null;
             try {
                 updated = await response.json();
             } catch {
                 /* tolerate empty body */
             }
-            if (updated && updated.version != null && window.krtFetch) {
-                window.krtFetch.syncVersion(
-                    selectElement.closest('.tree-row--leaf'),
-                    updated.version,
-                );
-            }
 
             if (typeof window.showFrontendSuccessToast === 'function') {
                 window.showFrontendSuccessToast(assocI18n.success);
             } else {
                 console.info(assocI18n.success);
+            }
+
+            // REQ-INV-026: an association change is no longer a pure in-place edit — for a PIECE
+            // material the backend now folds matching sibling rows into this one (their amounts
+            // summed, the siblings DELETED, delivered reset). When that happens a targeted
+            // syncVersion is not enough: the folded-away rows would linger as phantoms and the
+            // survivor's amount/data-amount would be stale, and a follow-up edit would re-send the
+            // stale amount and silently drop the folded quantity. The returned amount differing from
+            // the amount we sent flags the fold, so re-swap the whole grouped table (as the
+            // book-out / Umbuchen handlers do). Otherwise keep the lightweight version-only sync:
+            // propagate the AUTHORITATIVE new version to every data-version control in the leaf row.
+            if (updated && updated.amount != null && updated.amount !== amount) {
+                filterMyInventory();
+            } else if (updated && updated.version != null && window.krtFetch) {
+                window.krtFetch.syncVersion(
+                    selectElement.closest('.tree-row--leaf'),
+                    updated.version,
+                );
             }
         } else if (response.status === 409) {
             if (typeof window.showFrontendErrorToast === 'function') {

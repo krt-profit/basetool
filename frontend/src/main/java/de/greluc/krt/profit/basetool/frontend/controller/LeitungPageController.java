@@ -279,6 +279,46 @@ public class LeitungPageController {
   }
 
   /**
+   * Designates the Grand Admiral of the Organisationsleitung (admin-only at the backend,
+   * REQ-ORG-021).
+   *
+   * @param olId the OL.
+   * @param body the {@code {userId}} payload.
+   * @return 200 on success, or the backend error status + body.
+   */
+  @PutMapping("/organisationsleitung/{olId}/grand-admiral/ajax")
+  @ResponseBody
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  public ResponseEntity<Object> setGrandAdmiral(
+      @PathVariable @NotNull UUID olId, @RequestBody Map<String, Object> body) {
+    return proxy(
+        "Set Grand Admiral failed",
+        () ->
+            backendApiClient.put(
+                "/api/v1/org-hierarchy/organisationsleitung/" + olId + "/grand-admiral",
+                body,
+                Object.class));
+  }
+
+  /**
+   * Vacates the Grand Admiral post; the former holder stays an OL member.
+   *
+   * @param olId the OL.
+   * @return 200 on success, or the backend error status + body.
+   */
+  @DeleteMapping("/organisationsleitung/{olId}/grand-admiral/ajax")
+  @ResponseBody
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
+  public ResponseEntity<Object> removeGrandAdmiral(@PathVariable @NotNull UUID olId) {
+    return proxy(
+        "Remove Grand Admiral failed",
+        () ->
+            backendApiClient.delete(
+                "/api/v1/org-hierarchy/organisationsleitung/" + olId + "/grand-admiral",
+                Object.class));
+  }
+
+  /**
    * Toggles the SK-Leiter flag on a Spezialkommando member.
    *
    * @param skId the Spezialkommando.

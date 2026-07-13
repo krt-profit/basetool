@@ -33,6 +33,12 @@ import java.util.UUID;
  * @param version the source row's optimistic-lock version
  * @param targetOwningOrgUnitId the picked org-unit pool for the de-personalize direction, or {@code
  *     null}
+ * @param mergeStock the per-action stock-merge opt-in (REQ-INV-026) for the newly inserted row:
+ *     honoured only for an {@code SCU} material (a {@code PIECE} rebooking always merges); {@code
+ *     null}/{@code false} keeps the new row separate
  */
 public record InventoryItemPersonalRebookDto(
-    @NotNull @Min(0) Double amount, @NotNull Long version, UUID targetOwningOrgUnitId) {}
+    @NotNull @Min(0) Double amount,
+    @NotNull Long version,
+    UUID targetOwningOrgUnitId,
+    Boolean mergeStock) {}

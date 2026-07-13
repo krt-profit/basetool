@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemUpdateDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
@@ -78,6 +79,7 @@ class InventoryItemServiceVersionFlushTest {
   @Mock private MissionRepository missionRepository;
   @Mock private MissionFinanceEntryRepository missionFinanceEntryRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
+  @Mock private MaterialExchangeOfferRepository materialExchangeOfferRepository;
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private MaterialMapper materialMapper;
 
@@ -100,6 +102,7 @@ class InventoryItemServiceVersionFlushTest {
             locationRepository,
             missionFinanceEntryRepository,
             missionParticipantRepository,
+            materialExchangeOfferRepository,
             inventoryItemMapper,
             ownerScopeService,
             auditService);
@@ -134,9 +137,12 @@ class InventoryItemServiceVersionFlushTest {
     when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(new Material()));
     when(locationRepository.findById(locationId)).thenReturn(Optional.of(new Location()));
+    // Realistic saveAndFlush: return the flushed managed entity so the post-write stock-merge check
+    // receives a non-null row (it no-ops here — the material is SCU and the merge is not opted in).
+    when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
 
     InventoryItemUpdateDto dto =
-        new InventoryItemUpdateDto(materialId, locationId, 800, 15.0, false, null, null, 0L);
+        new InventoryItemUpdateDto(materialId, locationId, 800, 15.0, false, null, null, 0L, null);
     inventoryItemService.updateInventoryItem(itemId, dto, userId, false);
 
     verify(inventoryItemRepository).saveAndFlush(item);
@@ -168,7 +174,8 @@ class InventoryItemServiceVersionFlushTest {
 
     // DISCARD a partial amount so the row is reduced (not deleted) and its DTO is returned.
     InventoryItemBookOutDto dto =
-        new InventoryItemBookOutDto(3.0, null, null, CheckoutType.DISCARD, null, null, 0L, null);
+        new InventoryItemBookOutDto(
+            3.0, null, null, CheckoutType.DISCARD, null, null, 0L, null, null);
     inventoryItemService.bookOutInventoryItem(itemId, dto, userId, false);
 
     verify(inventoryItemRepository).saveAndFlush(item);

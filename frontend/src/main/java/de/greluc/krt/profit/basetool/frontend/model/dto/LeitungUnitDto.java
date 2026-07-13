@@ -35,6 +35,9 @@ import java.util.UUID;
  * @param canManageRoster whether the caller may manage this unit's subordinate roster.
  * @param members the unit's roster rows.
  * @param groups the unit's Kommandogruppen (Staffel only; empty otherwise).
+ * @param grandAdmiralUserId the account id of this unit's Grand Admiral (REQ-ORG-021), or {@code
+ *     null} — only ever set on the Organisationsleitung, so the page can badge the holder and gate
+ *     the promote / vacate actions.
  */
 public record LeitungUnitDto(
     UUID id,
@@ -44,4 +47,5 @@ public record LeitungUnitDto(
     boolean canAppointLead,
     boolean canManageRoster,
     List<LeitungMemberDto> members,
-    List<KommandoGroupDto> groups) {}
+    List<KommandoGroupDto> groups,
+    UUID grandAdmiralUserId) {}

@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.OrgChartPosition;
 import de.greluc.krt.profit.basetool.backend.model.OrgChartPositionType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.model.Organisationsleitung;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.AreaLeadershipDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BereichChartDto;
@@ -99,17 +100,39 @@ public class OrgChartReadService {
     Map<UUID, List<OrgChartPosition>> positionsByUnit =
         unitPositions.stream().collect(Collectors.groupingBy(p -> p.getOrgUnit().getId()));
 
-    // OL tier at the very top (null when no OL exists, so the chart omits the tier).
-    OlChartDto olTier =
-        ol == null
-            ? null
-            : new OlChartDto(
-                ol.getId(),
-                ol.getName(),
-                ol.getShorthand(),
-                nodesOfType(
-                    positionsByUnit.getOrDefault(ol.getId(), List.of()),
-                    OrgChartPositionType.OL_MEMBER));
+    // OL tier at the very top (null when no OL exists, so the chart omits the tier). The Grand
+    // Admiral (REQ-ORG-021) is surfaced above the rest of the OL. It is held by EITHER an account
+    // (an OL member split out of the member list — keeps the OL_MEMBER rank, so rights are
+    // unaffected) OR a free-text name for a member without an account (a synthesized node that
+    // grants
+    // nothing, like every other free-text holder) — the two are mutually exclusive.
+    OlChartDto olTier = null;
+    if (ol != null) {
+      List<OrgChartNodeDto> olMembers =
+          nodesOfType(
+              positionsByUnit.getOrDefault(ol.getId(), List.of()), OrgChartPositionType.OL_MEMBER);
+      Organisationsleitung olEntity = ol instanceof Organisationsleitung o ? o : null;
+      UUID grandAdmiralUserId = olEntity == null ? null : olEntity.getGrandAdmiralUserId();
+      String grandAdmiralName = olEntity == null ? null : olEntity.getGrandAdmiralDisplayName();
+      OrgChartNodeDto grandAdmiral = null;
+      List<OrgChartNodeDto> members = olMembers;
+      if (grandAdmiralUserId != null) {
+        OrgChartNodeDto account =
+            olMembers.stream()
+                .filter(node -> grandAdmiralUserId.equals(node.userId()))
+                .findFirst()
+                .orElse(null);
+        if (account != null) {
+          grandAdmiral = account;
+          members = olMembers.stream().filter(node -> !node.equals(account)).toList();
+        }
+      } else if (grandAdmiralName != null) {
+        grandAdmiral =
+            new OrgChartNodeDto(
+                null, OrgChartPositionType.OL_MEMBER, null, null, grandAdmiralName, 0, null);
+      }
+      olTier = new OlChartDto(ol.getId(), ol.getName(), ol.getShorthand(), grandAdmiral, members);
+    }
 
     // One tier per Bereich: its Bereichsleitung sub-tree + the Staffeln/SKs wired under it.
     List<BereichChartDto> bereichDtos =

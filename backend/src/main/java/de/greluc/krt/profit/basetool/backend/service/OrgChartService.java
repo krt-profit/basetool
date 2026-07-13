@@ -377,7 +377,7 @@ public class OrgChartService {
     // unbounded Koordinator / Operator ranks just append a fresh seat.
     if (type == OrgChartPositionType.BEREICHSLEITER) {
       upsertSingletonSeat(bereichId, type, userId);
-    } else {
+    } else if (!reuseFreeTextSeat(bereichId, type, null, userId)) {
       createUserSeat(bereichId, type, userId, null);
     }
   }
@@ -391,7 +391,9 @@ public class OrgChartService {
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public void mirrorOlMember(@NotNull UUID organisationsleitungId, @NotNull UUID userId) {
-    if (positionRepository.findByOrgUnitIdAndUserId(organisationsleitungId, userId).isEmpty()) {
+    if (positionRepository.findByOrgUnitIdAndUserId(organisationsleitungId, userId).isEmpty()
+        && !reuseFreeTextSeat(
+            organisationsleitungId, OrgChartPositionType.OL_MEMBER, null, userId)) {
       createUserSeat(organisationsleitungId, OrgChartPositionType.OL_MEMBER, userId, null);
     }
   }
@@ -407,7 +409,9 @@ public class OrgChartService {
   @Transactional(propagation = Propagation.MANDATORY)
   public void mirrorSkLead(@NotNull UUID specialCommandId, @NotNull UUID userId, boolean isLead) {
     if (isLead) {
-      if (positionRepository.findByOrgUnitIdAndUserId(specialCommandId, userId).isEmpty()) {
+      if (positionRepository.findByOrgUnitIdAndUserId(specialCommandId, userId).isEmpty()
+          && !reuseFreeTextSeat(
+              specialCommandId, OrgChartPositionType.SK_COMMANDER, null, userId)) {
         createUserSeat(specialCommandId, OrgChartPositionType.SK_COMMANDER, userId, null);
       }
     } else {
@@ -623,6 +627,9 @@ public class OrgChartService {
    */
   private void createEnsignSeat(
       @NotNull UUID squadronId, OrgChartPosition parent, @NotNull UUID userId) {
+    if (reuseFreeTextSeat(squadronId, OrgChartPositionType.ENSIGN, parent, userId)) {
+      return;
+    }
     int sortIndex =
         (int)
             positionRepository.countByOrgUnitIdAndPositionType(
@@ -671,6 +678,69 @@ public class OrgChartService {
     position.setParent(parent);
     position.setSortIndex(sortIndex);
     positionRepository.save(position);
+  }
+
+  /**
+   * Consumes a matching free-text placeholder when an account is appointed to a multi-holder post,
+   * so an admin who typed a member's name and later appoints that member's account does not have to
+   * delete the placeholder by hand (REQ-ROLE-006): the singleton ranks already reuse their single
+   * seat, but the flat multi-holder ranks (OL member / SK-Leiter / Koordinator / Operator / Ensign)
+   * would otherwise leave the placeholder alongside a fresh account seat. Reuses the first
+   * free-text ({@code user_id}-null) seat of the given type/unit/parent whose typed name matches
+   * the appointee's effective name (trimmed, case-insensitive), converting it to the account in
+   * place; returns {@code true} when one was reused. Name-scoped, so it never touches a different
+   * member's placeholder — and a no-op (falling back to a fresh seat) when nothing matches.
+   *
+   * @param orgUnitId the org unit the seat belongs to; never {@code null}.
+   * @param type the rank being appointed; never {@code null}.
+   * @param parent the parent node the seat hangs off, or {@code null} for a flat rank.
+   * @param userId the appointee's account; never {@code null}.
+   * @return {@code true} when a matching placeholder was reused; {@code false} to create a fresh
+   *     seat.
+   */
+  private boolean reuseFreeTextSeat(
+      @NotNull UUID orgUnitId,
+      @NotNull OrgChartPositionType type,
+      OrgChartPosition parent,
+      @NotNull UUID userId) {
+    String appointee = effectiveName(userId);
+    if (appointee == null || appointee.isBlank()) {
+      return false;
+    }
+    UUID parentId = parent == null ? null : parent.getId();
+    for (OrgChartPosition seat :
+        positionRepository.findByOrgUnitIdAndPositionType(orgUnitId, type)) {
+      UUID seatParentId = seat.getParent() == null ? null : seat.getParent().getId();
+      boolean sameParent = parentId == null ? seatParentId == null : parentId.equals(seatParentId);
+      if (seat.getUser() == null
+          && seat.getDisplayName() != null
+          && sameParent
+          && seat.getDisplayName().trim().equalsIgnoreCase(appointee.trim())) {
+        seat.setUser(userReference(userId));
+        seat.setDisplayName(null);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Resolves a user's effective display name (display name, falling back to username) so a
+   * free-text placeholder can be matched against the appointee; {@code null} when the user cannot
+   * be loaded.
+   *
+   * @param userId the user id; never {@code null}.
+   * @return the effective name, or {@code null} when the user is missing.
+   */
+  private String effectiveName(@NotNull UUID userId) {
+    return userRepository
+        .findById(userId)
+        .map(
+            user ->
+                user.getDisplayName() != null && !user.getDisplayName().isBlank()
+                    ? user.getDisplayName()
+                    : user.getUsername())
+        .orElse(null);
   }
 
   /**

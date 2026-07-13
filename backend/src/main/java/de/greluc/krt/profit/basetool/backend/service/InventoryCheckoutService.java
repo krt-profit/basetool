@@ -27,9 +27,11 @@ import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.model.FinanceType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Location;
+import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkCheckoutRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
@@ -38,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebo
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
@@ -45,13 +48,17 @@ import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAllocationSync;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -95,11 +102,22 @@ public class InventoryCheckoutService {
    */
   private static final double QUANTITY_EPSILON = 1e-4;
 
+  /**
+   * Max length of the {@code inventory_item.note} column (V61 {@code VARCHAR(1000)}). A stock merge
+   * concatenates the distinct notes of the folded rows and truncates the result to this length so
+   * the write can never overflow the column.
+   */
+  private static final int NOTE_MAX_LENGTH = 1000;
+
+  /** Separator used when a stock merge concatenates the distinct notes of the folded rows. */
+  private static final String NOTE_MERGE_SEPARATOR = "\n";
+
   private final InventoryItemRepository inventoryItemRepository;
   private final UserRepository userRepository;
   private final LocationRepository locationRepository;
   private final MissionFinanceEntryRepository missionFinanceEntryRepository;
   private final MissionParticipantRepository missionParticipantRepository;
+  private final MaterialExchangeOfferRepository materialExchangeOfferRepository;
   private final InventoryItemMapper inventoryItemMapper;
   private final OwnerScopeService ownerScopeService;
   private final AuditService auditService;
@@ -207,6 +225,9 @@ public class InventoryCheckoutService {
       // saveAndFlush so a partial book-out's response carries the fresh @Version (see
       // updateInventoryItem) — otherwise a follow-up edit of the reduced row 409s.
       InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
+      // Ratchet any active Materialbörse offer on this row down to the reduced stock
+      // (REQ-MARKET-013).
+      materialExchangeOfferRepository.clampOfferedAmountToStock(sourceId, remainingAmount);
       recordBookOutTail(
           checkoutType,
           sourceId,
@@ -300,6 +321,9 @@ public class InventoryCheckoutService {
       // the returned DTO is the new target row, but flushing keeps the source row's @Version
       // current within the transaction so any future in-place consumer of a transfer cannot 409.
       inventoryItemRepository.saveAndFlush(item);
+      // Ratchet any active Materialbörse offer on the source row down to the reduced stock
+      // (REQ-MARKET-013).
+      materialExchangeOfferRepository.clampOfferedAmountToStock(sourceId, remainingAmount);
     }
     auditService.record(
         AuditEventType.INVENTORY_ITEM_TRANSFERRED,
@@ -311,7 +335,11 @@ public class InventoryCheckoutService {
             .with("toLoc", targetLocation != null ? targetLocation.getName() : "—")
             .with("newRow", newItem.getId())
             .with("depleted", depleted));
-    return inventoryItemMapper.toDto(savedNew);
+    // Merge the moved quantity into a matching target stack when it applies (PIECE always, SCU on
+    // the per-action opt-in); the target row is the survivor, so its id/version stays stable.
+    final InventoryItem mergedTarget =
+        mergeStockIfRequested(savedNew, Boolean.TRUE.equals(dto.mergeStock()));
+    return inventoryItemMapper.toDto(mergedTarget);
   }
 
   /**
@@ -506,6 +534,9 @@ public class InventoryCheckoutService {
       // saveAndFlush (not save) keeps the source row's @Version current within the transaction so a
       // follow-up in-place edit of the reduced row cannot 409 (REQ-FE-003 parity with book-out).
       inventoryItemRepository.saveAndFlush(item);
+      // Ratchet any active Materialbörse offer on the source row down to the reduced stock
+      // (REQ-MARKET-013).
+      materialExchangeOfferRepository.clampOfferedAmountToStock(sourceId, remainingAmount);
     }
 
     auditService.record(
@@ -521,7 +552,166 @@ public class InventoryCheckoutService {
             .with("targetOrgUnit", targetOwningOrgUnit != null ? targetOwningOrgUnit.getId() : "-")
             .with("depleted", depleted));
 
-    return inventoryItemMapper.toDto(savedNew);
+    // Merge the rebooked quantity into a matching stack in its new pool when it applies (PIECE
+    // always, SCU on the per-action opt-in); the new row is the survivor.
+    final InventoryItem mergedTarget =
+        mergeStockIfRequested(savedNew, Boolean.TRUE.equals(dto.mergeStock()));
+    return inventoryItemMapper.toDto(mergedTarget);
+  }
+
+  /**
+   * Folds a just-written warehouse row into a single merged stack when the merge applies
+   * (REQ-INV-026), and returns the surviving row (or the unchanged input when nothing merges).
+   *
+   * <p>The merge runs for a {@code PIECE} material <em>unconditionally</em> and for an {@code SCU}
+   * material only when {@code clientRequestedMerge} is {@code true} — the per-action modal opt-in
+   * the caller ticked for this single write; it is never persisted. The survivor is the passed-in
+   * {@code row}: every other row that shares its stock identity (the append-only stack key minus
+   * the {@code delivered} marker — user · material · location · quality · personal · jobOrder ·
+   * mission · owningOrgUnit) is folded into it — amounts summed, distinct notes concatenated — and
+   * deleted. The merged row is reset to {@code delivered = false} (the "Geliefert" marker is not
+   * part of the key and has no unambiguous combined value). The merge group is loaded {@code FOR
+   * UPDATE} so two racing same-stack writers serialise (re-introducing, only here, the lock the
+   * append-only model of ADR-0003 removed).
+   *
+   * <p><strong>Materialbörse safety:</strong> a row that itself backs an offer is returned
+   * untouched (never a survivor that changes, never folded away), and offer-backed sibling rows are
+   * excluded by the query. This honours "a merge never changes a Materialbörse entry" (REQ-MARKET)
+   * and avoids the {@code ON DELETE CASCADE} FK (V210) silently destroying an offer.
+   *
+   * <p>Propagation is {@code MANDATORY}: this must join the caller's read-write transaction (the
+   * create / update / transfer / rebook flow), never open its own.
+   *
+   * @param row the just-created / just-edited / just-inserted target row (managed); the merge
+   *     survivor.
+   * @param clientRequestedMerge the per-action opt-in for an {@code SCU} material (ignored for
+   *     {@code PIECE}, which always merges).
+   * @return the surviving merged row (== {@code row}) with the summed amount and combined notes, or
+   *     {@code row} unchanged when the merge does not apply or finds no matching sibling.
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public InventoryItem mergeStockIfRequested(InventoryItem row, boolean clientRequestedMerge) {
+    final Material material = row.getMaterial();
+    if (material == null) {
+      // A row without a material cannot participate in merge-group matching (the merge key requires
+      // material · quality · …), so it stays unchanged — consistent with append-only/no-merge
+      // behaviour. Returning here also guards the material.getId() dereference below.
+      return row;
+    }
+    final boolean piece = material.getQuantityType() == QuantityType.PIECE;
+    if (!piece && !clientRequestedMerge) {
+      // SCU without the per-action opt-in stays append-only (REQ-INV-001).
+      return row;
+    }
+    // Never merge stock the Materialbörse references: its offered quantity must stay untouched and
+    // the ON DELETE CASCADE FK (V210) would destroy the offer if this row were folded away.
+    // Matching
+    // offer-backed siblings are excluded by the query's NOT EXISTS.
+    if (materialExchangeOfferRepository.existsByInventoryItemId(row.getId())) {
+      return row;
+    }
+
+    final List<InventoryItem> group =
+        inventoryItemRepository.findMergeGroupForUpdate(
+            row.getUser().getId(),
+            material.getId(),
+            row.getLocation().getId(),
+            row.getQuality(),
+            row.getPersonal(),
+            row.getJobOrder() != null ? row.getJobOrder().getId() : null,
+            row.getMission() != null ? row.getMission().getId() : null,
+            row.getOwningOrgUnit() != null ? row.getOwningOrgUnit().getId() : null);
+
+    // The survivor is the just-written row; fold every other matching (non-offer-backed) row into
+    // it. The query locked the whole group FOR UPDATE, so no concurrent writer can double-fold.
+    final List<InventoryItem> victims =
+        group.stream().filter(candidate -> !candidate.getId().equals(row.getId())).toList();
+    if (victims.isEmpty()) {
+      return row;
+    }
+
+    double total = row.getAmount() != null ? row.getAmount() : 0.0;
+    final Set<String> notes = new LinkedHashSet<>();
+    collectNote(notes, row.getNote());
+    for (InventoryItem victim : victims) {
+      total += victim.getAmount() != null ? victim.getAmount() : 0.0;
+      collectNote(notes, victim.getNote());
+    }
+
+    row.setAmount(InventoryItem.roundToScuScale(total));
+    row.setNote(mergeNotes(notes));
+    // The merged stack is reset to not-delivered: the "Geliefert" marker is not part of the merge
+    // key, and combining a delivered with a non-delivered contribution has no single truth.
+    row.setDelivered(false);
+    // Variante C soak (REQ-INV-027): #1304's merge sums the scalar rows' amounts but is unaware of
+    // the allocation tables. The survivor keeps its (unchanged) job-order/mission scalars while its
+    // amount grew, so re-mirror to bring its single allocation up to the summed amount; the victims'
+    // allocations vanish with them (FK ON DELETE CASCADE). The allocation-aware union merge that
+    // drops the scalar key entirely follows in a later step.
+    InventoryAllocationSync.mirrorScalars(row);
+
+    inventoryItemRepository.deleteAll(victims);
+    // saveAndFlush so the response DTO carries the post-merge amount and the fresh @Version, and
+    // the
+    // sibling deletes are flushed within this transaction (REQ-FE-003 parity). The survivor is the
+    // same managed instance (row), so read the audit fields off it rather than the flush return.
+    inventoryItemRepository.saveAndFlush(row);
+
+    auditService.record(
+        AuditEventType.INVENTORY_ITEM_MERGED,
+        row.getId(),
+        InventoryAuditLabels.label(row),
+        row.getUser().getId(),
+        AuditDetails.of("merged", victims.size())
+            .with("total", row.getAmount())
+            .with("q", row.getQuality())
+            .with("trigger", piece ? "auto" : "manual"));
+    return row;
+  }
+
+  /**
+   * Adds a note to the merge accumulator, trimmed to {@code null} and skipped when blank, so the
+   * merged note carries only the distinct non-empty contributions in first-seen order.
+   *
+   * @param notes the ordered accumulator of distinct notes.
+   * @param note the raw note of one folded row, possibly {@code null} or blank.
+   */
+  private static void collectNote(Set<String> notes, String note) {
+    final String normalized = StringNormalization.trimToNull(note);
+    if (normalized != null) {
+      notes.add(normalized);
+    }
+  }
+
+  /**
+   * Joins the distinct merged notes with {@link #NOTE_MERGE_SEPARATOR}, truncating to {@link
+   * #NOTE_MAX_LENGTH} so the write never overflows the {@code note} column.
+   *
+   * @param notes the ordered accumulator of distinct notes.
+   * @return the combined note, or {@code null} when no folded row carried a note.
+   */
+  private static String mergeNotes(Set<String> notes) {
+    if (notes.isEmpty()) {
+      return null;
+    }
+    final String joined = String.join(NOTE_MERGE_SEPARATOR, notes);
+    return joined.length() > NOTE_MAX_LENGTH ? joined.substring(0, NOTE_MAX_LENGTH) : joined;
+  }
+
+  /**
+   * Ratchets any active Materialbörse offer on a Lager row down to the row's current stock
+   * (REQ-MARKET-013) — the public seam the item-facade's update path calls after it edits a row's
+   * amount, mirroring the book-out / transfer / rebooking decrement sites that clamp inline. It is
+   * a no-op when the stock did not drop below the offered quantity (an increase never changes an
+   * offer). Delegates to the atomic conditional {@link
+   * MaterialExchangeOfferRepository#clampOfferedAmountToStock}.
+   *
+   * @param itemId the backing Lager row.
+   * @param stock the row's current (possibly reduced) stock.
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void clampOffersToStock(UUID itemId, double stock) {
+    materialExchangeOfferRepository.clampOfferedAmountToStock(itemId, stock);
   }
 
   /**

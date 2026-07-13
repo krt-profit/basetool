@@ -39,7 +39,8 @@ Coverage is **complete**, including the cross-area writers and the system/automa
 
 - **Lager** — create / edit / note / book-out (consume, transfer, sell) / personal-marker rebooking
   (Umbuchung — `INVENTORY_ITEM_DEPERSONALIZED` for personal→shared, `INVENTORY_ITEM_PERSONALIZED` for
-  shared→personal, REQ-INV-007) / delivery-toggle /
+  shared→personal, REQ-INV-007) / write-time stock merge (`INVENTORY_ITEM_MERGED` — `PIECE`
+  automatically, `SCU` on the per-action opt-in, REQ-INV-026) / delivery-toggle /
   bulk-checkout / global wipe; plus the cross-area writers (refinery store → `INVENTORY_RECEIVED_FROM_REFINERY`,
   job-order handover → `INVENTORY_HANDED_OVER`), the org-unit re-stamp on membership change, and the
   owner-reassignment on user deletion.
@@ -70,8 +71,9 @@ Coverage is **complete**, including the cross-area writers and the system/automa
 - **Rollen & Mitglieder** (`org_unit_membership` + `kommando_group`, epic #800) — every org-unit
   membership / role mutation: membership grant + revoke (SK join/leave, Staffel assign/move/remove);
   leadership-rank grant / change / revoke (Bereichsleitung, OL, SK-Lead and the squadron ranks
-  Staffelleiter / Kommandoleiter / stellv. / Ensign); Logistician / Mission-Manager capability-flag
-  changes; and Kommandogruppe create / rename+reorder / delete. For membership/rank events the
+  Staffelleiter / Kommandoleiter / stellv. / Ensign); Grand Admiral designation / vacation
+  (`ROLE_CHANGED` carrying a `grandAdmiral` boolean, REQ-ORG-021); Logistician / Mission-Manager
+  capability-flag changes; and Kommandogruppe create / rename+reorder / delete. For membership/rank events the
   subject is the org unit (its shorthand/name snapshot) and the affected user is the target
   reference; for Kommandogruppe events the subject is the group (its name snapshot). The details
   payload carries only the rank/kind enum names, the two flag booleans and the squadron label —

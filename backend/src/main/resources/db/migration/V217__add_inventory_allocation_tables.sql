@@ -4,7 +4,7 @@
 -- independently ("Modell G"). This migration creates the two allocation tables and backfills each
 -- existing single scalar assignment as ONE allocation carrying the full entry amount (R6). The scalar
 -- inventory_item.job_order_id / mission_id columns stay in place here and are dropped once all reads
--- and writes go through the allocations (V217).
+-- and writes go through the allocations (V218).
 
 CREATE TABLE inventory_item_job_order_allocation (
     id                UUID PRIMARY KEY,
