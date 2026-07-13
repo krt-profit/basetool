@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
+import de.greluc.krt.profit.basetool.backend.model.Organisationsleitung;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -407,6 +408,17 @@ public class OrgUnitMembershipService {
     membershipRepository.delete(m);
     // Remove the mirrored OL chart seat in the same transaction (REQ-ROLE-006).
     orgChartService.mirrorRemoveUnitSeat(organisationsleitungId, userId);
+    // If the removed member held the Grand Admiral post, vacate it too — the designation must never
+    // point at a non-member (REQ-ORG-021).
+    orgUnitRepository
+        .findById(organisationsleitungId)
+        .filter(
+            u -> u instanceof Organisationsleitung o && userId.equals(o.getGrandAdmiralUserId()))
+        .ifPresent(
+            u -> {
+              ((Organisationsleitung) u).setGrandAdmiralUserId(null);
+              orgUnitRepository.saveAndFlush(u);
+            });
     auditService.record(
         AuditEventType.ROLE_REVOKED,
         organisationsleitungId,
@@ -416,6 +428,99 @@ public class OrgUnitMembershipService {
     orgUnitBankResponsibilityServiceProvider
         .getObject()
         .recordResponsibleHolderChanges(responsibleBefore);
+  }
+
+  /**
+   * Designates a user as the Grand Admiral (REQ-ORG-021) — the single OL member the org chart
+   * renders at the very top of the Organisationsleitung. The holder keeps the {@code OL_MEMBER}
+   * rank, so their rights are entirely unchanged; this only records the title. When the user is not
+   * yet an OL member they are added as one first (auto-promote via {@link #addOlMember}, which runs
+   * the Staffel-exclusion guard, mirrors the OL seat and audits the grant). Setting a new Grand
+   * Admiral replaces any previous holder, who stays a plain OL member — the single {@code
+   * grand_admiral_user_id} column is itself the org-wide "at most one" guarantee. Idempotent when
+   * the user already holds the post.
+   *
+   * @param organisationsleitungId the OL org unit; never {@code null}.
+   * @param userId the user to designate; never {@code null}.
+   * @throws NotFoundException if the OL or the user does not exist.
+   * @throws BadRequestException if the id is not the Organisationsleitung, or the user belongs to a
+   *     Staffel (surfaced from {@link #addOlMember}).
+   */
+  @Transactional
+  public void setGrandAdmiral(@NotNull UUID organisationsleitungId, @NotNull UUID userId) {
+    Organisationsleitung ol = requireOrganisationsleitung(organisationsleitungId);
+    userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+    // Auto-promote to OL member first when needed; an existing OL member is left untouched.
+    if (!membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, organisationsleitungId)) {
+      addOlMember(organisationsleitungId, userId);
+    }
+    final UUID previous = ol.getGrandAdmiralUserId();
+    if (userId.equals(previous)) {
+      return;
+    }
+    ol.setGrandAdmiralUserId(userId);
+    orgUnitRepository.saveAndFlush(ol);
+    if (previous != null) {
+      auditService.record(
+          AuditEventType.ROLE_CHANGED,
+          ol.getId(),
+          OrgUnitLabels.shorthandOrName(ol),
+          previous,
+          AuditDetails.of("grandAdmiral", false));
+    }
+    auditService.record(
+        AuditEventType.ROLE_CHANGED,
+        ol.getId(),
+        OrgUnitLabels.shorthandOrName(ol),
+        userId,
+        AuditDetails.of("grandAdmiral", true));
+  }
+
+  /**
+   * Vacates the Grand Admiral post (REQ-ORG-021) by clearing the designation. The former Grand
+   * Admiral stays a plain OL member — their {@code OL_MEMBER} membership is untouched. A no-op when
+   * the post is already vacant.
+   *
+   * @param organisationsleitungId the OL org unit; never {@code null}.
+   * @throws NotFoundException if the OL does not exist.
+   * @throws BadRequestException if the id is not the Organisationsleitung.
+   */
+  @Transactional
+  public void removeGrandAdmiral(@NotNull UUID organisationsleitungId) {
+    Organisationsleitung ol = requireOrganisationsleitung(organisationsleitungId);
+    final UUID previous = ol.getGrandAdmiralUserId();
+    if (previous == null) {
+      return;
+    }
+    ol.setGrandAdmiralUserId(null);
+    orgUnitRepository.saveAndFlush(ol);
+    auditService.record(
+        AuditEventType.ROLE_CHANGED,
+        ol.getId(),
+        OrgUnitLabels.shorthandOrName(ol),
+        previous,
+        AuditDetails.of("grandAdmiral", false));
+  }
+
+  /**
+   * Loads an org unit by id and asserts it is the Organisationsleitung, returning the typed entity
+   * so the Grand-Admiral designation column is reachable.
+   *
+   * @param organisationsleitungId the expected OL id; never {@code null}.
+   * @return the typed {@link Organisationsleitung}; never {@code null}.
+   * @throws NotFoundException if no org unit has that id.
+   * @throws BadRequestException if the row exists but is not the Organisationsleitung.
+   */
+  private Organisationsleitung requireOrganisationsleitung(@NotNull UUID organisationsleitungId) {
+    OrgUnit ol =
+        orgUnitRepository
+            .findById(organisationsleitungId)
+            .orElseThrow(() -> new NotFoundException("Organisationsleitung not found"));
+    if (!(ol instanceof Organisationsleitung organisationsleitung)) {
+      throw new BadRequestException(
+          "Org unit " + organisationsleitungId + " is not the Organisationsleitung");
+    }
+    return organisationsleitung;
   }
 
   /**

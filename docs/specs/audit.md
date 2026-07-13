@@ -70,8 +70,9 @@ Coverage is **complete**, including the cross-area writers and the system/automa
 - **Rollen & Mitglieder** (`org_unit_membership` + `kommando_group`, epic #800) — every org-unit
   membership / role mutation: membership grant + revoke (SK join/leave, Staffel assign/move/remove);
   leadership-rank grant / change / revoke (Bereichsleitung, OL, SK-Lead and the squadron ranks
-  Staffelleiter / Kommandoleiter / stellv. / Ensign); Logistician / Mission-Manager capability-flag
-  changes; and Kommandogruppe create / rename+reorder / delete. For membership/rank events the
+  Staffelleiter / Kommandoleiter / stellv. / Ensign); Grand Admiral designation / vacation
+  (`ROLE_CHANGED` carrying a `grandAdmiral` boolean, REQ-ORG-021); Logistician / Mission-Manager
+  capability-flag changes; and Kommandogruppe create / rename+reorder / delete. For membership/rank events the
   subject is the org unit (its shorthand/name snapshot) and the affected user is the target
   reference; for Kommandogruppe events the subject is the group (its name snapshot). The details
   payload carries only the rank/kind enum names, the two flag booleans and the squadron label —

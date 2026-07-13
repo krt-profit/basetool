@@ -642,4 +642,76 @@
             initTrees();
         }
     });
+
+    // ---- Sticky horizontal scrollbar ---------------------------------------
+    // A wide chart is usually also tall, so its native horizontal scrollbar sits at the bottom of
+    // the (tall) chart — often below the fixed footer, so panning means scrolling the whole page
+    // down first. A proxy scrollbar pinned just above the footer mirrors the chart's horizontal
+    // scroll, so it is always one drag away. The proxy is a sibling of the stable #oc-chart
+    // container, so it survives the #571 fragment swaps; a MutationObserver re-measures on collapse
+    // toggles + swaps and window resize covers viewport changes. While the proxy is active the
+    // chart's own bar is suppressed (.oc-chart--proxied) so there is never a duplicate.
+    (function initStickyScrollbar() {
+        if (!chart) {
+            return;
+        }
+        const bar = document.createElement('div');
+        bar.className = 'oc-scrollbar';
+        bar.setAttribute('aria-hidden', 'true');
+        const track = document.createElement('div');
+        track.className = 'oc-scrollbar-track';
+        bar.appendChild(track);
+        chart.insertAdjacentElement('afterend', bar);
+
+        function measure() {
+            const overflow = chart.scrollWidth - chart.clientWidth;
+            if (overflow <= 1) {
+                bar.classList.remove('oc-scrollbar--active');
+                chart.classList.remove('oc-chart--proxied');
+                return;
+            }
+            track.style.width = chart.scrollWidth + 'px';
+            bar.classList.add('oc-scrollbar--active');
+            chart.classList.add('oc-chart--proxied');
+        }
+
+        // Proportional mirror with a dead-band so the two scrollers settle instead of ping-ponging.
+        function mirror(from, to) {
+            const fromRange = from.scrollWidth - from.clientWidth;
+            const toRange = to.scrollWidth - to.clientWidth;
+            const target = fromRange > 0 ? (from.scrollLeft / fromRange) * toRange : 0;
+            if (Math.abs(to.scrollLeft - target) > 0.5) {
+                to.scrollLeft = target;
+            }
+        }
+        bar.addEventListener('scroll', function () {
+            mirror(bar, chart);
+        });
+        chart.addEventListener('scroll', function () {
+            mirror(chart, bar);
+        });
+
+        let rafPending = false;
+        function scheduleMeasure() {
+            if (rafPending) {
+                return;
+            }
+            rafPending = true;
+            window.requestAnimationFrame(function () {
+                rafPending = false;
+                measure();
+            });
+        }
+        window.addEventListener('resize', scheduleMeasure);
+        if (window.MutationObserver) {
+            const observer = new MutationObserver(scheduleMeasure);
+            observer.observe(chart, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['hidden', 'class', 'style'],
+            });
+        }
+        measure();
+    })();
 })();

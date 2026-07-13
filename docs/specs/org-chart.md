@@ -51,12 +51,13 @@ the inline editor as an admin) · **Code:** `OrgChartController` · **Issues:** 
 > `userId` on create / update) and any edit / vacate / delete of a mirror-managed seat (account-held
 > or `kommando_group`-linked) with `problem.org_chart.account_managed_in_leitung`. The inline editor
 > therefore edits **free-text holders + structure only** (no account picker); account seats render
-> read-only with a "managed under Leitung" marker. The `OrgChartPositionCrudE2eTest` account-assign
-> path is retired with this change (free-text CRUD remains).
+> read-only, signalled only by their absent inline-edit affordances in edit mode. The
+> `OrgChartPositionCrudE2eTest` account-assign path is retired with this change (free-text CRUD
+> remains).
 >
 > A **`kommando_group`-linked Kommando is read-only as a whole subtree.** `CommandChartDto`
 > carries the `kommandoGroupId` link, so the chart renders a group-linked Kommando with **no**
-> rename / remove / assign-lead / add-child affordance — only the "managed under Leitung" marker; its
+> rename / remove / assign-lead / add-child affordance (a read-only subtree, no per-node marker); its
 > Kommandoleiter, Stv. and Ensigns are appointed under Organisation → Leitung. Beyond the head edits
 > already rejected above, the backend also **rejects creating a child** (Stv. / Ensign) under a
 > `kommando_group`-linked parent (`problem.org_chart.account_managed_in_leitung`), so no chart-only
@@ -128,7 +129,9 @@ an `aria-level` that matches its depth in that tier's reporting chain (within a 
 legacy tier: 1 = Bereichsleiter / Area Lead, 2 = Stab member / Staffel- or SK-unit box,
 3 = Staffel-/SK-Leiter, 4 = Kommandogruppe header / direct Ensign, 5 = Kommandoleiter,
 6 = Stv. Kommandoleiter / Ensign within a Kommando; within the OL tree: 1 = OL root box,
-2 = OL member) and an `aria-label` of "rank, name" (or "rank, nicht besetzt"). Parents are
+2 = OL member) and an `aria-label` of "rank, name" (or "rank, nicht besetzt"). The OL members
+fan out **side by side** beneath the OL root box (a `role="group"` peer fan, the same horizontal
+grouping the Staffeln/SKs use under a Staffelleiter), not as a vertical spine. Parents are
 `aria-expanded`; each Bereich additionally carries a collapse toggle that folds it to just its
 Bereichsleiter (flipping the toggle's + the Bereichsleiter's `aria-expanded` and hiding the Bereich
 body), and the keyboard nav skips the now-hidden treeitems.
@@ -139,11 +142,17 @@ deliberately distinct from the Bereichsleiter's bloom. The inline editor's dialo
 focus (Tab/Shift+Tab cycle within it), closes on Esc, returns focus to the control that
 opened it, and renders the page chrome `inert` + `aria-hidden` while open. A successful edit
 preserves the chart's horizontal scroll and the page's vertical scroll across the reload
-(the editor reloads on success by design — see the concurrency notes in `CLAUDE.md`). The
+(the editor reloads on success by design — see the concurrency notes in `CLAUDE.md`). Because a
+wide chart is usually also tall, its own horizontal scrollbar would sit far down the page (below the
+fixed footer); a **sticky proxy scrollbar** (`#oc-scrollbar`, org-chart.js) is therefore pinned just
+above the footer and kept in sync with the chart's horizontal scroll, so panning is always reachable
+without scrolling the whole page down — the chart's own bar is suppressed while the proxy is active. The
 "Bearbeiten" toggle — admins only, on the trailing edge of the page title box — exposes its
 state via `aria-pressed` and reveals a legend while editing. The transitional "seats are managed
-under Leitung" banner that once sat above the chart is gone; the per-node "managed under Leitung"
-marker (REQ-ROLE-006, REQ-ORG-010 amendment) is the canonical mirror signal.
+under Leitung" banner that once sat above the chart is gone, and the per-node "managed under Leitung"
+marker (REQ-ROLE-006, REQ-ORG-010 amendment) has since been retired too — a mirror-managed
+(account-held or `kommando_group`-linked) seat now reads read-only purely from its absent inline-edit
+affordances in edit mode.
 
 **Acceptance**
 
@@ -238,6 +247,9 @@ descriptive label).
   or update** — is a 400 (`problem.org_chart.holder_ambiguous`).
 - [x] A free-text position renders its typed name with a "no account" marker (not the vacant
   placeholder) and grants no scoped data — both as a regular node and as an inline Kommandoleiter.
+  The marker is a maintenance cue: its element is always in the DOM (it feeds the node's aria-label),
+  but it is **visible only while the inline editor is active** (edit mode) so the read view stays
+  clean.
 - [x] Reassigning a free-text position to an account clears the typed name in the same write, keeps
   the row's place in the tree, and bumps the version exactly once (no 409).
 - [x] Vacating a `COMMAND_LEAD` clears a free-text leader name as well as an account holder.
@@ -264,6 +276,45 @@ descriptive label).
 > their rank under Organisation → Leitung, which mirrors the account-linked seat into the chart (the
 > free-text placeholder is no longer swapped in place by an admin). Free-text holders (members
 > without an account) remain fully editable here and still grant nothing.
+
+### REQ-ORG-021 — The Organisationsleitung has a single Grand Admiral rendered at its top
+
+The OL may designate **exactly one** of its members as the **Grand Admiral** (label untranslated,
+DE = EN). The designation is a **title only**: the holder keeps the `OL_MEMBER` rank, so their rights
+are **identical to any OL member** — the org-wide officer reach and CARTEL-account responsibility of
+REQ-ORG-015 are unchanged, and no authority-layer code is touched. The chart renders the Grand
+Admiral on a spine **directly beneath the OL box, above the remaining OL members** (which fan out
+below it, REQ-ORG-013), then the Bereiche.
+
+Source of truth is a nullable `grand_admiral_user_id` on the OL org-unit row (`V215`), so the
+descriptive chart merely **mirrors** it (REQ-ROLE-006, ADR-0042) — the Grand Admiral chart node is
+an `OL_MEMBER` position surfaced with the "Grand Admiral" title, never a source of rights. Because
+the OL is a singleton tier, the single column is itself the org-wide "at most one" guarantee. In the
+read model the holder is split out of the OL members into `OlChartDto.grandAdmiral`, so it never also
+appears in `members`.
+
+Appointment is **ADMIN-only** and **direct** (`PUT /api/v1/org-hierarchy/organisationsleitung/{id}/grand-admiral`):
+a user who is not yet an OL member is **auto-added** as one (`OL_MEMBER` rank) first. Vacating
+(`DELETE …/grand-admiral`) keeps the person an OL member; removing an OL member who holds the post
+vacates it. The designation set/clear is audited as `ROLE_CHANGED` with a `grandAdmiral` detail.
+
+**Acceptance**
+
+- [ ] `GET /api/v1/org-chart` returns the designated member as `OlChartDto.grandAdmiral` (excluded
+  from `members`); a vacant post yields `null`.
+- [ ] `PUT …/grand-admiral` designates the user (auto-adding OL membership when needed), is
+  idempotent, and holds the org-wide singleton; `DELETE …/grand-admiral` vacates and leaves the OL
+  membership intact.
+- [ ] Removing the Grand Admiral's OL membership vacates the post (no dangling designation).
+- [ ] The holder's rights are exactly an OL member's — no `MembershipRole` / cascade / converter
+  change.
+
+**Enforced by:** `OrgUnitMembershipServiceTest` (`setGrandAdmiral*`, `removeGrandAdmiral*`),
+`OrgChartReadService` split (via `OrgChartServiceTest`), `OrgHierarchyMigrationTest` (V215 column +
+`chk_org_unit_grand_admiral_only_ol`), and `OrgChartPageRenderTest` (Grand Admiral renders above the
+member fan with the "Grand Admiral" label) · **Code:**
+`OrgUnitMembershipService#setGrandAdmiral`/`#removeGrandAdmiral`, `OrgChartReadService#getOrgChart`,
+`Organisationsleitung#grandAdmiralUserId`, `OrgHierarchyController` · **Issues:** —
 
 ## Out of scope
 

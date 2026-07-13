@@ -4,6 +4,16 @@
 
 ### Changed
 
+- **Organigramm: Kopf-Kasten und Bereichsleiter optisch geschärft.** Der Kasten der Organisationsleitung ist nicht mehr auf die Rasterbreite fixiert, wächst auf seine Beschriftung und hat mehr Innenabstand, sodass „ORGANISATIONSLEITUNG" nicht mehr am Rand klebt; der Rahmen der Bereichsleiter ist einen Pixel kräftiger.
+
+- **Organigramm: Ansicht entrümpelt.** Die Markierung „Leitung" an kontogebundenen Sitzen entfällt (der schreibgeschützte Zustand zeigt sich im Bearbeitungsmodus bereits an den fehlenden Schaltflächen), und der Pflegehinweis „Kein Account" erscheint nur noch im Bearbeitungsmodus (REQ-ORG-010, REQ-ORG-013, REQ-ORG-020).
+
+- **Organigramm: Die Mitglieder der Organisationsleitung stehen jetzt nebeneinander.** Statt als senkrechte Kette unter dem OL-Kasten fächern sie nun waagerecht auf — dieselbe Anordnung wie die Staffeln/Spezialkommandos unter einem Staffelleiter (REQ-ORG-013).
+
+- **Organigramm: Der horizontale Scrollbalken bleibt bei einem breiten Diagramm immer sichtbar.** Bisher saß er am unteren Rand des (bei vielen Einheiten sehr hohen) Diagramms — oft unterhalb der Fußzeile, sodass man erst die ganze Seite herunterscrollen musste, um seitlich zu scrollen. Ein mitlaufender Scrollbalken ist jetzt knapp über der Fußzeile fixiert und immer erreichbar.
+
+- **Neuer Posten „Grand Admiral" in der Organisationsleitung.** Ein einzelnes OL-Mitglied kann zum Grand Admiral ernannt werden; im Organigramm steht es dann direkt unter der Kachel „Organisationsleitung", über den übrigen OL-Mitgliedern. Der Grand Admiral hat exakt die Rechte eines OL-Mitglieds (kein neues Rechtemodell). Ernannt wird er unter „Organisation → Leitung" (Admin): wer noch kein OL-Mitglied ist, wird dabei automatisch eines; beim Entfernen bleibt die Person normales OL-Mitglied. Es gibt immer höchstens einen Grand Admiral (REQ-ORG-021).
+
 - **Die Seite „Organisation → Leitung" ist jetzt nur noch für Admins und Officer zugänglich.** Bisher öffnete das Gate zusätzlich für reine Logistiker/Missionsmanager, die dort aber ohnehin keine Ernennungsrechte und damit eine leere Seite hatten. Zugang (Seite und Aktionen) ist jetzt auf `ADMIN`/`OFFICER` eingegrenzt; alle funktionalen Leiter (OL-, Bereichs-, SK- und Staffelleitung samt Kommandorängen) tragen die operative `OFFICER`-Rolle und behalten den Zugang unverändert (REQ-ROLE-004).
 
 ### Fixed

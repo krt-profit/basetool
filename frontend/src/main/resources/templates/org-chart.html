@@ -77,13 +77,25 @@
                         <span class="sh" th:text="${ol.shorthand()}">OL</span>
                         <span class="nm" th:text="${ol.name()}">Organisationsleitung</span>
                     </div>
-                    <!-- OL Stab (members) as a vertical spine under the OL box, so the connector
-                         fan to the Bereiche below reads as one clean drop (mirrors a Bereich's
-                         Koordinatoren/Operatoren spine above its unit fan). -->
-                    <th:block th:each="m : ${ol.members()}">
+                    <!-- Grand Admiral (REQ-ORG-021): the single OL member holding the post, on a spine
+                         directly under the OL box and above the other members — an OL_MEMBER position
+                         rendered with the "Grand Admiral" title via the explicit label key. When the
+                         post is vacant the OL box connects straight to the member fan below. -->
+                    <th:block th:if="${ol.grandAdmiral() != null}">
                         <div class="oc-v"></div>
-                        <th:block th:replace="~{fragments/org-chart-node :: ocNode(${m}, 2)}"></th:block>
+                        <th:block th:replace="~{fragments/org-chart-node :: ocNodeLabeled(${ol.grandAdmiral()}, 2, 'orgChart.rank.GRAND_ADMIRAL')}"></th:block>
                     </th:block>
+                    <!-- OL Stab (members) fan out side by side beneath the OL box (level 2) — the same
+                         horizontal peer grouping the Staffeln/SKs use under a Staffelleiter, so the OL
+                         members read as peers rather than a vertical spine. Guarded so an empty OL
+                         draws no stray connector; the Bereiche fan below stays its own set of trees. -->
+                    <ul class="oc-fan" role="group" th:if="${!#lists.isEmpty(ol.members())}">
+                        <li th:each="m : ${ol.members()}">
+                            <div class="oc-col">
+                                <th:block th:replace="~{fragments/org-chart-node :: ocNode(${m}, 2)}"></th:block>
+                            </div>
+                        </li>
+                    </ul>
                     <button type="button" class="oc-add" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
                             data-trigger="oc-add" data-position-type="OL_MEMBER"
                             th:data-org-unit-id="${ol.orgUnitId()}"

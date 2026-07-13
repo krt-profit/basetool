@@ -35,7 +35,16 @@ import java.util.UUID;
  * @param orgUnitId the OL org unit's id (the scope new OL_MEMBER positions are stamped against).
  * @param name the OL's display name (the tier caption).
  * @param shorthand the OL's short tag.
- * @param members the OL members (OL_MEMBER positions); never {@code null}, possibly empty.
+ * @param grandAdmiral the OL member designated as the Grand Admiral (REQ-ORG-021), rendered at the
+ *     top of the OL above the other members, or {@code null} when the post is vacant. Its holder is
+ *     one of the OL members with the OL_MEMBER rank — this node is the same person split out of
+ *     {@code members} for prominent placement, so it never also appears in {@code members}.
+ * @param members the remaining OL members (OL_MEMBER positions, excluding the Grand Admiral); never
+ *     {@code null}, possibly empty.
  */
 public record OlChartDto(
-    UUID orgUnitId, String name, String shorthand, List<OrgChartNodeDto> members) {}
+    UUID orgUnitId,
+    String name,
+    String shorthand,
+    OrgChartNodeDto grandAdmiral,
+    List<OrgChartNodeDto> members) {}

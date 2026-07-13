@@ -19,8 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.model;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
+import java.util.UUID;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.ToString;
 
 /**
@@ -44,6 +48,21 @@ import lombok.ToString;
 @DiscriminatorValue("ORGANISATIONSLEITUNG")
 @ToString(callSuper = true)
 public class Organisationsleitung extends OrgUnit {
+
+  /**
+   * The account id of the OL member currently holding the <b>Grand Admiral</b> post (REQ-ORG-021),
+   * or {@code null} when the post is vacant. The Grand Admiral is one of the OL members — the
+   * holder keeps the {@code OL_MEMBER} rank and its rights are unchanged; this pointer only records
+   * who the org chart renders at the very top of the Organisationsleitung. Because the OL is a
+   * singleton tier, this single column is the org-wide "at most one Grand Admiral" guarantee. A
+   * subclass-only column on the single-table {@code org_unit} hierarchy (nullable for every non-OL
+   * row, enforced by {@code chk_org_unit_grand_admiral_only_ol}, V215), with a {@code SET NULL} FK
+   * to {@code app_user} so deleting the account vacates the post.
+   */
+  @Getter
+  @Setter
+  @Column(name = "grand_admiral_user_id")
+  private UUID grandAdmiralUserId;
 
   /**
    * No-arg constructor required by JPA. Forces the inherited {@link OrgUnit#isPromotionEnabled}

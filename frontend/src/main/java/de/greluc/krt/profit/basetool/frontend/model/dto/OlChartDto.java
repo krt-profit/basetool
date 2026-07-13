@@ -34,7 +34,15 @@ import java.util.UUID;
  * @param orgUnitId the OL org unit's id (the add-member affordance's target scope).
  * @param name the OL's display name (the tier caption).
  * @param shorthand the OL's short tag.
- * @param members the OL members (OL_MEMBER positions); never {@code null}, possibly empty.
+ * @param grandAdmiral the OL member holding the Grand Admiral post (REQ-ORG-021), rendered at the
+ *     top of the OL above the other members, or {@code null} when the post is vacant. Split out of
+ *     {@code members}, so it never also appears there.
+ * @param members the remaining OL members (OL_MEMBER positions, excluding the Grand Admiral); never
+ *     {@code null}, possibly empty.
  */
 public record OlChartDto(
-    UUID orgUnitId, String name, String shorthand, List<OrgChartNodeDto> members) {}
+    UUID orgUnitId,
+    String name,
+    String shorthand,
+    OrgChartNodeDto grandAdmiral,
+    List<OrgChartNodeDto> members) {}

@@ -281,6 +281,11 @@ addition to the OrgUnit membership:
   membership** (OL member or Bereichsleiter), **never** via the `OFFICER` role —
   Officers/SK-Leads therefore do **not** see Sonderkonten automatically, only via
   an explicit approval.
+- **The Grand Admiral (org-chart.md REQ-ORG-021) is an OL member with a title, not a
+  distinct permission.** The holder carries the `OL_MEMBER` rank, so their reach is
+  exactly an OL member's (every row above that grants to OL members applies unchanged) —
+  only the org-chart placement differs (rendered at the top of the OL). Designated /
+  vacated under „Leitung" (ADMIN); at most one org-wide.
 
 ---
 
