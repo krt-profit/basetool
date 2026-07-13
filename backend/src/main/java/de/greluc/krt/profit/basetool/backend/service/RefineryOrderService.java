@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.repository.RefineryYieldRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocationSync;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.util.ArrayList;
@@ -716,6 +717,10 @@ public class RefineryOrderService {
       item.setAmount(InventoryItem.roundToScuScale(itemDto.amount()));
       item.setMission(order.getMission());
       item.setNote(incomingNote);
+      // Variante C soak: seed the deposited row's job-order/mission allocations from its scalars
+      // for
+      // the deposited amount, so the allocation-based fulfilment reads count it (REQ-INV-027).
+      InventoryAllocationSync.mirrorScalars(item);
 
       inventoryItemRepository.save(item);
       // Cross-domain inventory effect: each stored refinery output creates one warehouse row. No

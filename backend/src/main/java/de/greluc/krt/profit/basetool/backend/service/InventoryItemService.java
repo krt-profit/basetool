@@ -24,8 +24,6 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
-import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
@@ -50,6 +48,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocationSync;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
@@ -563,22 +562,7 @@ public class InventoryItemService {
    * @param item the entry whose scalar assignments to mirror into allocations; never {@code null}.
    */
   private void syncScalarAllocations(InventoryItem item) {
-    item.getJobOrderAllocations().clear();
-    if (item.getJobOrder() != null) {
-      InventoryJobOrderAllocation allocation = new InventoryJobOrderAllocation();
-      allocation.setInventoryItem(item);
-      allocation.setJobOrder(item.getJobOrder());
-      allocation.setAmount(item.getAmount());
-      item.getJobOrderAllocations().add(allocation);
-    }
-    item.getMissionAllocations().clear();
-    if (item.getMission() != null) {
-      InventoryMissionAllocation allocation = new InventoryMissionAllocation();
-      allocation.setInventoryItem(item);
-      allocation.setMission(item.getMission());
-      allocation.setAmount(item.getAmount());
-      item.getMissionAllocations().add(allocation);
-    }
+    InventoryAllocationSync.mirrorScalars(item);
   }
 
   /**

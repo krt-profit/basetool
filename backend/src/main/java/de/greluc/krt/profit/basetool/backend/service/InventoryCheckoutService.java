@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepos
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocationSync;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.ArrayList;
@@ -199,6 +200,10 @@ public class InventoryCheckoutService {
       return null;
     } else {
       item.setAmount(remainingAmount);
+      // Variante C soak: the entry's single allocation carries its full amount, so a partial
+      // book-out must shrink the allocation in step or the allocation-based fulfilment reads
+      // over-credit the reduced row (REQ-INV-027).
+      InventoryAllocationSync.mirrorScalars(item);
       // saveAndFlush so a partial book-out's response carries the fresh @Version (see
       // updateInventoryItem) — otherwise a follow-up edit of the reduced row 409s.
       InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
@@ -281,11 +286,16 @@ public class InventoryCheckoutService {
     newItem.setPersonal(item.getPersonal());
     newItem.setJobOrder(item.getJobOrder());
     newItem.setMission(item.getMission());
+    // Variante C soak: seed the moved row's allocation(s) from the copied scalars for the moved
+    // amount, so the allocation-based views count the transferred stock (REQ-INV-027).
+    InventoryAllocationSync.mirrorScalars(newItem);
     InventoryItem savedNew = inventoryItemRepository.save(newItem);
     if (remainingAmount <= QUANTITY_EPSILON) {
       inventoryItemRepository.delete(item);
     } else {
       item.setAmount(remainingAmount);
+      // Shrink the source's allocation to the reduced amount in step (soak invariant).
+      InventoryAllocationSync.mirrorScalars(item);
       // saveAndFlush the reduced source row for parity with the discard/sell fall-through below:
       // the returned DTO is the new target row, but flushing keeps the source row's @Version
       // current within the transaction so any future in-place consumer of a transfer cannot 409.
@@ -482,12 +492,17 @@ public class InventoryCheckoutService {
     newItem.setPersonal(targetPersonal);
     newItem.setJobOrder(targetPersonal ? null : item.getJobOrder());
     newItem.setMission(targetPersonal ? null : item.getMission());
+    // Variante C soak: mirror the (possibly cleared) scalars onto the moved row's allocations for
+    // the moved amount — a personal target carries no assignment, so it gets none (REQ-INV-027).
+    InventoryAllocationSync.mirrorScalars(newItem);
     InventoryItem savedNew = inventoryItemRepository.save(newItem);
 
     if (depleted) {
       inventoryItemRepository.delete(item);
     } else {
       item.setAmount(remainingAmount);
+      // Shrink the source's allocation to the reduced amount in step (soak invariant).
+      InventoryAllocationSync.mirrorScalars(item);
       // saveAndFlush (not save) keeps the source row's @Version current within the transaction so a
       // follow-up in-place edit of the reduced row cannot 409 (REQ-FE-003 parity with book-out).
       inventoryItemRepository.saveAndFlush(item);

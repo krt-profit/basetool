@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderMaterialReposito
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocationSync;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -244,6 +245,10 @@ public class JobOrderHandoverService {
         inventoryItemRepository.delete(inventoryItem);
       } else {
         inventoryItem.setAmount(remainingAmount);
+        // Variante C soak: shrink the entry's allocation to the post-handover amount in step, so
+        // the
+        // allocation-based fulfilment reads do not over-credit the reduced row (REQ-INV-027).
+        InventoryAllocationSync.mirrorScalars(inventoryItem);
         inventoryItemRepository.save(inventoryItem);
       }
 
@@ -280,6 +285,11 @@ public class JobOrderHandoverService {
     // completion flow safe with respect to optimistic locking.
     for (UUID materialId : materialsToUnlink) {
       inventoryItemRepository.unlinkJobOrderMaterial(jobOrderId, materialId);
+      // R2 (REQ-INV-027): release the fulfilled material's allocation slices too, so the leftover
+      // stock stays in the Lager as (partially) unassigned rather than keeping a phantom order
+      // link.
+      inventoryItemRepository.deleteJobOrderAllocationsByJobOrderAndMaterial(
+          jobOrderId, materialId);
     }
 
     // Re-fetch the JobOrder so the completion check runs on a freshly managed aggregate

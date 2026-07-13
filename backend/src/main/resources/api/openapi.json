@@ -44529,22 +44529,6 @@
             "format" : "int32"
           }
         }, {
-          "name" : "jobOrderId",
-          "in" : "query",
-          "required" : false,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        }, {
-          "name" : "missionId",
-          "in" : "query",
-          "required" : false,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        }, {
           "name" : "personal",
           "in" : "query",
           "required" : false,
@@ -45318,22 +45302,6 @@
           "schema" : {
             "type" : "integer",
             "format" : "int32"
-          }
-        }, {
-          "name" : "jobOrderId",
-          "in" : "query",
-          "required" : false,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        }, {
-          "name" : "missionId",
-          "in" : "query",
-          "required" : false,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
           }
         }, {
           "name" : "owningOrgUnitId",
@@ -52627,7 +52595,7 @@
         "properties" : {
           "eventType" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED" ]
+            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_CANCELLED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED" ]
           },
           "notificationType" : {
             "type" : "string",
@@ -52666,7 +52634,7 @@
           },
           "eventType" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED" ]
+            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_CANCELLED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED" ]
           },
           "notificationType" : {
             "type" : "string",
@@ -53819,6 +53787,26 @@
           "missionName" : {
             "type" : "string"
           },
+          "jobOrderAllocations" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/JobOrderAllocationDto"
+            }
+          },
+          "jobOrderRest" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "missionAllocations" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/MissionAllocationDto"
+            }
+          },
+          "missionRest" : {
+            "type" : "number",
+            "format" : "double"
+          },
           "note" : {
             "type" : "string"
           },
@@ -53835,6 +53823,23 @@
           }
         }
       },
+      "JobOrderAllocationDto" : {
+        "type" : "object",
+        "properties" : {
+          "jobOrderId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "jobOrderDisplayId" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "amount" : {
+            "type" : "number",
+            "format" : "double"
+          }
+        }
+      },
       "LocationReferenceDto" : {
         "type" : "object",
         "properties" : {
@@ -53844,6 +53849,26 @@
           },
           "name" : {
             "type" : "string"
+          }
+        }
+      },
+      "MissionAllocationDto" : {
+        "type" : "object",
+        "properties" : {
+          "missionId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "missionName" : {
+            "type" : "string"
+          },
+          "missionPlannedStartTime" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "amount" : {
+            "type" : "number",
+            "format" : "double"
           }
         }
       },
@@ -59830,21 +59855,6 @@
           "quality" : {
             "type" : "integer",
             "format" : "int32"
-          },
-          "jobOrderId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "jobOrderDisplayId" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "missionId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "missionName" : {
-            "type" : "string"
           },
           "personal" : {
             "type" : "boolean"

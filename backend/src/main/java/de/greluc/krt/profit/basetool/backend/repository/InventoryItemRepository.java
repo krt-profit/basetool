@@ -415,6 +415,22 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   void unlinkJobOrder(@Param("jobOrderId") UUID jobOrderId);
 
   /**
+   * Drops every job-order allocation of the given order (Variante C, REQ-INV-027) — the
+   * allocation-table counterpart of {@link #unlinkJobOrder(UUID)}, run alongside it during the soak
+   * so the allocation-based fulfilment reads release the order's stock in step with the scalar
+   * null-out. The owning entries survive as (partially) unassigned stock — R2: an order activity
+   * that detaches stock drops only the order's allocated slice, never the entry. A plain bulk
+   * {@code DELETE}: {@code a.jobOrder.id} is the allocation's own FK column, so no join is implied.
+   * Not needed on a job-order <em>delete</em>, where the {@code job_order_id ON DELETE CASCADE}
+   * (V216) removes the allocations for free.
+   *
+   * @param jobOrderId the order whose allocations to drop.
+   */
+  @Modifying
+  @Query("DELETE FROM InventoryJobOrderAllocation a WHERE a.jobOrder.id = :jobOrderId")
+  void deleteJobOrderAllocationsByJobOrder(@Param("jobOrderId") UUID jobOrderId);
+
+  /**
    * Bulk-clears {@code jobOrder} only on items of one specific material under the job-order; used
    * by the handover flow when a single material gets returned. {@code clearAutomatically =
    * flushAutomatically = true} flushes pending changes first and clears the persistence context
@@ -428,6 +444,28 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       i.material.id = :materialId
       """)
   void unlinkJobOrderMaterial(
+      @Param("jobOrderId") UUID jobOrderId, @Param("materialId") UUID materialId);
+
+  /**
+   * Drops the job-order allocations of one specific material under the order (Variante C,
+   * REQ-INV-027) — the allocation counterpart of {@link #unlinkJobOrderMaterial(UUID, UUID)}, run
+   * alongside it in the handover / material-removal flows so released stock loses only that order's
+   * slice while the entry (its other allocations and its amount) survives (R2). The material filter
+   * is a subquery over {@link InventoryItem} because {@code a.inventoryItem.material.id} would
+   * imply a join a bulk {@code DELETE} may not carry, whereas {@code a.inventoryItem.id} is the
+   * allocation's own FK column. Carries the same {@code clearAutomatically = flushAutomatically =
+   * true} as its sibling so it keeps the loop-bulk-update discipline (CLAUDE.md).
+   *
+   * @param jobOrderId the order whose allocations to drop.
+   * @param materialId the material to restrict the drop to.
+   */
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query(
+      """
+      DELETE FROM InventoryJobOrderAllocation a WHERE a.jobOrder.id = :jobOrderId AND
+      a.inventoryItem.id IN (SELECT i.id FROM InventoryItem i WHERE i.material.id = :materialId)
+      """)
+  void deleteJobOrderAllocationsByJobOrderAndMaterial(
       @Param("jobOrderId") UUID jobOrderId, @Param("materialId") UUID materialId);
 
   /**
