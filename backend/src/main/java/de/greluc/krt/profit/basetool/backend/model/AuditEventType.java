@@ -47,6 +47,22 @@ public enum AuditEventType {
   /** A warehouse inventory row's free-text note was set or cleared. */
   INVENTORY_ITEM_NOTE_UPDATED(AuditDomain.INVENTORY),
 
+  /**
+   * A quantity slice earmarking part of a warehouse row to a job order or mission was added
+   * (Variante C, REQ-INV-027). Independent of the entry-level create/update — an entry may hold
+   * several such slices per dimension, each with its own amount.
+   */
+  INVENTORY_ALLOCATION_ADDED(AuditDomain.INVENTORY),
+
+  /** An existing quantity slice's earmarked amount was changed (Variante C, REQ-INV-027). */
+  INVENTORY_ALLOCATION_CHANGED(AuditDomain.INVENTORY),
+
+  /**
+   * A quantity slice was removed, releasing its amount back to the entry's unallocated remainder
+   * (Variante C, REQ-INV-027).
+   */
+  INVENTORY_ALLOCATION_REMOVED(AuditDomain.INVENTORY),
+
   /** Stock was discarded/consumed (book-out type {@code DISCARD}); the row may be depleted. */
   INVENTORY_ITEM_CONSUMED(AuditDomain.INVENTORY),
 

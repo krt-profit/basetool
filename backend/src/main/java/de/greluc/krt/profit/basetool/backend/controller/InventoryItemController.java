@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkCheckoutRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationWriteDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
@@ -481,6 +482,98 @@ public class InventoryItemController {
     boolean isLogistician = authHelperService.isLogisticianOrAbove();
     return inventoryItemService.updateInventoryItem(
         id, dto, userService.getUserIdFromJwt(jwt), isLogistician);
+  }
+
+  /**
+   * Adds a quantity slice earmarking part of an entry to a job order or mission (Variante C,
+   * REQ-INV-027). One entry may carry several slices per dimension, each with its own amount, split
+   * independently of the other dimension. The request echoes the entry's {@code version}; the write
+   * force-increments it so the response carries the version the client must echo next.
+   *
+   * @param id the inventory entry id.
+   * @param dto the allocation write payload (dimension, target, amount, version).
+   * @return the updated entry DTO (new version + both refreshed slice lists).
+   */
+  @Operation(
+      summary = "Add an inventory allocation",
+      description =
+          "Earmarks part of an inventory entry's quantity to a job order or mission. Rejects a"
+              + " personal entry, a material not required by the order, a duplicate target, and an"
+              + " amount that would over-allocate the dimension (422).")
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "Allocation added; the updated entry returned"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "Personal entry, wrong material, or bad amount"),
+    @ApiResponse(responseCode = "403", description = "Access denied"),
+    @ApiResponse(responseCode = "404", description = "Entry, job order or mission not found"),
+    @ApiResponse(responseCode = "409", description = "Optimistic locking conflict"),
+    @ApiResponse(responseCode = "422", description = "Over-allocation (dimension Σ exceeds amount)")
+  })
+  @PostMapping("/{id}/allocation")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)")
+  public InventoryItemDto addAllocation(
+      @PathVariable @NotNull UUID id, @RequestBody @Valid InventoryAllocationWriteDto dto) {
+    return inventoryItemService.addAllocation(id, dto);
+  }
+
+  /**
+   * Changes the amount of an existing quantity slice (Variante C, REQ-INV-027). Same version echo /
+   * force-increment as {@link #addAllocation}.
+   *
+   * @param id the inventory entry id.
+   * @param dto the allocation write payload (dimension, target, new amount, version).
+   * @return the updated entry DTO.
+   */
+  @Operation(
+      summary = "Change an inventory allocation amount",
+      description =
+          "Updates the earmarked amount of an existing slice. Rejects a bad amount and an amount"
+              + " that would over-allocate the dimension (422).")
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "Allocation changed; the updated entry returned"),
+    @ApiResponse(responseCode = "400", description = "Personal entry or bad amount"),
+    @ApiResponse(responseCode = "403", description = "Access denied"),
+    @ApiResponse(responseCode = "404", description = "Entry or allocation not found"),
+    @ApiResponse(responseCode = "409", description = "Optimistic locking conflict"),
+    @ApiResponse(responseCode = "422", description = "Over-allocation (dimension Σ exceeds amount)")
+  })
+  @PatchMapping("/{id}/allocation")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)")
+  public InventoryItemDto changeAllocation(
+      @PathVariable @NotNull UUID id, @RequestBody @Valid InventoryAllocationWriteDto dto) {
+    return inventoryItemService.changeAllocation(id, dto);
+  }
+
+  /**
+   * Removes a quantity slice, releasing its amount back to the entry's unallocated remainder
+   * (Variante C, REQ-INV-027). The {@code amount} field of the payload is ignored. Same version
+   * echo / force-increment as {@link #addAllocation}.
+   *
+   * @param id the inventory entry id.
+   * @param dto the allocation write payload (dimension, target, version).
+   * @return the updated entry DTO.
+   */
+  @Operation(
+      summary = "Remove an inventory allocation",
+      description = "Removes a job-order or mission slice from an inventory entry.")
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "Allocation removed; the updated entry returned"),
+    @ApiResponse(responseCode = "403", description = "Access denied"),
+    @ApiResponse(responseCode = "404", description = "Entry or allocation not found"),
+    @ApiResponse(responseCode = "409", description = "Optimistic locking conflict")
+  })
+  @DeleteMapping("/{id}/allocation")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)")
+  public InventoryItemDto removeAllocation(
+      @PathVariable @NotNull UUID id, @RequestBody @Valid InventoryAllocationWriteDto dto) {
+    return inventoryItemService.removeAllocation(id, dto);
   }
 
   /**

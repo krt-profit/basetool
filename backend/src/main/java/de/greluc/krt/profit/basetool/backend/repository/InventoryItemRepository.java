@@ -52,6 +52,27 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   Page<InventoryItem> findByUser(User user, Pageable pageable);
 
   /**
+   * Loads an entry for a per-allocation write (add / change / remove a job-order or mission slice,
+   * Variante C REQ-INV-027) under {@link LockModeType#OPTIMISTIC_FORCE_INCREMENT}. An allocation
+   * lives on the inverse ({@code mappedBy}) side of the entry's {@code @OneToMany}, so cascading a
+   * child insert/delete/amount-change through the collection dirties only the child rows and would
+   * NOT bump the entry's own {@code @Version} on its own. Forcing the increment here makes the
+   * entry's version the single concurrency token for both its splits — two concurrent allocation
+   * writers (or an allocation write racing a scalar edit) serialise and the loser gets a clean 409
+   * — and makes the response DTO carry the post-increment version the client must echo next. The
+   * {@code material} is graphed because the write validates the amount against the material's
+   * PIECE/SCU precision; the two allocation collections stay lazy (both are bags, so graphing them
+   * together would raise {@code MultipleBagFetchException}) and load within the same transaction.
+   *
+   * @param id the inventory entry id.
+   * @return the entry under a forced version increment, or empty when unknown.
+   */
+  @Lock(LockModeType.OPTIMISTIC_FORCE_INCREMENT)
+  @EntityGraph(attributePaths = {"material"})
+  @Query("SELECT i FROM InventoryItem i WHERE i.id = :id")
+  Optional<InventoryItem> findByIdForAllocationWrite(@Param("id") UUID id);
+
+  /**
    * Lists every inventory item (shared and personal) linked to {@code missionId} — the
    * mission-detail Wirtschaft "Lagereinträge" table (#1138). Replaces the former eagerly embedded
    * {@code MissionDto.inventoryEntries} field with a dedicated read; the display associations the

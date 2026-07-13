@@ -31,6 +31,8 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkCheckoutRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationDimension;
+import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationWriteDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
@@ -652,5 +654,58 @@ class InventoryItemControllerTest {
     assertThat(response.getStatusCode().value()).isEqualTo(204);
     assertThat(response.getBody()).isNull();
     verify(inventoryItemService).deleteAllGlobalInventory();
+  }
+
+  // ── POST/PATCH/DELETE /inventory/{id}/allocation (Variante C splits) ──
+
+  @Test
+  void addAllocation_delegatesIdAndDto_withoutJwtOrRoleHelper() {
+    UUID itemId = UUID.randomUUID();
+    InventoryAllocationWriteDto dto =
+        new InventoryAllocationWriteDto(
+            InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 4.0, 1L);
+    InventoryItemDto persisted = inventoryItem(itemId);
+    when(inventoryItemService.addAllocation(itemId, dto)).thenReturn(persisted);
+
+    InventoryItemDto result = controller.addAllocation(itemId, dto);
+
+    // The allocation endpoints are gated purely by @PreAuthorize(@ownerScopeService
+    // .canEditInventoryItem) plus the service's personal-entry guard — no JWT-owner read and no
+    // isLogistician boundary flag, so neither helper is consulted.
+    assertThat(result).isSameAs(persisted);
+    verify(inventoryItemService).addAllocation(itemId, dto);
+    verifyNoInteractions(userService, authHelperService);
+  }
+
+  @Test
+  void changeAllocation_delegatesIdAndDto() {
+    UUID itemId = UUID.randomUUID();
+    InventoryAllocationWriteDto dto =
+        new InventoryAllocationWriteDto(
+            InventoryAllocationDimension.MISSION, UUID.randomUUID(), 6.0, 2L);
+    InventoryItemDto persisted = inventoryItem(itemId);
+    when(inventoryItemService.changeAllocation(itemId, dto)).thenReturn(persisted);
+
+    InventoryItemDto result = controller.changeAllocation(itemId, dto);
+
+    assertThat(result).isSameAs(persisted);
+    verify(inventoryItemService).changeAllocation(itemId, dto);
+    verifyNoInteractions(userService, authHelperService);
+  }
+
+  @Test
+  void removeAllocation_delegatesIdAndDto() {
+    UUID itemId = UUID.randomUUID();
+    InventoryAllocationWriteDto dto =
+        new InventoryAllocationWriteDto(
+            InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), null, 3L);
+    InventoryItemDto persisted = inventoryItem(itemId);
+    when(inventoryItemService.removeAllocation(itemId, dto)).thenReturn(persisted);
+
+    InventoryItemDto result = controller.removeAllocation(itemId, dto);
+
+    assertThat(result).isSameAs(persisted);
+    verify(inventoryItemService).removeAllocation(itemId, dto);
+    verifyNoInteractions(userService, authHelperService);
   }
 }

@@ -21,17 +21,23 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.exception.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
+import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
+import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkCheckoutRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationDimension;
+import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationWriteDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
@@ -584,6 +590,351 @@ public class InventoryItemService {
    */
   private void syncScalarAllocations(InventoryItem item) {
     InventoryAllocationSync.mirrorScalars(item);
+  }
+
+  /**
+   * Epsilon for the over-allocation comparison. Both an entry's amount and every slice amount are
+   * SCU-rounded to three decimals at the persistence boundary, so a proposed Σ that lands a hair
+   * over the entry's amount purely through {@code double} noise (rather than a real
+   * over-allocation) is tolerated; anything beyond this margin is a genuine 422.
+   */
+  private static final double OVER_ALLOCATION_EPSILON = 1e-6;
+
+  /**
+   * Adds a quantity slice earmarking part of the entry to a job order or mission (Variante C,
+   * REQ-INV-027). Guards: the entry must not be personal (personal stock carries no assignment); a
+   * job-order slice's material must be required by the order (REQ-ORDERS-018); the same target may
+   * be allocated only once (the per-dimension unique constraint); and the new Σ of the dimension
+   * must stay within the entry's amount (rule R5, else 422). The write bumps the entry's
+   * {@code @Version} (loaded under a forced increment), so the returned DTO carries the version the
+   * client must echo on its next edit.
+   *
+   * @param id the inventory entry id.
+   * @param dto the allocation write payload (dimension, target, amount, echoed entry version).
+   * @return the updated entry DTO (new version + both refreshed slice lists).
+   * @throws NotFoundException when the entry, job order or mission is unknown.
+   * @throws BadRequestException when the entry is personal, the material is not required by the
+   *     order, the amount is missing/non-positive/fractional-for-PIECE, or the target is already
+   *     allocated.
+   * @throws OverAllocationException when the new dimension Σ would exceed the entry's amount.
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the echoed version
+   *     is stale.
+   */
+  @Transactional
+  public InventoryItemDto addAllocation(UUID id, InventoryAllocationWriteDto dto) {
+    InventoryItem item = loadForAllocationWrite(id, dto);
+    assertNotPersonal(item);
+    double amount = requireWriteAmount(dto, item);
+    switch (dto.field()) {
+      case JOB_ORDER -> {
+        JobOrder jobOrder =
+            jobOrderRepository
+                .findById(dto.targetId())
+                .orElseThrow(() -> new NotFoundException("JobOrder not found"));
+        assertMaterialRequiredByJobOrder(item.getMaterial(), jobOrder);
+        if (findJobOrderSlice(item, dto.targetId()) != null) {
+          throw new BadRequestException("This job order is already allocated on the entry");
+        }
+        assertFits(sumJobOrderAllocated(item, null) + amount, item.getAmount());
+        InventoryJobOrderAllocation slice = new InventoryJobOrderAllocation();
+        slice.setInventoryItem(item);
+        slice.setJobOrder(jobOrder);
+        slice.setAmount(amount);
+        item.getJobOrderAllocations().add(slice);
+        recordAllocation(
+            AuditEventType.INVENTORY_ALLOCATION_ADDED,
+            item,
+            dto.field(),
+            "#" + jobOrder.getDisplayId(),
+            amount);
+      }
+      case MISSION -> {
+        final Mission mission =
+            missionRepository
+                .findById(dto.targetId())
+                .orElseThrow(() -> new NotFoundException("Mission not found"));
+        if (findMissionSlice(item, dto.targetId()) != null) {
+          throw new BadRequestException("This mission is already allocated on the entry");
+        }
+        assertFits(sumMissionAllocated(item, null) + amount, item.getAmount());
+        InventoryMissionAllocation slice = new InventoryMissionAllocation();
+        slice.setInventoryItem(item);
+        slice.setMission(mission);
+        slice.setAmount(amount);
+        item.getMissionAllocations().add(slice);
+        recordAllocation(
+            AuditEventType.INVENTORY_ALLOCATION_ADDED,
+            item,
+            dto.field(),
+            mission.getName(),
+            amount);
+      }
+      default -> throw new IllegalStateException("Unhandled allocation dimension: " + dto.field());
+    }
+    return inventoryItemMapper.toDto(inventoryItemRepository.saveAndFlush(item));
+  }
+
+  /**
+   * Changes the amount of an existing quantity slice (Variante C, REQ-INV-027). The target slice
+   * must exist; the new Σ of the dimension (with this slice's new amount substituted for its old
+   * one) must stay within the entry's amount (rule R5, else 422). Same {@code @Version} bump and
+   * personal guard as {@link #addAllocation}.
+   *
+   * @param id the inventory entry id.
+   * @param dto the allocation write payload (dimension, target, new amount, echoed entry version).
+   * @return the updated entry DTO.
+   * @throws NotFoundException when the entry or the target slice is unknown.
+   * @throws BadRequestException when the entry is personal or the amount is
+   *     missing/non-positive/fractional-for-PIECE.
+   * @throws OverAllocationException when the new dimension Σ would exceed the entry's amount.
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the echoed version
+   *     is stale.
+   */
+  @Transactional
+  public InventoryItemDto changeAllocation(UUID id, InventoryAllocationWriteDto dto) {
+    InventoryItem item = loadForAllocationWrite(id, dto);
+    assertNotPersonal(item);
+    double amount = requireWriteAmount(dto, item);
+    switch (dto.field()) {
+      case JOB_ORDER -> {
+        InventoryJobOrderAllocation slice = findJobOrderSlice(item, dto.targetId());
+        if (slice == null) {
+          throw new NotFoundException("Job-order allocation not found");
+        }
+        assertFits(sumJobOrderAllocated(item, dto.targetId()) + amount, item.getAmount());
+        slice.setAmount(amount);
+        recordAllocation(
+            AuditEventType.INVENTORY_ALLOCATION_CHANGED,
+            item,
+            dto.field(),
+            "#" + slice.getJobOrder().getDisplayId(),
+            amount);
+      }
+      case MISSION -> {
+        InventoryMissionAllocation slice = findMissionSlice(item, dto.targetId());
+        if (slice == null) {
+          throw new NotFoundException("Mission allocation not found");
+        }
+        assertFits(sumMissionAllocated(item, dto.targetId()) + amount, item.getAmount());
+        slice.setAmount(amount);
+        recordAllocation(
+            AuditEventType.INVENTORY_ALLOCATION_CHANGED,
+            item,
+            dto.field(),
+            slice.getMission().getName(),
+            amount);
+      }
+      default -> throw new IllegalStateException("Unhandled allocation dimension: " + dto.field());
+    }
+    return inventoryItemMapper.toDto(inventoryItemRepository.saveAndFlush(item));
+  }
+
+  /**
+   * Removes a quantity slice, releasing its amount back to the entry's unallocated remainder
+   * (Variante C, REQ-INV-027). Removal only lowers a dimension's Σ, so there is no over-allocation
+   * check and no personal guard (a personal entry simply has no slices to remove → 404). The target
+   * slice must exist. Same {@code @Version} bump as {@link #addAllocation}.
+   *
+   * @param id the inventory entry id.
+   * @param dto the allocation write payload (dimension, target, echoed entry version; amount
+   *     ignored).
+   * @return the updated entry DTO.
+   * @throws NotFoundException when the entry or the target slice is unknown.
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the echoed version
+   *     is stale.
+   */
+  @Transactional
+  public InventoryItemDto removeAllocation(UUID id, InventoryAllocationWriteDto dto) {
+    InventoryItem item = loadForAllocationWrite(id, dto);
+    switch (dto.field()) {
+      case JOB_ORDER -> {
+        InventoryJobOrderAllocation slice = findJobOrderSlice(item, dto.targetId());
+        if (slice == null) {
+          throw new NotFoundException("Job-order allocation not found");
+        }
+        String ref = slice.getJobOrder() != null ? "#" + slice.getJobOrder().getDisplayId() : "-";
+        item.getJobOrderAllocations().remove(slice);
+        recordAllocation(AuditEventType.INVENTORY_ALLOCATION_REMOVED, item, dto.field(), ref, null);
+      }
+      case MISSION -> {
+        InventoryMissionAllocation slice = findMissionSlice(item, dto.targetId());
+        if (slice == null) {
+          throw new NotFoundException("Mission allocation not found");
+        }
+        String ref = slice.getMission() != null ? slice.getMission().getName() : "-";
+        item.getMissionAllocations().remove(slice);
+        recordAllocation(AuditEventType.INVENTORY_ALLOCATION_REMOVED, item, dto.field(), ref, null);
+      }
+      default -> throw new IllegalStateException("Unhandled allocation dimension: " + dto.field());
+    }
+    return inventoryItemMapper.toDto(inventoryItemRepository.saveAndFlush(item));
+  }
+
+  /**
+   * Loads an entry for a per-allocation write under a forced version increment and enforces the
+   * optimistic-lock echo. The forced increment (see {@code
+   * InventoryItemRepository.findByIdForAllocationWrite}) makes the entry's {@code @Version} the
+   * single concurrency token for both its splits, since a slice change on the inverse collection
+   * side would not otherwise dirty the entry row.
+   *
+   * @param id the inventory entry id.
+   * @param dto the write payload carrying the echoed version.
+   * @return the managed entry, ready for slice mutation.
+   * @throws NotFoundException when the entry is unknown.
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the echoed version
+   *     is stale.
+   */
+  private InventoryItem loadForAllocationWrite(UUID id, InventoryAllocationWriteDto dto) {
+    InventoryItem item =
+        inventoryItemRepository
+            .findByIdForAllocationWrite(id)
+            .orElseThrow(() -> new NotFoundException("Inventory item not found"));
+    OptimisticLock.checkOptionalClient(item.getVersion(), dto.version(), InventoryItem.class, id);
+    return item;
+  }
+
+  /**
+   * Rejects an allocation write on a personal entry — personal stock is attributable solely to its
+   * owner and carries no job-order/mission assignment (the same invariant {@link
+   * #createInventoryItem} and {@link #updateInventoryItem} enforce).
+   *
+   * @param item the entry being written.
+   * @throws BadRequestException when the entry is personal.
+   */
+  private void assertNotPersonal(InventoryItem item) {
+    if (Boolean.TRUE.equals(item.getPersonal())) {
+      throw new BadRequestException("Personal items cannot be assigned to a mission or job order");
+    }
+  }
+
+  /**
+   * Validates and normalizes an add/change amount: present, strictly positive, whole for a {@code
+   * PIECE} material, then SCU-rounded to storage precision. The material is read off the already
+   * managed entry rather than a separate lookup.
+   *
+   * @param dto the write payload.
+   * @param item the entry (for its material's quantity type).
+   * @return the validated, SCU-rounded amount.
+   * @throws BadRequestException when the amount is missing, non-positive, or fractional for a PIECE
+   *     material.
+   */
+  private double requireWriteAmount(InventoryAllocationWriteDto dto, InventoryItem item) {
+    Double raw = dto.amount();
+    if (raw == null) {
+      throw new BadRequestException("An allocation amount is required");
+    }
+    if (raw <= 0) {
+      throw new BadRequestException("An allocation amount must be positive");
+    }
+    if (item.getMaterial() != null
+        && item.getMaterial().getQuantityType() == QuantityType.PIECE
+        && raw % 1 != 0) {
+      throw new BadRequestException("A PIECE allocation amount must be a whole number");
+    }
+    return InventoryItem.roundToScuScale(raw);
+  }
+
+  /**
+   * Enforces rule R5: a dimension's proposed Σ must not exceed the entry's own amount. Both
+   * operands are SCU-rounded so floating-point noise near equality does not spuriously trip the
+   * guard.
+   *
+   * @param proposedSum the dimension's Σ after the write.
+   * @param capacity the entry's amount (the shared budget for the dimension).
+   * @throws OverAllocationException when {@code proposedSum} exceeds {@code capacity} beyond {@link
+   *     #OVER_ALLOCATION_EPSILON}.
+   */
+  private void assertFits(double proposedSum, double capacity) {
+    if (InventoryItem.roundToScuScale(proposedSum) - capacity > OVER_ALLOCATION_EPSILON) {
+      throw new OverAllocationException();
+    }
+  }
+
+  /**
+   * Sums the job-order dimension's currently allocated amount, optionally excluding one target's
+   * slice (used by the change path so the slice being edited does not count against its own new
+   * amount).
+   *
+   * @param item the entry.
+   * @param excludeTargetId the job-order id whose slice to exclude, or {@code null} to sum all.
+   * @return the Σ of the (non-excluded) job-order slice amounts.
+   */
+  private double sumJobOrderAllocated(InventoryItem item, UUID excludeTargetId) {
+    return item.getJobOrderAllocations().stream()
+        .filter(a -> a.getJobOrder() != null)
+        .filter(a -> excludeTargetId == null || !excludeTargetId.equals(a.getJobOrder().getId()))
+        .mapToDouble(a -> a.getAmount() == null ? 0.0 : a.getAmount())
+        .sum();
+  }
+
+  /**
+   * Mission counterpart of {@link #sumJobOrderAllocated}.
+   *
+   * @param item the entry.
+   * @param excludeTargetId the mission id whose slice to exclude, or {@code null} to sum all.
+   * @return the Σ of the (non-excluded) mission slice amounts.
+   */
+  private double sumMissionAllocated(InventoryItem item, UUID excludeTargetId) {
+    return item.getMissionAllocations().stream()
+        .filter(a -> a.getMission() != null)
+        .filter(a -> excludeTargetId == null || !excludeTargetId.equals(a.getMission().getId()))
+        .mapToDouble(a -> a.getAmount() == null ? 0.0 : a.getAmount())
+        .sum();
+  }
+
+  /**
+   * Finds the entry's job-order slice for a target order, or {@code null} when the order is not
+   * allocated on the entry.
+   *
+   * @param item the entry.
+   * @param targetId the job-order id.
+   * @return the matching slice, or {@code null}.
+   */
+  private InventoryJobOrderAllocation findJobOrderSlice(InventoryItem item, UUID targetId) {
+    return item.getJobOrderAllocations().stream()
+        .filter(a -> a.getJobOrder() != null && targetId.equals(a.getJobOrder().getId()))
+        .findFirst()
+        .orElse(null);
+  }
+
+  /**
+   * Mission counterpart of {@link #findJobOrderSlice}.
+   *
+   * @param item the entry.
+   * @param targetId the mission id.
+   * @return the matching slice, or {@code null}.
+   */
+  private InventoryMissionAllocation findMissionSlice(InventoryItem item, UUID targetId) {
+    return item.getMissionAllocations().stream()
+        .filter(a -> a.getMission() != null && targetId.equals(a.getMission().getId()))
+        .findFirst()
+        .orElse(null);
+  }
+
+  /**
+   * Records the REQ-AUDIT-001 event for an allocation add/change/remove. The details carry only
+   * PII-free tokens: the dimension, the target reference ({@code #<displayId>} for an order, the
+   * mission name — the same non-PII reference the entry-level create/update audit already emits)
+   * and the amount (omitted for a removal).
+   *
+   * @param type the allocation event type.
+   * @param item the entry the slice belongs to.
+   * @param field the dimension written.
+   * @param ref the target reference token (order display id or mission name).
+   * @param amount the slice amount, or {@code null} for a removal.
+   */
+  private void recordAllocation(
+      AuditEventType type,
+      InventoryItem item,
+      InventoryAllocationDimension field,
+      String ref,
+      Double amount) {
+    AuditDetails details = AuditDetails.of("dim", field).with("ref", ref);
+    if (amount != null) {
+      details = details.with("qty", amount);
+    }
+    auditService.record(
+        type, item.getId(), InventoryAuditLabels.label(item), item.getUser().getId(), details);
   }
 
   /**
