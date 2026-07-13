@@ -577,7 +577,13 @@ public class InventoryCheckoutService {
   @Transactional(propagation = Propagation.MANDATORY)
   public InventoryItem mergeStockIfRequested(InventoryItem row, boolean clientRequestedMerge) {
     final Material material = row.getMaterial();
-    final boolean piece = material != null && material.getQuantityType() == QuantityType.PIECE;
+    if (material == null) {
+      // A row without a material cannot participate in merge-group matching (the merge key requires
+      // material · quality · …), so it stays unchanged — consistent with append-only/no-merge
+      // behaviour. Returning here also guards the material.getId() dereference below.
+      return row;
+    }
+    final boolean piece = material.getQuantityType() == QuantityType.PIECE;
     if (!piece && !clientRequestedMerge) {
       // SCU without the per-action opt-in stays append-only (REQ-INV-001).
       return row;

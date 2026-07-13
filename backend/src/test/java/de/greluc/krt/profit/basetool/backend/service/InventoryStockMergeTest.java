@@ -209,4 +209,19 @@ class InventoryStockMergeTest {
     verify(inventoryItemRepository, never()).saveAndFlush(any());
     verifyNoInteractions(auditService);
   }
+
+  @Test
+  void nullMaterial_withOptIn_isNoOp() {
+    // A row without a material cannot merge (the merge key requires material) and must not NPE on
+    // material.getId() even with the SCU per-action opt-in set — pins the null-material early
+    // return.
+    InventoryItem row = row(UUID.randomUUID(), QuantityType.SCU, 5.0, "n", true);
+    row.setMaterial(null);
+
+    InventoryItem result = service.mergeStockIfRequested(row, true);
+
+    assertSame(row, result);
+    assertEquals(5.0, row.getAmount(), 1e-9, "the amount is untouched");
+    verifyNoInteractions(inventoryItemRepository, materialExchangeOfferRepository, auditService);
+  }
 }
