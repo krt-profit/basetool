@@ -834,6 +834,10 @@ public class InventoryCheckoutService {
     OptimisticLock.check(item.getVersion(), request.version(), InventoryItem.class, id);
 
     item.setDelivered(request.delivered());
+    // Variante A soak (REQ-INV-027): the delivered flag now also lives on the job-order slice, so
+    // toggling the entry re-mirrors it onto the entry's allocation; once the toggle becomes
+    // (entry, order)-scoped at the column drop, this entry-level write goes away.
+    InventoryAllocationSync.mirrorScalars(item);
     // saveAndFlush so the response carries the flushed @Version — the material-collection delivered
     // checkbox syncs the returned version onto the row in place (no reload), so a plain save would
     // return the stale pre-flush version and a second consecutive toggle of the same row would 409.

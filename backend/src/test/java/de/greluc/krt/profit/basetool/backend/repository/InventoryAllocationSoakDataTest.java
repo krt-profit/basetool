@@ -135,6 +135,38 @@ class InventoryAllocationSoakDataTest {
   }
 
   /**
+   * Variante A (REQ-INV-027): the job-order slice mirrors the entry's {@code delivered} flag during
+   * the soak — setting the entry flag and re-mirroring marks the slice delivered, clearing it and
+   * re-mirroring clears the slice.
+   */
+  @Test
+  void mirrorCopiesDeliveredOntoTheJobOrderSlice() {
+    Fixture f = seedLinkedItem(50.0);
+    entityManager.flush();
+    entityManager.clear();
+
+    InventoryItem reloaded = inventoryItemRepository.findById(f.itemId).orElseThrow();
+    reloaded.setDelivered(true);
+    InventoryAllocationSync.mirrorScalars(reloaded);
+    inventoryItemRepository.saveAndFlush(reloaded);
+    entityManager.clear();
+    assertThat(jobOrderAllocationRepository.findAll())
+        .filteredOn(a -> a.getInventoryItem().getId().equals(f.itemId))
+        .singleElement()
+        .satisfies(a -> assertThat(a.getDelivered()).isTrue());
+
+    InventoryItem again = inventoryItemRepository.findById(f.itemId).orElseThrow();
+    again.setDelivered(false);
+    InventoryAllocationSync.mirrorScalars(again);
+    inventoryItemRepository.saveAndFlush(again);
+    entityManager.clear();
+    assertThat(jobOrderAllocationRepository.findAll())
+        .filteredOn(a -> a.getInventoryItem().getId().equals(f.itemId))
+        .singleElement()
+        .satisfies(a -> assertThat(a.getDelivered()).isFalse());
+  }
+
+  /**
    * Seeds one job order plus one non-personal inventory entry linked to it, mirroring the scalar
    * into a single full-amount allocation exactly as the service create path does.
    *

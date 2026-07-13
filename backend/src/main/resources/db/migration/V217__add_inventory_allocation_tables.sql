@@ -14,6 +14,10 @@ CREATE TABLE inventory_item_job_order_allocation (
     -- survives as (partially) unassigned stock when the order is deleted.
     job_order_id      UUID NOT NULL REFERENCES job_order(id) ON DELETE CASCADE,
     amount            DOUBLE PRECISION NOT NULL,
+    -- Variante A (REQ-INV-027): "geliefert" is per job-order slice, not per entry — an entry that
+    -- serves several orders can be delivered for one and still open for another. The per-order
+    -- successor to the former entry-level inventory_item.delivered; missions carry no delivered.
+    delivered         BOOLEAN NOT NULL DEFAULT false,
     version           BIGINT NOT NULL DEFAULT 0,
     created_at        TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at        TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -39,10 +43,12 @@ CREATE TABLE inventory_item_mission_allocation (
 CREATE INDEX idx_inv_mission_alloc_mission ON inventory_item_mission_allocation (mission_id);
 CREATE INDEX idx_inv_mission_alloc_item ON inventory_item_mission_allocation (inventory_item_id);
 
--- Backfill: each existing scalar assignment becomes one allocation carrying the full entry amount (R6).
+-- Backfill: each existing scalar assignment becomes one allocation carrying the full entry amount
+-- (R6); the job-order slice inherits the entry's former scalar delivered flag (Variante A).
 INSERT INTO inventory_item_job_order_allocation
-    (id, inventory_item_id, job_order_id, amount, version, created_at, updated_at)
-SELECT gen_random_uuid(), i.id, i.job_order_id, COALESCE(i.amount, 0.0), 0, now(), now()
+    (id, inventory_item_id, job_order_id, amount, delivered, version, created_at, updated_at)
+SELECT gen_random_uuid(), i.id, i.job_order_id, COALESCE(i.amount, 0.0),
+       COALESCE(i.delivered, false), 0, now(), now()
 FROM inventory_item i
 WHERE i.job_order_id IS NOT NULL;
 

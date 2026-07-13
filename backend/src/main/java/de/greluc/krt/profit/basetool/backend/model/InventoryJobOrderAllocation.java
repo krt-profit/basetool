@@ -88,6 +88,16 @@ public class InventoryJobOrderAllocation extends AbstractEntity<UUID> {
   private Double amount; // SCU
 
   /**
+   * Whether the stock earmarked to this job order has been delivered (Variante A, REQ-INV-027) —
+   * the per-order successor to the former entry-level {@code InventoryItem.delivered}. An entry
+   * that serves several orders can be delivered for one and still open for another, which one
+   * entry-level flag could not express. Mission slices carry no delivered marker (a mission has no
+   * "delivery").
+   */
+  @Column(nullable = false)
+  private Boolean delivered = false;
+
+  /**
    * Rounds {@link #amount} to SCU storage precision (three decimals) before every {@code INSERT}
    * and {@code UPDATE}, mirroring {@link InventoryItem#roundAmountToScuScale()} so an allocation
    * never stores more fractional digits than the entry it splits.

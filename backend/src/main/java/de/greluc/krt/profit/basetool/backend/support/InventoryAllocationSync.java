@@ -49,8 +49,9 @@ public final class InventoryAllocationSync {
 
   /**
    * Rebuilds {@code item}'s allocation collections from its {@code jobOrder}/{@code mission}
-   * scalars: a set scalar becomes one allocation carrying the entry's full amount, an unset scalar
-   * leaves that dimension empty.
+   * scalars: a set scalar becomes one allocation carrying the entry's full amount (and, for the
+   * job-order slice, the entry's {@code delivered} flag — Variante A), an unset scalar leaves that
+   * dimension empty.
    *
    * <p>The slice carrying the current scalar is updated <em>in place</em> (its {@code amount} is
    * re-set); only slices for a different or now-absent assignment are removed, and a slice is
@@ -88,6 +89,10 @@ public final class InventoryAllocationSync {
         item.getJobOrderAllocations().add(slice);
       }
       slice.setAmount(item.getAmount());
+      // Variante A soak (REQ-INV-027): the per-order delivered flag mirrors the entry-level
+      // inventory_item.delivered while the scalar is still the source of truth; the material
+      // collection and the delivered toggle move onto the slice at the scalar column drop.
+      slice.setDelivered(Boolean.TRUE.equals(item.getDelivered()));
     }
 
     if (item.getMission() == null) {
