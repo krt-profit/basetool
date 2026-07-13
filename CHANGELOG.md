@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Die Seite „Organisation → Leitung" ist jetzt nur noch für Admins und Officer zugänglich.** Bisher öffnete das Gate zusätzlich für reine Logistiker/Missionsmanager, die dort aber ohnehin keine Ernennungsrechte und damit eine leere Seite hatten. Zugang (Seite und Aktionen) ist jetzt auf `ADMIN`/`OFFICER` eingegrenzt; alle funktionalen Leiter (OL-, Bereichs-, SK- und Staffelleitung samt Kommandorängen) tragen die operative `OFFICER`-Rolle und behalten den Zugang unverändert (REQ-ROLE-004).
+
 ### Fixed
 
 - **Monitoring: Ein laufender Monitoring-Stack mit nicht gesetztem `IRI_MONITORING_ENABLED` schlägt jetzt Alarm, statt still zu driften.** Bei nicht gesetztem Flag lud `deploy.sh` zwar weiter die Konfigdateien auf die Platte, erzeugte die laufenden Container aber nie neu — Regel- und Scrape-Änderungen erreichten das laufende Prometheus nie, und der dafür gedachte Alarm `PrometheusConfigStale` konnte nicht anschlagen, weil seine Metrik nur im (in diesem Fall deaktivierten) Reconcile-Codepfad geschrieben wird. `deploy.sh` meldet den Zustand jetzt pro Durchlauf als WARN und über die eigenständige Metrik `basetool_monitoring_reconcile_disabled`; der neue Alarm `MonitoringReconcileDisabled` schlägt nach 30 Minuten an (REQ-OBS-014, REQ-OPS-013).

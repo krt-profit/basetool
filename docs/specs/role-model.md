@@ -64,11 +64,22 @@ Bereich/OL appointment responses) derive it from `role` at the controller / mapp
 
 Each squadron leadership rank (`STAFFELLEITER` / `KOMMANDOLEITER` / `STELLV_KOMMANDOLEITER` /
 `ENSIGN`) confers officer-equivalent reach over its **own squadron only**, by minting contextual
-`LOGISTICIAN@<squadronId>` + `MISSION_MANAGER@<squadronId>` exactly as `SK_LEAD` does for an SK —
-**not** flat `ROLE_OFFICER`, **not** promotion rights, **not** cascade beyond the squadron. Area
-ranks keep their current cascading reach (Bereich + children, identical across the three area ranks
-for now). The Keycloak `OFFICER` realm role is left untouched. Per-rank / per-feature
-differentiation (including the bank) is deferred to later work.
+`LOGISTICIAN@<squadronId>` + `MISSION_MANAGER@<squadronId>` exactly as `SK_LEAD` does for an SK. The
+JWT authorities converter derives **no** flat `ROLE_OFFICER` from the rank, **no** promotion rights,
+and **no** cascade beyond the squadron. Area ranks keep their current cascading reach (Bereich +
+children, identical across the three area ranks for now). Per-rank / per-feature differentiation
+(including the bank) is deferred to later work.
+
+**"Not `ROLE_OFFICER`" describes what the rank auto-mints, not the roles the person actually
+holds.** Squadron leaders **do** hold the `OFFICER` Keycloak realm role — it is granted
+**operationally / manually** in Keycloak, exactly like OL / Bereich / SK leads (see the "Operational
+OFFICER grant" section of [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md)), which is
+what lets them pass `OFFICER`-gated surfaces such as the Leitung page. The converter never
+*synthesises* that realm role from the functional rank — `OFFICER` stays a separate,
+manually-granted authority, enforced by `CustomJwtGrantedAuthoritiesConverterTest`'s
+`staffelleiter_getsFlatRolesAndOwnSquadronContextualOnly_noCascade` (which drives a role-less user).
+So the realm-role assignment is managed operationally, not derived from — and, per "Out of scope"
+below, not retired by — the rank model.
 
 Like `SK_LEAD` and the area/OL ranks, a squadron rank also carries the flat back-compat
 `ROLE_LOGISTICIAN` / `ROLE_MISSION_MANAGER` (the `confersFlatOfficerRole` surface) so existing
@@ -144,6 +155,14 @@ R you must hold a strictly-higher rank, which you cannot grant to yourself) — 
 computed from the caller's own membership ranks only (never from the admin-pin header, contextual
 authorities, or `isAdmin()` inside the verdict); admin short-circuits only at the `@PreAuthorize`
 layer.
+
+The frontend Leitung page (`/organisation/leitung`) and its write proxies are role-gated to
+`ADMIN` / `OFFICER` only (`Roles.ADMIN_OR_OFFICER`). Every functional leader carries the operative
+`OFFICER` grant (see the "Operational OFFICER grant" section of
+[`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md)), so the coarse page gate never denies
+a delegated leader; `LOGISTICIAN` / `MISSION_MANAGER` are deliberately **not** accepted, so a
+capability-only holder with no appointment reach (empty view) cannot open the surface. The per-unit
+appointment authority remains the delegated verdict above, re-checked on every backend write.
 
 **Acceptance**
 

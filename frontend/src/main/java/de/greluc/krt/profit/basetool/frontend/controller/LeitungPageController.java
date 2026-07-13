@@ -53,13 +53,16 @@ import org.springframework.web.bind.annotation.ResponseBody;
  * Kommandoleiter / Stellvertreter / Ensigns and Kommandogruppen, the OL appoints Bereichsleiter,
  * and admin does everything.
  *
- * <p>The page is gated to any leader tier (broad, like the bank link); per-unit authorisation is
- * enforced by the backend appointment endpoints, which the write methods below proxy verbatim,
- * relaying any RFC-7807 failure as its original status + a slim {@code {code, detail}} body so the
- * page JS can toast the backend's localised message (and recognise {@code OPTIMISTIC_LOCK} to
- * prompt a reload). On success the page re-swaps the {@code leitungSections} fragment rather than
- * patching individual rows, so derived state (rank chips, group tiles, capability buttons) never
- * desyncs.
+ * <p>The page and its write proxies are gated to {@code ADMIN} / {@code OFFICER} only ({@link
+ * Roles#ADMIN_OR_OFFICER}): every functional leader carries the operative {@code OFFICER} grant
+ * (see {@code ROLES_AND_PERMISSIONS.md}), so no delegated leader is locked out, while a
+ * capability-only Logistician / Mission-Manager (no appointment reach, empty page) is kept out.
+ * Per-unit authorisation is still enforced by the backend appointment endpoints, which the write
+ * methods below proxy verbatim, relaying any RFC-7807 failure as its original status + a slim
+ * {@code {code, detail}} body so the page JS can toast the backend's localised message (and
+ * recognise {@code OPTIMISTIC_LOCK} to prompt a reload). On success the page re-swaps the {@code
+ * leitungSections} fragment rather than patching individual rows, so derived state (rank chips,
+ * group tiles, capability buttons) never desyncs.
  */
 @Controller
 @RequestMapping("/organisation/leitung")
@@ -81,16 +84,7 @@ public class LeitungPageController {
    * @return the view name, or its {@code leitungSections} selector for the fragment path.
    */
   @GetMapping
-  @PreAuthorize(
-      "hasAnyRole('"
-          + Roles.ADMIN
-          + "', '"
-          + Roles.OFFICER
-          + "', '"
-          + Roles.LOGISTICIAN
-          + "', '"
-          + Roles.MISSION_MANAGER
-          + "')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public String leitung(@RequestParam(required = false) String fragment, Model model) {
     try {
       model.addAttribute(
@@ -118,16 +112,7 @@ public class LeitungPageController {
    */
   @PutMapping("/squadrons/{squadronId}/ranks/{userId}/ajax")
   @ResponseBody
-  @PreAuthorize(
-      "hasAnyRole('"
-          + Roles.ADMIN
-          + "', '"
-          + Roles.OFFICER
-          + "', '"
-          + Roles.LOGISTICIAN
-          + "', '"
-          + Roles.MISSION_MANAGER
-          + "')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public ResponseEntity<Object> assignSquadronRank(
       @PathVariable @NotNull UUID squadronId,
       @PathVariable @NotNull UUID userId,
@@ -149,16 +134,7 @@ public class LeitungPageController {
    */
   @DeleteMapping("/squadrons/{squadronId}/ranks/{userId}/ajax")
   @ResponseBody
-  @PreAuthorize(
-      "hasAnyRole('"
-          + Roles.ADMIN
-          + "', '"
-          + Roles.OFFICER
-          + "', '"
-          + Roles.LOGISTICIAN
-          + "', '"
-          + Roles.MISSION_MANAGER
-          + "')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public ResponseEntity<Object> removeSquadronRank(
       @PathVariable @NotNull UUID squadronId,
       @PathVariable @NotNull UUID userId,
@@ -180,16 +156,7 @@ public class LeitungPageController {
    */
   @PostMapping("/squadrons/{squadronId}/kommando-groups/ajax")
   @ResponseBody
-  @PreAuthorize(
-      "hasAnyRole('"
-          + Roles.ADMIN
-          + "', '"
-          + Roles.OFFICER
-          + "', '"
-          + Roles.LOGISTICIAN
-          + "', '"
-          + Roles.MISSION_MANAGER
-          + "')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public ResponseEntity<Object> createKommandoGroup(
       @PathVariable @NotNull UUID squadronId, @RequestBody Map<String, Object> body) {
     return proxy(
@@ -208,16 +175,7 @@ public class LeitungPageController {
    */
   @PutMapping("/kommando-groups/{groupId}/ajax")
   @ResponseBody
-  @PreAuthorize(
-      "hasAnyRole('"
-          + Roles.ADMIN
-          + "', '"
-          + Roles.OFFICER
-          + "', '"
-          + Roles.LOGISTICIAN
-          + "', '"
-          + Roles.MISSION_MANAGER
-          + "')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public ResponseEntity<Object> updateKommandoGroup(
       @PathVariable @NotNull UUID groupId, @RequestBody Map<String, Object> body) {
     return proxy(
@@ -233,16 +191,7 @@ public class LeitungPageController {
    */
   @DeleteMapping("/kommando-groups/{groupId}/ajax")
   @ResponseBody
-  @PreAuthorize(
-      "hasAnyRole('"
-          + Roles.ADMIN
-          + "', '"
-          + Roles.OFFICER
-          + "', '"
-          + Roles.LOGISTICIAN
-          + "', '"
-          + Roles.MISSION_MANAGER
-          + "')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public ResponseEntity<Object> deleteKommandoGroup(@PathVariable @NotNull UUID groupId) {
     return proxy(
         "Delete Kommandogruppe failed",
@@ -258,16 +207,7 @@ public class LeitungPageController {
    */
   @PostMapping("/bereiche/{bereichId}/members/ajax")
   @ResponseBody
-  @PreAuthorize(
-      "hasAnyRole('"
-          + Roles.ADMIN
-          + "', '"
-          + Roles.OFFICER
-          + "', '"
-          + Roles.LOGISTICIAN
-          + "', '"
-          + Roles.MISSION_MANAGER
-          + "')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public ResponseEntity<Object> addBereichLeader(
       @PathVariable @NotNull UUID bereichId, @RequestBody Map<String, Object> body) {
     return proxy(
@@ -286,16 +226,7 @@ public class LeitungPageController {
    */
   @DeleteMapping("/bereiche/{bereichId}/members/{userId}/ajax")
   @ResponseBody
-  @PreAuthorize(
-      "hasAnyRole('"
-          + Roles.ADMIN
-          + "', '"
-          + Roles.OFFICER
-          + "', '"
-          + Roles.LOGISTICIAN
-          + "', '"
-          + Roles.MISSION_MANAGER
-          + "')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public ResponseEntity<Object> removeBereichLeader(
       @PathVariable @NotNull UUID bereichId, @PathVariable @NotNull UUID userId) {
     return proxy(
@@ -315,16 +246,7 @@ public class LeitungPageController {
    */
   @PostMapping("/organisationsleitung/{olId}/members/ajax")
   @ResponseBody
-  @PreAuthorize(
-      "hasAnyRole('"
-          + Roles.ADMIN
-          + "', '"
-          + Roles.OFFICER
-          + "', '"
-          + Roles.LOGISTICIAN
-          + "', '"
-          + Roles.MISSION_MANAGER
-          + "')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public ResponseEntity<Object> addOlMember(
       @PathVariable @NotNull UUID olId, @RequestBody Map<String, Object> body) {
     return proxy(
@@ -345,16 +267,7 @@ public class LeitungPageController {
    */
   @DeleteMapping("/organisationsleitung/{olId}/members/{userId}/ajax")
   @ResponseBody
-  @PreAuthorize(
-      "hasAnyRole('"
-          + Roles.ADMIN
-          + "', '"
-          + Roles.OFFICER
-          + "', '"
-          + Roles.LOGISTICIAN
-          + "', '"
-          + Roles.MISSION_MANAGER
-          + "')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public ResponseEntity<Object> removeOlMember(
       @PathVariable @NotNull UUID olId, @PathVariable @NotNull UUID userId) {
     return proxy(
@@ -375,16 +288,7 @@ public class LeitungPageController {
    */
   @PatchMapping("/special-commands/{skId}/members/{userId}/lead/ajax")
   @ResponseBody
-  @PreAuthorize(
-      "hasAnyRole('"
-          + Roles.ADMIN
-          + "', '"
-          + Roles.OFFICER
-          + "', '"
-          + Roles.LOGISTICIAN
-          + "', '"
-          + Roles.MISSION_MANAGER
-          + "')")
+  @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public ResponseEntity<Object> toggleSkLead(
       @PathVariable @NotNull UUID skId,
       @PathVariable @NotNull UUID userId,

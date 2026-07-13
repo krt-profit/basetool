@@ -261,12 +261,17 @@ account-bound org-chart seat (REQ-ROLE-006).
 The `OFFICER` Keycloak role is granted **operatively** (manually, cf. §1) in
 addition to the OrgUnit membership:
 
-- **All members of the Organisationsleitung, the Bereichsleitung and every
-  Spezialkommando receive `OFFICER`.** This way they satisfy the frontend's
-  `hasRole('OFFICER')` gates (e.g. the „Leitung" page). The backend still
-  evaluates reach **membership-based** via the `OwnerScopeService` (oversight
-  scope, responsible holder) — `OFFICER` only opens the role-gated surfaces,
-  **not** the contextual data reach.
+- **All members of the Organisationsleitung, the Bereichsleitung, every
+  Spezialkommando and every Staffel leadership rank (Staffelleiter,
+  Kommandoleiter, stellvertretender Kommandoleiter, Ensign) receive `OFFICER`.**
+  This way they satisfy the frontend's `OFFICER`-gated surfaces — e.g. the
+  „Leitung" page, whose page **and** write proxies are gated to `ADMIN` /
+  `OFFICER` (`Roles.ADMIN_OR_OFFICER`); the previously accepted
+  `LOGISTICIAN` / `MISSION_MANAGER` were removed, so a capability-only Logistician
+  / Mission-Manager (who has no appointment reach and only saw an empty page) no
+  longer opens it. The backend still evaluates reach **membership-based** via the
+  `OwnerScopeService` (oversight scope, responsible holder) — `OFFICER` only opens
+  the role-gated surfaces, **not** the contextual data reach.
 - **Bank Management (`BANK_MANAGEMENT`) also holds `OFFICER`.** **Bank Employees
   (`BANK_EMPLOYEE`)** have **at least `KRT Member`** (MEMBER), but **not
   necessarily `OFFICER`** — the bank gates rely exclusively on `BANK_*`
