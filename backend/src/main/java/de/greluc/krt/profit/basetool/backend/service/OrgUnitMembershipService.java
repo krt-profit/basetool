@@ -459,6 +459,8 @@ public class OrgUnitMembershipService {
       return;
     }
     ol.setGrandAdmiralUserId(userId);
+    // An account Grand Admiral supersedes any free-text one (account XOR free-text, REQ-ORG-020).
+    ol.setGrandAdmiralDisplayName(null);
     orgUnitRepository.saveAndFlush(ol);
     if (previous != null) {
       auditService.record(
@@ -488,18 +490,49 @@ public class OrgUnitMembershipService {
   @Transactional
   public void removeGrandAdmiral(@NotNull UUID organisationsleitungId) {
     Organisationsleitung ol = requireOrganisationsleitung(organisationsleitungId);
-    final UUID previous = ol.getGrandAdmiralUserId();
-    if (previous == null) {
+    final UUID previousUser = ol.getGrandAdmiralUserId();
+    if (previousUser == null && ol.getGrandAdmiralDisplayName() == null) {
       return;
     }
     ol.setGrandAdmiralUserId(null);
+    ol.setGrandAdmiralDisplayName(null);
     orgUnitRepository.saveAndFlush(ol);
-    auditService.record(
-        AuditEventType.ROLE_CHANGED,
-        ol.getId(),
-        OrgUnitLabels.shorthandOrName(ol),
-        previous,
-        AuditDetails.of("grandAdmiral", false));
+    // Only the account designation is a membership-relevant event; a free-text Grand Admiral is a
+    // descriptive chart holder that grants nothing, so its removal is not audited (REQ-AUDIT-001).
+    if (previousUser != null) {
+      auditService.record(
+          AuditEventType.ROLE_CHANGED,
+          ol.getId(),
+          OrgUnitLabels.shorthandOrName(ol),
+          previousUser,
+          AuditDetails.of("grandAdmiral", false));
+    }
+  }
+
+  /**
+   * Sets a <b>free-text</b> Grand Admiral (REQ-ORG-021): a typed name for an OL member who has no
+   * Basetool account yet, the same account-XOR-freetext holder model every other chart position
+   * uses (REQ-ORG-020). Grants nothing — it is a descriptive chart entry — so it makes no
+   * membership change and is not audited. Supersedes any existing Grand Admiral (account or
+   * free-text); the single {@code grand_admiral_*} column pair is the org-wide "at most one"
+   * guarantee.
+   *
+   * @param organisationsleitungId the OL org unit; never {@code null}.
+   * @param displayName the typed holder name; must not be blank.
+   * @throws NotFoundException if the OL does not exist.
+   * @throws BadRequestException if the id is not the Organisationsleitung, or the name is blank.
+   */
+  @Transactional
+  public void setGrandAdmiralFreeText(
+      @NotNull UUID organisationsleitungId, @NotNull String displayName) {
+    final String trimmed = displayName.trim();
+    if (trimmed.isEmpty()) {
+      throw new BadRequestException("Grand Admiral name must not be blank");
+    }
+    Organisationsleitung ol = requireOrganisationsleitung(organisationsleitungId);
+    ol.setGrandAdmiralDisplayName(trimmed);
+    ol.setGrandAdmiralUserId(null);
+    orgUnitRepository.saveAndFlush(ol);
   }
 
   /**

@@ -410,6 +410,47 @@ class OrgChartPageRenderTest {
 
   @Test
   @WithMockUser(roles = "ADMIN")
+  void olTier_freeTextGrandAdmiral_rendersTitleAndNoAccountMarker() throws Exception {
+    // Given: a free-text Grand Admiral (REQ-ORG-021) — a typed name for a member without an
+    // account,
+    // like every other chart field. The backend surfaces it as a synthesized
+    // OlChartDto.grandAdmiral
+    // node (no userId, a displayName); the chart renders it at the top with the "Grand Admiral"
+    // title
+    // and the free-text (no-account) marker.
+    UUID olId = UUID.randomUUID();
+    OrgChartNodeDto freeTextGa =
+        new OrgChartNodeDto(null, "OL_MEMBER", null, null, "Admiral Ohne Konto", 0, null);
+    when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
+        .thenReturn(
+            new OrgChartDto(
+                new OlChartDto(olId, "Organisationsleitung", "OL", freeTextGa, List.of()),
+                List.of(),
+                new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
+                List.of(),
+                List.of()));
+    when(backendApiClient.get(eq("/api/v1/users/lookup"), anyTypeRef()))
+        .thenReturn(List.of(Map.of("id", UUID.randomUUID().toString(), "effectiveName", "Pilot")));
+
+    String html =
+        mockMvc
+            .perform(get("/org-chart"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .as("the free-text Grand Admiral's typed name renders")
+        .contains("Admiral Ohne Konto");
+    assertThat(html).as("the Grand Admiral title renders").contains("Grand Admiral");
+    assertThat(html)
+        .as("the free-text Grand Admiral carries the no-account marker class")
+        .contains("oc-node--freetext");
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
   void freeTextHolder_admin_rendersTypedNameAndNoAccountMarker_notVacant() throws Exception {
     // Given: an OL member named on the chart who has no Basetool account yet (REQ-ORG-020) — userId
     // null but a free-text displayName. The node must render the typed name through ocNode with the

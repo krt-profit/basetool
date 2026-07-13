@@ -284,19 +284,26 @@ DE = EN). The designation is a **title only**: the holder keeps the `OL_MEMBER` 
 are **identical to any OL member** — the org-wide officer reach and CARTEL-account responsibility of
 REQ-ORG-015 are unchanged, and no authority-layer code is touched. The chart renders the Grand
 Admiral on a spine **directly beneath the OL box, above the remaining OL members** (which fan out
-below it, REQ-ORG-013), then the Bereiche.
+below it, REQ-ORG-013), then the Bereiche. Like every other person-position (REQ-ORG-020) the Grand
+Admiral may be held by **either** an account **or** a **free-text name** for a member without an
+account yet — mutually exclusive.
 
-Source of truth is a nullable `grand_admiral_user_id` on the OL org-unit row (`V215`), so the
-descriptive chart merely **mirrors** it (REQ-ROLE-006, ADR-0042) — the Grand Admiral chart node is
-an `OL_MEMBER` position surfaced with the "Grand Admiral" title, never a source of rights. Because
-the OL is a singleton tier, the single column is itself the org-wide "at most one" guarantee. In the
-read model the holder is split out of the OL members into `OlChartDto.grandAdmiral`, so it never also
-appears in `members`.
+Source of truth is the OL org-unit row (`V215`): a nullable `grand_admiral_user_id` (account) XOR a
+nullable `grand_admiral_display_name` (free-text), with `chk_org_unit_grand_admiral_holder` forbidding
+both. The descriptive chart merely **mirrors** it (REQ-ROLE-006, ADR-0042) and is never a source of
+rights. Because the OL is a singleton tier, this single column pair is itself the org-wide "at most
+one" guarantee. In the read model the holder is surfaced as `OlChartDto.grandAdmiral`: for an account
+it is the matching OL member split out of the member list (so it never also appears in `members`); a
+free-text holder is a synthesized node (no account, rendered with the "no account" marker).
 
-Appointment is **ADMIN-only** and **direct** (`PUT /api/v1/org-hierarchy/organisationsleitung/{id}/grand-admiral`):
-a user who is not yet an OL member is **auto-added** as one (`OL_MEMBER` rank) first. Vacating
-(`DELETE …/grand-admiral`) keeps the person an OL member; removing an OL member who holds the post
-vacates it. The designation set/clear is audited as `ROLE_CHANGED` with a `grandAdmiral` detail.
+Appointment is **ADMIN-only** via `PUT /api/v1/org-hierarchy/organisationsleitung/{id}/grand-admiral`,
+which takes **either** a `userId` (account) **or** a `displayName` (free-text). The account path is
+**direct**: a user who is not yet an OL member is **auto-added** as one (`OL_MEMBER` rank) first, and
+setting it clears any free-text holder. The free-text path — used by the chart editor, like every
+other field — sets the typed name and makes **no** membership change. Vacating (`DELETE …/grand-admiral`)
+clears whichever holder is set; removing an OL member who holds the post vacates it. Only the
+**account** set/clear is a membership event, audited as `ROLE_CHANGED` with a `grandAdmiral` detail;
+the free-text holder is a descriptive chart entry and is not audited.
 
 **Acceptance**
 
@@ -308,6 +315,9 @@ vacates it. The designation set/clear is audited as `ROLE_CHANGED` with a `grand
 - [ ] Removing the Grand Admiral's OL membership vacates the post (no dangling designation).
 - [ ] The holder's rights are exactly an OL member's — no `MembershipRole` / cascade / converter
   change.
+- [ ] A free-text Grand Admiral (a `displayName`, no account) renders at the top with the "no
+  account" marker, grants nothing, is editable/removable in the chart editor like other free-text
+  fields, and is superseded when an account Grand Admiral is designated.
 
 **Enforced by:** `OrgUnitMembershipServiceTest` (`setGrandAdmiral*`, `removeGrandAdmiral*`),
 `OrgChartReadService` split (via `OrgChartServiceTest`), `OrgHierarchyMigrationTest` (V215 column +

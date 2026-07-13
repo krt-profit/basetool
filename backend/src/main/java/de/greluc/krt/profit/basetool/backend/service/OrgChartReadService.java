@@ -101,26 +101,36 @@ public class OrgChartReadService {
         unitPositions.stream().collect(Collectors.groupingBy(p -> p.getOrgUnit().getId()));
 
     // OL tier at the very top (null when no OL exists, so the chart omits the tier). The Grand
-    // Admiral (REQ-ORG-021), when designated, is one of the OL members split out of the list and
-    // surfaced above the rest; its holder keeps the OL_MEMBER rank, so rights are unaffected.
+    // Admiral (REQ-ORG-021) is surfaced above the rest of the OL. It is held by EITHER an account
+    // (an OL member split out of the member list — keeps the OL_MEMBER rank, so rights are
+    // unaffected) OR a free-text name for a member without an account (a synthesized node that
+    // grants
+    // nothing, like every other free-text holder) — the two are mutually exclusive.
     OlChartDto olTier = null;
     if (ol != null) {
       List<OrgChartNodeDto> olMembers =
           nodesOfType(
               positionsByUnit.getOrDefault(ol.getId(), List.of()), OrgChartPositionType.OL_MEMBER);
-      UUID grandAdmiralUserId =
-          ol instanceof Organisationsleitung olEntity ? olEntity.getGrandAdmiralUserId() : null;
-      OrgChartNodeDto grandAdmiral =
-          grandAdmiralUserId == null
-              ? null
-              : olMembers.stream()
-                  .filter(node -> grandAdmiralUserId.equals(node.userId()))
-                  .findFirst()
-                  .orElse(null);
-      List<OrgChartNodeDto> members =
-          grandAdmiral == null
-              ? olMembers
-              : olMembers.stream().filter(node -> !node.equals(grandAdmiral)).toList();
+      Organisationsleitung olEntity = ol instanceof Organisationsleitung o ? o : null;
+      UUID grandAdmiralUserId = olEntity == null ? null : olEntity.getGrandAdmiralUserId();
+      String grandAdmiralName = olEntity == null ? null : olEntity.getGrandAdmiralDisplayName();
+      OrgChartNodeDto grandAdmiral = null;
+      List<OrgChartNodeDto> members = olMembers;
+      if (grandAdmiralUserId != null) {
+        OrgChartNodeDto account =
+            olMembers.stream()
+                .filter(node -> grandAdmiralUserId.equals(node.userId()))
+                .findFirst()
+                .orElse(null);
+        if (account != null) {
+          grandAdmiral = account;
+          members = olMembers.stream().filter(node -> !node.equals(account)).toList();
+        }
+      } else if (grandAdmiralName != null) {
+        grandAdmiral =
+            new OrgChartNodeDto(
+                null, OrgChartPositionType.OL_MEMBER, null, null, grandAdmiralName, 0, null);
+      }
       olTier = new OlChartDto(ol.getId(), ol.getName(), ol.getShorthand(), grandAdmiral, members);
     }
 

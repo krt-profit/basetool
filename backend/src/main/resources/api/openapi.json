@@ -5695,7 +5695,7 @@
       "put" : {
         "tags" : [ "org-hierarchy-controller" ],
         "summary" : "Designate the Grand Admiral",
-        "description" : "Designates the single OL member rendered at the top of the Organisationsleitung (REQ-ORG-021). The holder keeps OL-member rights; auto-adds OL membership when needed. ADMIN-only.",
+        "description" : "Designates the single Grand Admiral rendered at the top of the Organisationsleitung (REQ-ORG-021). Supply either a userId (an account holder, kept with OL-member rights, auto-adds OL membership) or a displayName (a free-text holder for a member without an account, grants nothing) — mutually exclusive. ADMIN-only.",
         "operationId" : "setGrandAdmiral",
         "parameters" : [ {
           "name" : "id",
@@ -5710,7 +5710,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/AddOlMemberRequest"
+                "$ref" : "#/components/schemas/GrandAdmiralRequest"
               }
             }
           },
@@ -52022,15 +52022,19 @@
         },
         "required" : [ "limit" ]
       },
-      "AddOlMemberRequest" : {
+      "GrandAdmiralRequest" : {
         "type" : "object",
         "properties" : {
           "userId" : {
             "type" : "string",
             "format" : "uuid"
+          },
+          "displayName" : {
+            "type" : "string",
+            "maxLength" : 120,
+            "minLength" : 0
           }
-        },
-        "required" : [ "userId" ]
+        }
       },
       "OrgChartPositionUpdateRequest" : {
         "type" : "object",
@@ -54949,6 +54953,16 @@
           }
         },
         "required" : [ "name", "shorthand" ]
+      },
+      "AddOlMemberRequest" : {
+        "type" : "object",
+        "properties" : {
+          "userId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        },
+        "required" : [ "userId" ]
       },
       "OlMemberResponse" : {
         "type" : "object",

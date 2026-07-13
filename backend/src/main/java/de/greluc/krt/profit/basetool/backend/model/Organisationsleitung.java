@@ -65,6 +65,19 @@ public class Organisationsleitung extends OrgUnit {
   private UUID grandAdmiralUserId;
 
   /**
+   * The free-text name of the OL member holding the Grand Admiral post when that member has no
+   * Basetool account yet (REQ-ORG-020/-021), or {@code null}. Mutually exclusive with {@link
+   * #grandAdmiralUserId} (a Grand Admiral is either an account or a typed name, never both —
+   * enforced by {@code chk_org_unit_grand_admiral_holder}, V215): set in the chart editor and, like
+   * every free-text holder, grants nothing. Cleared when an account Grand Admiral is designated
+   * under Leitung.
+   */
+  @Getter
+  @Setter
+  @Column(name = "grand_admiral_display_name", columnDefinition = "TEXT")
+  private String grandAdmiralDisplayName;
+
+  /**
    * No-arg constructor required by JPA. Forces the inherited {@link OrgUnit#isPromotionEnabled}
    * flag to {@code false} before Hibernate flushes the row, keeping the transient state aligned
    * with the {@code chk_org_unit_promotion_only_squadron} CHECK.

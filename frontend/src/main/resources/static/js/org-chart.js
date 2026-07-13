@@ -294,6 +294,23 @@
             return;
         }
 
+        // The free-text Grand Admiral (REQ-ORG-021) lives on the OL row, not as a position, so it
+        // goes through the OL grand-admiral endpoint with a typed name (reusing the Leitung proxy).
+        if (mode === 'grandAdmiral') {
+            const gaName = field('oc-display-name').trim();
+            if (!gaName) {
+                window.showFrontendErrorToast(OC_I18N.displayNameRequired);
+                return;
+            }
+            const olId = encodeURIComponent(field('oc-org-unit-id'));
+            send(
+                'PUT',
+                '/organisation/leitung/organisationsleitung/' + olId + '/grand-admiral/ajax',
+                { displayName: gaName },
+            );
+            return;
+        }
+
         // The chart editor only ever sets a free-text holder now (accounts are mirror-only,
         // REQ-ROLE-006); a backend reject is the backstop if a userId ever reaches it.
         const userOptional = field('oc-user-optional') === '1';
@@ -366,6 +383,34 @@
         window.krtEvents.on('click', 'oc-add-staff', function (btn) {
             lastTrigger = btn;
             openModal('create', { staffChoice: true });
+        });
+
+        // Grand Admiral (REQ-ORG-021): add / rename a free-text holder (a typed name), like every
+        // other chart field. The account Grand Admiral is managed under Leitung and stays read-only.
+        window.krtEvents.on('click', 'oc-ga-add', function (btn) {
+            lastTrigger = btn;
+            openModal('grandAdmiral', {
+                orgUnitId: btn.getAttribute('data-org-unit-id'),
+                rankLabel: btn.getAttribute('data-rank-label'),
+                displayName: btn.getAttribute('data-display-name'),
+            });
+        });
+
+        window.krtEvents.on('click', 'oc-ga-remove', function (btn) {
+            window
+                .showKrtConfirm(OC_I18N.removeConfirmTitle, OC_I18N.removeConfirm)
+                .then(function (ok) {
+                    if (ok) {
+                        const olId = encodeURIComponent(btn.getAttribute('data-org-unit-id'));
+                        send(
+                            'DELETE',
+                            '/organisation/leitung/organisationsleitung/' +
+                                olId +
+                                '/grand-admiral/ajax',
+                            null,
+                        );
+                    }
+                });
         });
 
         window.krtEvents.on('click', 'oc-reassign', function (btn) {

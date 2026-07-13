@@ -699,6 +699,22 @@ class OrgUnitMembershipServiceTest {
         .record(eq(AuditEventType.ROLE_CHANGED), eq(olId), any(), eq(userId), any());
   }
 
+  @Test
+  void setGrandAdmiralFreeText_setsTrimmedNameAndSupersedesAccount() {
+    UUID olId = UUID.randomUUID();
+    Organisationsleitung ol = new Organisationsleitung();
+    ol.setId(olId);
+    ol.setGrandAdmiralUserId(userId); // was an account Grand Admiral
+    when(orgUnitRepository.findById(olId)).thenReturn(Optional.of(ol));
+
+    membershipService.setGrandAdmiralFreeText(olId, "  Admiral ohne Account  ");
+
+    assertEquals("Admiral ohne Account", ol.getGrandAdmiralDisplayName());
+    assertNull(ol.getGrandAdmiralUserId());
+    // Free-text is a descriptive chart entry: no membership write (REQ-ORG-021).
+    verify(membershipRepository, never()).saveAndFlush(any());
+  }
+
   // --- assign/remove squadron rank (epic #800 Phase 3) ----------------------
 
   /** A Staffel membership row for {@link #userId} on the given squadron with the given rank. */

@@ -13,7 +13,7 @@
   Roving tabindex + arrow-key navigation is managed by the inline page JS, so every node starts at
   tabindex="-1".
 -->
-<div th:fragment="ocNodeLabeled(node, level, rankKey)" class="oc-node" th:if="${node != null}"
+<div th:fragment="ocNodeLabeled(node, level, rankKey, editable)" class="oc-node" th:if="${node != null}"
      th:with="rk=${rankKey},
               freeText=${node.userId() == null and node.displayName() != null},
               nm=${node.userName() != null ? node.userName() : node.displayName()},
@@ -26,8 +26,10 @@
     <span class="oc-node-flag" th:if="${freeText}" th:text="${noAcc}"
           th:title="#{orgChart.noAccount.hint}">Kein Account</span>
     <!-- Account-held seats mirror a functional rank (epic #800, REQ-ROLE-006) and are read-only
-         here — managed under Organisation -> Leitung. Only free-text holders keep edit/remove. -->
-    <div class="oc-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:if="${node.userId() == null}">
+         here — managed under Organisation -> Leitung. Only free-text holders keep edit/remove, and
+         only when `editable` (the Grand Admiral node suppresses these and uses its own OL-level
+         controls, since it lives on the OL row, not as a position — REQ-ORG-021). -->
+    <div class="oc-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:if="${editable and node.userId() == null}">
         <button type="button" class="oc-icon-btn" data-trigger="oc-reassign"
                 th:data-position-id="${node.positionId()}"
                 th:data-version="${node.version()}"
@@ -57,7 +59,7 @@
   title, so org-chart.html calls ocNodeLabeled(..., 'orgChart.rank.GRAND_ADMIRAL').
 -->
 <th:block th:fragment="ocNode(node, level)"
-          th:replace="~{fragments/org-chart-node :: ocNodeLabeled(${node}, ${level}, ${node == null ? '' : 'orgChart.rank.' + node.positionType()})}"></th:block>
+          th:replace="~{fragments/org-chart-node :: ocNodeLabeled(${node}, ${level}, ${node == null ? '' : 'orgChart.rank.' + node.positionType()}, true)}"></th:block>
 
 <!--
   One Bereich subtree (epic #692): its caption, then its own ARIA tree — the Bereichsleiter (the

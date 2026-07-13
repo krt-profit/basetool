@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.model.Organisationsleitung;
 import de.greluc.krt.profit.basetool.backend.model.dto.AddBereichLeaderRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.AddOlMemberRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BereichDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.GrandAdmiralRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitNodeDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitParentUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrganisationsleitungDto;
@@ -282,12 +283,18 @@ public class OrgHierarchyController {
   @Operation(
       summary = "Designate the Grand Admiral",
       description =
-          "Designates the single OL member rendered at the top of the Organisationsleitung"
-              + " (REQ-ORG-021). The holder keeps OL-member rights; auto-adds OL membership when"
-              + " needed. ADMIN-only.")
+          "Designates the single Grand Admiral rendered at the top of the Organisationsleitung"
+              + " (REQ-ORG-021). Supply either a userId (an account holder, kept with OL-member"
+              + " rights, auto-adds OL membership) or a displayName (a free-text holder for a"
+              + " member without an account, grants nothing) — mutually exclusive. ADMIN-only.")
   public void setGrandAdmiral(
-      @PathVariable @NotNull UUID id, @RequestBody @Valid AddOlMemberRequest request) {
-    orgUnitMembershipService.setGrandAdmiral(id, request.userId());
+      @PathVariable @NotNull UUID id, @RequestBody @Valid GrandAdmiralRequest request) {
+    if (request.userId() != null) {
+      orgUnitMembershipService.setGrandAdmiral(id, request.userId());
+    } else {
+      orgUnitMembershipService.setGrandAdmiralFreeText(
+          id, request.displayName() == null ? "" : request.displayName());
+    }
   }
 
   /**

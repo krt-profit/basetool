@@ -77,14 +77,38 @@
                         <span class="sh" th:text="${ol.shorthand()}">OL</span>
                         <span class="nm" th:text="${ol.name()}">Organisationsleitung</span>
                     </div>
-                    <!-- Grand Admiral (REQ-ORG-021): the single OL member holding the post, on a spine
-                         directly under the OL box and above the other members — an OL_MEMBER position
-                         rendered with the "Grand Admiral" title via the explicit label key. When the
-                         post is vacant the OL box connects straight to the member fan below. -->
+                    <!-- Grand Admiral (REQ-ORG-021): the single Grand Admiral on a spine directly under
+                         the OL box, above the other members. Held by an account (kept with OL-member
+                         rights, managed under Leitung, read-only here) OR a free-text name (like every
+                         other chart field, editable here). The node suppresses the generic position
+                         actions (editable=false) and carries its own OL-level controls, since the Grand
+                         Admiral lives on the OL row, not as a position. When vacant the OL box connects
+                         straight to the member fan below. -->
                     <th:block th:if="${ol.grandAdmiral() != null}">
                         <div class="oc-v"></div>
-                        <th:block th:replace="~{fragments/org-chart-node :: ocNodeLabeled(${ol.grandAdmiral()}, 2, 'orgChart.rank.GRAND_ADMIRAL')}"></th:block>
+                        <th:block th:replace="~{fragments/org-chart-node :: ocNodeLabeled(${ol.grandAdmiral()}, 2, 'orgChart.rank.GRAND_ADMIRAL', false)}"></th:block>
+                        <div class="oc-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
+                             th:if="${ol.grandAdmiral().userId() == null}">
+                            <button type="button" class="oc-icon-btn" data-trigger="oc-ga-add"
+                                    th:data-org-unit-id="${ol.orgUnitId()}"
+                                    th:data-display-name="${ol.grandAdmiral().displayName()}"
+                                    th:data-rank-label="#{orgChart.rank.GRAND_ADMIRAL}"
+                                    th:title="#{orgChart.reassign}" th:aria-label="#{orgChart.reassign}">
+                                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"></use></svg>
+                            </button>
+                            <button type="button" class="oc-icon-btn oc-icon-btn--danger" data-trigger="oc-ga-remove"
+                                    th:data-org-unit-id="${ol.orgUnitId()}"
+                                    th:title="#{orgChart.remove}" th:aria-label="#{orgChart.remove}">
+                                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"></use></svg>
+                            </button>
+                        </div>
                     </th:block>
+                    <!-- Add a free-text Grand Admiral when the post is vacant (edit mode, admins). -->
+                    <button type="button" class="oc-add" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
+                            th:if="${ol.grandAdmiral() == null}"
+                            data-trigger="oc-ga-add" th:data-org-unit-id="${ol.orgUnitId()}"
+                            th:data-rank-label="#{orgChart.rank.GRAND_ADMIRAL}"
+                            th:text="#{orgChart.add.grandAdmiral}">Grand Admiral hinzuf&#252;gen</button>
                     <!-- OL Stab (members) fan out side by side beneath the OL box (level 2) — the same
                          horizontal peer grouping the Staffeln/SKs use under a Staffelleiter, so the OL
                          members read as peers rather than a vertical spine. Guarded so an empty OL
