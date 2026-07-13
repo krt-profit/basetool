@@ -543,6 +543,10 @@ services:
     networks:
       - net-monitoring-core
       - net-monitoring-scrape
+      # Dedicated IPv6 egress (net-blackbox-v6, defined below): the other two nets are IPv4-only, so the
+      # ip6-pinned probes need this to reach the edge over v6 — makes EdgeIpv6Unreachable a true signal
+      # instead of a structural false positive (issue #1252).
+      - net-blackbox-v6
 
 networks:
   # Shared boundary net, created and owned by the app stack (docker-compose.yml); referenced here by
@@ -567,6 +571,22 @@ networks:
     name: net-docker-proxy
     driver: bridge
     internal: true
+  # Dedicated IPv6 egress net for blackbox-exporter ONLY (issue #1252). The two nets it otherwise
+  # joins — net-monitoring-core (here) and the external net-monitoring-scrape — are both IPv4-only, so
+  # the container had NO v6 route: every ip6-pinned probe (http_2xx_ipv6 / http_2xx_or_401_ipv6, no v4
+  # fallback) CONNECT-failed -> probe_success=0 -> a STRUCTURALLY false EdgeIpv6Unreachable, even though
+  # the public edge answers fine over IPv6 (host has working v6; the vhosts carry AAAA). This net gives
+  # the exporter real v6 egress so the probe tests the actual edge and the alert becomes a true signal.
+  # ULA subnet (RFC 4193); egress works via the host's global IPv6 + Docker's IPv6 masquerade for the
+  # private range (auto on Docker 27+, no /etc/docker/daemon.json change needed — verified http=200 from
+  # a throwaway container on such a net). Blackbox-only, keeping the v6 surface minimal.
+  net-blackbox-v6:
+    name: net-blackbox-v6
+    driver: bridge
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: fd00:bb::/64
   # App-owned data nets (created by docker-compose.yml), referenced so the exporters reach the
   # DBs/Redis without putting them on the broad scrape net.
   net-db-backend:

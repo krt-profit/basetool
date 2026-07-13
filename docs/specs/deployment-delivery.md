@@ -242,8 +242,18 @@ though the on-disk file was already correct) could not have persisted. On a Prom
 `deploy.sh` stamps `basetool_monitoring_config_applied_timestamp{component="prometheus"}`, which backs
 the `PrometheusConfigStale` alert (REQ-OBS-014). The reconcile is best-effort and **never gates** the
 deploy — a stopped monitoring service or a failed recreate only logs — and force-recreates only on an
-actual content change (config edits are rare, so the brief scrape gap is negligible). It is a no-op
-on a host without the monitoring stack (`IRI_MONITORING_ENABLED` unset).
+actual content change (config edits are rare, so the brief scrape gap is negligible). A host that runs
+the monitoring stack **must** set `IRI_MONITORING_ENABLED=true` (a systemd drop-in on the `iri-deploy`
+service — `/etc/systemd/system/iri-deploy.service.d/monitoring.conf` with
+`Environment=IRI_MONITORING_ENABLED=true`, then `systemctl daemon-reload`). If the stack is running but
+the flag is unset the reconcile gates itself off, yet the config-bundle rsync keeps rewriting
+`monitoring/**` on disk every tick — so on-disk rule/scrape changes silently never reach the running
+Prometheus (the 2026-07-13 drift). `PrometheusConfigStale` cannot catch that: its applied-stamp series
+is written only from inside the gated reconcile, so the same condition disables both the reconcile and
+its alarm. `deploy.sh` therefore logs a per-tick WARN and emits
+`basetool_monitoring_reconcile_disabled{component="deploy"}` = 1 on its own textfile path, backing the
+`MonitoringReconcileDisabled` alert (REQ-OBS-014). On a host with no monitoring stack running at all the
+reconcile is a silent no-op — nothing scrapes the textfile there anyway.
 
 **Acceptance**
 
@@ -253,6 +263,9 @@ on a host without the monitoring stack (`IRI_MONITORING_ENABLED` unset).
   last applied snapshot force-recreates Prometheus — including on the converged no-op fast-exit —
   without pulling or re-applying the app stack; a component whose on-disk config already matches its
   snapshot is left untouched, and the reconcile never gates the deploy.
+- [ ] On a host running the monitoring stack with `IRI_MONITORING_ENABLED` unset, every tick logs a
+  WARN and emits `basetool_monitoring_reconcile_disabled{component="deploy"} == 1` (the
+  `MonitoringReconcileDisabled` signal); with the flag set, the gauge is `0` and the reconcile runs.
 - [ ] A matching marker over a container running a non-target image digest, an
   unhealthy/restarting container, or a missing container triggers a logged drift re-apply of
   the same digest set.

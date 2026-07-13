@@ -94,9 +94,11 @@
                     <summary th:text="#{nav.section.organisation}">Organisation</summary>
                     <div class="sidebar-sublinks">
                         <a th:href="@{/org-chart}" data-testid="nav-org-chart" th:text="#{nav.orgChart}">Organigramm</a>
-                        <!-- Leitung: appointment surface, so officer-tier only (OL/Bereich/SK leads carry
-                             the OFFICER Keycloak role); matches LeitungPageController's @PreAuthorize. -->
-                        <a th:href="@{/organisation/leitung}" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).MISSION_MANAGER)" data-testid="nav-leitung" th:text="#{nav.leitung}">Leitung</a>
+                        <!-- Leitung: appointment surface, ADMIN/OFFICER only. Every functional leader
+                             (OL, Bereich, SK, Staffelleitung + in-Kommando ranks) carries the operative
+                             OFFICER Keycloak role, so none is locked out; matches LeitungPageController's
+                             @PreAuthorize(Roles.ADMIN_OR_OFFICER). -->
+                        <a th:href="@{/organisation/leitung}" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)" data-testid="nav-leitung" th:text="#{nav.leitung}">Leitung</a>
                         <!-- Org-Einheits-Bank: reachable by any KRT member (the CARTEL account is visible
                              to all, REQ-BANK-037, and a member may hold a view grant). Mirror the
                              member-or-above gate of OrgUnitBankPageController so the link is not hidden
