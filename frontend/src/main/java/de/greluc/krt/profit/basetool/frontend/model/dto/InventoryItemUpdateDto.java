@@ -21,7 +21,13 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 import java.util.UUID;
 
-/** Data transfer record carrying Inventory Item Update payload. */
+/**
+ * Data transfer record carrying Inventory Item Update payload.
+ *
+ * <p>The trailing {@code mergeStock} field is the per-action stock-merge opt-in (REQ-INV-026):
+ * honoured only for an {@code SCU} material (a {@code PIECE} edit always merges); {@code
+ * null}/{@code false} keeps the row separate.
+ */
 public record InventoryItemUpdateDto(
     UUID materialId,
     UUID locationId,
@@ -30,4 +36,5 @@ public record InventoryItemUpdateDto(
     Boolean personal,
     UUID jobOrderId,
     UUID missionId,
-    Long version) {}
+    Long version,
+    Boolean mergeStock) {}

@@ -126,7 +126,8 @@ public class InventoryWriteController {
               form.getPersonal(),
               form.getMissionId(),
               form.getJobOrderId(),
-              form.getOwningOrgUnitId());
+              form.getOwningOrgUnitId(),
+              form.getMergeStock());
       backendApiClient.post("/api/v1/inventory", request, InventoryItemDto.class);
       redirectAttributes.addFlashAttribute("successToast", "success.inventory.add");
     } catch (BackendServiceException e) {
@@ -189,7 +190,8 @@ public class InventoryWriteController {
               form.getPersonal(),
               form.getMissionId(),
               form.getJobOrderId(),
-              form.getOwningOrgUnitId());
+              form.getOwningOrgUnitId(),
+              form.getMergeStock());
       backendApiClient.post("/api/v1/inventory", request, InventoryItemDto.class);
       return org.springframework.http.ResponseEntity.ok(
           java.util.Map.of("targetUrl", inventorySourceTarget(form.getSource())));
@@ -293,7 +295,8 @@ public class InventoryWriteController {
               form.getTerminal(),
               form.getSellAmount(),
               form.getVersion(),
-              form.getTargetOwningOrgUnitId());
+              form.getTargetOwningOrgUnitId(),
+              form.getMergeStock());
       backendApiClient.post("/api/v1/inventory/" + id + "/book-out", request, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "success.inventory.bookout");
     } catch (BackendServiceException e) {

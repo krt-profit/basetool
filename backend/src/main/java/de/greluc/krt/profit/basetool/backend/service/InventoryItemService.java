@@ -471,7 +471,12 @@ public class InventoryItemService {
             .with("personal", item.getPersonal())
             .with("jobOrder", InventoryAuditLabels.jobOrderRef(item))
             .with("mission", item.getMission() != null ? item.getMission().getName() : "-"));
-    return inventoryItemMapper.toDto(saved);
+    // Stock merge (REQ-INV-026): a PIECE row is folded into a matching stack unconditionally; an
+    // SCU row only when the caller ticked the per-action opt-in. Returns the surviving row.
+    InventoryItem merged =
+        inventoryCheckoutService.mergeStockIfRequested(
+            saved, Boolean.TRUE.equals(dto.mergeStock()));
+    return inventoryItemMapper.toDto(merged);
   }
 
   /**
@@ -560,7 +565,15 @@ public class InventoryItemService {
             .with("personal", item.getPersonal())
             .with("jobOrder", InventoryAuditLabels.jobOrderRef(item))
             .with("mission", item.getMission() != null ? item.getMission().getName() : "-"));
-    return inventoryItemMapper.toDto(saved);
+    // Ratchet any active Materialbörse offer on this row down to the (possibly reduced) amount
+    // (REQ-MARKET-013); an increase is a no-op.
+    inventoryCheckoutService.clampOffersToStock(saved.getId(), saved.getAmount());
+    // Stock merge (REQ-INV-026): an edit that makes the row match an existing stack folds them —
+    // PIECE unconditionally, SCU only on the per-action opt-in. Returns the surviving row.
+    InventoryItem merged =
+        inventoryCheckoutService.mergeStockIfRequested(
+            saved, Boolean.TRUE.equals(dto.mergeStock()));
+    return inventoryItemMapper.toDto(merged);
   }
 
   /**

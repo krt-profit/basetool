@@ -625,6 +625,12 @@ function openUmbuchenModal(id, amount, version, materialId, userId, locationId, 
     const amountHint = document.getElementById('umbuchen-amount-scu-hint');
     if (targetHint) targetHint.classList.toggle('krtm-hidden', !isScu);
     if (amountHint) amountHint.classList.toggle('krtm-hidden', !isScu);
+    // REQ-INV-026: the per-action stock-merge opt-in is offered only for an SCU material (a PIECE
+    // transfer always merges server-side). Reset it on every open.
+    const mergeRow = document.getElementById('umbuchenMergeRow');
+    const mergeCheckbox = document.getElementById('umbuchenMergeStock');
+    if (mergeCheckbox) mergeCheckbox.checked = false;
+    if (mergeRow) mergeRow.classList.toggle('krtm-hidden', !isScu);
     amountEl.value = amount;
     amountEl.max = amount;
     targetEl.value = 0;
@@ -660,6 +666,8 @@ function submitUmbuchen(event) {
         ? window.krtScuInput.parse(amountEl.value)
         : parseFloat(amountEl.value);
     const submitBtn = document.getElementById('umbuchenSubmitBtn');
+    // REQ-INV-026: per-action stock-merge opt-in (only rendered for SCU; PIECE always merges).
+    const mergeCheckbox = document.getElementById('umbuchenMergeStock');
     const payload = {
         amount: amount,
         type: 'TRANSFER',
@@ -668,6 +676,7 @@ function submitUmbuchen(event) {
         targetOwningOrgUnitId:
             document.getElementById('umbuchenTargetOwningOrgUnitId').value || null,
         version: parseInt(document.getElementById('umbuchenVersion').value, 10),
+        mergeStock: !!(mergeCheckbox && mergeCheckbox.checked),
     };
     umbuchenInFlight = true;
     if (submitBtn) submitBtn.disabled = true;

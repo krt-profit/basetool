@@ -29,6 +29,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -166,6 +167,51 @@ public interface MaterialExchangeOfferRepository
   Set<UUID> findInventoryItemIdsWithStatus(
       @Param("status") MaterialExchangeOfferStatus status,
       @Param("inventoryItemIds") Collection<UUID> inventoryItemIds);
+
+  /**
+   * Whether the given Lager row currently backs <em>any</em> Materialbörse offer, regardless of
+   * status. The write-time stock merge (REQ-INV-026) consults this to leave offer-backed rows out
+   * of a merge entirely: the {@code inventory_item} FK is {@code ON DELETE CASCADE} (V210), so
+   * folding (and deleting) such a row would silently destroy the offer, and even a surviving
+   * offer-backed row must stay separate so the board's offered quantity is never changed by a
+   * merge. Any status counts (not just {@code ACTIVE}) because the cascade fires irrespective of
+   * status.
+   *
+   * @param inventoryItemId the Lager row to check.
+   * @return {@code true} iff at least one offer references that row.
+   */
+  boolean existsByInventoryItemId(UUID inventoryItemId);
+
+  /**
+   * Ratchets the stored {@code offeredAmount} of the active offer on a Lager row down to the row's
+   * current stock when the stock drops below it (REQ-MARKET-013): a book-out, transfer, rebooking
+   * or handover that reduces the backing row and leaves the offered quantity no longer covered
+   * persists the reduction, so a later stock <em>increase</em> does not silently re-expand the
+   * offer (offering more stays an explicit owner decision). This is the persisting counterpart to
+   * the display-time clamp-on-read (ADR-0086): the board already never advertises more than is in
+   * stock, but without this the stored value would recover on a subsequent increase.
+   *
+   * <p>Conditional and atomic: only rows where {@code offered_amount > :stock} are touched (an
+   * increase is a no-op), and only {@code ACTIVE} material offers (an item offer carries a {@code
+   * null} {@code offered_amount} and never matches). Runs in the caller's decrement transaction so
+   * the clamp commits with the stock reduction. The offer's {@code @Version} is intentionally left
+   * untouched — a concurrent owner edit is guarded independently by the release/edit {@code
+   * offeredAmount <= current stock} validation.
+   *
+   * @param itemId the backing Lager row whose active offer to clamp.
+   * @param stock the row's new (reduced) stock the offer must not exceed.
+   * @return the number of offers clamped (0 or 1).
+   */
+  @Modifying
+  @Query(
+      """
+      UPDATE MaterialExchangeOffer o SET o.offeredAmount = :stock
+      WHERE o.inventoryItem.id = :itemId
+        AND o.status = de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus.ACTIVE
+        AND o.offeredAmount IS NOT NULL
+        AND o.offeredAmount > :stock
+      """)
+  int clampOfferedAmountToStock(@Param("itemId") UUID itemId, @Param("stock") double stock);
 
   /**
    * Counts offers in the given status across the whole board — the "Alle Angebote" tab count and

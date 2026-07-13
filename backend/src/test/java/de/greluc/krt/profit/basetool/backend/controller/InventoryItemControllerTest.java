@@ -333,7 +333,7 @@ class InventoryItemControllerTest {
     UUID locationId = UUID.randomUUID();
     InventoryItemCreateDto createDto =
         new InventoryItemCreateDto(
-            null, materialId, locationId, 750, 25.0, false, null, null, null);
+            null, materialId, locationId, 750, 25.0, false, null, null, null, null);
     InventoryItemDto persisted = inventoryItem(UUID.randomUUID());
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
@@ -362,6 +362,7 @@ class InventoryItemControllerTest {
             false,
             null,
             null,
+            null,
             null);
     InventoryItemDto persisted = inventoryItem(UUID.randomUUID());
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
@@ -384,7 +385,7 @@ class InventoryItemControllerTest {
     UUID ownerId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
     InventoryItemBookOutDto bookOutDto =
-        new InventoryItemBookOutDto(5.0, null, null, null, null, null, 1L, null);
+        new InventoryItemBookOutDto(5.0, null, null, null, null, null, 1L, null, null);
     InventoryItemDto persisted = inventoryItem(itemId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
@@ -404,7 +405,7 @@ class InventoryItemControllerTest {
     UUID ownerId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
     InventoryItemBookOutDto bookOutDto =
-        new InventoryItemBookOutDto(25.0, null, null, null, null, null, 1L, null);
+        new InventoryItemBookOutDto(25.0, null, null, null, null, null, 1L, null, null);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
     when(inventoryItemService.bookOutInventoryItem(itemId, bookOutDto, ownerId, true))
@@ -429,7 +430,7 @@ class InventoryItemControllerTest {
     UUID ownerId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
     InventoryItemPersonalRebookDto rebookDto =
-        new InventoryItemPersonalRebookDto(4.0, 1L, UUID.randomUUID());
+        new InventoryItemPersonalRebookDto(4.0, 1L, UUID.randomUUID(), null);
     InventoryItemDto persisted = inventoryItem(itemId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
@@ -449,7 +450,8 @@ class InventoryItemControllerTest {
     Jwt jwt = jwt("alice-sub");
     UUID ownerId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
-    InventoryItemPersonalRebookDto rebookDto = new InventoryItemPersonalRebookDto(2.0, 3L, null);
+    InventoryItemPersonalRebookDto rebookDto =
+        new InventoryItemPersonalRebookDto(2.0, 3L, null, null);
     InventoryItemDto persisted = inventoryItem(itemId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
@@ -573,7 +575,7 @@ class InventoryItemControllerTest {
     UUID itemId = UUID.randomUUID();
     InventoryItemUpdateDto updateDto =
         new InventoryItemUpdateDto(
-            UUID.randomUUID(), UUID.randomUUID(), 800, 12.0, false, null, null, 1L);
+            UUID.randomUUID(), UUID.randomUUID(), 800, 12.0, false, null, null, 1L, null);
     InventoryItemDto persisted = inventoryItem(itemId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
@@ -593,7 +595,7 @@ class InventoryItemControllerTest {
     UUID itemId = UUID.randomUUID();
     InventoryItemUpdateDto updateDto =
         new InventoryItemUpdateDto(
-            UUID.randomUUID(), UUID.randomUUID(), 800, 12.0, false, null, null, 1L);
+            UUID.randomUUID(), UUID.randomUUID(), 800, 12.0, false, null, null, 1L, null);
     InventoryItemDto persisted = inventoryItem(itemId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     when(authHelperService.isLogisticianOrAbove()).thenReturn(false);

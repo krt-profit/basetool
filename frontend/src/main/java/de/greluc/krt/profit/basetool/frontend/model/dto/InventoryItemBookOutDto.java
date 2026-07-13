@@ -30,7 +30,9 @@ import java.util.UUID;
  *
  * <p>R5.d.g added the trailing {@code targetOwningOrgUnitId} picker output. Only honoured for
  * {@link CheckoutType#TRANSFER}; ignored for {@link CheckoutType#DISCARD} and {@link
- * CheckoutType#SELL}.
+ * CheckoutType#SELL}. The final {@code mergeStock} field is the per-action stock-merge opt-in
+ * (REQ-INV-026) for the {@code TRANSFER} target: honoured only for an {@code SCU} material (a
+ * {@code PIECE} transfer always merges); {@code null}/{@code false} keeps the new row separate.
  */
 public record InventoryItemBookOutDto(
     @NotNull @Min(0) Double amount,
@@ -40,4 +42,5 @@ public record InventoryItemBookOutDto(
     String terminal,
     @Min(0) BigDecimal sellAmount,
     @NotNull Long version,
-    UUID targetOwningOrgUnitId) {}
+    UUID targetOwningOrgUnitId,
+    Boolean mergeStock) {}

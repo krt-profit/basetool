@@ -123,7 +123,15 @@
                     <label for="personal" th:text="#{inventory.personal.label}" class="krtm-margin-0-display-inline-block-00ba">Als persönlicher Eintrag markieren</label>
                     <span class="krtm-font-size-0-8rem-color-var-color-gray-2-marg-f610" th:text="#{inventory.personal.help}">Dieser Eintrag ist nur für dich sichtbar und taucht nicht im globalen Lager auf.</span>
                 </div>
-                
+
+                <!-- REQ-INV-026: per-action stock-merge opt-in. Shown by inventory-input.js only for an
+                     SCU material (a PIECE book-in always merges, so no choice is offered). -->
+                <div class="form-group krtm-display-flex-align-items-center-gap-0-5rem-m-c9b5 krtm-hidden" id="merge-stock-row">
+                    <input type="checkbox" id="mergeStock" th:field="*{mergeStock}" class="krtm-width-auto-margin-0-5449">
+                    <label for="mergeStock" th:text="#{inventory.merge.label}" class="krtm-margin-0-display-inline-block-00ba">Mit vorhandenem Bestand zusammenführen</label>
+                    <span class="krtm-font-size-0-8rem-color-var-color-gray-2-marg-f610" th:text="#{inventory.merge.help}">Fügt diese Menge mit vorhandenem, gleichartigem Bestand zu einem Eintrag zusammen. Gilt nur für diese Buchung.</span>
+                </div>
+
                 <div class="mt-2-flex-gap">
                     <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{general.save}">Speichern</span></button>
                     <a th:href="@{/inventory}" data-trigger="history-back" class="btn btn-ghost krtm-text-align-center-display-flex-align-items-c-a651" th:text="#{general.cancel}">Abbrechen</a>

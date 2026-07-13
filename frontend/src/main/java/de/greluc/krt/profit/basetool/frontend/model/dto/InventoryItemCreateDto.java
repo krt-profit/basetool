@@ -29,7 +29,9 @@ import java.util.UUID;
  *
  * <p>The trailing {@code owningOrgUnitId} field is the R5.d picker output: when non-null, the
  * backend stamps the new inventory row onto the picked org unit instead of the target user's home
- * Staffel. {@code null} preserves the legacy stamping path.
+ * Staffel. {@code null} preserves the legacy stamping path. The final {@code mergeStock} field is
+ * the per-action stock-merge opt-in (REQ-INV-026): honoured only for an {@code SCU} material (a
+ * {@code PIECE} book-in always merges); {@code null}/{@code false} keeps the row separate.
  */
 public record InventoryItemCreateDto(
     UUID userId,
@@ -40,4 +42,5 @@ public record InventoryItemCreateDto(
     Boolean personal,
     UUID missionId,
     UUID jobOrderId,
-    UUID owningOrgUnitId) {}
+    UUID owningOrgUnitId,
+    Boolean mergeStock) {}

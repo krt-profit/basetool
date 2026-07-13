@@ -49,6 +49,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebo
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
@@ -93,6 +94,7 @@ class InventoryItemServicePersonalRebookTest {
   @Mock private MissionRepository missionRepository;
   @Mock private MissionFinanceEntryRepository missionFinanceEntryRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
+  @Mock private MaterialExchangeOfferRepository materialExchangeOfferRepository;
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private MaterialMapper materialMapper;
   @Mock private OwnerScopeService ownerScopeService;
@@ -459,7 +461,7 @@ class InventoryItemServicePersonalRebookTest {
    */
   private static InventoryItemPersonalRebookDto dto(
       Double amount, Long version, UUID targetOwningOrgUnitId) {
-    return new InventoryItemPersonalRebookDto(amount, version, targetOwningOrgUnitId);
+    return new InventoryItemPersonalRebookDto(amount, version, targetOwningOrgUnitId, null);
   }
 
   /**

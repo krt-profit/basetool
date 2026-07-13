@@ -4,6 +4,10 @@
 
 ### Changed
 
+- **Lager: Stückzahl-Materialien werden wieder zu einem Lagereintrag zusammengeführt.** Gleichartige Bestände desselben Stückzahl-Materials (gleiche Qualität, Lagerort, Auftrag und Einsatz) landen beim Einbuchen, Ändern und Umbuchen automatisch in einem einzigen Eintrag, wobei vorhandene Notizen zusammengeführt werden; bei SCU-Materialien lässt sich das Zusammenführen pro Aktion optional über eine Checkbox im Dialog aktivieren. Angebote in der Materialbörse bleiben dabei unverändert (die angebotene Menge steigt nicht), und bereits vorhandene passende Einträge werden beim Ausrollen der Änderung einmalig zusammengeführt.
+
+- **Materialbörse: Angebote werden automatisch verringert, wenn der zugehörige Lagerbestand kleiner wird.** Wird ein Lagereintrag ausgebucht, umgebucht, übergeben oder verringert und die angebotene Menge ist nicht mehr gedeckt, sinkt die angebotene Menge des Angebots dauerhaft auf den verbleibenden Bestand. Erhöht sich der Bestand später wieder, bleibt das Angebot unverändert — mehr anzubieten ist eine bewusste Entscheidung des Anbieters.
+
 - **Die Seite „Organisation → Leitung" ist jetzt nur noch für Admins und Officer zugänglich.** Bisher öffnete das Gate zusätzlich für reine Logistiker/Missionsmanager, die dort aber ohnehin keine Ernennungsrechte und damit eine leere Seite hatten. Zugang (Seite und Aktionen) ist jetzt auf `ADMIN`/`OFFICER` eingegrenzt; alle funktionalen Leiter (OL-, Bereichs-, SK- und Staffelleitung samt Kommandorängen) tragen die operative `OFFICER`-Rolle und behalten den Zugang unverändert (REQ-ROLE-004).
 
 ### Fixed

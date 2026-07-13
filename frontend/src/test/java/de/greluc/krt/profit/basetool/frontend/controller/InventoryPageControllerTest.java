@@ -422,7 +422,7 @@ class InventoryPageControllerTest {
     UUID id = UUID.randomUUID();
     InventoryItemUpdateDto dto =
         new InventoryItemUpdateDto(
-            UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, 1L);
+            UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, 1L, null);
 
     when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class))).thenReturn(null);
 
@@ -439,7 +439,7 @@ class InventoryPageControllerTest {
     UUID id = UUID.randomUUID();
     InventoryItemUpdateDto dto =
         new InventoryItemUpdateDto(
-            UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, 1L);
+            UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, 1L, null);
 
     org.springframework.web.reactive.function.client.WebClientResponseException exception =
         org.springframework.web.reactive.function.client.WebClientResponseException.create(
@@ -457,7 +457,7 @@ class InventoryPageControllerTest {
     UUID id = UUID.randomUUID();
     InventoryItemUpdateDto dto =
         new InventoryItemUpdateDto(
-            UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, 1L);
+            UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, 1L, null);
 
     when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class)))
         .thenThrow(new RuntimeException("Generic error"));
@@ -545,7 +545,7 @@ class InventoryPageControllerTest {
     UUID id = UUID.randomUUID();
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
-            10.0, UUID.randomUUID(), null, CheckoutType.TRANSFER, null, null, 1L, null);
+            10.0, UUID.randomUUID(), null, CheckoutType.TRANSFER, null, null, 1L, null, null);
     when(backendApiClient.post(
             eq("/api/v1/inventory/" + id + "/book-out"), eq(dto), eq(InventoryItemDto.class)))
         .thenReturn(null);
@@ -566,7 +566,7 @@ class InventoryPageControllerTest {
     UUID id = UUID.randomUUID();
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
-            5.0, UUID.randomUUID(), null, CheckoutType.TRANSFER, null, null, 1L, null);
+            5.0, UUID.randomUUID(), null, CheckoutType.TRANSFER, null, null, 1L, null, null);
     InventoryItemDto remaining =
         new InventoryItemDto(
             id, null, null, null, 100, 45.0, false, null, null, null, null, null, null, 2L, null);
@@ -589,7 +589,7 @@ class InventoryPageControllerTest {
     UUID id = UUID.randomUUID();
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
-            10.0, UUID.randomUUID(), null, CheckoutType.TRANSFER, null, null, 1L, null);
+            10.0, UUID.randomUUID(), null, CheckoutType.TRANSFER, null, null, 1L, null, null);
     de.greluc.krt.profit.basetool.frontend.service.BackendServiceException ex =
         new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
             "Backend returned 409 [OPTIMISTIC_LOCK]",
@@ -678,7 +678,7 @@ class InventoryPageControllerTest {
   void rebookPersonalInventoryItem_success_returnsNewRow() {
     // Given — the backend split the source row and returns the new opposite-personal row.
     UUID id = UUID.randomUUID();
-    InventoryItemPersonalRebookDto dto = new InventoryItemPersonalRebookDto(5.0, 1L, null);
+    InventoryItemPersonalRebookDto dto = new InventoryItemPersonalRebookDto(5.0, 1L, null, null);
     InventoryItemDto newRow =
         new InventoryItemDto(
             UUID.randomUUID(),
@@ -721,7 +721,7 @@ class InventoryPageControllerTest {
   void rebookPersonalInventoryItem_conflict_propagatesProblemJson() {
     // Given — a concurrent edit made the amount-splitting rebook fail with 409 OPTIMISTIC_LOCK.
     UUID id = UUID.randomUUID();
-    InventoryItemPersonalRebookDto dto = new InventoryItemPersonalRebookDto(5.0, 1L, null);
+    InventoryItemPersonalRebookDto dto = new InventoryItemPersonalRebookDto(5.0, 1L, null, null);
     de.greluc.krt.profit.basetool.frontend.service.BackendServiceException ex =
         new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
             "Backend returned 409 [OPTIMISTIC_LOCK]",

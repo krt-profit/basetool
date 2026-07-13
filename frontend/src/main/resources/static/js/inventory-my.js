@@ -750,6 +750,13 @@ function openUmbuchenModal(
     if (targetHint) targetHint.classList.toggle('krtm-hidden', !isScu);
     if (amountHint) amountHint.classList.toggle('krtm-hidden', !isScu);
 
+    // REQ-INV-026: the per-action stock-merge opt-in is offered only for an SCU material (a PIECE
+    // rebooking/transfer always merges server-side). Reset it on every open.
+    const mergeRow = document.getElementById('umbuchenMergeRow');
+    const mergeCheckbox = document.getElementById('umbuchenMergeStock');
+    if (mergeCheckbox) mergeCheckbox.checked = false;
+    if (mergeRow) mergeRow.classList.toggle('krtm-hidden', !isScu);
+
     amountEl.value = amount;
     amountEl.max = amount;
     targetEl.value = 0;
@@ -816,6 +823,9 @@ function submitUmbuchen(event) {
         : parseFloat(amountEl.value);
     const version = parseInt(document.getElementById('umbuchenVersion').value, 10);
     const submitBtn = document.getElementById('umbuchenSubmitBtn');
+    // REQ-INV-026: per-action stock-merge opt-in (only rendered for SCU; PIECE always merges).
+    const mergeCheckbox = document.getElementById('umbuchenMergeStock');
+    const mergeStock = !!(mergeCheckbox && mergeCheckbox.checked);
 
     let url, payload;
     if (mode === 'PERSONAL') {
@@ -826,7 +836,12 @@ function submitUmbuchen(event) {
             orgWrapper && window.getComputedStyle(orgWrapper).display !== 'none' && orgSelect
                 ? orgSelect.value || null
                 : null;
-        payload = { amount: amount, version: version, targetOwningOrgUnitId: orgUnitId };
+        payload = {
+            amount: amount,
+            version: version,
+            targetOwningOrgUnitId: orgUnitId,
+            mergeStock: mergeStock,
+        };
     } else {
         url = '/inventory/' + umbuchenItemId + '/transfer';
         payload = {
@@ -837,6 +852,7 @@ function submitUmbuchen(event) {
             targetOwningOrgUnitId:
                 document.getElementById('umbuchenTargetOwningOrgUnitId').value || null,
             version: version,
+            mergeStock: mergeStock,
         };
     }
 

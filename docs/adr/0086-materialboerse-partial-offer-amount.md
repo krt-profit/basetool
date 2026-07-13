@@ -1,10 +1,10 @@
 # ADR-0086 — Materialbörse: offered amount is an owner-chosen partial quantity, not live-read
 
-- **Status:** Accepted
+- **Status:** Accepted — **extended by REQ-MARKET-013 (#1182):** the display-time clamp-on-read below is now *also persisted* on a stock decrease (book-out / transfer / rebooking / update / handover ratchet `offeredAmount` down to the new stock in the decrement's transaction), so a later stock **increase** no longer re-expands the stored offer — offering more stays an explicit owner decision. An increase itself never changes the offer.
 - **Date:** 2026-07-09
 - **Deciders:** @greluc
-- **Related:** ADR-0082 (amends decision D1) · spec REQ-MARKET-002/007/008/009
-  (`docs/specs/materialboerse.md`) · REQ-AUDIT-001 · issue #1183
+- **Related:** ADR-0082 (amends decision D1) · spec REQ-MARKET-002/007/008/009/013
+  (`docs/specs/materialboerse.md`) · REQ-AUDIT-001 · issue #1183, #1182
 
 ## Context
 
