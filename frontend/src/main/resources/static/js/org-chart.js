@@ -294,6 +294,23 @@
             return;
         }
 
+        // The free-text Grand Admiral (REQ-ORG-021) lives on the OL row, not as a position, so it
+        // goes through the OL grand-admiral endpoint with a typed name (reusing the Leitung proxy).
+        if (mode === 'grandAdmiral') {
+            const gaName = field('oc-display-name').trim();
+            if (!gaName) {
+                window.showFrontendErrorToast(OC_I18N.displayNameRequired);
+                return;
+            }
+            const olId = encodeURIComponent(field('oc-org-unit-id'));
+            send(
+                'PUT',
+                '/organisation/leitung/organisationsleitung/' + olId + '/grand-admiral/ajax',
+                { displayName: gaName },
+            );
+            return;
+        }
+
         // The chart editor only ever sets a free-text holder now (accounts are mirror-only,
         // REQ-ROLE-006); a backend reject is the backstop if a userId ever reaches it.
         const userOptional = field('oc-user-optional') === '1';
@@ -366,6 +383,34 @@
         window.krtEvents.on('click', 'oc-add-staff', function (btn) {
             lastTrigger = btn;
             openModal('create', { staffChoice: true });
+        });
+
+        // Grand Admiral (REQ-ORG-021): add / rename a free-text holder (a typed name), like every
+        // other chart field. The account Grand Admiral is managed under Leitung and stays read-only.
+        window.krtEvents.on('click', 'oc-ga-add', function (btn) {
+            lastTrigger = btn;
+            openModal('grandAdmiral', {
+                orgUnitId: btn.getAttribute('data-org-unit-id'),
+                rankLabel: btn.getAttribute('data-rank-label'),
+                displayName: btn.getAttribute('data-display-name'),
+            });
+        });
+
+        window.krtEvents.on('click', 'oc-ga-remove', function (btn) {
+            window
+                .showKrtConfirm(OC_I18N.removeConfirmTitle, OC_I18N.removeConfirm)
+                .then(function (ok) {
+                    if (ok) {
+                        const olId = encodeURIComponent(btn.getAttribute('data-org-unit-id'));
+                        send(
+                            'DELETE',
+                            '/organisation/leitung/organisationsleitung/' +
+                                olId +
+                                '/grand-admiral/ajax',
+                            null,
+                        );
+                    }
+                });
         });
 
         window.krtEvents.on('click', 'oc-reassign', function (btn) {
@@ -642,4 +687,76 @@
             initTrees();
         }
     });
+
+    // ---- Sticky horizontal scrollbar ---------------------------------------
+    // A wide chart is usually also tall, so its native horizontal scrollbar sits at the bottom of
+    // the (tall) chart — often below the fixed footer, so panning means scrolling the whole page
+    // down first. A proxy scrollbar pinned just above the footer mirrors the chart's horizontal
+    // scroll, so it is always one drag away. The proxy is a sibling of the stable #oc-chart
+    // container, so it survives the #571 fragment swaps; a MutationObserver re-measures on collapse
+    // toggles + swaps and window resize covers viewport changes. While the proxy is active the
+    // chart's own bar is suppressed (.oc-chart--proxied) so there is never a duplicate.
+    (function initStickyScrollbar() {
+        if (!chart) {
+            return;
+        }
+        const bar = document.createElement('div');
+        bar.className = 'oc-scrollbar';
+        bar.setAttribute('aria-hidden', 'true');
+        const track = document.createElement('div');
+        track.className = 'oc-scrollbar-track';
+        bar.appendChild(track);
+        chart.insertAdjacentElement('afterend', bar);
+
+        function measure() {
+            const overflow = chart.scrollWidth - chart.clientWidth;
+            if (overflow <= 1) {
+                bar.classList.remove('oc-scrollbar--active');
+                chart.classList.remove('oc-chart--proxied');
+                return;
+            }
+            track.style.width = chart.scrollWidth + 'px';
+            bar.classList.add('oc-scrollbar--active');
+            chart.classList.add('oc-chart--proxied');
+        }
+
+        // Proportional mirror with a dead-band so the two scrollers settle instead of ping-ponging.
+        function mirror(from, to) {
+            const fromRange = from.scrollWidth - from.clientWidth;
+            const toRange = to.scrollWidth - to.clientWidth;
+            const target = fromRange > 0 ? (from.scrollLeft / fromRange) * toRange : 0;
+            if (Math.abs(to.scrollLeft - target) > 0.5) {
+                to.scrollLeft = target;
+            }
+        }
+        bar.addEventListener('scroll', function () {
+            mirror(bar, chart);
+        });
+        chart.addEventListener('scroll', function () {
+            mirror(chart, bar);
+        });
+
+        let rafPending = false;
+        function scheduleMeasure() {
+            if (rafPending) {
+                return;
+            }
+            rafPending = true;
+            window.requestAnimationFrame(function () {
+                rafPending = false;
+                measure();
+            });
+        }
+        window.addEventListener('resize', scheduleMeasure);
+        if (window.MutationObserver) {
+            const observer = new MutationObserver(scheduleMeasure);
+            observer.observe(chart, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['hidden', 'class', 'style'],
+            });
+        }
+        measure();
+    })();
 })();

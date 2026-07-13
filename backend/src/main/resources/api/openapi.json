@@ -5691,6 +5691,178 @@
         }
       }
     },
+    "/api/v1/org-hierarchy/organisationsleitung/{id}/grand-admiral" : {
+      "put" : {
+        "tags" : [ "org-hierarchy-controller" ],
+        "summary" : "Designate the Grand Admiral",
+        "description" : "Designates the single Grand Admiral rendered at the top of the Organisationsleitung (REQ-ORG-021). Supply either a userId (an account holder, kept with OL-member rights, auto-adds OL membership) or a displayName (a free-text holder for a member without an account, grants nothing) — mutually exclusive. ADMIN-only.",
+        "operationId" : "setGrandAdmiral",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/GrandAdmiralRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "org-hierarchy-controller" ],
+        "summary" : "Vacate the Grand Admiral post",
+        "description" : "Clears the Grand Admiral designation; the former holder stays an OL member. ADMIN-only.",
+        "operationId" : "removeGrandAdmiral",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/org-chart/positions/{id}" : {
       "put" : {
         "tags" : [ "org-chart-controller" ],
@@ -51850,6 +52022,20 @@
         },
         "required" : [ "limit" ]
       },
+      "GrandAdmiralRequest" : {
+        "type" : "object",
+        "properties" : {
+          "userId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "displayName" : {
+            "type" : "string",
+            "maxLength" : 120,
+            "minLength" : 0
+          }
+        }
+      },
       "OrgChartPositionUpdateRequest" : {
         "type" : "object",
         "properties" : {
@@ -58380,6 +58566,9 @@
           "shorthand" : {
             "type" : "string"
           },
+          "grandAdmiral" : {
+            "$ref" : "#/components/schemas/OrgChartNodeDto"
+          },
           "members" : {
             "type" : "array",
             "items" : {
@@ -59703,6 +59892,10 @@
             "items" : {
               "$ref" : "#/components/schemas/KommandoGroupDto"
             }
+          },
+          "grandAdmiralUserId" : {
+            "type" : "string",
+            "format" : "uuid"
           }
         }
       },

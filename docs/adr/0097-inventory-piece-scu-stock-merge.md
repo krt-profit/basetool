@@ -47,7 +47,7 @@ Two invariants are non-negotiable:
 - **Concurrency.** The merge group is loaded `FOR UPDATE`, re-introducing — only on the merge path —
   the pessimistic lost-update lock ADR-0003 removed, so two racing same-stack writers serialise.
 
-A one-time Flyway backfill (`V215`) merges pre-existing PIECE rows under the same identity and
+A one-time Flyway backfill (`V216`) merges pre-existing PIECE rows under the same identity and
 offer-exclusion so the deployed dataset matches the new write behaviour.
 
 ## Consequences

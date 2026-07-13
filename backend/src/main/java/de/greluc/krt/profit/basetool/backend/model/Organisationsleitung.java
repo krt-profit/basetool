@@ -19,8 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.model;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
+import java.util.UUID;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.ToString;
 
 /**
@@ -44,6 +48,34 @@ import lombok.ToString;
 @DiscriminatorValue("ORGANISATIONSLEITUNG")
 @ToString(callSuper = true)
 public class Organisationsleitung extends OrgUnit {
+
+  /**
+   * The account id of the OL member currently holding the <b>Grand Admiral</b> post (REQ-ORG-021),
+   * or {@code null} when the post is vacant. The Grand Admiral is one of the OL members — the
+   * holder keeps the {@code OL_MEMBER} rank and its rights are unchanged; this pointer only records
+   * who the org chart renders at the very top of the Organisationsleitung. Because the OL is a
+   * singleton tier, this single column is the org-wide "at most one Grand Admiral" guarantee. A
+   * subclass-only column on the single-table {@code org_unit} hierarchy (nullable for every non-OL
+   * row, enforced by {@code chk_org_unit_grand_admiral_only_ol}, V215), with a {@code SET NULL} FK
+   * to {@code app_user} so deleting the account vacates the post.
+   */
+  @Getter
+  @Setter
+  @Column(name = "grand_admiral_user_id")
+  private UUID grandAdmiralUserId;
+
+  /**
+   * The free-text name of the OL member holding the Grand Admiral post when that member has no
+   * Basetool account yet (REQ-ORG-020/-021), or {@code null}. Mutually exclusive with {@link
+   * #grandAdmiralUserId} (a Grand Admiral is either an account or a typed name, never both —
+   * enforced by {@code chk_org_unit_grand_admiral_holder}, V215): set in the chart editor and, like
+   * every free-text holder, grants nothing. Cleared when an account Grand Admiral is designated
+   * under Leitung.
+   */
+  @Getter
+  @Setter
+  @Column(name = "grand_admiral_display_name", columnDefinition = "TEXT")
+  private String grandAdmiralDisplayName;
 
   /**
    * No-arg constructor required by JPA. Forces the inherited {@link OrgUnit#isPromotionEnabled}

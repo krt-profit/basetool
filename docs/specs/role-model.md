@@ -213,6 +213,20 @@ on it (rename / remove / assign-lead / add-child) and the backend additionally *
 child** (Stv. / Ensign) under a `kommando_group`-linked parent — so no chart-only seat can be bolted
 onto a Leitung-managed Kommando.
 
+When the appointment mints a **new** account seat for a multi-holder post (OL member, SK-Leiter,
+Bereichskoordinator/-operator, Ensign), the mirror first **consumes a matching free-text
+placeholder**: a free-text seat of the same type/unit/parent whose typed name matches the appointee's
+effective name is converted in place instead of leaving a duplicate, so an admin who typed a name and
+later appoints that person's account need not delete the placeholder by hand. The singleton posts
+(Staffelleiter, Bereichsleiter, Kommandoleiter, Stv.) already reuse their single seat; the match is
+name-scoped, so it never touches a different member's placeholder.
+
+The **Grand Admiral** (org-chart.md REQ-ORG-021) is a **title on top of the `OL_MEMBER` rank, not a
+separate rank**: the holder is an ordinary OL member with unchanged rights, and the chart mirrors the
+OL's `grand_admiral_user_id` designation by rendering that one member at the top of the OL. No
+rights-read point changes — reusing `OL_MEMBER` is what keeps the Grand Admiral's reach identical to
+an OL member's by construction.
+
 **Acceptance**
 
 - [x] Granting / revoking a rank updates the account-linked chart seat in the same transaction; the

@@ -216,9 +216,10 @@ class OrgChartPageRenderTest {
   void groupLinkedCommand_admin_rendersReadOnlyHeadWithNoEditAffordances() throws Exception {
     // Given: a Kommando that mirrors a kommando_group (kommandoGroupId set, epic #800 /
     // REQ-ROLE-006) with its Kommandoleiter appointed under Organisation -> Leitung (an account).
-    // The whole Kommando subtree is Leitung-managed, so the chart renders it read-only: the head
-    // carries the "managed under Leitung" marker and NONE of the rename / remove / vacate /
-    // add-child controls render, even for an admin — those would 400 at the backend.
+    // The whole Kommando subtree is Leitung-managed, so the chart renders it read-only: NONE of the
+    // rename / remove / vacate / add-child controls render, even for an admin — those would 400
+    // at the backend. (The per-node "managed under Leitung" marker was retired; read-only is
+    // signalled purely by the absent edit affordances in edit mode.)
     CommandChartDto command =
         new CommandChartDto(
             UUID.randomUUID(),
@@ -263,8 +264,8 @@ class OrgChartPageRenderTest {
     assertThat(html).as("the Kommando name renders").contains("Alpha");
     assertThat(html).as("the appointed Kommandoleiter renders").contains("Cmd");
     assertThat(html)
-        .as("the head carries the managed-in-Leitung marker")
-        .contains("oc-node-managed");
+        .as("the retired managed-in-Leitung marker no longer renders")
+        .doesNotContain("oc-node-managed");
     assertThat(html)
         .as("no rename control on a group-linked Kommando head")
         .doesNotContain("data-trigger=\"oc-rename\"");
@@ -342,7 +343,7 @@ class OrgChartPageRenderTest {
     when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
         .thenReturn(
             new OrgChartDto(
-                new OlChartDto(olId, "Organisationsleitung", "OL", List.of(member)),
+                new OlChartDto(olId, "Organisationsleitung", "OL", null, List.of(member)),
                 List.of(),
                 new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
                 List.of(),
@@ -371,6 +372,85 @@ class OrgChartPageRenderTest {
 
   @Test
   @WithMockUser(roles = "ADMIN")
+  void olTier_grandAdmiral_rendersAtTopWithTitle() throws Exception {
+    // Given: an OL with a Grand Admiral (REQ-ORG-021) split out of the members. The holder is an
+    // OL_MEMBER position surfaced via OlChartDto.grandAdmiral; the chart renders it above the
+    // member
+    // fan with the untranslated "Grand Admiral" title, while the plain member still shows.
+    UUID olId = UUID.randomUUID();
+    OrgChartNodeDto grandAdmiral =
+        new OrgChartNodeDto(
+            UUID.randomUUID(), "OL_MEMBER", UUID.randomUUID(), "Admiral Arun", null, 0, 0L);
+    OrgChartNodeDto member =
+        new OrgChartNodeDto(
+            UUID.randomUUID(), "OL_MEMBER", UUID.randomUUID(), "Chief", null, 1, 0L);
+    when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
+        .thenReturn(
+            new OrgChartDto(
+                new OlChartDto(olId, "Organisationsleitung", "OL", grandAdmiral, List.of(member)),
+                List.of(),
+                new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
+                List.of(),
+                List.of()));
+    when(backendApiClient.get(eq("/api/v1/users/lookup"), anyTypeRef()))
+        .thenReturn(List.of(Map.of("id", UUID.randomUUID().toString(), "effectiveName", "Pilot")));
+
+    String html =
+        mockMvc
+            .perform(get("/org-chart"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).as("the Grand Admiral holder renders").contains("Admiral Arun");
+    assertThat(html).as("the untranslated Grand Admiral title renders").contains("Grand Admiral");
+    assertThat(html).as("the plain OL member still renders").contains("Chief");
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void olTier_freeTextGrandAdmiral_rendersTitleAndNoAccountMarker() throws Exception {
+    // Given: a free-text Grand Admiral (REQ-ORG-021) — a typed name for a member without an
+    // account,
+    // like every other chart field. The backend surfaces it as a synthesized
+    // OlChartDto.grandAdmiral
+    // node (no userId, a displayName); the chart renders it at the top with the "Grand Admiral"
+    // title
+    // and the free-text (no-account) marker.
+    UUID olId = UUID.randomUUID();
+    OrgChartNodeDto freeTextGa =
+        new OrgChartNodeDto(null, "OL_MEMBER", null, null, "Admiral Ohne Konto", 0, null);
+    when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
+        .thenReturn(
+            new OrgChartDto(
+                new OlChartDto(olId, "Organisationsleitung", "OL", freeTextGa, List.of()),
+                List.of(),
+                new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
+                List.of(),
+                List.of()));
+    when(backendApiClient.get(eq("/api/v1/users/lookup"), anyTypeRef()))
+        .thenReturn(List.of(Map.of("id", UUID.randomUUID().toString(), "effectiveName", "Pilot")));
+
+    String html =
+        mockMvc
+            .perform(get("/org-chart"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .as("the free-text Grand Admiral's typed name renders")
+        .contains("Admiral Ohne Konto");
+    assertThat(html).as("the Grand Admiral title renders").contains("Grand Admiral");
+    assertThat(html)
+        .as("the free-text Grand Admiral carries the no-account marker class")
+        .contains("oc-node--freetext");
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
   void freeTextHolder_admin_rendersTypedNameAndNoAccountMarker_notVacant() throws Exception {
     // Given: an OL member named on the chart who has no Basetool account yet (REQ-ORG-020) — userId
     // null but a free-text displayName. The node must render the typed name through ocNode with the
@@ -382,7 +462,7 @@ class OrgChartPageRenderTest {
     when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
         .thenReturn(
             new OrgChartDto(
-                new OlChartDto(olId, "Organisationsleitung", "OL", List.of(freeTextMember)),
+                new OlChartDto(olId, "Organisationsleitung", "OL", null, List.of(freeTextMember)),
                 List.of(),
                 new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
                 List.of(),
@@ -550,7 +630,7 @@ class OrgChartPageRenderTest {
     when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
         .thenReturn(
             new OrgChartDto(
-                new OlChartDto(olId, "Organisationsleitung", "OL", List.of()),
+                new OlChartDto(olId, "Organisationsleitung", "OL", null, List.of()),
                 List.of(bereichA, bereichB),
                 new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
                 List.of(),

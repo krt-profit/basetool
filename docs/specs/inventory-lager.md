@@ -323,7 +323,7 @@ a read-add-write that runs inside the caller's transaction (`Propagation.MANDATO
 (REQ-AUDIT-001) carrying the folded-row count, the resulting total and the `auto` (PIECE) / `manual`
 (SCU opt-in) trigger.
 
-**Deployment.** The change ships a one-time Flyway backfill (`V215__merge_piece_inventory_rows.sql`)
+**Deployment.** The change ships a one-time Flyway backfill (`V216__merge_piece_inventory_rows.sql`)
 that merges pre-existing `PIECE` rows under the same identity and offer-exclusion, so the deployed
 dataset matches the new write behaviour. `SCU` rows and offer-backed rows are left untouched.
 
@@ -347,7 +347,7 @@ dataset matches the new write behaviour. `SCU` rows and offer-backed rows are le
 `InventoryItemServiceBookOutTest`, `InventoryItemServicePersonalRebookTest` · **Code:**
 `InventoryCheckoutService#mergeStockIfRequested`, `InventoryItemRepository#findMergeGroupForUpdate`,
 `MaterialExchangeOfferRepository#existsByInventoryItemId`, `InventoryItemService`,
-`V215__merge_piece_inventory_rows.sql`, `inventory-input.html` / `inventory-input.js`,
+`V216__merge_piece_inventory_rows.sql`, `inventory-input.html` / `inventory-input.js`,
 `inventory-my.html` / `inventory-my.js`, `inventory-admin.html` / `inventory-admin.js` · **Issues:**
 
 # 1182 · **ADR:** ADR-0097

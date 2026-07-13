@@ -53,6 +53,9 @@ import java.util.UUID;
  *     Staffelleiter can promote any member); never {@code null}.
  * @param groups the unit's Kommandogruppen ({@code SQUADRON} only; empty for every other kind);
  *     never {@code null}.
+ * @param grandAdmiralUserId the account id of this unit's Grand Admiral (REQ-ORG-021), or {@code
+ *     null}. Only ever populated on the {@code ORGANISATIONSLEITUNG}, so the page can badge the
+ *     current holder and offer the promote / vacate actions; {@code null} for every other kind.
  */
 public record LeitungUnitDto(
     UUID id,
@@ -62,4 +65,5 @@ public record LeitungUnitDto(
     boolean canAppointLead,
     boolean canManageRoster,
     List<LeitungMemberDto> members,
-    List<KommandoGroupDto> groups) {}
+    List<KommandoGroupDto> groups,
+    UUID grandAdmiralUserId) {}

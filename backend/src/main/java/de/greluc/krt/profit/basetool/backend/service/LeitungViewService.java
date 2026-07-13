@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
+import de.greluc.krt.profit.basetool.backend.model.Organisationsleitung;
 import de.greluc.krt.profit.basetool.backend.model.dto.BereichLeadershipRole;
 import de.greluc.krt.profit.basetool.backend.model.dto.KommandoGroupDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.LeitungMemberDto;
@@ -164,7 +165,8 @@ public class LeitungViewService {
         canAppointLead,
         canManageRoster,
         members,
-        groups);
+        groups,
+        orgUnit instanceof Organisationsleitung ol ? ol.getGrandAdmiralUserId() : null);
   }
 
   /**

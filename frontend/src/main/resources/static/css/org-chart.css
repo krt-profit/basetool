@@ -62,6 +62,44 @@ main.oc-page .oc-greeting .oc-edit-toggle {
 /* The horizontal scrollbar intentionally inherits the global HUD scrollbar from
    styles.css — the previous local override pre-dated and diverged from the
    design-system spec (size + hover colour). */
+
+/* --- sticky horizontal scrollbar (REQ-ORG-013) ------------------------------
+   A wide chart is usually also tall, so its own horizontal scrollbar sits at the bottom of the
+   chart — far down the page, often below the fixed footer, so panning means scrolling the whole page
+   down first. #oc-scrollbar is a proxy scrollbar org-chart.js pins just above the footer and keeps
+   in sync with the chart's horizontal scroll, so it is always one drag away. It is created + toggled
+   by the JS (hidden until the chart overflows); while it is active the chart's own bar is suppressed
+   (.oc-chart--proxied) so there is never a duplicate. Pinned above the fixed footer via the shared
+   --krt-footer-height and kept just under it in the stacking order. */
+.oc-scrollbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: var(--krt-footer-height, 5rem);
+    z-index: 998;
+    display: none;
+    height: 14px;
+    overflow: auto hidden;
+    background: var(--color-bg-dark-gray);
+    border-top: 1px solid var(--color-gray-3);
+}
+
+.oc-scrollbar--active {
+    display: block;
+}
+
+.oc-scrollbar-track {
+    height: 1px;
+}
+
+.oc-chart--proxied {
+    scrollbar-width: none;
+}
+
+.oc-chart--proxied::-webkit-scrollbar {
+    display: none;
+}
+
 .oc-caption {
     display: flex;
     align-items: center;
@@ -212,8 +250,11 @@ main.oc-page .oc-greeting .oc-edit-toggle {
     overflow-wrap: break-word;
 }
 
-/* the Bereichsleiter reads as the hero: orange frame + bloom */
+/* the Bereichsleiter reads as the hero: orange frame + bloom. Its frame is a hair
+   thicker (2px vs the 1px hairline of every other node) so the leader box reads as
+   heavier even when its bloom is replaced by a flat department colour in a tier. */
 .oc-node--hero {
+    border-width: 2px;
     border-color: var(--color-primary);
     box-shadow: var(--glow-primary);
 }
@@ -246,8 +287,10 @@ main.oc-page .oc-greeting .oc-edit-toggle {
 /* Free-text holder: a Kartell member named on the chart who has no Basetool account yet. The seat
    IS occupied (solid frame, like an account node), but a small muted "Kein Account" pill marks that
    the name is provisional until the member is linked to an account. Distinct from the dashed vacant
-   slot. */
+   slot. The pill is a maintenance cue, not part of the public read of the chart, so it surfaces only
+   while the inline editor is on (.oc-chart.editing); otherwise it stays hidden. */
 .oc-node-flag {
+    display: none;
     align-self: flex-start;
     margin-top: 0.1rem;
     padding: 0.05rem 0.35rem;
@@ -311,9 +354,17 @@ main.oc-page .oc-greeting .oc-edit-toggle {
 }
 
 /* The Organisationsleitung apex box: a neutral white top edge so it reads as
-   sitting above every (department-coloured) Bereich rather than belonging to one. */
+   sitting above every (department-coloured) Bereich rather than belonging to one.
+   As the apex it is not locked to the shared column width (--oc-box-w): its label
+   is the long single word "ORGANISATIONSLEITUNG", which otherwise clings to the
+   frame. It grows to fit that label with comfortable side padding — floored at the
+   shared width so it never shrinks below a unit box, capped so it never sprawls. */
 .oc-unit-box--ol {
     border-top-color: var(--color-white);
+    width: auto;
+    min-width: var(--oc-box-w);
+    max-width: calc(var(--oc-box-w) * 2);
+    padding: 0.7rem 1.75rem;
 }
 
 .oc-unit-box--ol .sh {
@@ -531,6 +582,12 @@ main.oc-page .oc-greeting .oc-edit-toggle {
 
 .oc-chart.editing .oc-add {
     display: inline-flex;
+}
+
+/* The "Kein Account" pill (.oc-node-flag) is hidden by default (see its rule above) and revealed
+   only here, so it reads purely as an edit-mode maintenance cue. */
+.oc-chart.editing .oc-node-flag {
+    display: inline-block;
 }
 
 .oc-icon-btn {

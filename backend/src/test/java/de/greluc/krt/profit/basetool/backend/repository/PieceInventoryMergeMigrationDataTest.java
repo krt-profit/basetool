@@ -51,7 +51,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Data-level coverage for the one-time PIECE stock-merge backfill migration {@code
- * V215__merge_piece_inventory_rows.sql} (REQ-INV-026, ADR-0097) against the real Postgres test
+ * V216__merge_piece_inventory_rows.sql} (REQ-INV-026, ADR-0097) against the real Postgres test
  * schema (Testcontainers + Flyway via the {@code test} profile). The migration mutates existing
  * prod data on deploy and is a second, SQL-only implementation of the runtime merge, so its logic —
  * the NULL-as-equal grouping, the note concatenation, the offer exclusion and the SCU carve-out —
@@ -88,7 +88,7 @@ class PieceInventoryMergeMigrationDataTest {
   private static String backfillSql() throws IOException {
     try (InputStream in =
         PieceInventoryMergeMigrationDataTest.class.getResourceAsStream(
-            "/db/migration/V215__merge_piece_inventory_rows.sql")) {
+            "/db/migration/V216__merge_piece_inventory_rows.sql")) {
       assertThat(in).as("migration resource on the classpath").isNotNull();
       return new String(in.readAllBytes(), StandardCharsets.UTF_8);
     }
