@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -27,12 +28,15 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -94,6 +98,26 @@ public class InventoryItem extends AbstractEntity<UUID> {
   @JoinColumn(name = "mission_id", nullable = true)
   @ToString.Exclude
   private Mission mission;
+
+  /**
+   * The job-order quantity slices of this entry (Variante C, REQ-INV-027) — an entry may earmark
+   * parts of its stock to several job orders at once, each with its own amount, split independently
+   * of {@link #missionAllocations}. Cascade + orphan-removal so the slices are written and deleted
+   * through the entry; the sum of the slice amounts must stay ≤ {@link #amount} (enforced in the
+   * service, REQ-INV-027).
+   */
+  @OneToMany(mappedBy = "inventoryItem", cascade = CascadeType.ALL, orphanRemoval = true)
+  @ToString.Exclude
+  private List<InventoryJobOrderAllocation> jobOrderAllocations = new ArrayList<>();
+
+  /**
+   * The mission quantity slices of this entry (Variante C, REQ-INV-027) — the mission counterpart
+   * of {@link #jobOrderAllocations}, split independently; the sum of the slice amounts must stay ≤
+   * {@link #amount}.
+   */
+  @OneToMany(mappedBy = "inventoryItem", cascade = CascadeType.ALL, orphanRemoval = true)
+  @ToString.Exclude
+  private List<InventoryMissionAllocation> missionAllocations = new ArrayList<>();
 
   @Column(name = "note", length = 1000)
   private String note;
