@@ -43,6 +43,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.BatchSize;
 
 /** Inventory Item JPA entity. */
 @Entity
@@ -107,6 +108,7 @@ public class InventoryItem extends AbstractEntity<UUID> {
    * service, REQ-INV-027).
    */
   @OneToMany(mappedBy = "inventoryItem", cascade = CascadeType.ALL, orphanRemoval = true)
+  @BatchSize(size = 100)
   @ToString.Exclude
   private List<InventoryJobOrderAllocation> jobOrderAllocations = new ArrayList<>();
 
@@ -116,6 +118,7 @@ public class InventoryItem extends AbstractEntity<UUID> {
    * {@link #amount}.
    */
   @OneToMany(mappedBy = "inventoryItem", cascade = CascadeType.ALL, orphanRemoval = true)
+  @BatchSize(size = 100)
   @ToString.Exclude
   private List<InventoryMissionAllocation> missionAllocations = new ArrayList<>();
 
