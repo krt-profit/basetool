@@ -867,8 +867,12 @@ therefore alerts on:
   — keycloak carries the same 2048 cap but exports no `basetool-*` Micrometer series, so
   `JvmThreadsHigh` cannot see a pids/thread runaway in it at all. The signal exists **only because**
   the cadvisor `process` metric group is enabled in `docker-compose.monitoring.yml`
-  (`--disable_metrics` set to cadvisor's default minus `process`; `--enable_metrics=process` is wrong
-  — it *replaces* the whole set and would blind the memory/cpu container alerts). The 2048 cap is
+  (`--disable_metrics` set to cadvisor's default minus `process`, plus `disk`; `--enable_metrics=process`
+  is wrong — it *replaces* the whole set and would blind the memory/cpu container alerts). The `disk`
+  group is additionally disabled because the host's Docker (containerd `overlayfs` snapshotter) makes
+  cAdvisor's fsHandler fail to stat per-container layers — only log noise, no usable `container_fs_*`;
+  per-container filesystem metrics are unused (host filesystem usage comes from node-exporter's
+  `node_filesystem_*`). The 2048 cap is
   hardcoded to stay in lockstep with `JvmThreadsHigh` and the compose `pids` limit; do **not** raise
   the cap to silence the alert.
 

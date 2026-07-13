@@ -16,6 +16,8 @@
 
 - **Monitoring: Der Alarm `EdgeIpv6Unreachable` schlug fälschlich an, weil der blackbox-Prober kein IPv6 konnte.** Die Monitoring-Netze des Exporters sind rein IPv4, sodass er keine IPv6-Route hatte und die v6-Probes stets scheiterten, obwohl das öffentliche Edge über IPv6 erreichbar ist. Der Exporter bekommt jetzt ein eigenes v6-Egress-Netz (`net-blackbox-v6`), womit die Probes die echte Edge-Strecke testen und der Alarm ein wahres Signal wird (REQ-OBS-008/-012).
 
+- **Monitoring: cAdvisor schreibt keine Dateisystem-Fehlerzeilen mehr ins Log.** Auf dem containerd-`overlayfs`-Speichertreiber von Docker 29 konnte cAdvisor die Layer der einzelnen Container nicht lesen und schrieb pro Housekeeping-Durchlauf eine Fehlerzeile je Container (`could not stat … no such file`), ohne verwertbare Pro-Container-Dateisystemmetriken zu liefern. Die `disk`-Metrikgruppe ist jetzt deaktiviert — sie wird von keinem Alarm oder Dashboard genutzt (die Host-Dateisystembelegung liefert der node-exporter), sodass das Log-Rauschen ohne Funktionsverlust entfällt (REQ-OBS-014).
+
 ## [v1.3.6](https://github.com/krt-profit/basetool/releases/tag/v1.3.6) - 2026-07-12
 
 ### Changed

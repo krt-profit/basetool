@@ -381,7 +381,16 @@ services:
       # and blind ContainerWorkingSetHigh / ContainerCpuThrottledHigh / ContainerMetricsMissing.
       # Verified on cadvisor v0.60.5: container_threads{name=...} appears while container_last_seen /
       # container_memory_working_set_bytes stay present.
-      - --disable_metrics=advtcp,cpu_topology,cpuset,hugetlb,memory_numa,referenced_memory,resctrl,sched,tcp,udp
+      #
+      # `disk` is ALSO disabled (added on top of the default set). The prod host's Docker 29 uses the
+      # containerd image store / `overlayfs` snapshotter, whose per-container layer paths cAdvisor's
+      # fsHandler cannot stat (`could not stat "/var/lib/docker/rootfs/overlayfs/<id>": no such file`),
+      # so it emitted no usable container_fs_* series and logged one error PER container PER 30s
+      # housekeeping tick. Per-container filesystem metrics are unused by any alert or dashboard (host
+      # filesystem usage comes from node-exporter's node_filesystem_*), so disabling the `disk` group
+      # is zero-loss and silences the noise (REQ-OBS-014). Keep `diskIO`/blkio enabled (it reads cgroup
+      # counters, not host paths, so it does not hit the snapshotter and is not affected).
+      - --disable_metrics=advtcp,cpu_topology,cpuset,disk,hugetlb,memory_numa,referenced_memory,resctrl,sched,tcp,udp
     volumes:
       - /:/rootfs:ro
       - /sys:/sys:ro
