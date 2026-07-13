@@ -10,6 +10,8 @@
 
 - **Monitoring: Ein laufender Monitoring-Stack mit nicht gesetztem `IRI_MONITORING_ENABLED` schlägt jetzt Alarm, statt still zu driften.** Bei nicht gesetztem Flag lud `deploy.sh` zwar weiter die Konfigdateien auf die Platte, erzeugte die laufenden Container aber nie neu — Regel- und Scrape-Änderungen erreichten das laufende Prometheus nie, und der dafür gedachte Alarm `PrometheusConfigStale` konnte nicht anschlagen, weil seine Metrik nur im (in diesem Fall deaktivierten) Reconcile-Codepfad geschrieben wird. `deploy.sh` meldet den Zustand jetzt pro Durchlauf als WARN und über die eigenständige Metrik `basetool_monitoring_reconcile_disabled`; der neue Alarm `MonitoringReconcileDisabled` schlägt nach 30 Minuten an (REQ-OBS-014, REQ-OPS-013).
 
+- **Monitoring: Der Alarm `EdgeIpv6Unreachable` schlug fälschlich an, weil der blackbox-Prober kein IPv6 konnte.** Die Monitoring-Netze des Exporters sind rein IPv4, sodass er keine IPv6-Route hatte und die v6-Probes stets scheiterten, obwohl das öffentliche Edge über IPv6 erreichbar ist. Der Exporter bekommt jetzt ein eigenes v6-Egress-Netz (`net-blackbox-v6`), womit die Probes die echte Edge-Strecke testen und der Alarm ein wahres Signal wird (REQ-OBS-008/-012).
+
 ## [v1.3.6](https://github.com/krt-profit/basetool/releases/tag/v1.3.6) - 2026-07-12
 
 ### Changed
