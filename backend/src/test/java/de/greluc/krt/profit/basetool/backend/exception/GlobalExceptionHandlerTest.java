@@ -171,6 +171,46 @@ class GlobalExceptionHandlerTest {
     assertHttpErrorCounted(GlobalExceptionHandler.CODE_UNAUTHENTICATED);
   }
 
+  /**
+   * REQ-OBS-001: a 401 UNAUTHENTICATED is the expected default for any unauthenticated caller
+   * (internal-TLS health probes hitting {@code /}, bots, pre-login navigation), so it must log at
+   * DEBUG — never WARN — to keep the log free of steady probe noise. The counter (asserted above)
+   * preserves the signal.
+   */
+  @Test
+  void handleAuthentication_logsAtDebugNotWarn() {
+    when(request.getMethod()).thenReturn("GET");
+    when(request.getRequestURI()).thenReturn("/");
+
+    Logger logger = (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    Level original = logger.getLevel();
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    logger.setLevel(Level.DEBUG);
+    try {
+      handler.handleAuthentication(new BadCredentialsException("bad creds"), request);
+
+      assertTrue(
+          appender.list.stream().noneMatch(e -> e.getLevel() == Level.WARN),
+          "a 401 must not be logged at WARN (unauthenticated is the expected default → probe"
+              + " noise)");
+      ILoggingEvent debug =
+          appender.list.stream()
+              .filter(e -> e.getLevel() == Level.DEBUG)
+              .filter(e -> e.getFormattedMessage().contains("Authentication required"))
+              .findFirst()
+              .orElseThrow(() -> new AssertionError("expected a DEBUG log line for the 401"));
+      String formatted = debug.getFormattedMessage();
+      assertTrue(formatted.contains("GET"), "log must include the HTTP method");
+      assertTrue(
+          formatted.contains("correlationId="), "log must include the correlationId for tracing");
+    } finally {
+      logger.setLevel(original);
+      logger.detachAppender(appender);
+    }
+  }
+
   @Test
   void handleAccessDenied_legacyException_returns403WithCode() {
     ResponseEntity<ProblemDetail> resp =

@@ -44,6 +44,35 @@ This file is **reference documentation**, not a credential store. Treat it as re
 prod realm config changes in a way that matters to the app (token settings, a new client/scope, a
 mapper), update this file in the same PR — secrets stay redacted.
 
+## `backend-service` service-account roles (Admin API)
+
+The backend's user sync (`KeycloakService`, `UserSyncTask`) authenticates to the Keycloak Admin API
+as the `backend-service` confidential client's service account. Because the built-in
+`realm-management` client is omitted from the reference above, the required grants are documented
+here instead. The service account MUST hold **both** `realm-management` client roles:
+
+|     Role     |                                                                                                 Why                                                                                                 |
+|--------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `view-users` | list users (`GET /users`) and read a user's federated identity (Discord back-fill).                                                                                                                 |
+| `view-realm` | list realm roles (`GET /admin/realms/{realm}/roles`) and read their members (`GET /roles/{name}/users`) — the role-indexed resolution added by the 5000-account hardening (ADR-0085 / REQ-SEC-018). |
+
+**`view-realm` is easy to miss:** before role-indexing the sync read roles per user and needed only
+`view-users`, so an older deployment's service account may carry `view-users` alone. With only
+`view-users` the nightly sync fails closed every run — a `403` on the `GET /roles` listing, which
+`KeycloakService` skips (never a wipe) but which means roles/departures stop reconciling until the
+next interactive login. The backend logs this as an explicit "missing `view-realm`" ERROR.
+
+Grant it once, via the Admin Console (**Clients → `backend-service` → Service account roles → Assign
+role → filter by `realm-management` → `view-realm`**) or with `kcadm.sh`:
+
+```bash
+# Authenticate kcadm against the running Keycloak first (adjust server/admin creds), then:
+kcadm.sh add-roles -r iri \
+  --uusername service-account-backend-service \
+  --cclientid realm-management \
+  --rolename view-realm
+```
+
 ## Token & session settings (source of truth for session behaviour)
 
 The realm-level token settings reproduced verbatim in the reference are what govern login

@@ -52,9 +52,9 @@ import org.jetbrains.annotations.Nullable;
  *     empty when only the Staffel side is being touched.
  */
 public record MembershipDeltaRequest(
-    @Valid @Size(max = 2, message = "A user may belong to at most two Staffeln") @Nullable
-        List<StaffelChange> staffeln,
-    @Valid @Nullable List<SpecialCommandChange> specialCommands) {
+    @Size(max = 2, message = "A user may belong to at most two Staffeln") @Nullable
+        List<@Valid StaffelChange> staffeln,
+    @Nullable List<@Valid SpecialCommandChange> specialCommands) {
 
   /**
    * One entry of the desired Staffel membership set. Declarative, not action-tagged: each entry

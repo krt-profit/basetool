@@ -36,6 +36,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.boot.ssl.SslBundles;
 import org.springframework.core.ParameterizedTypeReference;
@@ -231,13 +232,42 @@ public class KeycloakService {
       return result;
 
     } catch (Exception e) {
-      log.error("Failed to fetch users from Keycloak", e);
+      logFetchFailure(e);
       // REQ-OBS-011: the swallow returns an empty roster and the sync still records success, so
       // without this counter a Keycloak Admin-API outage is indistinguishable from a legitimately
       // empty roster (departed users would keep their local roles). KeycloakSyncFetchFailing
       // alerts.
       meterRegistry.counter(MetricNames.KEYCLOAK_SYNC_FETCH_FAILURES).increment();
       return Collections.emptyList();
+    }
+  }
+
+  /**
+   * Logs a swallowed {@link #fetchUsers(Collection, Set)} failure, upgrading the generic message to
+   * an operator-actionable hint when the Admin API answered {@code 401}/{@code 403}. A persistent
+   * authorization rejection is a permission misconfiguration, not a transient outage: since the
+   * role-indexed refactor (ADR-0085 / REQ-SEC-018) the sync lists realm roles ({@code GET
+   * /admin/realms/{realm}/roles}) and reads their members ({@code GET /roles/{name}/users}), which
+   * require the {@code view-realm} realm-management role on top of the {@code view-users} the
+   * roster listing already needs — so a service account provisioned with only {@code view-users}
+   * fails every run once role-indexing shipped. Naming the missing grant makes the daily failure
+   * diagnosable from a single log line; any other failure keeps the original generic message.
+   *
+   * @param e the exception caught while fetching users; never {@code null}.
+   */
+  private void logFetchFailure(@NotNull Exception e) {
+    if (e instanceof RestClientResponseException rcre
+        && (rcre.getStatusCode().value() == 401 || rcre.getStatusCode().value() == 403)) {
+      log.error(
+          "Keycloak Admin API rejected the user sync with {}: the '{}' service account is likely "
+              + "missing the 'view-realm' realm-management role. Since the role-indexed sync lists "
+              + "realm roles and reads their members, view-realm is needed beyond view-users. "
+              + "Grant it in Keycloak; the run is skipped until then.",
+          rcre.getStatusCode(),
+          properties.getClientId(),
+          e);
+    } else {
+      log.error("Failed to fetch users from Keycloak", e);
     }
   }
 

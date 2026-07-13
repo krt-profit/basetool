@@ -617,6 +617,18 @@ interactive JWT path's `findByNameIgnoreCase`), then queries members under Keycl
 removes a scheduled-vs-interactive casing asymmetry: a role whose Keycloak name differs only in case
 from the local name is still resolved, not silently dropped.
 
+**The service account needs `view-realm` on top of `view-users`.** The roster page (`GET /users`) and
+its per-user reads need only `view-users`, but the role-indexed resolution lists realm roles (`GET
+/admin/realms/{realm}/roles`) and reads their members (`GET /roles/{name}/users`), both of which the
+Keycloak Admin API gates behind the `view-realm` realm-management role. The `backend-service` service
+account MUST therefore hold **both** `view-users` and `view-realm`. A service account carrying only
+`view-users` (the pre-role-indexing requirement) fails closed on the `GET /roles` listing with a `403`
+every run: the run skips (no wipe), but the sync never reconciles — departed members keep their local
+roles and role changes propagate only via interactive login. `KeycloakService.fetchUsers` logs the
+401/403 case with an explicit "missing `view-realm`" hint (naming the offending service account) rather
+than the generic fetch-failure message, so the daily failure is diagnosable from one log line. See
+[`docs/keycloak/README.md`](../keycloak/README.md) for the exact grant command.
+
 **A role-membership read failure is fail-safe: it skips the run, never degrades the write.** Because a
 role-stripped set would misclassify holders — mapping a brand-new admin to the `Guest` fallback and
 creating it `PENDING` instead of `ACTIVE`, or mass-downgrading existing admins — a transient failure of
@@ -630,12 +642,14 @@ the run continues.
 `fetchUsers` returns all three, the first request binds `first=0&max=2`, and the second advances to
 `first=2`; with realm role `ADMIN` listing user A, A's DTO carries `ADMIN` resolved from
 `/roles/ADMIN/users`; a realm role spelled `admin` still resolves the app's `ADMIN` (case-insensitive);
-a 5xx on a role's member read yields an empty result (run skipped, no degraded roles); and a clean 404
-on a role's member read keeps the roster with that role simply absent.
+a 5xx on a role's member read yields an empty result (run skipped, no degraded roles); a clean 404
+on a role's member read keeps the roster with that role simply absent; and a `403` on the realm-role
+listing (a service account missing `view-realm`) yields an empty result and increments the
+`basetool_keycloak_sync_fetch_failures_total` counter.
 
 **Enforced by:** `KeycloakServiceTest` · **Code:** `KeycloakService.fetchAllUsers`,
 `KeycloakService.fetchRealmRoleNames`, `KeycloakService.fetchRoleMemberships`,
-`KeycloakSyncProperties.pageSize`, `UserSyncTask`
+`KeycloakService.logFetchFailure`, `KeycloakSyncProperties.pageSize`, `UserSyncTask`
 
 ### REQ-SEC-015 — Bereich/OL leadership grants officer-equivalent reach, never admin rights
 

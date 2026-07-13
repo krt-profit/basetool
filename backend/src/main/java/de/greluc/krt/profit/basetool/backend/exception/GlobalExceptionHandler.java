@@ -206,37 +206,69 @@ public class GlobalExceptionHandler {
       Pattern.compile("constraint\\s+\"?([A-Za-z0-9_]+)\"?");
 
   /**
-   * Structured WARN log line shared by all 4xx handlers. Contains HTTP method, URI, status, stable
-   * {@code code} and the per-request {@code correlationId} so that a user-reported problem can be
-   * located in the log without a reproduction. The optional {@code extra} map is appended verbatim
-   * and MUST NOT contain rejected user values (PII protection, see AGENTS.md).
+   * Structured 4xx log line at {@code WARN}, shared by all client-error handlers. See {@link
+   * #logProblem(HttpServletRequest, ProblemDetail, String, Map, boolean)} for the format and the
+   * level rationale.
+   *
+   * @param req the servlet request, for method/URI enrichment; never {@code null}.
+   * @param pd the problem detail carrying status, {@code code} and {@code correlationId}; never
+   *     {@code null}.
+   * @param shortMessage the human-readable log prefix; never {@code null}.
+   * @param extra optional structured context appended verbatim (no PII); may be {@code null}/empty.
    */
   private void logProblem(
       @org.jetbrains.annotations.NotNull HttpServletRequest req,
       @org.jetbrains.annotations.NotNull ProblemDetail pd,
       @org.jetbrains.annotations.NotNull String shortMessage,
       @org.jetbrains.annotations.Nullable Map<String, ?> extra) {
+    logProblem(req, pd, shortMessage, extra, false);
+  }
+
+  /**
+   * Structured 4xx log line shared by all client-error handlers. Contains HTTP method, URI, status,
+   * stable {@code code} and the per-request {@code correlationId} so that a user-reported problem
+   * can be located in the log without a reproduction. The optional {@code extra} map is appended
+   * verbatim and MUST NOT contain rejected user values (PII protection, see AGENTS.md).
+   *
+   * <p>Logged at {@code WARN} except when {@code debug} is set: a {@code 401 UNAUTHENTICATED} is
+   * the expected, non-actionable default for any unauthenticated caller — internal-TLS health
+   * probes hitting {@code /}, bots/scanners, and pre-login navigation all produce it — so it logs
+   * at {@code DEBUG} to keep the log free of that steady probe noise (REQ-OBS-001). The {@code
+   * basetool_http_error_total{code}} counter preserves the signal regardless of level, and every
+   * other 4xx (including {@code 403 ACCESS_DENIED}) stays at {@code WARN}.
+   *
+   * @param req the servlet request, for method/URI enrichment; never {@code null}.
+   * @param pd the problem detail carrying status, {@code code} and {@code correlationId}; never
+   *     {@code null}.
+   * @param shortMessage the human-readable log prefix; never {@code null}.
+   * @param extra optional structured context appended verbatim (no PII); may be {@code null}/empty.
+   * @param debug {@code true} to log at {@code DEBUG} instead of {@code WARN}.
+   */
+  private void logProblem(
+      @org.jetbrains.annotations.NotNull HttpServletRequest req,
+      @org.jetbrains.annotations.NotNull ProblemDetail pd,
+      @org.jetbrains.annotations.NotNull String shortMessage,
+      @org.jetbrains.annotations.Nullable Map<String, ?> extra,
+      boolean debug) {
     Object cid = pd.getProperties() != null ? pd.getProperties().get("correlationId") : null;
     Object code = pd.getProperties() != null ? pd.getProperties().get("code") : null;
-    if (extra == null || extra.isEmpty()) {
-      log.warn(
-          "{} for {} {} [status={}, code={}, correlationId={}]",
-          shortMessage,
-          req.getMethod(),
-          req.getRequestURI(),
-          pd.getStatus(),
-          code,
-          cid);
+    boolean hasExtra = extra != null && !extra.isEmpty();
+    String format =
+        hasExtra
+            ? "{} for {} {} [status={}, code={}, correlationId={}] {}"
+            : "{} for {} {} [status={}, code={}, correlationId={}]";
+    Object[] args =
+        hasExtra
+            ? new Object[] {
+              shortMessage, req.getMethod(), req.getRequestURI(), pd.getStatus(), code, cid, extra
+            }
+            : new Object[] {
+              shortMessage, req.getMethod(), req.getRequestURI(), pd.getStatus(), code, cid
+            };
+    if (debug) {
+      log.debug(format, args);
     } else {
-      log.warn(
-          "{} for {} {} [status={}, code={}, correlationId={}] {}",
-          shortMessage,
-          req.getMethod(),
-          req.getRequestURI(),
-          pd.getStatus(),
-          code,
-          cid,
-          extra);
+      log.warn(format, args);
     }
   }
 
@@ -347,8 +379,15 @@ public class GlobalExceptionHandler {
             request,
             "unauthenticated",
             CODE_UNAUTHENTICATED);
+    // DEBUG, not WARN: a 401 is the expected default for any unauthenticated caller (internal-TLS
+    // health probes on `/`, bots, pre-login navigation), so WARN-logging it floods the log with
+    // steady probe noise. The counter above preserves the signal; 403 stays at WARN (REQ-OBS-001).
     logProblem(
-        request, pd, "Authentication required", Map.of("exception", ex.getClass().getSimpleName()));
+        request,
+        pd,
+        "Authentication required",
+        Map.of("exception", ex.getClass().getSimpleName()),
+        true);
     return toEntity(pd);
   }
 
