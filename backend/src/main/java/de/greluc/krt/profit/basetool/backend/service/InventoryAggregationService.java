@@ -177,8 +177,8 @@ public class InventoryAggregationService {
 
   /**
    * Filter-only convenience overload of {@link #getMyAggregatedInventory(UUID, List, Integer, List,
-   * List, boolean)} that returns both the caller's shared and personal stacks (no personal-only
-   * narrowing).
+   * List, boolean, boolean)} that returns both the caller's shared and personal stacks (no
+   * personal-/non-personal-only narrowing).
    *
    * @param userId owner id
    * @param materialIds optional material filter
@@ -196,7 +196,7 @@ public class InventoryAggregationService {
           List<UUID> jobOrderIds,
           List<UUID> missionIds) {
     return getMyAggregatedInventory(
-        userId, materialIds, minQuality, jobOrderIds, missionIds, false);
+        userId, materialIds, minQuality, jobOrderIds, missionIds, false, false);
   }
 
   /**
@@ -210,8 +210,11 @@ public class InventoryAggregationService {
    * @param jobOrderIds optional job order filter
    * @param missionIds optional mission filter
    * @param personalOnly when {@code true}, narrows the result to the caller's private stock ({@code
-   *     personal = true} rows) — the "Mein Lager" personal-entries-only filter; when {@code false},
-   *     both shared and personal stacks are returned
+   *     personal = true} rows) — the "Mein Lager" personal-entries-only filter
+   * @param nonPersonalOnly when {@code true}, narrows the result to the caller's shared stock
+   *     ({@code personal = false} rows) — the "Mein Lager" non-personal-entries-only filter;
+   *     mutually exclusive with {@code personalOnly}, and when both are {@code false} both shared
+   *     and personal stacks are returned
    * @return aggregated items
    * @throws NotFoundException when the user id is unknown
    */
@@ -222,7 +225,8 @@ public class InventoryAggregationService {
           Integer minQuality,
           List<UUID> jobOrderIds,
           List<UUID> missionIds,
-          boolean personalOnly) {
+          boolean personalOnly,
+          boolean nonPersonalOnly) {
     User user =
         userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
     boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
@@ -238,7 +242,8 @@ public class InventoryAggregationService {
             hasJobOrders ? jobOrderIds : null,
             hasMissions,
             hasMissions ? missionIds : null,
-            personalOnly);
+            personalOnly,
+            nonPersonalOnly);
 
     return buildGroupedFromStacks(stacks);
   }

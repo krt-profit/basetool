@@ -204,8 +204,13 @@
                     </div>
                     <label class="flex-gap-sm cursor-pointer krtm-align-items-center-6a4e">
                         <input type="checkbox" id="personalOnly" name="personalOnly" value="true" class="item-checkbox"
-                               th:checked="${selectedPersonalOnly}" data-trigger="inv-my-filter">
+                               th:checked="${selectedPersonalOnly}" data-trigger="inv-my-personal-filter">
                         <span class="form-label-xs" th:text="#{inventory.filter.personalOnly}">Nur pers\u00f6nliche Eintr\u00e4ge</span>
+                    </label>
+                    <label class="flex-gap-sm cursor-pointer krtm-align-items-center-6a4e">
+                        <input type="checkbox" id="nonPersonalOnly" name="nonPersonalOnly" value="true" class="item-checkbox"
+                               th:checked="${selectedNonPersonalOnly}" data-trigger="inv-my-personal-filter">
+                        <span class="form-label-xs" th:text="#{inventory.filter.nonPersonalOnly}">Nur nicht-pers\u00f6nliche Eintr\u00e4ge</span>
                     </label>
                     <button type="button" class="btn btn-ghost" data-trigger="inv-my-reset-filter" th:text="#{inventory.filter.reset}">Filter zur\u00fccksetzen</button>
                 </form>
