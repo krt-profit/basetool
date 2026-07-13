@@ -32,6 +32,7 @@ import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
@@ -356,6 +357,36 @@ public class BackendApiClient {
   /** DELETE overload that targets the anonymous public WebClient when {@code isPublic} is true. */
   public <R> R delete(String uri, Class<R> responseType, boolean isPublic) {
     return executeDelete(isPublic ? publicWebClient : webClient, uri, responseType);
+  }
+
+  /**
+   * DELETE against the authenticated backend that carries a request body — needed by the inventory
+   * per-allocation remove endpoint, which identifies the slice to drop through a body (dimension +
+   * target + echoed version) rather than the URI. The body-less {@link #delete(String, Class)}
+   * stays the default for the common no-payload case.
+   *
+   * @param uri the backend path.
+   * @param body the request payload; must not be {@code null} (use {@link #delete(String, Class)}
+   *     for a body-less DELETE).
+   * @param responseType the expected response type.
+   * @param <T> the request-body type.
+   * @param <R> the response type.
+   * @return the deserialized response body.
+   */
+  public <T, R> R delete(String uri, T body, Class<R> responseType) {
+    try {
+      return webClient
+          .method(HttpMethod.DELETE)
+          .uri(uri)
+          .bodyValue(body)
+          .retrieve()
+          .bodyToMono(responseType)
+          .block();
+    } catch (WebClientResponseException e) {
+      return handleWebClientException(e, "DELETE", uri);
+    } catch (Exception e) {
+      return handleException(e, "DELETE", uri);
+    }
   }
 
   private <R> R executeDelete(WebClient client, String uri, Class<R> responseType) {
