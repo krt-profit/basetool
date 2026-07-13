@@ -282,7 +282,8 @@ public class InventoryWriteController {
       if (fromAdminListing) {
         return inventoryPageController.viewAllInventory(null, null, null, null, false, model);
       }
-      return inventoryPageController.viewMyInventory(null, null, null, null, false, false, model);
+      return inventoryPageController.viewMyInventory(
+          null, null, null, null, false, false, false, model);
     }
 
     try {

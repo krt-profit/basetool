@@ -44893,6 +44893,14 @@
             "type" : "boolean",
             "default" : false
           }
+        }, {
+          "name" : "nonPersonalOnly",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          }
         } ],
         "responses" : {
           "200" : {

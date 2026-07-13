@@ -378,6 +378,7 @@ class InventoryItemServiceTest {
             eq(jobOrderIds),
             eq(true),
             eq(missionIds),
+            eq(false),
             eq(false)))
         .thenReturn(List.of());
 
@@ -397,6 +398,7 @@ class InventoryItemServiceTest {
             eq(jobOrderIds),
             eq(true),
             eq(missionIds),
+            eq(false),
             eq(false));
   }
 
@@ -415,6 +417,7 @@ class InventoryItemServiceTest {
             eq(null),
             eq(false),
             eq(null),
+            eq(false),
             eq(false)))
         .thenReturn(List.of());
 
@@ -431,6 +434,7 @@ class InventoryItemServiceTest {
             eq(null),
             eq(false),
             eq(null),
+            eq(false),
             eq(false));
   }
 
@@ -454,6 +458,7 @@ class InventoryItemServiceTest {
             eq(null),
             eq(false),
             eq(null),
+            eq(false),
             eq(false)))
         .thenReturn(List.of());
 
@@ -473,6 +478,7 @@ class InventoryItemServiceTest {
             eq(null),
             eq(false),
             eq(null),
+            eq(false),
             eq(false));
   }
 
@@ -493,12 +499,13 @@ class InventoryItemServiceTest {
             eq(null),
             eq(false),
             eq(null),
-            eq(true)))
+            eq(true),
+            eq(false)))
         .thenReturn(List.of());
 
     // When
     List<GroupedInventoryDto> result =
-        inventoryItemService.getMyAggregatedInventory(userId, null, null, null, null, true);
+        inventoryItemService.getMyAggregatedInventory(userId, null, null, null, null, true, false);
 
     // Then
     assertNotNull(result);
@@ -512,6 +519,48 @@ class InventoryItemServiceTest {
             eq(null),
             eq(false),
             eq(null),
+            eq(true),
+            eq(false));
+  }
+
+  @Test
+  void getMyAggregatedInventory_nonPersonalOnly_forwardsFlagToRepository() {
+    // Given
+    UUID userId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(inventoryItemRepository.findUserStacks(
+            eq(userId),
+            eq(false),
+            eq(null),
+            eq(null),
+            eq(false),
+            eq(null),
+            eq(false),
+            eq(null),
+            eq(false),
+            eq(true)))
+        .thenReturn(List.of());
+
+    // When
+    List<GroupedInventoryDto> result =
+        inventoryItemService.getMyAggregatedInventory(userId, null, null, null, null, false, true);
+
+    // Then
+    assertNotNull(result);
+    verify(inventoryItemRepository)
+        .findUserStacks(
+            eq(userId),
+            eq(false),
+            eq(null),
+            eq(null),
+            eq(false),
+            eq(null),
+            eq(false),
+            eq(null),
+            eq(false),
             eq(true));
   }
 

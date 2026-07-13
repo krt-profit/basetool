@@ -293,6 +293,8 @@ public class InventoryPageController {
    * @param missionIds optional mission id filter (multi)
    * @param personalOnly when true, show only the caller's personal entries ({@code personal =
    *     true})
+   * @param nonPersonalOnly when true, show only the caller's non-personal (shared) entries ({@code
+   *     personal = false}); mutually exclusive with {@code personalOnly}
    * @param fragment when true, return the {@code inventoryTableFragment} fragment
    * @param model Thymeleaf model populated with grouped items, filter source catalogs and the
    *     auth-derived UX flags
@@ -305,6 +307,7 @@ public class InventoryPageController {
       @RequestParam(required = false) List<UUID> jobOrderIds,
       @RequestParam(required = false) List<UUID> missionIds,
       @RequestParam(required = false, defaultValue = "false") boolean personalOnly,
+      @RequestParam(required = false, defaultValue = "false") boolean nonPersonalOnly,
       @RequestParam(required = false, defaultValue = "false") boolean fragment,
       Model model) {
     if (!model.containsAttribute("inventoryForm")) {
@@ -342,6 +345,9 @@ public class InventoryPageController {
       if (personalOnly) {
         uriBuilder.queryParam("personalOnly", true);
       }
+      if (nonPersonalOnly) {
+        uriBuilder.queryParam("nonPersonalOnly", true);
+      }
       String url = uriBuilder.build().toUriString();
       List<GroupedInventoryDto> res = backendApiClient.get(url, GROUPED_INVENTORY_LIST);
       if (res != null) {
@@ -365,6 +371,7 @@ public class InventoryPageController {
     model.addAttribute("selectedJobOrderIds", jobOrderIds);
     model.addAttribute("selectedMissionIds", missionIds);
     model.addAttribute("selectedPersonalOnly", personalOnly);
+    model.addAttribute("selectedNonPersonalOnly", nonPersonalOnly);
     model.addAttribute("authUserId", currentAuthName());
     model.addAttribute("canEditForeignNotes", hasLogisticianOrAbove());
 

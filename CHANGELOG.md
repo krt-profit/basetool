@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **Lager: Neuer Filter „Nur nicht-persönliche Einträge" in „Mein Lager".** Neben „Nur persönliche Einträge" lässt sich die Ansicht jetzt auch umgekehrt auf die geteilten (nicht-persönlichen) Bestände einschränken. Beide Filter schließen sich gegenseitig aus (das Aktivieren des einen hebt den anderen auf) und werden wie die übrigen Filter in der Seiten-URL mitgeführt (REQ-INV-006).
+
 - **Lager: Stückzahl-Materialien werden wieder zu einem Lagereintrag zusammengeführt.** Gleichartige Bestände desselben Stückzahl-Materials (gleiche Qualität, Lagerort, Auftrag und Einsatz) landen beim Einbuchen, Ändern und Umbuchen automatisch in einem einzigen Eintrag, wobei vorhandene Notizen zusammengeführt werden; bei SCU-Materialien lässt sich das Zusammenführen pro Aktion optional über eine Checkbox im Dialog aktivieren. Angebote in der Materialbörse bleiben dabei unverändert (die angebotene Menge steigt nicht), und bereits vorhandene passende Einträge werden beim Ausrollen der Änderung einmalig zusammengeführt.
 
 - **Materialbörse: Angebote werden automatisch verringert, wenn der zugehörige Lagerbestand kleiner wird.** Wird ein Lagereintrag ausgebucht, umgebucht, übergeben oder verringert und die angebotene Menge ist nicht mehr gedeckt, sinkt die angebotene Menge des Angebots dauerhaft auf den verbleibenden Bestand. Erhöht sich der Bestand später wieder, bleibt das Angebot unverändert — mehr anzubieten ist eine bewusste Entscheidung des Anbieters.

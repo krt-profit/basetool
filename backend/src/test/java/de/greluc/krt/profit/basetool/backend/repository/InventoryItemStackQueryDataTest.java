@@ -159,7 +159,7 @@ class InventoryItemStackQueryDataTest {
 
     List<InventoryStackAggregate> stacks =
         inventoryItemRepository.findUserStacks(
-            user.getId(), false, null, null, false, null, false, null, false);
+            user.getId(), false, null, null, false, null, false, null, false, false);
 
     assertThat(stacks)
         .as(
@@ -171,13 +171,14 @@ class InventoryItemStackQueryDataTest {
   }
 
   /**
-   * With {@code personalOnly = true} the owner's grouped "my inventory" view must return only the
-   * caller's private stock ({@code personal = true}); a shared (non-personal) contribution at the
-   * same location/material is excluded. The same query with {@code personalOnly = false} keeps both
-   * stacks — the "Mein Lager" personal-entries-only filter.
+   * The mutually exclusive "Mein Lager" personal- / non-personal-entries-only filters narrow the
+   * owner's grouped view: {@code personalOnly = true} returns only the caller's private stock
+   * ({@code personal = true}), {@code nonPersonalOnly = true} returns only the shared stock ({@code
+   * personal = false}), and both {@code false} keeps every stack. Seeds one personal and one shared
+   * contribution at the same location/material and asserts each toggle keeps only its side.
    */
   @Test
-  void findUserStacks_personalOnly_returnsOnlyPersonalStock() {
+  void findUserStacks_personalAndNonPersonalOnly_narrowToMatchingStock() {
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("u-" + UUID.randomUUID());
@@ -213,18 +214,27 @@ class InventoryItemStackQueryDataTest {
 
     List<InventoryStackAggregate> personalOnly =
         inventoryItemRepository.findUserStacks(
-            user.getId(), false, null, null, false, null, false, null, true);
+            user.getId(), false, null, null, false, null, false, null, true, false);
     assertThat(personalOnly)
         .as("personalOnly=true must return only the caller's personal stock")
         .hasSize(1);
     assertThat(personalOnly.get(0).personal()).isTrue();
     assertThat(personalOnly.get(0).totalAmount()).isEqualTo(10.0);
 
+    List<InventoryStackAggregate> nonPersonalOnly =
+        inventoryItemRepository.findUserStacks(
+            user.getId(), false, null, null, false, null, false, null, false, true);
+    assertThat(nonPersonalOnly)
+        .as("nonPersonalOnly=true must return only the caller's shared (non-personal) stock")
+        .hasSize(1);
+    assertThat(nonPersonalOnly.get(0).personal()).isFalse();
+    assertThat(nonPersonalOnly.get(0).totalAmount()).isEqualTo(25.0);
+
     List<InventoryStackAggregate> all =
         inventoryItemRepository.findUserStacks(
-            user.getId(), false, null, null, false, null, false, null, false);
+            user.getId(), false, null, null, false, null, false, null, false, false);
     assertThat(all)
-        .as("personalOnly=false must return both the personal and the shared stack")
+        .as("both toggles false must return the personal and the shared stack")
         .hasSize(2);
   }
 }

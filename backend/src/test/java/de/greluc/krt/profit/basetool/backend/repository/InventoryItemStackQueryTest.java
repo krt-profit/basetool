@@ -61,7 +61,7 @@ class InventoryItemStackQueryTest {
         .isEmpty();
     assertThat(
             inventoryItemRepository.findUserStacks(
-                UUID.randomUUID(), false, null, null, false, null, false, null, false))
+                UUID.randomUUID(), false, null, null, false, null, false, null, false, false))
         .isEmpty();
     assertThat(
             inventoryItemRepository
