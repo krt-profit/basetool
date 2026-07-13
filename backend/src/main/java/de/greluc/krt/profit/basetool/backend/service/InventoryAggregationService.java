@@ -348,10 +348,6 @@ public class InventoryAggregationService {
               refs.user(),
               refs.location(),
               refs.quality(),
-              refs.jobOrderId(),
-              refs.jobOrderDisplayId(),
-              refs.missionId(),
-              refs.missionName(),
               refs.personal(),
               refs.owningSquadron(),
               amt,
@@ -389,8 +385,6 @@ public class InventoryAggregationService {
     probe.setMaterial(aggregate.material());
     probe.setLocation(aggregate.location());
     probe.setQuality(aggregate.quality());
-    probe.setJobOrder(aggregate.jobOrder());
-    probe.setMission(aggregate.mission());
     probe.setPersonal(aggregate.personal());
     probe.setOwningOrgUnit(aggregate.owningOrgUnit());
     return inventoryItemMapper.toDto(probe);
@@ -407,8 +401,6 @@ public class InventoryAggregationService {
    * @param materialId the stack's material
    * @param locationId the stack's storage location
    * @param quality the stack's quality grade, or {@code null}
-   * @param jobOrderId the stack's job-order id, or {@code null}
-   * @param missionId the stack's mission id, or {@code null}
    * @param personal whether the stack is private stock (defaults to {@code false} when {@code
    *     null})
    * @param owningOrgUnitId the stack's owning org-unit pool id, or {@code null}
@@ -420,8 +412,6 @@ public class InventoryAggregationService {
       UUID materialId,
       UUID locationId,
       Integer quality,
-      UUID jobOrderId,
-      UUID missionId,
       Boolean personal,
       UUID owningOrgUnitId,
       Pageable pageable) {
@@ -433,8 +423,6 @@ public class InventoryAggregationService {
             materialId,
             locationId,
             quality,
-            jobOrderId,
-            missionId,
             personal != null ? personal : Boolean.FALSE,
             owningOrgUnitId,
             pageable)
@@ -452,8 +440,6 @@ public class InventoryAggregationService {
    * @param userId the stack's owning user
    * @param locationId the stack's storage location
    * @param quality the stack's quality grade, or {@code null}
-   * @param jobOrderId the stack's job-order id, or {@code null}
-   * @param missionId the stack's mission id, or {@code null}
    * @param owningOrgUnitId the stack's owning org-unit pool id, or {@code null}
    * @param pageable the page request (the query forces oldest-first by creation instant)
    * @return one page of the stack's entries, oldest-first
@@ -463,8 +449,6 @@ public class InventoryAggregationService {
       UUID userId,
       UUID locationId,
       Integer quality,
-      UUID jobOrderId,
-      UUID missionId,
       UUID owningOrgUnitId,
       Pageable pageable) {
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
@@ -474,8 +458,6 @@ public class InventoryAggregationService {
             userId,
             locationId,
             quality,
-            jobOrderId,
-            missionId,
             owningOrgUnitId,
             scope.adminAllScope(),
             scope.activeOrgUnitId(),

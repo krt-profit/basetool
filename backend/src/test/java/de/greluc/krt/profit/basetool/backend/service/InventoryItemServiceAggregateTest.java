@@ -400,8 +400,6 @@ class InventoryItemServiceAggregateTest {
         null,
         location,
         quality,
-        null,
-        null,
         false,
         null,
         totalAmount,

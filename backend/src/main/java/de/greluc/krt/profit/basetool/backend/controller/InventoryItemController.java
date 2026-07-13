@@ -255,8 +255,6 @@ public class InventoryItemController {
       @RequestParam @NotNull UUID materialId,
       @RequestParam @NotNull UUID locationId,
       @RequestParam(required = false) Integer quality,
-      @RequestParam(required = false) UUID jobOrderId,
-      @RequestParam(required = false) UUID missionId,
       @RequestParam(required = false, defaultValue = "false") Boolean personal,
       @RequestParam(required = false) UUID owningOrgUnitId,
       @RequestParam(required = false) Integer page,
@@ -267,8 +265,6 @@ public class InventoryItemController {
             materialId,
             locationId,
             quality,
-            jobOrderId,
-            missionId,
             personal,
             owningOrgUnitId,
             stackEntriesPageRequest(page, size));
@@ -291,8 +287,6 @@ public class InventoryItemController {
       @RequestParam @NotNull UUID userId,
       @RequestParam @NotNull UUID locationId,
       @RequestParam(required = false) Integer quality,
-      @RequestParam(required = false) UUID jobOrderId,
-      @RequestParam(required = false) UUID missionId,
       @RequestParam(required = false) UUID owningOrgUnitId,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size) {
@@ -302,8 +296,6 @@ public class InventoryItemController {
             userId,
             locationId,
             quality,
-            jobOrderId,
-            missionId,
             owningOrgUnitId,
             stackEntriesPageRequest(page, size));
     return PageResponse.of(p);

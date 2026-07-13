@@ -143,9 +143,11 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       "SELECT i FROM InventoryItem i WHERE i.personal = false AND "
           + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE
           + " AND (:hasMaterials = false OR i.material.id IN :materialIds) AND (:minQuality IS"
-          + " NULL OR i.quality >= :minQuality) AND (:hasJobOrders = false OR (i.jobOrder IS NOT"
-          + " NULL AND i.jobOrder.id IN :jobOrderIds)) AND (:hasMissions = false OR (i.mission IS"
-          + " NOT NULL AND i.mission.id IN :missionIds))")
+          + " NULL OR i.quality >= :minQuality) AND (:hasJobOrders = false OR EXISTS (SELECT 1"
+          + " FROM InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrder.id"
+          + " IN :jobOrderIds)) AND (:hasMissions = false OR EXISTS (SELECT 1 FROM"
+          + " InventoryMissionAllocation ma WHERE ma.inventoryItem = i AND ma.mission.id IN"
+          + " :missionIds))")
   Page<InventoryItem> findGlobalByFilters(
       @Param("hasMaterials") boolean hasMaterials,
       @Param("materialIds") List<UUID> materialIds,
@@ -170,9 +172,10 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       """
       SELECT i FROM InventoryItem i WHERE i.user = :user AND (:hasMaterials = false OR
       i.material.id IN :materialIds) AND (:minQuality IS NULL OR i.quality >= :minQuality)
-      AND (:hasJobOrders = false OR (i.jobOrder IS NOT NULL AND i.jobOrder.id IN
-      :jobOrderIds)) AND (:hasMissions = false OR (i.mission IS NOT NULL AND i.mission.id
-      IN :missionIds))
+      AND (:hasJobOrders = false OR EXISTS (SELECT 1 FROM InventoryJobOrderAllocation ja
+      WHERE ja.inventoryItem = i AND ja.jobOrder.id IN :jobOrderIds)) AND (:hasMissions =
+      false OR EXISTS (SELECT 1 FROM InventoryMissionAllocation ma WHERE ma.inventoryItem =
+      i AND ma.mission.id IN :missionIds))
       """)
   Page<InventoryItem> findUserByFilters(
       @Param("user") User user,
@@ -197,18 +200,19 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.InventoryStackAggregate(i.material, i.user, i.location, i.quality, jo, m, i.personal,
+      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.InventoryStackAggregate(i.material, i.user, i.location, i.quality, i.personal,
       oou, SUM(COALESCE(i.amount, 0.0)), SUM(COALESCE(i.amount, 0.0) *
       COALESCE(i.quality, 0)), MAX(COALESCE(i.quality, 0)), COUNT(i)) FROM InventoryItem i
-      LEFT JOIN i.jobOrder jo LEFT JOIN i.mission m LEFT JOIN i.owningOrgUnit oou
+      LEFT JOIN i.owningOrgUnit oou
       WHERE i.personal = false AND
       """
           + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE
           + " AND (:hasMaterials = false OR i.material.id IN :materialIds) AND (:minQuality IS"
-          + " NULL OR i.quality >= :minQuality) AND (:hasJobOrders = false OR (i.jobOrder IS NOT"
-          + " NULL AND i.jobOrder.id IN :jobOrderIds)) AND (:hasMissions = false OR (i.mission IS"
-          + " NOT NULL AND i.mission.id IN :missionIds)) GROUP BY i.material, i.user, i.location,"
-          + " i.quality, jo, m, i.personal, oou")
+          + " NULL OR i.quality >= :minQuality) AND (:hasJobOrders = false OR EXISTS (SELECT 1"
+          + " FROM InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrder.id"
+          + " IN :jobOrderIds)) AND (:hasMissions = false OR EXISTS (SELECT 1 FROM"
+          + " InventoryMissionAllocation ma WHERE ma.inventoryItem = i AND ma.mission.id IN"
+          + " :missionIds)) GROUP BY i.material, i.user, i.location, i.quality, i.personal, oou")
   List<InventoryStackAggregate> findGlobalStacks(
       @Param("hasMaterials") boolean hasMaterials,
       @Param("materialIds") List<UUID> materialIds,
@@ -232,16 +236,17 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.InventoryStackAggregate(i.material, i.user, i.location, i.quality, jo, m, i.personal,
+      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.InventoryStackAggregate(i.material, i.user, i.location, i.quality, i.personal,
       oou, SUM(COALESCE(i.amount, 0.0)), SUM(COALESCE(i.amount, 0.0) *
       COALESCE(i.quality, 0)), MAX(COALESCE(i.quality, 0)), COUNT(i)) FROM InventoryItem i
-      LEFT JOIN i.jobOrder jo LEFT JOIN i.mission m LEFT JOIN i.owningOrgUnit oou
+      LEFT JOIN i.owningOrgUnit oou
       WHERE i.user.id = :userId AND (:personalOnly = false OR i.personal = true)
       AND (:hasMaterials = false OR i.material.id IN :materialIds) AND (:minQuality IS NULL
-      OR i.quality >= :minQuality) AND (:hasJobOrders = false OR (i.jobOrder IS NOT NULL
-      AND i.jobOrder.id IN :jobOrderIds)) AND (:hasMissions = false OR (i.mission IS NOT
-      NULL AND i.mission.id IN :missionIds)) GROUP BY i.material, i.user, i.location,
-      i.quality, jo, m, i.personal, oou
+      OR i.quality >= :minQuality) AND (:hasJobOrders = false OR EXISTS (SELECT 1 FROM
+      InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrder.id IN
+      :jobOrderIds)) AND (:hasMissions = false OR EXISTS (SELECT 1 FROM
+      InventoryMissionAllocation ma WHERE ma.inventoryItem = i AND ma.mission.id IN
+      :missionIds)) GROUP BY i.material, i.user, i.location, i.quality, i.personal, oou
       """)
   List<InventoryStackAggregate> findUserStacks(
       @Param("userId") UUID userId,
@@ -269,9 +274,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       """
       SELECT i FROM InventoryItem i WHERE i.personal = false AND i.material.id = :materialId AND
       i.user.id = :userId AND i.location.id = :locationId AND ((:quality IS NULL AND
-      i.quality IS NULL) OR i.quality = :quality) AND ((:jobOrderId IS NULL AND i.jobOrder
-      IS NULL) OR i.jobOrder.id = :jobOrderId) AND ((:missionId IS NULL AND i.mission IS
-      NULL) OR i.mission.id = :missionId) AND ((:owningOrgUnitId IS NULL AND
+      i.quality IS NULL) OR i.quality = :quality) AND ((:owningOrgUnitId IS NULL AND
       i.owningOrgUnit IS NULL) OR i.owningOrgUnit.id = :owningOrgUnitId) AND
       """
           + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE
@@ -281,8 +284,6 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("userId") UUID userId,
       @Param("locationId") UUID locationId,
       @Param("quality") Integer quality,
-      @Param("jobOrderId") UUID jobOrderId,
-      @Param("missionId") UUID missionId,
       @Param("owningOrgUnitId") UUID owningOrgUnitId,
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
@@ -303,9 +304,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       """
       SELECT i FROM InventoryItem i WHERE i.user.id = :userId AND i.material.id = :materialId AND
       i.location.id = :locationId AND ((:quality IS NULL AND i.quality IS NULL) OR
-      i.quality = :quality) AND ((:jobOrderId IS NULL AND i.jobOrder IS NULL) OR
-      i.jobOrder.id = :jobOrderId) AND ((:missionId IS NULL AND i.mission IS NULL) OR
-      i.mission.id = :missionId) AND i.personal = :personal AND ((:owningOrgUnitId IS NULL
+      i.quality = :quality) AND i.personal = :personal AND ((:owningOrgUnitId IS NULL
       AND i.owningOrgUnit IS NULL) OR i.owningOrgUnit.id = :owningOrgUnitId) ORDER BY
       i.createdAt ASC
       """)
@@ -314,8 +313,6 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("materialId") UUID materialId,
       @Param("locationId") UUID locationId,
       @Param("quality") Integer quality,
-      @Param("jobOrderId") UUID jobOrderId,
-      @Param("missionId") UUID missionId,
       @Param("personal") Boolean personal,
       @Param("owningOrgUnitId") UUID owningOrgUnitId,
       Pageable pageable);

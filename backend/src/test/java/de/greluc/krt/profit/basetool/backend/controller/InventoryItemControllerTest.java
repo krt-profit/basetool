@@ -266,8 +266,6 @@ class InventoryItemControllerTest {
             eq(materialId),
             eq(locationId),
             eq(800),
-            eq(jobOrderId),
-            eq(missionId),
             eq(Boolean.TRUE),
             eq(owningOrgUnitId),
             any(Pageable.class)))
@@ -275,7 +273,7 @@ class InventoryItemControllerTest {
 
     PageResponse<InventoryItemDto> result =
         controller.getMyStackEntries(
-            jwt, materialId, locationId, 800, jobOrderId, missionId, true, owningOrgUnitId, 0, 500);
+            jwt, materialId, locationId, 800, true, owningOrgUnitId, 0, 500);
 
     assertThat(result.content()).containsExactly(dto);
     // The owner id is derived from the JWT, never a request parameter (personal-inventory
@@ -289,8 +287,6 @@ class InventoryItemControllerTest {
             eq(materialId),
             eq(locationId),
             eq(800),
-            eq(jobOrderId),
-            eq(missionId),
             eq(Boolean.TRUE),
             eq(owningOrgUnitId),
             pageable.capture());
@@ -308,19 +304,11 @@ class InventoryItemControllerTest {
     InventoryItemDto dto = inventoryItem(UUID.randomUUID());
     Page<InventoryItemDto> page = new PageImpl<>(List.of(dto), PageRequest.of(0, 20), 1);
     when(inventoryItemService.getAllStackEntries(
-            eq(materialId),
-            eq(userId),
-            eq(locationId),
-            isNull(),
-            isNull(),
-            isNull(),
-            isNull(),
-            any(Pageable.class)))
+            eq(materialId), eq(userId), eq(locationId), isNull(), isNull(), any(Pageable.class)))
         .thenReturn(page);
 
     PageResponse<InventoryItemDto> result =
-        controller.getAllStackEntries(
-            materialId, userId, locationId, null, null, null, null, null, null);
+        controller.getAllStackEntries(materialId, userId, locationId, null, null, null, null);
 
     assertThat(result.content()).containsExactly(dto);
     // The squadron-wide drill-down is gated by @PreAuthorize + service scope, not a JWT-owner read.
@@ -329,14 +317,7 @@ class InventoryItemControllerTest {
     ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
     verify(inventoryItemService)
         .getAllStackEntries(
-            eq(materialId),
-            eq(userId),
-            eq(locationId),
-            isNull(),
-            isNull(),
-            isNull(),
-            isNull(),
-            pageable.capture());
+            eq(materialId), eq(userId), eq(locationId), isNull(), isNull(), pageable.capture());
     assertThat(pageable.getValue().getPageSize()).isEqualTo(20);
     assertThat(pageable.getValue().getPageNumber()).isZero();
   }

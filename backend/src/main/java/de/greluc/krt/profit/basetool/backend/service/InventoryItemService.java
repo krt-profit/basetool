@@ -277,8 +277,6 @@ public class InventoryItemService {
    * @param materialId the stack's material
    * @param locationId the stack's storage location
    * @param quality the stack's quality grade, or {@code null}
-   * @param jobOrderId the stack's job-order id, or {@code null}
-   * @param missionId the stack's mission id, or {@code null}
    * @param personal whether the stack is private stock (defaults to {@code false} when {@code
    *     null})
    * @param owningOrgUnitId the stack's owning org-unit pool id, or {@code null}
@@ -290,21 +288,11 @@ public class InventoryItemService {
       UUID materialId,
       UUID locationId,
       Integer quality,
-      UUID jobOrderId,
-      UUID missionId,
       Boolean personal,
       UUID owningOrgUnitId,
       Pageable pageable) {
     return inventoryAggregationService.getMyStackEntries(
-        userId,
-        materialId,
-        locationId,
-        quality,
-        jobOrderId,
-        missionId,
-        personal,
-        owningOrgUnitId,
-        pageable);
+        userId, materialId, locationId, quality, personal, owningOrgUnitId, pageable);
   }
 
   /**
@@ -318,8 +306,6 @@ public class InventoryItemService {
    * @param userId the stack's owning user
    * @param locationId the stack's storage location
    * @param quality the stack's quality grade, or {@code null}
-   * @param jobOrderId the stack's job-order id, or {@code null}
-   * @param missionId the stack's mission id, or {@code null}
    * @param owningOrgUnitId the stack's owning org-unit pool id, or {@code null}
    * @param pageable the page request (the query forces oldest-first by creation instant)
    * @return one page of the stack's entries, oldest-first
@@ -329,12 +315,10 @@ public class InventoryItemService {
       UUID userId,
       UUID locationId,
       Integer quality,
-      UUID jobOrderId,
-      UUID missionId,
       UUID owningOrgUnitId,
       Pageable pageable) {
     return inventoryAggregationService.getAllStackEntries(
-        materialId, userId, locationId, quality, jobOrderId, missionId, owningOrgUnitId, pageable);
+        materialId, userId, locationId, quality, owningOrgUnitId, pageable);
   }
 
   /**

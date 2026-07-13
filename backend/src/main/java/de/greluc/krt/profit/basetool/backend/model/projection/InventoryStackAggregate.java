@@ -19,10 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.model.projection;
 
-import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
-import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.User;
 
@@ -31,18 +29,18 @@ import de.greluc.krt.profit.basetool.backend.model.User;
  * natural key (stock identity) collapsed by the database for the group-on-read Lager views
  * (ADR-0003, REQ-INV-002). One row of this projection equals one display stack; the underlying
  * individual entries are <em>not</em> loaded here — they are fetched lazily and paginated when a
- * stack is expanded. The shared-identity fields ({@code material}, {@code user}, {@code location},
- * {@code quality}, {@code jobOrder}, {@code mission}, {@code personal}, {@code owningOrgUnit}) are
- * the GROUP BY key; the remaining fields are the per-stack aggregates. {@code weightedQualitySum}
- * is {@code SUM(amount * quality)} so the service can derive the amount-weighted mean quality as
- * {@code weightedQualitySum / totalAmount} without re-reading the entries.
+ * stack is expanded. Since Variante C (REQ-INV-027) moved the job-order/mission link off the row
+ * into per-entry quantity allocations, they are no longer part of the stock identity: the shared
+ * key is ({@code material}, {@code user}, {@code location}, {@code quality}, {@code personal},
+ * {@code owningOrgUnit}) and each leaf entry carries its own allocation chips. {@code
+ * weightedQualitySum} is {@code SUM(amount * quality)} so the service can derive the
+ * amount-weighted mean quality as {@code weightedQualitySum / totalAmount} without re-reading the
+ * entries.
  *
  * @param material the grouping material shared by every entry in the stack
  * @param user the owning user shared by every entry
  * @param location the storage location shared by every entry
  * @param quality the quality grade shared by every entry, or {@code null}
- * @param jobOrder the linked job order shared by every entry, or {@code null} when unassigned
- * @param mission the linked mission shared by every entry, or {@code null} when unassigned
  * @param personal whether the stack holds private (owner-only) stock
  * @param owningOrgUnit the owning org-unit pool shared by every entry, or {@code null} for an
  *     ownerless-personal stack
@@ -58,8 +56,6 @@ public record InventoryStackAggregate(
     User user,
     Location location,
     Integer quality,
-    JobOrder jobOrder,
-    Mission mission,
     Boolean personal,
     OrgUnit owningOrgUnit,
     Double totalAmount,
