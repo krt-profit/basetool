@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
+import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedInventoryDto;
@@ -36,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -540,19 +542,24 @@ public class InventoryAggregationService {
                   item.getUser().getDisplayName() != null
                       ? item.getUser().getDisplayName()
                       : item.getUser().getUsername();
-              // Variante A (REQ-INV-027): delivered is per-order — read this order's own slice
-              // (batched via @BatchSize), not the vestigial entry scalar, so an entry serving
-              // several orders shows the right delivered state for each. The quantity stays the
-              // entry's total for now (the per-order allocated share + the full-amount transfer
-              // semantics are a follow-up).
-              boolean delivered =
+              // Variante C (REQ-INV-027): both the delivered flag and the order-relevant quantity
+              // are per-order — read this order's own job-order slice (batched via @BatchSize), not
+              // the whole entry. `delivered` is the slice's flag (an entry serving several orders
+              // shows the right state for each); `allocatedQuantity` is the slice's amount, i.e.
+              // the
+              // share actually earmarked to THIS order, which is what counts toward its fulfilment.
+              // `quantity` stays the entry's total physical stock — it backs the full-row owner /
+              // location transfer (data-amount) and is shown as context alongside the allocated
+              // share.
+              Optional<InventoryJobOrderAllocation> slice =
                   item.getJobOrderAllocations().stream()
                       .filter(
                           a ->
                               a.getJobOrder() != null && jobOrderId.equals(a.getJobOrder().getId()))
-                      .findFirst()
-                      .map(a -> Boolean.TRUE.equals(a.getDelivered()))
-                      .orElse(false);
+                      .findFirst();
+              boolean delivered =
+                  slice.map(a -> Boolean.TRUE.equals(a.getDelivered())).orElse(false);
+              Double allocatedQuantity = slice.map(a -> a.getAmount()).orElse(item.getAmount());
               return new MaterialCollectionEntryDto(
                   item.getId(),
                   item.getVersion() != null ? item.getVersion() : 0L,
@@ -563,6 +570,7 @@ public class InventoryAggregationService {
                   item.getMaterial().getName(),
                   item.getQuality() != null ? item.getQuality().doubleValue() : null,
                   item.getAmount(),
+                  allocatedQuantity,
                   delivered);
             })
         .toList();

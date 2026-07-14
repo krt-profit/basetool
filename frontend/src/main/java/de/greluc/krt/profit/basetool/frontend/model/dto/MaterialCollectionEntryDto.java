@@ -21,7 +21,11 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 import java.util.UUID;
 
-/** DTO for a single entry in the material collection overview of a job order. */
+/**
+ * DTO for a single entry in the material collection overview of a job order. {@code quantity} is
+ * the entry's total physical stock (backs the full-row transfer); {@code allocatedQuantity} is the
+ * share earmarked to this job order (Variante C / REQ-INV-027), {@code <= quantity}.
+ */
 public record MaterialCollectionEntryDto(
     UUID inventoryEntryId,
     long version,
@@ -32,4 +36,5 @@ public record MaterialCollectionEntryDto(
     String materialName,
     double quality,
     double quantity,
+    double allocatedQuantity,
     boolean delivered) {}

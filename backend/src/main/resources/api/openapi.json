@@ -59018,6 +59018,10 @@
             "type" : "number",
             "format" : "double"
           },
+          "allocatedQuantity" : {
+            "type" : "number",
+            "format" : "double"
+          },
           "delivered" : {
             "type" : "boolean"
           }

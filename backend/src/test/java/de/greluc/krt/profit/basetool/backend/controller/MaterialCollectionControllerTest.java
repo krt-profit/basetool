@@ -60,6 +60,7 @@ class MaterialCollectionControllerTest {
                 "Gold",
                 800.0,
                 5.0,
+                3.0,
                 false));
     when(inventoryItemService.getMaterialCollection(jobOrderId)).thenReturn(expected);
 

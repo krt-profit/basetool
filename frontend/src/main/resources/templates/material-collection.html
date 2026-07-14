@@ -71,7 +71,12 @@
                     </td>
                     <td th:text="${entry.materialName}" class="krtm-font-family-lato-sans-serif-437e"></td>
                     <td th:text="${entry.quality}" class="krtm-font-family-lato-sans-serif-437e"></td>
-                    <td th:text="${entry.quantity}" class="krtm-font-family-lato-sans-serif-437e"></td>
+                    <td class="krtm-font-family-lato-sans-serif-437e">
+                        <span th:text="${entry.allocatedQuantity}">3</span>
+                        <small th:if="${entry.quantity > entry.allocatedQuantity}"
+                               class="text-muted"
+                               th:text="#{material.collection.quantity.ofStock(${entry.quantity})}">von 10 im Bestand</small>
+                    </td>
                     <td class="text-center">
                         <input type="checkbox"
                                class="delivered-checkbox krtm-width-22px-height-22px-cursor-pointer-accent-b072"

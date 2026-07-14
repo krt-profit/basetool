@@ -1030,12 +1030,14 @@ class InventoryItemServiceTest {
     item.setMaterial(material);
     item.setQuality(100);
     item.setAmount(5.0);
-    // The order's own slice is delivered: the collection must read the slice (Variante A,
-    // REQ-INV-027) — delivered now lives only on the job-order allocation, not on the entry.
+    // The order's own slice is delivered and earmarks only PART of the entry (3 of the 5 SCU): the
+    // collection must read the slice (Variante C, REQ-INV-027) — delivered and the order-relevant
+    // quantity live on the job-order allocation, not on the entry. quantity stays the entry total
+    // (5), allocatedQuantity is the slice's 3.
     InventoryJobOrderAllocation slice = new InventoryJobOrderAllocation();
     slice.setInventoryItem(item);
     slice.setJobOrder(jobOrder);
-    slice.setAmount(5.0);
+    slice.setAmount(3.0);
     slice.setDelivered(true);
     item.getJobOrderAllocations().add(slice);
 
@@ -1056,6 +1058,9 @@ class InventoryItemServiceTest {
     assertEquals("Port Olisar", dto.location());
     assertEquals(locationId, dto.locationId());
     assertEquals("Laranite", dto.materialName());
+    assertEquals(5.0, dto.quantity(), "quantity is the entry's total physical stock");
+    assertEquals(
+        3.0, dto.allocatedQuantity(), "allocatedQuantity is this order's earmarked slice, not 5");
     assertTrue(dto.delivered(), "delivered reads the order's slice, not the entry scalar");
   }
 
