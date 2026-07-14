@@ -518,10 +518,6 @@ class InventoryItemServiceTest {
             null,
             null,
             false,
-            null,
-            null,
-            null,
-            null,
             java.util.List.of(),
             0.0,
             java.util.List.of(),
@@ -1375,8 +1371,8 @@ class InventoryItemServiceTest {
   private static de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto
       minimalInventoryDto(UUID id) {
     return new de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto(
-        id, null, null, null, null, null, null, null, null, null, null, List.of(), 0.0, List.of(),
-        0.0, null, null, 1L, null);
+        id, null, null, null, null, null, null, List.of(), 0.0, List.of(), 0.0, null, null, 1L,
+        null);
   }
 
   /**

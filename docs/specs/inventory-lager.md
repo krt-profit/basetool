@@ -395,6 +395,13 @@ unit); the group-on-read display shows the earmarks as amount chips on the indiv
 not on the stack. Stacking, filters and job-order / mission fulfilment sums all read the allocation
 tables — an order is credited only its **allocated** share of a split entry, not the whole row.
 
+**Projection (chips only).** The outbound `InventoryItemDto` carries the two allocation lists
+(`jobOrderAllocations` / `missionAllocations`) with their per-dimension unallocated rest, and **no**
+per-entry association scalar (the transitional first-allocation `jobOrderId` / `missionId` fields are
+gone once every reader consumes the allocations). Every read-only inventory listing that shows an
+entry's orders — including the mission detail page's Lagereinträge table — renders **all** of the
+entry's order chips with their amounts, not just the first.
+
 **Assignment writes.** The earmarks are edited through dedicated per-allocation endpoints `POST` /
 `PATCH` / `DELETE /api/v1/inventory/{id}/allocation` (add / change amount / remove), each gated by
 `isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)` — the same owner-scoped

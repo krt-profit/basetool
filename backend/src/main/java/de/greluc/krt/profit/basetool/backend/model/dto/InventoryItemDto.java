@@ -29,13 +29,12 @@ import java.util.UUID;
  * row's creation instant so the UI can order the individual entries of a grouped stack oldest-first
  * and show when each contribution was recorded.
  *
- * <p>Variante C (REQ-INV-027) adds the two independent quantity splits: {@code jobOrderAllocations}
- * / {@code missionAllocations} carry the earmarked orders/missions each with their own amount, and
- * {@code jobOrderRest} / {@code missionRest} are the still-unallocated remainder per dimension
- * ({@code amount − Σ}) the UI renders as the rest-chip. The legacy single {@code jobOrderId} /
- * {@code missionId} scalars are still populated during the migration (they carry the first
- * allocation of each dimension, or {@code null}); they are removed once the stacking and all
- * consumers read the allocations.
+ * <p>Variante C (REQ-INV-027) carries the two independent quantity splits: {@code
+ * jobOrderAllocations} / {@code missionAllocations} list the earmarked orders/missions each with
+ * their own amount, and {@code jobOrderRest} / {@code missionRest} are the still-unallocated
+ * remainder per dimension ({@code amount − Σ}) the UI renders as the rest-chip. Both are the
+ * authoritative multi-earmark view; the former single {@code jobOrderId} / {@code missionId}
+ * scalars were dropped once every consumer read the allocations.
  */
 public record InventoryItemDto(
     UUID id,
@@ -45,10 +44,6 @@ public record InventoryItemDto(
     Integer quality,
     Double amount,
     Boolean personal,
-    UUID jobOrderId,
-    Integer jobOrderDisplayId,
-    UUID missionId,
-    String missionName,
     List<JobOrderAllocationDto> jobOrderAllocations,
     Double jobOrderRest,
     List<MissionAllocationDto> missionAllocations,
@@ -79,10 +74,6 @@ public record InventoryItemDto(
         quality,
         amount,
         personal,
-        jobOrderId,
-        jobOrderDisplayId,
-        missionId,
-        missionName,
         jobOrderAllocations,
         jobOrderRest,
         missionAllocations,

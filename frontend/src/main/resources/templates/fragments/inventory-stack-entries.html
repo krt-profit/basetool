@@ -205,7 +205,7 @@
                         th:data-user-id="${entry.user.id}"
                         th:data-location-id="${entry.location.id}"
                         th:data-personal="${entry.personal}"
-                        th:data-has-assoc="${entry.jobOrderId != null or entry.missionId != null}"
+                        th:data-has-assoc="${!#lists.isEmpty(entry.jobOrderAllocations) or !#lists.isEmpty(entry.missionAllocations)}"
                         data-trigger="inv-my-umbuchen"
                         th:title="#{inventory.rebook.action}" th:aria-label="#{inventory.rebook.action}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-rebook"/></svg>

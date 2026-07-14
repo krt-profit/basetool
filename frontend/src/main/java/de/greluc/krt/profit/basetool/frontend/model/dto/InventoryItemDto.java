@@ -29,8 +29,7 @@ import java.util.UUID;
  *
  * <p>Since Variante C (REQ-INV-027) an entry's quantity is split independently across several job
  * orders ({@code jobOrderAllocations}, unassigned {@code jobOrderRest}) and several missions
- * ({@code missionAllocations}, unassigned {@code missionRest}) shown as chips. The scalar {@code
- * jobOrderId} / {@code missionId} fields remain during the soak until the backend column drop.
+ * ({@code missionAllocations}, unassigned {@code missionRest}) shown as chips.
  */
 public record InventoryItemDto(
     UUID id,
@@ -40,10 +39,6 @@ public record InventoryItemDto(
     Integer quality,
     Double amount,
     Boolean personal,
-    UUID jobOrderId,
-    Integer jobOrderDisplayId,
-    UUID missionId,
-    String missionName,
     List<JobOrderAllocationDto> jobOrderAllocations,
     Double jobOrderRest,
     List<MissionAllocationDto> missionAllocations,

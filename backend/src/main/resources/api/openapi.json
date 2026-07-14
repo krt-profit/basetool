@@ -54158,21 +54158,6 @@
           "personal" : {
             "type" : "boolean"
           },
-          "jobOrderId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "jobOrderDisplayId" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "missionId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "missionName" : {
-            "type" : "string"
-          },
           "jobOrderAllocations" : {
             "type" : "array",
             "items" : {

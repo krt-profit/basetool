@@ -16,6 +16,8 @@
 
 - **Lager: Die aggregierte Materialübersicht zeigt jetzt auch die maximale verfügbare Qualität.** In der Ansicht `/inventory` steht zwischen „Ø Qualität" und „Gesamtmenge" eine neue Spalte „Max. Qualität" mit der höchsten für das jeweilige Material vorhandenen Qualität (REQ-INV-027).
 
+- **Einsatz-Detailseite: Die Lagerbestände zeigen jetzt alle zugeordneten Aufträge als Mengen-Chips.** In der Auftrag-Spalte der Lagereinträge-Tabelle stand bisher nur der erste zugeordnete Auftrag; bei einem auf mehrere Aufträge aufgeteilten Eintrag werden nun alle Aufträge mit ihrer jeweiligen Menge angezeigt (REQ-INV-027).
+
 - **Oberfläche: Das dezente Wabenmuster (Honeycomb) im Seitenhintergrund entfällt.** Der Hintergrund der App sowie der Keycloak-Anmelde- und -Kontoseiten ist jetzt durchgehend flaches Schwarz; der dezente orange Schimmer oben auf der Anmeldeseite bleibt erhalten. Das Hintergrundbild `honeycomb-bg.svg` wurde aus allen Ressourcen entfernt (REQ-UI-003).
 
 - **Lager: Neuer Filter „Nur nicht-persönliche Einträge" in „Mein Lager".** Neben „Nur persönliche Einträge" lässt sich die Ansicht jetzt auch umgekehrt auf die geteilten (nicht-persönlichen) Bestände einschränken. Beide Filter schließen sich gegenseitig aus (das Aktivieren des einen hebt den anderen auf) und werden wie die übrigen Filter in der Seiten-URL mitgeführt (REQ-INV-006).
