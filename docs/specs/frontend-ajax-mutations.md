@@ -714,7 +714,9 @@ sanitising/dedup, full seam-map whitelist relay for the mission topic, no-op on 
 `LiveSyncSubscriptionAuthorizerTest` (mission: allowed on authorized read, refused on 403/404,
 fail-open on transient, malformed topic rejected) · `LiveSyncSectionMapParityTest` (seam map ↔
 registry whitelist set-equality) · `MissionLiveSyncE2eTest` (two-context live participant-add
-propagation + no-reload assertion) · **Code:** `LiveSyncWebSocketHandler` (`allowChangedFrame` /
+propagation + no-reload assertion) · `InventorySharedLagerLiveSyncE2eTest` (two-context shared-Lager
+allocation-chip propagation + no-reload assertion, #1307) · **Code:** `LiveSyncWebSocketHandler`
+(`allowChangedFrame` /
 `allowPresenceFrame` / `MAX_SECTION_KEY_LENGTH`) / `LiveSyncTopicClass` (mission row),
 `LiveSyncPresenceService` (`MAX_SECTIONS_PER_TOPIC`),
 `mission-presence.js` (adapter: `sendChanged` / `krt:mission-changed` / `krt:mission-resync`),
