@@ -223,7 +223,10 @@ public class InventoryPageController {
    * @return the {@code inventory-material} view name
    */
   @GetMapping("/material/{materialId}")
-  public String viewMaterialInventory(@PathVariable @NotNull UUID materialId, Model model) {
+  public String viewMaterialInventory(
+      @PathVariable @NotNull UUID materialId,
+      @RequestParam(required = false) String fragment,
+      Model model) {
     List<InventoryItemDto> items = new ArrayList<>();
     try {
       PageResponse<InventoryItemDto> p =
@@ -241,6 +244,11 @@ public class InventoryPageController {
     model.addAttribute("materials", fetchMaterials());
     model.addAttribute("selectedMaterialId", materialId);
     model.addAttribute("jobOrders", fetchActiveJobOrders());
+    // REQ-FE-010 (#1309): a peer's stock change re-fetches just the results table via
+    // inventory-material.js, so the drilldown updates live without a reload.
+    if (fragment != null && "results".equalsIgnoreCase(fragment)) {
+      return "inventory-material :: inventoryMaterialResults";
+    }
     return "inventory-material";
   }
 

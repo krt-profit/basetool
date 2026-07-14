@@ -110,11 +110,26 @@ class InventoryPageControllerTest {
         new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
-    String view = controller.viewMaterialInventory(materialId, model);
+    String view = controller.viewMaterialInventory(materialId, null, model);
 
     assertEquals("inventory-material", view);
     assertTrue(model.containsAttribute("items"));
     assertEquals(materialId, model.getAttribute("selectedMaterialId"));
+  }
+
+  @Test
+  void viewMaterialInventory_withFragmentResults_returnsOnlyTheResultsFragment() {
+    Model model = new ConcurrentModel();
+    UUID materialId = UUID.randomUUID();
+    PageResponse<InventoryItemDto> page =
+        new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+
+    // #1309: the live-sync receiver re-fetches ?fragment=results, which renders only the results
+    // table, not the whole page.
+    String view = controller.viewMaterialInventory(materialId, "results", model);
+
+    assertEquals("inventory-material :: inventoryMaterialResults", view);
   }
 
   @Test

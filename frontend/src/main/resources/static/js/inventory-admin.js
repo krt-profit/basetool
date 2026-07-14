@@ -195,6 +195,41 @@ function broadcastInventoryAllChanged() {
         window.krtLiveSync.sendChanged('inventory', Object.keys(INVENTORY_ALL_SECTIONS));
     }
 }
+// Exposed so the shared note modal (inventory-note-modal.js) can notify from either inventory page.
+window.krtNotifyInventoryChanged = broadcastInventoryAllChanged;
+
+// Cross-feature live-sync (#1309): an inventory write also changes surfaces in OTHER rooms.
+// broadcastOrdersChanged tells each affected job order's detail viewers to re-pull their material
+// collection (its stock column tracks the earmark roll-up, not just deliveries), and
+// broadcastBoardChanged tells the Materialbörse to re-pull its board after a stock-reducing write
+// (the backend clamps an offer down to the remaining stock). The actor is not in those rooms, so
+// there is no self-refresh; an unaffected peer's re-fetch is a harmless no-op.
+function broadcastOrdersChanged(orderIds) {
+    if (!window.krtLiveSync || typeof window.krtLiveSync.sendChanged !== 'function') return;
+    (orderIds || []).forEach(function (orderId) {
+        if (orderId)
+            window.krtLiveSync.sendChanged('order:' + orderId, ['materials', 'aggregated']);
+    });
+}
+function broadcastBoardChanged() {
+    if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
+        window.krtLiveSync.sendChanged('materialboard', ['board']);
+    }
+}
+// The job-order target-ids currently earmarked on an entry's leaf row (read before a stock write, so
+// the affected orders are known even for a rest-first book-out the backend auto-distributes).
+function collectLeafOrderIds(itemId) {
+    const leaf = document.querySelector('.tree-row--leaf[data-item-id="' + itemId + '"]');
+    if (!leaf) return [];
+    const ids = [];
+    leaf.querySelectorAll(
+        '.assoc-split[data-assoc-field="JOB_ORDER"] [data-assoc-chip][data-target-id]',
+    ).forEach(function (chip) {
+        const id = chip.getAttribute('data-target-id');
+        if (id && ids.indexOf(id) < 0) ids.push(id);
+    });
+    return ids;
+}
 
 // Inbound peer changes: subscribe to the global "inventory" room and re-fetch this viewer's own
 // filtered grouped table in place. filterInventory preserves the viewer's filter + tree expansion,
@@ -742,6 +777,8 @@ function submitUmbuchen(event) {
         jobOrderReductions: reductions.jobOrderReductions,
         missionReductions: reductions.missionReductions,
     };
+    // Read the earmarked orders before the write (the leaf is replaced on the post-write re-swap).
+    const affectedOrderIds = collectLeafOrderIds(umbuchenItemId);
     umbuchenInFlight = true;
     if (submitBtn) submitBtn.disabled = true;
     window.krtFetch
@@ -756,6 +793,8 @@ function submitUmbuchen(event) {
                 closeUmbuchenModal();
                 filterInventory();
                 broadcastInventoryAllChanged();
+                broadcastOrdersChanged(affectedOrderIds);
+                broadcastBoardChanged();
             },
         })
         .then(function () {
@@ -818,6 +857,8 @@ function submitBookOut(event) {
         missionReductions: reductions.missionReductions,
     };
     const submitBtn = document.getElementById('bookOutSubmitBtn');
+    // Read the earmarked orders before the write (the leaf is replaced on the post-write re-swap).
+    const affectedOrderIds = collectLeafOrderIds(bookOutItemId);
     bookOutInFlight = true;
     if (submitBtn) {
         submitBtn.disabled = true;
@@ -834,6 +875,8 @@ function submitBookOut(event) {
                 closeBookOutModal();
                 filterInventory();
                 broadcastInventoryAllChanged();
+                broadcastOrdersChanged(affectedOrderIds);
+                broadcastBoardChanged();
             },
         })
         .then(function () {
@@ -1007,6 +1050,11 @@ window.onclick = function (event) {
                     showInventoryToast('success', deleteBtn.getAttribute('data-success'));
                     filterInventory();
                     broadcastInventoryAllChanged();
+                    // Every offer on a wiped row is cascade-deleted, so the board is stale too. The
+                    // per-order rooms are NOT poked here: a full wipe cannot enumerate the affected
+                    // orders client-side, and this admin-only nuke is rare — an open order view
+                    // self-heals its collection on the next interaction (documented limitation).
+                    broadcastBoardChanged();
                 },
             });
             closeModal();
@@ -1188,6 +1236,10 @@ async function assocSend(entryId, method, body, split, pop) {
                 window.showFrontendSuccessToast(assocI18n.saved);
             }
             broadcastInventoryAllChanged();
+            // A job-order earmark change shifts that order's material collection.
+            if (body && body.field === 'JOB_ORDER') {
+                broadcastOrdersChanged([body.targetId]);
+            }
         } else if (response.status === 409) {
             if (typeof window.showFrontendErrorToast === 'function') {
                 window.showFrontendErrorToast(assocI18n.conflict);

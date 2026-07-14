@@ -965,12 +965,22 @@ this requirement exists to prevent, #1102). Covered topics and their section whi
 | `materialboard` (global) | board                                                                                                             | no            | authenticated                                                                                         |
 | `inventory` (global)     | stock                                                                                                             | no            | authenticated (every viewer re-fetches its own owner/org-unit-scoped view)                            |
 
-The `inventory` room is the shared Lager (`/inventory/all`, #1307): a single opaque `stock` section
-covers the whole grouped table, so a peer's allocation-chip, book-out, transfer or delete-all write
-tells the other viewers to re-pull their own filtered fragment (`filterInventory`) — including the
-lazily-loaded stack entries, so a collapsed stack simply re-fetches its chips on the next expand.
-Because it is a global room but each viewer's fragment is owner- and org-unit-scoped, a cross-squadron
-peer refresh is a harmless no-op.
+The `inventory` room is the squadron Lager (#1307/#1309): a single opaque `stock` section stands for
+"the inventory changed". **All** inventory views subscribe and re-pull their own fragment on a peer's
+write — the shared `/inventory/all` and personal `/inventory/my` grouped tables (`filterInventory` /
+`filterMyInventory`, including their lazily-loaded stack entries, so a collapsed stack re-fetches its
+chips on the next expand), the aggregated `/inventory` overview and the per-material
+`/inventory/material/{id}` drilldown (each `krtFetch.swap` its `?fragment=results` container). Every
+inventory write (allocation add/change/remove, book-out, transfer, personal-rebook, bulk-checkout,
+delete-all, note) broadcasts it, from whichever page made it. Because it is a global room but each
+viewer's fragment is owner- and org-unit-scoped, a cross-scope peer refresh (another squadron, or a
+personal-only change seen by a shared view) is a harmless no-op. The same inventory writes also
+cross-publish to the `order:{id}` room (the order material collection tracks the earmark roll-up) and
+the `materialboard` room (a stock-reducing write clamps an offer server-side), so those surfaces
+reflect inventory changes live too. The affected order ids are read off the entry's leaf chips before
+the write; the sole exception is the admin `DELETE /inventory/all` full wipe, which cannot enumerate
+them client-side — its board and inventory rooms are still poked, but an open order collection
+self-heals on the next interaction (an accepted limitation for that rare nuke).
 
 The server-side **topic-class registry** (the `LiveSyncTopicClass` enum) is the single source of
 truth for this table. The REQ-FE-010 **three-mirror-points rule applies per topic**: the acting page's seam map,

@@ -108,6 +108,14 @@ async function executeBulkCheckout() {
     if (!window.krtFetch) {
         return;
     }
+    // Collect every earmarked order across the checked entries before the write (a full bulk
+    // book-out zeroes their order slices), deduped, so those order collections refresh too.
+    const affectedOrderIds = [];
+    ids.forEach(function (itemId) {
+        collectLeafOrderIds(itemId).forEach(function (orderId) {
+            if (affectedOrderIds.indexOf(orderId) < 0) affectedOrderIds.push(orderId);
+        });
+    });
     // #577 part 2: route through the new POST /inventory/bulk-checkout frontend proxy (the
     // former direct browser call to the backend /api/v1/... path had no frontend route, so the
     // bulk action never reached the backend). krtFetch handles CSRF + retry-on-403 and drives
@@ -136,6 +144,9 @@ async function executeBulkCheckout() {
                 bulkCount.textContent = '';
             }
             filterMyInventory();
+            broadcastInventoryChanged();
+            broadcastOrdersChanged(affectedOrderIds);
+            broadcastBoardChanged();
         },
     });
 }
@@ -308,6 +319,72 @@ function resetMyInventoryFilter() {
     if (document.getElementById('missionHeader'))
         updateSelectState('missionAll', 'missionCheck', 'missionHeader');
     filterMyInventory();
+}
+
+// Live peer-sync for the personal Lager (REQ-FE-010 / REQ-FE-015, #1307/#1309). /inventory/my joins
+// the same global "inventory" room as the shared Lager, so a change to the viewer's own stock made
+// elsewhere (e.g. an admin edits it on /inventory/all, or another tab) refreshes this view, and this
+// page's writes tell those other inventory views. One opaque "stock" section = the whole owned table.
+const INVENTORY_MY_SECTIONS = {
+    stock: { container: '#myInventoryTableContainer', fragmentValue: 'stock' },
+};
+
+// Broadcast that this viewer's stock changed; keys derive from the seam map so they can never drift
+// from the whitelist, and the relay excludes the origin socket (no self-refresh). Exposed on window
+// so the shared note modal (inventory-note-modal.js) can notify from either inventory page.
+function broadcastInventoryChanged() {
+    if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
+        window.krtLiveSync.sendChanged('inventory', Object.keys(INVENTORY_MY_SECTIONS));
+    }
+}
+window.krtNotifyInventoryChanged = broadcastInventoryChanged;
+
+// Cross-feature live-sync (#1309): an inventory write also changes surfaces in OTHER rooms.
+// broadcastOrdersChanged tells each affected job order's detail viewers to re-pull their material
+// collection (its stock column tracks the earmark roll-up), and broadcastBoardChanged tells the
+// Materialbörse to re-pull its board after a stock-reducing write (the backend clamps an offer down
+// to the remaining stock). The actor is not in those rooms, so there is no self-refresh.
+function broadcastOrdersChanged(orderIds) {
+    if (!window.krtLiveSync || typeof window.krtLiveSync.sendChanged !== 'function') return;
+    (orderIds || []).forEach(function (orderId) {
+        if (orderId)
+            window.krtLiveSync.sendChanged('order:' + orderId, ['materials', 'aggregated']);
+    });
+}
+function broadcastBoardChanged() {
+    if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
+        window.krtLiveSync.sendChanged('materialboard', ['board']);
+    }
+}
+// The job-order target-ids currently earmarked on an entry's leaf row (read before a stock write).
+function collectLeafOrderIds(itemId) {
+    const leaf = document.querySelector('.tree-row--leaf[data-item-id="' + itemId + '"]');
+    if (!leaf) return [];
+    const ids = [];
+    leaf.querySelectorAll(
+        '.assoc-split[data-assoc-field="JOB_ORDER"] [data-assoc-chip][data-target-id]',
+    ).forEach(function (chip) {
+        const id = chip.getAttribute('data-target-id');
+        if (id && ids.indexOf(id) < 0) ids.push(id);
+    });
+    return ids;
+}
+
+// Inbound peer changes: re-fetch this viewer's own filtered owned table in place (filterMyInventory
+// preserves the filter + tree expansion; a collapsed stack re-fetches its chips on next expand).
+if (
+    window.krtLiveSync &&
+    typeof window.krtLiveSync.createReceiver === 'function' &&
+    document.getElementById('myInventoryTableContainer')
+) {
+    window.krtLiveSync.createReceiver({
+        topic: 'inventory',
+        sections: INVENTORY_MY_SECTIONS,
+        coalesceMs: 1500,
+        refresh: function () {
+            filterMyInventory();
+        },
+    });
 }
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -904,6 +981,9 @@ function submitUmbuchen(event) {
         };
     }
 
+    // Read the earmarked orders before the write. Only a LOCATION transfer touches order slices; the
+    // PERSONAL rebook is refused on an allocated row, so it only clamps offers (board), not orders.
+    const affectedOrderIds = mode === 'PERSONAL' ? [] : collectLeafOrderIds(umbuchenItemId);
     umbuchenInFlight = true;
     if (submitBtn) submitBtn.disabled = true;
     window.krtFetch
@@ -917,6 +997,9 @@ function submitUmbuchen(event) {
             onSuccess: function () {
                 closeUmbuchenModal();
                 filterMyInventory();
+                broadcastInventoryChanged();
+                broadcastOrdersChanged(affectedOrderIds);
+                broadcastBoardChanged();
             },
         })
         .then(function () {
@@ -980,6 +1063,8 @@ function submitBookOut(event) {
         missionReductions: reductions.missionReductions,
     };
     const submitBtn = document.getElementById('bookOutSubmitBtn');
+    // Read the earmarked orders before the write (the leaf is replaced on the post-write re-swap).
+    const affectedOrderIds = collectLeafOrderIds(bookOutItemId);
     bookOutInFlight = true;
     if (submitBtn) {
         submitBtn.disabled = true;
@@ -995,6 +1080,9 @@ function submitBookOut(event) {
             onSuccess: function () {
                 closeBookOutModal();
                 filterMyInventory();
+                broadcastInventoryChanged();
+                broadcastOrdersChanged(affectedOrderIds);
+                broadcastBoardChanged();
             },
         })
         .then(function () {
@@ -1292,6 +1380,11 @@ async function assocSend(entryId, method, body, split, pop) {
             pop.classList.add('krtm-hidden');
             if (typeof window.showFrontendSuccessToast === 'function') {
                 window.showFrontendSuccessToast(assocI18n.saved);
+            }
+            broadcastInventoryChanged();
+            // A job-order earmark change shifts that order's material collection.
+            if (body && body.field === 'JOB_ORDER') {
+                broadcastOrdersChanged([body.targetId]);
             }
         } else if (response.status === 409) {
             if (typeof window.showFrontendErrorToast === 'function') {
