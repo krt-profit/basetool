@@ -473,24 +473,16 @@ class InventoryOperationsE2eTest {
                       + "[data-target-id='"
                       + herkunftOrderId
                       + "']");
+          // 40 of the 50 booked out came from the order tag (70 - 40 = 30), not the rest. The
+          // book-out re-swap re-renders the reduced chip asynchronously, so assert the chip's
+          // data-amount with an auto-retrying matcher rather than reading it once: a slower browser
+          // can otherwise still expose the pre-swap 70 at read time (firefox flake). The pattern
+          // tolerates the Double's rendered forms (30 / 30.0 / 30.000).
           assertThat(orderChip)
-              .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
-          String rawChipAmount = orderChip.getAttribute("data-amount");
-          if (rawChipAmount == null) {
-            throw new AssertionError("order chip is missing its data-amount attribute");
-          }
-          double chipAmount;
-          try {
-            chipAmount = Double.parseDouble(rawChipAmount);
-          } catch (NumberFormatException e) {
-            throw new AssertionError(
-                "order chip data-amount is not a parseable number: " + rawChipAmount, e);
-          }
-          assertEquals(
-              30.0,
-              chipAmount,
-              AMOUNT_DELTA,
-              "40 of the 50 booked out came from the order tag (70 - 40 = 30)");
+              .hasAttribute(
+                  "data-amount",
+                  Pattern.compile("^30(\\.0+)?$"),
+                  new LocatorAssertions.HasAttributeOptions().setTimeout(20_000));
         });
   }
 
