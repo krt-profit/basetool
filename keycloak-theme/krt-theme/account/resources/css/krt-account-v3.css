@@ -3,9 +3,9 @@
  *
  * DESIGN-TOKEN SOURCE OF TRUTH: frontend/src/main/resources/static/css/styles.css :root.
  * This file mirrors those tokens; the shared design-token VALUES (colors,
- * semantic colors, fonts, glows) and the body pattern are kept identical with
- * login/krt-login-v3.css so the login screen and account console share one
- * identity across the SSO redirect.
+ * semantic colors, fonts, glows) and the body background (flat black + top
+ * bloom) are kept identical with login/krt-login-v3.css so the login screen and
+ * account console share one identity across the SSO redirect.
  *
  * MAINTENANCE RULE: any token change in colors_and_type.css / styles.css must be
  * reflected in BOTH Keycloak CSS files in the SAME commit.
@@ -95,21 +95,19 @@
     --pf-v5-global--Color--200: var(--color-gray-2);
 }
 
-/* Flat black + faint honeycomb wash + a soft top bloom, matching the app login
-   and the login theme so the account console shares one identity. The PF grid
-   stays hard-reset below; only <body> carries the pattern. */
+/* Flat black + a soft top bloom, matching the app login and the login theme so
+   the account console shares one identity. The PF grid stays hard-reset below;
+   only <body> carries the bloom gradient. */
 body {
     background-color: var(--color-bg-black);
     background-image:
-        radial-gradient(circle at 50% -10%, rgba(231, 126, 35, 0.10), transparent 55%),
-        url('../img/honeycomb-bg.svg');
-    background-repeat: no-repeat, repeat;
-    background-size: auto, 46px 26.56px;
+        radial-gradient(circle at 50% -10%, rgba(231, 126, 35, 0.10), transparent 55%);
+    background-repeat: no-repeat;
     background-attachment: fixed;
 }
 
 /* Hard reset for all backgrounds to remove the orange grid completely.
-   NOTE: `body` is intentionally NOT in this list — it carries the honeycomb. */
+   NOTE: `body` is intentionally NOT in this list — it carries the top bloom. */
 html, #app, main, .pf-c-page, .pf-c-page__main, .pf-c-page__main-section,
 .pf-v5-c-page, .pf-v5-c-page__main, .pf-v5-c-page__main-section, 
 .pf-v6-c-page, .pf-v6-c-page__main, .pf-v6-c-page__main-section,

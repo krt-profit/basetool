@@ -115,7 +115,7 @@
         /* Uebersicht */
         .desc { font-size: 0.85rem; font-weight: 300; color: var(--color-gray-1); margin: 0; line-height: 1.55; max-width: 80ch; white-space: pre-line; }
         /* Detaillierte Beschreibung — sits on the same gray card surface as the other overview
-           panels (.kpanel) instead of bare on the honeycomb backdrop (owner request 2026-06-27,
+           panels (.kpanel) instead of bare on the flat page background (owner request 2026-06-27,
            #818 follow-up). Collapsible with a chevron that flips when open. */
         details.more { border: var(--border-hairline); background-color: var(--color-bg-dark-gray); margin-top: 12px; }
         details.more > summary { list-style: none; cursor: pointer; padding: 11px 14px; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: var(--fw-bold); color: var(--color-gray-1); display: flex; align-items: center; gap: 8px; min-height: var(--touch-target); box-sizing: border-box; }
@@ -138,7 +138,7 @@
         .sec-h { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
         .sec-h h2 { font-family: var(--font-body); font-weight: var(--fw-bold); text-transform: uppercase; letter-spacing: 0.07em; font-size: 0.75rem; color: var(--color-gray-1); margin: 0; }
         .sec-h .warn { color: var(--color-warning); }
-        /* gray-1 + regular weight: gray-2 at thin weight was unreadable over the honeycomb. */
+        /* gray-1 + regular weight: gray-2 at thin weight was unreadable over the dark page background. */
         .sec-h .legend { font-size: 0.72rem; color: var(--color-gray-1); font-weight: 400; }
         /* Pool column widened to match the 1800px page cap — the person rows carry
            name + badges + wish/note + actions and clipped at the mock's 340px. */
@@ -176,7 +176,7 @@
         .payout-table th.num, .payout-table td.num { width: 1%; }
         .payout-table td:first-child { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .payout-table select { min-width: 0; }
-        /* The Wirtschaft details sit directly on the honeycomb backdrop — give them
+        /* The Wirtschaft details sit directly on the flat page background — give them
            the panel surface so summary titles stay readable. */
         #pane-fin details.hud-details { background-color: var(--color-bg-dark-gray); border: var(--border-hairline); padding: 12px 14px; }
         /* Actual start/end carry a trailing "Jetzt" button — let it wrap below the
