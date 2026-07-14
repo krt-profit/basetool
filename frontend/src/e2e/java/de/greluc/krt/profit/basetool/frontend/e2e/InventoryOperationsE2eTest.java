@@ -450,9 +450,10 @@ class InventoryOperationsE2eTest {
   }
 
   /**
-   * Edge case: the create form refuses to mark an entry personal while it carries a mission (the
-   * cross-field invariant in REQ-INV), re-rendering the form inline with a field error instead of
-   * persisting.
+   * Edge case: a personal entry cannot carry an assignment (REQ-INV, REQ-INV-027). Since Variante C
+   * the create form splits at check-in via repeatable allocation rows; ticking "personal" hides and
+   * clears those sections, so the invariant is enforced in the UI (the backend also rejects a
+   * personal+assignment create with a 422, covered by the controller unit test).
    */
   @Test
   void edgeCasePersonalEntryCannotCarryAnAssignment() {
@@ -466,28 +467,24 @@ class InventoryOperationsE2eTest {
           page.locator("#locationId").selectOption(new SelectOption().setIndex(1));
           page.locator("#quality").fill(String.valueOf(SEED_QUALITY));
           page.locator("#amount").fill("5");
-          page.locator("#personal").check();
-          // Index 0 is the "-- Kein Einsatz --" placeholder; index 1 is the seeded mission.
-          page.locator("#missionId").selectOption(new SelectOption().setIndex(1));
-          // #577: the cross-field rule now comes back as a 422 from the AJAX twin — no navigation,
-          // the form stays put and the error surfaces as a toast.
-          page.evaluate("window.__krtNoReload = true;");
-          page.evaluate(
-              "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
-                  + " 'none'; } }");
-          page.waitForResponse(
-              r -> r.url().contains("/inventory/input") && "POST".equals(r.request().method()),
-              () -> page.locator("form[action$='/inventory/input'] button[type='submit']").click());
 
-          assertEquals(
-              Boolean.TRUE,
-              page.evaluate("window.__krtNoReload === true"),
-              "a rejected personal+assignment create must not navigate (in-place 422)");
-          assertThat(page).hasURL(Pattern.compile(".*/inventory/input.*"));
-          // The 422 surfaces as the JS-built dynamic toast (.notification-toast.error-toast, no
-          // id),
-          // not the server-rendered flash toast — the AJAX path never re-renders the page.
-          assertThat(page.locator(".notification-toast.error-toast").first()).isVisible();
+          // Add a mission earmark via the split-at-check-in UI: index 0 is the placeholder, index 1
+          // the seeded mission.
+          page.locator("[data-trigger='inv-input-add-mission']").click();
+          page.locator("#missionAllocRows [data-alloc-target]")
+              .first()
+              .selectOption(new SelectOption().setIndex(1));
+          assertThat(page.locator("#missionAllocRows [data-alloc-row]")).hasCount(1);
+
+          // Marking the entry personal hides and clears both allocation sections — a personal entry
+          // can never carry an assignment.
+          page.locator("#personal").check();
+
+          assertThat(page.locator("#missionAllocGroup"))
+              .hasClass(Pattern.compile(".*krtm-hidden.*"));
+          assertThat(page.locator("#jobOrderAllocGroup"))
+              .hasClass(Pattern.compile(".*krtm-hidden.*"));
+          assertThat(page.locator("#missionAllocRows [data-alloc-row]")).hasCount(0);
         });
   }
 

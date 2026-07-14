@@ -575,4 +575,24 @@ class InventoryPageControllerMvcTest {
         .andExpect(model().attribute("missions", empty()))
         .andExpect(model().attribute("materials", hasSize(1)));
   }
+
+  // covers REQ-INV-027 (R4): the create form carries the Variante-C split-at-check-in allocation
+  // sections + their hidden row templates that inventory-input.js clones.
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewInputPage_RendersSplitAtCheckInAllocationControls() throws Exception {
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/input"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("inventory-input"))
+        .andExpect(content().string(containsString("id=\"jobOrderAllocRows\"")))
+        .andExpect(content().string(containsString("id=\"missionAllocRows\"")))
+        .andExpect(content().string(containsString("data-trigger=\"inv-input-add-order\"")))
+        .andExpect(content().string(containsString("data-trigger=\"inv-input-add-mission\"")))
+        .andExpect(content().string(containsString("id=\"jobOrderRowTemplate\"")));
+  }
 }

@@ -101,23 +101,44 @@
                     <input type="text" inputmode="decimal" data-scu-decimal id="amount" th:field="*{amount}" step="0.001" min="0" required>
                 </div>
                 
-                <div class="form-group">
-                    <label for="missionId" th:text="#{inventory.mission}">Einsatz zuordnen (optional)</label>
-                    <select id="missionId" th:field="*{missionId}">
-                        <option value="" th:text="#{inventory.mission.select}">-- Kein Einsatz --</option>
-                        <option th:each="mission : ${missions}" th:value="${mission.id}"
-                                th:text="${mission.plannedStartTime != null} ? |${mission.name} - ${#temporals.format(mission.plannedStartTime, #messages.msg('format.date'), #locale)}| : ${mission.name}"></option>
-                    </select>
+                <!-- Variante C (REQ-INV-027, R4): split at check-in — assign the new stock to several
+                     job orders / missions with their own amounts. inventory-input.js clones a row
+                     from the hidden template and binds it as indexed params the FormData submit
+                     carries; an empty section falls back to no assignment. -->
+                <div class="form-group" id="jobOrderAllocGroup">
+                    <label th:text="#{inventory.input.orders.label}">Aufträge zuordnen (optional)</label>
+                    <div id="jobOrderAllocRows" data-alloc-rows="jobOrder"></div>
+                    <button type="button" class="btn btn-ghost" data-trigger="inv-input-add-order" th:text="#{inventory.assoc.add.order}">+ Auftrag</button>
+                    <template id="jobOrderRowTemplate">
+                        <div class="flex-gap-sm mb-1" data-alloc-row>
+                            <select class="w-full" data-alloc-target>
+                                <option value="" th:text="#{inventory.order.none}">-- Kein Auftrag --</option>
+                                <option th:each="order : ${jobOrders}" th:value="${order.id}" th:data-materials="${order.materials != null and !order.materials.isEmpty() ? #strings.listJoin(order.materials.![material.id], ',') : ''}" th:text="${'#' + order.displayId + ' - ' + order.handle + ' (' + order.status + ')'}"></option>
+                            </select>
+                            <input type="number" class="assoc-menge-input" data-alloc-amount step="0.001" min="0" th:placeholder="#{inventory.assoc.amount}">
+                            <button type="button" class="btn btn-ghost" data-trigger="inv-input-remove-alloc" th:title="#{inventory.assoc.remove}" aria-label="Entfernen">&#215;</button>
+                        </div>
+                    </template>
                 </div>
-                
-                <div class="form-group">
-                    <label for="jobOrderId">Auftrag zuordnen (optional)</label>
-                    <select id="jobOrderId" th:field="*{jobOrderId}">
-                        <option value="">-- Kein Auftrag --</option>
-                        <option th:each="order : ${jobOrders}" th:value="${order.id}" th:data-materials="${order.materials != null and !order.materials.isEmpty() ? #strings.listJoin(order.materials.![material.id], ',') : ''}" th:text="${'#' + order.displayId + ' - ' + order.handle + ' (' + order.status + ')'}"></option>
-                    </select>
+
+                <div class="form-group" id="missionAllocGroup">
+                    <label th:text="#{inventory.input.missions.label}">Einsätze zuordnen (optional)</label>
+                    <div id="missionAllocRows" data-alloc-rows="mission"></div>
+                    <button type="button" class="btn btn-ghost" data-trigger="inv-input-add-mission" th:text="#{inventory.assoc.add.mission}">+ Einsatz</button>
+                    <template id="missionRowTemplate">
+                        <div class="flex-gap-sm mb-1" data-alloc-row>
+                            <select class="w-full" data-alloc-target>
+                                <option value="" th:text="#{inventory.mission.none}">-- Kein Einsatz --</option>
+                                <option th:each="mission : ${missions}" th:value="${mission.id}" th:text="${mission.plannedStartTime != null} ? |${mission.name} - ${#temporals.format(mission.plannedStartTime, #messages.msg('format.date'), #locale)}| : ${mission.name}"></option>
+                            </select>
+                            <input type="number" class="assoc-menge-input" data-alloc-amount step="0.001" min="0" th:placeholder="#{inventory.assoc.amount}">
+                            <button type="button" class="btn btn-ghost" data-trigger="inv-input-remove-alloc" th:title="#{inventory.assoc.remove}" aria-label="Entfernen">&#215;</button>
+                        </div>
+                    </template>
                 </div>
-                
+
+                <p id="inputAllocOver" class="form-hint krtm-hidden" th:text="#{inventory.input.alloc.over}">Zuordnung übersteigt die Menge</p>
+
                 <div class="form-group krtm-display-flex-align-items-center-gap-0-5rem-m-c9b5" th:unless="*{isGlobal}">
                     <input type="checkbox" id="personal" th:field="*{personal}" class="krtm-width-auto-margin-0-5449">
                     <label for="personal" th:text="#{inventory.personal.label}" class="krtm-margin-0-display-inline-block-00ba">Als persönlicher Eintrag markieren</label>

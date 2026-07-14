@@ -21,8 +21,11 @@
  * Inventory-input page module (/inventory/input), extracted verbatim from the former two inline
  * scripts of inventory-input.html (ADR-0069, follow-up to #924).
  *
- * First: filters the job-order dropdown to the orders that need the chosen material and mirrors the
- * amount field to the material's quantity type (PIECE integer step vs. SCU 0.001 step + hint).
+ * First: mirrors the amount field to the material's quantity type (PIECE integer step vs. SCU 0.001
+ * step + hint) and drives the Variante-C split-at-check-in rows (REQ-INV-027, R4) — repeatable
+ * job-order / mission allocation rows cloned from hidden templates and bound as indexed form params
+ * (jobOrderAllocations[i].targetId / .amount), each order row filtered to the chosen material, with
+ * an over-allocation hint and a personal-toggle that clears/hides the sections.
  * Second (an IIFE): the #577 in-place book-into-inventory submit through krtFetch.submitForm —
  * navigate-after-AJAX on success, a code-specific inline error toast on failure; the classic
  * POST->redirect stays the no-JS fallback. Both former blocks always render, so they are combined
@@ -38,18 +41,39 @@ document.addEventListener('DOMContentLoaded', function () {
     const matSelect = document.getElementById('materialId');
     if (matSelect) {
         matSelect.addEventListener('change', function () {
-            filterJobOrdersByMaterial(this.value);
+            filterOrderSelects(this.value);
             updateAmountFieldForMaterial(this);
         });
-        // Initial filter if a material is already selected
         if (matSelect.value) {
-            filterJobOrdersByMaterial(matSelect.value);
             updateAmountFieldForMaterial(matSelect);
-        } else {
-            // If no material is selected, show all job orders initially
-            filterJobOrdersByMaterial('');
         }
     }
+
+    const personalToggle = document.getElementById('personal');
+    if (personalToggle) {
+        personalToggle.addEventListener('change', syncPersonalAllocations);
+    }
+
+    // Delegated controls for the Variante-C split-at-check-in rows (REQ-INV-027, R4).
+    document.addEventListener('click', function (event) {
+        if (event.target.closest('[data-trigger="inv-input-add-order"]')) {
+            addAllocRow('jobOrder');
+        } else if (event.target.closest('[data-trigger="inv-input-add-mission"]')) {
+            addAllocRow('mission');
+        } else if (event.target.closest('[data-trigger="inv-input-remove-alloc"]')) {
+            removeAllocRow(event.target.closest('[data-trigger="inv-input-remove-alloc"]'));
+        }
+    });
+    document.addEventListener('input', function (event) {
+        if (event.target.matches('[data-alloc-amount]') || event.target.id === 'amount') {
+            updateAllocOver();
+        }
+    });
+    document.addEventListener('change', function (event) {
+        if (event.target.matches('[data-alloc-target]')) {
+            updateAllocOver();
+        }
+    });
 });
 
 function updateAmountFieldForMaterial(selectElement) {
@@ -96,42 +120,127 @@ function updateMergeOptIn(qtType) {
     }
 }
 
-function filterJobOrdersByMaterial(matId) {
-    const jobSelect = document.getElementById('jobOrderId');
-    if (!jobSelect) return;
+// ===== Variante C split-at-check-in (REQ-INV-027, R4) =====
+// Repeatable job-order / mission allocation rows, cloned from the hidden <template>s and bound as
+// indexed form params (jobOrderAllocations[i].targetId / .amount) the FormData submit carries; the
+// single scalar selects were replaced by these lists.
 
-    let hasSelectedValidOption = false;
+// Per-dimension DOM/param handles for the split-at-check-in rows.
+function allocConfig(dimension) {
+    return dimension === 'jobOrder'
+        ? {
+              rows: 'jobOrderAllocRows',
+              template: 'jobOrderRowTemplate',
+              prefix: 'jobOrderAllocations',
+              group: 'jobOrderAllocGroup',
+          }
+        : {
+              rows: 'missionAllocRows',
+              template: 'missionRowTemplate',
+              prefix: 'missionAllocations',
+              group: 'missionAllocGroup',
+          };
+}
 
-    for (let i = 1; i < jobSelect.options.length; i++) {
-        const option = jobSelect.options[i];
+// Renumbers a dimension's rows so the indexed form params stay contiguous (Spring binding needs no
+// gaps) after an add or remove.
+function reindexAllocRows(dimension) {
+    const cfg = allocConfig(dimension);
+    const container = document.getElementById(cfg.rows);
+    if (!container) return;
+    container.querySelectorAll('[data-alloc-row]').forEach(function (row, index) {
+        const select = row.querySelector('[data-alloc-target]');
+        const amount = row.querySelector('[data-alloc-amount]');
+        if (select) select.name = cfg.prefix + '[' + index + '].targetId';
+        if (amount) amount.name = cfg.prefix + '[' + index + '].amount';
+    });
+}
 
-        if (!matId) {
-            // If no material is selected, show all active orders
-            option.style.display = '';
-            option.disabled = false;
-            if (option.selected) hasSelectedValidOption = true;
-        } else {
+// Appends a fresh allocation row for the dimension, cloned from its <template>.
+function addAllocRow(dimension) {
+    const cfg = allocConfig(dimension);
+    const container = document.getElementById(cfg.rows);
+    const template = document.getElementById(cfg.template);
+    if (!container || !template) return;
+    container.appendChild(template.content.cloneNode(true));
+    reindexAllocRows(dimension);
+    if (dimension === 'jobOrder') {
+        const matSelect = document.getElementById('materialId');
+        filterOrderSelects(matSelect ? matSelect.value : '');
+    }
+    updateAllocOver();
+}
+
+// Removes the allocation row owning `button` and renumbers the surviving rows of that dimension.
+function removeAllocRow(button) {
+    const row = button.closest('[data-alloc-row]');
+    if (!row) return;
+    const missionContainer = document.getElementById('missionAllocRows');
+    const dimension = missionContainer && missionContainer.contains(row) ? 'mission' : 'jobOrder';
+    row.remove();
+    reindexAllocRows(dimension);
+    updateAllocOver();
+}
+
+// Filters every job-order row select to the orders that need the chosen material (data-materials
+// CSV), clearing an incompatible current selection — the multi-row successor of the former single
+// #jobOrderId filter.
+function filterOrderSelects(matId) {
+    document.querySelectorAll('#jobOrderAllocRows [data-alloc-target]').forEach(function (select) {
+        let hasSelectedValid = false;
+        for (let i = 1; i < select.options.length; i++) {
+            const option = select.options[i];
             const materialsStr = option.getAttribute('data-materials');
-            if (materialsStr) {
-                const materials = materialsStr.split(',');
-                if (materials.includes(matId)) {
-                    option.style.display = '';
-                    option.disabled = false;
-                    if (option.selected) hasSelectedValidOption = true;
-                } else {
-                    option.style.display = 'none';
-                    option.disabled = true;
-                }
-            } else {
-                option.style.display = 'none';
-                option.disabled = true;
-            }
+            const compatible = !matId || (materialsStr && materialsStr.split(',').includes(matId));
+            option.style.display = compatible ? '' : 'none';
+            option.disabled = !compatible;
+            if (compatible && option.selected) hasSelectedValid = true;
         }
-    }
+        if (select.selectedIndex > 0 && !hasSelectedValid) select.value = '';
+    });
+}
 
-    if (jobSelect.selectedIndex > 0 && !hasSelectedValidOption) {
-        jobSelect.value = '';
-    }
+// Sums a dimension's entered allocation amounts.
+function allocDimensionSum(dimension) {
+    let sum = 0;
+    document
+        .querySelectorAll('#' + allocConfig(dimension).rows + ' [data-alloc-amount]')
+        .forEach(function (input) {
+            const value = parseFloat(input.value);
+            if (!isNaN(value)) sum += value;
+        });
+    return sum;
+}
+
+// Shows the over-allocation warning when either dimension's Σ exceeds the entry amount (the backend
+// enforces the same R5 rule with a 422).
+function updateAllocOver() {
+    const overEl = document.getElementById('inputAllocOver');
+    if (!overEl) return;
+    const amountEl = document.getElementById('amount');
+    const raw = amountEl ? amountEl.value : '';
+    const amount = window.krtScuInput && amountEl ? window.krtScuInput.parse(raw) : parseFloat(raw);
+    const total = isNaN(amount) ? 0 : amount;
+    const over =
+        allocDimensionSum('jobOrder') > total + 1e-6 || allocDimensionSum('mission') > total + 1e-6;
+    overEl.classList.toggle('krtm-hidden', !over);
+}
+
+// Personal stock can never be assigned: hide + clear both allocation sections while personal is
+// ticked (the backend rejects a personal entry carrying assignments too).
+function syncPersonalAllocations() {
+    const personal = document.getElementById('personal');
+    const on = !!(personal && personal.checked);
+    ['jobOrder', 'mission'].forEach(function (dimension) {
+        const cfg = allocConfig(dimension);
+        const group = document.getElementById(cfg.group);
+        if (group) group.classList.toggle('krtm-hidden', on);
+        if (on) {
+            const container = document.getElementById(cfg.rows);
+            if (container) container.innerHTML = '';
+        }
+    });
+    updateAllocOver();
 }
 
 // #577: book an item into the inventory in place. The classic POST->redirect stays the no-JS
