@@ -5,7 +5,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/ensure-design-system.ps1"
+            "command": "command -v pwsh >/dev/null 2>&1 && pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/ensure-design-system.ps1 || true"
+          },
+          {
+            "type": "command",
+            "command": "command -v pwsh >/dev/null 2>&1 || bash .claude/hooks/ensure-design-system.sh"
           }
         ]
       }
