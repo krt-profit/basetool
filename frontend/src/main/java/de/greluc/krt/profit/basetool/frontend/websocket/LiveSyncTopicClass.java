@@ -213,7 +213,19 @@ public enum LiveSyncTopicClass {
    * A subscribe is authorized by the socket's authentication alone (no probe path, no capability,
    * no role gate) — the same "authenticated member" bar the board page itself already carries.
    */
-  MATERIALBOARD("materialboard", false, Set.of("board"), false, "materialboard", null, null);
+  MATERIALBOARD("materialboard", false, Set.of("board"), false, "materialboard", null, null),
+
+  /**
+   * Global shared-Lager room for the squadron inventory (the shared {@code /inventory/all} view,
+   * REQ-FE-010 / REQ-INV-027, #1307). A single global room carrying one opaque {@code stock} key: a
+   * peer's allocation, book-out, transfer or delete-all change on the shared Lager tells the other
+   * viewers to re-pull their own filtered table fragment — no stock data crosses the socket. No
+   * editor-presence dots. A subscribe is authorized by the socket's authentication alone (no probe,
+   * no capability, no role gate), so a read-only viewer is refreshed too; every viewer re-fetches
+   * its own owner- and org-unit-scoped view, which makes a cross-squadron peer refresh a harmless
+   * no-op.
+   */
+  INVENTORY_ALL("inventory", false, Set.of("stock"), false, "inventory_all", null, null);
 
   private final String prefix;
   private final boolean scoped;
