@@ -51,12 +51,17 @@ import org.jetbrains.annotations.Nullable;
  * SCU} material merges only when this flag is {@code true}. It is never persisted and governs only
  * this one transfer.
  *
- * <p>{@link #missionAttributions} applies only to the {@link CheckoutType#SELL} branch (Variante C,
- * REQ-INV-027): the seller distributes the sale's total {@link #sellAmount} across the sold row's
- * earmarked missions they participate in, one {@link MissionSaleAttributionDto} per credited
- * mission. The sum may be less than {@link #sellAmount} (the remainder is the seller's personal
- * proceeds) and an empty / {@code null} list is a fully-personal sale that credits no mission.
- * Ignored for DISCARD and TRANSFER.
+ * <p>{@link #jobOrderReductions} and {@link #missionReductions} are the Variante-C "deduct from"
+ * plan (REQ-INV-027): because an entry's job-order and mission splits are two independent taggings
+ * of the same stock, the single deducted {@link #amount} is sourced separately per dimension. Each
+ * list names the earmark slices to shrink and by how much; whatever a dimension's reductions leave
+ * uncovered is taken from that dimension's not-yet-assigned rest. A {@code null} / empty list means
+ * "take it all from the rest" (the legacy behaviour, which 422s when the rest is too small). On a
+ * {@link CheckoutType#TRANSFER} the reduced tags move to the new target row (the moved stock stays
+ * earmarked); on a {@link CheckoutType#SELL} the mission reductions additionally drive the proceeds
+ * split — mission {@code j} is credited {@code sellAmount × amount_j / amount} of the sale (for
+ * missions the seller participates in), the rest staying the seller's personal proceeds, so no
+ * separate income-attribution input exists any more.
  */
 public record InventoryItemBookOutDto(
     @NotNull @Min(0) Double amount,
@@ -68,4 +73,5 @@ public record InventoryItemBookOutDto(
     @NotNull Long version,
     @Nullable UUID targetOwningOrgUnitId,
     Boolean mergeStock,
-    @Valid @Nullable List<MissionSaleAttributionDto> missionAttributions) {}
+    @Valid @Nullable List<AllocationReductionDto> jobOrderReductions,
+    @Valid @Nullable List<AllocationReductionDto> missionReductions) {}

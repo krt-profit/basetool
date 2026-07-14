@@ -55976,6 +55976,20 @@
         },
         "required" : [ "amount", "version" ]
       },
+      "AllocationReductionDto" : {
+        "type" : "object",
+        "properties" : {
+          "targetId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "amount" : {
+            "type" : "number",
+            "format" : "double"
+          }
+        },
+        "required" : [ "amount", "targetId" ]
+      },
       "InventoryItemBookOutDto" : {
         "type" : "object",
         "properties" : {
@@ -56014,27 +56028,20 @@
           "mergeStock" : {
             "type" : "boolean"
           },
-          "missionAttributions" : {
+          "jobOrderReductions" : {
             "type" : "array",
             "items" : {
-              "$ref" : "#/components/schemas/MissionSaleAttributionDto"
+              "$ref" : "#/components/schemas/AllocationReductionDto"
+            }
+          },
+          "missionReductions" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AllocationReductionDto"
             }
           }
         },
         "required" : [ "amount", "version" ]
-      },
-      "MissionSaleAttributionDto" : {
-        "type" : "object",
-        "properties" : {
-          "missionId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "amount" : {
-            "type" : "number"
-          }
-        },
-        "required" : [ "amount", "missionId" ]
       },
       "InventoryAllocationWriteDto" : {
         "type" : "object",

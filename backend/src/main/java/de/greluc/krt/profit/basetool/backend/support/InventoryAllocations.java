@@ -152,25 +152,6 @@ public final class InventoryAllocations {
   }
 
   /**
-   * Copies every allocation of {@code from} onto {@code to} verbatim — the full-move inherit for a
-   * transfer / personal-rebook that relocates an entry's <em>entire</em> stock (the moved row is a
-   * pure relocation, so amounts already match and no split is needed). A partial move does NOT call
-   * this: its moved row starts unassigned (a multi-order earmark cannot be split), and the source
-   * keeps its allocations guarded by {@link #fits(InventoryItem)}.
-   *
-   * @param from the source entry whose allocations to copy; never {@code null}
-   * @param to the target (moved) entry to copy them onto; never {@code null}
-   */
-  public static void copyAllocations(InventoryItem from, InventoryItem to) {
-    for (InventoryJobOrderAllocation a : from.getJobOrderAllocations()) {
-      addJobOrder(to, a.getJobOrder(), a.getAmount(), Boolean.TRUE.equals(a.getDelivered()));
-    }
-    for (InventoryMissionAllocation a : from.getMissionAllocations()) {
-      addMission(to, a.getMission(), a.getAmount());
-    }
-  }
-
-  /**
    * Shrinks the entry's earmark to {@code orderId} by {@code amount} because that much stock was
    * just handed over to (i.e. fulfilled for) the order and physically left inventory. The slice is
    * floored at zero and removed entirely when it reaches it (no zero-amount chip lingers); a
@@ -181,7 +162,7 @@ public final class InventoryAllocations {
    * @param amount the handed-over SCU to subtract from the slice
    */
   public static void reduceJobOrder(InventoryItem item, UUID orderId, double amount) {
-    InventoryJobOrderAllocation slice = findJobOrder(item, orderId);
+    InventoryJobOrderAllocation slice = jobOrderSlice(item, orderId);
     if (slice == null) {
       return;
     }
@@ -194,6 +175,30 @@ public final class InventoryAllocations {
     // it would round to zero keeps that from happening.
     if (InventoryItem.roundToScuScale(reduced) <= 0.0) {
       item.getJobOrderAllocations().remove(slice);
+    } else {
+      slice.setAmount(reduced);
+    }
+  }
+
+  /**
+   * Shrinks the entry's earmark to {@code missionId} by {@code amount} — the mission-dimension
+   * mirror of {@link #reduceJobOrder(InventoryItem, UUID, double)}. The slice is floored at zero
+   * and removed entirely when it reaches it (dropped whenever it would round to {@code 0.000} on
+   * flush, so no phantom zero-amount chip lingers to block re-earmarking the mission); a missing
+   * slice — the deducted stock was unassigned to any mission — is a no-op.
+   *
+   * @param item the entry whose mission slice to shrink; never {@code null}
+   * @param missionId the earmarked mission to debit; never {@code null}
+   * @param amount the SCU to subtract from the slice
+   */
+  public static void reduceMission(InventoryItem item, UUID missionId, double amount) {
+    InventoryMissionAllocation slice = missionSlice(item, missionId);
+    if (slice == null) {
+      return;
+    }
+    double reduced = (slice.getAmount() != null ? slice.getAmount() : 0.0) - amount;
+    if (InventoryItem.roundToScuScale(reduced) <= 0.0) {
+      item.getMissionAllocations().remove(slice);
     } else {
       slice.setAmount(reduced);
     }
@@ -214,7 +219,7 @@ public final class InventoryAllocations {
   public static void unionInto(InventoryItem survivor, InventoryItem victim) {
     for (InventoryJobOrderAllocation va : victim.getJobOrderAllocations()) {
       UUID orderId = va.getJobOrder() != null ? va.getJobOrder().getId() : null;
-      InventoryJobOrderAllocation existing = findJobOrder(survivor, orderId);
+      InventoryJobOrderAllocation existing = jobOrderSlice(survivor, orderId);
       if (existing != null) {
         existing.setAmount(existing.getAmount() + va.getAmount());
         existing.setDelivered(
@@ -226,7 +231,7 @@ public final class InventoryAllocations {
     }
     for (InventoryMissionAllocation va : victim.getMissionAllocations()) {
       UUID missionId = va.getMission() != null ? va.getMission().getId() : null;
-      InventoryMissionAllocation existing = findMission(survivor, missionId);
+      InventoryMissionAllocation existing = missionSlice(survivor, missionId);
       if (existing != null) {
         existing.setAmount(existing.getAmount() + va.getAmount());
       } else {
@@ -236,13 +241,17 @@ public final class InventoryAllocations {
   }
 
   /**
-   * Finds the entry's job-order slice for {@code orderId}, or {@code null}.
+   * Finds the entry's job-order slice for {@code orderId}, or {@code null} when the order is not
+   * earmarked. Public so a write path can read the pre-deduction slice amount and its {@code
+   * JobOrder} / delivered state — the book-out / transfer "deduct from" plan validates each
+   * reduction against the slice amount and, on a transfer, carries the reduced slice's tag onto the
+   * moved row.
    *
    * @param item the entry; never {@code null}
    * @param orderId the job-order id to match; may be {@code null}
    * @return the matching slice, or {@code null} when none
    */
-  private static InventoryJobOrderAllocation findJobOrder(InventoryItem item, UUID orderId) {
+  public static InventoryJobOrderAllocation jobOrderSlice(InventoryItem item, UUID orderId) {
     if (orderId == null) {
       return null;
     }
@@ -253,13 +262,17 @@ public final class InventoryAllocations {
   }
 
   /**
-   * Finds the entry's mission slice for {@code missionId}, or {@code null}.
+   * Finds the entry's mission slice for {@code missionId}, or {@code null} when the mission is not
+   * earmarked. Public for the same reason as {@link #jobOrderSlice(InventoryItem, UUID)} — the
+   * book-out / transfer plan validates each mission reduction against its slice amount, carries the
+   * reduced tag onto a transfer's moved row, and reads the reduced SCU to drive the coupled sale
+   * proceeds.
    *
    * @param item the entry; never {@code null}
    * @param missionId the mission id to match; may be {@code null}
    * @return the matching slice, or {@code null} when none
    */
-  private static InventoryMissionAllocation findMission(InventoryItem item, UUID missionId) {
+  public static InventoryMissionAllocation missionSlice(InventoryItem item, UUID missionId) {
     if (missionId == null) {
       return null;
     }
