@@ -336,14 +336,14 @@
 /* Loading placeholder and empty-result states. */
 .matrix-loading {
     padding: 1rem;
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-family: var(--font-body);
 }
 
 .matrix-table td.mtx-no-results {
     text-align: center;
     font-style: italic;
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
 }
 
 .filters-container {
