@@ -327,18 +327,18 @@ Columns: **Anonymous** = not logged in · **Member** = KRT Member ·
 
 ### 3.3 Inventory (Lager) & Job Orders
 
-| Function (gate)                                                                                                                                   | Anonymous | Member | Log. | MM  | Officer | Admin |
-|:--------------------------------------------------------------------------------------------------------------------------------------------------|:---------:|:------:|:----:|:---:|:-------:|:-----:|
-| View inventory view (`/inventory`, Member+)                                                                                                       |     ❌     |   ✅    |  ✅   |  ✅  |    ✅    |   ✅   |
-| Edit inventory / check items in/out / rebook personal marker (Umbuchung, REQ-INV-007) (`isAuthenticated()` + `canEditInventoryItem`, owner scope) |     ❌     |   ✅¹   |  ✅   | ✅¹  |    ✅    |   ✅   |
-| **Create** job order (material & item order)                                                                                                      |     ✅     |   ✅    |  ✅   |  ✅  |    ✅    |   ✅   |
-| Read job-order list / detail (`isAuthenticated()` + `canViewJobOrders` + `canSeeJobOrder`)                                                        |     ❌     |   ✅³   |  ✅³  | ✅³  |   ✅³    |   ✅   |
-| Add/remove **yourself** as an editor, maintain your own editor note (`canSeeJobOrder` + self-or-Logistician)                                      |     ❌     |  ✅³⁵   |  ✅³  | ✅³⁵ |   ✅³    |   ✅   |
-| Read the **blueprint coverage** of an item order (`canSeeJobOrderBlueprintOwners`)                                                                |     ❌     |   ✅⁴   |  ✅⁴  | ✅⁴  |   ✅⁴    |   ✅   |
-| **Edit** job order (status, priority, materials, handover) (`hasRole('LOGISTICIAN')` + `canEditJobOrder`)                                         |     ❌     |   ❌    |  ✅³  |  ❌  |   ✅³    |   ✅   |
-| Reassign the responsible unit (`PATCH /{id}/responsible-org-unit`)                                                                                |     ❌     |   ❌    |  ✅²  |  ❌  |   ✅²    |   ✅   |
-| Add/withdraw material claims on SK job orders (`hasRole('LOGISTICIAN')` + `canViewJobOrders`)                                                     |     ❌     |   ❌    |  ✅³  |  ❌  |   ✅³    |   ✅   |
-| **Delete** job order (`hasRole('ADMIN')`)                                                                                                         |     ❌     |   ❌    |  ❌   |  ❌  |    ❌    |   ✅   |
+| Function (gate)                                                                                                                                                                                                                       | Anonymous | Member | Log. | MM  | Officer | Admin |
+|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:---------:|:------:|:----:|:---:|:-------:|:-----:|
+| View inventory view (`/inventory`, Member+)                                                                                                                                                                                           |     ❌     |   ✅    |  ✅   |  ✅  |    ✅    |   ✅   |
+| Edit inventory / check items in/out / assign entries to job orders & missions (quantity-split allocations, REQ-INV-027) / rebook personal marker (Umbuchung, REQ-INV-007) (`isAuthenticated()` + `canEditInventoryItem`, owner scope) |     ❌     |   ✅¹   |  ✅   | ✅¹  |    ✅    |   ✅   |
+| **Create** job order (material & item order)                                                                                                                                                                                          |     ✅     |   ✅    |  ✅   |  ✅  |    ✅    |   ✅   |
+| Read job-order list / detail (`isAuthenticated()` + `canViewJobOrders` + `canSeeJobOrder`)                                                                                                                                            |     ❌     |   ✅³   |  ✅³  | ✅³  |   ✅³    |   ✅   |
+| Add/remove **yourself** as an editor, maintain your own editor note (`canSeeJobOrder` + self-or-Logistician)                                                                                                                          |     ❌     |  ✅³⁵   |  ✅³  | ✅³⁵ |   ✅³    |   ✅   |
+| Read the **blueprint coverage** of an item order (`canSeeJobOrderBlueprintOwners`)                                                                                                                                                    |     ❌     |   ✅⁴   |  ✅⁴  | ✅⁴  |   ✅⁴    |   ✅   |
+| **Edit** job order (status, priority, materials, handover) (`hasRole('LOGISTICIAN')` + `canEditJobOrder`)                                                                                                                             |     ❌     |   ❌    |  ✅³  |  ❌  |   ✅³    |   ✅   |
+| Reassign the responsible unit (`PATCH /{id}/responsible-org-unit`)                                                                                                                                                                    |     ❌     |   ❌    |  ✅²  |  ❌  |   ✅²    |   ✅   |
+| Add/withdraw material claims on SK job orders (`hasRole('LOGISTICIAN')` + `canViewJobOrders`)                                                                                                                                         |     ❌     |   ❌    |  ✅³  |  ❌  |   ✅³    |   ✅   |
+| **Delete** job order (`hasRole('ADMIN')`)                                                                                                                                                                                             |     ❌     |   ❌    |  ❌   |  ❌  |    ❌    |   ✅   |
 
 ¹ Only via the own object / the owner-scope check — not in general. The **owner** of a
 personal aggregate (inventory entry `inventory_item.user`, ship `ship.owner`, refinery order
