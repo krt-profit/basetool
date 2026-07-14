@@ -53,7 +53,7 @@ or check-in change never leaves the bar stale (REQ-FE-010). The four tabs:
    `--color-bg-dark-gray` panel surface as the other overview cards (owner request 2026-06-27, #818
    follow-up), **expanded by default** (owner request 2026-07-01) so the briefing is visible without a
    click, with a chevron that flips on open, replacing the former bare `hud-details` summary that
-   sat directly on the honeycomb backdrop (member+ gate unchanged; rendered
+   sat directly on the flat page background (member+ gate unchanged; rendered
    server-side via the `@markdown` bean — raw HTML escaped, unsafe link protocols stripped, so
    `th:utext` never emits user-controlled markup; the same renderer feeds the home-page next-mission
    banner). The `#overview-actual-start` / `#overview-actual-end` / `#overview-party-lead` ids and the
