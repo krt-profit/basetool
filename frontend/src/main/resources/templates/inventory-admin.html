@@ -339,6 +339,19 @@
                 </div>
             </div>
 
+            <!-- Variante C "Herkunft" (deduct-from) picker (REQ-INV-027): inventory-admin.js fills
+                 [data-herkunft-body] from the source entry's chips when the modal opens, so the user
+                 chooses which Auftrag / Einsatz slices (or the rest) the ausgebuchte Menge comes
+                 from. Hidden for an entry with no earmark tags. -->
+            <div class="form-group mb-1 krtm-hidden" data-herkunft="bookout"
+                 data-herkunft-amount-id="amount"
+                 data-herkunft-submit-id="bookOutSubmitBtn"
+                 data-herkunft-sell-amount-id="sellAmount">
+                <span class="form-label" th:text="#{inventory.herkunft.label}">Herkunft der Menge</span>
+                <p class="herkunft-help" th:text="#{inventory.herkunft.help}">Auswahl der Herkunft</p>
+                <div class="herkunft-body" data-herkunft-body></div>
+            </div>
+
             <div class="mt-2-flex-gap">
                 <button type="submit" id="bookOutSubmitBtn" class="btn btn--cta"
                         th:data-text-discard="#{inventory.bookout.btn.discard}"
@@ -401,6 +414,16 @@
                     <select id="umbuchenTargetOwningOrgUnitId" class="w-full">
                         <option value="" th:text="#{inventory.bookout.targetOrgUnit.placeholder}">Heim-Staffel des Ziels beibehalten</option>
                     </select>
+                </div>
+                <!-- Variante C "Herkunft" (deduct-from) picker (REQ-INV-027) for the transfer: the
+                     moved row inherits the reduced tags ("Marken mitnehmen"). inventory-admin.js
+                     fills it on open; hidden for an entry with no earmark tags. -->
+                <div class="form-group mb-1 krtm-hidden" data-herkunft="umbuchen"
+                     data-herkunft-amount-id="umbuchenAmount"
+                     data-herkunft-submit-id="umbuchenSubmitBtn">
+                    <span class="form-label" th:text="#{inventory.herkunft.label}">Herkunft der Menge</span>
+                    <p class="herkunft-help" th:text="#{inventory.herkunft.help.transfer}">Auswahl der Herkunft</p>
+                    <div class="herkunft-body" data-herkunft-body></div>
                 </div>
             </div>
 
@@ -506,8 +529,23 @@
         restOver: /*[[#{inventory.assoc.rest.over}]]*/ '{0} \u00fcber',
         failed: /*[[#{error.inventory.update.failed}]]*/ 'Fehler beim Aktualisieren des Lagers.'
     };
+
+    // Variante C "Herkunft" (deduct-from) picker strings (REQ-INV-027): inventory-herkunft.js reads
+    // these to label each dimension, the rest chip, the "assign at least" warning and the coupled
+    // SELL proceeds hint. order/mission reuse the Auftrag/Einsatz captions; rest/min/personal carry
+    // a {0} placeholder the module substitutes.
+    var herkunftI18n = {
+        order: /*[[#{inventory.order}]]*/ 'Auftrag',
+        mission: /*[[#{inventory.tree.field.mission}]]*/ 'Einsatz',
+        rest: /*[[#{inventory.herkunft.rest}]]*/ 'Vom Rest: {0}',
+        min: /*[[#{inventory.herkunft.min}]]*/ 'Mindestens {0} auf Marken zuweisen',
+        proceedsTitle: /*[[#{inventory.herkunft.proceeds.title}]]*/ 'Gekoppelter Verkaufserl\u00f6s',
+        personal: /*[[#{inventory.herkunft.proceeds.personal}]]*/ 'Pers\u00f6nlich: {0}',
+        auec: /*[[#{inventory.herkunft.auec}]]*/ 'aUEC'
+    };
 </script>
 <script th:src="@{/js/inventory-note-modal.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/inventory-herkunft.js}" th:attr="nonce=${cspNonce}"></script>
 <script th:src="@{/js/inventory-admin.js}" th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

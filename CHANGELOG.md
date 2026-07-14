@@ -10,6 +10,8 @@
 
 - **Lager: Beim Verkauf von einem Einsatz zugeordnetem Bestand wählt der Verkäufer, welchen Einsätzen wie viel des Erlöses gutgeschrieben wird.** Bisher wurde der gesamte Erlös automatisch einem Einsatz zugeschrieben; jetzt verteilt der Verkäufer den Erlös auf die Einsätze, an denen er teilnimmt, und ein nicht zugeordneter Rest bleibt persönlich (REQ-INV-027).
 
+- **Lager: Beim Ausbuchen und Umbuchen wählt man jetzt direkt im Dialog, von welchen Auftrags- und Einsatz-Marken die Menge abgezogen wird.** Je zugeordneter Marke gibt es ein Mengenfeld; nicht zugewiesene Mengen kommen vom noch nicht zugewiesenen Rest (Voreinstellung), und reicht der Rest nicht, blockiert der Dialog das Absenden und nennt die mindestens auf Marken zu verteilende Menge. Beim Umbuchen nimmt die verschobene Menge ihre Marken mit; beim Verkauf zeigt der Dialog den je Einsatz gekoppelten Erlös (REQ-INV-027).
+
 - **Lager: Die aggregierte Materialübersicht zeigt jetzt auch die maximale verfügbare Qualität.** In der Ansicht `/inventory` steht zwischen „Ø Qualität" und „Gesamtmenge" eine neue Spalte „Max. Qualität" mit der höchsten für das jeweilige Material vorhandenen Qualität (REQ-INV-027).
 
 - **Oberfläche: Das dezente Wabenmuster (Honeycomb) im Seitenhintergrund entfällt.** Der Hintergrund der App sowie der Keycloak-Anmelde- und -Kontoseiten ist jetzt durchgehend flaches Schwarz; der dezente orange Schimmer oben auf der Anmeldeseite bleibt erhalten. Das Hintergrundbild `honeycomb-bg.svg` wurde aus allen Ressourcen entfernt (REQ-UI-003).

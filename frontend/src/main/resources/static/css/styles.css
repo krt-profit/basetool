@@ -757,6 +757,108 @@ tbody tr:nth-child(even):hover {
     align-items: center;
 }
 
+/* Variante C "Herkunft" (deduct-from) picker (REQ-INV-027): inside the Ausbuchen /
+   Umbuchen modals, one amount input per earmark tag per dimension lets the user choose how
+   much of the booked-out quantity comes from each Auftrag / Einsatz slice; whatever is left
+   comes from the not-yet-assigned rest. The rest chip reuses the shared .chip tones, a danger
+   warning states the minimum that must go to tags when the rest cannot cover the deduction,
+   and (SELL only) a coupled-proceeds hint estimates each mission's credit. */
+.herkunft-help {
+    margin: 0 0 0.5rem;
+    font-size: var(--fs-2xs);
+    color: var(--color-gray-2-text);
+}
+
+.herkunft-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.herkunft-dim {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.herkunft-dim-cap {
+    font-size: 0.6rem;
+    font-weight: var(--fw-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-gray-2-text);
+}
+
+.herkunft-tag {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.herkunft-tag-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: var(--fs-2xs);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.herkunft-input {
+    flex: 0 0 6rem;
+    width: 6rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.herkunft-tag-max {
+    flex: 0 0 auto;
+    font-size: var(--fs-2xs);
+    color: var(--color-gray-2-text);
+    font-variant-numeric: tabular-nums;
+}
+
+.herkunft-restline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+}
+
+.herkunft-warn {
+    font-size: var(--fs-2xs);
+    color: var(--color-danger);
+}
+
+.herkunft-proceeds {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.4rem 0.5rem;
+    border-left: 2px solid var(--color-info);
+    background-color: rgb(53 93 220 / 10%);
+}
+
+.herkunft-proceeds-title {
+    font-size: 0.6rem;
+    font-weight: var(--fw-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-info);
+}
+
+.herkunft-proceeds-line {
+    font-size: var(--fs-2xs);
+    color: var(--color-white);
+    font-variant-numeric: tabular-nums;
+}
+
+.herkunft-proceeds-personal {
+    color: var(--color-gray-2-text);
+}
+
 /* Quality gauge (0-1000): number above a thin orange bar. */
 .tree-gauge {
     display: inline-flex;

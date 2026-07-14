@@ -654,10 +654,18 @@ function openUmbuchenModal(id, amount, version, materialId, userId, locationId, 
     document.getElementById('umbuchenTargetLocationId').value = locationId;
     refreshUmbuchenTransferOrgUnitPicker();
     document.getElementById('umbuchenModal').style.display = 'block';
+    // Variante C (REQ-INV-027): build the transfer "Herkunft" picker (the moved row inherits the
+    // reduced tags) after the modal is shown, so its initial validity gates the submit button.
+    if (window.krtHerkunft) {
+        window.krtHerkunft.populate('umbuchen', id);
+    }
 }
 
 function closeUmbuchenModal() {
     if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
+    if (window.krtHerkunft) {
+        window.krtHerkunft.reset('umbuchen');
+    }
     document.getElementById('umbuchenModal').style.display = 'none';
 }
 
@@ -672,6 +680,17 @@ function submitUmbuchen(event) {
     const submitBtn = document.getElementById('umbuchenSubmitBtn');
     // REQ-INV-026: per-action stock-merge opt-in (only rendered for SCU; PIECE always merges).
     const mergeCheckbox = document.getElementById('umbuchenMergeStock');
+    // Variante C (REQ-INV-027): a transfer carries its reduced tags onto the moved row. An invalid
+    // plan already disables the submit button; guard the Enter-key path too.
+    if (window.krtHerkunft && !window.krtHerkunft.isValid('umbuchen')) {
+        if (typeof window.showFrontendErrorToast === 'function') {
+            window.showFrontendErrorToast(assocI18n.overallocated);
+        }
+        return;
+    }
+    const reductions = window.krtHerkunft
+        ? window.krtHerkunft.collect('umbuchen')
+        : { jobOrderReductions: null, missionReductions: null };
     const payload = {
         amount: amount,
         type: 'TRANSFER',
@@ -681,6 +700,8 @@ function submitUmbuchen(event) {
             document.getElementById('umbuchenTargetOwningOrgUnitId').value || null,
         version: parseInt(document.getElementById('umbuchenVersion').value, 10),
         mergeStock: !!(mergeCheckbox && mergeCheckbox.checked),
+        jobOrderReductions: reductions.jobOrderReductions,
+        missionReductions: reductions.missionReductions,
     };
     umbuchenInFlight = true;
     if (submitBtn) submitBtn.disabled = true;
@@ -733,6 +754,19 @@ function submitBookOut(event) {
     const sellAmountEl = document.getElementById('sellAmount');
     // Ausbuchen now only discards or sells — the TRANSFER (Umbuchung) mode moved to the
     // dedicated Umbuchen modal. The transfer-only fields stay null on the book-out payload.
+    // Variante C (REQ-INV-027): the "Herkunft" picker chooses which order/mission slices (or the
+    // rest) the deduction comes from and, for a SELL, which missions get the coupled proceeds. An
+    // invalid plan already disables the submit button; guard the Enter-key path too. A null list
+    // means "take it from the rest" (SELL → that portion is personal).
+    if (window.krtHerkunft && !window.krtHerkunft.isValid('bookout')) {
+        if (typeof window.showFrontendErrorToast === 'function') {
+            window.showFrontendErrorToast(assocI18n.overallocated);
+        }
+        return;
+    }
+    const reductions = window.krtHerkunft
+        ? window.krtHerkunft.collect('bookout')
+        : { jobOrderReductions: null, missionReductions: null };
     const payload = {
         amount: amount,
         type: type,
@@ -740,11 +774,9 @@ function submitBookOut(event) {
         sellAmount:
             type === 'SELL' && sellAmountEl.value !== '' ? Number(sellAmountEl.value) : null,
         version: parseInt(document.getElementById('version').value, 10),
+        jobOrderReductions: reductions.jobOrderReductions,
+        missionReductions: reductions.missionReductions,
     };
-    // Variante C (REQ-INV-027): the per-dimension "deduct from" plan (jobOrderReductions /
-    // missionReductions, which also drives the coupled SELL proceeds) is not collected here yet — a
-    // null plan makes the backend take the deduction from the not-yet-assigned rest (a SELL is a
-    // fully-personal sale). The interactive Herkunft picker is added in a follow-up.
     const submitBtn = document.getElementById('bookOutSubmitBtn');
     bookOutInFlight = true;
     if (submitBtn) {
@@ -868,11 +900,19 @@ function openBookOutModal(id, amount, version, materialId, userId, locationId, q
     }
 
     document.getElementById('bookOutModal').style.display = 'block';
+    // Variante C (REQ-INV-027): build the "Herkunft" (deduct-from) picker from this entry's chips
+    // now that the modal is shown, so its initial validity gates the submit button.
+    if (window.krtHerkunft) {
+        window.krtHerkunft.populate('bookout', id);
+    }
 }
 
 function closeBookOutModal() {
     if (typeof window.resetUnsavedChanges === 'function') {
         window.resetUnsavedChanges();
+    }
+    if (window.krtHerkunft) {
+        window.krtHerkunft.reset('bookout');
     }
     document.getElementById('bookOutModal').style.display = 'none';
 }

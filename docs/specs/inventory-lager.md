@@ -430,6 +430,15 @@ target or a Σ over X is a 400, and an under-assigned plan whose rest cannot cov
 earmark, a partial move leaves the tags intact). On a `TRANSFER` the reduced tags **move onto the new
 row** (the moved stock stays earmarked to the same order / mission for the deducted amount).
 
+The Ausbuchen and Umbuchen (Ort / Nutzer) modals render an interactive **"Herkunft" picker**
+(`inventory-herkunft.js`, shared by the personal and global pages): one amount input per earmark tag
+per dimension, read straight from the source leaf row's chips. The inputs default to `0` — the whole
+deduction is taken from the not-yet-assigned rest ("Rest zuerst, Rest leer lassen") — and the picker
+mirrors the backend rules client-side, disabling the submit and stating the minimum that must be
+assigned to tags when the deduction exceeds a dimension's rest. For a `SELL` it also shows the coupled
+per-mission proceeds estimate. A submit sends only the non-zero inputs as the plan; an entry with no
+earmarks hides the picker and submits the legacy `null` plan.
+
 **SELL proceeds are coupled to the mission deduct-from plan.** A `SELL` credits each mission a share
 of the sale proceeds **proportional to the SCU deducted from its earmark** — `sellAmount ×
 amount_j / X`, one squadron-`INCOME` `MissionFinanceEntry` per credited mission — with the rest (SCU
@@ -453,6 +462,9 @@ there is no separate income-attribution input.
 - [ ] A book-out / transfer "deduct from" plan is validated against the slices (unknown / duplicate /
   over-slice / over-total → 400; an under-assigned plan the rest cannot cover → 422); a transfer
   carries the reduced tags onto the moved row; a `null` plan takes it all from the rest.
+- [ ] The Ausbuchen and Umbuchen modals render the "Herkunft" picker (one input per tag per
+  dimension, defaulting to 0 = from the rest), block the submit while the plan is invalid, and send
+  only the non-zero inputs; an entry with no earmarks hides the picker.
 - [ ] A SELL credits each mission proportionally to the SCU deducted from its earmark
   (`sellAmount × scu/sold`), leaves the rest (unassigned + non-participated) personal, and books no
   entry when nothing is deducted from a mission earmark.
@@ -467,7 +479,8 @@ there is no separate income-attribution input.
 `InventoryAggregationService#getMaterialCollection`, `InventoryItemMapper`,
 `V217__add_inventory_allocation_tables.sql`, `V218__drop_inventory_scalar_associations.sql`,
 `fragments/inventory-stack-entries.html`, `inventory-my.js` / `inventory-admin.js`,
-`inventory-input.html` / `inventory-input.js` · **Issues:** #1182 · **ADR:** ADR-0098
+`inventory-herkunft.js` (deduct-from picker), `inventory-input.html` / `inventory-input.js` ·
+**Issues:** #1182 · **ADR:** ADR-0098
 
 ### REQ-INV-028 — Aggregated per-material overview shows average and maximum quality
 

@@ -157,7 +157,30 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString("data-text-sell=\"Verkaufen\"")))
         .andExpect(content().string(not(containsString("data-text-transfer"))))
         .andExpect(content().string(containsString("id=\"umbuchenModal\"")))
-        .andExpect(content().string(containsString("id=\"umbuchenSubmitBtn\"")));
+        .andExpect(content().string(containsString("id=\"umbuchenSubmitBtn\"")))
+        // Variante C (REQ-INV-027): the "Herkunft" (deduct-from) picker sections render in both the
+        // Ausbuchen and Umbuchen modals, wired to their shared inventory-herkunft.js module.
+        .andExpect(content().string(containsString("data-herkunft=\"bookout\"")))
+        .andExpect(content().string(containsString("data-herkunft=\"umbuchen\"")))
+        .andExpect(content().string(containsString("/js/inventory-herkunft.js")));
+  }
+
+  // REQ-INV-027: the personal Lager's Ausbuchen + Umbuchen modals carry the same "Herkunft"
+  // (deduct-from) picker sections and load the shared inventory-herkunft.js module.
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewMyInventory_ShouldRenderHerkunftPicker() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/my"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-herkunft=\"bookout\"")))
+        .andExpect(content().string(containsString("data-herkunft=\"umbuchen\"")))
+        .andExpect(content().string(containsString("data-herkunft-body")))
+        .andExpect(content().string(containsString("/js/inventory-herkunft.js")));
   }
 
   // covers REQ-INV-001 (SCU amount input) / REQ-INV-002 (PIECE amount input) — see
