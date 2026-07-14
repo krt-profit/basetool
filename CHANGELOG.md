@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.4.0](https://github.com/krt-profit/basetool/releases/tag/v1.4.0) - 2026-07-14
+
 ### Changed
 
 - **Lager: Ein Lagereintrag kann jetzt mehreren Aufträgen und Einsätzen mit eigener Menge zugeordnet werden.** Statt genau einem Auftrag und einem Einsatz lässt sich der Bestand eines Eintrags getrennt je Dimension aufteilen und wird als Mengen-Chips direkt am Eintrag angezeigt (z. B. 60 SCU für Auftrag A, 40 SCU für Auftrag B); ein unverteilter Rest erscheint als eigener Chip. Auch beim Einbuchen kann die Menge gleich auf mehrere Aufträge/Einsätze verteilt werden. Ein Eintrag stapelt sich dadurch nur noch über seine physische Identität (Material, Besitzer, Lagerort, Qualität, Org-Einheit) — die Zuordnungen wandern an den einzelnen Eintrag (REQ-INV-027).
