@@ -23,6 +23,7 @@ import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorRespons
 
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BulkCheckoutRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryAllocationInput;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryAllocationWriteDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemCreateDto;
@@ -33,6 +34,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.InventoryForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -103,8 +105,7 @@ public class InventoryWriteController {
       BindingResult bindingResult,
       Model model,
       RedirectAttributes redirectAttributes) {
-    if (Boolean.TRUE.equals(form.getPersonal())
-        && (form.getJobOrderId() != null || form.getMissionId() != null)) {
+    if (formPersonalWithAssignment(form)) {
       bindingResult.rejectValue(
           "personal",
           "error.inventory.personal.assignment",
@@ -128,7 +129,9 @@ public class InventoryWriteController {
               form.getMissionId(),
               form.getJobOrderId(),
               form.getOwningOrgUnitId(),
-              form.getMergeStock());
+              form.getMergeStock(),
+              toAllocationInputs(form.getJobOrderAllocations()),
+              toAllocationInputs(form.getMissionAllocations()));
       backendApiClient.post("/api/v1/inventory", request, InventoryItemDto.class);
       redirectAttributes.addFlashAttribute("successToast", "success.inventory.add");
     } catch (BackendServiceException e) {
@@ -173,8 +176,7 @@ public class InventoryWriteController {
   @ResponseBody
   public org.springframework.http.ResponseEntity<Object> addInventoryItemAjax(
       @Valid @ModelAttribute("inventoryForm") InventoryForm form, BindingResult bindingResult) {
-    if (Boolean.TRUE.equals(form.getPersonal())
-        && (form.getJobOrderId() != null || form.getMissionId() != null)) {
+    if (formPersonalWithAssignment(form)) {
       return inventoryValidationError("INVENTORY_PERSONAL_ASSIGNMENT");
     }
     if (bindingResult.hasErrors()) {
@@ -192,7 +194,9 @@ public class InventoryWriteController {
               form.getMissionId(),
               form.getJobOrderId(),
               form.getOwningOrgUnitId(),
-              form.getMergeStock());
+              form.getMergeStock(),
+              toAllocationInputs(form.getJobOrderAllocations()),
+              toAllocationInputs(form.getMissionAllocations()));
       backendApiClient.post("/api/v1/inventory", request, InventoryItemDto.class);
       return org.springframework.http.ResponseEntity.ok(
           java.util.Map.of("targetUrl", inventorySourceTarget(form.getSource())));
@@ -203,6 +207,42 @@ public class InventoryWriteController {
       log.error("Failed to add inventory item (ajax)", e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
     }
+  }
+
+  /**
+   * Whether a create form marks the entry personal while also carrying any assignment — a single
+   * job order / mission or a Variante-C split-at-check-in earmark (REQ-INV-027, R4). Personal stock
+   * can never be assigned, so this drives the friendly pre-backend rejection on both create paths.
+   *
+   * @param form the bound create form.
+   * @return {@code true} when the entry is personal and carries at least one assignment.
+   */
+  private static boolean formPersonalWithAssignment(InventoryForm form) {
+    if (!Boolean.TRUE.equals(form.getPersonal())) {
+      return false;
+    }
+    return form.getJobOrderId() != null
+        || form.getMissionId() != null
+        || !toAllocationInputs(form.getJobOrderAllocations()).isEmpty()
+        || !toAllocationInputs(form.getMissionAllocations()).isEmpty();
+  }
+
+  /**
+   * Maps the create form's split-at-check-in rows to the backend allocation-input list
+   * (REQ-INV-027, R4), dropping incomplete rows (a target or amount the user left blank).
+   *
+   * @param rows the bound allocation rows; may be {@code null}.
+   * @return the non-blank allocation inputs; never {@code null}.
+   */
+  private static List<InventoryAllocationInput> toAllocationInputs(
+      List<InventoryForm.AllocationRow> rows) {
+    if (rows == null) {
+      return List.of();
+    }
+    return rows.stream()
+        .filter(row -> row != null && row.getTargetId() != null && row.getAmount() != null)
+        .map(row -> new InventoryAllocationInput(row.getTargetId(), row.getAmount()))
+        .toList();
   }
 
   /**

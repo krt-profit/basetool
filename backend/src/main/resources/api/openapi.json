@@ -55882,6 +55882,20 @@
         },
         "required" : [ "productKey", "quantity" ]
       },
+      "InventoryAllocationInput" : {
+        "type" : "object",
+        "properties" : {
+          "targetId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "amount" : {
+            "type" : "number",
+            "format" : "double"
+          }
+        },
+        "required" : [ "amount", "targetId" ]
+      },
       "InventoryItemCreateDto" : {
         "type" : "object",
         "properties" : {
@@ -55924,6 +55938,18 @@
           },
           "mergeStock" : {
             "type" : "boolean"
+          },
+          "jobOrderAllocations" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/InventoryAllocationInput"
+            }
+          },
+          "missionAllocations" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/InventoryAllocationInput"
+            }
           }
         },
         "required" : [ "amount", "locationId", "materialId", "quality" ]

@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkCheckoutRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationDimension;
+import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationInput;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationWriteDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemCreateDto;
@@ -57,7 +58,9 @@ import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -411,28 +414,7 @@ public class InventoryItemService {
             .findById(dto.locationId())
             .orElseThrow(() -> new NotFoundException("Location not found"));
 
-    Mission mission = null;
-    if (dto.missionId() != null) {
-      mission =
-          missionRepository
-              .findById(dto.missionId())
-              .orElseThrow(() -> new NotFoundException("Mission not found"));
-    }
-
-    JobOrder jobOrder = null;
-    if (dto.jobOrderId() != null) {
-      jobOrder =
-          jobOrderRepository
-              .findById(dto.jobOrderId())
-              .orElseThrow(() -> new NotFoundException("JobOrder not found"));
-      assertMaterialRequiredByJobOrder(material, jobOrder);
-    }
-
     Boolean isPersonal = dto.personal() != null ? dto.personal() : false;
-
-    if (Boolean.TRUE.equals(isPersonal) && (mission != null || jobOrder != null)) {
-      throw new BadRequestException("Personal items cannot be assigned to a mission or job order");
-    }
 
     // The owning org unit is the eighth dimension of an inventory stack's identity. Resolve it up
     // front (validating the picker output) so the new row is stamped with the correct org-unit
@@ -453,14 +435,50 @@ public class InventoryItemService {
     item.setQuality(dto.quality());
     item.setAmount(InventoryItem.roundToScuScale(dto.amount()));
     item.setPersonal(isPersonal);
-    // Variante C (REQ-INV-027): a single-assignment create writes one job-order + one mission
-    // allocation for the entry's full amount (the einbuchen form still offers a single Auftrag /
-    // Einsatz); an unset dimension stays empty. Multi-split at check-in (R4) is a later addition.
-    if (jobOrder != null) {
-      InventoryAllocations.addJobOrder(item, jobOrder, item.getAmount(), false);
+    // Variante C (REQ-INV-027, R4): split at check-in. The explicit per-dimension allocation lists
+    // take precedence; otherwise the single jobOrderId / missionId writes one full-amount slice
+    // (backward compatible). Guards mirror the per-allocation write endpoints: a personal entry
+    // carries no assignment, a job-order target's material must be one the order needs, no target
+    // twice, PIECE amounts are whole, and per dimension the Σ of the slices must stay within the
+    // entry amount (R5) — else 422.
+    List<InventoryAllocationInput> jobAllocations =
+        effectiveAllocations(dto.jobOrderAllocations(), dto.jobOrderId(), item.getAmount());
+    List<InventoryAllocationInput> missionAllocations =
+        effectiveAllocations(dto.missionAllocations(), dto.missionId(), item.getAmount());
+    if (Boolean.TRUE.equals(isPersonal)
+        && (!jobAllocations.isEmpty() || !missionAllocations.isEmpty())) {
+      throw new BadRequestException("Personal items cannot be assigned to a mission or job order");
     }
-    if (mission != null) {
-      InventoryAllocations.addMission(item, mission, item.getAmount());
+    boolean piece = material.getQuantityType() == QuantityType.PIECE;
+    Set<UUID> seenOrders = new HashSet<>();
+    for (InventoryAllocationInput allocation : jobAllocations) {
+      if (!seenOrders.add(allocation.targetId())) {
+        throw new BadRequestException("A job order may be assigned at most once at check-in");
+      }
+      requireWholeForPiece(piece, allocation.amount());
+      JobOrder order =
+          jobOrderRepository
+              .findById(allocation.targetId())
+              .orElseThrow(() -> new NotFoundException("JobOrder not found"));
+      assertMaterialRequiredByJobOrder(material, order);
+      InventoryAllocations.addJobOrder(
+          item, order, InventoryItem.roundToScuScale(allocation.amount()), false);
+    }
+    Set<UUID> seenMissions = new HashSet<>();
+    for (InventoryAllocationInput allocation : missionAllocations) {
+      if (!seenMissions.add(allocation.targetId())) {
+        throw new BadRequestException("A mission may be assigned at most once at check-in");
+      }
+      requireWholeForPiece(piece, allocation.amount());
+      Mission missionTarget =
+          missionRepository
+              .findById(allocation.targetId())
+              .orElseThrow(() -> new NotFoundException("Mission not found"));
+      InventoryAllocations.addMission(
+          item, missionTarget, InventoryItem.roundToScuScale(allocation.amount()));
+    }
+    if (!InventoryAllocations.fits(item)) {
+      throw new OverAllocationException();
     }
 
     InventoryItem saved = inventoryItemRepository.save(item);
@@ -850,6 +868,42 @@ public class InventoryItemService {
               + " is not required by job order "
               + jobOrder.getId()
               + "; an inventory item can only be linked to an order that needs its material.");
+    }
+  }
+
+  /**
+   * Resolves the effective split-at-check-in allocations for one dimension (Variante C,
+   * REQ-INV-027, R4): the caller-supplied {@code explicit} list when it carries any entry;
+   * otherwise, for backward compatibility, a single full-amount allocation from the legacy scalar
+   * {@code singleId}; otherwise none.
+   *
+   * @param explicit the per-target split list from the create payload; may be {@code null}/empty.
+   * @param singleId the legacy single job-order / mission id; may be {@code null}.
+   * @param fullAmount the entry's amount, used when falling back to the single id.
+   * @return the effective allocations to write for this dimension; never {@code null}.
+   */
+  private static List<InventoryAllocationInput> effectiveAllocations(
+      List<InventoryAllocationInput> explicit, UUID singleId, double fullAmount) {
+    if (explicit != null && !explicit.isEmpty()) {
+      return explicit;
+    }
+    if (singleId != null) {
+      return List.of(new InventoryAllocationInput(singleId, fullAmount));
+    }
+    return List.of();
+  }
+
+  /**
+   * Rejects a fractional allocation amount for a {@code PIECE} material (whole units only),
+   * mirroring the entry-amount rule and the per-allocation write endpoints.
+   *
+   * @param piece whether the entry's material is measured in whole PIECEs.
+   * @param amount the allocation amount to check.
+   * @throws BadRequestException when {@code piece} and {@code amount} is not a whole number.
+   */
+  private static void requireWholeForPiece(boolean piece, double amount) {
+    if (piece && amount % 1 != 0) {
+      throw new BadRequestException("Amount must be a whole number for PIECE materials");
     }
   }
 

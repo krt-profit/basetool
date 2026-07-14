@@ -21,9 +21,11 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 
 import de.greluc.krt.profit.basetool.backend.validation.QuantityAware;
 import de.greluc.krt.profit.basetool.backend.validation.ValidQuantityAmount;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -58,6 +60,13 @@ import java.util.UUID;
  *     for an {@code SCU} material the merge happens only when this is {@code true} — the user ticks
  *     the modal checkbox for this single book-in. {@code null} is treated as {@code false}. It is
  *     never persisted: it governs only this one transaction.
+ * @param jobOrderAllocations optional Variante-C split-at-check-in (REQ-INV-027, R4): earmark parts
+ *     of the new entry to several job orders with their own amounts. When non-empty it supersedes
+ *     {@link #jobOrderId}; the Σ of the amounts must stay within {@link #amount} (R5) and every
+ *     target's material requirement is checked. {@code null}/empty falls back to the single {@link
+ *     #jobOrderId}.
+ * @param missionAllocations optional Variante-C split-at-check-in for missions — the mission
+ *     counterpart of {@link #jobOrderAllocations}; supersedes {@link #missionId} when non-empty.
  */
 @ValidQuantityAmount
 public record InventoryItemCreateDto(
@@ -70,5 +79,7 @@ public record InventoryItemCreateDto(
     UUID missionId,
     UUID jobOrderId,
     UUID owningOrgUnitId,
-    Boolean mergeStock)
+    Boolean mergeStock,
+    @Valid List<InventoryAllocationInput> jobOrderAllocations,
+    @Valid List<InventoryAllocationInput> missionAllocations)
     implements QuantityAware {}

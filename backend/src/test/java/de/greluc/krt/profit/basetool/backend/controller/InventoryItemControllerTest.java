@@ -365,7 +365,7 @@ class InventoryItemControllerTest {
     UUID locationId = UUID.randomUUID();
     InventoryItemCreateDto createDto =
         new InventoryItemCreateDto(
-            null, materialId, locationId, 750, 25.0, false, null, null, null, null);
+            null, materialId, locationId, 750, 25.0, false, null, null, null, null, null, null);
     InventoryItemDto persisted = inventoryItem(UUID.randomUUID());
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
@@ -392,6 +392,8 @@ class InventoryItemControllerTest {
             750,
             25.0,
             false,
+            null,
+            null,
             null,
             null,
             null,

@@ -26,6 +26,7 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.exception.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
@@ -488,7 +489,7 @@ class InventoryItemServiceTest {
 
     InventoryItemCreateDto dto =
         new InventoryItemCreateDto(
-            userId, materialId, locationId, 100, 10.0, false, null, null, null, null);
+            userId, materialId, locationId, 100, 10.0, false, null, null, null, null, null, null);
 
     User user = new User();
     user.setId(userId);
@@ -536,6 +537,209 @@ class InventoryItemServiceTest {
   }
 
   @Test
+  void createInventoryItem_withSplitAtCheckIn_writesEachAllocation() {
+    // Variante C (REQ-INV-027, R4): split at check-in — the entry earmarks parts of its amount to
+    // several job orders and a mission with their own amounts.
+    UUID userId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID orderAId = UUID.randomUUID();
+    UUID orderBId = UUID.randomUUID();
+    UUID missionXId = UUID.randomUUID();
+
+    InventoryItemCreateDto dto =
+        new InventoryItemCreateDto(
+            userId,
+            materialId,
+            locationId,
+            100,
+            10.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            java.util.List.of(
+                new InventoryAllocationInput(orderAId, 3.0),
+                new InventoryAllocationInput(orderBId, 4.0)),
+            java.util.List.of(new InventoryAllocationInput(missionXId, 5.0)));
+
+    User user = new User();
+    user.setId(userId);
+    Material material = new Material();
+    material.setId(materialId);
+    Location location = new Location();
+    location.setId(locationId);
+    JobOrder orderA = new JobOrder();
+    orderA.setId(orderAId);
+    JobOrder orderB = new JobOrder();
+    orderB.setId(orderBId);
+    Mission missionX = new Mission();
+    missionX.setId(missionXId);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+    when(jobOrderRepository.findById(orderAId)).thenReturn(Optional.of(orderA));
+    when(jobOrderRepository.findById(orderBId)).thenReturn(Optional.of(orderB));
+    when(missionRepository.findById(missionXId)).thenReturn(Optional.of(missionX));
+    when(jobOrderItemService.requiredMaterialIds(any(JobOrder.class)))
+        .thenReturn(Set.of(materialId));
+    when(inventoryItemRepository.save(any(InventoryItem.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+    when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
+
+    inventoryItemService.createInventoryItem(dto, userId, false);
+
+    org.mockito.ArgumentCaptor<InventoryItem> captor =
+        org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
+    verify(inventoryItemRepository).save(captor.capture());
+    InventoryItem saved = captor.getValue();
+    assertEquals(2, saved.getJobOrderAllocations().size(), "two job-order slices written");
+    assertEquals(1, saved.getMissionAllocations().size(), "one mission slice written");
+    assertEquals(
+        7.0,
+        saved.getJobOrderAllocations().stream().mapToDouble(a -> a.getAmount()).sum(),
+        "Σ job-order slices");
+    assertEquals(5.0, saved.getMissionAllocations().get(0).getAmount());
+  }
+
+  @Test
+  void createInventoryItem_withSplitExceedingAmount_throwsOverAllocation() {
+    // R5: Σ per dimension must stay within the entry amount; 8 + 5 > 10 => 422.
+    UUID userId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID orderAId = UUID.randomUUID();
+    UUID orderBId = UUID.randomUUID();
+
+    InventoryItemCreateDto dto =
+        new InventoryItemCreateDto(
+            userId,
+            materialId,
+            locationId,
+            100,
+            10.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            java.util.List.of(
+                new InventoryAllocationInput(orderAId, 8.0),
+                new InventoryAllocationInput(orderBId, 5.0)),
+            null);
+
+    User user = new User();
+    user.setId(userId);
+    Material material = new Material();
+    material.setId(materialId);
+    Location location = new Location();
+    location.setId(locationId);
+    JobOrder orderA = new JobOrder();
+    orderA.setId(orderAId);
+    JobOrder orderB = new JobOrder();
+    orderB.setId(orderBId);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+    when(jobOrderRepository.findById(orderAId)).thenReturn(Optional.of(orderA));
+    when(jobOrderRepository.findById(orderBId)).thenReturn(Optional.of(orderB));
+    when(jobOrderItemService.requiredMaterialIds(any(JobOrder.class)))
+        .thenReturn(Set.of(materialId));
+
+    assertThrows(
+        OverAllocationException.class,
+        () -> inventoryItemService.createInventoryItem(dto, userId, false));
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
+  }
+
+  @Test
+  void createInventoryItem_withDuplicateSplitTarget_throwsBadRequest() {
+    UUID userId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID orderAId = UUID.randomUUID();
+
+    InventoryItemCreateDto dto =
+        new InventoryItemCreateDto(
+            userId,
+            materialId,
+            locationId,
+            100,
+            10.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            java.util.List.of(
+                new InventoryAllocationInput(orderAId, 3.0),
+                new InventoryAllocationInput(orderAId, 4.0)),
+            null);
+
+    User user = new User();
+    user.setId(userId);
+    Material material = new Material();
+    material.setId(materialId);
+    Location location = new Location();
+    location.setId(locationId);
+    JobOrder orderA = new JobOrder();
+    orderA.setId(orderAId);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+    when(jobOrderRepository.findById(orderAId)).thenReturn(Optional.of(orderA));
+    when(jobOrderItemService.requiredMaterialIds(any(JobOrder.class)))
+        .thenReturn(Set.of(materialId));
+
+    assertThrows(
+        BadRequestException.class,
+        () -> inventoryItemService.createInventoryItem(dto, userId, false));
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
+  }
+
+  @Test
+  void createInventoryItem_personalWithSplitAllocations_throwsBadRequest() {
+    UUID userId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+
+    InventoryItemCreateDto dto =
+        new InventoryItemCreateDto(
+            userId,
+            materialId,
+            locationId,
+            100,
+            10.0,
+            true,
+            null,
+            null,
+            null,
+            null,
+            java.util.List.of(new InventoryAllocationInput(UUID.randomUUID(), 3.0)),
+            null);
+
+    User user = new User();
+    user.setId(userId);
+    Material material = new Material();
+    material.setId(materialId);
+    Location location = new Location();
+    location.setId(locationId);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+
+    assertThrows(
+        BadRequestException.class,
+        () -> inventoryItemService.createInventoryItem(dto, userId, false));
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
+  }
+
+  @Test
   void createInventoryItem_shouldRejectWhenMaterialNotRequiredByJobOrder() {
     // REQ-ORDERS-018: a material may only be linked to an order that requires it; otherwise the
     // link
@@ -547,7 +751,18 @@ class InventoryItemServiceTest {
 
     InventoryItemCreateDto dto =
         new InventoryItemCreateDto(
-            userId, materialId, locationId, 100, 10.0, false, null, jobOrderId, null, null);
+            userId,
+            materialId,
+            locationId,
+            100,
+            10.0,
+            false,
+            null,
+            jobOrderId,
+            null,
+            null,
+            null,
+            null);
 
     User user = new User();
     user.setId(userId);
@@ -581,7 +796,18 @@ class InventoryItemServiceTest {
 
     InventoryItemCreateDto dto =
         new InventoryItemCreateDto(
-            userId, materialId, locationId, 100, 10.0, false, null, jobOrderId, null, null);
+            userId,
+            materialId,
+            locationId,
+            100,
+            10.0,
+            false,
+            null,
+            jobOrderId,
+            null,
+            null,
+            null,
+            null);
 
     User user = new User();
     user.setId(userId);
@@ -621,7 +847,18 @@ class InventoryItemServiceTest {
 
     InventoryItemCreateDto dto =
         new InventoryItemCreateDto(
-            userId, materialId, locationId, 100, inputAmount, false, null, null, null, null);
+            userId,
+            materialId,
+            locationId,
+            100,
+            inputAmount,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
 
     User user = new User();
     user.setId(userId);
@@ -661,6 +898,8 @@ class InventoryItemServiceTest {
             100,
             10.0,
             false,
+            null,
+            null,
             null,
             null,
             null,
@@ -1286,6 +1525,8 @@ class InventoryItemServiceTest {
             null,
             null,
             pickedOrgUnitId,
+            null,
+            null,
             null);
 
     User user = new User();
@@ -1327,6 +1568,8 @@ class InventoryItemServiceTest {
             null,
             null,
             foreignOrgUnitId,
+            null,
+            null,
             null);
 
     User user = new User();
@@ -1355,7 +1598,18 @@ class InventoryItemServiceTest {
 
     InventoryItemCreateDto dto =
         new InventoryItemCreateDto(
-            userId, materialId, locationId, 100, 10.0, false, null, null, pickedOrgUnitId, null);
+            userId,
+            materialId,
+            locationId,
+            100,
+            10.0,
+            false,
+            null,
+            null,
+            pickedOrgUnitId,
+            null,
+            null,
+            null);
 
     User user = new User();
     user.setId(userId);

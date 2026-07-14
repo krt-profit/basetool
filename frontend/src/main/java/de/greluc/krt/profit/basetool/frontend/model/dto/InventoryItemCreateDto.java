@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -32,6 +33,11 @@ import java.util.UUID;
  * Staffel. {@code null} preserves the legacy stamping path. The final {@code mergeStock} field is
  * the per-action stock-merge opt-in (REQ-INV-026): honoured only for an {@code SCU} material (a
  * {@code PIECE} book-in always merges); {@code null}/{@code false} keeps the row separate.
+ *
+ * <p>The trailing {@code jobOrderAllocations} / {@code missionAllocations} lists are the Variante-C
+ * split-at-check-in payload (REQ-INV-027, R4): earmark parts of the new entry to several job orders
+ * / missions with their own amounts. When non-empty they supersede the single {@code jobOrderId} /
+ * {@code missionId}; {@code null}/empty falls back to the single scalar.
  */
 public record InventoryItemCreateDto(
     UUID userId,
@@ -43,4 +49,6 @@ public record InventoryItemCreateDto(
     UUID missionId,
     UUID jobOrderId,
     UUID owningOrgUnitId,
-    Boolean mergeStock) {}
+    Boolean mergeStock,
+    List<InventoryAllocationInput> jobOrderAllocations,
+    List<InventoryAllocationInput> missionAllocations) {}
