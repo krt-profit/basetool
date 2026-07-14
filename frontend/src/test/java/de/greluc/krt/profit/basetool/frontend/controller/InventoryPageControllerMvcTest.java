@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryStackDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionAllocationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -215,12 +216,13 @@ class InventoryPageControllerMvcTest {
   /**
    * Fragment-render guard for the personal Lager's lazy stack-entries drill-down ({@code
    * /inventory/my/stack/entries}). The append-only Lager loads a stack's entries on expand, not
-   * inline, so this is where the per-entry association select lives. Regression: a refinery order
-   * assigned to a (now non-active) mission produces an entry whose mission is no longer returned by
-   * {@code /api/v1/missions/lookup}; the mission must still appear via a fallback {@code <option
-   * selected>}. Stubs the backend stack-entries page with that entry and asserts the real {@code
-   * stackEntriesMy} fragment carries the entry row (id) and the fallback option — so a Thymeleaf
-   * 500 (stale {@code #{...}} key) fails the build.
+   * inline, so this is where the per-entry Variante-C allocation chips (REQ-INV-027) live.
+   * Regression: a refinery order assigned to a (now non-active) mission produces an entry whose
+   * mission is no longer returned by {@code /api/v1/missions/lookup}; the mission must still appear
+   * because its chip renders from the entry's own {@code missionAllocations}, independent of the
+   * (empty) candidate lookup. Stubs the backend stack-entries page with that allocation and asserts
+   * the real {@code stackEntriesMy} fragment carries the entry row (id) and the mission chip — so a
+   * Thymeleaf 500 (stale {@code #{...}} key / bad SpEL) fails the build.
    */
   @Test
   @WithMockUser(roles = "KRT_MEMBER", username = "test-user-123")
@@ -247,8 +249,8 @@ class InventoryPageControllerMvcTest {
             missionName,
             java.util.List.of(),
             null,
-            java.util.List.of(),
-            null,
+            java.util.List.of(new MissionAllocationDto(missionId, missionName, null, 4.0)),
+            6.0,
             null,
             null,
             1L,
@@ -276,9 +278,12 @@ class InventoryPageControllerMvcTest {
                 .param("personal", "false"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("data-item-id=\"" + itemId + "\"")))
-        .andExpect(content().string(containsString("value=\"" + missionId + "\"")))
-        .andExpect(content().string(containsString(missionName)))
-        .andExpect(content().string(containsString("selected=\"selected\"")));
+        // Variante C (REQ-INV-027): the mission is an allocation chip, not a scalar <option>.
+        // The archived mission still shows because the chip renders from the entry's own
+        // allocation, independent of whether the mission is still in the active lookup.
+        .andExpect(content().string(containsString("assoc-chip--mission")))
+        .andExpect(content().string(containsString("data-target-id=\"" + missionId + "\"")))
+        .andExpect(content().string(containsString(missionName)));
   }
 
   /**

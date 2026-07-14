@@ -38,51 +38,127 @@
                        th:data-material-id="${entry.material.id}"
                        data-trigger="inv-my-update-bulk-state">
                 <div class="tree-fieldset">
+                    <!-- Auftrag split (Variante C, REQ-INV-027): chips per job-order allocation with
+                         its amount, a "+ Zuordnen" combobox of eligible orders (material required,
+                         not yet allocated), and a rest chip. All editing routes through the
+                         delegated inv-my-assoc-* handlers, which call the per-allocation endpoints. -->
                     <div class="tree-field">
                         <span class="tree-field-cap" th:text="#{inventory.order}">Auftrag</span>
-                        <select class="association-select"
-                                th:data-id="${entry.id}"
-                                th:data-material-id="${entry.material.id}"
-                                th:data-location-id="${entry.location.id}"
-                                th:data-quality="${entry.quality}"
-                                th:data-amount="${entry.amount}"
-                                th:data-personal="${entry.personal}"
-                                th:data-version="${entry.version}"
-                                th:data-field="jobOrderId"
-                                data-trigger="inv-my-update-assoc">
-                            <option value="" th:text="#{inventory.order.none}">-- Kein Auftrag --</option>
-                            <option th:each="order : ${jobOrders}"
-                                    th:value="${order.id}"
-                                    th:text="'Auftrag #' + ${order.displayId}"
-                                    th:selected="${order.id == entry.jobOrderId}"
-                                    th:if="${order.id == entry.jobOrderId or (order.requiredMaterialIds != null and #lists.contains(order.requiredMaterialIds, entry.material.id))}">
-                            </option>
-                        </select>
+                        <div class="assoc-split"
+                             th:data-entry-id="${entry.id}"
+                             data-assoc-field="JOB_ORDER"
+                             th:data-amount="${entry.amount}"
+                             th:data-version="${entry.version}"
+                             th:data-piece="${entry.material.quantityType == 'PIECE'}">
+                            <span th:each="a : ${entry.jobOrderAllocations}"
+                                  class="assoc-chip assoc-chip--order"
+                                  role="button" tabindex="0"
+                                  data-trigger="inv-my-assoc-edit"
+                                  data-assoc-chip="jobOrder"
+                                  th:data-target-id="${a.jobOrderId}"
+                                  th:data-amount="${a.amount}"
+                                  th:title="#{inventory.assoc.amount}">
+                                <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
+                                <span class="assoc-chip__amt"
+                                      th:text="${#numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
+                            </span>
+                            <span class="assoc-add-wrap">
+                                <button type="button" class="assoc-add"
+                                        data-trigger="inv-my-assoc-add-open"
+                                        th:aria-label="#{inventory.assoc.add.order}"
+                                        th:text="#{inventory.assoc.add}">+ Zuordnen</button>
+                                <div class="assoc-pop krtm-hidden" data-assoc-pop>
+                                    <div data-assoc-pop-pick>
+                                        <select data-krt-combobox
+                                                data-trigger="inv-my-assoc-pick"
+                                                th:data-combobox-placeholder="#{inventory.assoc.add.order}">
+                                            <option value=""></option>
+                                            <option th:each="order : ${jobOrders}"
+                                                    th:if="${order.requiredMaterialIds != null and #lists.contains(order.requiredMaterialIds, entry.material.id) and not #lists.contains(entry.jobOrderAllocations.![jobOrderId], order.id)}"
+                                                    th:value="${order.id}"
+                                                    th:text="'#' + ${order.displayId}"></option>
+                                        </select>
+                                    </div>
+                                    <div class="assoc-pop__menge krtm-hidden" data-assoc-pop-amount>
+                                        <label th:text="#{inventory.assoc.amount}">Menge</label>
+                                        <div class="assoc-menge-row">
+                                            <input type="number" min="0" step="0.001"
+                                                   class="assoc-menge-input" data-assoc-amount-input
+                                                   th:aria-label="#{inventory.assoc.amount}"/>
+                                            <button type="button" class="btn btn-primary btn-xs"
+                                                    data-trigger="inv-my-assoc-save"
+                                                    th:text="#{general.save}">Speichern</button>
+                                            <button type="button" class="btn btn-quiet-danger btn-xs krtm-hidden"
+                                                    data-trigger="inv-my-assoc-remove"
+                                                    th:text="#{inventory.assoc.remove}">Entfernen</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </span>
+                            <span class="chip" data-assoc-rest
+                                  th:classappend="${entry.jobOrderRest == null or (entry.jobOrderRest &gt;= -0.0005 and entry.jobOrderRest &lt;= 0.0005)} ? 'chip--success' : (${entry.jobOrderRest &lt; 0} ? 'chip--danger' : 'chip--muted')"
+                                  th:text="${entry.jobOrderRest == null or (entry.jobOrderRest &gt;= -0.0005 and entry.jobOrderRest &lt;= 0.0005)} ? #{inventory.assoc.rest.zero} : (${entry.jobOrderRest &lt; 0} ? #{inventory.assoc.rest.over(${#numbers.formatDecimal(-entry.jobOrderRest, 1, 'NONE', 3, 'DEFAULT')})} : #{inventory.assoc.rest.free(${#numbers.formatDecimal(entry.jobOrderRest, 1, 'NONE', 3, 'DEFAULT')})})">Rest 0</span>
+                        </div>
                     </div>
+                    <!-- Einsatz split: same shape, no material-required filter (any mission is
+                         eligible) and no delivered marker. -->
                     <div class="tree-field">
                         <span class="tree-field-cap" th:text="#{inventory.tree.field.mission}">Einsatz</span>
-                        <select class="association-select"
-                                th:data-id="${entry.id}"
-                                th:data-material-id="${entry.material.id}"
-                                th:data-location-id="${entry.location.id}"
-                                th:data-quality="${entry.quality}"
-                                th:data-amount="${entry.amount}"
-                                th:data-personal="${entry.personal}"
-                                th:data-version="${entry.version}"
-                                th:data-field="missionId"
-                                data-trigger="inv-my-update-assoc">
-                            <option value="" th:text="#{inventory.mission.none}">-- Kein Einsatz --</option>
-                            <option th:each="mission : ${missions}"
-                                    th:value="${mission.id}"
-                                    th:text="${mission.plannedStartTime != null} ? |${mission.name} - ${#temporals.format(mission.plannedStartTime, #messages.msg('format.date'), #locale)}| : ${mission.name}"
-                                    th:selected="${mission.id == entry.missionId}">
-                            </option>
-                            <option th:if="${entry.missionId != null and not #lists.contains(missions.![id], entry.missionId)}"
-                                    th:value="${entry.missionId}"
-                                    th:text="${entry.missionName}"
-                                    selected="selected">
-                            </option>
-                        </select>
+                        <div class="assoc-split"
+                             th:data-entry-id="${entry.id}"
+                             data-assoc-field="MISSION"
+                             th:data-amount="${entry.amount}"
+                             th:data-version="${entry.version}"
+                             th:data-piece="${entry.material.quantityType == 'PIECE'}">
+                            <span th:each="a : ${entry.missionAllocations}"
+                                  class="assoc-chip assoc-chip--mission"
+                                  role="button" tabindex="0"
+                                  data-trigger="inv-my-assoc-edit"
+                                  data-assoc-chip="mission"
+                                  th:data-target-id="${a.missionId}"
+                                  th:data-amount="${a.amount}"
+                                  th:title="#{inventory.assoc.amount}">
+                                <span th:text="${a.missionName}">Nachtfalke</span> ·
+                                <span class="assoc-chip__amt"
+                                      th:text="${#numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
+                            </span>
+                            <span class="assoc-add-wrap">
+                                <button type="button" class="assoc-add"
+                                        data-trigger="inv-my-assoc-add-open"
+                                        th:aria-label="#{inventory.assoc.add.mission}"
+                                        th:text="#{inventory.assoc.add}">+ Zuordnen</button>
+                                <div class="assoc-pop krtm-hidden" data-assoc-pop>
+                                    <div data-assoc-pop-pick>
+                                        <select data-krt-combobox
+                                                data-trigger="inv-my-assoc-pick"
+                                                th:data-combobox-placeholder="#{inventory.assoc.add.mission}">
+                                            <option value=""></option>
+                                            <option th:each="mission : ${missions}"
+                                                    th:if="${not #lists.contains(entry.missionAllocations.![missionId], mission.id)}"
+                                                    th:value="${mission.id}"
+                                                    th:text="${mission.plannedStartTime != null} ? |${mission.name} - ${#temporals.format(mission.plannedStartTime, #messages.msg('format.date'), #locale)}| : ${mission.name}"></option>
+                                        </select>
+                                    </div>
+                                    <div class="assoc-pop__menge krtm-hidden" data-assoc-pop-amount>
+                                        <label th:text="#{inventory.assoc.amount}">Menge</label>
+                                        <div class="assoc-menge-row">
+                                            <input type="number" min="0" step="0.001"
+                                                   class="assoc-menge-input" data-assoc-amount-input
+                                                   th:aria-label="#{inventory.assoc.amount}"/>
+                                            <button type="button" class="btn btn-primary btn-xs"
+                                                    data-trigger="inv-my-assoc-save"
+                                                    th:text="#{general.save}">Speichern</button>
+                                            <button type="button" class="btn btn-quiet-danger btn-xs krtm-hidden"
+                                                    data-trigger="inv-my-assoc-remove"
+                                                    th:text="#{inventory.assoc.remove}">Entfernen</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </span>
+                            <span class="chip" data-assoc-rest
+                                  th:classappend="${entry.missionRest == null or (entry.missionRest &gt;= -0.0005 and entry.missionRest &lt;= 0.0005)} ? 'chip--success' : (${entry.missionRest &lt; 0} ? 'chip--danger' : 'chip--muted')"
+                                  th:text="${entry.missionRest == null or (entry.missionRest &gt;= -0.0005 and entry.missionRest &lt;= 0.0005)} ? #{inventory.assoc.rest.zero} : (${entry.missionRest &lt; 0} ? #{inventory.assoc.rest.over(${#numbers.formatDecimal(-entry.missionRest, 1, 'NONE', 3, 'DEFAULT')})} : #{inventory.assoc.rest.free(${#numbers.formatDecimal(entry.missionRest, 1, 'NONE', 3, 'DEFAULT')})})">Rest 0</span>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -562,12 +562,17 @@
         confirmMessage: /*[[#{inventory.note.confirmRemove.message}]]*/ 'Notiz wirklich entfernen?'
     };
 
-    // #924 Part 2: association-update toast strings, hoisted from the former bare inline
-    // i18n expressions inside updateInventoryAssociation so its logic can live in the
-    // static /js/inventory-my.js page module.
+    // Variante C allocation-chip strings (REQ-INV-027): the toast + rest-chip i18n the
+    // /js/inventory-my.js allocation module reads (add/edit/remove of a job-order or mission
+    // quantity slice). restFree/restOver carry a {0} placeholder the module substitutes.
     var assocI18n = {
-        success: /*[[#{success.inventory.update}]]*/ 'Lagerbestand erfolgreich aktualisiert.',
+        saved: /*[[#{notification.success.assoc.saved}]]*/ 'Zuordnung gespeichert.',
         conflict: /*[[#{error.inventory.update.conflict}]]*/ 'Der Eintrag wurde in der Zwischenzeit von einem anderen Nutzer ge\u00e4ndert. Bitte lade die Seite neu.',
+        overallocated: /*[[#{error.inventory.assoc.overallocated}]]*/ 'Die zugeordnete Menge \u00fcbersteigt die verf\u00fcgbare Menge des Eintrags.',
+        amountRequired: /*[[#{error.inventory.assoc.amount.required}]]*/ 'Bitte eine g\u00fcltige Menge gr\u00f6\u00dfer 0 eingeben.',
+        restZero: /*[[#{inventory.assoc.rest.zero}]]*/ 'Rest 0',
+        restFree: /*[[#{inventory.assoc.rest.free}]]*/ 'Rest {0} frei',
+        restOver: /*[[#{inventory.assoc.rest.over}]]*/ '{0} \u00fcber',
         failed: /*[[#{error.inventory.update.failed}]]*/ 'Fehler beim Aktualisieren des Lagers.'
     };
 
