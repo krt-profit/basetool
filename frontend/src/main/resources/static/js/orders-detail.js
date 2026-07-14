@@ -34,7 +34,7 @@
  * synchronous script at the same end-of-body position, never with defer.
  */
 
-/* global MSG_HANDOVER_SUCCESS, MSG_HANDOVER_FAILED, MSG_HANDOVER_NOITEMS, labelPiece, labelScu, scuHintText, labelMenge, ORDER_AGE_YELLOW, ORDER_AGE_RED, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_STATUS_SUCCESS, MSG_STATUS_ERROR, ORDER_CONFLICT, MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL, MSG_DELETE_ERROR, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_MATERIAL_INVALID, MSG_CLAIM_TITLE_ADD, MSG_CLAIM_TITLE_EDIT, MSG_CLAIM_MAX_HINT, MSG_QUALITY_GOOD, MSG_QUALITY_NONE, MSG_CLAIM_SUCCESS, MSG_CLAIM_WITHDRAW_SUCCESS, MSG_CLAIM_ERROR, MSG_CLAIM_VALIDATION_SQUADRON, MSG_CLAIM_VALIDATION_AMOUNT, MSG_CLAIM_VALIDATION_OVERCLAIM, MSG_BP_COUNTING_SUCCESS, MSG_BP_COUNTING_ERROR, MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_OWNER, MSG_LOCATION, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_UNLINK_TOOLTIP, MSG_INVENTORY_UNLINK_SUCCESS, MSG_INVENTORY_UNLINK_ERROR, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, I18N_ADDED, I18N_REMOVED, I18N_NOTE_SAVED, I18N_NOTE_DELETED, I18N_ADD_ERROR, I18N_REMOVE_ERROR, I18N_NOTE_ERROR, I18N_NOTE_CONFLICT, I18N_NOTE_FORBIDDEN, I18N_NOTE_FOR, showFrontendErrorToast, showFrontendSuccessToast, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR */
+/* global MSG_HANDOVER_SUCCESS, MSG_HANDOVER_FAILED, MSG_HANDOVER_NOITEMS, labelPiece, labelScu, scuHintText, labelMenge, ORDER_AGE_YELLOW, ORDER_AGE_RED, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_STATUS_SUCCESS, MSG_STATUS_ERROR, ORDER_CONFLICT, MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL, MSG_DELETE_ERROR, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_MATERIAL_INVALID, MSG_CLAIM_TITLE_ADD, MSG_CLAIM_TITLE_EDIT, MSG_CLAIM_MAX_HINT, MSG_QUALITY_GOOD, MSG_QUALITY_NONE, MSG_CLAIM_SUCCESS, MSG_CLAIM_WITHDRAW_SUCCESS, MSG_CLAIM_ERROR, MSG_CLAIM_VALIDATION_SQUADRON, MSG_CLAIM_VALIDATION_AMOUNT, MSG_CLAIM_VALIDATION_OVERCLAIM, MSG_BP_COUNTING_SUCCESS, MSG_BP_COUNTING_ERROR, MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_HANDOVER_MISSION_HERKUNFT, MSG_HANDOVER_MISSION_REST, MSG_HANDOVER_MISSION_MIN, MSG_OWNER, MSG_LOCATION, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_UNLINK_TOOLTIP, MSG_INVENTORY_UNLINK_SUCCESS, MSG_INVENTORY_UNLINK_ERROR, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, I18N_ADDED, I18N_REMOVED, I18N_NOTE_SAVED, I18N_NOTE_DELETED, I18N_ADD_ERROR, I18N_REMOVE_ERROR, I18N_NOTE_ERROR, I18N_NOTE_CONFLICT, I18N_NOTE_FORBIDDEN, I18N_NOTE_FOR, showFrontendErrorToast, showFrontendSuccessToast, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR */
 
 let cachedInventoryItems = [];
 let isInventoryCached = false;
@@ -154,7 +154,11 @@ function _serializeHandoverForm() {
                       ? parseFloat(amtInput.value)
                       : NaN;
             if (!inventoryItemId || !(amount > 0)) return;
-            items.push({ inventoryItemId: inventoryItemId, amount: amount });
+            items.push({
+                inventoryItemId: inventoryItemId,
+                amount: amount,
+                missionReductions: _collectHandoverMissionReductions(row),
+            });
         });
     return {
         handoverTime: (document.getElementById('handoverTime') || {}).value || '',
@@ -279,9 +283,140 @@ function addHandoverItemRow() {
                 if (unitSpan) unitSpan.textContent = '';
                 if (rowScuHint) rowScuHint.classList.add('krtm-hidden');
             }
+            _refreshHandoverMissionPicker(row);
         });
+        // The mission "Herkunft" picker's visibility depends on the handed amount vs the mission
+        // rest, so re-evaluate it on every amount keystroke too.
+        amtInput.addEventListener('input', () => _refreshHandoverMissionPicker(row));
     }
     container.appendChild(row);
+}
+
+// Renders / refreshes a handover row's mission "Herkunft" picker (Variante C, REQ-INV-027). Shown
+// only when the selected entry is earmarked to two or more missions AND the handed amount cannot come
+// entirely from the not-yet-assigned mission rest — i.e. only when the mission clamp is ambiguous.
+// Inputs default to 0, meaning the backend auto-clamps (rest-first, then proportional); a non-zero
+// input directs that much of the handed amount out of that mission's earmark.
+function _refreshHandoverMissionPicker(row) {
+    const sel = row.querySelector('select');
+    const amtInput = row.querySelector('input[data-scu-decimal]');
+    const inv = sel ? cachedInventoryItems.find((i) => i.id === sel.value) : null;
+    const missions = inv && Array.isArray(inv.missionAllocations) ? inv.missionAllocations : [];
+    const missionRest = inv && typeof inv.missionRest === 'number' ? inv.missionRest : 0;
+    const handed =
+        amtInput && window.krtScuInput ? window.krtScuInput.parse(amtInput.value) : Number.NaN;
+    const ambiguous = missions.length >= 2 && isFinite(handed) && handed > missionRest + 0.0005;
+
+    let holder = row.querySelector('[data-role="mission-herkunft"]');
+    if (!ambiguous) {
+        if (holder) holder.remove();
+        return;
+    }
+    if (!holder) {
+        holder = document.createElement('div');
+        holder.setAttribute('data-role', 'mission-herkunft');
+        holder.style.gridColumn = '1 / -1';
+        holder.style.marginTop = '0.5rem';
+        holder.style.paddingTop = '0.5rem';
+        holder.style.borderTop = '1px solid var(--color-gray-3)';
+        row.appendChild(holder);
+    }
+    // Rebuild the inputs only when the selected entry changed, so an amount keystroke never clobbers
+    // what the user already typed into the mission fields.
+    if (holder.getAttribute('data-entry') !== inv.id) {
+        holder.setAttribute('data-entry', inv.id);
+        holder.textContent = '';
+        const title = document.createElement('div');
+        title.style.fontSize = '0.7rem';
+        title.style.textTransform = 'uppercase';
+        title.style.letterSpacing = '0.08em';
+        title.style.color = 'var(--color-gray-2-text)';
+        title.style.marginBottom = '0.35rem';
+        title.textContent = MSG_HANDOVER_MISSION_HERKUNFT;
+        holder.appendChild(title);
+        missions.forEach((m) => {
+            const line = document.createElement('label');
+            line.style.display = 'flex';
+            line.style.gap = '0.5rem';
+            line.style.alignItems = 'center';
+            line.style.marginBottom = '0.25rem';
+            const name = document.createElement('span');
+            name.style.flex = '1 1 auto';
+            name.style.fontSize = '0.7rem';
+            name.textContent = m.missionName;
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.min = '0';
+            input.step = '0.001';
+            input.max = String(m.amount);
+            input.value = '0';
+            input.style.width = '6rem';
+            input.style.textAlign = 'right';
+            input.setAttribute('data-mission-input', '');
+            input.setAttribute('data-mission-id', m.missionId);
+            input.addEventListener('input', () => _updateHandoverMissionRest(row));
+            const max = document.createElement('span');
+            max.style.fontSize = '0.7rem';
+            max.style.color = 'var(--color-gray-2-text)';
+            max.textContent = '/ ' + m.amount.toFixed(3);
+            line.appendChild(name);
+            line.appendChild(input);
+            line.appendChild(max);
+            holder.appendChild(line);
+        });
+        const rest = document.createElement('span');
+        rest.className = 'chip chip--muted';
+        rest.setAttribute('data-mission-rest', '');
+        holder.appendChild(rest);
+    }
+    _updateHandoverMissionRest(row);
+}
+
+// Recomputes a row's mission "from rest" hint and flags (danger) a plan the mission rest cannot
+// cover, so the submit validation and the visible chip agree.
+function _updateHandoverMissionRest(row) {
+    const holder = row.querySelector('[data-role="mission-herkunft"]');
+    const sel = row.querySelector('select');
+    const amtInput = row.querySelector('input[data-scu-decimal]');
+    if (!holder || !sel || !amtInput) return;
+    const inv = cachedInventoryItems.find((i) => i.id === sel.value);
+    const missionRest = inv && typeof inv.missionRest === 'number' ? inv.missionRest : 0;
+    const handed = window.krtScuInput
+        ? window.krtScuInput.parse(amtInput.value)
+        : parseFloat(amtInput.value);
+    let assigned = 0;
+    holder.querySelectorAll('[data-mission-input]').forEach((inp) => {
+        const v = parseFloat(inp.value);
+        if (!isNaN(v) && v > 0) assigned += v;
+    });
+    const restEl = holder.querySelector('[data-mission-rest]');
+    if (!restEl) return;
+    const fromRest = isFinite(handed) ? handed - assigned : 0;
+    const minRequired = isFinite(handed) ? Math.max(0, handed - missionRest) : 0;
+    const invalid = assigned < minRequired - 1e-6 || fromRest < -1e-6;
+    restEl.classList.toggle('chip--danger', invalid);
+    restEl.classList.toggle('chip--muted', !invalid);
+    restEl.textContent = invalid
+        ? MSG_HANDOVER_MISSION_MIN.replace('{0}', minRequired.toFixed(3))
+        : MSG_HANDOVER_MISSION_REST.replace('{0}', Math.max(0, fromRest).toFixed(3));
+}
+
+// Collects a handover row's mission "deduct from" plan from its picker (only inputs > 0), or null
+// when the row has no picker / no positive input (the backend then auto-clamps the mission dimension).
+function _collectHandoverMissionReductions(row) {
+    const holder = row.querySelector('[data-role="mission-herkunft"]');
+    if (!holder) return null;
+    const list = [];
+    holder.querySelectorAll('[data-mission-input]').forEach((inp) => {
+        const v = parseFloat(inp.value);
+        if (!isNaN(v) && v > 0) {
+            list.push({
+                targetId: inp.getAttribute('data-mission-id'),
+                amount: Math.round(v * 1000) / 1000,
+            });
+        }
+    });
+    return list.length > 0 ? list : null;
 }
 
 function validateHandoverAmounts() {
@@ -303,6 +438,28 @@ function validateHandoverAmounts() {
             );
             showFrontendErrorToast(msg);
             return false;
+        }
+        // Variante C (REQ-INV-027): if the mission "Herkunft" picker is showing, its plan must be
+        // applyable — each input within its slice, the total not exceeding the handed amount, and the
+        // missions absorbing at least what the mission rest cannot (else the backend 422s).
+        const holder = row.querySelector('[data-role="mission-herkunft"]');
+        if (holder) {
+            const missionRest = typeof inv.missionRest === 'number' ? inv.missionRest : 0;
+            let assigned = 0;
+            let overSlice = false;
+            holder.querySelectorAll('[data-mission-input]').forEach((inp2) => {
+                const v = parseFloat(inp2.value) || 0;
+                const cap = parseFloat(inp2.max) || 0;
+                if (v > cap + 1e-6) overSlice = true;
+                if (v > 0) assigned += v;
+            });
+            const minRequired = Math.max(0, entered - missionRest);
+            if (overSlice || assigned > entered + 1e-6 || assigned < minRequired - 1e-6) {
+                showFrontendErrorToast(
+                    MSG_HANDOVER_MISSION_MIN.replace('{0}', minRequired.toFixed(3)),
+                );
+                return false;
+            }
         }
     }
     return true;

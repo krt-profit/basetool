@@ -439,6 +439,15 @@ assigned to tags when the deduction exceeds a dimension's rest. For a `SELL` it 
 per-mission proceeds estimate. A submit sends only the non-zero inputs as the plan; an entry with no
 earmarks hides the picker and submits the legacy `null` plan.
 
+**A job-order handover clamps the mission dimension the same way.** A partial handover of quantity X
+to an order shrinks that order's slice by X and lowers the entry amount by X; the same physical SCU
+leave the entry's mission earmarks too, so the mission dimension is reduced by exactly the same X —
+resolved through the shared `AllocationReductions` resolver (rest-first, then proportional by default,
+so a dual-tagged partial handover no longer 422s). The handover item DTO carries an optional
+`missionReductions` plan, and the handover modal renders the mission picker **only for the ambiguous
+case** — the entry is earmarked to two or more missions and X exceeds the mission rest, so more than
+one distribution is possible; otherwise the auto-clamp applies with no prompt.
+
 **SELL proceeds are coupled to the mission deduct-from plan.** A `SELL` credits each mission a share
 of the sale proceeds **proportional to the SCU deducted from its earmark** — `sellAmount ×
 amount_j / X`, one squadron-`INCOME` `MissionFinanceEntry` per credited mission — with the rest (SCU
@@ -465,6 +474,10 @@ there is no separate income-attribution input.
 - [ ] The Ausbuchen and Umbuchen modals render the "Herkunft" picker (one input per tag per
   dimension, defaulting to 0 = from the rest), block the submit while the plan is invalid, and send
   only the non-zero inputs; an entry with no earmarks hides the picker.
+- [ ] A partial handover of a dual-tagged (order + mission) entry clamps the mission dimension by the
+  handed amount instead of 422-ing (rest-first, then proportional by default); the handover modal
+  shows the mission picker only when two or more missions and the handed amount exceeds the mission
+  rest (the ambiguous case), and an explicit `missionReductions` plan is honoured/validated.
 - [ ] A SELL credits each mission proportionally to the SCU deducted from its earmark
   (`sellAmount × scu/sold`), leaves the rest (unassigned + non-participated) personal, and books no
   entry when nothing is deducted from a mission earmark.
