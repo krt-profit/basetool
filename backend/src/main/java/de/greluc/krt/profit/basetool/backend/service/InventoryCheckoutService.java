@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.BulkCheckoutRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebookDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MissionSaleAttributionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
@@ -53,6 +54,7 @@ import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -71,7 +73,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Extracted from {@code InventoryItemService} (#921, L2) as the mutating cluster of the former
  * god-class: the book-out flow ({@link #bookOutInventoryItem} with its per-type {@link
- * #bookOutTransfer} / {@link #createSaleFinanceEntry} branches and the {@link #recordBookOutTail}
+ * #bookOutTransfer} / {@link #createSaleFinanceEntries} branches and the {@link #recordBookOutTail}
  * audit tail), the personal↔shared rebooking ({@link #rebookPersonal}), the bulk checkout ({@link
  * #bulkCheckout}), the delivered-flag toggle ({@link #updateDelivered}) and the admin global-wipe
  * ({@link #deleteAllGlobalInventory}). {@code InventoryItemService} keeps the identical public
@@ -197,15 +199,18 @@ public class InventoryCheckoutService {
     final String materialName = item.getMaterial() != null ? item.getMaterial().getName() : "—";
     final UUID sourceOwnerId = item.getUser().getId();
     final boolean depleted = remainingAmount <= QUANTITY_EPSILON;
-    UUID financeEntryId = null;
+    List<UUID> financeEntryIds = List.of();
 
     if (checkoutType == CheckoutType.TRANSFER) {
       // A TRANSFER is guaranteed to carry at least one target here (the up-front guard rejects the
       // target-less case), so the branch is unconditional on the type.
       return bookOutTransfer(
           item, dto, remainingAmount, sourceId, sourceLabel, materialName, depleted);
-    } else if (checkoutType == CheckoutType.SELL && !item.getMissionAllocations().isEmpty()) {
-      financeEntryId = createSaleFinanceEntry(item, dto, currentUserId);
+    } else if (checkoutType == CheckoutType.SELL) {
+      // Variante C (REQ-INV-027): the seller distributes the sale proceeds across the row's
+      // earmarked missions they participate in (empty list => a fully-personal sale that credits no
+      // mission). Validates + books one MissionFinanceEntry per attribution.
+      financeEntryIds = createSaleFinanceEntries(item, dto, currentUserId);
     }
 
     if (remainingAmount <= QUANTITY_EPSILON) { // Floating point precision safety
@@ -218,7 +223,7 @@ public class InventoryCheckoutService {
           sourceOwnerId,
           dto,
           0.0,
-          financeEntryId);
+          financeEntryIds);
       return null;
     } else {
       item.setAmount(remainingAmount);
@@ -241,7 +246,7 @@ public class InventoryCheckoutService {
           sourceOwnerId,
           dto,
           remainingAmount,
-          financeEntryId);
+          financeEntryIds);
       return inventoryItemMapper.toDto(saved);
     }
   }
@@ -353,54 +358,98 @@ public class InventoryCheckoutService {
   }
 
   /**
-   * Creates the {@link MissionFinanceEntry} for a {@code SELL} book-out of a mission-linked row:
-   * the caller must be a participant of the item's mission, and the sale is recorded as squadron
-   * {@code INCOME} of {@code dto.sellAmount()}. The DISCARD/SELL consume tail then decrements the
-   * source row as usual.
+   * Books the seller-chosen per-mission income attributions for a {@code SELL} book-out (Variante
+   * C, REQ-INV-027). The seller distributes the sale's total {@code dto.sellAmount()} across the
+   * sold row's earmarked missions, one squadron {@code INCOME} {@link MissionFinanceEntry} per
+   * {@link MissionSaleAttributionDto}; the uncredited remainder (when Σ &lt; sellAmount) is the
+   * seller's own personal proceeds. An empty / {@code null} list is a fully-personal sale that
+   * credits no mission — allowed even for mission-earmarked stock. The DISCARD/SELL consume tail
+   * then decrements the source row as usual.
    *
-   * @param item the managed source row (mission-linked)
-   * @param dto the book-out request (read for sell amount, terminal, amount)
+   * <p>Each attribution is validated: the mission must be one the row earmarks (a mission slice),
+   * the seller must be a participant of it (a {@link MissionFinanceEntry} structurally requires a
+   * {@link MissionParticipant}), no mission may appear twice, and the attributions must not sum to
+   * more than {@code dto.sellAmount()}.
+   *
+   * @param item the managed source row (its mission allocations loaded within the tx)
+   * @param dto the book-out request (read for the attributions, sell amount, terminal, amount)
    * @param currentUserId the selling participant's user id
-   * @return the created finance-entry id (read off the managed entity, so a unit-test mock's null
-   *     {@code save()} return does not matter)
-   * @throws BadRequestException when the caller is not a participant of the item's mission
+   * @return the created finance-entry ids (read off the managed entities, so a unit-test mock's
+   *     null {@code save()} return does not matter); empty for a fully-personal sale
+   * @throws BadRequestException when an attribution targets a non-earmarked mission, a mission the
+   *     seller does not participate in, a duplicate mission, or the attributions exceed the
+   *     proceeds
    */
-  private UUID createSaleFinanceEntry(
+  private List<UUID> createSaleFinanceEntries(
       InventoryItem item, InventoryItemBookOutDto dto, UUID currentUserId) {
-    // Variante C soak (REQ-INV-027): the sold row's mission lives in the allocation table — take
-    // its
-    // (single, during the soak) mission slice; the SELL guard already ensured one exists. A row
-    // with
-    // several mission allocations would warrant one proportional finance entry per slice — a
-    // follow-up once the multi-allocation write endpoints can produce such rows.
-    Mission mission =
-        item.getMissionAllocations().stream()
-            .map(InventoryMissionAllocation::getMission)
-            .filter(m -> m != null)
-            .findFirst()
-            .orElseThrow(
-                () ->
-                    new BadRequestException(
-                        "You must be a participant of the mission to sell its items"));
-    MissionParticipant participant =
-        missionParticipantRepository
-            .findByMissionIdAndUserId(mission.getId(), currentUserId)
-            .orElseThrow(
-                () ->
-                    new BadRequestException(
-                        "You must be a participant of the mission to sell its items"));
+    List<MissionSaleAttributionDto> attributions =
+        dto.missionAttributions() != null ? dto.missionAttributions() : List.of();
+    if (attributions.isEmpty()) {
+      // Fully-personal sale: no mission is credited (the seller keeps the whole proceeds).
+      return List.of();
+    }
 
-    MissionFinanceEntry entry = new MissionFinanceEntry();
-    entry.setMission(mission);
-    entry.setParticipant(participant);
-    entry.setType(FinanceType.INCOME);
-    entry.setAmount(dto.sellAmount());
-    entry.setNote(
-        "Sale of " + dto.amount() + "x " + item.getMaterial().getName() + " at " + dto.terminal());
-    missionFinanceEntryRepository.save(entry);
-    // Read the id off the managed entity (set by save()); the dedicated capture avoids relying on
-    // the save() return value, which a unit-test mock leaves null.
-    return entry.getId();
+    BigDecimal proceeds = dto.sellAmount() != null ? dto.sellAmount() : BigDecimal.ZERO;
+    BigDecimal totalAttributed =
+        attributions.stream()
+            .map(MissionSaleAttributionDto::amount)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+    if (totalAttributed.compareTo(proceeds) > 0) {
+      throw new BadRequestException("Attributed mission income exceeds the sale proceeds");
+    }
+
+    // Validate + build every entry BEFORE persisting any, so an invalid attribution (unknown /
+    // non-earmarked mission, non-participant, duplicate) leaves the finance ledger untouched rather
+    // than booking a partial subset that the surrounding @Transactional would have to roll back.
+    Set<UUID> creditedMissions = new LinkedHashSet<>();
+    List<MissionFinanceEntry> entries = new ArrayList<>();
+    for (MissionSaleAttributionDto attribution : attributions) {
+      if (!creditedMissions.add(attribution.missionId())) {
+        throw new BadRequestException("A mission may be credited at most once per sale");
+      }
+      // The mission must be one the row earmarks; pull the managed Mission off its slice (which
+      // also
+      // serves as the "is earmarked" check — an unmatched id yields the 400 below).
+      Mission mission =
+          item.getMissionAllocations().stream()
+              .map(InventoryMissionAllocation::getMission)
+              .filter(m -> m != null && attribution.missionId().equals(m.getId()))
+              .findFirst()
+              .orElseThrow(
+                  () ->
+                      new BadRequestException(
+                          "Cannot credit a mission the sold item is not earmarked to"));
+      MissionParticipant participant =
+          missionParticipantRepository
+              .findByMissionIdAndUserId(mission.getId(), currentUserId)
+              .orElseThrow(
+                  () ->
+                      new BadRequestException(
+                          "You must be a participant of a mission to credit its sale income"));
+
+      MissionFinanceEntry entry = new MissionFinanceEntry();
+      entry.setMission(mission);
+      entry.setParticipant(participant);
+      entry.setType(FinanceType.INCOME);
+      entry.setAmount(attribution.amount());
+      entry.setNote(
+          "Sale of "
+              + dto.amount()
+              + "x "
+              + item.getMaterial().getName()
+              + " at "
+              + dto.terminal());
+      entries.add(entry);
+    }
+
+    List<UUID> financeEntryIds = new ArrayList<>();
+    for (MissionFinanceEntry entry : entries) {
+      missionFinanceEntryRepository.save(entry);
+      // Read the id off the managed entity (set by save()); the dedicated capture avoids relying on
+      // the save() return value, which a unit-test mock leaves null.
+      financeEntryIds.add(entry.getId());
+    }
+    return financeEntryIds;
   }
 
   /**
@@ -415,7 +464,8 @@ public class InventoryCheckoutService {
    * @param ownerId the source row owner's id
    * @param dto the book-out request (read for terminal/sell amount)
    * @param remaining the post-decrement amount (0 when the row was depleted)
-   * @param financeEntryId the created finance entry id for a SELL with a mission, or {@code null}
+   * @param financeEntryIds the created per-mission finance entry ids for a SELL (empty for a
+   *     fully-personal sale that credited no mission)
    */
   private void recordBookOutTail(
       CheckoutType type,
@@ -425,7 +475,7 @@ public class InventoryCheckoutService {
       UUID ownerId,
       InventoryItemBookOutDto dto,
       double remaining,
-      UUID financeEntryId) {
+      List<UUID> financeEntryIds) {
     boolean rowDepleted = remaining <= QUANTITY_EPSILON;
     if (type == CheckoutType.SELL) {
       auditService.record(
@@ -437,7 +487,13 @@ public class InventoryCheckoutService {
               .with("amount", dto.amount())
               .with("terminal", dto.terminal())
               .with("sellAmount", dto.sellAmount())
-              .with("financeEntry", financeEntryId != null ? financeEntryId : "-")
+              .with(
+                  "financeEntries",
+                  financeEntryIds.stream()
+                      .filter(id -> id != null)
+                      .map(UUID::toString)
+                      .reduce((a, b) -> a + "," + b)
+                      .orElse("-"))
               .with("depleted", rowDepleted));
     } else {
       auditService.record(

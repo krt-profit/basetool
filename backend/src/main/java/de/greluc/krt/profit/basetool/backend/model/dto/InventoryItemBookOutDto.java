@@ -20,9 +20,11 @@
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
@@ -48,6 +50,13 @@ import org.jetbrains.annotations.Nullable;
  * {@code PIECE} material merges it into a matching target stack unconditionally while an {@code
  * SCU} material merges only when this flag is {@code true}. It is never persisted and governs only
  * this one transfer.
+ *
+ * <p>{@link #missionAttributions} applies only to the {@link CheckoutType#SELL} branch (Variante C,
+ * REQ-INV-027): the seller distributes the sale's total {@link #sellAmount} across the sold row's
+ * earmarked missions they participate in, one {@link MissionSaleAttributionDto} per credited
+ * mission. The sum may be less than {@link #sellAmount} (the remainder is the seller's personal
+ * proceeds) and an empty / {@code null} list is a fully-personal sale that credits no mission.
+ * Ignored for DISCARD and TRANSFER.
  */
 public record InventoryItemBookOutDto(
     @NotNull @Min(0) Double amount,
@@ -58,4 +67,5 @@ public record InventoryItemBookOutDto(
     @Min(0) BigDecimal sellAmount,
     @NotNull Long version,
     @Nullable UUID targetOwningOrgUnitId,
-    Boolean mergeStock) {}
+    Boolean mergeStock,
+    @Valid @Nullable List<MissionSaleAttributionDto> missionAttributions) {}

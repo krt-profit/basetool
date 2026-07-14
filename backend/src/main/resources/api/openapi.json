@@ -55987,9 +55987,28 @@
           },
           "mergeStock" : {
             "type" : "boolean"
+          },
+          "missionAttributions" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/MissionSaleAttributionDto"
+            }
           }
         },
         "required" : [ "amount", "version" ]
+      },
+      "MissionSaleAttributionDto" : {
+        "type" : "object",
+        "properties" : {
+          "missionId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "amount" : {
+            "type" : "number"
+          }
+        },
+        "required" : [ "amount", "missionId" ]
       },
       "InventoryAllocationWriteDto" : {
         "type" : "object",

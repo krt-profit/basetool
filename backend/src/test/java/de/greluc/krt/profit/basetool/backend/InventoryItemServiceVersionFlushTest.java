@@ -148,7 +148,7 @@ class InventoryItemServiceVersionFlushTest {
     // DISCARD a partial amount so the row is reduced (not deleted) and its DTO is returned.
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
-            3.0, null, null, CheckoutType.DISCARD, null, null, 0L, null, null);
+            3.0, null, null, CheckoutType.DISCARD, null, null, 0L, null, null, null);
     inventoryItemService.bookOutInventoryItem(itemId, dto, userId, false);
 
     verify(inventoryItemRepository).saveAndFlush(item);

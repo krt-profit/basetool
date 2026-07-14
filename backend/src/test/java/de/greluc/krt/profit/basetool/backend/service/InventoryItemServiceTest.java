@@ -678,7 +678,7 @@ class InventoryItemServiceTest {
 
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
-            5.0, null, null, CheckoutType.DISCARD, null, null, 1L, null, null);
+            5.0, null, null, CheckoutType.DISCARD, null, null, 1L, null, null, null);
 
     InventoryItem existingItem = new InventoryItem();
     existingItem.setId(itemId);
@@ -701,7 +701,7 @@ class InventoryItemServiceTest {
     UUID itemId = UUID.randomUUID();
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
-            5.0, null, null, CheckoutType.DISCARD, null, null, 2L, null, null);
+            5.0, null, null, CheckoutType.DISCARD, null, null, 2L, null, null, null);
 
     InventoryItem existingItem = new InventoryItem();
     existingItem.setId(itemId);
@@ -722,7 +722,7 @@ class InventoryItemServiceTest {
 
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
-            5.0, targetUserId, null, CheckoutType.TRANSFER, null, null, 1L, null, null);
+            5.0, targetUserId, null, CheckoutType.TRANSFER, null, null, 1L, null, null, null);
 
     InventoryItem existingItem = new InventoryItem();
     existingItem.setId(itemId);
@@ -758,7 +758,7 @@ class InventoryItemServiceTest {
 
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
-            5.0, null, null, CheckoutType.DISCARD, null, null, 1L, null, null);
+            5.0, null, null, CheckoutType.DISCARD, null, null, 1L, null, null, null);
 
     InventoryItem existingItem = new InventoryItem();
     existingItem.setId(itemId);
@@ -789,7 +789,7 @@ class InventoryItemServiceTest {
 
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
-            10.0, null, null, CheckoutType.DISCARD, null, null, 1L, null, null);
+            10.0, null, null, CheckoutType.DISCARD, null, null, 1L, null, null, null);
 
     when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
 
@@ -813,7 +813,7 @@ class InventoryItemServiceTest {
 
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
-            15.0, null, null, CheckoutType.DISCARD, null, null, 1L, null, null);
+            15.0, null, null, CheckoutType.DISCARD, null, null, 1L, null, null, null);
 
     when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
 
@@ -838,7 +838,10 @@ class InventoryItemServiceTest {
             new java.math.BigDecimal("100.50"),
             1L,
             null,
-            null);
+            null,
+            java.util.List.of(
+                new de.greluc.krt.profit.basetool.backend.model.dto.MissionSaleAttributionDto(
+                    missionId, new java.math.BigDecimal("100.50"))));
 
     Mission mission = new Mission();
     mission.setId(missionId);

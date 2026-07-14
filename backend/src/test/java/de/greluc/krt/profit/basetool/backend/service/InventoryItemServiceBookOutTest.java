@@ -47,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MissionSaleAttributionDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
@@ -58,6 +59,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -676,15 +678,17 @@ class InventoryItemServiceBookOutTest {
   class SellTests {
 
     @Test
-    void sellWithMission_createsMissionFinanceEntryIncome() {
+    void sellWithChosenMission_createsMissionFinanceEntryIncome() {
+      // Variante C (REQ-INV-027): the seller attributes the proceeds to a mission the row earmarks
+      // and they participate in — one INCOME MissionFinanceEntry for the attributed amount.
       Mission mission = new Mission();
       mission.setId(UUID.randomUUID());
       MissionParticipant participant = new MissionParticipant();
       participant.setId(UUID.randomUUID());
 
       InventoryItem item = newItem(10.0, 1L);
-      // Variante C: earmark only part of the 10 SCU to the mission so the row still fits its
-      // mission allocation after this partial sell decrements it (sum(mission) <= remaining, R5).
+      // Earmark only part of the 10 SCU to the mission so the row still fits its mission allocation
+      // after this partial sell decrements it (sum(mission) <= remaining, R5).
       InventoryAllocations.addMission(item, mission, 1.0);
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
@@ -693,7 +697,12 @@ class InventoryItemServiceBookOutTest {
 
       service.bookOutInventoryItem(
           ITEM_ID,
-          newDto(1.0, null, null, CheckoutType.SELL, "TDD", BigDecimal.valueOf(500), 1L),
+          newSellDto(
+              1.0,
+              "TDD",
+              BigDecimal.valueOf(500),
+              1L,
+              List.of(new MissionSaleAttributionDto(mission.getId(), BigDecimal.valueOf(500)))),
           OWNER_ID,
           false);
 
@@ -710,8 +719,54 @@ class InventoryItemServiceBookOutTest {
     }
 
     @Test
-    void fullSellWithMission_createsIncomeAndDeletesRow() {
-      // Gap 1: a SELL of the WHOLE mission-linked stack (amount == available). The squadron INCOME
+    void sellWithMultipleMissions_booksOnePerAttributionWithItsShare() {
+      // The seller distributes the proceeds across two earmarked missions with their own amounts.
+      Mission missionA = new Mission();
+      missionA.setId(UUID.randomUUID());
+      Mission missionB = new Mission();
+      missionB.setId(UUID.randomUUID());
+      MissionParticipant participantA = new MissionParticipant();
+      participantA.setId(UUID.randomUUID());
+      MissionParticipant participantB = new MissionParticipant();
+      participantB.setId(UUID.randomUUID());
+
+      InventoryItem item = newItem(10.0, 1L);
+      InventoryAllocations.addMission(item, missionA, 1.0);
+      InventoryAllocations.addMission(item, missionB, 1.0);
+
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+      when(missionParticipantRepository.findByMissionIdAndUserId(missionA.getId(), OWNER_ID))
+          .thenReturn(Optional.of(participantA));
+      when(missionParticipantRepository.findByMissionIdAndUserId(missionB.getId(), OWNER_ID))
+          .thenReturn(Optional.of(participantB));
+
+      service.bookOutInventoryItem(
+          ITEM_ID,
+          newSellDto(
+              1.0,
+              "TDD",
+              BigDecimal.valueOf(500),
+              1L,
+              List.of(
+                  new MissionSaleAttributionDto(missionA.getId(), BigDecimal.valueOf(300)),
+                  new MissionSaleAttributionDto(missionB.getId(), BigDecimal.valueOf(150)))),
+          OWNER_ID,
+          false);
+
+      // Two INCOME entries, one per attribution with its own share; the remaining 50 of the 500
+      // proceeds is uncredited (the seller's personal share).
+      ArgumentCaptor<MissionFinanceEntry> captor =
+          ArgumentCaptor.forClass(MissionFinanceEntry.class);
+      verify(missionFinanceEntryRepository, org.mockito.Mockito.times(2)).save(captor.capture());
+      assertEquals(BigDecimal.valueOf(300), captor.getAllValues().get(0).getAmount());
+      assertSame(missionA, captor.getAllValues().get(0).getMission());
+      assertEquals(BigDecimal.valueOf(150), captor.getAllValues().get(1).getAmount());
+      assertSame(missionB, captor.getAllValues().get(1).getMission());
+    }
+
+    @Test
+    void fullSellWithChosenMission_createsIncomeAndDeletesRow() {
+      // A SELL of the WHOLE mission-linked stack (amount == available). The squadron INCOME
       // MissionFinanceEntry must be created off the still-managed row BEFORE the depletion branch
       // deletes it, the source row is delete()d (not saveAndFlush()ed), the method returns null so
       // the frontend drops the depleted row, and the SOLD audit still carries the pre-delete id.
@@ -732,7 +787,12 @@ class InventoryItemServiceBookOutTest {
       InventoryItemDto result =
           service.bookOutInventoryItem(
               ITEM_ID,
-              newDto(5.0, null, null, CheckoutType.SELL, "TDD", BigDecimal.valueOf(500), 1L),
+              newSellDto(
+                  5.0,
+                  "TDD",
+                  BigDecimal.valueOf(500),
+                  1L,
+                  List.of(new MissionSaleAttributionDto(mission.getId(), BigDecimal.valueOf(500)))),
               OWNER_ID,
               false);
 
@@ -757,12 +817,10 @@ class InventoryItemServiceBookOutTest {
     }
 
     @Test
-    void sellWithMission_butCallerNotParticipant_throwsBadRequest() {
+    void sellAttributingToMission_butCallerNotParticipant_throwsBadRequest() {
       Mission mission = new Mission();
       mission.setId(UUID.randomUUID());
       InventoryItem item = newItem(10.0, 1L);
-      // Variante C: earmark only part of the 10 SCU to the mission so the row still fits its
-      // mission allocation after this partial sell decrements it (sum(mission) <= remaining, R5).
       InventoryAllocations.addMission(item, mission, 1.0);
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
@@ -774,16 +832,127 @@ class InventoryItemServiceBookOutTest {
           () ->
               service.bookOutInventoryItem(
                   ITEM_ID,
-                  newDto(1.0, null, null, CheckoutType.SELL, "TDD", BigDecimal.TEN, 1L),
+                  newSellDto(
+                      1.0,
+                      "TDD",
+                      BigDecimal.TEN,
+                      1L,
+                      List.of(new MissionSaleAttributionDto(mission.getId(), BigDecimal.TEN))),
                   OWNER_ID,
                   false));
       verify(missionFinanceEntryRepository, never()).save(any());
     }
 
     @Test
+    void sellAttributingToMission_notEarmarkedOnTheRow_throwsBadRequest() {
+      Mission earmarked = new Mission();
+      earmarked.setId(UUID.randomUUID());
+      InventoryItem item = newItem(10.0, 1L);
+      InventoryAllocations.addMission(item, earmarked, 1.0);
+
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+
+      // Attribute to a DIFFERENT mission the row does not earmark -> 400 before any participant
+      // look
+      // up.
+      assertThrows(
+          BadRequestException.class,
+          () ->
+              service.bookOutInventoryItem(
+                  ITEM_ID,
+                  newSellDto(
+                      1.0,
+                      "TDD",
+                      BigDecimal.TEN,
+                      1L,
+                      List.of(new MissionSaleAttributionDto(UUID.randomUUID(), BigDecimal.TEN))),
+                  OWNER_ID,
+                  false));
+      verify(missionFinanceEntryRepository, never()).save(any());
+    }
+
+    @Test
+    void sellWithAttributionsExceedingProceeds_throwsBadRequest() {
+      Mission mission = new Mission();
+      mission.setId(UUID.randomUUID());
+      InventoryItem item = newItem(10.0, 1L);
+      InventoryAllocations.addMission(item, mission, 1.0);
+
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+
+      // Attributed 600 exceeds the 500 proceeds -> 400.
+      assertThrows(
+          BadRequestException.class,
+          () ->
+              service.bookOutInventoryItem(
+                  ITEM_ID,
+                  newSellDto(
+                      1.0,
+                      "TDD",
+                      BigDecimal.valueOf(500),
+                      1L,
+                      List.of(
+                          new MissionSaleAttributionDto(mission.getId(), BigDecimal.valueOf(600)))),
+                  OWNER_ID,
+                  false));
+      verify(missionFinanceEntryRepository, never()).save(any());
+    }
+
+    @Test
+    void sellWithDuplicateMissionAttribution_throwsBadRequest() {
+      Mission mission = new Mission();
+      mission.setId(UUID.randomUUID());
+      MissionParticipant participant = new MissionParticipant();
+      participant.setId(UUID.randomUUID());
+      InventoryItem item = newItem(10.0, 1L);
+      InventoryAllocations.addMission(item, mission, 1.0);
+
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+      // The first attribution resolves fully (participant found); the duplicate is caught on the
+      // second, before any finance entry is persisted (validate-then-book).
+      when(missionParticipantRepository.findByMissionIdAndUserId(mission.getId(), OWNER_ID))
+          .thenReturn(Optional.of(participant));
+
+      assertThrows(
+          BadRequestException.class,
+          () ->
+              service.bookOutInventoryItem(
+                  ITEM_ID,
+                  newSellDto(
+                      1.0,
+                      "TDD",
+                      BigDecimal.valueOf(500),
+                      1L,
+                      List.of(
+                          new MissionSaleAttributionDto(mission.getId(), BigDecimal.valueOf(100)),
+                          new MissionSaleAttributionDto(mission.getId(), BigDecimal.valueOf(100)))),
+                  OWNER_ID,
+                  false));
+      verify(missionFinanceEntryRepository, never()).save(any());
+    }
+
+    @Test
+    void sellWithNoAttributions_isFullyPersonalSale_skipsFinanceEntry() {
+      // Variante C: a SELL with no mission attributions is a fully-personal sale that credits no
+      // mission — allowed even for a mission-earmarked row, and never touches the finance ledger.
+      Mission mission = new Mission();
+      mission.setId(UUID.randomUUID());
+      InventoryItem item = newItem(10.0, 1L);
+      InventoryAllocations.addMission(item, mission, 1.0);
+
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+
+      service.bookOutInventoryItem(
+          ITEM_ID, newSellDto(1.0, "TDD", BigDecimal.TEN, 1L, List.of()), OWNER_ID, false);
+
+      verify(missionFinanceEntryRepository, never()).save(any());
+      verify(missionParticipantRepository, never()).findByMissionIdAndUserId(any(), any());
+    }
+
+    @Test
     void sellWithoutMission_skipsFinanceEntry() {
-      // No mission attached (the row has no mission allocation) -> the SELL just decrements the
-      // item, no MissionFinanceEntry side-effect.
+      // No mission earmarked and no attributions -> the SELL just decrements the item, no
+      // MissionFinanceEntry side-effect and no participant lookup.
       InventoryItem item = newItem(10.0, 1L);
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
@@ -924,7 +1093,12 @@ class InventoryItemServiceBookOutTest {
 
       service.bookOutInventoryItem(
           ITEM_ID,
-          newDto(1.0, null, null, CheckoutType.SELL, "TDD", BigDecimal.valueOf(500), 1L),
+          newSellDto(
+              1.0,
+              "TDD",
+              BigDecimal.valueOf(500),
+              1L,
+              List.of(new MissionSaleAttributionDto(mission.getId(), BigDecimal.valueOf(500)))),
           OWNER_ID,
           false);
 
@@ -988,7 +1162,46 @@ class InventoryItemServiceBookOutTest {
       BigDecimal sellAmount,
       Long version) {
     return new InventoryItemBookOutDto(
-        amount, targetUserId, targetLocationId, type, terminal, sellAmount, version, null, null);
+        amount,
+        targetUserId,
+        targetLocationId,
+        type,
+        terminal,
+        sellAmount,
+        version,
+        null,
+        null,
+        null);
+  }
+
+  /**
+   * Builds a {@code SELL} book-out DTO carrying explicit per-mission income attributions (Variante
+   * C).
+   *
+   * @param amount the sold quantity
+   * @param terminal the sale terminal
+   * @param sellAmount the total sale proceeds
+   * @param version the optimistic-lock version
+   * @param attributions the per-mission income attributions
+   * @return the SELL DTO
+   */
+  private static InventoryItemBookOutDto newSellDto(
+      double amount,
+      String terminal,
+      BigDecimal sellAmount,
+      Long version,
+      List<MissionSaleAttributionDto> attributions) {
+    return new InventoryItemBookOutDto(
+        amount,
+        null,
+        null,
+        CheckoutType.SELL,
+        terminal,
+        sellAmount,
+        version,
+        null,
+        null,
+        attributions);
   }
 
   // --- R5.d.g TRANSFER picker delegation -----------------------------------
@@ -1039,7 +1252,16 @@ class InventoryItemServiceBookOutTest {
 
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
-            5.0, targetUserId, null, CheckoutType.TRANSFER, null, null, 1L, pickedOrgUnitId, null);
+            5.0,
+            targetUserId,
+            null,
+            CheckoutType.TRANSFER,
+            null,
+            null,
+            1L,
+            pickedOrgUnitId,
+            null,
+            null);
 
     service.bookOutInventoryItem(itemId, dto, owner.getId(), false);
 

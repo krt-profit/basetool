@@ -94,6 +94,7 @@ public class InventoryJobOrderAllocation extends AbstractEntity<UUID> {
    * entry-level flag could not express. Mission slices carry no delivered marker (a mission has no
    * "delivery").
    */
+  @Builder.Default
   @Column(nullable = false)
   private Boolean delivered = false;
 
