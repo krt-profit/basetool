@@ -721,7 +721,7 @@ public class InventoryItemService {
   /**
    * Rejects an allocation write on a personal entry — personal stock is attributable solely to its
    * owner and carries no job-order/mission assignment (the same invariant {@link
-   * #createInventoryItem} and {@link #updateInventoryItem} enforce).
+   * #createInventoryItem} and the allocation writes enforce).
    *
    * @param item the entry being written.
    * @throws BadRequestException when the entry is personal.
@@ -961,7 +961,7 @@ public class InventoryItemService {
     String normalizedNote = StringNormalization.trimToNull(request.note());
     item.setNote(normalizedNote);
 
-    // saveAndFlush so the response carries the post-increment @Version (see updateInventoryItem) —
+    // saveAndFlush so the response carries the post-increment @Version —
     // otherwise editing a note right after an association change 409s.
     InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
     // PII: the note body is user free text — record only its presence/length, never the content.

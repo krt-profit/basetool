@@ -583,8 +583,8 @@ public class InventoryCheckoutService {
    *
    * <p>The personalize direction refuses a source row bound to a job order or mission: a {@code
    * personal = true} row may never carry either association (the invariant {@code
-   * InventoryItemService.createInventoryItem} and {@code InventoryItemService.updateInventoryItem}
-   * also enforce), and silently dropping the link would lose the assignment.
+   * InventoryItemService.createInventoryItem} and the allocation writes also enforce), and silently
+   * dropping the link would lose the assignment.
    *
    * @param id the source inventory row id
    * @param dto the rebooking payload (amount, version, target org-unit pool)
