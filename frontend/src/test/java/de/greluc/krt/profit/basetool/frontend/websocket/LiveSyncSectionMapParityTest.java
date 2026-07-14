@@ -90,6 +90,18 @@ class LiveSyncSectionMapParityTest {
   }
 
   @Test
+  void inventoryAllSeamMap_matchesTheInventoryAllTopicWhitelist() throws IOException {
+    // #1307: the shared Lager's INVENTORY_ALL_SECTIONS receiver map must mirror the
+    // LiveSyncTopicClass.INVENTORY_ALL whitelist (the broadcast derives its keys from this map).
+    Set<String> jsKeys = seamMapKeys("/static/js/inventory-admin.js", "INVENTORY_ALL_SECTIONS");
+    assertThat(jsKeys)
+        .as(
+            "INVENTORY_ALL_SECTIONS keys in inventory-admin.js vs LiveSyncTopicClass.INVENTORY_ALL"
+                + " whitelist")
+        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.INVENTORY_ALL.allowedSections());
+  }
+
+  @Test
   void bankStaffAccountSeamMap_matchesTheBankAccountTopicWhitelist() throws IOException {
     Set<String> jsKeys = seamMapKeys("/static/js/bank.js", "BANK_ACCOUNT_SECTIONS");
     assertThat(jsKeys)

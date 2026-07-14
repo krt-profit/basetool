@@ -961,6 +961,14 @@ this requirement exists to prevent, #1102). Covered topics and their section whi
 | `bank` (staff-global)    | grid, requestQueue, manage, grants                                                                                | no            | `ROLE_BANK_EMPLOYEE` (local check)                                                                    |
 | `orgunit-bank` (global)  | orgUnitBank, orgUnitBankSettings                                                                                  | no            | member-or-above (the `/org-unit-bank` page gate, local check)                                         |
 | `materialboard` (global) | board                                                                                                             | no            | authenticated                                                                                         |
+| `inventory` (global)     | stock                                                                                                             | no            | authenticated (every viewer re-fetches its own owner/org-unit-scoped view)                            |
+
+The `inventory` room is the shared Lager (`/inventory/all`, #1307): a single opaque `stock` section
+covers the whole grouped table, so a peer's allocation-chip, book-out, transfer or delete-all write
+tells the other viewers to re-pull their own filtered fragment (`filterInventory`) — including the
+lazily-loaded stack entries, so a collapsed stack simply re-fetches its chips on the next expand.
+Because it is a global room but each viewer's fragment is owner- and org-unit-scoped, a cross-squadron
+peer refresh is a harmless no-op.
 
 The server-side **topic-class registry** (the `LiveSyncTopicClass` enum) is the single source of
 truth for this table. The REQ-FE-010 **three-mirror-points rule applies per topic**: the acting page's seam map,

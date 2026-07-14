@@ -177,6 +177,45 @@ function filterInventory() {
         });
 }
 
+// Live peer-sync for the shared Lager (REQ-FE-010 / REQ-FE-015, #1307).
+// INVENTORY_ALL_SECTIONS is the single source of truth shared by the write-side broadcast and the
+// receive-side refresh (the three-mirror-points rule); its one key mirrors the server-side
+// LiveSyncTopicClass.INVENTORY_ALL whitelist. The whole shared /inventory/all grouped table is one
+// opaque "stock" section: any allocation / book-out / transfer / delete-all write tells peers to
+// re-pull their own filtered fragment, so no stock data ever crosses the socket.
+const INVENTORY_ALL_SECTIONS = {
+    stock: { container: '#tableContainer', fragmentValue: 'stock' },
+};
+
+// Tell other users viewing the shared Lager that the stock changed. The keys derive from the seam
+// map so the broadcast can never drift from the whitelisted sections; the relay excludes the origin
+// socket, so the acting viewer never receives its own change (no echo, no self-refresh).
+function broadcastInventoryAllChanged() {
+    if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
+        window.krtLiveSync.sendChanged('inventory', Object.keys(INVENTORY_ALL_SECTIONS));
+    }
+}
+
+// Inbound peer changes: subscribe to the global "inventory" room and re-fetch this viewer's own
+// filtered grouped table in place. filterInventory preserves the viewer's filter + tree expansion,
+// and a collapsed stack comes back data-stack-loaded=false so its chips refresh on the next expand
+// (the lazy-load requirement). createReceiver coalesces bursts (1500 ms) and defers behind the
+// "updates available" pill while a modal is open or an edit is focused in the table.
+if (
+    window.krtLiveSync &&
+    typeof window.krtLiveSync.createReceiver === 'function' &&
+    document.getElementById('tableContainer')
+) {
+    window.krtLiveSync.createReceiver({
+        topic: 'inventory',
+        sections: INVENTORY_ALL_SECTIONS,
+        coalesceMs: 1500,
+        refresh: function () {
+            filterInventory();
+        },
+    });
+}
+
 function resetInventoryFilter() {
     ['matCheck', 'jobOrderCheck', 'missionCheck'].forEach(function (cls) {
         const boxes = document.getElementsByClassName(cls);
@@ -716,6 +755,7 @@ function submitUmbuchen(event) {
             onSuccess: function () {
                 closeUmbuchenModal();
                 filterInventory();
+                broadcastInventoryAllChanged();
             },
         })
         .then(function () {
@@ -793,6 +833,7 @@ function submitBookOut(event) {
             onSuccess: function () {
                 closeBookOutModal();
                 filterInventory();
+                broadcastInventoryAllChanged();
             },
         })
         .then(function () {
@@ -965,6 +1006,7 @@ window.onclick = function (event) {
                 onSuccess: function () {
                     showInventoryToast('success', deleteBtn.getAttribute('data-success'));
                     filterInventory();
+                    broadcastInventoryAllChanged();
                 },
             });
             closeModal();
@@ -1145,6 +1187,7 @@ async function assocSend(entryId, method, body, split, pop) {
             if (typeof window.showFrontendSuccessToast === 'function') {
                 window.showFrontendSuccessToast(assocI18n.saved);
             }
+            broadcastInventoryAllChanged();
         } else if (response.status === 409) {
             if (typeof window.showFrontendErrorToast === 'function') {
                 window.showFrontendErrorToast(assocI18n.conflict);
