@@ -186,6 +186,15 @@ function _serializeItemHandoverForm() {
     };
 }
 
+// Variante C (REQ-INV-027): a handover for THIS order (window.orderId) may draw only from the
+// entry's own earmark to this order — never from a sibling order's slice or the free rest. Returns
+// that slice's amount (0 when the entry carries no slice for this order), used as the handover cap.
+function orderSliceAmount(inv) {
+    if (!inv || !Array.isArray(inv.jobOrderAllocations)) return 0;
+    const slice = inv.jobOrderAllocations.find((a) => a.jobOrderId === window.orderId);
+    return slice && typeof slice.amount === 'number' ? slice.amount : 0;
+}
+
 async function openHandoverModal() {
     document.getElementById('handover-modal').style.display = 'flex';
     if (!isInventoryCached) {
@@ -260,7 +269,7 @@ function addHandoverItemRow() {
         sel.addEventListener('change', () => {
             const inv = cachedInventoryItems.find((i) => i.id === sel.value);
             if (inv) {
-                amtInput.max = inv.amount;
+                amtInput.max = orderSliceAmount(inv);
             } else {
                 amtInput.removeAttribute('max');
             }
@@ -428,9 +437,10 @@ function validateHandoverAmounts() {
         const inv = cachedInventoryItems.find((i) => i.id === sel.value);
         if (!inv) continue;
         const entered = window.krtScuInput.parse(inp.value);
-        if (entered > inv.amount) {
+        const sliceMax = orderSliceAmount(inv);
+        if (entered > sliceMax) {
             const isPiece = inv.material && inv.material.quantityType === 'PIECE';
-            const available = isPiece ? inv.amount.toFixed(0) : inv.amount.toFixed(3);
+            const available = isPiece ? sliceMax.toFixed(0) : sliceMax.toFixed(3);
             const materialName = inv.material ? inv.material.name : sel.value;
             const msg = MSG_HANDOVER_REPORT_VALIDATION_AMOUNT.replace('{0}', materialName).replace(
                 '{1}',

@@ -213,6 +213,21 @@ public class JobOrderHandoverService {
       if (itemDto.amount() > inventoryItem.getAmount() + QUANTITY_EPSILON) {
         throw new BadRequestException("Cannot hand over more than the available amount");
       }
+      // Variante C (REQ-INV-027): the handover fulfils THIS order, so it may draw only from this
+      // order's own earmark on the entry — never from a sibling order's slice or the free rest. Cap
+      // the handed amount at the entry's job-order slice for this order (defence in depth behind
+      // the
+      // frontend, which sets the amount field's max to the same slice). Reducing only that slice
+      // then keeps R5 (Σ job-order ≤ amount) without touching any other order chip or the rest —
+      // the
+      // silent sibling over-allocation was possible only because this cap was missing.
+      var orderSlice = InventoryAllocations.jobOrderSlice(inventoryItem, jobOrderId);
+      double orderSliceAmount =
+          orderSlice != null && orderSlice.getAmount() != null ? orderSlice.getAmount() : 0.0;
+      if (itemDto.amount() > orderSliceAmount + QUANTITY_EPSILON) {
+        throw new BadRequestException(
+            "Cannot hand over more than the amount earmarked to this job order");
+      }
       QuantityType quantityType =
           inventoryItem.getMaterial() != null
               ? inventoryItem.getMaterial().getQuantityType()

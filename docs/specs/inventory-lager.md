@@ -446,11 +446,16 @@ assigned to tags when the deduction exceeds a dimension's rest. For a `SELL` it 
 per-mission proceeds estimate. A submit sends only the non-zero inputs as the plan; an entry with no
 earmarks hides the picker and submits the legacy `null` plan.
 
-**A job-order handover clamps the mission dimension the same way.** A partial handover of quantity X
-to an order shrinks that order's slice by X and lowers the entry amount by X; the same physical SCU
-leave the entry's mission earmarks too, so the mission dimension is reduced by exactly the same X —
-resolved through the shared `AllocationReductions` resolver (rest-first, then proportional by default,
-so a dual-tagged partial handover no longer 422s). The handover item DTO carries an optional
+**A job-order handover draws only from its own order's slice, and clamps the mission dimension.** A
+partial handover of quantity X to an order shrinks **that order's own slice** by X and lowers the
+entry amount by X. X is capped at that order's slice on the entry — a handover fulfils only its own
+order, so it may never draw from a sibling order's slice or from the free rest; the frontend sets the
+amount field's max to that slice and the backend rejects an over-slice amount with **HTTP 400**.
+Because only the fulfilled order's slice and the entry amount drop by the same X, R5 holds on the
+job-order dimension with no sibling slice or rest touched. The same physical SCU leave the entry's
+mission earmarks too, so the mission dimension is reduced by exactly the same X — resolved through the
+shared `AllocationReductions` resolver (rest-first, then proportional by default, so a dual-tagged
+partial handover no longer 422s). The handover item DTO carries an optional
 `missionReductions` plan, and the handover modal renders the mission picker **only for the ambiguous
 case** — the entry is earmarked to two or more missions and X exceeds the mission rest, so more than
 one distribution is possible; otherwise the auto-clamp applies with no prompt.
@@ -485,6 +490,9 @@ there is no separate income-attribution input.
   handed amount instead of 422-ing (rest-first, then proportional by default); the handover modal
   shows the mission picker only when two or more missions and the handed amount exceeds the mission
   rest (the ambiguous case), and an explicit `missionReductions` plan is honoured/validated.
+- [ ] A handover cannot exceed the order's own slice on the entry: the amount field's max is that
+  slice, and an over-slice amount is rejected with HTTP 400 — a sibling order's slice and the free
+  rest are never drawn from, so a multi-order entry cannot be silently over-allocated by a handover.
 - [ ] A SELL credits each mission proportionally to the SCU deducted from its earmark
   (`sellAmount × scu/sold`), leaves the rest (unassigned + non-participated) personal, and books no
   entry when nothing is deducted from a mission earmark.

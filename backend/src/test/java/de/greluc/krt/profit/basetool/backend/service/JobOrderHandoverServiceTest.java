@@ -225,6 +225,39 @@ class JobOrderHandoverServiceTest {
   }
 
   @Test
+  void createHandover_shouldReject_whenAmountExceedsOwnOrderSlice_withSiblingOrder() {
+    // Given: a 100-SCU entry split across TWO orders on the job-order dimension — 20 to THIS order,
+    // 70 to a sibling order (rest 10). A handover fulfils THIS order only, so it may draw at most
+    // this order's own 20-SCU slice. Handing over 50 would erode the sibling order's coverage
+    // (REQ-INV-027 R5): the guard must reject it (400) rather than silently over-allocate order B.
+    JobOrder siblingOrder = new JobOrder();
+    siblingOrder.setId(UUID.randomUUID());
+    inventoryItem.getJobOrderAllocations().clear();
+    inventoryItem.setAmount(100.0);
+    InventoryAllocations.addJobOrder(inventoryItem, order, 20.0, false);
+    InventoryAllocations.addJobOrder(inventoryItem, siblingOrder, 70.0, false);
+
+    JobOrderHandoverItemCreateDto itemDto =
+        new JobOrderHandoverItemCreateDto(inventoryId, 50.0, null);
+    JobOrderHandoverCreateDto createDto =
+        new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", "Rogue", List.of(itemDto));
+
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
+
+    // When & Then: rejected with 400, and the entry is left entirely untouched (no R5 violation,
+    // the sibling order's 70-SCU slice is preserved).
+    BadRequestException ex =
+        assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
+    assertTrue(ex.getMessage().contains("earmarked to this job order"));
+    assertEquals(100.0, inventoryItem.getAmount());
+    assertEquals(2, inventoryItem.getJobOrderAllocations().size());
+    verify(inventoryItemRepository, never()).save(any());
+    verify(inventoryItemRepository, never()).delete(any());
+  }
+
+  @Test
   void createHandover_shouldDeleteInventoryItem_whenAmountIsFullyHandedOver() {
     // Given
     JobOrderHandoverItemCreateDto itemDto =
