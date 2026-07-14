@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryCheckoutService;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -113,8 +114,8 @@ class InventoryItemServiceBulkCheckoutTest {
     // When
     inventoryItemService.bulkCheckout(request, userId);
 
-    // Then
-    verify(inventoryItemRepository).flush();
+    // Then – deleted in one batch (the association-clearing loop and its flush were removed;
+    // each row's job-order / mission allocations cascade away with it, FK ON DELETE CASCADE, V217).
     verify(inventoryItemRepository).deleteAllById(List.of(itemId1, itemId2));
   }
 
@@ -149,18 +150,22 @@ class InventoryItemServiceBulkCheckoutTest {
   }
 
   @Test
-  void bulkCheckout_clearsJobOrderAndMissionAssociations() {
-    // Given
+  void bulkCheckout_deletesEarmarkedItem_allocationsCascadeAway() {
+    // Given – an item earmarked to a job order and a mission. Variante C (REQ-INV-027): the
+    // earmarks now live in the entry's allocation collections, not on scalar columns, and a bulk
+    // checkout no longer clears them in code — the batch deleteAllById cascades the job-order /
+    // mission slices away with the row (FK ON DELETE CASCADE, V217).
     UUID userId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
 
     InventoryItem item = itemOwnedBy(itemId, userId);
+    item.setAmount(10.0);
     JobOrder jobOrder = new JobOrder();
     jobOrder.setId(UUID.randomUUID());
     Mission mission = new Mission();
     mission.setId(UUID.randomUUID());
-    item.setJobOrder(jobOrder);
-    item.setMission(mission);
+    InventoryAllocations.addJobOrder(item, jobOrder, item.getAmount(), false);
+    InventoryAllocations.addMission(item, mission, item.getAmount());
 
     when(inventoryItemRepository.findByIdForUpdate(itemId)).thenReturn(Optional.of(item));
 
@@ -169,10 +174,7 @@ class InventoryItemServiceBulkCheckoutTest {
     // When
     inventoryItemService.bulkCheckout(request, userId);
 
-    // Then – associations must be cleared before deletion
-    assertNull(item.getJobOrder(), "JobOrder association must be cleared");
-    assertNull(item.getMission(), "Mission association must be cleared");
-    verify(inventoryItemRepository).flush();
+    // Then – the earmarked row is removed in the batch delete; its allocations cascade with it.
     verify(inventoryItemRepository).deleteAllById(List.of(itemId));
   }
 

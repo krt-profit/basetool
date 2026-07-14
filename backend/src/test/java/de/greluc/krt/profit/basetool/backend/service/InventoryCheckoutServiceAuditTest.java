@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -94,16 +95,10 @@ class InventoryCheckoutServiceAuditTest {
     item.setId(itemId);
     item.setVersion(1L);
     item.setUser(owner);
-    item.setDelivered(false);
-    // The requested order is the entry's single scalar assignment, so the soak dual-write keeps the
-    // entry scalar in step with the flipped slice.
-    item.setJobOrder(order);
-    InventoryJobOrderAllocation slice = new InventoryJobOrderAllocation();
-    slice.setInventoryItem(item);
-    slice.setJobOrder(order);
-    slice.setAmount(5.0);
-    slice.setDelivered(false);
-    item.getJobOrderAllocations().add(slice);
+    item.setAmount(5.0);
+    // Variante C (REQ-INV-027): delivered lives on the job-order slice, not the entry. Earmark the
+    // entry's stock to the requested order so updateDelivered has that order's slice to flip.
+    InventoryJobOrderAllocation slice = InventoryAllocations.addJobOrder(item, order, 5.0, false);
 
     UpdateDeliveredRequest request = new UpdateDeliveredRequest(true, orderId, 1L);
 
@@ -114,7 +109,6 @@ class InventoryCheckoutServiceAuditTest {
     service.updateDelivered(itemId, request, ownerId, false);
 
     assertTrue(slice.getDelivered(), "the order's slice is flipped to delivered");
-    assertTrue(item.getDelivered(), "the entry scalar stays in step during the soak");
     verify(auditService)
         .record(
             eq(AuditEventType.INVENTORY_ITEM_DELIVERY_TOGGLED),

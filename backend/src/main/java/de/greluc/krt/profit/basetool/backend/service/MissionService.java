@@ -720,11 +720,10 @@ public class MissionService {
     final UUID deletedMissionId = mission.getId();
     final String deletedMissionName = mission.getName();
 
-    // Detach inventory items (so they are not deleted while still avoiding the FK violation)
-    if (mission.getInventoryEntries() != null) {
-      mission.getInventoryEntries().forEach(entry -> entry.setMission(null));
-      mission.getInventoryEntries().clear();
-    }
+    // Variante C (REQ-INV-027): an inventory entry's mission earmark lives in the
+    // mission-allocation
+    // table with an ON DELETE CASCADE FK, so deleting the mission drops those slices automatically
+    // while the inventory rows survive as (partially) unassigned stock — no manual detach needed.
 
     // Detach refinery orders
     if (mission.getRefineryOrders() != null) {

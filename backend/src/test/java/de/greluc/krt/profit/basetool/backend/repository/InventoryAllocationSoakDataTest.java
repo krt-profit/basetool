@@ -30,7 +30,7 @@ import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAllocationSync;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.UUID;
@@ -41,17 +41,14 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Data-level coverage for the Variante-C soak write path (REQ-INV-027) against the real Postgres
- * test schema (Testcontainers + Flyway via the {@code test} profile): that {@link
- * InventoryAllocationSync#mirrorScalars(InventoryItem)} re-mirrors a <em>persisted</em> entry to
- * the same job order <em>in place</em> without tripping the non-deferrable {@code
- * uq_inv_job_order_alloc} unique constraint (V217), and that the R2 allocation-drop queries release
- * an order's slice while the entry survives as unassigned stock.
+ * Data-level coverage for the Variante-C soak drop path (REQ-INV-027) against the real Postgres
+ * test schema (Testcontainers + Flyway via the {@code test} profile): that the R2 allocation-drop
+ * queries release an order's job-order slice while the entry itself survives in the Lager as
+ * (partially) unassigned stock, with its amount intact.
  *
- * <p>The plain Mockito service tests cannot prove either: the constraint and the flush ordering
- * only exist on the real dialect, and the in-memory mirror never round-trips through a committed
- * row. Each method is {@link Transactional} so the seeded rows roll back and never pollute the
- * shared Testcontainers database.
+ * <p>The plain Mockito service tests cannot prove this: the bulk {@code DELETE} and the flush
+ * ordering only exist on the real dialect. Each method is {@link Transactional} so the seeded rows
+ * roll back and never pollute the shared Testcontainers database.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -67,34 +64,6 @@ class InventoryAllocationSoakDataTest {
   @Autowired private SquadronRepository squadronRepository;
 
   @PersistenceContext private EntityManager entityManager;
-
-  /**
-   * Re-mirroring a persisted, flushed entry to the same order after lowering its amount must UPDATE
-   * the existing slice, not delete-then-re-insert the same {@code (inventory_item_id,
-   * job_order_id)} pair — the latter violates the non-deferrable unique constraint because
-   * Hibernate flushes the INSERT before the orphan DELETE. Proves the checkout / handover
-   * amount-reduce paths are safe on real Postgres.
-   */
-  @Test
-  void mirrorScalarsReMirrorsSameOrderInPlaceWithoutConstraintViolation() {
-    Fixture f = seedLinkedItem(100.0);
-
-    // Detach so the re-mirror operates on a freshly loaded entry with its slice already committed —
-    // the exact cross-flush shape the reduce paths hit in production.
-    entityManager.flush();
-    entityManager.clear();
-
-    InventoryItem reloaded = inventoryItemRepository.findById(f.itemId).orElseThrow();
-    reloaded.setAmount(40.0);
-    InventoryAllocationSync.mirrorScalars(reloaded);
-    inventoryItemRepository.saveAndFlush(reloaded); // must not throw a unique-constraint violation
-
-    entityManager.clear();
-    assertThat(jobOrderAllocationRepository.findAll())
-        .filteredOn(a -> a.getInventoryItem().getId().equals(f.itemId))
-        .singleElement()
-        .satisfies(a -> assertThat(a.getAmount()).isEqualTo(40.0));
-  }
 
   /**
    * The R2 {@code deleteJobOrderAllocationsByJobOrder} drop releases the order's slice while the
@@ -135,40 +104,8 @@ class InventoryAllocationSoakDataTest {
   }
 
   /**
-   * Variante A (REQ-INV-027): the job-order slice mirrors the entry's {@code delivered} flag during
-   * the soak — setting the entry flag and re-mirroring marks the slice delivered, clearing it and
-   * re-mirroring clears the slice.
-   */
-  @Test
-  void mirrorCopiesDeliveredOntoTheJobOrderSlice() {
-    Fixture f = seedLinkedItem(50.0);
-    entityManager.flush();
-    entityManager.clear();
-
-    InventoryItem reloaded = inventoryItemRepository.findById(f.itemId).orElseThrow();
-    reloaded.setDelivered(true);
-    InventoryAllocationSync.mirrorScalars(reloaded);
-    inventoryItemRepository.saveAndFlush(reloaded);
-    entityManager.clear();
-    assertThat(jobOrderAllocationRepository.findAll())
-        .filteredOn(a -> a.getInventoryItem().getId().equals(f.itemId))
-        .singleElement()
-        .satisfies(a -> assertThat(a.getDelivered()).isTrue());
-
-    InventoryItem again = inventoryItemRepository.findById(f.itemId).orElseThrow();
-    again.setDelivered(false);
-    InventoryAllocationSync.mirrorScalars(again);
-    inventoryItemRepository.saveAndFlush(again);
-    entityManager.clear();
-    assertThat(jobOrderAllocationRepository.findAll())
-        .filteredOn(a -> a.getInventoryItem().getId().equals(f.itemId))
-        .singleElement()
-        .satisfies(a -> assertThat(a.getDelivered()).isFalse());
-  }
-
-  /**
-   * Seeds one job order plus one non-personal inventory entry linked to it, mirroring the scalar
-   * into a single full-amount allocation exactly as the service create path does.
+   * Seeds one job order plus one non-personal inventory entry linked to it, writing a single
+   * full-amount (not-delivered) job-order allocation exactly as the service create path does.
    *
    * @param amount the entry (and initial allocation) amount in SCU.
    * @return the created ids needed by the assertions.
@@ -207,8 +144,7 @@ class InventoryAllocationSoakDataTest {
     item.setAmount(amount);
     item.setPersonal(false);
     item.setOwningOrgUnit(iridium);
-    item.setJobOrder(order);
-    InventoryAllocationSync.mirrorScalars(item);
+    InventoryAllocations.addJobOrder(item, order, amount, false);
     inventoryItemRepository.save(item);
 
     return new Fixture(item.getId(), order.getId(), material.getId());

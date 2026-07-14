@@ -22,7 +22,9 @@ package de.greluc.krt.profit.basetool.backend.mapper;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
+import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Location;
+import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderAllocationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
@@ -55,10 +57,10 @@ public interface InventoryItemMapper {
    * @param inventoryItem the inventory-item entity to project; {@code null} returns {@code null}.
    * @return the populated inventory-item DTO.
    */
-  @Mapping(source = "jobOrder.id", target = "jobOrderId")
-  @Mapping(source = "jobOrder.displayId", target = "jobOrderDisplayId")
-  @Mapping(source = "mission.id", target = "missionId")
-  @Mapping(source = "mission.name", target = "missionName")
+  @Mapping(target = "jobOrderId", expression = "java(firstJobOrderId(inventoryItem))")
+  @Mapping(target = "jobOrderDisplayId", expression = "java(firstJobOrderDisplayId(inventoryItem))")
+  @Mapping(target = "missionId", expression = "java(firstMissionId(inventoryItem))")
+  @Mapping(target = "missionName", expression = "java(firstMissionName(inventoryItem))")
   @Mapping(target = "jobOrderRest", expression = "java(jobOrderRest(inventoryItem))")
   @Mapping(target = "missionRest", expression = "java(missionRest(inventoryItem))")
   @Mapping(target = "owningSquadron", source = "owningOrgUnit")
@@ -86,6 +88,72 @@ public interface InventoryItemMapper {
   @Mapping(source = "mission.name", target = "missionName")
   @Mapping(source = "mission.plannedStartTime", target = "missionPlannedStartTime")
   MissionAllocationDto missionAllocationToDto(InventoryMissionAllocation allocation);
+
+  /**
+   * The id of the entry's first job-order earmark, or {@code null} when it has none. Since Variante
+   * C (REQ-INV-027) dropped the scalar {@code jobOrder} column, the DTO's soak-compat {@code
+   * jobOrderId} field is derived from the first allocation (there is exactly one for a
+   * single-assignment entry; the authoritative multi-earmark view is {@code jobOrderAllocations}).
+   *
+   * @param item the entry; never {@code null}.
+   * @return the first earmarked job order's id, or {@code null}.
+   */
+  default java.util.UUID firstJobOrderId(InventoryItem item) {
+    return item.getJobOrderAllocations().stream()
+        .map(InventoryJobOrderAllocation::getJobOrder)
+        .filter(order -> order != null)
+        .map(JobOrder::getId)
+        .findFirst()
+        .orElse(null);
+  }
+
+  /**
+   * The display id of the entry's first job-order earmark, or {@code null} — the soak-compat
+   * companion of {@link #firstJobOrderId(InventoryItem)}.
+   *
+   * @param item the entry; never {@code null}.
+   * @return the first earmarked job order's display id, or {@code null}.
+   */
+  default Integer firstJobOrderDisplayId(InventoryItem item) {
+    return item.getJobOrderAllocations().stream()
+        .map(InventoryJobOrderAllocation::getJobOrder)
+        .filter(order -> order != null)
+        .map(JobOrder::getDisplayId)
+        .findFirst()
+        .orElse(null);
+  }
+
+  /**
+   * The id of the entry's first mission earmark, or {@code null} — the mission counterpart of
+   * {@link #firstJobOrderId(InventoryItem)} (authoritative view: {@code missionAllocations}).
+   *
+   * @param item the entry; never {@code null}.
+   * @return the first earmarked mission's id, or {@code null}.
+   */
+  default java.util.UUID firstMissionId(InventoryItem item) {
+    return item.getMissionAllocations().stream()
+        .map(InventoryMissionAllocation::getMission)
+        .filter(mission -> mission != null)
+        .map(Mission::getId)
+        .findFirst()
+        .orElse(null);
+  }
+
+  /**
+   * The name of the entry's first mission earmark, or {@code null} — the soak-compat companion of
+   * {@link #firstMissionId(InventoryItem)}.
+   *
+   * @param item the entry; never {@code null}.
+   * @return the first earmarked mission's name, or {@code null}.
+   */
+  default String firstMissionName(InventoryItem item) {
+    return item.getMissionAllocations().stream()
+        .map(InventoryMissionAllocation::getMission)
+        .filter(mission -> mission != null)
+        .map(Mission::getName)
+        .findFirst()
+        .orElse(null);
+  }
 
   /** Nested mapping for the item's {@link Location} (used as {@code uses} target). */
   LocationDto locationToDto(Location location);

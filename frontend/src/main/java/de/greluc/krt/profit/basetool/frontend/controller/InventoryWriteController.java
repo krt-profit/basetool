@@ -29,7 +29,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemNoteUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemPersonalRebookDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemUpdateDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.InventoryForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
@@ -452,39 +451,6 @@ public class InventoryWriteController {
     } catch (Exception e) {
       log.error("Failed to bulk-checkout inventory items (ajax)", e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
-    }
-  }
-
-  /**
-   * AJAX endpoint that updates the soft associations of an inventory item (mission, job order,
-   * note). Distinct from {@link #transferInventoryItem} — this is a metadata-only update, no
-   * quantity changes. Propagates the backend's status code verbatim so the AJAX layer can map a 409
-   * to a dedicated optimistic-lock toast.
-   *
-   * @param id inventory item id
-   * @param dto update payload
-   * @return the updated item on success, propagated backend status on failure
-   */
-  @PutMapping("/{id}/update-associations")
-  @ResponseBody
-  public org.springframework.http.ResponseEntity<InventoryItemDto> updateAssociations(
-      @PathVariable @NotNull UUID id, @RequestBody @Valid InventoryItemUpdateDto dto) {
-    try {
-      InventoryItemDto updated =
-          backendApiClient.put("/api/v1/inventory/" + id, dto, InventoryItemDto.class);
-      return org.springframework.http.ResponseEntity.ok(updated);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
-      log.debug(
-          "Failed to update inventory item associations: status={}, {}",
-          e.getStatusCode(),
-          e.getMessage());
-      return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
-    } catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
-      log.error("Failed to update inventory item associations: {}", e.getMessage());
-      return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
-    } catch (Exception e) {
-      log.error("Failed to update inventory item associations", e);
-      return org.springframework.http.ResponseEntity.status(500).build();
     }
   }
 

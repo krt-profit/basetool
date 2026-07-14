@@ -27,12 +27,9 @@ import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.Location;
-import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemNoteUpdateRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemUpdateDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
@@ -58,14 +55,14 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Regression tests for the optimistic-lock {@code @Version} write-back on the in-place inventory
- * edits (epic #571 / #577). The in-place edits ({@code updateInventoryItem}, {@code updateNote} and
- * the reducing {@code bookOutInventoryItem}) return the item DTO whose version the frontend writes
- * back onto every control in the same row. Because the service is {@code @Transactional} (the
- * commit — and thus the {@code @Version} increment — happens after the method returns), the DTO
- * must be mapped from a {@code saveAndFlush}, not a plain {@code save}: a plain {@code save} leaves
- * the version unflushed, so the response carries the STALE version and the user's next in-place
- * edit of the same row fails with {@code ObjectOptimisticLockingFailureException} (HTTP 409). These
- * tests pin {@code saveAndFlush}, mirroring the {@code verify(...).flush()} guard in {@code
+ * edits (epic #571 / #577). The in-place edits ({@code updateNote} and the reducing {@code
+ * bookOutInventoryItem}) return the item DTO whose version the frontend writes back onto every
+ * control in the same row. Because the service is {@code @Transactional} (the commit — and thus the
+ * {@code @Version} increment — happens after the method returns), the DTO must be mapped from a
+ * {@code saveAndFlush}, not a plain {@code save}: a plain {@code save} leaves the version
+ * unflushed, so the response carries the STALE version and the user's next in-place edit of the
+ * same row fails with {@code ObjectOptimisticLockingFailureException} (HTTP 409). These tests pin
+ * {@code saveAndFlush}, mirroring the {@code verify(...).flush()} guard in {@code
  * InventoryItemServiceBulkCheckoutTest}.
  */
 @ExtendWith(MockitoExtension.class)
@@ -93,8 +90,7 @@ class InventoryItemServiceVersionFlushTest {
   void wireCheckoutDelegate() {
     // The facade delegates the book-out flow to InventoryCheckoutService; Mockito does not inject
     // one @InjectMocks target into another, so build the real sub-service from the same mocks and
-    // set it on the facade. updateInventoryItem / updateNote stay on the facade and use the mocks
-    // directly.
+    // set it on the facade. updateNote stays on the facade and uses the mocks directly.
     realCheckoutService =
         new InventoryCheckoutService(
             inventoryItemRepository,
@@ -124,29 +120,6 @@ class InventoryItemServiceVersionFlushTest {
     item.setVersion(0L);
     item.setAmount(amount);
     return item;
-  }
-
-  @Test
-  void updateInventoryItem_flushesSoTheReturnedVersionIsCurrent() {
-    UUID userId = UUID.randomUUID();
-    UUID itemId = UUID.randomUUID();
-    UUID materialId = UUID.randomUUID();
-    UUID locationId = UUID.randomUUID();
-    InventoryItem item = item(itemId, userId, 15.0);
-
-    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
-    when(materialRepository.findById(materialId)).thenReturn(Optional.of(new Material()));
-    when(locationRepository.findById(locationId)).thenReturn(Optional.of(new Location()));
-    // Realistic saveAndFlush: return the flushed managed entity so the post-write stock-merge check
-    // receives a non-null row (it no-ops here — the material is SCU and the merge is not opted in).
-    when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
-
-    InventoryItemUpdateDto dto =
-        new InventoryItemUpdateDto(materialId, locationId, 800, 15.0, false, null, null, 0L, null);
-    inventoryItemService.updateInventoryItem(itemId, dto, userId, false);
-
-    verify(inventoryItemRepository).saveAndFlush(item);
-    verify(inventoryItemRepository, never()).save(item);
   }
 
   @Test

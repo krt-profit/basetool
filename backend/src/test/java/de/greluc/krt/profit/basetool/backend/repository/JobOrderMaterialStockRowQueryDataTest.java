@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.backend.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
-import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.Location;
@@ -32,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.List;
@@ -50,12 +50,13 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>The {@link JobOrderServiceAssigneeAndListTest} unit tests stub this query, so they cannot
  * catch two things only the real dialect proves: (1) the JPQL constructor expression {@code new
- * JobOrderMaterialStockRow(i.jobOrder.id, i.material.id, i.quality, i.amount)} actually parses and
- * binds the right columns on Postgres, and the {@code i.jobOrder.id IN :ids} join returns only
- * <em>linked</em> rows (unlinked stock excluded); and (2) summing the projected rows at a quality
- * floor in memory reproduces the native {@code sumAmountByMaterialAndJobOrderAndMinQuality}
- * aggregate exactly — the equivalence the list path relies on instead of one {@code SUM} per bucket
- * per order.
+ * JobOrderMaterialStockRow(a.jobOrder.id, a.inventoryItem.material.id, a.inventoryItem.quality,
+ * a.amount)} over {@code InventoryJobOrderAllocation} (Variante C, REQ-INV-027 — the scalar {@code
+ * jobOrder} column was dropped) actually parses and binds the right columns on Postgres, and the
+ * {@code a.jobOrder.id IN :ids} filter returns only <em>allocated</em> rows (stock carrying no
+ * job-order slice excluded); and (2) summing the projected rows at a quality floor in memory
+ * reproduces the native {@code sumAmountByMaterialAndJobOrderAndMinQuality} aggregate exactly — the
+ * equivalence the list path relies on instead of one {@code SUM} per bucket per order.
  *
  * <p>{@link Transactional} so each method rolls back: the seeded rows must never commit to the
  * shared Testcontainers database. The query still observes them because they are flushed within the
@@ -112,7 +113,8 @@ class JobOrderMaterialStockRowQueryDataTest {
     saveLinkedItem(user, location, material, iridium, order, 300, 10.0);
     saveLinkedItem(user, location, material, iridium, order, 600, 20.0);
     saveLinkedItem(user, location, material, iridium, order, 900, 5.0);
-    // An unlinked item (no job order) at the same material must be dropped by the IN-join.
+    // An unallocated item (no job-order slice) at the same material must be dropped by the
+    // allocation filter — it never surfaces in the InventoryJobOrderAllocation projection.
     InventoryItem unlinked = new InventoryItem();
     unlinked.setUser(user);
     unlinked.setLocation(location);
@@ -121,7 +123,6 @@ class JobOrderMaterialStockRowQueryDataTest {
     unlinked.setAmount(1000.0);
     unlinked.setPersonal(false);
     unlinked.setOwningOrgUnit(iridium);
-    unlinked.setJobOrder(null);
     inventoryItemRepository.save(unlinked);
     entityManager.flush();
 
@@ -183,14 +184,10 @@ class JobOrderMaterialStockRowQueryDataTest {
     inv.setAmount(amount);
     inv.setPersonal(false);
     inv.setOwningOrgUnit(owner);
-    inv.setJobOrder(order);
-    // Variante C (REQ-INV-027): the fulfilment queries read the per-entry job-order allocation, so
-    // the fixture mirrors the full amount into one allocation just as the service create path does.
-    InventoryJobOrderAllocation allocation = new InventoryJobOrderAllocation();
-    allocation.setInventoryItem(inv);
-    allocation.setJobOrder(order);
-    allocation.setAmount(amount);
-    inv.getJobOrderAllocations().add(allocation);
+    // Variante C (REQ-INV-027): the scalar jobOrder column is gone, so the fulfilment queries read
+    // the per-entry job-order allocation. The fixture earmarks the full amount into one allocation
+    // (cascade-persisted with the entry) exactly as the service create path does.
+    InventoryAllocations.addJobOrder(inv, order, amount, false);
     inventoryItemRepository.save(inv);
   }
 }

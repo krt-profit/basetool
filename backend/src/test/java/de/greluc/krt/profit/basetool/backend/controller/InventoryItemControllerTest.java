@@ -38,7 +38,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemNoteUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebookDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemUpdateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
@@ -68,10 +67,10 @@ import org.springframework.security.oauth2.jwt.Jwt;
  *   <li>{@code /my-inventory*} derives the owner id from the JWT via {@link
  *       UserService#getUserIdFromJwt} — never a URL parameter. This is the personal-inventory
  *       data-isolation guarantee from CLAUDE.md.
- *   <li>{@code create}, {@code book-out}, {@code update}, {@code update-delivered} and {@code
- *       update-note} read {@code authHelperService.isLogisticianOrAbove()} at the HTTP boundary and
- *       pass the boolean down so the service stays free of {@code SecurityContextHolder} (ArchUnit
- *       rule). The role-driven branch is exercised for both {@code true} and {@code false}.
+ *   <li>{@code create}, {@code book-out}, {@code update-delivered} and {@code update-note} read
+ *       {@code authHelperService.isLogisticianOrAbove()} at the HTTP boundary and pass the boolean
+ *       down so the service stays free of {@code SecurityContextHolder} (ArchUnit rule). The
+ *       role-driven branch is exercised for both {@code true} and {@code false}.
  *   <li>{@code POST /{id}/book-out} returns {@code 200 OK} when the service yields a DTO and {@code
  *       204 No Content} when the row was removed entirely (service returns {@code null}). The
  *       branch decision lives in the controller, not the service.
@@ -597,48 +596,6 @@ class InventoryItemControllerTest {
 
     assertThat(result).isSameAs(persisted);
     verify(inventoryItemService).updateDelivered(itemId, request, ownerId, false);
-  }
-
-  // ── PUT /inventory/{id} (soft-association update) ────────────────────
-
-  @Test
-  void updateInventoryItem_logisticianBranch_passesTrueToService() {
-    Jwt jwt = jwt("alice-sub");
-    UUID ownerId = UUID.randomUUID();
-    UUID itemId = UUID.randomUUID();
-    InventoryItemUpdateDto updateDto =
-        new InventoryItemUpdateDto(
-            UUID.randomUUID(), UUID.randomUUID(), 800, 12.0, false, null, null, 1L, null);
-    InventoryItemDto persisted = inventoryItem(itemId);
-    when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
-    when(inventoryItemService.updateInventoryItem(itemId, updateDto, ownerId, true))
-        .thenReturn(persisted);
-
-    InventoryItemDto result = controller.updateInventoryItem(jwt, itemId, updateDto);
-
-    assertThat(result).isSameAs(persisted);
-    verify(inventoryItemService).updateInventoryItem(itemId, updateDto, ownerId, true);
-  }
-
-  @Test
-  void updateInventoryItem_nonLogisticianBranch_passesFalseToService() {
-    Jwt jwt = jwt("alice-sub");
-    UUID ownerId = UUID.randomUUID();
-    UUID itemId = UUID.randomUUID();
-    InventoryItemUpdateDto updateDto =
-        new InventoryItemUpdateDto(
-            UUID.randomUUID(), UUID.randomUUID(), 800, 12.0, false, null, null, 1L, null);
-    InventoryItemDto persisted = inventoryItem(itemId);
-    when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
-    when(inventoryItemService.updateInventoryItem(itemId, updateDto, ownerId, false))
-        .thenReturn(persisted);
-
-    InventoryItemDto result = controller.updateInventoryItem(jwt, itemId, updateDto);
-
-    assertThat(result).isSameAs(persisted);
-    verify(inventoryItemService).updateInventoryItem(itemId, updateDto, ownerId, false);
   }
 
   // ── DELETE /inventory/all (ADMIN-only nuke) ──────────────────────────

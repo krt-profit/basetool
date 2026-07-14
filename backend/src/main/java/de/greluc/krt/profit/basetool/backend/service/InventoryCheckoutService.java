@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.exception.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
@@ -48,7 +49,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepos
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAllocationSync;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
@@ -221,12 +222,13 @@ public class InventoryCheckoutService {
       return null;
     } else {
       item.setAmount(remainingAmount);
-      // Variante C soak: the entry's single allocation carries its full amount, so a partial
-      // book-out must shrink the allocation in step or the allocation-based fulfilment reads
-      // over-credit the reduced row (REQ-INV-027).
-      InventoryAllocationSync.mirrorScalars(item);
-      // saveAndFlush so a partial book-out's response carries the fresh @Version (see
-      // updateInventoryItem) — otherwise a follow-up edit of the reduced row 409s.
+      // Variante C (REQ-INV-027, R5): a book-out does NOT auto-shrink the entry's earmarks. If the
+      // reduced amount no longer covers them, block (422) so the user lowers the allocations first.
+      if (!InventoryAllocations.fits(item)) {
+        throw new OverAllocationException();
+      }
+      // saveAndFlush so a partial book-out's response carries the fresh @Version — otherwise a
+      // follow-up edit of the reduced row 409s.
       InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
       // Ratchet any active Materialbörse offer on this row down to the reduced stock
       // (REQ-MARKET-013).
@@ -308,18 +310,23 @@ public class InventoryCheckoutService {
     newItem.setQuality(item.getQuality());
     newItem.setAmount(InventoryItem.roundToScuScale(dto.amount()));
     newItem.setPersonal(item.getPersonal());
-    newItem.setJobOrder(item.getJobOrder());
-    newItem.setMission(item.getMission());
-    // Variante C soak: seed the moved row's allocation(s) from the copied scalars for the moved
-    // amount, so the allocation-based views count the transferred stock (REQ-INV-027).
-    InventoryAllocationSync.mirrorScalars(newItem);
+    // Variante C (REQ-INV-027, D2): a FULL move (source depleted) is a pure relocation, so the
+    // moved
+    // row inherits all the source's earmarks; a PARTIAL move starts unassigned — a multi-order
+    // earmark cannot be split — and the source keeps its allocations (R5-guarded below).
+    if (depleted) {
+      InventoryAllocations.copyAllocations(item, newItem);
+    }
     InventoryItem savedNew = inventoryItemRepository.save(newItem);
     if (remainingAmount <= QUANTITY_EPSILON) {
       inventoryItemRepository.delete(item);
     } else {
       item.setAmount(remainingAmount);
-      // Shrink the source's allocation to the reduced amount in step (soak invariant).
-      InventoryAllocationSync.mirrorScalars(item);
+      // R5: the moved row took no earmarks, so the source keeps all of its; block (422) if the
+      // reduced amount no longer covers them.
+      if (!InventoryAllocations.fits(item)) {
+        throw new OverAllocationException();
+      }
       // saveAndFlush the reduced source row for parity with the discard/sell fall-through below:
       // the returned DTO is the new target row, but flushing keeps the source row's @Version
       // current within the transaction so any future in-place consumer of a transfer cannot 409.
@@ -537,19 +544,20 @@ public class InventoryCheckoutService {
     newItem.setQuality(item.getQuality());
     newItem.setAmount(InventoryItem.roundToScuScale(dto.amount()));
     newItem.setPersonal(targetPersonal);
-    newItem.setJobOrder(targetPersonal ? null : item.getJobOrder());
-    newItem.setMission(targetPersonal ? null : item.getMission());
-    // Variante C soak: mirror the (possibly cleared) scalars onto the moved row's allocations for
-    // the moved amount — a personal target carries no assignment, so it gets none (REQ-INV-027).
-    InventoryAllocationSync.mirrorScalars(newItem);
+    // Variante C (REQ-INV-027): the moved row is unassigned — a personalize target carries no
+    // earmark (personal stock never does), and a de-personalize source is itself personal so has no
+    // allocations to inherit. Re-assign the shared result via chips.
     InventoryItem savedNew = inventoryItemRepository.save(newItem);
 
     if (depleted) {
       inventoryItemRepository.delete(item);
     } else {
       item.setAmount(remainingAmount);
-      // Shrink the source's allocation to the reduced amount in step (soak invariant).
-      InventoryAllocationSync.mirrorScalars(item);
+      // R5: the source keeps its allocations (a personalize leaves the shared remainder earmarked);
+      // block (422) if the reduced amount no longer covers them.
+      if (!InventoryAllocations.fits(item)) {
+        throw new OverAllocationException();
+      }
       // saveAndFlush (not save) keeps the source row's @Version current within the transaction so a
       // follow-up in-place edit of the reduced row cannot 409 (REQ-FE-003 parity with book-out).
       inventoryItemRepository.saveAndFlush(item);
@@ -585,13 +593,13 @@ public class InventoryCheckoutService {
    * <p>The merge runs for a {@code PIECE} material <em>unconditionally</em> and for an {@code SCU}
    * material only when {@code clientRequestedMerge} is {@code true} — the per-action modal opt-in
    * the caller ticked for this single write; it is never persisted. The survivor is the passed-in
-   * {@code row}: every other row that shares its stock identity (the append-only stack key minus
-   * the {@code delivered} marker — user · material · location · quality · personal · jobOrder ·
-   * mission · owningOrgUnit) is folded into it — amounts summed, distinct notes concatenated — and
-   * deleted. The merged row is reset to {@code delivered = false} (the "Geliefert" marker is not
-   * part of the key and has no unambiguous combined value). The merge group is loaded {@code FOR
-   * UPDATE} so two racing same-stack writers serialise (re-introducing, only here, the lock the
-   * append-only model of ADR-0003 removed).
+   * {@code row}: every other row that shares its <em>physical</em> stock identity (Variante C,
+   * REQ-INV-027: user · material · location · quality · personal · owningOrgUnit — the earmarks are
+   * NO longer part of the key) is folded into it — amounts summed, distinct notes concatenated,
+   * their job-order / mission allocations unioned into the survivor (summed per target, job-order
+   * delivered OR-combined, rule R1) — and deleted. The merge group is loaded {@code FOR UPDATE} so
+   * two racing same-stack writers serialise (re-introducing, only here, the lock the append-only
+   * model of ADR-0003 removed).
    *
    * <p><strong>Materialbörse safety:</strong> a row that itself backs an offer is returned
    * untouched (never a survivor that changes, never folded away), and offer-backed sibling rows are
@@ -637,8 +645,6 @@ public class InventoryCheckoutService {
             row.getLocation().getId(),
             row.getQuality(),
             row.getPersonal(),
-            row.getJobOrder() != null ? row.getJobOrder().getId() : null,
-            row.getMission() != null ? row.getMission().getId() : null,
             row.getOwningOrgUnit() != null ? row.getOwningOrgUnit().getId() : null);
 
     // The survivor is the just-written row; fold every other matching (non-offer-backed) row into
@@ -659,16 +665,15 @@ public class InventoryCheckoutService {
 
     row.setAmount(InventoryItem.roundToScuScale(total));
     row.setNote(mergeNotes(notes));
-    // The merged stack is reset to not-delivered: the "Geliefert" marker is not part of the merge
-    // key, and combining a delivered with a non-delivered contribution has no single truth.
-    row.setDelivered(false);
-    // Variante C soak (REQ-INV-027): #1304's merge sums the scalar rows' amounts but is unaware of
-    // the allocation tables. The survivor keeps its (unchanged) job-order/mission scalars while its
-    // amount grew, so re-mirror to bring its single allocation up to the summed amount; the
-    // victims'
-    // allocations vanish with them (FK ON DELETE CASCADE). The allocation-aware union merge that
-    // drops the scalar key entirely follows in a later step.
-    InventoryAllocationSync.mirrorScalars(row);
+    // Variante C (REQ-INV-027, R1): merge on physical identity (the key no longer carries the
+    // job-order / mission earmark), so union the victims' allocations into the survivor — sum per
+    // order / mission id (the per-dimension unique constraint allows one slice per target), and
+    // OR-combine the job-order delivered flag (delivered if any folded part was). The survivor's
+    // amount already absorbed the victims (total above), so Σ ≤ amount holds; the victims'
+    // allocations vanish with them (FK ON DELETE CASCADE) once copied.
+    for (InventoryItem victim : victims) {
+      InventoryAllocations.unionInto(row, victim);
+    }
 
     inventoryItemRepository.deleteAll(victims);
     // saveAndFlush so the response DTO carries the post-merge amount and the fresh @Version, and
@@ -807,15 +812,11 @@ public class InventoryCheckoutService {
             "You are not allowed to check out inventory item: " + itemId);
       }
 
-      // Clear associations on the managed entity – no @Modifying query inside the loop
-      item.setJobOrder(null);
-      item.setMission(null);
-
       toDelete.add(itemId);
     }
 
-    // Flush association changes, then delete all in one batch
-    inventoryItemRepository.flush();
+    // Delete all in one batch; each row's job-order / mission allocations cascade away with it
+    // (FK ON DELETE CASCADE, V217), so no per-row association clear is needed.
     inventoryItemRepository.deleteAllById(toDelete);
     log.info(
         "Bulk checkout completed: {} items removed for user {}", toDelete.size(), currentUserId);
@@ -870,12 +871,6 @@ public class InventoryCheckoutService {
                     new NotFoundException(
                         "Job-order allocation not found for this inventory item"));
     slice.setDelivered(request.delivered());
-    // Soak: keep the entry-level scalar in step while the requested order is still the entry's
-    // single scalar assignment, so a later scalar re-mirror (mirrorScalars) does not reset the
-    // slice from a stale inventory_item.delivered. Dropped with the scalar column.
-    if (item.getJobOrder() != null && request.jobOrderId().equals(item.getJobOrder().getId())) {
-      item.setDelivered(request.delivered());
-    }
     InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
     auditService.record(
         AuditEventType.INVENTORY_ITEM_DELIVERY_TOGGLED,

@@ -38,7 +38,7 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverReposito
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderMaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAllocationSync;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -97,12 +97,11 @@ class JobOrderHandoverServiceTest {
 
     inventoryItem = new InventoryItem();
     inventoryItem.setId(inventoryId);
-    inventoryItem.setJobOrder(order);
     inventoryItem.setMaterial(material);
     inventoryItem.setAmount(10.0);
-    // Variante C soak: the handover guard reads the job-order allocation, so mirror the scalar into
-    // a slice exactly as the real create path does.
-    InventoryAllocationSync.mirrorScalars(inventoryItem);
+    // Variante C (REQ-INV-027): the handover guard reads the job-order allocation, so earmark the
+    // entry's full amount to this order exactly as the real create path does.
+    InventoryAllocations.addJobOrder(inventoryItem, order, inventoryItem.getAmount(), false);
   }
 
   @Test
@@ -129,7 +128,8 @@ class JobOrderHandoverServiceTest {
     assertEquals(6.0, jobOrderMaterial.getAmount());
     verify(inventoryItemRepository).save(inventoryItem);
     verify(inventoryItemRepository, never()).delete(any());
-    verify(inventoryItemRepository, never()).unlinkJobOrderMaterial(any(), any());
+    verify(inventoryItemRepository, never())
+        .deleteJobOrderAllocationsByJobOrderAndMaterial(any(), any());
     verify(jobOrderService, never()).completeJobOrderWithinTransaction(any());
     verify(jobOrderHandoverRepository).save(any(JobOrderHandover.class));
     // findById called twice: initial load + re-fetch after clearAutomatically evicts session cache
@@ -174,7 +174,8 @@ class JobOrderHandoverServiceTest {
     // REQ-MARKET-013: a depleted row was deleted and its offer cascade-removed (V210), so the
     // handover must NOT clamp it — pins the depleted-skip branch.
     verify(materialExchangeOfferRepository, never()).clampOfferedAmountToStock(any(), anyDouble());
-    verify(inventoryItemRepository).unlinkJobOrderMaterial(orderId, materialId);
+    verify(inventoryItemRepository)
+        .deleteJobOrderAllocationsByJobOrderAndMaterial(orderId, materialId);
     // completeJobOrderWithinTransaction called with the re-fetched managed entity (same object in
     // unit test)
     verify(jobOrderService).completeJobOrderWithinTransaction(order);
@@ -210,11 +211,10 @@ class JobOrderHandoverServiceTest {
 
   @Test
   void createHandover_shouldThrowException_whenJobOrderIsNullOnInventoryItem() {
-    // Given — reproduces the bug where findByIdForUpdate loaded the InventoryItem without
-    // eagerly fetching jobOrder (no @EntityGraph), causing jobOrder to be null even though
-    // the item belongs to the order in the DB. The fix adds @EntityGraph to findByIdForUpdate.
-    inventoryItem.setJobOrder(null);
-    InventoryAllocationSync.mirrorScalars(inventoryItem);
+    // Given — the item carries no job-order slice for this order at all. Since Variante C
+    // (REQ-INV-027) the order binding lives in the allocation table, an item with no slice for
+    // this order must be rejected by the pre-write guard exactly like a foreign-order item.
+    inventoryItem.getJobOrderAllocations().clear();
 
     JobOrderHandoverItemCreateDto itemDto = new JobOrderHandoverItemCreateDto(inventoryId, 5.0);
     JobOrderHandoverCreateDto createDto =
@@ -224,11 +224,9 @@ class JobOrderHandoverServiceTest {
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
 
-    // When & Then — before fix: this threw "Inventory item does not belong to this JobOrder"
-    // because jobOrder was null (not eagerly loaded). After fix (@EntityGraph on findByIdForUpdate)
-    // the jobOrder is always loaded and the check works correctly. The cross-staffel pre-write
-    // guard (MULTI_SQUADRON_PLAN.md §4.4) now raises IllegalStateException — GlobalExceptionHandler
-    // maps it to 400 so the wire format is unchanged.
+    // When & Then — the cross-staffel pre-write guard (MULTI_SQUADRON_PLAN.md §4.4) now reads the
+    // job-order allocation and raises IllegalStateException when the item has no slice for this
+    // order — GlobalExceptionHandler maps it to 400 so the wire format is unchanged.
     IllegalStateException ex =
         assertThrows(IllegalStateException.class, () -> service.createHandover(orderId, createDto));
     assertTrue(ex.getMessage().contains("Inventory item does not belong to this JobOrder"));
@@ -255,10 +253,9 @@ class JobOrderHandoverServiceTest {
 
     InventoryItem inventoryItem2 = new InventoryItem();
     inventoryItem2.setId(inventoryId2);
-    inventoryItem2.setJobOrder(order);
     inventoryItem2.setMaterial(material2);
     inventoryItem2.setAmount(8.0);
-    InventoryAllocationSync.mirrorScalars(inventoryItem2);
+    InventoryAllocations.addJobOrder(inventoryItem2, order, inventoryItem2.getAmount(), false);
 
     // Hand over 5.0 of material1 (partial) and 8.0 of material2 (full)
     JobOrderHandoverItemCreateDto itemDto1 = new JobOrderHandoverItemCreateDto(inventoryId, 5.0);
@@ -299,7 +296,8 @@ class JobOrderHandoverServiceTest {
     verify(jobOrderMaterialRepository, never()).save(any());
     // material2 fully handed over → inventory deleted and unlinked
     verify(inventoryItemRepository).delete(inventoryItem2);
-    verify(inventoryItemRepository).unlinkJobOrderMaterial(orderId, materialId2);
+    verify(inventoryItemRepository)
+        .deleteJobOrderAllocationsByJobOrderAndMaterial(orderId, materialId2);
     // material1 partial → inventory saved, not deleted
     verify(inventoryItemRepository).save(inventoryItem);
     // Not all fulfilled → order must NOT be completed
@@ -308,10 +306,11 @@ class JobOrderHandoverServiceTest {
 
   @Test
   void createHandover_shouldSucceed_whenMultipleItemsHandedOver_andFirstItemFullyConsumed() {
-    // Given — reproduces the bug where unlinkJobOrderMaterial() (a @Modifying bulk-update)
+    // Given — reproduces the bug where deleteJobOrderAllocationsByJobOrderAndMaterial() (a
+    // @Modifying bulk-update)
     // invalidated the Hibernate first-level cache, causing the second item's jobOrder
     // association to appear null on the next findByIdForUpdate call → HTTP 400.
-    // Fix: @Modifying(clearAutomatically = true) on unlinkJobOrderMaterial.
+    // Fix: @Modifying(clearAutomatically = true) on deleteJobOrderAllocationsByJobOrderAndMaterial.
     UUID inventoryId2 = UUID.randomUUID();
     UUID materialId2 = UUID.randomUUID();
 
@@ -328,12 +327,12 @@ class JobOrderHandoverServiceTest {
 
     InventoryItem inventoryItem2 = new InventoryItem();
     inventoryItem2.setId(inventoryId2);
-    inventoryItem2.setJobOrder(order);
     inventoryItem2.setMaterial(material2);
     inventoryItem2.setAmount(5.0);
-    InventoryAllocationSync.mirrorScalars(inventoryItem2);
+    InventoryAllocations.addJobOrder(inventoryItem2, order, inventoryItem2.getAmount(), false);
 
-    // First item is fully consumed (triggers unlinkJobOrderMaterial), second is partial
+    // First item is fully consumed (triggers deleteJobOrderAllocationsByJobOrderAndMaterial),
+    // second is partial
     JobOrderHandoverItemCreateDto itemDto1 = new JobOrderHandoverItemCreateDto(inventoryId, 10.0);
     JobOrderHandoverItemCreateDto itemDto2 = new JobOrderHandoverItemCreateDto(inventoryId2, 3.0);
     JobOrderHandoverCreateDto createDto =
@@ -354,7 +353,8 @@ class JobOrderHandoverServiceTest {
 
     // Then
     verify(inventoryItemRepository).delete(inventoryItem);
-    verify(inventoryItemRepository).unlinkJobOrderMaterial(orderId, materialId);
+    verify(inventoryItemRepository)
+        .deleteJobOrderAllocationsByJobOrderAndMaterial(orderId, materialId);
     assertEquals(2.0, inventoryItem2.getAmount());
     verify(inventoryItemRepository).save(inventoryItem2);
   }
@@ -404,7 +404,8 @@ class JobOrderHandoverServiceTest {
     // Then — inventory item must still be linked (saved with reduced amount, not deleted/unlinked)
     verify(inventoryItemRepository).save(inventoryItem);
     verify(inventoryItemRepository, never()).delete(any());
-    verify(inventoryItemRepository, never()).unlinkJobOrderMaterial(any(), any());
+    verify(inventoryItemRepository, never())
+        .deleteJobOrderAllocationsByJobOrderAndMaterial(any(), any());
     // Order must remain open
     verify(jobOrderService, never()).completeJobOrderWithinTransaction(any());
   }
@@ -414,8 +415,10 @@ class JobOrderHandoverServiceTest {
     // Given
     JobOrder otherOrder = new JobOrder();
     otherOrder.setId(UUID.randomUUID());
-    inventoryItem.setJobOrder(otherOrder);
-    InventoryAllocationSync.mirrorScalars(inventoryItem);
+    // Variante C (REQ-INV-027): the item's only job-order slice points at a different order, so the
+    // guard finds no slice for this order and rejects the handover.
+    inventoryItem.getJobOrderAllocations().clear();
+    InventoryAllocations.addJobOrder(inventoryItem, otherOrder, inventoryItem.getAmount(), false);
 
     JobOrderHandoverItemCreateDto itemDto = new JobOrderHandoverItemCreateDto(inventoryId, 5.0);
     JobOrderHandoverCreateDto createDto =
@@ -489,13 +492,17 @@ class JobOrderHandoverServiceTest {
       createHandover_shouldCompleteOrder_whenLastRemainingMaterialHandedOverAfterPreviousPartialHandover() {
     // Given — reproduces the bug: after a previous partial handover, jobOrderMaterial.amount was
     // already reduced (e.g. from 10.0 to 4.0). The final handover hands over the last 4.0 SCU.
-    // unlinkJobOrderMaterial() uses @Modifying(clearAutomatically = true) which evicts the
+    // deleteJobOrderAllocationsByJobOrderAndMaterial() uses @Modifying(clearAutomatically = true)
+    // which evicts the
     // Hibernate first-level cache, DETACHING the jobOrder entity from the session. Without the
     // re-fetch fix, jobOrder.setStatus(COMPLETED) was called on a detached entity and never
     // flushed to DB → status remained OPEN.
     // Fix: re-fetch managedJobOrder via jobOrderRepository.findById() after the loop.
     jobOrderMaterial.setAmount(4.0); // simulates state after a previous partial handover
     inventoryItem.setAmount(4.0); // only 4.0 SCU left in inventory
+    // keep the order earmark consistent with the reduced stock (Variante C, REQ-INV-027)
+    inventoryItem.getJobOrderAllocations().clear();
+    InventoryAllocations.addJobOrder(inventoryItem, order, 4.0, false);
 
     JobOrderHandoverItemCreateDto itemDto = new JobOrderHandoverItemCreateDto(inventoryId, 4.0);
     JobOrderHandoverCreateDto createDto =
@@ -611,10 +618,9 @@ class JobOrderHandoverServiceTest {
 
     InventoryItem inventoryItem2 = new InventoryItem();
     inventoryItem2.setId(inventoryId2);
-    inventoryItem2.setJobOrder(order);
     inventoryItem2.setMaterial(material2);
     inventoryItem2.setAmount(8.0);
-    InventoryAllocationSync.mirrorScalars(inventoryItem2);
+    InventoryAllocations.addJobOrder(inventoryItem2, order, inventoryItem2.getAmount(), false);
 
     JobOrderHandoverItemCreateDto itemDto1 = new JobOrderHandoverItemCreateDto(inventoryId, 10.0);
     JobOrderHandoverItemCreateDto itemDto2 = new JobOrderHandoverItemCreateDto(inventoryId2, 8.0);
@@ -702,6 +708,9 @@ class JobOrderHandoverServiceTest {
     // row and its material link behind, so the order would never auto-complete.
     inventoryItem.setAmount(10.00003);
     jobOrderMaterial.setAmount(10.00003);
+    // keep the order earmark consistent with the edge-case stock (Variante C, REQ-INV-027)
+    inventoryItem.getJobOrderAllocations().clear();
+    InventoryAllocations.addJobOrder(inventoryItem, order, 10.00003, false);
 
     JobOrderHandoverItemCreateDto itemDto = new JobOrderHandoverItemCreateDto(inventoryId, 10.0);
     JobOrderHandoverCreateDto createDto =
@@ -720,7 +729,8 @@ class JobOrderHandoverServiceTest {
     // Then — the sub-epsilon inventory row is deleted, never saved, and its material is unlinked
     verify(inventoryItemRepository).delete(inventoryItem);
     verify(inventoryItemRepository, never()).save(any());
-    verify(inventoryItemRepository).unlinkJobOrderMaterial(orderId, materialId);
+    verify(inventoryItemRepository)
+        .deleteJobOrderAllocationsByJobOrderAndMaterial(orderId, materialId);
     // ... and the INVENTORY_HANDED_OVER audit snapshot reflects the depleted state
     verify(auditService)
         .record(
@@ -743,6 +753,9 @@ class JobOrderHandoverServiceTest {
     // the handover so the material never depletes and no unlink fires.
     inventoryItem.setAmount(10.0002);
     jobOrderMaterial.setAmount(50.0);
+    // keep the order earmark consistent with the edge-case stock (Variante C, REQ-INV-027)
+    inventoryItem.getJobOrderAllocations().clear();
+    InventoryAllocations.addJobOrder(inventoryItem, order, 10.0002, false);
 
     JobOrderHandoverItemCreateDto itemDto = new JobOrderHandoverItemCreateDto(inventoryId, 10.0);
     JobOrderHandoverCreateDto createDto =
@@ -762,7 +775,8 @@ class JobOrderHandoverServiceTest {
     assertEquals(0.0002, inventoryItem.getAmount(), 1e-6);
     verify(inventoryItemRepository).save(inventoryItem);
     verify(inventoryItemRepository, never()).delete(any());
-    verify(inventoryItemRepository, never()).unlinkJobOrderMaterial(any(), any());
+    verify(inventoryItemRepository, never())
+        .deleteJobOrderAllocationsByJobOrderAndMaterial(any(), any());
     verify(auditService)
         .record(
             eq(AuditEventType.INVENTORY_HANDED_OVER),

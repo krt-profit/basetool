@@ -56,7 +56,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepos
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAllocationSync;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
@@ -683,8 +683,9 @@ class InventoryItemServiceBookOutTest {
       participant.setId(UUID.randomUUID());
 
       InventoryItem item = newItem(10.0, 1L);
-      item.setMission(mission);
-      InventoryAllocationSync.mirrorScalars(item);
+      // Variante C: earmark only part of the 10 SCU to the mission so the row still fits its
+      // mission allocation after this partial sell decrements it (sum(mission) <= remaining, R5).
+      InventoryAllocations.addMission(item, mission, 1.0);
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       when(missionParticipantRepository.findByMissionIdAndUserId(mission.getId(), OWNER_ID))
@@ -720,8 +721,9 @@ class InventoryItemServiceBookOutTest {
       participant.setId(UUID.randomUUID());
 
       InventoryItem item = newItem(5.0, 1L);
-      item.setMission(mission);
-      InventoryAllocationSync.mirrorScalars(item);
+      // The whole 5 SCU is earmarked to the mission; the full sale depletes and deletes the row,
+      // so the R5 fit check is skipped on the depletion path.
+      InventoryAllocations.addMission(item, mission, 5.0);
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       when(missionParticipantRepository.findByMissionIdAndUserId(mission.getId(), OWNER_ID))
@@ -759,8 +761,9 @@ class InventoryItemServiceBookOutTest {
       Mission mission = new Mission();
       mission.setId(UUID.randomUUID());
       InventoryItem item = newItem(10.0, 1L);
-      item.setMission(mission);
-      InventoryAllocationSync.mirrorScalars(item);
+      // Variante C: earmark only part of the 10 SCU to the mission so the row still fits its
+      // mission allocation after this partial sell decrements it (sum(mission) <= remaining, R5).
+      InventoryAllocations.addMission(item, mission, 1.0);
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       when(missionParticipantRepository.findByMissionIdAndUserId(mission.getId(), OWNER_ID))
@@ -779,10 +782,9 @@ class InventoryItemServiceBookOutTest {
 
     @Test
     void sellWithoutMission_skipsFinanceEntry() {
-      // No mission attached -> the SELL just decrements the item, no
-      // MissionFinanceEntry side-effect.
+      // No mission attached (the row has no mission allocation) -> the SELL just decrements the
+      // item, no MissionFinanceEntry side-effect.
       InventoryItem item = newItem(10.0, 1L);
-      item.setMission(null);
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
@@ -912,8 +914,9 @@ class InventoryItemServiceBookOutTest {
       participant.setId(UUID.randomUUID());
 
       InventoryItem item = newItem(10.0, 1L);
-      item.setMission(mission);
-      InventoryAllocationSync.mirrorScalars(item);
+      // Variante C: earmark only part of the 10 SCU to the mission so the row still fits its
+      // mission allocation after this partial sell decrements it (sum(mission) <= remaining, R5).
+      InventoryAllocations.addMission(item, mission, 1.0);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       when(missionParticipantRepository.findByMissionIdAndUserId(mission.getId(), OWNER_ID))
           .thenReturn(Optional.of(participant));

@@ -28,6 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.backend.model.*;
 import de.greluc.krt.profit.basetool.backend.repository.*;
 import de.greluc.krt.profit.basetool.backend.service.OperationService;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import java.math.BigDecimal;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -135,7 +136,8 @@ class OperationDeletionIntegrationTest {
     item.setLocation(location);
     item.setQuality(100);
     item.setAmount(10.0);
-    item.setMission(mission);
+    // Variante C: the mission earmark is a cascade-persisted allocation slice, not a scalar column.
+    InventoryAllocations.addMission(item, mission, item.getAmount());
     item = inventoryItemRepository.save(item);
 
     // Given: RefineryOrder linked to Mission
@@ -184,12 +186,17 @@ class OperationDeletionIntegrationTest {
     assertNull(
         survivedMission.getOperation(), "mission must no longer reference the deleted operation");
 
-    // Then: InventoryItem is still linked to the (now operation-less) mission
+    // Then: InventoryItem is still linked to the (now operation-less) mission via its
+    // mission allocation slice (Variante C)
     InventoryItem survivedItem = inventoryItemRepository.findById(itemId).orElseThrow();
-    assertNotNull(
-        survivedItem.getMission(),
-        "inventory item must keep its mission link when the operation is deleted");
-    assertEquals(missionId, survivedItem.getMission().getId());
+    InventoryMissionAllocation survivedAllocation =
+        survivedItem.getMissionAllocations().stream()
+            .findFirst()
+            .orElseThrow(
+                () ->
+                    new AssertionError(
+                        "inventory item must keep its mission link when the operation is deleted"));
+    assertEquals(missionId, survivedAllocation.getMission().getId());
 
     // Then: RefineryOrder is still linked to the mission
     RefineryOrder survivedOrder = refineryOrderRepository.findById(orderId).orElseThrow();

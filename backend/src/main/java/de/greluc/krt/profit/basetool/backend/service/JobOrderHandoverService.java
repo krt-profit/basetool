@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.exception.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderHandoverMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -38,7 +39,7 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAllocationSync;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -249,10 +250,14 @@ public class JobOrderHandoverService {
         inventoryItemRepository.delete(inventoryItem);
       } else {
         inventoryItem.setAmount(remainingAmount);
-        // Variante C soak: shrink the entry's allocation to the post-handover amount in step, so
-        // the
-        // allocation-based fulfilment reads do not over-credit the reduced row (REQ-INV-027).
-        InventoryAllocationSync.mirrorScalars(inventoryItem);
+        // Variante C (REQ-INV-027): the handover fulfils this job order, so the handed stock leaves
+        // inventory AND its earmark to the order — shrink that slice by the handed amount. If the
+        // reduced entry no longer covers its remaining earmarks (e.g. a mission also had the full
+        // amount reserved), block (422, R5) so the user lowers those first.
+        InventoryAllocations.reduceJobOrder(inventoryItem, jobOrderId, itemDto.amount());
+        if (!InventoryAllocations.fits(inventoryItem)) {
+          throw new OverAllocationException();
+        }
         inventoryItemRepository.save(inventoryItem);
       }
 
@@ -288,8 +293,7 @@ public class JobOrderHandoverService {
     // this once at the end (instead of inside the loop) is what makes the multi-material
     // completion flow safe with respect to optimistic locking.
     for (UUID materialId : materialsToUnlink) {
-      inventoryItemRepository.unlinkJobOrderMaterial(jobOrderId, materialId);
-      // R2 (REQ-INV-027): release the fulfilled material's allocation slices too, so the leftover
+      // R2 (REQ-INV-027): release the fulfilled material's allocation slices, so the leftover
       // stock stays in the Lager as (partially) unassigned rather than keeping a phantom order
       // link.
       inventoryItemRepository.deleteJobOrderAllocationsByJobOrderAndMaterial(

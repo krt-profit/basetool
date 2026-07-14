@@ -46,14 +46,19 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code test} profile).
  *
  * <p>The sibling {@code InventoryItemStackQueryTest} only smoke-tests these queries against an
- * empty table, so it cannot catch the trap this test pins down: the projection selects and groups
- * the <em>nullable</em> associations {@code jobOrder}, {@code mission} and {@code owningOrgUnit} as
- * whole entities. A naive constructor-expression projection over a nullable to-one renders an
- * implicit INNER JOIN, which silently drops every row where that association is {@code null} — i.e.
- * the vast majority of real Lager stock (most items belong to no job order and no mission). That
- * made {@code /inventory/all} and {@code /inventory/my} show "no entries" even though the
- * aggregated overview listed the very same material. These tests seed exactly such rows and assert
- * they still surface.
+ * empty table, so it cannot catch the trap this test pins down: the projection groups the
+ * <em>nullable</em> {@code owningOrgUnit} association as a whole entity. A naive
+ * constructor-expression projection over a nullable to-one renders an implicit INNER JOIN, which
+ * silently drops every row where that association is {@code null} — the ownerless-personal stock a
+ * user with no Staffel/SK records, and (before Variante C, REQ-INV-027, dropped the scalar {@code
+ * jobOrder} / {@code mission} columns off the row) the vast majority of real Lager stock that
+ * belongs to no job order and no mission. That made {@code /inventory/all} and {@code
+ * /inventory/my} show "no entries" even though the aggregated overview listed the very same
+ * material, which is why the query LEFT JOINs {@code owningOrgUnit}. Under the current model the
+ * earmarks live in side tables and are no longer part of the stock identity, so an unearmarked
+ * entry must also aggregate and surface; these tests seed exactly such rows — a non-personal item
+ * earmarked to nothing and a personal item with a {@code null} owning org unit — and assert they
+ * still surface.
  *
  * <p>The class is {@link Transactional} so each method rolls back: the seeded rows must never
  * commit to the shared Testcontainers database, otherwise the sibling empty-table smoke test (and
@@ -74,10 +79,11 @@ class InventoryItemStackQueryDataTest {
   @PersistenceContext private EntityManager entityManager;
 
   /**
-   * A squadron-owned, non-personal item that is linked to neither a job order nor a mission (the
-   * common case) must surface in the global stack view. Before the implicit-join fix the
-   * constructor-expression INNER JOIN on {@code jobOrder} / {@code mission} dropped it, so the
-   * admin-wide Lager came back empty.
+   * A squadron-owned, non-personal item that is earmarked to neither a job order nor a mission (the
+   * common case: both allocation collections are empty) must surface in the global stack view.
+   * Since Variante C (REQ-INV-027) keeps the earmarks in side tables and out of the stock identity,
+   * this pins the grouped read down to the physical stock — an unearmarked entry must still
+   * aggregate and appear rather than be silently dropped.
    */
   @Test
   void findGlobalStacks_includesNonPersonalItemWithoutJobOrderOrMission() {
@@ -102,8 +108,6 @@ class InventoryItemStackQueryDataTest {
     inv.setQuality(800);
     inv.setAmount(100.0);
     inv.setPersonal(false);
-    inv.setJobOrder(null);
-    inv.setMission(null);
     inv.setOwningOrgUnit(squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow());
     inventoryItemRepository.save(inv);
     entityManager.flush();
@@ -123,10 +127,11 @@ class InventoryItemStackQueryDataTest {
   }
 
   /**
-   * A personal item is, by the inventory invariants, never linked to a job order or mission and may
-   * have a {@code null} owning org unit (ownerless personal). It must still surface in the owner's
-   * grouped "my inventory" view; the same implicit-join trap on {@code jobOrder} / {@code mission}
-   * / {@code owningOrgUnit} would otherwise hide every personal stack.
+   * A personal item is, by the inventory invariants, never earmarked to a job order or mission and
+   * may have a {@code null} owning org unit (ownerless personal). It must still surface in the
+   * owner's grouped "my inventory" view; the implicit-join trap on the nullable {@code
+   * owningOrgUnit} would otherwise hide every ownerless-personal stack, which is why the projection
+   * LEFT JOINs it.
    */
   @Test
   void findUserStacks_includesPersonalItemWithoutAssociations() {
@@ -151,8 +156,6 @@ class InventoryItemStackQueryDataTest {
     inv.setQuality(500);
     inv.setAmount(42.0);
     inv.setPersonal(true);
-    inv.setJobOrder(null);
-    inv.setMission(null);
     inv.setOwningOrgUnit(null);
     inventoryItemRepository.save(inv);
     entityManager.flush();

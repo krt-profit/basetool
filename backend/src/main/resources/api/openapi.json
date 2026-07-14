@@ -12223,103 +12223,6 @@
         }
       }
     },
-    "/api/v1/inventory/{id}" : {
-      "put" : {
-        "tags" : [ "inventory-item-controller" ],
-        "operationId" : "updateInventoryItem",
-        "parameters" : [ {
-          "name" : "id",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/InventoryItemUpdateDto"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/InventoryItemDto"
-                }
-              }
-            }
-          },
-          "400" : {
-            "description" : "Bad Request",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "500" : {
-            "description" : "Internal Server Error",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/inventory/{id}/note" : {
       "put" : {
         "tags" : [ "inventory-item-controller" ],
@@ -54213,47 +54116,20 @@
           }
         }
       },
-      "InventoryItemUpdateDto" : {
+      "InventoryItemNoteUpdateRequest" : {
         "type" : "object",
         "properties" : {
-          "materialId" : {
+          "note" : {
             "type" : "string",
-            "format" : "uuid"
-          },
-          "locationId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "quality" : {
-            "type" : "integer",
-            "format" : "int32",
-            "maximum" : 1000,
-            "minimum" : 0
-          },
-          "amount" : {
-            "type" : "number",
-            "format" : "double"
-          },
-          "personal" : {
-            "type" : "boolean"
-          },
-          "jobOrderId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "missionId" : {
-            "type" : "string",
-            "format" : "uuid"
+            "maxLength" : 1000,
+            "minLength" : 0
           },
           "version" : {
             "type" : "integer",
             "format" : "int64"
-          },
-          "mergeStock" : {
-            "type" : "boolean"
           }
         },
-        "required" : [ "amount", "locationId", "materialId", "quality" ]
+        "required" : [ "version" ]
       },
       "InventoryItemDto" : {
         "type" : "object",
@@ -54381,21 +54257,6 @@
             "format" : "double"
           }
         }
-      },
-      "InventoryItemNoteUpdateRequest" : {
-        "type" : "object",
-        "properties" : {
-          "note" : {
-            "type" : "string",
-            "maxLength" : 1000,
-            "minLength" : 0
-          },
-          "version" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        },
-        "required" : [ "version" ]
       },
       "ShipRequestDto" : {
         "type" : "object",

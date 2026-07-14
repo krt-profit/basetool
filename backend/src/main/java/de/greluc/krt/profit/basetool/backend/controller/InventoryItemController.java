@@ -27,7 +27,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemNoteUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebookDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemUpdateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
@@ -465,23 +464,6 @@ public class InventoryItemController {
     boolean isLogistician = authHelperService.isLogisticianOrAbove();
     return inventoryItemService.updateDelivered(
         id, request, userService.getUserIdFromJwt(jwt), isLogistician);
-  }
-
-  /**
-   * Updates the soft associations of an inventory item (mission, job order, owner). Quantity and
-   * material identity go through {@link #bookOutInventoryItem} instead.
-   *
-   * @return the persisted DTO
-   */
-  @PutMapping("/{id}")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)")
-  public InventoryItemDto updateInventoryItem(
-      @AuthenticationPrincipal Jwt jwt,
-      @PathVariable @NotNull UUID id,
-      @RequestBody @Valid InventoryItemUpdateDto dto) {
-    boolean isLogistician = authHelperService.isLogisticianOrAbove();
-    return inventoryItemService.updateInventoryItem(
-        id, dto, userService.getUserIdFromJwt(jwt), isLogistician);
   }
 
   /**

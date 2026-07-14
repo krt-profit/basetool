@@ -37,7 +37,7 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAllocationSync;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -126,8 +126,9 @@ class JobOrderHandoverCompletionIntegrationTest {
           inv1.setMaterial(aslarite);
           inv1.setQuality(800);
           inv1.setAmount(1.835);
-          inv1.setJobOrder(jobOrder);
-          InventoryAllocationSync.mirrorScalars(inv1);
+          // Variante C (REQ-INV-027): earmark the entry's full stock to the order via a job-order
+          // slice (cascade-persisted with the entry) instead of the dropped scalar column.
+          InventoryAllocations.addJobOrder(inv1, jobOrder, inv1.getAmount(), false);
           inv1 = inventoryItemRepository.save(inv1);
 
           InventoryItem inv2 = new InventoryItem();
@@ -141,8 +142,9 @@ class JobOrderHandoverCompletionIntegrationTest {
           inv2.setMaterial(ouratite);
           inv2.setQuality(900);
           inv2.setAmount(5.730999999999999);
-          inv2.setJobOrder(jobOrder);
-          InventoryAllocationSync.mirrorScalars(inv2);
+          // Variante C (REQ-INV-027): earmark the entry's full stock to the order via a job-order
+          // slice (cascade-persisted with the entry) instead of the dropped scalar column.
+          InventoryAllocations.addJobOrder(inv2, jobOrder, inv2.getAmount(), false);
           inv2 = inventoryItemRepository.save(inv2);
 
           return new Fixture(jobOrder.getId(), inv1.getId(), inv2.getId());

@@ -42,7 +42,7 @@ import de.greluc.krt.profit.basetool.backend.repository.RefineryYieldRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAllocationSync;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.util.ArrayList;
@@ -710,17 +710,21 @@ public class RefineryOrderService {
       InventoryItem item = new InventoryItem();
       item.setUser(assignee);
       item.setOwningOrgUnit(owningOrgUnit);
-      item.setJobOrder(jobOrder);
       item.setMaterial(mat);
       item.setLocation(loc);
       item.setQuality(itemDto.quality());
       item.setAmount(InventoryItem.roundToScuScale(itemDto.amount()));
-      item.setMission(order.getMission());
       item.setNote(incomingNote);
-      // Variante C soak: seed the deposited row's job-order/mission allocations from its scalars
-      // for
-      // the deposited amount, so the allocation-based fulfilment reads count it (REQ-INV-027).
-      InventoryAllocationSync.mirrorScalars(item);
+      // Variante C (REQ-INV-027): the deposited row earmarks its full amount to the order it was
+      // refined for and to the refinery order's mission (each as one allocation); an unset
+      // dimension
+      // stays empty.
+      if (jobOrder != null) {
+        InventoryAllocations.addJobOrder(item, jobOrder, item.getAmount(), false);
+      }
+      if (order.getMission() != null) {
+        InventoryAllocations.addMission(item, order.getMission(), item.getAmount());
+      }
 
       inventoryItemRepository.save(item);
       // Cross-domain inventory effect: each stored refinery output creates one warehouse row. No

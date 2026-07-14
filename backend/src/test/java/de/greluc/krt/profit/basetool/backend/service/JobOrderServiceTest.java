@@ -47,7 +47,7 @@ import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAllocationSync;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -619,7 +619,7 @@ class JobOrderServiceTest {
     assertEquals(JobOrderStatus.COMPLETED, jobOrder.getStatus());
     assertNotNull(result);
     verify(jobOrderRepository).lockAllJobOrders();
-    verify(inventoryItemRepository).unlinkJobOrder(orderId);
+    verify(inventoryItemRepository).deleteJobOrderAllocationsByJobOrder(orderId);
   }
 
   @Test
@@ -646,7 +646,7 @@ class JobOrderServiceTest {
     assertEquals(JobOrderStatus.REJECTED, jobOrder.getStatus());
     assertNotNull(result);
     verify(jobOrderRepository).lockAllJobOrders();
-    verify(inventoryItemRepository).unlinkJobOrder(orderId);
+    verify(inventoryItemRepository).deleteJobOrderAllocationsByJobOrder(orderId);
   }
 
   @Test
@@ -670,7 +670,7 @@ class JobOrderServiceTest {
     // Then
     assertEquals(JobOrderStatus.IN_PROGRESS, jobOrder.getStatus());
     assertNotNull(result);
-    verify(inventoryItemRepository, never()).unlinkJobOrder(any());
+    verify(inventoryItemRepository, never()).deleteJobOrderAllocationsByJobOrder(any());
   }
 
   @Test
@@ -687,7 +687,7 @@ class JobOrderServiceTest {
             jobOrderService.updateJobOrderStatus(
                 orderId, new UpdateJobOrderStatusDto(JobOrderStatus.COMPLETED, 1L)));
     verify(jobOrderRepository, never()).save(any());
-    verify(inventoryItemRepository, never()).unlinkJobOrder(any());
+    verify(inventoryItemRepository, never()).deleteJobOrderAllocationsByJobOrder(any());
   }
 
   @Test
@@ -745,7 +745,7 @@ class JobOrderServiceTest {
     // Then
     verify(jobOrderRepository, times(2)).lockAllJobOrders();
     verify(jobOrderRepository).delete(jobOrder);
-    verify(inventoryItemRepository).unlinkJobOrder(orderId);
+    // Allocations cascade with the order (job_order_id ON DELETE CASCADE, V217) — no explicit call.
   }
 
   @Test
@@ -886,7 +886,8 @@ class JobOrderServiceTest {
     assertEquals("NewTester", jobOrder.getHandle());
 
     // Check if the old material was unlinked
-    verify(inventoryItemRepository).unlinkJobOrderMaterial(orderId, materialId);
+    verify(inventoryItemRepository)
+        .deleteJobOrderAllocationsByJobOrderAndMaterial(orderId, materialId);
 
     // Verify the persist flushes (saveAndFlush) so the in-place response carries the fresh
     // @Version.
@@ -1093,8 +1094,11 @@ class JobOrderServiceTest {
     org.mockito.InOrder inOrder =
         org.mockito.Mockito.inOrder(jobOrderRepository, inventoryItemRepository);
     inOrder.verify(jobOrderRepository).saveAndFlush(itemOrder);
-    inOrder.verify(inventoryItemRepository).unlinkJobOrderMaterial(orderId, removedMaterial);
-    verify(inventoryItemRepository, never()).unlinkJobOrderMaterial(orderId, keptMaterial);
+    inOrder
+        .verify(inventoryItemRepository)
+        .deleteJobOrderAllocationsByJobOrderAndMaterial(orderId, removedMaterial);
+    verify(inventoryItemRepository, never())
+        .deleteJobOrderAllocationsByJobOrderAndMaterial(orderId, keptMaterial);
     verify(materialClaimService).withdrawOrphanedClaimsWithinTransaction(itemOrder);
     verify(eventPublisher)
         .publishEvent(
@@ -1132,7 +1136,7 @@ class JobOrderServiceTest {
 
     assertEquals(JobOrderStatus.COMPLETED, jobOrder.getStatus());
     assertNull(jobOrder.getPriority());
-    verify(inventoryItemRepository).unlinkJobOrder(orderId);
+    verify(inventoryItemRepository).deleteJobOrderAllocationsByJobOrder(orderId);
   }
 
   @Test
@@ -1147,7 +1151,7 @@ class JobOrderServiceTest {
     // Then — no flush, no lock query, no unlink since wasTerminal=true
     verify(jobOrderRepository, never()).flush();
     verify(jobOrderRepository, never()).lockAllJobOrders();
-    verify(inventoryItemRepository, never()).unlinkJobOrder(any());
+    verify(inventoryItemRepository, never()).deleteJobOrderAllocationsByJobOrder(any());
   }
 
   @Test
@@ -1210,7 +1214,8 @@ class JobOrderServiceTest {
     jobOrderService.unlinkMaterial(orderId, materialId);
 
     // Then
-    verify(inventoryItemRepository).unlinkJobOrderMaterial(orderId, materialId);
+    verify(inventoryItemRepository)
+        .deleteJobOrderAllocationsByJobOrderAndMaterial(orderId, materialId);
     verify(jobOrderRepository).save(jobOrder);
     assertTrue(
         jobOrder.getMaterials().isEmpty(), "Material should have been removed from job order");
@@ -1225,7 +1230,8 @@ class JobOrderServiceTest {
     NotFoundException ex =
         assertThrows(
             NotFoundException.class, () -> jobOrderService.unlinkMaterial(orderId, materialId));
-    verify(inventoryItemRepository, never()).unlinkJobOrderMaterial(any(), any());
+    verify(inventoryItemRepository, never())
+        .deleteJobOrderAllocationsByJobOrderAndMaterial(any(), any());
   }
 
   @Test
@@ -1239,18 +1245,20 @@ class JobOrderServiceTest {
         assertThrows(
             NotFoundException.class,
             () -> jobOrderService.unlinkMaterial(orderId, otherMaterialId));
-    verify(inventoryItemRepository, never()).unlinkJobOrderMaterial(any(), any());
+    verify(inventoryItemRepository, never())
+        .deleteJobOrderAllocationsByJobOrderAndMaterial(any(), any());
   }
 
   @Test
-  void unlinkInventoryItem_ShouldSetJobOrderToNull() {
-    // Given
+  void unlinkInventoryItem_ShouldDropTheOrdersAllocationSlice() {
+    // Given — an entry earmarked to this order via a job-order allocation slice (Variante C,
+    // REQ-INV-027). Unlinking must drop that slice (R2) while the entry survives in the Lager.
     UUID inventoryItemId = UUID.randomUUID();
     de.greluc.krt.profit.basetool.backend.model.InventoryItem item =
         new de.greluc.krt.profit.basetool.backend.model.InventoryItem();
     item.setId(inventoryItemId);
-    item.setJobOrder(jobOrder);
-    InventoryAllocationSync.mirrorScalars(item);
+    item.setAmount(10.0);
+    InventoryAllocations.addJobOrder(item, jobOrder, 10.0, false);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(inventoryItemRepository.findById(inventoryItemId)).thenReturn(Optional.of(item));
@@ -1258,10 +1266,11 @@ class JobOrderServiceTest {
     // When
     jobOrderService.unlinkInventoryItem(orderId, inventoryItemId);
 
-    // Then
-    assertNull(
-        ((de.greluc.krt.profit.basetool.backend.model.InventoryItem) item).getJobOrder(),
-        "JobOrder should be null after unlinking");
+    // Then — the order's slice is gone; the entry keeps no earmark to it.
+    assertTrue(
+        item.getJobOrderAllocations().stream()
+            .noneMatch(a -> a.getJobOrder() != null && a.getJobOrder().getId().equals(orderId)),
+        "the order's allocation slice should be removed after unlinking");
     verify(jobOrderRepository).findById(orderId);
     verify(inventoryItemRepository).findById(inventoryItemId);
   }
@@ -1305,8 +1314,9 @@ class JobOrderServiceTest {
     de.greluc.krt.profit.basetool.backend.model.InventoryItem item =
         new de.greluc.krt.profit.basetool.backend.model.InventoryItem();
     item.setId(inventoryItemId);
-    item.setJobOrder(otherOrder);
-    InventoryAllocationSync.mirrorScalars(item);
+    item.setAmount(10.0);
+    // Earmarked to a DIFFERENT order, so this order has no slice to drop -> NotFound.
+    InventoryAllocations.addJobOrder(item, otherOrder, 10.0, false);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(inventoryItemRepository.findById(inventoryItemId)).thenReturn(Optional.of(item));
@@ -1598,7 +1608,7 @@ class JobOrderServiceTest {
             any(),
             any());
     // Not a terminal EDGE, so no priority reshuffle / inventory unlink runs on the idempotent save.
-    verify(inventoryItemRepository, never()).unlinkJobOrder(any());
+    verify(inventoryItemRepository, never()).deleteJobOrderAllocationsByJobOrder(any());
   }
 
   // ---------------------------------------------------------------

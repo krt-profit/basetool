@@ -43,7 +43,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemNoteUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebookDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemUpdateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCollectionEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.model.projection.OwnedStockSlice;
@@ -54,7 +53,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
-import de.greluc.krt.profit.basetool.backend.support.InventoryAllocationSync;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
@@ -454,9 +453,15 @@ public class InventoryItemService {
     item.setQuality(dto.quality());
     item.setAmount(InventoryItem.roundToScuScale(dto.amount()));
     item.setPersonal(isPersonal);
-    item.setMission(mission);
-    item.setJobOrder(jobOrder);
-    syncScalarAllocations(item);
+    // Variante C (REQ-INV-027): a single-assignment create writes one job-order + one mission
+    // allocation for the entry's full amount (the einbuchen form still offers a single Auftrag /
+    // Einsatz); an unset dimension stays empty. Multi-split at check-in (R4) is a later addition.
+    if (jobOrder != null) {
+      InventoryAllocations.addJobOrder(item, jobOrder, item.getAmount(), false);
+    }
+    if (mission != null) {
+      InventoryAllocations.addMission(item, mission, item.getAmount());
+    }
 
     InventoryItem saved = inventoryItemRepository.save(item);
     auditService.record(
@@ -475,121 +480,6 @@ public class InventoryItemService {
         inventoryCheckoutService.mergeStockIfRequested(
             saved, Boolean.TRUE.equals(dto.mergeStock()));
     return inventoryItemMapper.toDto(merged);
-  }
-
-  /**
-   * Updates the soft associations of an inventory item (mission, job order, owner). Quantity and
-   * material identity are NOT mutable here — those go through {@link #bookOutInventoryItem} so the
-   * audit trail stays consistent.
-   *
-   * @throws NotFoundException when any referenced id is unknown
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the supplied
-   *     version is stale
-   */
-  @Transactional
-  public InventoryItemDto updateInventoryItem(
-      UUID id, InventoryItemUpdateDto dto, UUID currentUserId, boolean isLogistician) {
-    InventoryItem item =
-        inventoryItemRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("Inventory item not found"));
-
-    if (!item.getUser().getId().equals(currentUserId)) {
-      if (item.getPersonal() || !isLogistician) {
-        throw new AccessDeniedException("You are not allowed to update this inventory item");
-      }
-    }
-
-    OptimisticLock.checkOptionalClient(item.getVersion(), dto.version(), InventoryItem.class, id);
-
-    Boolean isPersonal = dto.personal() != null ? dto.personal() : item.getPersonal();
-    item.setPersonal(isPersonal);
-
-    if (Boolean.TRUE.equals(isPersonal) && (dto.missionId() != null || dto.jobOrderId() != null)) {
-      throw new BadRequestException("Personal items cannot be assigned to a mission or job order");
-    }
-
-    Material material =
-        materialRepository
-            .findById(dto.materialId())
-            .orElseThrow(() -> new NotFoundException("Material not found"));
-    item.setMaterial(material);
-
-    Location location =
-        locationRepository
-            .findById(dto.locationId())
-            .orElseThrow(() -> new NotFoundException("Location not found"));
-    item.setLocation(location);
-
-    item.setQuality(dto.quality());
-    item.setAmount(InventoryItem.roundToScuScale(dto.amount()));
-
-    if (dto.jobOrderId() != null) {
-      JobOrder jobOrder =
-          jobOrderRepository
-              .findById(dto.jobOrderId())
-              .orElseThrow(() -> new NotFoundException("JobOrder not found"));
-      assertMaterialRequiredByJobOrder(material, jobOrder);
-      item.setJobOrder(jobOrder);
-    } else {
-      item.setJobOrder(null);
-    }
-
-    if (dto.missionId() != null) {
-      Mission mission =
-          missionRepository
-              .findById(dto.missionId())
-              .orElseThrow(() -> new NotFoundException("Mission not found"));
-      item.setMission(mission);
-    } else {
-      item.setMission(null);
-    }
-    syncScalarAllocations(item);
-
-    // Append-only by default: an update edits the row in place; rows that share a stack identity
-    // are grouped only for display (group-on-read). The scoped exception is the write-time stock
-    // merge below (REQ-INV-026, ADR-0097): when this edit makes the row match an existing stack, a
-    // PIECE row (or an SCU row with the per-action opt-in) is folded into it — see
-    // mergeStockIfRequested. The re-swap on the frontend association path depends on this.
-    // saveAndFlush (not save): this method's @Transactional commits AFTER it returns, so a plain
-    // save() leaves the @Version increment unflushed and the mapped DTO carries the STALE version.
-    // The client writes that back, and the user's NEXT in-place edit of the same row then 409s.
-    // Flushing here makes the response @Version authoritative (REQ-FE-003).
-    InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
-    auditService.record(
-        AuditEventType.INVENTORY_ITEM_UPDATED,
-        item.getId(),
-        InventoryAuditLabels.label(item),
-        item.getUser().getId(),
-        AuditDetails.of("qty", item.getAmount())
-            .with("q", item.getQuality())
-            .with("personal", item.getPersonal())
-            .with("jobOrder", InventoryAuditLabels.jobOrderRef(item))
-            .with("mission", InventoryAuditLabels.missionName(item)));
-    // Ratchet any active Materialbörse offer on this row down to the (possibly reduced) amount
-    // (REQ-MARKET-013); an increase is a no-op.
-    inventoryCheckoutService.clampOffersToStock(saved.getId(), saved.getAmount());
-    // Stock merge (REQ-INV-026): an edit that makes the row match an existing stack folds them —
-    // PIECE unconditionally, SCU only on the per-action opt-in. Returns the surviving row.
-    InventoryItem merged =
-        inventoryCheckoutService.mergeStockIfRequested(
-            saved, Boolean.TRUE.equals(dto.mergeStock()));
-    return inventoryItemMapper.toDto(merged);
-  }
-
-  /**
-   * Mirrors the entry's single {@code jobOrder}/{@code mission} scalar into its allocation
-   * collections (Variante C soak, REQ-INV-027): each set scalar becomes one allocation carrying the
-   * entry's full amount, an unset scalar leaves that dimension empty. Called on create and the
-   * scalar-editing update so the allocation-reading views (stacking, fulfilment, the mapper's chips
-   * and rest) stay in step with the scalars until the per-allocation write endpoints and the column
-   * drop replace them entirely. Relies on cascade + orphan-removal: clearing the list deletes the
-   * obsolete slices, adding a managed child inserts the new one on flush.
-   *
-   * @param item the entry whose scalar assignments to mirror into allocations; never {@code null}.
-   */
-  private void syncScalarAllocations(InventoryItem item) {
-    InventoryAllocationSync.mirrorScalars(item);
   }
 
   /**

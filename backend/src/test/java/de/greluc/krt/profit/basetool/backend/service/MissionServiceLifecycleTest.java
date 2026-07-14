@@ -33,7 +33,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionCrew;
 import de.greluc.krt.profit.basetool.backend.model.MissionFrequency;
@@ -74,10 +73,11 @@ import org.springframework.test.util.ReflectionTestUtils;
  * files don't reach: {@code deleteMission}, {@code removeParticipant}, {@code setMissionOwner},
  * {@code removeMissionFrequency}, and {@code findAllActiveReference}.
  *
- * <p>{@code deleteMission} performs three manual collection detachments (inventory entries,
- * refinery orders, sub-missions) before deleting the mission row — exactly the kind of multi-step
- * transaction CLAUDE.md flags as bug-prone. {@code setMissionOwner} is privilege-escalation
- * surface. None of these had dedicated tests before this PR.
+ * <p>{@code deleteMission} performs two manual collection detachments (refinery orders,
+ * sub-missions) before deleting the mission row — exactly the kind of multi-step transaction
+ * CLAUDE.md flags as bug-prone; since Variante C (REQ-INV-027) the inventory earmarks cascade via
+ * the mission-allocation FK instead of a manual null-out. {@code setMissionOwner} is
+ * privilege-escalation surface. None of these had dedicated tests before this PR.
  */
 @ExtendWith(MockitoExtension.class)
 class MissionServiceLifecycleTest {
@@ -131,24 +131,17 @@ class MissionServiceLifecycleTest {
     }
 
     @Test
-    void detachesInventoryEntries_beforeDelete() {
+    void recordsAudit_onDelete() {
+      // Variante C (REQ-INV-027): a mission's inventory earmarks live in the mission-allocation
+      // table with an ON DELETE CASCADE FK, so deleteMission no longer manually detaches inventory
+      // rows — it just deletes and records the audit. (Refinery orders + sub-missions are still
+      // detached in memory; covered below.)
       Mission mission = newMission();
-      InventoryItem inv1 = new InventoryItem();
-      inv1.setMission(mission);
-      InventoryItem inv2 = new InventoryItem();
-      inv2.setMission(mission);
-      mission.getInventoryEntries().add(inv1);
-      mission.getInventoryEntries().add(inv2);
 
       when(missionRepository.findById(MISSION_ID)).thenReturn(Optional.of(mission));
 
       service.deleteMission(MISSION_ID);
 
-      // Each inventory item's mission pointer must be null after deletion —
-      // this is the FK-safety detachment.
-      assertNull(inv1.getMission());
-      assertNull(inv2.getMission());
-      assertTrue(mission.getInventoryEntries().isEmpty());
       verify(missionRepository).delete(mission);
       verify(auditService)
           .record(
@@ -193,13 +186,10 @@ class MissionServiceLifecycleTest {
     }
 
     @Test
-    void detachesAllThreeCollections_inOneCall() {
-      // Combined scenario: a real mission has all three kinds of dependents.
+    void detachesRefineryOrdersAndSubMissions_inOneCall() {
+      // Combined scenario: refinery orders + sub-missions are detached in memory before delete.
+      // Inventory earmarks are NOT (Variante C: they cascade via the mission-allocation FK).
       Mission mission = newMission();
-      InventoryItem inv = new InventoryItem();
-      inv.setMission(mission);
-      mission.getInventoryEntries().add(inv);
-
       RefineryOrder order = new RefineryOrder();
       order.setMission(mission);
       mission.getRefineryOrders().add(order);
@@ -212,7 +202,6 @@ class MissionServiceLifecycleTest {
 
       service.deleteMission(MISSION_ID);
 
-      assertNull(inv.getMission());
       assertNull(order.getMission());
       assertNull(sub.getParent());
       verify(missionRepository).delete(mission);
@@ -547,7 +536,6 @@ class MissionServiceLifecycleTest {
     m.setVersion(1L);
     m.setParticipants(new HashSet<>());
     m.setAssignedUnits(new HashSet<>());
-    m.setInventoryEntries(new HashSet<>());
     m.setRefineryOrders(new HashSet<>());
     m.setSubMissions(new HashSet<>());
     m.setFrequencies(new HashSet<>());

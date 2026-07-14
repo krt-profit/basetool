@@ -269,12 +269,6 @@ public class Mission extends AbstractEntity<UUID> {
   private Set<Mission> subMissions = new HashSet<>();
 
   @OneToMany(mappedBy = "mission")
-  @OrderBy("createdAt DESC")
-  @com.fasterxml.jackson.annotation.JsonIgnore
-  @OptimisticLock(excluded = true)
-  private Set<InventoryItem> inventoryEntries = new LinkedHashSet<>();
-
-  @OneToMany(mappedBy = "mission")
   @OrderBy("startedAt DESC")
   @com.fasterxml.jackson.annotation.JsonIgnore
   @OptimisticLock(excluded = true)
