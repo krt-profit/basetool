@@ -366,8 +366,10 @@ class InventoryPageControllerMvcTest {
    * Same as {@link #viewMyStackEntries_ShouldRenderEntryRowsWithMissionFallbackOption()} for the
    * logistician/admin stack-entries drill-down ({@code /inventory/all/stack/entries} → {@code
    * stackEntriesAdmin} fragment), which additionally carries the owning {@code userId} in the stack
-   * key and renders the editable association dropdowns (and the archived-mission fallback option)
-   * under {@code sec:authorize}.
+   * key. Since Variante C (REQ-INV-027) the mission is an editable allocation chip (gated behind
+   * {@code sec:authorize} for association-capable roles), not a scalar {@code <option>}; the
+   * archived mission still shows because its chip renders from the entry's own {@code
+   * missionAllocations}, independent of the (empty) active-mission lookup.
    */
   @Test
   @WithMockUser(roles = "LOGISTICIAN", username = "logi-user")
@@ -394,8 +396,8 @@ class InventoryPageControllerMvcTest {
             missionName,
             java.util.List.of(),
             null,
-            java.util.List.of(),
-            null,
+            java.util.List.of(new MissionAllocationDto(missionId, missionName, null, 4.0)),
+            6.0,
             null,
             null,
             1L,
@@ -423,9 +425,12 @@ class InventoryPageControllerMvcTest {
                 .param("missionId", missionId.toString()))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("data-item-id=\"" + itemId + "\"")))
-        .andExpect(content().string(containsString("value=\"" + missionId + "\"")))
-        .andExpect(content().string(containsString(missionName)))
-        .andExpect(content().string(containsString("selected=\"selected\"")));
+        // Variante C (REQ-INV-027): the mission is an editable allocation chip, not a scalar
+        // <option>. The archived mission still shows because the chip renders from the entry's own
+        // allocation, independent of whether the mission is still in the active lookup.
+        .andExpect(content().string(containsString("assoc-chip--mission")))
+        .andExpect(content().string(containsString("data-target-id=\"" + missionId + "\"")))
+        .andExpect(content().string(containsString(missionName)));
   }
 
   /**
