@@ -533,6 +533,13 @@ function loadStackEntries(headerRow, page) {
         .then(function (html) {
             content.innerHTML = html;
             headerRow.setAttribute('data-stack-loaded', 'true');
+            // The entries are injected via innerHTML (not krtFetch.swap), so no krt:swapped fires —
+            // enhance the Variante-C allocation "+ Zuordnen" <select data-krt-combobox> popovers by
+            // hand (REQ-INV-027), else they stay raw native selects instead of the HUD combobox and
+            // the add-open reset (hidden.krtCombobox.setValue / input focus) has nothing to target.
+            if (typeof window.krtEnhanceComboboxes === 'function') {
+                window.krtEnhanceComboboxes(content);
+            }
             // Newly injected checkboxes must be reflected in the bulk-checkout state.
             updateBulkCheckoutState();
         })

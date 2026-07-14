@@ -55,12 +55,14 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * its <strong>own unique material</strong> to stay isolated in the shared, sequentially-run stack.
  *
  * <p><b>Drive via UI, verify via API.</b> Every mutation goes through the real Thymeleaf form /
- * book -out modal / inline association select — i.e. the genuine frontend → backend → DB path. The
- * outcome is then asserted by reading the same grouped endpoint the {@code /inventory/my} view
- * itself uses ({@code GET /api/v1/inventory/my-inventory/grouped?materialIds=…}) through {@link
- * BackendSeeder}, which is far more robust than re-expanding the lazily-loaded, grouped tree table
- * and never races the post-write render. The grouped query returns every row the caller owns
- * regardless of the {@code personal} flag, so the seeded non-personal rows surface there.
+ * book-out modal / allocation-chip combobox — i.e. the genuine frontend → backend → DB path. The
+ * book-out / transfer / sell outcomes are then asserted by reading the same grouped endpoint the
+ * {@code /inventory/my} view itself uses ({@code GET /api/v1/inventory/my-inventory/grouped?…})
+ * through {@link BackendSeeder}, which is far more robust than re-expanding the lazily-loaded,
+ * grouped tree table and never races the post-write render. The grouped query returns every row the
+ * caller owns regardless of the {@code personal} flag, so the seeded non-personal rows surface
+ * there. The two allocation scenarios instead assert the rendered chip, since the grouped endpoint
+ * no longer carries the per-entry job-order / mission allocation (Variante C, REQ-INV-027).
  *
  * <p><b>Cache-awareness.</b> The create-form material/location dropdowns come from the frontend's
  * 10-minute cached lookups, so — like {@code JobOrderCreateE2eTest} — the create flow selects
@@ -68,8 +70,8 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * freshly-seeded entry is listed. The Umbuchen modal's transfer dropdown is likewise cached, so the
  * same-location edge case anchors its row at the bootstrap-seeded {@code E2E Refinery Hub} (always
  * cached) to make the Umbuchen modal preselect the source as the transfer target. The job-order and
- * mission lookups are <em>not</em> cached, so freshly seeded ones appear in the association selects
- * at once.
+ * mission lookups are <em>not</em> cached, so freshly seeded ones appear in the allocation-chip
+ * combobox at once.
  */
 @Tag("e2e")
 class InventoryOperationsE2eTest {
@@ -348,9 +350,10 @@ class InventoryOperationsE2eTest {
   }
 
   /**
-   * <em>Zuweisen zu einem Auftrag.</em> Picks a job order in the row's inline Auftrag select (an
-   * AJAX {@code PUT /inventory/{id}/update-associations}); the owned stack then carries that job
-   * order id.
+   * <em>Zuweisen zu einem Auftrag.</em> Adds a job-order allocation chip on the entry (Variante C,
+   * REQ-INV-027): opens the "+ Zuordnen" combobox, picks the order, enters the amount and saves (an
+   * AJAX {@code POST /inventory/{id}/allocation}). The entry's Auftrag split then shows the order's
+   * chip, re-rendered in place from the returned DTO without a reload.
    */
   @Test
   void zuweisenAssignsStockToAJobOrder() {
@@ -358,23 +361,24 @@ class InventoryOperationsE2eTest {
         "inventory-zuweisen-auftrag",
         page -> {
           openMyInventoryToEntry(page, assignOrderMatId, assignOrderItemId);
-          page.waitForResponse(
-              response -> response.url().contains("/update-associations"),
-              () ->
-                  page.locator(
-                          "select[data-field='jobOrderId'][data-id='" + assignOrderItemId + "']")
-                      .selectOption(assignOrderId));
+          assignAllocationViaChip(page, assignOrderItemId, "JOB_ORDER", assignOrderId, "100");
 
-          assertEquals(
-              assignOrderId,
-              firstStackJobOrderId(stacksForMaterial(assignOrderMatId)),
-              "stack should now carry the assigned job order");
+          assertThat(
+                  page.locator(
+                      "div.assoc-split[data-entry-id='"
+                          + assignOrderItemId
+                          + "'][data-assoc-field='JOB_ORDER']"
+                          + " [data-assoc-chip='jobOrder'][data-target-id='"
+                          + assignOrderId
+                          + "']"))
+              .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
         });
   }
 
   /**
-   * <em>Zuweisen zu einem Einsatz.</em> Picks a mission in the row's inline Einsatz select (the
-   * same AJAX association update); the owned stack then carries that mission id.
+   * <em>Zuweisen zu einem Einsatz.</em> Adds a mission allocation chip on the entry (Variante C,
+   * REQ-INV-027) through the same "+ Zuordnen" combobox → {@code POST /inventory/{id}/allocation};
+   * the entry's Einsatz split then shows the mission's chip.
    */
   @Test
   void zuweisenAssignsStockToAMission() {
@@ -382,17 +386,17 @@ class InventoryOperationsE2eTest {
         "inventory-zuweisen-einsatz",
         page -> {
           openMyInventoryToEntry(page, assignMissionMatId, assignMissionItemId);
-          page.waitForResponse(
-              response -> response.url().contains("/update-associations"),
-              () ->
-                  page.locator(
-                          "select[data-field='missionId'][data-id='" + assignMissionItemId + "']")
-                      .selectOption(missionId));
+          assignAllocationViaChip(page, assignMissionItemId, "MISSION", missionId, "100");
 
-          assertEquals(
-              missionId,
-              firstStackMissionId(stacksForMaterial(assignMissionMatId)),
-              "stack should now carry the assigned mission");
+          assertThat(
+                  page.locator(
+                      "div.assoc-split[data-entry-id='"
+                          + assignMissionItemId
+                          + "'][data-assoc-field='MISSION']"
+                          + " [data-assoc-chip='mission'][data-target-id='"
+                          + missionId
+                          + "']"))
+              .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
         });
   }
 
@@ -587,6 +591,45 @@ class InventoryOperationsE2eTest {
   }
 
   /**
+   * Adds a Variante-C allocation chip to a stack entry via the inline "+ Zuordnen" combobox
+   * (REQ-INV-027): opens the popover of the entry's {@code field} split, picks the target option in
+   * the enhanced searchable combobox by its value, fills the amount and clicks Speichern, waiting
+   * for the in-place {@code POST /inventory/{id}/allocation} to settle. Drops the fixed footer (it
+   * can otherwise intercept the trusted clicks) and asserts the write did not reload the page.
+   *
+   * @param page the authenticated page expanded to the entry (see {@link #openMyInventoryToEntry})
+   * @param itemId the entry whose split to edit
+   * @param field the allocation dimension, {@code JOB_ORDER} or {@code MISSION}
+   * @param targetId the job-order / mission id to allocate (the combobox option value)
+   * @param amount the amount to allocate (must not exceed the entry's amount)
+   */
+  private static void assignAllocationViaChip(
+      Page page, String itemId, String field, String targetId, String amount) {
+    Locator split =
+        page.locator(
+            "div.assoc-split[data-entry-id='" + itemId + "'][data-assoc-field='" + field + "']");
+    page.evaluate("window.__krtNoReload = true;");
+    page.evaluate(
+        "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
+            + " 'none'; } }");
+    split.locator("button[data-trigger='inv-my-assoc-add-open']").click();
+    Locator pop = split.locator("[data-assoc-pop]");
+    // The "+ Zuordnen" <select data-krt-combobox> is enhanced into a .krt-combobox: click the
+    // textbox to open the listbox, then pick the option by its data-value (the target UUID, since
+    // the visible label is the display id / mission name, not the id).
+    pop.locator(".krt-combobox__input").click();
+    pop.locator("li.krt-combobox__option[data-value='" + targetId + "']").click();
+    pop.locator("[data-assoc-amount-input]").fill(amount);
+    page.waitForResponse(
+        r -> r.url().contains("/allocation") && "POST".equals(r.request().method()),
+        () -> pop.locator("button[data-trigger='inv-my-assoc-save']").click());
+    assertEquals(
+        Boolean.TRUE,
+        page.evaluate("window.__krtNoReload === true"),
+        "the in-place allocation write must not reload the page");
+  }
+
+  /**
    * Expands to the row (see {@link #openMyInventoryToEntry}) and clicks its book-out button, which
    * opens the shared book-out modal preloaded with that row's id, amount, version and location.
    *
@@ -760,42 +803,5 @@ class InventoryOperationsE2eTest {
    */
   private static int stackCount(JsonArray stacks) {
     return stacks.size();
-  }
-
-  /**
-   * Reads the job order id of the first stack (single-row scenarios have exactly one).
-   *
-   * @param stacks the stacks of one material
-   * @return the first stack's job order id, or {@code null} if unset / no stack
-   */
-  private static String firstStackJobOrderId(JsonArray stacks) {
-    return firstStackString(stacks, "jobOrderId");
-  }
-
-  /**
-   * Reads the mission id of the first stack (single-row scenarios have exactly one).
-   *
-   * @param stacks the stacks of one material
-   * @return the first stack's mission id, or {@code null} if unset / no stack
-   */
-  private static String firstStackMissionId(JsonArray stacks) {
-    return firstStackString(stacks, "missionId");
-  }
-
-  /**
-   * Reads a string field from the first stack, treating a missing/JSON-null value as {@code null}.
-   *
-   * @param stacks the stacks of one material
-   * @param field the field name to read
-   * @return the field value of the first stack, or {@code null}
-   */
-  private static String firstStackString(JsonArray stacks, String field) {
-    if (stacks.isEmpty()) {
-      return null;
-    }
-    JsonObject stack = stacks.get(0).getAsJsonObject();
-    return stack.has(field) && !stack.get(field).isJsonNull()
-        ? stack.get(field).getAsString()
-        : null;
   }
 }
