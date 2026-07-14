@@ -57220,12 +57220,16 @@
           "delivered" : {
             "type" : "boolean"
           },
+          "jobOrderId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
           "version" : {
             "type" : "integer",
             "format" : "int64"
           }
         },
-        "required" : [ "delivered", "version" ]
+        "required" : [ "delivered", "jobOrderId", "version" ]
       },
       "CityDto" : {
         "type" : "object",

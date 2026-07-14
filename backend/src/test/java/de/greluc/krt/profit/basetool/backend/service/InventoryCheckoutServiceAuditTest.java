@@ -30,6 +30,8 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
+import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
+import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
@@ -80,24 +82,39 @@ class InventoryCheckoutServiceAuditTest {
     UUID itemId = UUID.randomUUID();
     UUID ownerId = UUID.randomUUID();
 
+    UUID orderId = UUID.randomUUID();
     User owner = new User();
     owner.setId(ownerId);
+
+    JobOrder order = new JobOrder();
+    order.setId(orderId);
+    order.setDisplayId(42);
 
     InventoryItem item = new InventoryItem();
     item.setId(itemId);
     item.setVersion(1L);
     item.setUser(owner);
     item.setDelivered(false);
+    // The requested order is the entry's single scalar assignment, so the soak dual-write keeps the
+    // entry scalar in step with the flipped slice.
+    item.setJobOrder(order);
+    InventoryJobOrderAllocation slice = new InventoryJobOrderAllocation();
+    slice.setInventoryItem(item);
+    slice.setJobOrder(order);
+    slice.setAmount(5.0);
+    slice.setDelivered(false);
+    item.getJobOrderAllocations().add(slice);
 
-    UpdateDeliveredRequest request = new UpdateDeliveredRequest(true, 1L);
+    UpdateDeliveredRequest request = new UpdateDeliveredRequest(true, orderId, 1L);
 
-    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+    when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
     when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
     when(inventoryItemMapper.toDto(item)).thenReturn(null);
 
     service.updateDelivered(itemId, request, ownerId, false);
 
-    assertTrue(item.getDelivered(), "the delivered flag is flipped to true");
+    assertTrue(slice.getDelivered(), "the order's slice is flipped to delivered");
+    assertTrue(item.getDelivered(), "the entry scalar stays in step during the soak");
     verify(auditService)
         .record(
             eq(AuditEventType.INVENTORY_ITEM_DELIVERY_TOGGLED),

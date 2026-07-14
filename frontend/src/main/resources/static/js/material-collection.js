@@ -139,6 +139,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 url: '/inventory/' + inventoryId + '/delivered',
                 payload: {
                     delivered: cb.checked,
+                    // Variante C (REQ-INV-027): delivered is per-order — this whole page is one job
+                    // order's collection, so send its id and the backend flips only that slice.
+                    jobOrderId: cb.getAttribute('data-job-order-id'),
                     version: parseInt(row.getAttribute('data-version'), 10),
                 },
                 containerSelector: 'tr[data-inventory-id="' + inventoryId + '"]',

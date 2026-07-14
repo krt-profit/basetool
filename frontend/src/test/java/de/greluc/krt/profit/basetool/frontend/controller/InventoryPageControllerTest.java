@@ -687,7 +687,7 @@ class InventoryPageControllerTest {
   void updateDelivered_success_returnsUpdatedDtoWithBumpedVersion() {
     // Given — the backend accepted the delivered toggle and returns the incremented version.
     UUID id = UUID.randomUUID();
-    UpdateDeliveredRequest request = new UpdateDeliveredRequest(true, 1L);
+    UpdateDeliveredRequest request = new UpdateDeliveredRequest(true, UUID.randomUUID(), 1L);
     InventoryItemDto updated =
         new InventoryItemDto(
             id,
@@ -728,7 +728,7 @@ class InventoryPageControllerTest {
   void updateDelivered_conflict_propagatesProblemJsonWithCode() {
     // Given — a concurrent edit made the delivered relay fail with 409 OPTIMISTIC_LOCK.
     UUID id = UUID.randomUUID();
-    UpdateDeliveredRequest request = new UpdateDeliveredRequest(true, 1L);
+    UpdateDeliveredRequest request = new UpdateDeliveredRequest(true, UUID.randomUUID(), 1L);
     de.greluc.krt.profit.basetool.frontend.service.BackendServiceException ex =
         new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
             "Backend returned 409 [OPTIMISTIC_LOCK]",

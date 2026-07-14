@@ -540,6 +540,19 @@ public class InventoryAggregationService {
                   item.getUser().getDisplayName() != null
                       ? item.getUser().getDisplayName()
                       : item.getUser().getUsername();
+              // Variante A (REQ-INV-027): delivered is per-order — read this order's own slice
+              // (batched via @BatchSize), not the vestigial entry scalar, so an entry serving
+              // several orders shows the right delivered state for each. The quantity stays the
+              // entry's total for now (the per-order allocated share + the full-amount transfer
+              // semantics are a follow-up).
+              boolean delivered =
+                  item.getJobOrderAllocations().stream()
+                      .filter(
+                          a ->
+                              a.getJobOrder() != null && jobOrderId.equals(a.getJobOrder().getId()))
+                      .findFirst()
+                      .map(a -> Boolean.TRUE.equals(a.getDelivered()))
+                      .orElse(false);
               return new MaterialCollectionEntryDto(
                   item.getId(),
                   item.getVersion() != null ? item.getVersion() : 0L,
@@ -550,7 +563,7 @@ public class InventoryAggregationService {
                   item.getMaterial().getName(),
                   item.getQuality() != null ? item.getQuality().doubleValue() : null,
                   item.getAmount(),
-                  Boolean.TRUE.equals(item.getDelivered()));
+                  delivered);
             })
         .toList();
   }

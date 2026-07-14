@@ -568,7 +568,7 @@ class InventoryItemControllerTest {
     Jwt jwt = jwt("alice-sub");
     UUID ownerId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
-    UpdateDeliveredRequest request = new UpdateDeliveredRequest(true, 1L);
+    UpdateDeliveredRequest request = new UpdateDeliveredRequest(true, UUID.randomUUID(), 1L);
     InventoryItemDto persisted = inventoryItem(itemId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
@@ -586,7 +586,7 @@ class InventoryItemControllerTest {
     Jwt jwt = jwt("alice-sub");
     UUID ownerId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
-    UpdateDeliveredRequest request = new UpdateDeliveredRequest(false, 2L);
+    UpdateDeliveredRequest request = new UpdateDeliveredRequest(false, UUID.randomUUID(), 2L);
     InventoryItemDto persisted = inventoryItem(itemId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     when(authHelperService.isLogisticianOrAbove()).thenReturn(false);

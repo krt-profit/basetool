@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
+import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
@@ -1301,7 +1302,15 @@ class InventoryItemServiceTest {
     item.setMaterial(material);
     item.setQuality(100);
     item.setAmount(5.0);
+    // Entry scalar false but the order's own slice is delivered: the collection must read the slice
+    // (Variante A, REQ-INV-027), so this pins that it does not fall back to the vestigial scalar.
     item.setDelivered(false);
+    InventoryJobOrderAllocation slice = new InventoryJobOrderAllocation();
+    slice.setInventoryItem(item);
+    slice.setJobOrder(jobOrder);
+    slice.setAmount(5.0);
+    slice.setDelivered(true);
+    item.getJobOrderAllocations().add(slice);
 
     when(jobOrderRepository.findById(jobOrderId)).thenReturn(Optional.of(jobOrder));
     when(inventoryItemRepository.findByJobOrderIdOrdered(jobOrderId)).thenReturn(List.of(item));
@@ -1320,7 +1329,7 @@ class InventoryItemServiceTest {
     assertEquals("Port Olisar", dto.location());
     assertEquals(locationId, dto.locationId());
     assertEquals("Laranite", dto.materialName());
-    assertFalse(dto.delivered());
+    assertTrue(dto.delivered(), "delivered reads the order's slice, not the entry scalar");
   }
 
   @Test
@@ -1342,19 +1351,32 @@ class InventoryItemServiceTest {
     UUID itemId = UUID.randomUUID();
     UUID ownerId = UUID.randomUUID();
 
+    UUID orderId = UUID.randomUUID();
     User owner = new User();
     owner.setId(ownerId);
+
+    JobOrder order = new JobOrder();
+    order.setId(orderId);
+    order.setDisplayId(7);
 
     InventoryItem item = new InventoryItem();
     item.setId(itemId);
     item.setVersion(1L);
     item.setUser(owner);
     item.setDelivered(false);
+    item.setJobOrder(order);
+    InventoryJobOrderAllocation slice = new InventoryJobOrderAllocation();
+    slice.setInventoryItem(item);
+    slice.setJobOrder(order);
+    slice.setAmount(3.0);
+    slice.setDelivered(false);
+    item.getJobOrderAllocations().add(slice);
 
     de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest request =
-        new de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest(true, 1L);
+        new de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest(
+            true, orderId, 1L);
 
-    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+    when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
     when(inventoryItemRepository.saveAndFlush(any(InventoryItem.class)))
         .thenAnswer(inv -> inv.getArgument(0));
     when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
@@ -1363,7 +1385,8 @@ class InventoryItemServiceTest {
     inventoryItemService.updateDelivered(itemId, request, ownerId, false);
 
     // Then
-    assertTrue(item.getDelivered());
+    assertTrue(slice.getDelivered(), "the order's slice is delivered");
+    assertTrue(item.getDelivered(), "the entry scalar stays in step during the soak");
     verify(inventoryItemRepository).saveAndFlush(item);
   }
 
@@ -1378,19 +1401,32 @@ class InventoryItemServiceTest {
     UUID itemId = UUID.randomUUID();
     UUID ownerId = UUID.randomUUID();
 
+    UUID orderId = UUID.randomUUID();
     User owner = new User();
     owner.setId(ownerId);
+
+    JobOrder order = new JobOrder();
+    order.setId(orderId);
+    order.setDisplayId(9);
 
     InventoryItem item = new InventoryItem();
     item.setId(itemId);
     item.setVersion(1L);
     item.setUser(owner);
     item.setDelivered(false);
+    item.setJobOrder(order);
+    InventoryJobOrderAllocation slice = new InventoryJobOrderAllocation();
+    slice.setInventoryItem(item);
+    slice.setJobOrder(order);
+    slice.setAmount(3.0);
+    slice.setDelivered(false);
+    item.getJobOrderAllocations().add(slice);
 
     de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest request =
-        new de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest(true, 1L);
+        new de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest(
+            true, orderId, 1L);
 
-    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+    when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
     when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
 
     inventoryItemService.updateDelivered(itemId, request, ownerId, false);
@@ -1415,9 +1451,10 @@ class InventoryItemServiceTest {
     item.setDelivered(false);
 
     de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest request =
-        new de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest(true, 1L);
+        new de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest(
+            true, UUID.randomUUID(), 1L);
 
-    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+    when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
 
     // When / Then
     assertThrows(
@@ -1442,9 +1479,10 @@ class InventoryItemServiceTest {
     item.setUser(owner);
 
     de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest request =
-        new de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest(true, 1L);
+        new de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest(
+            true, UUID.randomUUID(), 1L);
 
-    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+    when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
 
     // When / Then
     assertThrows(

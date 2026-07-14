@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.model.FinanceType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
+import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
@@ -840,9 +841,13 @@ public class InventoryCheckoutService {
   @Transactional
   public InventoryItemDto updateDelivered(
       UUID id, UpdateDeliveredRequest request, UUID currentUserId, boolean isLogistician) {
+    // OPTIMISTIC_FORCE_INCREMENT: delivered now lives on the inverse-side job-order slice, so
+    // changing it would not dirty the entry row on its own — force-bump the entry @Version (the
+    // single client-echoed token for the whole split) so a stale echo still 409s and the response
+    // carries the fresh version for the in-place DOM sync.
     InventoryItem item =
         inventoryItemRepository
-            .findById(id)
+            .findByIdForAllocationWrite(id)
             .orElseThrow(() -> new NotFoundException("Inventory item not found"));
 
     if (!item.getUser().getId().equals(currentUserId) && !isLogistician) {
@@ -851,14 +856,26 @@ public class InventoryCheckoutService {
 
     OptimisticLock.check(item.getVersion(), request.version(), InventoryItem.class, id);
 
-    item.setDelivered(request.delivered());
-    // Variante A soak (REQ-INV-027): the delivered flag now also lives on the job-order slice, so
-    // toggling the entry re-mirrors it onto the entry's allocation; once the toggle becomes
-    // (entry, order)-scoped at the column drop, this entry-level write goes away.
-    InventoryAllocationSync.mirrorScalars(item);
-    // saveAndFlush so the response carries the flushed @Version — the material-collection delivered
-    // checkbox syncs the returned version onto the row in place (no reload), so a plain save would
-    // return the stale pre-flush version and a second consecutive toggle of the same row would 409.
+    // Variante A (REQ-INV-027): the toggle is (entry, order)-scoped — an entry serving several
+    // orders can be delivered for one and still open for another. Flip only the requested order's
+    // slice; an absent slice means the order is no longer earmarked on this entry (stale UI) → 404.
+    InventoryJobOrderAllocation slice =
+        item.getJobOrderAllocations().stream()
+            .filter(
+                a ->
+                    a.getJobOrder() != null && request.jobOrderId().equals(a.getJobOrder().getId()))
+            .findFirst()
+            .orElseThrow(
+                () ->
+                    new NotFoundException(
+                        "Job-order allocation not found for this inventory item"));
+    slice.setDelivered(request.delivered());
+    // Soak: keep the entry-level scalar in step while the requested order is still the entry's
+    // single scalar assignment, so a later scalar re-mirror (mirrorScalars) does not reset the
+    // slice from a stale inventory_item.delivered. Dropped with the scalar column.
+    if (item.getJobOrder() != null && request.jobOrderId().equals(item.getJobOrder().getId())) {
+      item.setDelivered(request.delivered());
+    }
     InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
     auditService.record(
         AuditEventType.INVENTORY_ITEM_DELIVERY_TOGGLED,
@@ -866,7 +883,7 @@ public class InventoryCheckoutService {
         InventoryAuditLabels.label(item),
         item.getUser().getId(),
         AuditDetails.of("delivered", request.delivered())
-            .with("jobOrder", InventoryAuditLabels.jobOrderRef(saved)));
+            .with("jobOrder", "#" + slice.getJobOrder().getDisplayId()));
     return inventoryItemMapper.toDto(saved);
   }
 }
