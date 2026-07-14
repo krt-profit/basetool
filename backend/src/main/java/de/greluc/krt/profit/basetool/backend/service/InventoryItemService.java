@@ -579,7 +579,7 @@ public class InventoryItemService {
       }
       default -> throw new IllegalStateException("Unhandled allocation dimension: " + dto.field());
     }
-    return inventoryItemMapper.toDto(inventoryItemRepository.saveAndFlush(item));
+    return mapWithForcedVersion(inventoryItemRepository.saveAndFlush(item));
   }
 
   /**
@@ -634,7 +634,7 @@ public class InventoryItemService {
       }
       default -> throw new IllegalStateException("Unhandled allocation dimension: " + dto.field());
     }
-    return inventoryItemMapper.toDto(inventoryItemRepository.saveAndFlush(item));
+    return mapWithForcedVersion(inventoryItemRepository.saveAndFlush(item));
   }
 
   /**
@@ -675,7 +675,24 @@ public class InventoryItemService {
       }
       default -> throw new IllegalStateException("Unhandled allocation dimension: " + dto.field());
     }
-    return inventoryItemMapper.toDto(inventoryItemRepository.saveAndFlush(item));
+    return mapWithForcedVersion(inventoryItemRepository.saveAndFlush(item));
+  }
+
+  /**
+   * Maps a just-flushed entry to its DTO carrying the post-commit force-increment version (see
+   * {@link InventoryAllocations#forcedNextVersion}). The allocation writes only mutate an
+   * inverse-side slice and force-bump the entry {@code @Version} via {@code
+   * OPTIMISTIC_FORCE_INCREMENT}, which Hibernate applies at commit — so the client must echo {@code
+   * loaded + 1}, not the pre-increment value the entity still shows here, or its next write to the
+   * same entry 409s (REQ-FE-003).
+   *
+   * @param saved the just-flushed entry; never {@code null}.
+   * @return the entry DTO carrying the version the client should echo next.
+   */
+  private InventoryItemDto mapWithForcedVersion(InventoryItem saved) {
+    return inventoryItemMapper
+        .toDto(saved)
+        .withVersion(InventoryAllocations.forcedNextVersion(saved));
   }
 
   /**

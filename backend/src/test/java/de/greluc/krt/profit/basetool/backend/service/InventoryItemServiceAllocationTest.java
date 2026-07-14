@@ -166,7 +166,10 @@ class InventoryItemServiceAllocationTest {
             new InventoryAllocationWriteDto(
                 InventoryAllocationDimension.JOB_ORDER, orderId, 4.0, 1L));
 
-    assertSame(dtoOut, result);
+    // The response carries the mapped DTO with the post-commit force-increment version: the entry
+    // @Version (1) is bumped at commit by OPTIMISTIC_FORCE_INCREMENT, so the client must echo 2 on
+    // its next write to the same entry, else a second consecutive chip edit 409s (REQ-INV-027).
+    assertEquals(2L, result.version());
     assertEquals(1, item.getJobOrderAllocations().size());
     assertEquals(4.0, item.getJobOrderAllocations().get(0).getAmount(), 1e-9);
     assertSame(order, item.getJobOrderAllocations().get(0).getJobOrder());

@@ -56,4 +56,40 @@ public record InventoryItemDto(
     String note,
     SquadronReferenceDto owningSquadron,
     Long version,
-    Instant createdAt) {}
+    Instant createdAt) {
+
+  /**
+   * Returns a copy of this projection with {@link #version} replaced. Used by the force-increment
+   * write paths (the per-order delivered toggle and the allocation add/change/remove endpoints):
+   * those only mutate an inverse-side allocation slice, so they force-bump the entry's
+   * {@code @Version} via {@code OPTIMISTIC_FORCE_INCREMENT}, which Hibernate applies at transaction
+   * commit — the entity mapped in-transaction therefore still carries the pre-increment value. The
+   * client must echo the post-commit version ({@code loaded + 1}) on its next write to the same
+   * entry, or the follow-up optimistic-lock check 409s (REQ-FE-003, REQ-INV-027).
+   *
+   * @param newVersion the version the client should echo on its next write.
+   * @return a copy of this DTO carrying {@code newVersion}.
+   */
+  public InventoryItemDto withVersion(Long newVersion) {
+    return new InventoryItemDto(
+        id,
+        user,
+        material,
+        location,
+        quality,
+        amount,
+        personal,
+        jobOrderId,
+        jobOrderDisplayId,
+        missionId,
+        missionName,
+        jobOrderAllocations,
+        jobOrderRest,
+        missionAllocations,
+        missionRest,
+        note,
+        owningSquadron,
+        newVersion,
+        createdAt);
+  }
+}

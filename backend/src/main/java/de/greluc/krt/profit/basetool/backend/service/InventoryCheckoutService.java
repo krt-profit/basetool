@@ -935,6 +935,12 @@ public class InventoryCheckoutService {
         item.getUser().getId(),
         AuditDetails.of("delivered", request.delivered())
             .with("jobOrder", "#" + slice.getJobOrder().getDisplayId()));
-    return inventoryItemMapper.toDto(saved);
+    // OPTIMISTIC_FORCE_INCREMENT bumps the entry @Version at commit, so `saved` still carries the
+    // pre-increment value here — hand the client the post-commit version (loaded + 1) so a
+    // follow-up
+    // toggle of the same row echoes it and does not 409 (REQ-FE-003, REQ-INV-027).
+    return inventoryItemMapper
+        .toDto(saved)
+        .withVersion(InventoryAllocations.forcedNextVersion(saved));
   }
 }

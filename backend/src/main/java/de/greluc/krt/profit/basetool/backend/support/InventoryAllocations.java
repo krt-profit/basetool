@@ -93,6 +93,24 @@ public final class InventoryAllocations {
   }
 
   /**
+   * The entry {@code @Version} a client must echo after a force-increment write — the per-order
+   * delivered toggle and the allocation add/change/remove endpoints, which only mutate an
+   * inverse-side allocation slice and so force-bump the entry {@code @Version} via {@code
+   * OPTIMISTIC_FORCE_INCREMENT}. Hibernate applies that increment at transaction commit, so the
+   * entity mapped in-transaction still carries the pre-increment value; the post-commit version the
+   * client must echo next is therefore {@code loaded + 1}. Returning the stale (pre-increment)
+   * value makes the client's very next write to the same entry 409 (the defect the {@code
+   * MaterialCollectionDeliveredInPlaceE2eTest} second toggle caught).
+   *
+   * @param saved the just-flushed entry (its {@code @Version} still pre-increment); never {@code
+   *     null}
+   * @return the version the client should echo on its next write to this entry
+   */
+  public static long forcedNextVersion(InventoryItem saved) {
+    return (saved.getVersion() != null ? saved.getVersion() : 0L) + 1L;
+  }
+
+  /**
    * Appends a job-order slice earmarking {@code amount} of the entry to {@code order}. The caller
    * owns the R5 / duplicate-target guards; this only wires the managed child so cascade-persist
    * inserts it on flush.

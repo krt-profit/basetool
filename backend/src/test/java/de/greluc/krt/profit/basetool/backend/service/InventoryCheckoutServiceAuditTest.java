@@ -104,7 +104,30 @@ class InventoryCheckoutServiceAuditTest {
 
     when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
     when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
-    when(inventoryItemMapper.toDto(item)).thenReturn(null);
+    // A non-null DTO: updateDelivered wraps it with the post-commit force-increment version
+    // (withVersion), so a null mapping would NPE (REQ-INV-027).
+    when(inventoryItemMapper.toDto(item))
+        .thenReturn(
+            new de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto(
+                itemId,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                java.util.List.of(),
+                0.0,
+                java.util.List.of(),
+                0.0,
+                null,
+                null,
+                1L,
+                null));
 
     service.updateDelivered(itemId, request, ownerId, false);
 

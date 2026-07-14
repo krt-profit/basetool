@@ -1349,7 +1349,8 @@ class InventoryItemServiceTest {
     when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
     when(inventoryItemRepository.saveAndFlush(any(InventoryItem.class)))
         .thenAnswer(inv -> inv.getArgument(0));
-    when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
+    when(inventoryItemMapper.toDto(any(InventoryItem.class)))
+        .thenReturn(minimalInventoryDto(itemId));
 
     // When
     inventoryItemService.updateDelivered(itemId, request, ownerId, false);
@@ -1357,6 +1358,22 @@ class InventoryItemServiceTest {
     // Then
     assertTrue(slice.getDelivered(), "the order's slice is delivered");
     verify(inventoryItemRepository).saveAndFlush(item);
+  }
+
+  /**
+   * A minimal {@link de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto} for stubbing
+   * {@code inventoryItemMapper.toDto(...)} on the force-increment write paths (delivered toggle,
+   * allocation writes), which wrap the mapped DTO with the post-commit version via {@code
+   * withVersion}.
+   *
+   * @param id the entry id to carry.
+   * @return a minimal DTO (version {@code 1L}).
+   */
+  private static de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto
+      minimalInventoryDto(UUID id) {
+    return new de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto(
+        id, null, null, null, null, null, null, null, null, null, null, List.of(), 0.0, List.of(),
+        0.0, null, null, 1L, null);
   }
 
   /**
@@ -1396,11 +1413,18 @@ class InventoryItemServiceTest {
 
     when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
     when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
+    when(inventoryItemMapper.toDto(any(InventoryItem.class)))
+        .thenReturn(minimalInventoryDto(itemId));
 
-    inventoryItemService.updateDelivered(itemId, request, ownerId, false);
+    de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto result =
+        inventoryItemService.updateDelivered(itemId, request, ownerId, false);
 
     verify(inventoryItemRepository).saveAndFlush(item);
     verify(inventoryItemRepository, never()).save(item);
+    // OPTIMISTIC_FORCE_INCREMENT bumps the entry @Version (1) at commit, so the client must echo 2
+    // on its next write to the same row — else a second consecutive delivered toggle 409s
+    // (the MaterialCollectionDeliveredInPlaceE2eTest regression, REQ-INV-027).
+    assertEquals(2L, result.version(), "response carries the post-commit force-increment version");
   }
 
   @Test
