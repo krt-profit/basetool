@@ -48,11 +48,13 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * <p>One method per operation — <em>einbuchen</em> (create), <em>ausbuchen</em> (DISCARD, partial
  * and full), <em>umbuchen</em> (TRANSFER), <em>verkaufen</em> (SELL), and the two append-only-safe
  * association edits, <em>zuweisen zu einem Auftrag</em> (job order) and <em>zuweisen zu einem
- * Einsatz</em> (mission) — plus three edge cases: over-booking past the held amount, a no-op
- * transfer to the same user+location, and the cross-field invariant that a personal entry may carry
- * neither a job order nor a mission. The append-only model means TRANSFER and create insert new
- * rows while DISCARD/SELL decrement (and delete at the {@code 1e-4} epsilon), so each scenario uses
- * its <strong>own unique material</strong> to stay isolated in the shared, sequentially-run stack.
+ * Einsatz</em> (mission) — plus the <em>Herkunft</em> deduct-from picker (REQ-INV-027), which both
+ * gates a book-out when the rest cannot cover it and directs the deduction onto a chosen earmark,
+ * and three edge cases: over-booking past the held amount, a no-op transfer to the same
+ * user+location, and the cross-field invariant that a personal entry may carry neither a job order
+ * nor a mission. The append-only model means TRANSFER and create insert new rows while DISCARD/SELL
+ * decrement (and delete at the {@code 1e-4} epsilon), so each scenario uses its <strong>own unique
+ * material</strong> to stay isolated in the shared, sequentially-run stack.
  *
  * <p><b>Drive via UI, verify via API.</b> Every mutation goes through the real Thymeleaf form /
  * book-out modal / allocation-chip combobox — i.e. the genuine frontend → backend → DB path. The
@@ -119,6 +121,9 @@ class InventoryOperationsE2eTest {
   private static String assignOrderItemId;
   private static String assignMissionMatId;
   private static String assignMissionItemId;
+  private static String herkunftMatId;
+  private static String herkunftItemId;
+  private static String herkunftOrderId;
   private static String overbookMatId;
   private static String overbookItemId;
   private static String sameLocMatId;
@@ -183,6 +188,16 @@ class InventoryOperationsE2eTest {
     assignMissionItemId =
         seeder.createInventoryItem(
             USERNAME, PASSWORD, assignMissionMatId, opsHubLocId, SEED_QUALITY, 100);
+
+    // Deduct-from ("Herkunft") picker fixture: a job-order-eligible 100-SCU row plus an order that
+    // requests it, so the flow can earmark 70 (rest 30) and then book out from the tag.
+    herkunftMatId = seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, "E2E Inv Herkunft Mat");
+    herkunftItemId =
+        seeder.createInventoryItem(
+            USERNAME, PASSWORD, herkunftMatId, opsHubLocId, SEED_QUALITY, 100);
+    herkunftOrderId =
+        seeder.createJobOrder(
+            USERNAME, PASSWORD, IRIDIUM_ID, "E2E Inv Herkunft Order", herkunftMatId, 650, 100);
 
     overbookMatId = seeder.createRefineryMaterial(USERNAME, PASSWORD, "E2E Inv Overbook Mat");
     overbookItemId =
@@ -397,6 +412,74 @@ class InventoryOperationsE2eTest {
                           + missionId
                           + "']"))
               .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
+        });
+  }
+
+  /**
+   * <em>Herkunft-Picker (REQ-INV-027).</em> The Ausbuchen deduct-from picker both gates and directs
+   * a book-out. Earmarks 70 of a 100-SCU row to a job order (rest 30), opens the book-out modal and
+   * books out 50: with the order input left at 0 the 30 rest cannot cover the 50, so the picker
+   * disables the submit and shows the "assign at least" warning; entering 40 into the order input
+   * satisfies the plan and re-enables it. After the write the row holds 50 and the order chip has
+   * shrunk from 70 to 30 — proving the 40 came out of the chosen tag (not silently from the rest),
+   * the client-side mirror of {@code InventoryCheckoutService.resolveReductionPlan}.
+   */
+  @Test
+  void herkunftPickerGatesTheRestAndDeductsFromTheChosenTag() {
+    runFlow(
+        "inventory-herkunft-picker",
+        page -> {
+          // Earmark 70 of the 100-SCU row to the job order (rest = 30).
+          openMyInventoryToEntry(page, herkunftMatId, herkunftItemId);
+          assignAllocationViaChip(page, herkunftItemId, "JOB_ORDER", herkunftOrderId, "70");
+
+          // Re-open on a fresh page so the book-out modal builds its picker from the persisted
+          // chip.
+          openBookOutModal(page, herkunftMatId, herkunftItemId);
+          page.locator("input[name='type'][value='DISCARD']").check();
+
+          Locator submit = page.locator("#bookOutSubmitBtn");
+          Locator orderInput =
+              page.locator(
+                  "#bookOutModal [data-herkunft-dim='JOB_ORDER']"
+                      + " [data-herkunft-input][data-herkunft-target='"
+                      + herkunftOrderId
+                      + "']");
+          Locator warn =
+              page.locator("#bookOutModal [data-herkunft-dim='JOB_ORDER'] [data-herkunft-warn]");
+
+          // Book out 50: with the tag at 0 the 30 rest cannot cover it, so the picker gates the
+          // submit and states the minimum that must go to the tag.
+          page.locator("#amount").fill("50");
+          assertThat(submit).isDisabled();
+          assertThat(warn).isVisible();
+
+          // Direct 40 of the 50 to the order tag — the plan is now valid and the submit re-enables.
+          orderInput.fill("40");
+          assertThat(submit).isEnabled();
+
+          submitBookOutInPlace(page);
+
+          // Stock dropped by the full 50 ...
+          assertEquals(
+              50.0, totalAmount(stacksForMaterial(herkunftMatId)), AMOUNT_DELTA, "100 - 50 = 50");
+          // ... and exactly 40 came out of the order earmark (70 - 40 = 30), not the rest. The
+          // partial book-out leaves the row, so the tree restores and the reduced chip re-renders.
+          Locator orderChip =
+              page.locator(
+                  "div.assoc-split[data-entry-id='"
+                      + herkunftItemId
+                      + "'][data-assoc-field='JOB_ORDER'] [data-assoc-chip='jobOrder']"
+                      + "[data-target-id='"
+                      + herkunftOrderId
+                      + "']");
+          assertThat(orderChip)
+              .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
+          assertEquals(
+              30.0,
+              Double.parseDouble(orderChip.getAttribute("data-amount")),
+              AMOUNT_DELTA,
+              "40 of the 50 booked out came from the order tag (70 - 40 = 30)");
         });
   }
 
