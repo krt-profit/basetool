@@ -38,7 +38,6 @@ import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.User;
-import de.greluc.krt.profit.basetool.backend.model.dto.AllocationReductionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkCheckoutRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
@@ -58,7 +57,6 @@ import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -111,13 +109,6 @@ public class InventoryCheckoutService {
    * user-edited at three decimals max), not a real residual.
    */
   private static final double QUANTITY_EPSILON = 1e-4;
-
-  /**
-   * Tolerance for validating the "deduct from" plan against slice amounts and the deducted total.
-   * Matches {@link InventoryAllocations}'s R5 epsilon so a plan landing a hair over a slice or the
-   * total purely through {@code double} noise is tolerated; anything beyond is a genuine overshoot.
-   */
-  private static final double REDUCTION_EPSILON = 1e-6;
 
   /**
    * Max length of the {@code inventory_item.note} column (V61 {@code VARCHAR(1000)}). A stock merge
@@ -229,9 +220,11 @@ public class InventoryCheckoutService {
     // over-total
     // => 400, an under-assigned plan whose rest cannot absorb the remainder => 422).
     Map<UUID, Double> orderReductions =
-        resolveReductionPlan(item, dto.jobOrderReductions(), dto.amount(), true);
+        AllocationReductions.resolveReductionPlan(
+            item, dto.jobOrderReductions(), dto.amount(), true);
     Map<UUID, Double> missionReductions =
-        resolveReductionPlan(item, dto.missionReductions(), dto.amount(), false);
+        AllocationReductions.resolveReductionPlan(
+            item, dto.missionReductions(), dto.amount(), false);
 
     if (checkoutType == CheckoutType.SELL) {
       // Coupled proceeds (REQ-INV-027): each mission's credited income is proportional to the SCU
@@ -243,7 +236,8 @@ public class InventoryCheckoutService {
     }
     // Apply the plan to the source's slices (shrinks / removes the tags); the amount is lowered
     // below.
-    applyReductions(item, orderReductions, missionReductions);
+    AllocationReductions.applyPlan(item, orderReductions, true);
+    AllocationReductions.applyPlan(item, missionReductions, false);
 
     if (remainingAmount <= QUANTITY_EPSILON) { // Floating point precision safety
       inventoryItemRepository.delete(item);
@@ -354,12 +348,15 @@ public class InventoryCheckoutService {
     // earmark; a partial move with no plan takes it all from the rest, leaving the moved row
     // unassigned and the source's tags intact (both the legacy behaviours).
     Map<UUID, Double> orderReductions =
-        resolveReductionPlan(item, dto.jobOrderReductions(), dto.amount(), true);
+        AllocationReductions.resolveReductionPlan(
+            item, dto.jobOrderReductions(), dto.amount(), true);
     Map<UUID, Double> missionReductions =
-        resolveReductionPlan(item, dto.missionReductions(), dto.amount(), false);
+        AllocationReductions.resolveReductionPlan(
+            item, dto.missionReductions(), dto.amount(), false);
     applyTransferInherit(item, newItem, orderReductions, missionReductions);
     final InventoryItem savedNew = inventoryItemRepository.save(newItem);
-    applyReductions(item, orderReductions, missionReductions);
+    AllocationReductions.applyPlan(item, orderReductions, true);
+    AllocationReductions.applyPlan(item, missionReductions, false);
     if (remainingAmount <= QUANTITY_EPSILON) {
       inventoryItemRepository.delete(item);
     } else {
@@ -404,8 +401,8 @@ public class InventoryCheckoutService {
    * proceeds; no separate money-attribution input exists. An empty plan (nothing deducted from a
    * mission earmark) is a fully-personal sale.
    *
-   * <p>Read the mission slices BEFORE {@link #applyReductions} shrinks / removes them. A mission
-   * the seller does not participate in cannot receive a {@link MissionFinanceEntry} (it
+   * <p>Read the mission slices BEFORE the reductions are applied (which shrinks / removes them). A
+   * mission the seller does not participate in cannot receive a {@link MissionFinanceEntry} (it
    * structurally requires a {@link MissionParticipant}), so that share simply falls to personal
    * rather than being an error.
    *
@@ -479,149 +476,11 @@ public class InventoryCheckoutService {
   }
 
   /**
-   * Resolves a single dimension's "deduct from" plan for a book-out / transfer of {@code totalX}
-   * from {@code item} (Variante C, REQ-INV-027), validating it against the entry's pre-decrement
-   * slices. Returns an insertion-ordered {@code targetId → SCU} map (empty = take it all from the
-   * dimension's not-yet-assigned rest).
-   *
-   * <p>A {@code null} list means "use the default": take from the rest first, and spread whatever
-   * the rest cannot cover across the tags proportionally to their size — so the default never fails
-   * and a caller that omits the plan keeps the legacy semantics (full move inherits all, partial
-   * move leaves the tags intact). An explicit list is validated exactly as given.
-   *
-   * @param item the entry whose slices back the plan (loaded within the tx); never {@code null}
-   * @param reductions the requested reductions, or {@code null} to auto-derive the default plan
-   * @param totalX the total quantity being deducted from the entry
-   * @param jobOrderDimension {@code true} for the job-order dimension, {@code false} for the
-   *     mission dimension
-   * @return the validated {@code targetId → amount} plan for this dimension
-   * @throws BadRequestException when a reduction targets a non-earmarked slice, duplicates a
-   *     target, exceeds its slice, or the reductions sum to more than {@code totalX}
-   * @throws OverAllocationException when the plan under-assigns so much that the not-yet-assigned
-   *     rest cannot absorb the remainder (the R5 422)
-   */
-  private Map<UUID, Double> resolveReductionPlan(
-      InventoryItem item,
-      List<AllocationReductionDto> reductions,
-      double totalX,
-      boolean jobOrderDimension) {
-    double amount = item.getAmount() != null ? item.getAmount() : 0.0;
-    double sumSlices =
-        jobOrderDimension
-            ? InventoryAllocations.sumJobOrder(item)
-            : InventoryAllocations.sumMission(item);
-    double rest = InventoryItem.roundToScuScale(amount - sumSlices);
-
-    if (reductions == null) {
-      return defaultReductionPlan(item, totalX, rest, jobOrderDimension);
-    }
-
-    Map<UUID, Double> plan = new LinkedHashMap<>();
-    double sumReductions = 0.0;
-    for (AllocationReductionDto reduction : reductions) {
-      double sliceAmount = sliceAmount(item, reduction.targetId(), jobOrderDimension);
-      if (sliceAmount <= 0.0) {
-        throw new BadRequestException("Cannot deduct from a target the entry is not earmarked to");
-      }
-      if (plan.put(reduction.targetId(), reduction.amount()) != null) {
-        throw new BadRequestException("A target may appear at most once in the deduct-from plan");
-      }
-      if (reduction.amount() > sliceAmount + REDUCTION_EPSILON) {
-        throw new BadRequestException("Cannot deduct more from a tag than it holds");
-      }
-      sumReductions += reduction.amount();
-    }
-    if (sumReductions > totalX + REDUCTION_EPSILON) {
-      throw new BadRequestException("The deduct-from plan exceeds the deducted amount");
-    }
-    // The rest absorbs whatever the tags did not; if that is more than the rest holds, the plan is
-    // under-assigned and cannot be applied without over-drawing the rest (the R5 422).
-    if (totalX - sumReductions > rest + REDUCTION_EPSILON) {
-      throw new OverAllocationException();
-    }
-    return plan;
-  }
-
-  /**
-   * Auto-derives a dimension's "deduct from" plan when the caller omitted one: take {@code totalX}
-   * from the not-yet-assigned rest first, then spread the remainder across the entry's tags in
-   * proportion to their current amount (the last tag absorbs the rounding residue so the plan sums
-   * exactly). Always yields an applyable plan.
-   *
-   * @param item the entry whose slices to spend against; never {@code null}
-   * @param totalX the total quantity being deducted
-   * @param rest the dimension's not-yet-assigned rest (already SCU-rounded)
-   * @param jobOrderDimension {@code true} for job-order slices, {@code false} for mission slices
-   * @return the derived {@code targetId → amount} plan (empty when the rest already covers {@code
-   *     totalX})
-   */
-  private Map<UUID, Double> defaultReductionPlan(
-      InventoryItem item, double totalX, double rest, boolean jobOrderDimension) {
-    Map<UUID, Double> plan = new LinkedHashMap<>();
-    double forced = InventoryItem.roundToScuScale(totalX - rest);
-    if (forced <= REDUCTION_EPSILON) {
-      return plan; // the rest covers the whole deduction
-    }
-    List<UUID> targets = new ArrayList<>();
-    List<Double> sliceAmounts = new ArrayList<>();
-    if (jobOrderDimension) {
-      for (InventoryJobOrderAllocation a : item.getJobOrderAllocations()) {
-        if (a.getJobOrder() != null) {
-          targets.add(a.getJobOrder().getId());
-          sliceAmounts.add(a.getAmount() != null ? a.getAmount() : 0.0);
-        }
-      }
-    } else {
-      for (InventoryMissionAllocation a : item.getMissionAllocations()) {
-        if (a.getMission() != null) {
-          targets.add(a.getMission().getId());
-          sliceAmounts.add(a.getAmount() != null ? a.getAmount() : 0.0);
-        }
-      }
-    }
-    double totalSlice = sliceAmounts.stream().mapToDouble(Double::doubleValue).sum();
-    if (totalSlice <= 0.0) {
-      return plan;
-    }
-    double assigned = 0.0;
-    for (int i = 0; i < targets.size(); i++) {
-      double share;
-      if (i == targets.size() - 1) {
-        share = InventoryItem.roundToScuScale(forced - assigned); // last tag takes the residue
-      } else {
-        share = InventoryItem.roundToScuScale(forced * (sliceAmounts.get(i) / totalSlice));
-      }
-      share = Math.min(share, sliceAmounts.get(i)); // never over-draw a tag
-      if (share > 0.0) {
-        plan.put(targets.get(i), share);
-        assigned = InventoryItem.roundToScuScale(assigned + share);
-      }
-    }
-    return plan;
-  }
-
-  /**
-   * Applies a resolved plan to the entry's slices, shrinking (and removing when they hit zero) each
-   * tagged slice by its planned amount. Whatever the plan did not cover implicitly comes from the
-   * dimension's rest once {@link #bookOutInventoryItem} lowers the entry amount.
-   *
-   * @param item the entry whose slices to shrink; never {@code null}
-   * @param orderReductions the job-order plan (orderId → SCU)
-   * @param missionReductions the mission plan (missionId → SCU)
-   */
-  private void applyReductions(
-      InventoryItem item, Map<UUID, Double> orderReductions, Map<UUID, Double> missionReductions) {
-    orderReductions.forEach(
-        (orderId, scu) -> InventoryAllocations.reduceJobOrder(item, orderId, scu));
-    missionReductions.forEach(
-        (missionId, scu) -> InventoryAllocations.reduceMission(item, missionId, scu));
-  }
-
-  /**
    * Carries the reduced tags of a transfer onto the moved row ("Marken mitnehmen", REQ-INV-027):
    * each planned reduction becomes a same-size earmark on {@code target}, inheriting the source
-   * order slice's delivered flag. Must run BEFORE {@link #applyReductions} shrinks the source
-   * slices, since it reads their managed {@code JobOrder} / {@code Mission} and delivered state.
+   * order slice's delivered flag. Must run BEFORE the reductions are applied, which shrinks the
+   * source slices, since it reads their managed {@code JobOrder} / {@code Mission} and delivered
+   * state.
    *
    * @param source the source row whose slices are read for the tags; never {@code null}
    * @param target the freshly built moved row to earmark; never {@code null}
@@ -649,24 +508,6 @@ public class InventoryCheckoutService {
         InventoryAllocations.addMission(target, slice.getMission(), reduction.getValue());
       }
     }
-  }
-
-  /**
-   * The pre-decrement slice amount of {@code targetId} in the given dimension, or {@code 0.0} when
-   * the entry does not earmark it.
-   *
-   * @param item the entry; never {@code null}
-   * @param targetId the job-order or mission id; never {@code null}
-   * @param jobOrderDimension {@code true} for job-order slices, {@code false} for mission slices
-   * @return the slice amount, or {@code 0.0} when not earmarked
-   */
-  private double sliceAmount(InventoryItem item, UUID targetId, boolean jobOrderDimension) {
-    if (jobOrderDimension) {
-      InventoryJobOrderAllocation slice = InventoryAllocations.jobOrderSlice(item, targetId);
-      return slice != null && slice.getAmount() != null ? slice.getAmount() : 0.0;
-    }
-    InventoryMissionAllocation slice = InventoryAllocations.missionSlice(item, targetId);
-    return slice != null && slice.getAmount() != null ? slice.getAmount() : 0.0;
   }
 
   /**

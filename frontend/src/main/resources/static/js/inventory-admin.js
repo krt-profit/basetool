@@ -1178,7 +1178,6 @@ function assocSubmit(split, pop, method) {
     const entryId = split.getAttribute('data-entry-id');
     const field = split.getAttribute('data-assoc-field');
     const targetId = pop.getAttribute('data-assoc-target');
-    const version = parseInt(split.getAttribute('data-version'), 10);
     const isPiece = split.getAttribute('data-piece') === 'true';
     let amount = null;
     if (method !== 'DELETE') {
@@ -1192,8 +1191,14 @@ function assocSubmit(split, pop, method) {
         }
         amount = Math.round(amount * 1000) / 1000;
     }
-    const body = { field: field, targetId: targetId, amount: amount, version: version };
     const run = function () {
+        // Read the entry version at SEND time, not click time (REQ-FE-003): both chip dimensions
+        // share the entry @Version and the inv-assoc key, so a rapid 2nd edit of the same entry is
+        // queued behind the 1st — which force-increments the version and syncs it onto data-version
+        // via assocRerender. Reading data-version here (inside the serialized task) picks up that
+        // fresh value, avoiding a self-inflicted 409.
+        const version = parseInt(split.getAttribute('data-version'), 10);
+        const body = { field: field, targetId: targetId, amount: amount, version: version };
         return assocSend(entryId, method, body, split, pop);
     };
     if (window.krtFetch && typeof window.krtFetch.serialize === 'function') {

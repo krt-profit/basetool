@@ -44,6 +44,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.OptimisticLock;
 
@@ -85,6 +86,11 @@ import org.hibernate.annotations.OptimisticLock;
       "steps",
       "objectives"
     })
+// Batch-fetch lazy proxies of this entity so a page of InventoryJobOrderAllocation /
+// InventoryMissionAllocation rows initialises its to-one references in bounded batches
+// instead of one-by-one (the allocation N+1, REQ-DATA-003). @BatchSize is invalid on a
+// @ManyToOne field in Hibernate 6, so it goes on the target entity class.
+@BatchSize(size = 100)
 public class Mission extends AbstractEntity<UUID> {
 
   @Getter(onMethod_ = @__(@Override))

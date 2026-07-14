@@ -116,7 +116,7 @@
                                 <option th:each="order : ${jobOrders}" th:value="${order.id}" th:data-materials="${order.materials != null and !order.materials.isEmpty() ? #strings.listJoin(order.materials.![material.id], ',') : ''}" th:text="${'#' + order.displayId + ' - ' + order.handle + ' (' + order.status + ')'}"></option>
                             </select>
                             <input type="number" class="assoc-menge-input" data-alloc-amount step="0.001" min="0" th:placeholder="#{inventory.assoc.amount}">
-                            <button type="button" class="btn btn-ghost" data-trigger="inv-input-remove-alloc" th:title="#{inventory.assoc.remove}" aria-label="Entfernen">&#215;</button>
+                            <button type="button" class="btn btn-ghost" data-trigger="inv-input-remove-alloc" th:title="#{inventory.assoc.remove}" th:aria-label="#{inventory.assoc.remove}">&#215;</button>
                         </div>
                     </template>
                 </div>
@@ -132,7 +132,7 @@
                                 <option th:each="mission : ${missions}" th:value="${mission.id}" th:text="${mission.plannedStartTime != null} ? |${mission.name} - ${#temporals.format(mission.plannedStartTime, #messages.msg('format.date'), #locale)}| : ${mission.name}"></option>
                             </select>
                             <input type="number" class="assoc-menge-input" data-alloc-amount step="0.001" min="0" th:placeholder="#{inventory.assoc.amount}">
-                            <button type="button" class="btn btn-ghost" data-trigger="inv-input-remove-alloc" th:title="#{inventory.assoc.remove}" aria-label="Entfernen">&#215;</button>
+                            <button type="button" class="btn btn-ghost" data-trigger="inv-input-remove-alloc" th:title="#{inventory.assoc.remove}" th:aria-label="#{inventory.assoc.remove}">&#215;</button>
                         </div>
                     </template>
                 </div>

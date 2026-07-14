@@ -238,11 +238,13 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
     List<JobOrderHandoverItemCreateDto> items = new ArrayList<>();
     for (int i = 0; i < f.aslariteInvIds().size(); i++) {
       items.add(
-          new JobOrderHandoverItemCreateDto(f.aslariteInvIds().get(i), f.aslariteAmounts().get(i)));
+          new JobOrderHandoverItemCreateDto(
+              f.aslariteInvIds().get(i), f.aslariteAmounts().get(i), null));
     }
     for (int i = 0; i < f.ouratiteInvIds().size(); i++) {
       items.add(
-          new JobOrderHandoverItemCreateDto(f.ouratiteInvIds().get(i), f.ouratiteAmounts().get(i)));
+          new JobOrderHandoverItemCreateDto(
+              f.ouratiteInvIds().get(i), f.ouratiteAmounts().get(i), null));
     }
 
     JobOrderHandoverCreateDto dto =

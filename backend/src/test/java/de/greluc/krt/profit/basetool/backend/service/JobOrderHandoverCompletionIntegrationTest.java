@@ -168,8 +168,8 @@ class JobOrderHandoverCompletionIntegrationTest {
             "swing-by",
             "KARTELL",
             List.of(
-                new JobOrderHandoverItemCreateDto(f.invItem1Id(), 1.8),
-                new JobOrderHandoverItemCreateDto(f.invItem2Id(), 5.7)));
+                new JobOrderHandoverItemCreateDto(f.invItem1Id(), 1.8, null),
+                new JobOrderHandoverItemCreateDto(f.invItem2Id(), 5.7, null)));
 
     // When — must NOT throw ObjectOptimisticLockingFailureException
     jobOrderHandoverService.createHandover(f.jobOrderId(), dto);

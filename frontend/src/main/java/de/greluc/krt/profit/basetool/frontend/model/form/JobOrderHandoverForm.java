@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.model.form;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.AllocationReductionDto;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -37,5 +38,12 @@ public class JobOrderHandoverForm {
   public static class JobOrderHandoverItemForm {
     private UUID inventoryItemId;
     private Double amount;
+
+    /**
+     * Optional per-mission "deduct from" plan for the handed amount (Variante C, REQ-INV-027): the
+     * ambiguous-case picker fills it so the handed SCU leave the chosen mission earmarks; {@code
+     * null} lets the backend auto-clamp the mission dimension (rest-first, then proportional).
+     */
+    private List<AllocationReductionDto> missionReductions;
   }
 }

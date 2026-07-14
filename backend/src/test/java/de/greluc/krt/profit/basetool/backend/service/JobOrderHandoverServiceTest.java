@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderHandover;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
+import de.greluc.krt.profit.basetool.backend.model.dto.AllocationReductionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverItemCreateDto;
@@ -107,7 +108,8 @@ class JobOrderHandoverServiceTest {
   @Test
   void createHandover_shouldReduceInventoryAmount_whenAmountIsSmallerThanStock() {
     // Given
-    JobOrderHandoverItemCreateDto itemDto = new JobOrderHandoverItemCreateDto(inventoryId, 4.0);
+    JobOrderHandoverItemCreateDto itemDto =
+        new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", "Rogue", List.of(itemDto));
 
@@ -140,9 +142,93 @@ class JobOrderHandoverServiceTest {
   }
 
   @Test
+  void createHandover_shouldAutoClampMissionEarmark_whenDualTaggedPartialHandover() {
+    // Given: the entry is earmarked at its FULL amount to BOTH the order and a mission (as a
+    // refinery deposit for an order that also belongs to a mission does). A partial handover to the
+    // order must auto-clamp the mission earmark to the remaining stock instead of 422-ing
+    // (REQ-INV-027) — the handed physical SCU leave BOTH earmarks.
+    de.greluc.krt.profit.basetool.backend.model.Mission mission =
+        new de.greluc.krt.profit.basetool.backend.model.Mission();
+    mission.setId(UUID.randomUUID());
+    InventoryAllocations.addMission(inventoryItem, mission, 10.0);
+
+    JobOrderHandoverItemCreateDto itemDto =
+        new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null);
+    JobOrderHandoverCreateDto createDto =
+        new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", "Rogue", List.of(itemDto));
+
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
+    when(jobOrderHandoverRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+    when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
+        .thenReturn(mock(JobOrderHandoverDto.class));
+
+    // When
+    service.createHandover(orderId, createDto);
+
+    // Then: the entry drops to 6, and BOTH the order slice and the auto-clamped mission slice
+    // follow
+    // the physical stock down to 6 (no OverAllocationException).
+    assertEquals(6.0, inventoryItem.getAmount());
+    assertEquals(6.0, inventoryItem.getJobOrderAllocations().iterator().next().getAmount());
+    assertEquals(6.0, inventoryItem.getMissionAllocations().iterator().next().getAmount());
+    verify(inventoryItemRepository).save(inventoryItem);
+  }
+
+  @Test
+  void createHandover_shouldApplyExplicitMissionPlan_whenAmbiguousMultiMission() {
+    // Given: the entry is dual-tagged to the order (full 10) and split across TWO missions (6 + 4,
+    // no mission rest). A partial handover of 4 could shrink either mission, so the modal picker
+    // sends an explicit plan taking all 4 out of mission A; mission B stays untouched.
+    de.greluc.krt.profit.basetool.backend.model.Mission missionA =
+        new de.greluc.krt.profit.basetool.backend.model.Mission();
+    missionA.setId(UUID.randomUUID());
+    de.greluc.krt.profit.basetool.backend.model.Mission missionB =
+        new de.greluc.krt.profit.basetool.backend.model.Mission();
+    missionB.setId(UUID.randomUUID());
+    InventoryAllocations.addMission(inventoryItem, missionA, 6.0);
+    InventoryAllocations.addMission(inventoryItem, missionB, 4.0);
+
+    JobOrderHandoverItemCreateDto itemDto =
+        new JobOrderHandoverItemCreateDto(
+            inventoryId, 4.0, List.of(new AllocationReductionDto(missionA.getId(), 4.0)));
+    JobOrderHandoverCreateDto createDto =
+        new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", "Rogue", List.of(itemDto));
+
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
+        .thenReturn(Optional.of(inventoryItem));
+    when(jobOrderHandoverRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+    when(jobOrderHandoverMapper.toDto(any(JobOrderHandover.class)))
+        .thenReturn(mock(JobOrderHandoverDto.class));
+
+    // When
+    service.createHandover(orderId, createDto);
+
+    // Then: the entry drops to 6, mission A took the whole 4 (6 -> 2), mission B is untouched (4).
+    assertEquals(6.0, inventoryItem.getAmount());
+    double missionAAmount =
+        inventoryItem.getMissionAllocations().stream()
+            .filter(a -> a.getMission().getId().equals(missionA.getId()))
+            .findFirst()
+            .orElseThrow()
+            .getAmount();
+    double missionBAmount =
+        inventoryItem.getMissionAllocations().stream()
+            .filter(a -> a.getMission().getId().equals(missionB.getId()))
+            .findFirst()
+            .orElseThrow()
+            .getAmount();
+    assertEquals(2.0, missionAAmount);
+    assertEquals(4.0, missionBAmount);
+  }
+
+  @Test
   void createHandover_shouldDeleteInventoryItem_whenAmountIsFullyHandedOver() {
     // Given
-    JobOrderHandoverItemCreateDto itemDto = new JobOrderHandoverItemCreateDto(inventoryId, 10.0);
+    JobOrderHandoverItemCreateDto itemDto =
+        new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
 
@@ -195,7 +281,8 @@ class JobOrderHandoverServiceTest {
   @Test
   void createHandover_shouldThrowException_whenAmountExceedsStock() {
     // Given
-    JobOrderHandoverItemCreateDto itemDto = new JobOrderHandoverItemCreateDto(inventoryId, 11.0);
+    JobOrderHandoverItemCreateDto itemDto =
+        new JobOrderHandoverItemCreateDto(inventoryId, 11.0, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
 
@@ -216,7 +303,8 @@ class JobOrderHandoverServiceTest {
     // this order must be rejected by the pre-write guard exactly like a foreign-order item.
     inventoryItem.getJobOrderAllocations().clear();
 
-    JobOrderHandoverItemCreateDto itemDto = new JobOrderHandoverItemCreateDto(inventoryId, 5.0);
+    JobOrderHandoverItemCreateDto itemDto =
+        new JobOrderHandoverItemCreateDto(inventoryId, 5.0, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "swing-by", null, List.of(itemDto));
 
@@ -258,8 +346,10 @@ class JobOrderHandoverServiceTest {
     InventoryAllocations.addJobOrder(inventoryItem2, order, inventoryItem2.getAmount(), false);
 
     // Hand over 5.0 of material1 (partial) and 8.0 of material2 (full)
-    JobOrderHandoverItemCreateDto itemDto1 = new JobOrderHandoverItemCreateDto(inventoryId, 5.0);
-    JobOrderHandoverItemCreateDto itemDto2 = new JobOrderHandoverItemCreateDto(inventoryId2, 8.0);
+    JobOrderHandoverItemCreateDto itemDto1 =
+        new JobOrderHandoverItemCreateDto(inventoryId, 5.0, null);
+    JobOrderHandoverItemCreateDto itemDto2 =
+        new JobOrderHandoverItemCreateDto(inventoryId2, 8.0, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "swing-by", null, List.of(itemDto1, itemDto2));
 
@@ -333,8 +423,10 @@ class JobOrderHandoverServiceTest {
 
     // First item is fully consumed (triggers deleteJobOrderAllocationsByJobOrderAndMaterial),
     // second is partial
-    JobOrderHandoverItemCreateDto itemDto1 = new JobOrderHandoverItemCreateDto(inventoryId, 10.0);
-    JobOrderHandoverItemCreateDto itemDto2 = new JobOrderHandoverItemCreateDto(inventoryId2, 3.0);
+    JobOrderHandoverItemCreateDto itemDto1 =
+        new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null);
+    JobOrderHandoverItemCreateDto itemDto2 =
+        new JobOrderHandoverItemCreateDto(inventoryId2, 3.0, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "swing-by", null, List.of(itemDto1, itemDto2));
 
@@ -362,7 +454,8 @@ class JobOrderHandoverServiceTest {
   @Test
   void createHandover_shouldNotCompleteOrder_whenMaterialStillOpen() {
     // Given — only part of the required material is handed over; the order must NOT be completed
-    JobOrderHandoverItemCreateDto itemDto = new JobOrderHandoverItemCreateDto(inventoryId, 4.0);
+    JobOrderHandoverItemCreateDto itemDto =
+        new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
 
@@ -386,7 +479,8 @@ class JobOrderHandoverServiceTest {
   @Test
   void createHandover_shouldNotCompleteOrder_whenInventoryItemLinkedToOrder() {
     // Given — inventory item still belongs to the order (not fully handed over)
-    JobOrderHandoverItemCreateDto itemDto = new JobOrderHandoverItemCreateDto(inventoryId, 3.0);
+    JobOrderHandoverItemCreateDto itemDto =
+        new JobOrderHandoverItemCreateDto(inventoryId, 3.0, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
 
@@ -420,7 +514,8 @@ class JobOrderHandoverServiceTest {
     inventoryItem.getJobOrderAllocations().clear();
     InventoryAllocations.addJobOrder(inventoryItem, otherOrder, inventoryItem.getAmount(), false);
 
-    JobOrderHandoverItemCreateDto itemDto = new JobOrderHandoverItemCreateDto(inventoryId, 5.0);
+    JobOrderHandoverItemCreateDto itemDto =
+        new JobOrderHandoverItemCreateDto(inventoryId, 5.0, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
 
@@ -438,7 +533,8 @@ class JobOrderHandoverServiceTest {
   @Test
   void createHandover_shouldThrowException_whenAmountExceedsRemainingAmount() {
     // Given — inventoryItem.amount = 10.0, but 15.0 is requested (exceeds remaining)
-    JobOrderHandoverItemCreateDto itemDto = new JobOrderHandoverItemCreateDto(inventoryId, 15.0);
+    JobOrderHandoverItemCreateDto itemDto =
+        new JobOrderHandoverItemCreateDto(inventoryId, 15.0, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
@@ -465,7 +561,8 @@ class JobOrderHandoverServiceTest {
     // double-save that triggered ObjectOptimisticLockingFailureException (HTTP 409).
     // Fix: call completeJobOrderWithinTransaction(managedJobOrder) where managedJobOrder is the
     // re-fetched entity (after clearAutomatically=true evicts the session cache).
-    JobOrderHandoverItemCreateDto itemDto = new JobOrderHandoverItemCreateDto(inventoryId, 10.0);
+    JobOrderHandoverItemCreateDto itemDto =
+        new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "swing-by", null, List.of(itemDto));
 
@@ -504,7 +601,8 @@ class JobOrderHandoverServiceTest {
     inventoryItem.getJobOrderAllocations().clear();
     InventoryAllocations.addJobOrder(inventoryItem, order, 4.0, false);
 
-    JobOrderHandoverItemCreateDto itemDto = new JobOrderHandoverItemCreateDto(inventoryId, 4.0);
+    JobOrderHandoverItemCreateDto itemDto =
+        new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "swing-by", null, List.of(itemDto));
 
@@ -534,7 +632,8 @@ class JobOrderHandoverServiceTest {
     inventoryItem.setAmount(5.0);
     jobOrderMaterial.setAmount(5.0);
 
-    JobOrderHandoverItemCreateDto itemDto = new JobOrderHandoverItemCreateDto(inventoryId, 2.5);
+    JobOrderHandoverItemCreateDto itemDto =
+        new JobOrderHandoverItemCreateDto(inventoryId, 2.5, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
@@ -573,7 +672,8 @@ class JobOrderHandoverServiceTest {
     order.setRequestingOrgUnit(squadronA);
     inventoryItem.setOwningOrgUnit(squadronB);
 
-    JobOrderHandoverItemCreateDto itemDto = new JobOrderHandoverItemCreateDto(inventoryId, 3.0);
+    JobOrderHandoverItemCreateDto itemDto =
+        new JobOrderHandoverItemCreateDto(inventoryId, 3.0, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(
             Instant.now(), "CrossSquadronHandler", "BRV", List.of(itemDto));
@@ -622,8 +722,10 @@ class JobOrderHandoverServiceTest {
     inventoryItem2.setAmount(8.0);
     InventoryAllocations.addJobOrder(inventoryItem2, order, inventoryItem2.getAmount(), false);
 
-    JobOrderHandoverItemCreateDto itemDto1 = new JobOrderHandoverItemCreateDto(inventoryId, 10.0);
-    JobOrderHandoverItemCreateDto itemDto2 = new JobOrderHandoverItemCreateDto(inventoryId2, 8.0);
+    JobOrderHandoverItemCreateDto itemDto1 =
+        new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null);
+    JobOrderHandoverItemCreateDto itemDto2 =
+        new JobOrderHandoverItemCreateDto(inventoryId2, 8.0, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto1, itemDto2));
 
@@ -665,7 +767,8 @@ class JobOrderHandoverServiceTest {
     // Given — only 4.0 of the required 10.0 is handed over, so the order stays open. The
     // JOB_ORDER_HANDOVER_CREATED audit must report items=1 and autoCompleted=false, and there
     // must be exactly one INVENTORY_HANDED_OVER event for the single handed item.
-    JobOrderHandoverItemCreateDto itemDto = new JobOrderHandoverItemCreateDto(inventoryId, 4.0);
+    JobOrderHandoverItemCreateDto itemDto =
+        new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
 
@@ -712,7 +815,8 @@ class JobOrderHandoverServiceTest {
     inventoryItem.getJobOrderAllocations().clear();
     InventoryAllocations.addJobOrder(inventoryItem, order, 10.00003, false);
 
-    JobOrderHandoverItemCreateDto itemDto = new JobOrderHandoverItemCreateDto(inventoryId, 10.0);
+    JobOrderHandoverItemCreateDto itemDto =
+        new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
 
@@ -757,7 +861,8 @@ class JobOrderHandoverServiceTest {
     inventoryItem.getJobOrderAllocations().clear();
     InventoryAllocations.addJobOrder(inventoryItem, order, 10.0002, false);
 
-    JobOrderHandoverItemCreateDto itemDto = new JobOrderHandoverItemCreateDto(inventoryId, 10.0);
+    JobOrderHandoverItemCreateDto itemDto =
+        new JobOrderHandoverItemCreateDto(inventoryId, 10.0, null);
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
 

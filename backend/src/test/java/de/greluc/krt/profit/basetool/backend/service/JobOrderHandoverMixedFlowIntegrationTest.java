@@ -187,8 +187,8 @@ class JobOrderHandoverMixedFlowIntegrationTest {
             "swing-by",
             "KARTELL",
             List.of(
-                new JobOrderHandoverItemCreateDto(f.invItem1Id(), 1.8),
-                new JobOrderHandoverItemCreateDto(f.invItem2Id(), 2.0)));
+                new JobOrderHandoverItemCreateDto(f.invItem1Id(), 1.8, null),
+                new JobOrderHandoverItemCreateDto(f.invItem2Id(), 2.0, null)));
     jobOrderHandoverService.createHandover(f.jobOrderId(), firstDto);
 
     Material ouratiteRef =
@@ -234,7 +234,7 @@ class JobOrderHandoverMixedFlowIntegrationTest {
             Instant.now(),
             "swing-by",
             "KARTELL",
-            List.of(new JobOrderHandoverItemCreateDto(f.invItem2Id(), 3.7)));
+            List.of(new JobOrderHandoverItemCreateDto(f.invItem2Id(), 3.7, null)));
     jobOrderHandoverService.createHandover(f.jobOrderId(), secondDto);
 
     transactionTemplate.executeWithoutResult(

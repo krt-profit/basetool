@@ -55417,6 +55417,20 @@
         },
         "required" : [ "amount", "jobOrderItemId" ]
       },
+      "AllocationReductionDto" : {
+        "type" : "object",
+        "properties" : {
+          "targetId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "amount" : {
+            "type" : "number",
+            "format" : "double"
+          }
+        },
+        "required" : [ "amount", "targetId" ]
+      },
       "JobOrderHandoverCreateDto" : {
         "type" : "object",
         "properties" : {
@@ -55451,6 +55465,12 @@
           "amount" : {
             "type" : "number",
             "format" : "double"
+          },
+          "missionReductions" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AllocationReductionDto"
+            }
           }
         },
         "required" : [ "amount", "inventoryItemId" ]
@@ -55975,20 +55995,6 @@
           }
         },
         "required" : [ "amount", "version" ]
-      },
-      "AllocationReductionDto" : {
-        "type" : "object",
-        "properties" : {
-          "targetId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "amount" : {
-            "type" : "number",
-            "format" : "double"
-          }
-        },
-        "required" : [ "amount", "targetId" ]
       },
       "InventoryItemBookOutDto" : {
         "type" : "object",

@@ -19,10 +19,23 @@
 
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
-/** Data transfer record carrying Job Order Handover Item Create payload. */
+/**
+ * Frontend mirror of the backend handover-item payload: hand over {@code amount} SCU of {@code
+ * inventoryItemId}; {@code missionReductions} optionally names how much of the handed amount comes
+ * out of each mission earmark (Variante C, REQ-INV-027), {@code null} to auto-clamp.
+ *
+ * @param inventoryItemId the inventory entry handed over from
+ * @param amount the SCU amount handed over
+ * @param missionReductions the per-mission "deduct from" plan, or {@code null} to auto-clamp
+ */
 public record JobOrderHandoverItemCreateDto(
-    @NotNull UUID inventoryItemId, @NotNull @Positive Double amount) {}
+    @NotNull UUID inventoryItemId,
+    @NotNull @Positive Double amount,
+    @Valid @Nullable List<AllocationReductionDto> missionReductions) {}

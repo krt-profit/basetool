@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.exception.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderHandoverMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -43,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -249,15 +249,20 @@ public class JobOrderHandoverService {
       if (remainingAmount <= QUANTITY_EPSILON) {
         inventoryItemRepository.delete(inventoryItem);
       } else {
-        inventoryItem.setAmount(remainingAmount);
         // Variante C (REQ-INV-027): the handover fulfils this job order, so the handed stock leaves
-        // inventory AND its earmark to the order — shrink that slice by the handed amount. If the
-        // reduced entry no longer covers its remaining earmarks (e.g. a mission also had the full
-        // amount reserved), block (422, R5) so the user lowers those first.
+        // inventory AND its earmark to the order — shrink that order slice by the handed amount.
+        // The
+        // same physical SCU also leave any mission earmark, so the mission dimension is clamped by
+        // the same amount: resolve its "deduct from" plan against the PRE-decrement slices (an
+        // explicit plan from the handover modal picker, else rest-first then proportional) and
+        // apply
+        // it, keeping R5 without a 422 for a dual-tagged partial handover.
+        Map<UUID, Double> missionPlan =
+            AllocationReductions.resolveReductionPlan(
+                inventoryItem, itemDto.missionReductions(), itemDto.amount(), false);
         InventoryAllocations.reduceJobOrder(inventoryItem, jobOrderId, itemDto.amount());
-        if (!InventoryAllocations.fits(inventoryItem)) {
-          throw new OverAllocationException();
-        }
+        AllocationReductions.applyPlan(inventoryItem, missionPlan, false);
+        inventoryItem.setAmount(remainingAmount);
         inventoryItemRepository.save(inventoryItem);
       }
 
