@@ -28,6 +28,8 @@
 
 ### Fixed
 
+- **Barrierefreiheit: Gedämpfter grauer Text erfüllt auf dem flachen schwarzen Hintergrund wieder den WCAG-AA-Kontrast.** Mit dem Wegfall des Wabenmusters lag gedämpfter Text in Grau 2 (`#646464`) nur noch bei rund 3,5:1 und unterschritt damit die AA-Schwelle für kleinen Text (sichtbar u. a. auf der Hangar-Seite). Muted-Text, Platzhalter und die leise Löschen-Schaltfläche nutzen jetzt den helleren Ton `--color-gray-2-text` (`#8A8A8A`, rund 6,1:1); Rahmen, Bildlaufleisten und dekorative Symbole behalten das bisherige Grau 2 (REQ-UI-003, REQ-UI-006).
+
 - **Keycloak-Nutzerabgleich: Der nächtliche Abgleich lief ins Leere, wenn dem Dienstkonto die Berechtigung `view-realm` fehlte.** Seit der rollenindizierten Auflösung (5000-Konten-Härtung) liest der Abgleich die Realm-Rollen und deren Mitglieder, was zusätzlich zu `view-users` die `realm-management`-Rolle `view-realm` erfordert. Fehlt sie, brach jeder Lauf mit `403` ab — der Abgleich wird übersprungen (kein Datenverlust), aber ausgetretene Mitglieder behielten ihre Rollen und Rollenänderungen wurden nur beim interaktiven Login übernommen. Der Fehler wird jetzt mit klarem Hinweis auf die fehlende Rolle protokolliert; die nötige Berechtigung ist in `docs/keycloak/README.md` dokumentiert (REQ-SEC-018).
 
 - **Logging: Unauthentifizierte Backend-Anfragen (HTTP 401) werden nicht mehr als WARN protokolliert.** Der interne TLS-Health-Probe fragt alle 30 Sekunden die Wurzel `/` jedes Dienstes ab und erzeugte so rund 2 WARN-Zeilen pro Minute reines Rauschen. Ein 401 ist der erwartete Normalfall für jeden anonymen Aufrufer und läuft jetzt auf DEBUG; 403 und alle anderen 4xx bleiben WARN, und die Metrik `basetool_http_error_total{code}` ist unverändert (REQ-OBS-001).

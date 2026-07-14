@@ -62,6 +62,10 @@ honeycomb/Wabenmuster wash was removed 2026-07); a subtle radial **top bloom**
 (`rgba(231,126,35,0.10)` fading to transparent) over the black is permitted on the
 login / entry surfaces. `color-scheme: dark`; there is **no light theme**.
 
+> **Contrast note.** Removing the honeycomb wash left muted Grau 2 text at a sub-AA ratio on
+> the now-flat black. Muted **text** must use the accessible `--color-gray-2-text` tint per
+> REQ-UI-006, not the canonical `--color-gray-2`.
+
 ### REQ-UI-004 — Typography
 
 - **One typeface: Lato.** Body / UI default weight Light 300, Bold 700 for emphasis.
@@ -116,10 +120,21 @@ use the lightened tints — `--color-danger-text` `#F2564B`, `--color-info-text`
 borders and the brand Bereichsfarben tags. An invalid field additionally takes a red
 hairline (`.input-error`) beside its `.field-error` message.
 
+The same rule applies to the **muted grayscale**: Grau 2 (`--color-gray-2` `#646464`)
+reads at only ≈ 3.5:1 on the flat-black page and fails WCAG AA as small text (the former
+honeycomb wash masked this from the automated a11y gate; the flat-black surface of
+REQ-UI-003 exposed it). When muted grey **is the text itself** — `.text-muted`, secondary
+labels, hints, placeholders, the quiet-danger button label — use `--color-gray-2-text`
+`#8A8A8A` (≈ 6.1:1 on black, ≥ 4.9:1 on the `#141414` / `#1C1C1C` surfaces). Keep the
+canonical `--color-gray-2` for hairline borders, scrollbar thumbs, disabled fills and
+purely decorative glyphs.
+
 **Acceptance**
 
 - [ ] Semantic colour used as small text uses the matching `*-text` tint, not the dark
   canonical hue; the canonical hues stay on fills/borders/tags.
+- [ ] Muted grey used as small text uses `--color-gray-2-text`, not the canonical
+  `--color-gray-2`; the canonical Grau 2 stays on borders/scrollbars/decorative glyphs.
 
 ### REQ-UI-007 — Visual style: square-first sci-fi HUD
 
