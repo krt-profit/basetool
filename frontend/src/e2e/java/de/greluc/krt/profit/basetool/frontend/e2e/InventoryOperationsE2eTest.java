@@ -475,9 +475,20 @@ class InventoryOperationsE2eTest {
                       + "']");
           assertThat(orderChip)
               .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
+          String rawChipAmount = orderChip.getAttribute("data-amount");
+          if (rawChipAmount == null) {
+            throw new AssertionError("order chip is missing its data-amount attribute");
+          }
+          double chipAmount;
+          try {
+            chipAmount = Double.parseDouble(rawChipAmount);
+          } catch (NumberFormatException e) {
+            throw new AssertionError(
+                "order chip data-amount is not a parseable number: " + rawChipAmount, e);
+          }
           assertEquals(
               30.0,
-              Double.parseDouble(orderChip.getAttribute("data-amount")),
+              chipAmount,
               AMOUNT_DELTA,
               "40 of the 50 booked out came from the order tag (70 - 40 = 30)");
         });
