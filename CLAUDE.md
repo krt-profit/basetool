@@ -67,6 +67,18 @@ visual source of truth is the design skill at
 [`.claude/skills/das-kartell-design/README.md`](.claude/skills/das-kartell-design/README.md)
 (README.md = Quelle der Wahrheit für Farben, Typografie, Komponenten).
 
+**The design system is a git submodule (`github.com/krt-profit/design-system`) and MUST be
+present before any UI work.** `git worktree add` does not populate submodules, so in a fresh
+worktree `.claude/skills/das-kartell-design/` is empty and the source of truth above is
+unreadable. A `SessionStart` hook (`.claude/settings.json` →
+[`.claude/hooks/ensure-design-system.ps1`](.claude/hooks/ensure-design-system.ps1)) materialises
+it automatically at session start (offline-first from the module store, with a copy from the main
+worktree as fallback). **If that directory is still empty when you start UI work** — hooks
+disabled, a non-`pwsh` host, or a worktree outside the harness — populate it yourself before
+touching any frontend surface: `git submodule update --init .claude/skills/das-kartell-design`,
+or, offline, copy it from the main worktree (find it via `git worktree list`). Never do UI work
+against an empty design system and never treat its absence as "no design system applies".
+
 **Live update is a binding requirement: every part of the frontend must support live update to
 the current standard.** Every create / update / delete / toggle / reorder / filter / paginate
 interaction updates the DOM **in place** through the shared `krtFetch` / `krtCsrf` / fragment-swap
