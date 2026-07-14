@@ -97,6 +97,16 @@
     --color-info-text: #6c93ef; /* ~ 6.1:1 on black */
     --color-success-text: #2ebc3d; /* ~ 5.6:1 on black */
 
+    /* Accessible muted-text tint - Grau 2 (#646464) reads at only ~3.5:1 on the
+       flat-black page and fails WCAG AA as small text (the former honeycomb wash
+       used to keep the automated a11y gate from measuring it; the flat-black
+       surface of REQ-UI-003 exposed the shortfall). Use this lightened variant
+       whenever muted grey IS the text itself (.text-muted, secondary labels,
+       placeholders, hints); keep the canonical --color-gray-2 for hairline
+       borders, scrollbar thumbs, disabled fills and decorative glyphs. ~ 6.1:1
+       on black and >= 4.9:1 on the #141414 / #1c1c1c surfaces. */
+    --color-gray-2-text: #8a8a8a;
+
     /* Action hierarchy - how the orange accent is allocated. The filled
        orange CTA marks the ONE primary action per context; orange is for
        action + identity (logo, badges, headings), never plain data values.
@@ -613,7 +623,7 @@ tbody tr:nth-child(even):hover {
 }
 
 .tree-field .tree-field-cap {
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-size: 0.58rem;
     text-transform: uppercase;
     letter-spacing: 0.09em;
@@ -761,7 +771,7 @@ tbody tr:nth-child(even):hover {
 }
 
 .tree-gauge .tree-gauge-val .tree-gauge-max {
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-size: 0.74rem;
 }
 
@@ -787,7 +797,7 @@ tbody tr:nth-child(even):hover {
 }
 
 .tree-amount .tree-unit {
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-size: 0.74rem;
 }
 
@@ -922,7 +932,7 @@ tbody tr:nth-child(even):hover {
     padding: var(--space-4) var(--space-8);
     background-color: var(--color-bg-dark-gray);
     border-top: var(--border-hairline);
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-size: var(--fs-xs);
     display: flex;
     flex-wrap: wrap;
@@ -1497,9 +1507,9 @@ label:has(+ [required])::after {
 }
 
 /* Small muted help text under a form control (replaces ad-hoc inline
-   `font-size: 0.8rem; color: var(--color-gray-2)` styles). */
+   `font-size: 0.8rem; color: var(--color-gray-2-text)` styles). */
 .form-hint {
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-size: var(--fs-xs);
     margin-top: var(--space-2);
     max-width: var(--measure);
@@ -1583,7 +1593,7 @@ label:has(+ [required])::after {
     background-color: var(--color-surface-input);
     padding: 0.2rem 0.4rem;
     margin-left: var(--space-2);
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
 }
 
 /* Stacked label/value pair (e.g. the refinery method-rating readout): a neutral
@@ -1700,7 +1710,7 @@ textarea:focus {
 }
 
 input::placeholder {
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-style: italic;
 }
 
@@ -1935,7 +1945,7 @@ input[type='radio']:focus {
 /* Destructive, quiet — transparent until hover, then commits to red. */
 .btn-quiet-danger {
     background-color: transparent;
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     border: 1px solid var(--color-gray-3);
 }
 
@@ -2175,7 +2185,7 @@ input[type='radio']:focus {
 }
 
 .page-size-picker .page-size-label {
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-size: 0.8rem;
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -2195,7 +2205,7 @@ input[type='radio']:focus {
 
 .kv-list dt,
 .kv-list .kv-key {
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-family: var(--font-body);
     font-weight: var(--fw-bold);
     font-size: var(--fs-sm);
@@ -2255,7 +2265,7 @@ input[type='radio']:focus {
     color: var(--color-warning) !important;
 }
 .text-muted {
-    color: var(--color-gray-2) !important;
+    color: var(--color-gray-2-text) !important;
 }
 
 /* Utilities */
@@ -2424,7 +2434,7 @@ input[type='radio']:focus {
 }
 
 .chip--muted {
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     background-color: transparent;
     border-color: var(--color-gray-3);
 }
@@ -2817,7 +2827,7 @@ input[type='radio']:focus {
     font-weight: var(--fw-bold);
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     margin-top: var(--space-3);
 }
 
@@ -2963,7 +2973,7 @@ input[type='radio']:focus {
 .notification-dropdown-empty,
 .notification-empty {
     padding: var(--space-3);
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-size: 0.85rem;
 }
 
@@ -2992,7 +3002,7 @@ input[type='radio']:focus {
 }
 
 .notification-item-time {
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-size: 0.7rem;
 }
 
@@ -3018,7 +3028,7 @@ input[type='radio']:focus {
 }
 
 .squadron-switcher-label {
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     font-size: var(--fs-2xs);
@@ -3258,7 +3268,7 @@ input[type='radio']:focus {
 .bp-coverage__subtitle {
     max-width: var(--measure);
     margin: 0 0 var(--space-4);
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-size: var(--fs-sm);
 }
 
@@ -3337,13 +3347,13 @@ input[type='radio']:focus {
    appears only because they opted into global blueprint sharing (REQ-INV-018). Muted and
    small so it reads as a footnote, never competing with the member's name. */
 .bp-owner__external {
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-size: var(--fs-xs);
     font-style: italic;
 }
 
 .bp-owner__count {
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-size: var(--fs-xs);
 }
 
@@ -3371,7 +3381,7 @@ input[type='radio']:focus {
 .bp-coverage__empty {
     margin: 0;
     padding: var(--space-2) 0;
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
 }
 
 /* Coverage gap — nobody in the unit owns this item's blueprint. Uses the
@@ -3388,7 +3398,7 @@ input[type='radio']:focus {
 .bp-coverage__hint {
     display: block;
     margin-top: var(--space-1);
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-size: var(--fs-xs);
 }
 
@@ -3686,7 +3696,7 @@ details.hud-details[open] > summary::after {
 /* Non-selectable status rows (no matches / "keep typing"). */
 .krt-combobox__notice {
     padding: 0.75rem;
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-family: var(--font-body);
     font-style: italic;
 }
@@ -4583,7 +4593,7 @@ textarea:focus-visible,
     text-transform: uppercase;
     letter-spacing: 0.06em;
     font-size: 0.72rem;
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     padding: 11px 14px;
     border: none;
     background: none;
@@ -4621,7 +4631,7 @@ textarea:focus-visible,
     font-size: 0.78rem;
 }
 .facts-bar .fact-k {
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     text-transform: uppercase;
     font-size: 0.62rem;
     letter-spacing: 0.08em;
@@ -4665,7 +4675,7 @@ textarea:focus-visible,
     text-transform: uppercase;
     letter-spacing: 0.12em;
     font-weight: var(--fw-bold);
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     margin-bottom: 8px;
 }
 /* Compact two-column key/value used inside a meta-group (denser than .kv-list). */
@@ -4676,7 +4686,7 @@ textarea:focus-visible,
     align-items: baseline;
 }
 .kv-compact .kv-key {
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-size: 0.75rem;
     font-weight: var(--fw-bold);
 }
@@ -4710,7 +4720,7 @@ textarea:focus-visible,
     text-transform: uppercase;
     letter-spacing: 0.1em;
     font-weight: var(--fw-bold);
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
 }
 /* pre-wrap lives on the text only: it preserves the user's own line breaks
    without rendering the template's inter-element indentation whitespace (which
@@ -4747,7 +4757,7 @@ textarea:focus-visible,
     margin-top: 1rem;
 }
 .od-status-row-label {
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-size: 0.6rem;
     text-transform: uppercase;
     letter-spacing: 0.12em;
@@ -4895,7 +4905,7 @@ textarea:focus-visible,
     outline-offset: -2px;
 }
 .person-row .row-grip {
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     flex: none;
 }
 .person-row .row-main {
@@ -4904,7 +4914,7 @@ textarea:focus-visible,
 }
 .person-row .row-sub {
     font-size: 0.66rem;
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -5085,7 +5095,7 @@ textarea:focus-visible,
 .markdown-content blockquote {
     border-left: 3px solid var(--color-primary);
     padding-left: 0.8em;
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
 }
 
 .markdown-content hr {
@@ -5139,7 +5149,7 @@ textarea:focus-visible,
 .empty-state .empty-text {
     font-size: 0.8rem;
     font-weight: 300;
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     max-width: 48ch;
 }
 
@@ -5217,7 +5227,7 @@ input[type='range'] {
     font-size: 0.62rem;
     text-transform: uppercase;
     letter-spacing: 0.09em;
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
 }
 .quality-block .quality-name {
     font-size: 0.8rem;
@@ -5227,7 +5237,7 @@ input[type='range'] {
     color: var(--color-white);
 }
 .quality-block .quality-name small {
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
 }
 .quality-row {
     display: flex;
@@ -5247,12 +5257,12 @@ input[type='range'] {
     min-width: 70px;
 }
 .quality-row .quality-value small {
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-weight: 400;
 }
 .quality-affects {
     font-size: 0.72rem;
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     display: flex;
     gap: 6px;
     align-items: center;
@@ -5284,7 +5294,7 @@ input[type='range'] {
 
 .profile-page .pf-sub {
     margin: 0 0 var(--space-6);
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-size: var(--fs-sm);
 }
 
@@ -5329,7 +5339,7 @@ input[type='range'] {
 
 .profile-page .id-handle {
     margin: var(--space-1) 0 0;
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-size: var(--fs-xs);
 }
 
@@ -5358,7 +5368,7 @@ input[type='range'] {
 
 .profile-page .facts .fk {
     margin: 0 0 var(--space-1);
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-size: 0.625rem;
     font-weight: var(--fw-bold);
     text-transform: uppercase;

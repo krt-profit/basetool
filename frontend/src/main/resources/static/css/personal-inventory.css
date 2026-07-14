@@ -1120,7 +1120,7 @@
 
 .krt-bp-detail-acquired {
     font-size: 0.7rem;
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     margin-top: 2px;
 }
 
@@ -1218,7 +1218,7 @@
 }
 
 .krt-bp-craft-toolbar-hint {
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-size: 0.72rem;
 }
 
@@ -1248,7 +1248,7 @@
 }
 
 .krt-bp-craft-badge.is-muted {
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
 }
 
 .krt-bp-craft-badge.is-ref {
@@ -1270,7 +1270,7 @@
     font-size: 0.7rem;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
 }
 
 .krt-bp-craft-count {
@@ -1285,14 +1285,14 @@
 
 .krt-bp-craft-limit {
     font-size: 0.72rem;
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
 }
 
 .krt-bp-craft-note {
     margin: 0;
     font-size: 0.78rem;
     font-style: italic;
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
 }
 
 .krt-bp-craft-mats {
