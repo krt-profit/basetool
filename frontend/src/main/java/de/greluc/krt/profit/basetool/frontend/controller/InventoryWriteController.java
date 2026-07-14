@@ -339,10 +339,12 @@ public class InventoryWriteController {
               form.getVersion(),
               form.getTargetOwningOrgUnitId(),
               form.getMergeStock(),
-              // The no-JS classic fallback cannot collect per-mission attributions; a SELL through
-              // it
-              // is a fully-personal sale. The JS path sends the attributions on the /transfer
-              // route.
+              // The no-JS classic fallback cannot collect a "deduct from" plan; both lists stay
+              // null
+              // so the backend defaults to "take it from the rest" (a SELL through it is therefore
+              // a
+              // fully-personal sale). The JS path sends the plan on the /transfer route.
+              null,
               null);
       backendApiClient.post("/api/v1/inventory/" + id + "/book-out", request, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "success.inventory.bookout");

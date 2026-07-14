@@ -596,91 +596,6 @@ function updateTargetFromAmount() {
     }
 }
 
-// ===== SELL per-mission income attribution (Variante C, REQ-INV-027) =====
-// The row's earmarked missions the seller can credit, collected from the leaf row's mission chips
-// when the book-out modal opens. Each entry: { missionId, name }.
-let bookOutMissions = [];
-
-// Collects the earmarked missions of the leaf row `itemId` from its rendered mission chips, so the
-// SELL dialog can offer them as income-attribution targets (the chips already carry every mission
-// allocation — the id in data-target-id, the name as the chip's leading text node).
-function collectRowMissions(itemId) {
-    const row = document.querySelector('.tree-row--leaf[data-item-id="' + itemId + '"]');
-    if (!row) {
-        return [];
-    }
-    const missions = [];
-    row.querySelectorAll('.assoc-split[data-assoc-field="MISSION"] .assoc-chip--mission').forEach(
-        function (chip) {
-            const missionId = chip.getAttribute('data-target-id');
-            if (!missionId) {
-                return;
-            }
-            const nameEl = chip.querySelector('span:not(.assoc-chip__amt)');
-            missions.push({
-                missionId: missionId,
-                name: nameEl ? nameEl.textContent.trim() : missionId,
-            });
-        },
-    );
-    return missions;
-}
-
-// (Re)builds the per-mission attribution input rows in the SELL dialog from `bookOutMissions`.
-function renderSellAttributions() {
-    const container = document.getElementById('sellMissionAttributions');
-    if (!container) {
-        return;
-    }
-    container.innerHTML = '';
-    bookOutMissions.forEach(function (mission) {
-        const row = document.createElement('div');
-        row.className = 'flex-gap-sm mb-1';
-        row.setAttribute('data-attr-row', '');
-        const name = document.createElement('span');
-        name.className = 'w-full';
-        name.textContent = mission.name;
-        const input = document.createElement('input');
-        input.type = 'number';
-        input.className = 'assoc-menge-input';
-        input.step = '0.01';
-        input.min = '0';
-        input.setAttribute('data-attr-amount', '');
-        input.setAttribute('data-mission-id', mission.missionId);
-        input.addEventListener('input', updateAttributionRest);
-        row.appendChild(name);
-        row.appendChild(input);
-        container.appendChild(row);
-    });
-}
-
-// Recomputes the "remainder (personal)" hint: the sale proceeds minus the sum of the per-mission
-// amounts. When the sum exceeds the proceeds the over-attribution message is shown instead (the
-// backend rejects it too).
-function updateAttributionRest() {
-    const restEl = document.getElementById('sellAttributionsRest');
-    if (!restEl) {
-        return;
-    }
-    const sellAmountEl = document.getElementById('sellAmount');
-    const proceeds = sellAmountEl && sellAmountEl.value !== '' ? Number(sellAmountEl.value) : 0;
-    let sum = 0;
-    document
-        .querySelectorAll('#sellMissionAttributions [data-attr-amount]')
-        .forEach(function (input) {
-            const value = input.value !== '' ? Number(input.value) : 0;
-            if (!isNaN(value)) {
-                sum += value;
-            }
-        });
-    if (sum > proceeds + 1e-9) {
-        restEl.textContent = restEl.getAttribute('data-over');
-    } else {
-        const rest = Math.round((proceeds - sum) * 100) / 100;
-        restEl.textContent = restEl.getAttribute('data-template').replace('{0}', rest);
-    }
-}
-
 function toggleBookOutTypeFields() {
     const typeSell = document.querySelector('input[name="type"][value="SELL"]').checked;
 
@@ -697,12 +612,6 @@ function toggleBookOutTypeFields() {
         terminal.required = false;
         sellAmount.required = false;
     }
-
-    const attrWrap = document.getElementById('sellMissionAttributionsWrap');
-    if (attrWrap) {
-        attrWrap.classList.toggle('krtm-hidden', !(typeSell && bookOutMissions.length > 0));
-    }
-    updateAttributionRest();
 
     const submitBtn = document.getElementById('bookOutSubmitBtn');
     if (submitBtn) {
@@ -1028,32 +937,10 @@ function submitBookOut(event) {
             type === 'SELL' && sellAmountEl.value !== '' ? Number(sellAmountEl.value) : null,
         version: parseInt(document.getElementById('version').value, 10),
     };
-    if (type === 'SELL') {
-        // Variante C (REQ-INV-027): collect the seller's per-mission income attributions; only
-        // missions given a positive amount are sent. Block client-side if they exceed the proceeds
-        // (the backend enforces the same, R5-style).
-        const attributions = [];
-        document
-            .querySelectorAll('#sellMissionAttributions [data-attr-amount]')
-            .forEach(function (input) {
-                const value = input.value !== '' ? Number(input.value) : 0;
-                if (!isNaN(value) && value > 0) {
-                    attributions.push({
-                        missionId: input.getAttribute('data-mission-id'),
-                        amount: value,
-                    });
-                }
-            });
-        const proceeds = sellAmountEl.value !== '' ? Number(sellAmountEl.value) : 0;
-        const sum = attributions.reduce(function (acc, a) {
-            return acc + a.amount;
-        }, 0);
-        if (sum > proceeds + 1e-9) {
-            updateAttributionRest();
-            return;
-        }
-        payload.missionAttributions = attributions.length ? attributions : null;
-    }
+    // Variante C (REQ-INV-027): the per-dimension "deduct from" plan (jobOrderReductions /
+    // missionReductions, which also drives the coupled SELL proceeds) is not collected here yet — a
+    // null plan makes the backend take the deduction from the not-yet-assigned rest (a SELL is a
+    // fully-personal sale). The interactive Herkunft picker is added in a follow-up.
     const submitBtn = document.getElementById('bookOutSubmitBtn');
     bookOutInFlight = true;
     if (submitBtn) {
@@ -1082,9 +969,6 @@ function submitBookOut(event) {
 
 function openBookOutModal(id, amount, version, materialId, userId, locationId, quantityType) {
     bookOutItemId = id;
-    // Variante C: offer the row's earmarked missions as SELL income-attribution targets.
-    bookOutMissions = collectRowMissions(id);
-    renderSellAttributions();
     const bookOutForm = document.getElementById('bookOutForm');
     bookOutForm.action = window.safeSameOriginUrl(
         '/inventory/' + id + '/book-out',
@@ -1571,11 +1455,6 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
 let bookOutFormEl = document.getElementById('bookOutForm');
 if (bookOutFormEl) {
     bookOutFormEl.addEventListener('submit', submitBookOut);
-}
-// Keep the "remainder (personal)" hint in step as the seller edits the total sale proceeds.
-let sellAmountInputEl = document.getElementById('sellAmount');
-if (sellAmountInputEl) {
-    sellAmountInputEl.addEventListener('input', updateAttributionRest);
 }
 // The Umbuchen form is likewise a stable top-level element; its submit listener (bound once)
 // survives the grouped-table re-swaps and runs after scu-decimal-input.js canonicalises/validates

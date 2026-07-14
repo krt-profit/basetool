@@ -31,8 +31,9 @@ at once, each earmark carrying its own amount, split independently per dimension
 therefore leave the stock-identity key — a row now stacks on its **physical identity only** — and
 move down to the individual entry as amount chips. Per dimension the Σ of the slice amounts must stay
 within the entry's amount (rule R5, HTTP 422 on breach); `delivered` becomes a per-(entry, job-order)
-slice; a `SELL` books seller-chosen per-mission income attributions; and the write-time merge unions
-the folded rows' allocations. The full rules live in
+slice; a book-out / transfer chooses per dimension which earmarks (or the rest) its quantity is
+deducted from, with a `SELL` crediting each mission proportionally to the SCU it sourced from that
+mission; and the write-time merge unions the folded rows' allocations. The full rules live in
 [REQ-INV-027](#req-inv-027--inventory-associations-are-to-many-quantity-splits-variante-c) below.
 
 The **stock identity** ("stack key") is the inventory **physical** natural key: owner (`user`),
@@ -418,11 +419,23 @@ identity and **unions** the folded rows' allocations into the survivor — summe
 job-order delivered flag OR-combined. Because the survivor's amount already absorbed the folded
 amounts, R5 is preserved under the fold.
 
-**SELL books seller-chosen per-mission attributions.** A `SELL` book-out of mission-earmarked stock
-distributes the sale proceeds across the row's earmarked missions the seller participates in — one
-squadron-`INCOME` `MissionFinanceEntry` per chosen mission, Σ ≤ the sale proceeds, an uncredited
-remainder staying the seller's personal proceeds. Only missions the seller participates in are
-creditable; an empty attribution list is a fully-personal sale that credits no mission.
+**A book-out / transfer chooses which earmarks it deducts from.** Because the two dimensions are
+independent, a book-out or transfer of quantity X carries a per-dimension **"deduct from" plan**
+(`jobOrderReductions` / `missionReductions` on `InventoryItemBookOutDto`, each an
+`AllocationReductionDto{targetId, amount}`): each dimension's plan names how much of X comes out of
+which earmark slice, and whatever it leaves uncovered is taken from that dimension's not-yet-assigned
+rest. A plan is validated against the pre-decrement slices — an unknown / duplicate / over-slice
+target or a Σ over X is a 400, and an under-assigned plan whose rest cannot cover the remainder is a
+422 — and a `null` list defaults to "take it all from the rest" (a full move then inherits every
+earmark, a partial move leaves the tags intact). On a `TRANSFER` the reduced tags **move onto the new
+row** (the moved stock stays earmarked to the same order / mission for the deducted amount).
+
+**SELL proceeds are coupled to the mission deduct-from plan.** A `SELL` credits each mission a share
+of the sale proceeds **proportional to the SCU deducted from its earmark** — `sellAmount ×
+amount_j / X`, one squadron-`INCOME` `MissionFinanceEntry` per credited mission — with the rest (SCU
+taken from the mission rest, plus SCU deducted from a mission the seller does not participate in)
+staying the seller's personal proceeds. Only missions the seller participates in receive an entry;
+there is no separate income-attribution input.
 
 **Acceptance**
 
@@ -437,9 +450,12 @@ creditable; an empty attribution list is a fully-personal sale that credits no m
 - [ ] `delivered` toggled for one order leaves the entry's other orders unchanged; the order
   material-collection shows the amount allocated to that order.
 - [ ] A stock merge sums the folded rows' allocations per target and OR-combines job-order delivered.
-- [ ] A SELL with per-mission attributions books one INCOME entry per attribution (Σ ≤ proceeds),
-  rejects an attribution to a non-earmarked mission or a mission the seller is not in, and treats an
-  empty list as a fully-personal sale.
+- [ ] A book-out / transfer "deduct from" plan is validated against the slices (unknown / duplicate /
+  over-slice / over-total → 400; an under-assigned plan the rest cannot cover → 422); a transfer
+  carries the reduced tags onto the moved row; a `null` plan takes it all from the rest.
+- [ ] A SELL credits each mission proportionally to the SCU deducted from its earmark
+  (`sellAmount × scu/sold`), leaves the rest (unassigned + non-participated) personal, and books no
+  entry when nothing is deducted from a mission earmark.
 - [ ] Each allocation add / change / remove records the matching `INVENTORY_ALLOCATION_*` audit event.
 
 **Enforced by:** `InventoryItemServiceTest`, `InventoryItemServiceBookOutTest`,

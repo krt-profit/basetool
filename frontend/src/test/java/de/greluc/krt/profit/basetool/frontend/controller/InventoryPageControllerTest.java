@@ -541,7 +541,17 @@ class InventoryPageControllerTest {
     UUID id = UUID.randomUUID();
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
-            10.0, UUID.randomUUID(), null, CheckoutType.TRANSFER, null, null, 1L, null, null, null);
+            10.0,
+            UUID.randomUUID(),
+            null,
+            CheckoutType.TRANSFER,
+            null,
+            null,
+            1L,
+            null,
+            null,
+            null,
+            null);
     when(backendApiClient.post(
             eq("/api/v1/inventory/" + id + "/book-out"), eq(dto), eq(InventoryItemDto.class)))
         .thenReturn(null);
@@ -562,7 +572,17 @@ class InventoryPageControllerTest {
     UUID id = UUID.randomUUID();
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
-            5.0, UUID.randomUUID(), null, CheckoutType.TRANSFER, null, null, 1L, null, null, null);
+            5.0,
+            UUID.randomUUID(),
+            null,
+            CheckoutType.TRANSFER,
+            null,
+            null,
+            1L,
+            null,
+            null,
+            null,
+            null);
     InventoryItemDto remaining =
         new InventoryItemDto(
             id,
@@ -603,7 +623,17 @@ class InventoryPageControllerTest {
     UUID id = UUID.randomUUID();
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
-            10.0, UUID.randomUUID(), null, CheckoutType.TRANSFER, null, null, 1L, null, null, null);
+            10.0,
+            UUID.randomUUID(),
+            null,
+            CheckoutType.TRANSFER,
+            null,
+            null,
+            1L,
+            null,
+            null,
+            null,
+            null);
     de.greluc.krt.profit.basetool.frontend.service.BackendServiceException ex =
         new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
             "Backend returned 409 [OPTIMISTIC_LOCK]",

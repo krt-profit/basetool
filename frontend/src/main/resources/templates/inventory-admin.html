@@ -337,13 +337,6 @@
                     <label for="sellAmount" class="form-label" th:text="#{inventory.bookout.sellAmount}">Verkaufsbetrag</label>
                     <input type="number" id="sellAmount" th:field="*{sellAmount}" step="0.01" min="0" class="w-full">
                 </div>
-                <div id="sellMissionAttributionsWrap" class="form-group mb-1 krtm-hidden">
-                    <label class="form-label" th:text="#{inventory.bookout.attributions.label}">Ertrag auf Einsaetze aufteilen</label>
-                    <div id="sellMissionAttributions"></div>
-                    <small id="sellAttributionsRest" class="form-hint"
-                           th:data-template="#{inventory.bookout.attributions.rest('{0}')}"
-                           th:data-over="#{inventory.bookout.attributions.over}"></small>
-                </div>
             </div>
 
             <div class="mt-2-flex-gap">

@@ -156,9 +156,6 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString("data-text-discard=\"Ausbuchen\"")))
         .andExpect(content().string(containsString("data-text-sell=\"Verkaufen\"")))
         .andExpect(content().string(not(containsString("data-text-transfer"))))
-        // Variante C (REQ-INV-027): the SELL dialog carries the per-mission income-attribution
-        // sub-form (populated client-side from the row's mission chips).
-        .andExpect(content().string(containsString("id=\"sellMissionAttributionsWrap\"")))
         .andExpect(content().string(containsString("id=\"umbuchenModal\"")))
         .andExpect(content().string(containsString("id=\"umbuchenSubmitBtn\"")));
   }

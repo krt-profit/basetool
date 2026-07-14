@@ -21,18 +21,16 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
-import java.math.BigDecimal;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend {@code MissionSaleAttributionDto} (per the {@code
- * feedback_backend_frontend_dto_mirror} memory): one per-mission income attribution of a {@code
- * SELL} book-out (Variante C, REQ-INV-027). The seller credits {@code amount} of the sale proceeds
- * to mission {@code missionId}; the SELL carries a list of these and the uncredited remainder is
- * the seller's own proceeds.
+ * Frontend mirror of the backend {@code AllocationReductionDto} (per the {@code
+ * feedback_backend_frontend_dto_mirror} memory): one line of a book-out / transfer "deduct from"
+ * plan (Variante C, REQ-INV-027). It takes {@code amount} of the deducted quantity out of the
+ * entry's earmark to {@code targetId} (a job order or a mission, depending on which dimension list
+ * of {@code InventoryItemBookOutDto} carries it).
  *
- * @param missionId the earmarked mission to credit; never {@code null}.
- * @param amount the share of the sale proceeds to book to the mission; strictly positive.
+ * @param targetId the job order or mission whose slice to shrink; never {@code null}.
+ * @param amount the SCU (or whole pieces) to subtract from that slice; strictly positive.
  */
-public record MissionSaleAttributionDto(
-    @NotNull UUID missionId, @NotNull @Positive BigDecimal amount) {}
+public record AllocationReductionDto(@NotNull UUID targetId, @NotNull @Positive Double amount) {}

@@ -36,10 +36,12 @@ import java.util.UUID;
  * (REQ-INV-026) for the {@code TRANSFER} target: honoured only for an {@code SCU} material (a
  * {@code PIECE} transfer always merges); {@code null}/{@code false} keeps the new row separate.
  *
- * <p>{@code missionAttributions} is the {@code SELL}-only per-mission income split (Variante C,
- * REQ-INV-027): the seller distributes the sale proceeds across the sold row's earmarked missions
- * they participate in. Ignored for DISCARD and TRANSFER; {@code null}/empty is a fully-personal
- * sale.
+ * <p>{@code jobOrderReductions} / {@code missionReductions} are the Variante-C "deduct from" plan
+ * (REQ-INV-027): the deducted {@code amount} is sourced independently per dimension from named
+ * earmark slices or the not-yet-assigned rest. A {@code null}/empty list takes it all from the
+ * rest. On a {@code TRANSFER} the reduced tags move to the new row; on a {@code SELL} the mission
+ * reductions also drive the coupled proceeds split (each mission credited {@code sellAmount ×
+ * amount_j / amount}, the rest personal).
  */
 public record InventoryItemBookOutDto(
     @NotNull @Min(0) Double amount,
@@ -51,4 +53,5 @@ public record InventoryItemBookOutDto(
     @NotNull Long version,
     UUID targetOwningOrgUnitId,
     Boolean mergeStock,
-    @Valid List<MissionSaleAttributionDto> missionAttributions) {}
+    @Valid List<AllocationReductionDto> jobOrderReductions,
+    @Valid List<AllocationReductionDto> missionReductions) {}
