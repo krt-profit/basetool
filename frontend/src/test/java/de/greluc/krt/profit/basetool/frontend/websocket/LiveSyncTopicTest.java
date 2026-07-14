@@ -94,6 +94,23 @@ class LiveSyncTopicTest {
   }
 
   @Test
+  void parse_acceptsGlobalInventoryTopic() {
+    // #1307: the shared-Lager room is a bare-prefix global room (like `orders` / `materialboard`).
+    LiveSyncTopic topic = LiveSyncTopic.parse("inventory");
+
+    assertThat(topic).isNotNull();
+    assertThat(topic.topicClass()).isEqualTo(LiveSyncTopicClass.INVENTORY_ALL);
+    assertThat(topic.resourceId()).isNull();
+    assertThat(topic.canonical()).isEqualTo("inventory");
+  }
+
+  @Test
+  void parse_rejectsGlobalInventoryTopicCarryingAnId() {
+    // `inventory` is a global room; a prefixed id violates its scope.
+    assertThat(LiveSyncTopic.parse("inventory:" + UUID.randomUUID())).isNull();
+  }
+
+  @Test
   void parse_distinguishesTheSharedBankPrefixByScope() {
     UUID id = UUID.randomUUID();
 

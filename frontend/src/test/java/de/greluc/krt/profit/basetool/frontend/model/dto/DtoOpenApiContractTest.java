@@ -168,14 +168,23 @@ class DtoOpenApiContractTest {
       Set<String> mirror = enumConstantNames(type);
       // SpringDoc inlines enum types into each using property (no shared component schema), so
       // match
-      // by value rather than by name: the backend enum this mirror reflects is the largest inline
-      // enum set that contains every mirror constant. No superset ⇒ the mirror reflects no emitted
+      // by value rather than by name: the backend enum this mirror reflects is an inline enum set
+      // that contains every mirror constant. Prefer an EXACT match first — a complete mirror of a
+      // small backend enum whose values happen to be a subset of a larger one (e.g.
+      // InventoryAllocationDimension {JOB_ORDER, MISSION} ⊂ AuditDomain) must bind to its own enum,
+      // not the superset — then fall back to the largest superset, so an INCOMPLETE mirror of a
+      // bigger enum still fails the coverage assert. No superset ⇒ the mirror reflects no emitted
       // enum (request-only / frontend-only view model) ⇒ nothing to assert against.
       Set<String> backend =
           backendEnums.stream()
-              .filter(candidate -> candidate.containsAll(mirror))
-              .max(Comparator.comparingInt(Set::size))
-              .orElse(null);
+              .filter(mirror::equals)
+              .findFirst()
+              .orElseGet(
+                  () ->
+                      backendEnums.stream()
+                          .filter(candidate -> candidate.containsAll(mirror))
+                          .max(Comparator.comparingInt(Set::size))
+                          .orElse(null));
       if (backend == null) {
         continue;
       }

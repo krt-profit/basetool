@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -163,7 +164,11 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
             inv.setMaterial(aslarite);
             inv.setQuality(800);
             inv.setAmount(a);
-            inv.setJobOrder(jobOrder);
+            // Variante C (REQ-INV-027): earmark the entry's full amount to the order via a
+            // job-order allocation slice (the scalar jobOrder column + soak mirror were dropped in
+            // V218). The handover's pre-write guard requires the item to carry a slice for this
+            // order.
+            InventoryAllocations.addJobOrder(inv, jobOrder, a, false);
             inv = inventoryItemRepository.save(inv);
             aslariteIds.add(inv.getId());
           }
@@ -180,7 +185,11 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
             inv.setMaterial(ouratite);
             inv.setQuality(900);
             inv.setAmount(a);
-            inv.setJobOrder(jobOrder);
+            // Variante C (REQ-INV-027): earmark the entry's full amount to the order via a
+            // job-order allocation slice (the scalar jobOrder column + soak mirror were dropped in
+            // V218). The handover's pre-write guard requires the item to carry a slice for this
+            // order.
+            InventoryAllocations.addJobOrder(inv, jobOrder, a, false);
             inv = inventoryItemRepository.save(inv);
             ouratiteIds.add(inv.getId());
           }
@@ -229,11 +238,13 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
     List<JobOrderHandoverItemCreateDto> items = new ArrayList<>();
     for (int i = 0; i < f.aslariteInvIds().size(); i++) {
       items.add(
-          new JobOrderHandoverItemCreateDto(f.aslariteInvIds().get(i), f.aslariteAmounts().get(i)));
+          new JobOrderHandoverItemCreateDto(
+              f.aslariteInvIds().get(i), f.aslariteAmounts().get(i), null));
     }
     for (int i = 0; i < f.ouratiteInvIds().size(); i++) {
       items.add(
-          new JobOrderHandoverItemCreateDto(f.ouratiteInvIds().get(i), f.ouratiteAmounts().get(i)));
+          new JobOrderHandoverItemCreateDto(
+              f.ouratiteInvIds().get(i), f.ouratiteAmounts().get(i), null));
     }
 
     JobOrderHandoverCreateDto dto =

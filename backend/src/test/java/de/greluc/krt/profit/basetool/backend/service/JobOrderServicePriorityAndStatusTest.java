@@ -190,7 +190,7 @@ class JobOrderServicePriorityAndStatusTest {
 
       assertNull(o.getPriority(), "terminal status (COMPLETED) must clear priority");
       assertEquals(JobOrderStatus.COMPLETED, o.getStatus());
-      verify(inventoryItemRepository).unlinkJobOrder(ORDER_ID);
+      verify(inventoryItemRepository).deleteJobOrderAllocationsByJobOrder(ORDER_ID);
       verify(jobOrderRepository).save(o);
       verify(jobOrderRepository).flush();
       // normalizePriorities was called -> lockAllJobOrders invoked
@@ -209,7 +209,7 @@ class JobOrderServicePriorityAndStatusTest {
 
       assertNull(o.getPriority());
       assertEquals(JobOrderStatus.REJECTED, o.getStatus());
-      verify(inventoryItemRepository).unlinkJobOrder(ORDER_ID);
+      verify(inventoryItemRepository).deleteJobOrderAllocationsByJobOrder(ORDER_ID);
     }
 
     @Test
@@ -232,7 +232,7 @@ class JobOrderServicePriorityAndStatusTest {
           o.getPriority(),
           "un-completion sets priority = findMaxPriority + 1 = 6; "
               + "normalize doesn't see this order in lockAllJobOrders stub");
-      verify(inventoryItemRepository, never()).unlinkJobOrder(any());
+      verify(inventoryItemRepository, never()).deleteJobOrderAllocationsByJobOrder(any());
       verify(jobOrderRepository, times(2)).lockAllJobOrders();
     }
 
@@ -268,7 +268,7 @@ class JobOrderServicePriorityAndStatusTest {
       assertEquals(JobOrderStatus.REJECTED, o.getStatus());
       assertNull(o.getPriority());
       verify(jobOrderRepository, never()).lockAllJobOrders();
-      verify(inventoryItemRepository, never()).unlinkJobOrder(any());
+      verify(inventoryItemRepository, never()).deleteJobOrderAllocationsByJobOrder(any());
     }
 
     @Test
@@ -434,7 +434,7 @@ class JobOrderServicePriorityAndStatusTest {
 
       service.updateJobOrder(ORDER_ID, dto);
 
-      verify(inventoryItemRepository).unlinkJobOrderMaterial(ORDER_ID, xId);
+      verify(inventoryItemRepository).deleteJobOrderAllocationsByJobOrderAndMaterial(ORDER_ID, xId);
     }
 
     @Test
@@ -492,7 +492,8 @@ class JobOrderServicePriorityAndStatusTest {
 
       service.deleteJobOrder(ORDER_ID);
 
-      verify(inventoryItemRepository).unlinkJobOrder(ORDER_ID);
+      // The order's allocation slices vanish via the job_order_id ON DELETE CASCADE (V217), not an
+      // explicit call, so only the delete itself is verifiable here.
       verify(jobOrderRepository).delete(o);
       verify(jobOrderRepository).flush();
       // normalize called because priority was non-null -> 2nd lockAllJobOrders.
@@ -552,7 +553,8 @@ class JobOrderServicePriorityAndStatusTest {
 
       service.unlinkMaterial(ORDER_ID, matId);
 
-      verify(inventoryItemRepository).unlinkJobOrderMaterial(ORDER_ID, matId);
+      verify(inventoryItemRepository)
+          .deleteJobOrderAllocationsByJobOrderAndMaterial(ORDER_ID, matId);
       assertTrue(
           o.getMaterials().isEmpty(),
           "the JobOrderMaterial association must be removed from the in-memory set too");
@@ -586,7 +588,7 @@ class JobOrderServicePriorityAndStatusTest {
       assertEquals(JobOrderStatus.COMPLETED, o.getStatus());
       verify(jobOrderRepository, never()).flush();
       verify(jobOrderRepository, never()).lockAllJobOrders();
-      verify(inventoryItemRepository, never()).unlinkJobOrder(any());
+      verify(inventoryItemRepository, never()).deleteJobOrderAllocationsByJobOrder(any());
     }
 
     @Test
@@ -600,7 +602,7 @@ class JobOrderServicePriorityAndStatusTest {
       assertNull(o.getPriority(), "priority must be cleared");
       verify(jobOrderRepository).flush();
       verify(jobOrderRepository).lockAllJobOrders();
-      verify(inventoryItemRepository).unlinkJobOrder(ORDER_ID);
+      verify(inventoryItemRepository).deleteJobOrderAllocationsByJobOrder(ORDER_ID);
     }
 
     @Test
@@ -615,7 +617,7 @@ class JobOrderServicePriorityAndStatusTest {
       // Even with null priority, the wasTerminal=false branch still
       // flushes and normalises.
       verify(jobOrderRepository).flush();
-      verify(inventoryItemRepository).unlinkJobOrder(ORDER_ID);
+      verify(inventoryItemRepository).deleteJobOrderAllocationsByJobOrder(ORDER_ID);
     }
   }
 

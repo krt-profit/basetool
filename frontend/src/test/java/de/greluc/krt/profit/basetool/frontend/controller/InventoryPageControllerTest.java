@@ -110,11 +110,26 @@ class InventoryPageControllerTest {
         new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
-    String view = controller.viewMaterialInventory(materialId, model);
+    String view = controller.viewMaterialInventory(materialId, null, model);
 
     assertEquals("inventory-material", view);
     assertTrue(model.containsAttribute("items"));
     assertEquals(materialId, model.getAttribute("selectedMaterialId"));
+  }
+
+  @Test
+  void viewMaterialInventory_withFragmentResults_returnsOnlyTheResultsFragment() {
+    Model model = new ConcurrentModel();
+    UUID materialId = UUID.randomUUID();
+    PageResponse<InventoryItemDto> page =
+        new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+
+    // #1309: the live-sync receiver re-fetches ?fragment=results, which renders only the results
+    // table, not the whole page.
+    String view = controller.viewMaterialInventory(materialId, "results", model);
+
+    assertEquals("inventory-material :: inventoryMaterialResults", view);
   }
 
   @Test
@@ -275,9 +290,9 @@ class InventoryPageControllerTest {
             10,
             100.0,
             false,
+            java.util.List.of(),
             null,
-            null,
-            null,
+            java.util.List.of(),
             null,
             null,
             null,
@@ -444,64 +459,26 @@ class InventoryPageControllerTest {
   }
 
   @Test
-  void updateAssociations_shouldReturnOkOnSuccess() {
-    UUID id = UUID.randomUUID();
-    InventoryItemUpdateDto dto =
-        new InventoryItemUpdateDto(
-            UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, 1L, null);
-
-    when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class))).thenReturn(null);
-
-    org.springframework.http.ResponseEntity<InventoryItemDto> response =
-        writeController.updateAssociations(id, dto);
-
-    assertEquals(200, response.getStatusCode().value());
-    verify(backendApiClient)
-        .put(eq("/api/v1/inventory/" + id), eq(dto), eq(InventoryItemDto.class));
-  }
-
-  @Test
-  void updateAssociations_shouldReturnStatusFromWebClientResponseException() {
-    UUID id = UUID.randomUUID();
-    InventoryItemUpdateDto dto =
-        new InventoryItemUpdateDto(
-            UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, 1L, null);
-
-    org.springframework.web.reactive.function.client.WebClientResponseException exception =
-        org.springframework.web.reactive.function.client.WebClientResponseException.create(
-            409, "Conflict", org.springframework.http.HttpHeaders.EMPTY, null, null);
-    when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class))).thenThrow(exception);
-
-    org.springframework.http.ResponseEntity<InventoryItemDto> response =
-        writeController.updateAssociations(id, dto);
-
-    assertEquals(409, response.getStatusCode().value());
-  }
-
-  @Test
-  void updateAssociations_shouldReturn500OnGenericException() {
-    UUID id = UUID.randomUUID();
-    InventoryItemUpdateDto dto =
-        new InventoryItemUpdateDto(
-            UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, 1L, null);
-
-    when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class)))
-        .thenThrow(new RuntimeException("Generic error"));
-
-    org.springframework.http.ResponseEntity<InventoryItemDto> response =
-        writeController.updateAssociations(id, dto);
-
-    assertEquals(500, response.getStatusCode().value());
-  }
-
-  @Test
   void updateInventoryItemNote_shouldReturnOkWithUpdatedDtoOnSuccess() {
     // Given
     UUID id = UUID.randomUUID();
     InventoryItemNoteUpdateRequest request = new InventoryItemNoteUpdateRequest("hello", 1L);
     InventoryItemDto updated =
         new InventoryItemDto(
-            id, null, null, null, 100, 10.0, false, null, null, null, null, "hello", null, 2L,
+            id,
+            null,
+            null,
+            null,
+            100,
+            10.0,
+            false,
+            java.util.List.of(),
+            null,
+            java.util.List.of(),
+            null,
+            "hello",
+            null,
+            2L,
             null);
     when(backendApiClient.put(
             eq("/api/v1/inventory/" + id + "/note"), eq(request), eq(InventoryItemDto.class)))
@@ -571,7 +548,17 @@ class InventoryPageControllerTest {
     UUID id = UUID.randomUUID();
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
-            10.0, UUID.randomUUID(), null, CheckoutType.TRANSFER, null, null, 1L, null, null);
+            10.0,
+            UUID.randomUUID(),
+            null,
+            CheckoutType.TRANSFER,
+            null,
+            null,
+            1L,
+            null,
+            null,
+            null,
+            null);
     when(backendApiClient.post(
             eq("/api/v1/inventory/" + id + "/book-out"), eq(dto), eq(InventoryItemDto.class)))
         .thenReturn(null);
@@ -592,10 +579,34 @@ class InventoryPageControllerTest {
     UUID id = UUID.randomUUID();
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
-            5.0, UUID.randomUUID(), null, CheckoutType.TRANSFER, null, null, 1L, null, null);
+            5.0,
+            UUID.randomUUID(),
+            null,
+            CheckoutType.TRANSFER,
+            null,
+            null,
+            1L,
+            null,
+            null,
+            null,
+            null);
     InventoryItemDto remaining =
         new InventoryItemDto(
-            id, null, null, null, 100, 45.0, false, null, null, null, null, null, null, 2L, null);
+            id,
+            null,
+            null,
+            null,
+            100,
+            45.0,
+            false,
+            java.util.List.of(),
+            null,
+            java.util.List.of(),
+            null,
+            null,
+            null,
+            2L,
+            null);
     when(backendApiClient.post(
             eq("/api/v1/inventory/" + id + "/book-out"), eq(dto), eq(InventoryItemDto.class)))
         .thenReturn(remaining);
@@ -615,7 +626,17 @@ class InventoryPageControllerTest {
     UUID id = UUID.randomUUID();
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
-            10.0, UUID.randomUUID(), null, CheckoutType.TRANSFER, null, null, 1L, null, null);
+            10.0,
+            UUID.randomUUID(),
+            null,
+            CheckoutType.TRANSFER,
+            null,
+            null,
+            1L,
+            null,
+            null,
+            null,
+            null);
     de.greluc.krt.profit.basetool.frontend.service.BackendServiceException ex =
         new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
             "Backend returned 409 [OPTIMISTIC_LOCK]",
@@ -648,10 +669,24 @@ class InventoryPageControllerTest {
   void updateDelivered_success_returnsUpdatedDtoWithBumpedVersion() {
     // Given — the backend accepted the delivered toggle and returns the incremented version.
     UUID id = UUID.randomUUID();
-    UpdateDeliveredRequest request = new UpdateDeliveredRequest(true, 1L);
+    UpdateDeliveredRequest request = new UpdateDeliveredRequest(true, UUID.randomUUID(), 1L);
     InventoryItemDto updated =
         new InventoryItemDto(
-            id, null, null, null, 100, 10.0, false, null, null, null, null, null, null, 2L, null);
+            id,
+            null,
+            null,
+            null,
+            100,
+            10.0,
+            false,
+            java.util.List.of(),
+            null,
+            java.util.List.of(),
+            null,
+            null,
+            null,
+            2L,
+            null);
     when(backendApiClient.patch(
             eq("/api/v1/inventory/" + id + "/delivered"), eq(request), eq(InventoryItemDto.class)))
         .thenReturn(updated);
@@ -671,7 +706,7 @@ class InventoryPageControllerTest {
   void updateDelivered_conflict_propagatesProblemJsonWithCode() {
     // Given — a concurrent edit made the delivered relay fail with 409 OPTIMISTIC_LOCK.
     UUID id = UUID.randomUUID();
-    UpdateDeliveredRequest request = new UpdateDeliveredRequest(true, 1L);
+    UpdateDeliveredRequest request = new UpdateDeliveredRequest(true, UUID.randomUUID(), 1L);
     de.greluc.krt.profit.basetool.frontend.service.BackendServiceException ex =
         new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
             "Backend returned 409 [OPTIMISTIC_LOCK]",
@@ -714,9 +749,9 @@ class InventoryPageControllerTest {
             100,
             5.0,
             true,
+            java.util.List.of(),
             null,
-            null,
-            null,
+            java.util.List.of(),
             null,
             null,
             null,

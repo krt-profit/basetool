@@ -26,10 +26,12 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.exception.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
+import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
@@ -48,6 +50,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepos
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -95,7 +98,7 @@ class InventoryItemServiceTest {
     // The facade delegates every read/aggregation to InventoryAggregationService and every checkout
     // write to InventoryCheckoutService (the L2 split, #921). Mockito does not inject one
     // @InjectMocks target into another, so build the real sub-services from the same mocks and set
-    // them on the facade. createInventoryItem / updateInventoryItem / updateNote stay on the facade
+    // them on the facade. createInventoryItem / updateNote stay on the facade
     // and use the mocks directly.
     realAggregationService =
         new InventoryAggregationService(
@@ -143,94 +146,9 @@ class InventoryItemServiceTest {
   }
 
   @Test
-  void updateInventoryItem_savesInPlaceWithoutMerging() {
-    // Append-only Lager: an update edits the targeted row in place and never folds it into another
-    // matching stack. Even when a sibling row with the same stock identity exists, the edited row's
-    // amount becomes exactly the DTO amount (no summing), nothing is deleted, and the returned DTO
-    // is the mapper's projection of the edited row.
-    // Given
-    UUID itemId = UUID.randomUUID();
-    UUID currentUserId = UUID.randomUUID();
-
-    User user = new User();
-    user.setId(currentUserId);
-
-    Material material = new Material();
-    material.setId(UUID.randomUUID());
-
-    Location location = new Location();
-    location.setId(UUID.randomUUID());
-
-    JobOrder jobOrder = new JobOrder();
-    jobOrder.setId(UUID.randomUUID());
-
-    InventoryItem item = new InventoryItem();
-    item.setId(itemId);
-    item.setUser(user);
-    item.setMaterial(material);
-    item.setLocation(location);
-    item.setQuality(10);
-    item.setAmount(5.0);
-    item.setPersonal(false);
-    item.setVersion(1L);
-
-    InventoryItemUpdateDto dto =
-        new InventoryItemUpdateDto(
-            material.getId(),
-            location.getId(),
-            10,
-            2.0,
-            false, // personal
-            jobOrder.getId(), // jobOrderId
-            null, // missionId
-            1L // version
-            ,
-            null);
-
-    InventoryItemDto mapped =
-        new InventoryItemDto(
-            itemId,
-            null,
-            null,
-            null,
-            10,
-            2.0,
-            false,
-            jobOrder.getId(),
-            null,
-            null,
-            null,
-            null,
-            null,
-            1L,
-            null);
-
-    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
-    when(materialRepository.findById(material.getId())).thenReturn(Optional.of(material));
-    when(locationRepository.findById(location.getId())).thenReturn(Optional.of(location));
-    when(jobOrderRepository.findById(jobOrder.getId())).thenReturn(Optional.of(jobOrder));
-    when(jobOrderItemService.requiredMaterialIds(jobOrder)).thenReturn(Set.of(material.getId()));
-    when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
-    when(inventoryItemMapper.toDto(item)).thenReturn(mapped);
-
-    // When
-    InventoryItemDto result =
-        inventoryItemService.updateInventoryItem(itemId, dto, currentUserId, false);
-
-    // Then
-    assertSame(mapped, result, "the returned DTO is the mapper projection of the edited row");
-    assertEquals(
-        2.0, item.getAmount(), "amount equals the DTO amount, never summed with a sibling");
-    verify(inventoryItemRepository).saveAndFlush(item);
-    verify(inventoryItemRepository, never()).delete(any());
-    // REQ-MARKET-013: an edit ratchets any active offer on the row down to the (possibly reduced)
-    // amount — pins the update clamp call site (the repository query itself no-ops on an increase).
-    verify(materialExchangeOfferRepository).clampOfferedAmountToStock(eq(itemId), eq(2.0));
-  }
-
-  @Test
   void getAggregatedInventory_shouldReturnPage() {
-    Object[] obj = new Object[] {new Material(), 10.0, 5L};
+    // material, weighted-avg quality, MAX quality, total amount (REQ-INV-027 max-quality column).
+    Object[] obj = new Object[] {new Material(), 10.0, 900, 5L};
     Page<Object[]> page = new PageImpl<Object[]>(List.<Object[]>of(obj));
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
@@ -245,6 +163,7 @@ class InventoryItemServiceTest {
     assertNotNull(result);
     assertEquals(1, result.getTotalElements());
     assertEquals(10, result.getContent().get(0).quality());
+    assertEquals(900, result.getContent().get(0).maxQuality());
     assertEquals(5L, result.getContent().get(0).amount());
   }
 
@@ -572,7 +491,7 @@ class InventoryItemServiceTest {
 
     InventoryItemCreateDto dto =
         new InventoryItemCreateDto(
-            userId, materialId, locationId, 100, 10.0, false, null, null, null, null);
+            userId, materialId, locationId, 100, 10.0, false, null, null, null, null, null, null);
 
     User user = new User();
     user.setId(userId);
@@ -599,10 +518,10 @@ class InventoryItemServiceTest {
             null,
             null,
             false,
-            null,
-            null,
-            null,
-            null,
+            java.util.List.of(),
+            0.0,
+            java.util.List.of(),
+            0.0,
             null,
             null,
             null,
@@ -613,6 +532,209 @@ class InventoryItemServiceTest {
 
     assertNotNull(result);
     verify(inventoryItemRepository).save(any(InventoryItem.class));
+  }
+
+  @Test
+  void createInventoryItem_withSplitAtCheckIn_writesEachAllocation() {
+    // Variante C (REQ-INV-027, R4): split at check-in — the entry earmarks parts of its amount to
+    // several job orders and a mission with their own amounts.
+    UUID userId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID orderAId = UUID.randomUUID();
+    UUID orderBId = UUID.randomUUID();
+    UUID missionXId = UUID.randomUUID();
+
+    InventoryItemCreateDto dto =
+        new InventoryItemCreateDto(
+            userId,
+            materialId,
+            locationId,
+            100,
+            10.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            java.util.List.of(
+                new InventoryAllocationInput(orderAId, 3.0),
+                new InventoryAllocationInput(orderBId, 4.0)),
+            java.util.List.of(new InventoryAllocationInput(missionXId, 5.0)));
+
+    User user = new User();
+    user.setId(userId);
+    Material material = new Material();
+    material.setId(materialId);
+    Location location = new Location();
+    location.setId(locationId);
+    JobOrder orderA = new JobOrder();
+    orderA.setId(orderAId);
+    JobOrder orderB = new JobOrder();
+    orderB.setId(orderBId);
+    Mission missionX = new Mission();
+    missionX.setId(missionXId);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+    when(jobOrderRepository.findById(orderAId)).thenReturn(Optional.of(orderA));
+    when(jobOrderRepository.findById(orderBId)).thenReturn(Optional.of(orderB));
+    when(missionRepository.findById(missionXId)).thenReturn(Optional.of(missionX));
+    when(jobOrderItemService.requiredMaterialIds(any(JobOrder.class)))
+        .thenReturn(Set.of(materialId));
+    when(inventoryItemRepository.save(any(InventoryItem.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+    when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
+
+    inventoryItemService.createInventoryItem(dto, userId, false);
+
+    org.mockito.ArgumentCaptor<InventoryItem> captor =
+        org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
+    verify(inventoryItemRepository).save(captor.capture());
+    InventoryItem saved = captor.getValue();
+    assertEquals(2, saved.getJobOrderAllocations().size(), "two job-order slices written");
+    assertEquals(1, saved.getMissionAllocations().size(), "one mission slice written");
+    assertEquals(
+        7.0,
+        saved.getJobOrderAllocations().stream().mapToDouble(a -> a.getAmount()).sum(),
+        "Σ job-order slices");
+    assertEquals(5.0, saved.getMissionAllocations().get(0).getAmount());
+  }
+
+  @Test
+  void createInventoryItem_withSplitExceedingAmount_throwsOverAllocation() {
+    // R5: Σ per dimension must stay within the entry amount; 8 + 5 > 10 => 422.
+    UUID userId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID orderAId = UUID.randomUUID();
+    UUID orderBId = UUID.randomUUID();
+
+    InventoryItemCreateDto dto =
+        new InventoryItemCreateDto(
+            userId,
+            materialId,
+            locationId,
+            100,
+            10.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            java.util.List.of(
+                new InventoryAllocationInput(orderAId, 8.0),
+                new InventoryAllocationInput(orderBId, 5.0)),
+            null);
+
+    User user = new User();
+    user.setId(userId);
+    Material material = new Material();
+    material.setId(materialId);
+    Location location = new Location();
+    location.setId(locationId);
+    JobOrder orderA = new JobOrder();
+    orderA.setId(orderAId);
+    JobOrder orderB = new JobOrder();
+    orderB.setId(orderBId);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+    when(jobOrderRepository.findById(orderAId)).thenReturn(Optional.of(orderA));
+    when(jobOrderRepository.findById(orderBId)).thenReturn(Optional.of(orderB));
+    when(jobOrderItemService.requiredMaterialIds(any(JobOrder.class)))
+        .thenReturn(Set.of(materialId));
+
+    assertThrows(
+        OverAllocationException.class,
+        () -> inventoryItemService.createInventoryItem(dto, userId, false));
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
+  }
+
+  @Test
+  void createInventoryItem_withDuplicateSplitTarget_throwsBadRequest() {
+    UUID userId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID orderAId = UUID.randomUUID();
+
+    InventoryItemCreateDto dto =
+        new InventoryItemCreateDto(
+            userId,
+            materialId,
+            locationId,
+            100,
+            10.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            java.util.List.of(
+                new InventoryAllocationInput(orderAId, 3.0),
+                new InventoryAllocationInput(orderAId, 4.0)),
+            null);
+
+    User user = new User();
+    user.setId(userId);
+    Material material = new Material();
+    material.setId(materialId);
+    Location location = new Location();
+    location.setId(locationId);
+    JobOrder orderA = new JobOrder();
+    orderA.setId(orderAId);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+    when(jobOrderRepository.findById(orderAId)).thenReturn(Optional.of(orderA));
+    when(jobOrderItemService.requiredMaterialIds(any(JobOrder.class)))
+        .thenReturn(Set.of(materialId));
+
+    assertThrows(
+        BadRequestException.class,
+        () -> inventoryItemService.createInventoryItem(dto, userId, false));
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
+  }
+
+  @Test
+  void createInventoryItem_personalWithSplitAllocations_throwsBadRequest() {
+    UUID userId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+
+    InventoryItemCreateDto dto =
+        new InventoryItemCreateDto(
+            userId,
+            materialId,
+            locationId,
+            100,
+            10.0,
+            true,
+            null,
+            null,
+            null,
+            null,
+            java.util.List.of(new InventoryAllocationInput(UUID.randomUUID(), 3.0)),
+            null);
+
+    User user = new User();
+    user.setId(userId);
+    Material material = new Material();
+    material.setId(materialId);
+    Location location = new Location();
+    location.setId(locationId);
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+
+    assertThrows(
+        BadRequestException.class,
+        () -> inventoryItemService.createInventoryItem(dto, userId, false));
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
 
   @Test
@@ -627,7 +749,18 @@ class InventoryItemServiceTest {
 
     InventoryItemCreateDto dto =
         new InventoryItemCreateDto(
-            userId, materialId, locationId, 100, 10.0, false, null, jobOrderId, null, null);
+            userId,
+            materialId,
+            locationId,
+            100,
+            10.0,
+            false,
+            null,
+            jobOrderId,
+            null,
+            null,
+            null,
+            null);
 
     User user = new User();
     user.setId(userId);
@@ -661,7 +794,18 @@ class InventoryItemServiceTest {
 
     InventoryItemCreateDto dto =
         new InventoryItemCreateDto(
-            userId, materialId, locationId, 100, 10.0, false, null, jobOrderId, null, null);
+            userId,
+            materialId,
+            locationId,
+            100,
+            10.0,
+            false,
+            null,
+            jobOrderId,
+            null,
+            null,
+            null,
+            null);
 
     User user = new User();
     user.setId(userId);
@@ -686,48 +830,9 @@ class InventoryItemServiceTest {
     org.mockito.ArgumentCaptor<InventoryItem> captor =
         org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
     verify(inventoryItemRepository).save(captor.capture());
-    assertSame(jobOrder, captor.getValue().getJobOrder());
-  }
-
-  @Test
-  void updateInventoryItem_shouldRejectWhenMaterialNotRequiredByJobOrder() {
-    // REQ-ORDERS-018: the link gate also applies to the in-place association edit (the Lager path
-    // that produced the original orphaned Torite→#71 link).
-    UUID itemId = UUID.randomUUID();
-    UUID currentUserId = UUID.randomUUID();
-    UUID jobOrderId = UUID.randomUUID();
-    UUID materialId = UUID.randomUUID();
-    UUID locationId = UUID.randomUUID();
-
-    InventoryItemUpdateDto dto =
-        new InventoryItemUpdateDto(
-            materialId, locationId, 100, 10.0, false, jobOrderId, null, 1L, null);
-
-    InventoryItem existingItem = new InventoryItem();
-    existingItem.setId(itemId);
-    existingItem.setVersion(1L);
-    existingItem.setPersonal(false);
-    User user = new User();
-    user.setId(currentUserId);
-    existingItem.setUser(user);
-
-    Material material = new Material();
-    material.setId(materialId);
-    Location location = new Location();
-    location.setId(locationId);
-    JobOrder jobOrder = new JobOrder();
-    jobOrder.setId(jobOrderId);
-
-    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
-    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
-    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
-    when(jobOrderRepository.findById(jobOrderId)).thenReturn(Optional.of(jobOrder));
-    when(jobOrderItemService.requiredMaterialIds(jobOrder)).thenReturn(Set.of(UUID.randomUUID()));
-
-    assertThrows(
-        BadRequestException.class,
-        () -> inventoryItemService.updateInventoryItem(itemId, dto, currentUserId, false));
-    verify(inventoryItemRepository, never()).saveAndFlush(any(InventoryItem.class));
+    // Variante C (REQ-INV-027): a single-assignment create writes one job-order slice for the
+    // entry's full amount, so the earmark lives on the allocation, not a vestigial entry scalar.
+    assertSame(jobOrder, captor.getValue().getJobOrderAllocations().get(0).getJobOrder());
   }
 
   @Test
@@ -740,7 +845,18 @@ class InventoryItemServiceTest {
 
     InventoryItemCreateDto dto =
         new InventoryItemCreateDto(
-            userId, materialId, locationId, 100, inputAmount, false, null, null, null, null);
+            userId,
+            materialId,
+            locationId,
+            100,
+            inputAmount,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
 
     User user = new User();
     user.setId(userId);
@@ -783,6 +899,8 @@ class InventoryItemServiceTest {
             null,
             null,
             null,
+            null,
+            null,
             null);
 
     assertThrows(
@@ -797,7 +915,7 @@ class InventoryItemServiceTest {
 
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
-            5.0, null, null, CheckoutType.DISCARD, null, null, 1L, null, null);
+            5.0, null, null, CheckoutType.DISCARD, null, null, 1L, null, null, null, null);
 
     InventoryItem existingItem = new InventoryItem();
     existingItem.setId(itemId);
@@ -820,7 +938,7 @@ class InventoryItemServiceTest {
     UUID itemId = UUID.randomUUID();
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
-            5.0, null, null, CheckoutType.DISCARD, null, null, 2L, null, null);
+            5.0, null, null, CheckoutType.DISCARD, null, null, 2L, null, null, null, null);
 
     InventoryItem existingItem = new InventoryItem();
     existingItem.setId(itemId);
@@ -841,7 +959,7 @@ class InventoryItemServiceTest {
 
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
-            5.0, targetUserId, null, CheckoutType.TRANSFER, null, null, 1L, null, null);
+            5.0, targetUserId, null, CheckoutType.TRANSFER, null, null, 1L, null, null, null, null);
 
     InventoryItem existingItem = new InventoryItem();
     existingItem.setId(itemId);
@@ -877,7 +995,7 @@ class InventoryItemServiceTest {
 
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
-            5.0, null, null, CheckoutType.DISCARD, null, null, 1L, null, null);
+            5.0, null, null, CheckoutType.DISCARD, null, null, 1L, null, null, null, null);
 
     InventoryItem existingItem = new InventoryItem();
     existingItem.setId(itemId);
@@ -908,7 +1026,7 @@ class InventoryItemServiceTest {
 
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
-            10.0, null, null, CheckoutType.DISCARD, null, null, 1L, null, null);
+            10.0, null, null, CheckoutType.DISCARD, null, null, 1L, null, null, null, null);
 
     when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
 
@@ -932,7 +1050,7 @@ class InventoryItemServiceTest {
 
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
-            15.0, null, null, CheckoutType.DISCARD, null, null, 1L, null, null);
+            15.0, null, null, CheckoutType.DISCARD, null, null, 1L, null, null, null, null);
 
     when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
 
@@ -957,7 +1075,11 @@ class InventoryItemServiceTest {
             new java.math.BigDecimal("100.50"),
             1L,
             null,
-            null);
+            null,
+            null,
+            java.util.List.of(
+                new de.greluc.krt.profit.basetool.backend.model.dto.AllocationReductionDto(
+                    missionId, 5.0)));
 
     Mission mission = new Mission();
     mission.setId(missionId);
@@ -973,8 +1095,11 @@ class InventoryItemServiceTest {
     existingItem.setVersion(1L);
     existingItem.setAmount(10.0);
     existingItem.setUser(user);
-    existingItem.setMission(mission);
     existingItem.setMaterial(material);
+    // Variante C (REQ-INV-027): the mission earmark lives on a mission allocation, not a scalar.
+    // Size it at 5.0 (the post-book-out remainder) so the R5 fit check still passes after the SELL
+    // consumes 5.0 — the test's intent is the mission finance entry, not over-allocation.
+    InventoryAllocations.addMission(existingItem, mission, 5.0);
 
     MissionParticipant participant = new MissionParticipant();
     participant.setUser(user);
@@ -990,154 +1115,6 @@ class InventoryItemServiceTest {
     assertEquals(5.0, existingItem.getAmount());
 
     verify(missionFinanceEntryRepository).save(any(MissionFinanceEntry.class));
-  }
-
-  @Test
-  void updateInventoryItem_shouldUpdateAssociations_whenValidRequest() {
-    UUID itemId = UUID.randomUUID();
-    UUID currentUserId = UUID.randomUUID();
-    UUID newJobOrderId = UUID.randomUUID();
-    UUID newMissionId = UUID.randomUUID();
-
-    InventoryItemUpdateDto dto =
-        new InventoryItemUpdateDto(
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            100,
-            10.0,
-            false,
-            newJobOrderId,
-            newMissionId,
-            1L,
-            null);
-
-    InventoryItem existingItem = new InventoryItem();
-    existingItem.setId(itemId);
-    existingItem.setVersion(1L);
-    existingItem.setPersonal(false);
-    User user = new User();
-    user.setId(currentUserId);
-    existingItem.setUser(user);
-
-    JobOrder jobOrder = new JobOrder();
-    jobOrder.setId(newJobOrderId);
-
-    Mission mission = new Mission();
-    mission.setId(newMissionId);
-
-    Material material = new Material();
-    material.setId(dto.materialId());
-
-    Location location = new Location();
-    location.setId(dto.locationId());
-
-    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
-    when(materialRepository.findById(dto.materialId())).thenReturn(Optional.of(material));
-    when(locationRepository.findById(dto.locationId())).thenReturn(Optional.of(location));
-    when(jobOrderRepository.findById(newJobOrderId)).thenReturn(Optional.of(jobOrder));
-    when(jobOrderItemService.requiredMaterialIds(jobOrder)).thenReturn(Set.of(material.getId()));
-    when(missionRepository.findById(newMissionId)).thenReturn(Optional.of(mission));
-    when(inventoryItemRepository.saveAndFlush(any(InventoryItem.class))).thenReturn(existingItem);
-    when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
-
-    inventoryItemService.updateInventoryItem(itemId, dto, currentUserId, false);
-
-    verify(inventoryItemRepository).saveAndFlush(existingItem);
-    assertEquals(newJobOrderId, existingItem.getJobOrder().getId());
-    assertEquals(newMissionId, existingItem.getMission().getId());
-  }
-
-  @Test
-  void updateInventoryItem_shouldThrowAccessDenied_whenUserLacksPermissions() {
-    UUID itemId = UUID.randomUUID();
-    UUID currentUserId = UUID.randomUUID();
-
-    InventoryItemUpdateDto dto =
-        new InventoryItemUpdateDto(
-            UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, 1L, null);
-
-    InventoryItem existingItem = new InventoryItem();
-    existingItem.setId(itemId);
-    existingItem.setVersion(1L);
-    existingItem.setPersonal(false); // Global inventory
-    User owner = new User();
-    owner.setId(UUID.randomUUID()); // different user
-    existingItem.setUser(owner);
-
-    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
-
-    assertThrows(
-        AccessDeniedException.class,
-        () -> inventoryItemService.updateInventoryItem(itemId, dto, currentUserId, false));
-  }
-
-  @Test
-  void updateInventoryItem_shouldAllowLogisticianToUpdateGlobalInventory() {
-    UUID itemId = UUID.randomUUID();
-    UUID currentUserId = UUID.randomUUID();
-
-    InventoryItemUpdateDto dto =
-        new InventoryItemUpdateDto(
-            UUID.randomUUID(), UUID.randomUUID(), 100, 10.0, false, null, null, 1L, null);
-
-    InventoryItem existingItem = new InventoryItem();
-    existingItem.setId(itemId);
-    existingItem.setVersion(1L);
-    existingItem.setPersonal(false); // Global inventory
-    User owner = new User();
-    owner.setId(UUID.randomUUID()); // different user
-    existingItem.setUser(owner);
-
-    Material material = new Material();
-    material.setId(dto.materialId());
-
-    Location location = new Location();
-    location.setId(dto.locationId());
-
-    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
-    when(materialRepository.findById(dto.materialId())).thenReturn(Optional.of(material));
-    when(locationRepository.findById(dto.locationId())).thenReturn(Optional.of(location));
-    when(inventoryItemRepository.saveAndFlush(any(InventoryItem.class))).thenReturn(existingItem);
-    when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
-
-    // isLogistician = true
-    inventoryItemService.updateInventoryItem(itemId, dto, currentUserId, true);
-
-    verify(inventoryItemRepository).saveAndFlush(existingItem);
-    assertNull(existingItem.getJobOrder());
-    assertNull(existingItem.getMission());
-  }
-
-  @Test
-  void updateInventoryItem_shouldThrowOptimisticLockingFailure_whenVersionsMismatch() {
-    UUID itemId = UUID.randomUUID();
-    UUID currentUserId = UUID.randomUUID();
-
-    InventoryItemUpdateDto dto =
-        new InventoryItemUpdateDto(
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            100,
-            10.0,
-            false,
-            null,
-            null,
-            1L // outdated version
-            ,
-            null);
-
-    InventoryItem existingItem = new InventoryItem();
-    existingItem.setId(itemId);
-    existingItem.setVersion(2L); // newer version in DB
-    User user = new User();
-    user.setId(currentUserId);
-    existingItem.setUser(user);
-
-    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
-
-    assertThrows(
-        ObjectOptimisticLockingFailureException.class,
-        () -> inventoryItemService.updateInventoryItem(itemId, dto, currentUserId, false));
   }
 
   @Test
@@ -1291,7 +1268,16 @@ class InventoryItemServiceTest {
     item.setMaterial(material);
     item.setQuality(100);
     item.setAmount(5.0);
-    item.setDelivered(false);
+    // The order's own slice is delivered and earmarks only PART of the entry (3 of the 5 SCU): the
+    // collection must read the slice (Variante C, REQ-INV-027) — delivered and the order-relevant
+    // quantity live on the job-order allocation, not on the entry. quantity stays the entry total
+    // (5), allocatedQuantity is the slice's 3.
+    InventoryJobOrderAllocation slice = new InventoryJobOrderAllocation();
+    slice.setInventoryItem(item);
+    slice.setJobOrder(jobOrder);
+    slice.setAmount(3.0);
+    slice.setDelivered(true);
+    item.getJobOrderAllocations().add(slice);
 
     when(jobOrderRepository.findById(jobOrderId)).thenReturn(Optional.of(jobOrder));
     when(inventoryItemRepository.findByJobOrderIdOrdered(jobOrderId)).thenReturn(List.of(item));
@@ -1310,7 +1296,10 @@ class InventoryItemServiceTest {
     assertEquals("Port Olisar", dto.location());
     assertEquals(locationId, dto.locationId());
     assertEquals("Laranite", dto.materialName());
-    assertFalse(dto.delivered());
+    assertEquals(5.0, dto.quantity(), "quantity is the entry's total physical stock");
+    assertEquals(
+        3.0, dto.allocatedQuantity(), "allocatedQuantity is this order's earmarked slice, not 5");
+    assertTrue(dto.delivered(), "delivered reads the order's slice, not the entry scalar");
   }
 
   @Test
@@ -1332,29 +1321,58 @@ class InventoryItemServiceTest {
     UUID itemId = UUID.randomUUID();
     UUID ownerId = UUID.randomUUID();
 
+    UUID orderId = UUID.randomUUID();
     User owner = new User();
     owner.setId(ownerId);
+
+    JobOrder order = new JobOrder();
+    order.setId(orderId);
+    order.setDisplayId(7);
 
     InventoryItem item = new InventoryItem();
     item.setId(itemId);
     item.setVersion(1L);
     item.setUser(owner);
-    item.setDelivered(false);
+    // Variante A (REQ-INV-027): delivered lives on the job-order slice, not the entry.
+    InventoryJobOrderAllocation slice = new InventoryJobOrderAllocation();
+    slice.setInventoryItem(item);
+    slice.setJobOrder(order);
+    slice.setAmount(3.0);
+    slice.setDelivered(false);
+    item.getJobOrderAllocations().add(slice);
 
     de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest request =
-        new de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest(true, 1L);
+        new de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest(
+            true, orderId, 1L);
 
-    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+    when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
     when(inventoryItemRepository.saveAndFlush(any(InventoryItem.class)))
         .thenAnswer(inv -> inv.getArgument(0));
-    when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
+    when(inventoryItemMapper.toDto(any(InventoryItem.class)))
+        .thenReturn(minimalInventoryDto(itemId));
 
     // When
     inventoryItemService.updateDelivered(itemId, request, ownerId, false);
 
     // Then
-    assertTrue(item.getDelivered());
+    assertTrue(slice.getDelivered(), "the order's slice is delivered");
     verify(inventoryItemRepository).saveAndFlush(item);
+  }
+
+  /**
+   * A minimal {@link de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto} for stubbing
+   * {@code inventoryItemMapper.toDto(...)} on the force-increment write paths (delivered toggle,
+   * allocation writes), which wrap the mapped DTO with the post-commit version via {@code
+   * withVersion}.
+   *
+   * @param id the entry id to carry.
+   * @return a minimal DTO (version {@code 1L}).
+   */
+  private static de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto
+      minimalInventoryDto(UUID id) {
+    return new de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto(
+        id, null, null, null, null, null, null, List.of(), 0.0, List.of(), 0.0, null, null, 1L,
+        null);
   }
 
   /**
@@ -1368,25 +1386,44 @@ class InventoryItemServiceTest {
     UUID itemId = UUID.randomUUID();
     UUID ownerId = UUID.randomUUID();
 
+    UUID orderId = UUID.randomUUID();
     User owner = new User();
     owner.setId(ownerId);
+
+    JobOrder order = new JobOrder();
+    order.setId(orderId);
+    order.setDisplayId(9);
 
     InventoryItem item = new InventoryItem();
     item.setId(itemId);
     item.setVersion(1L);
     item.setUser(owner);
-    item.setDelivered(false);
+    // Variante A (REQ-INV-027): delivered lives on the job-order slice, not the entry.
+    InventoryJobOrderAllocation slice = new InventoryJobOrderAllocation();
+    slice.setInventoryItem(item);
+    slice.setJobOrder(order);
+    slice.setAmount(3.0);
+    slice.setDelivered(false);
+    item.getJobOrderAllocations().add(slice);
 
     de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest request =
-        new de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest(true, 1L);
+        new de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest(
+            true, orderId, 1L);
 
-    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+    when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
     when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
+    when(inventoryItemMapper.toDto(any(InventoryItem.class)))
+        .thenReturn(minimalInventoryDto(itemId));
 
-    inventoryItemService.updateDelivered(itemId, request, ownerId, false);
+    de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto result =
+        inventoryItemService.updateDelivered(itemId, request, ownerId, false);
 
     verify(inventoryItemRepository).saveAndFlush(item);
     verify(inventoryItemRepository, never()).save(item);
+    // OPTIMISTIC_FORCE_INCREMENT bumps the entry @Version (1) at commit, so the client must echo 2
+    // on its next write to the same row — else a second consecutive delivered toggle 409s
+    // (the MaterialCollectionDeliveredInPlaceE2eTest regression, REQ-INV-027).
+    assertEquals(2L, result.version(), "response carries the post-commit force-increment version");
   }
 
   @Test
@@ -1402,12 +1439,12 @@ class InventoryItemServiceTest {
     item.setId(itemId);
     item.setVersion(2L);
     item.setUser(owner);
-    item.setDelivered(false);
 
     de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest request =
-        new de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest(true, 1L);
+        new de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest(
+            true, UUID.randomUUID(), 1L);
 
-    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+    when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
 
     // When / Then
     assertThrows(
@@ -1432,9 +1469,10 @@ class InventoryItemServiceTest {
     item.setUser(owner);
 
     de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest request =
-        new de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest(true, 1L);
+        new de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest(
+            true, UUID.randomUUID(), 1L);
 
-    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+    when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
 
     // When / Then
     assertThrows(
@@ -1510,6 +1548,8 @@ class InventoryItemServiceTest {
             null,
             null,
             pickedOrgUnitId,
+            null,
+            null,
             null);
 
     User user = new User();
@@ -1551,6 +1591,8 @@ class InventoryItemServiceTest {
             null,
             null,
             foreignOrgUnitId,
+            null,
+            null,
             null);
 
     User user = new User();
@@ -1579,7 +1621,18 @@ class InventoryItemServiceTest {
 
     InventoryItemCreateDto dto =
         new InventoryItemCreateDto(
-            userId, materialId, locationId, 100, 10.0, false, null, null, pickedOrgUnitId, null);
+            userId,
+            materialId,
+            locationId,
+            100,
+            10.0,
+            false,
+            null,
+            null,
+            pickedOrgUnitId,
+            null,
+            null,
+            null);
 
     User user = new User();
     user.setId(userId);

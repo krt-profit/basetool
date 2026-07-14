@@ -891,7 +891,15 @@
                                         <span th:case="*" th:text="${item.amount != null} ? |${#numbers.formatDecimal(item.amount, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}| : '-'">10.500 SCU</span>
                                     </td>
                                     <td th:text="${item.quality != null ? item.quality : '-'}">Qualit&auml;t</td>
-                                    <td th:text="${item.jobOrderDisplayId != null ? '#' + item.jobOrderDisplayId : '-'}">Auftrag</td>
+                                    <td>
+                                        <span th:each="a : ${item.jobOrderAllocations}"
+                                              class="assoc-chip assoc-chip--order">
+                                            <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
+                                            <span class="assoc-chip__amt"
+                                                  th:text="${#numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
+                                        </span>
+                                        <span th:if="${#lists.isEmpty(item.jobOrderAllocations)}">-</span>
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>

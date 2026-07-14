@@ -74,6 +74,22 @@ public enum AppExceptionKind {
       "Business conflict",
       ErrorDisclosurePolicy.STANDARD),
 
+  /**
+   * {@code OverAllocationException} — a well-formed, version-current request whose amount would
+   * push a dimension's Σ over the inventory entry's own amount (Variante C, REQ-INV-027 rule R5).
+   * The {@code 422} status is deliberately distinct from a {@code 400} validation error and a
+   * {@code 409} lock conflict so the frontend can render an inline toast rather than a reload
+   * prompt.
+   */
+  OVER_ALLOCATION(
+      HttpStatus.UNPROCESSABLE_CONTENT,
+      "OVER_ALLOCATION",
+      "problem.over_allocation.title",
+      "problem.over_allocation.detail",
+      "over-allocation",
+      "Over-allocation",
+      ErrorDisclosurePolicy.STANDARD),
+
   /** {@code DuplicateEntityException} — service-layer uniqueness check. */
   DUPLICATE_ENTITY(
       HttpStatus.CONFLICT,

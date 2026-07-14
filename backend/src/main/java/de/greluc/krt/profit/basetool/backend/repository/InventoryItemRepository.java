@@ -47,9 +47,29 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * Derived Spring-Data query - returns entities matching {@code User}. Eagerly fetches the
    * configured relations via {@code @EntityGraph}.
    */
-  @EntityGraph(
-      attributePaths = {"material", "location", "user", "jobOrder", "mission", "owningOrgUnit"})
+  @EntityGraph(attributePaths = {"material", "location", "user", "owningOrgUnit"})
   Page<InventoryItem> findByUser(User user, Pageable pageable);
+
+  /**
+   * Loads an entry for a per-allocation write (add / change / remove a job-order or mission slice,
+   * Variante C REQ-INV-027) under {@link LockModeType#OPTIMISTIC_FORCE_INCREMENT}. An allocation
+   * lives on the inverse ({@code mappedBy}) side of the entry's {@code @OneToMany}, so cascading a
+   * child insert/delete/amount-change through the collection dirties only the child rows and would
+   * NOT bump the entry's own {@code @Version} on its own. Forcing the increment here makes the
+   * entry's version the single concurrency token for both its splits — two concurrent allocation
+   * writers (or an allocation write racing a scalar edit) serialise and the loser gets a clean 409
+   * — and makes the response DTO carry the post-increment version the client must echo next. The
+   * {@code material} is graphed because the write validates the amount against the material's
+   * PIECE/SCU precision; the two allocation collections stay lazy (both are bags, so graphing them
+   * together would raise {@code MultipleBagFetchException}) and load within the same transaction.
+   *
+   * @param id the inventory entry id.
+   * @return the entry under a forced version increment, or empty when unknown.
+   */
+  @Lock(LockModeType.OPTIMISTIC_FORCE_INCREMENT)
+  @EntityGraph(attributePaths = {"material"})
+  @Query("SELECT i FROM InventoryItem i WHERE i.id = :id")
+  Optional<InventoryItem> findByIdForAllocationWrite(@Param("id") UUID id);
 
   /**
    * Lists every inventory item (shared and personal) linked to {@code missionId} — the
@@ -62,8 +82,13 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * @param missionId the mission whose linked inventory to load; never {@code null}.
    * @return the mission's inventory rows; never {@code null}, possibly empty.
    */
-  @EntityGraph(attributePaths = {"material", "location", "user", "jobOrder"})
-  List<InventoryItem> findByMissionId(UUID missionId);
+  @EntityGraph(attributePaths = {"material", "location", "user"})
+  @Query(
+      """
+      SELECT i FROM InventoryItem i WHERE EXISTS (SELECT 1 FROM InventoryMissionAllocation ma
+      WHERE ma.inventoryItem = i AND ma.mission.id = :missionId)
+      """)
+  List<InventoryItem> findByMissionId(@Param("missionId") UUID missionId);
 
   /**
    * Loads every non-personal (shared) inventory row owned by the given user as managed entities.
@@ -76,7 +101,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * @param userId the owner whose shared inventory to load; never {@code null}.
    * @return the user's non-personal inventory rows; never {@code null}, possibly empty.
    */
-  @EntityGraph(attributePaths = {"material", "location", "jobOrder", "mission", "owningOrgUnit"})
+  @EntityGraph(attributePaths = {"material", "location", "owningOrgUnit"})
   @Query("SELECT i FROM InventoryItem i WHERE i.user.id = :userId AND i.personal = false")
   List<InventoryItem> findByUserIdAndPersonalFalse(@Param("userId") UUID userId);
 
@@ -110,8 +135,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * owningSquadronId} {@code null} = admin "all squadrons" mode (no filter applied); a non-null id
    * restricts to that squadron.
    */
-  @EntityGraph(
-      attributePaths = {"material", "location", "user", "jobOrder", "mission", "owningOrgUnit"})
+  @EntityGraph(attributePaths = {"material", "location", "user", "owningOrgUnit"})
   @Query(
       "SELECT i FROM InventoryItem i WHERE i.material = :material AND i.personal = false AND "
           + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE)
@@ -137,15 +161,16 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * they are linked to a job order - the Job-Order-Kontext is a separate, intentionally ungated
    * lookup path served by {@link #findByJobOrderIdOrdered(UUID)}.
    */
-  @EntityGraph(
-      attributePaths = {"material", "location", "user", "jobOrder", "mission", "owningOrgUnit"})
+  @EntityGraph(attributePaths = {"material", "location", "user", "owningOrgUnit"})
   @Query(
       "SELECT i FROM InventoryItem i WHERE i.personal = false AND "
           + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE
           + " AND (:hasMaterials = false OR i.material.id IN :materialIds) AND (:minQuality IS"
-          + " NULL OR i.quality >= :minQuality) AND (:hasJobOrders = false OR (i.jobOrder IS NOT"
-          + " NULL AND i.jobOrder.id IN :jobOrderIds)) AND (:hasMissions = false OR (i.mission IS"
-          + " NOT NULL AND i.mission.id IN :missionIds))")
+          + " NULL OR i.quality >= :minQuality) AND (:hasJobOrders = false OR EXISTS (SELECT 1"
+          + " FROM InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrder.id"
+          + " IN :jobOrderIds)) AND (:hasMissions = false OR EXISTS (SELECT 1 FROM"
+          + " InventoryMissionAllocation ma WHERE ma.inventoryItem = i AND ma.mission.id IN"
+          + " :missionIds))")
   Page<InventoryItem> findGlobalByFilters(
       @Param("hasMaterials") boolean hasMaterials,
       @Param("materialIds") List<UUID> materialIds,
@@ -164,15 +189,15 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * the items owned by {@code :user}. Used by the "my inventory" view to enforce isolation at the
    * data layer rather than relying on the controller alone.
    */
-  @EntityGraph(
-      attributePaths = {"material", "location", "user", "jobOrder", "mission", "owningOrgUnit"})
+  @EntityGraph(attributePaths = {"material", "location", "user", "owningOrgUnit"})
   @Query(
       """
       SELECT i FROM InventoryItem i WHERE i.user = :user AND (:hasMaterials = false OR
       i.material.id IN :materialIds) AND (:minQuality IS NULL OR i.quality >= :minQuality)
-      AND (:hasJobOrders = false OR (i.jobOrder IS NOT NULL AND i.jobOrder.id IN
-      :jobOrderIds)) AND (:hasMissions = false OR (i.mission IS NOT NULL AND i.mission.id
-      IN :missionIds))
+      AND (:hasJobOrders = false OR EXISTS (SELECT 1 FROM InventoryJobOrderAllocation ja
+      WHERE ja.inventoryItem = i AND ja.jobOrder.id IN :jobOrderIds)) AND (:hasMissions =
+      false OR EXISTS (SELECT 1 FROM InventoryMissionAllocation ma WHERE ma.inventoryItem =
+      i AND ma.mission.id IN :missionIds))
       """)
   Page<InventoryItem> findUserByFilters(
       @Param("user") User user,
@@ -197,18 +222,19 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.InventoryStackAggregate(i.material, i.user, i.location, i.quality, jo, m, i.personal,
+      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.InventoryStackAggregate(i.material, i.user, i.location, i.quality, i.personal,
       oou, SUM(COALESCE(i.amount, 0.0)), SUM(COALESCE(i.amount, 0.0) *
       COALESCE(i.quality, 0)), MAX(COALESCE(i.quality, 0)), COUNT(i)) FROM InventoryItem i
-      LEFT JOIN i.jobOrder jo LEFT JOIN i.mission m LEFT JOIN i.owningOrgUnit oou
+      LEFT JOIN i.owningOrgUnit oou
       WHERE i.personal = false AND
       """
           + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE
           + " AND (:hasMaterials = false OR i.material.id IN :materialIds) AND (:minQuality IS"
-          + " NULL OR i.quality >= :minQuality) AND (:hasJobOrders = false OR (i.jobOrder IS NOT"
-          + " NULL AND i.jobOrder.id IN :jobOrderIds)) AND (:hasMissions = false OR (i.mission IS"
-          + " NOT NULL AND i.mission.id IN :missionIds)) GROUP BY i.material, i.user, i.location,"
-          + " i.quality, jo, m, i.personal, oou")
+          + " NULL OR i.quality >= :minQuality) AND (:hasJobOrders = false OR EXISTS (SELECT 1"
+          + " FROM InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrder.id"
+          + " IN :jobOrderIds)) AND (:hasMissions = false OR EXISTS (SELECT 1 FROM"
+          + " InventoryMissionAllocation ma WHERE ma.inventoryItem = i AND ma.mission.id IN"
+          + " :missionIds)) GROUP BY i.material, i.user, i.location, i.quality, i.personal, oou")
   List<InventoryStackAggregate> findGlobalStacks(
       @Param("hasMaterials") boolean hasMaterials,
       @Param("materialIds") List<UUID> materialIds,
@@ -235,17 +261,18 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.InventoryStackAggregate(i.material, i.user, i.location, i.quality, jo, m, i.personal,
+      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.InventoryStackAggregate(i.material, i.user, i.location, i.quality, i.personal,
       oou, SUM(COALESCE(i.amount, 0.0)), SUM(COALESCE(i.amount, 0.0) *
       COALESCE(i.quality, 0)), MAX(COALESCE(i.quality, 0)), COUNT(i)) FROM InventoryItem i
-      LEFT JOIN i.jobOrder jo LEFT JOIN i.mission m LEFT JOIN i.owningOrgUnit oou
+      LEFT JOIN i.owningOrgUnit oou
       WHERE i.user.id = :userId AND (:personalOnly = false OR i.personal = true)
       AND (:nonPersonalOnly = false OR i.personal = false)
       AND (:hasMaterials = false OR i.material.id IN :materialIds) AND (:minQuality IS NULL
-      OR i.quality >= :minQuality) AND (:hasJobOrders = false OR (i.jobOrder IS NOT NULL
-      AND i.jobOrder.id IN :jobOrderIds)) AND (:hasMissions = false OR (i.mission IS NOT
-      NULL AND i.mission.id IN :missionIds)) GROUP BY i.material, i.user, i.location,
-      i.quality, jo, m, i.personal, oou
+      OR i.quality >= :minQuality) AND (:hasJobOrders = false OR EXISTS (SELECT 1 FROM
+      InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrder.id IN
+      :jobOrderIds)) AND (:hasMissions = false OR EXISTS (SELECT 1 FROM
+      InventoryMissionAllocation ma WHERE ma.inventoryItem = i AND ma.mission.id IN
+      :missionIds)) GROUP BY i.material, i.user, i.location, i.quality, i.personal, oou
       """)
   List<InventoryStackAggregate> findUserStacks(
       @Param("userId") UUID userId,
@@ -268,15 +295,12 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * drill-down can never widen visibility beyond the caller's org-unit slice. Only non-personal
    * stock is exposed here, mirroring the global grouped view.
    */
-  @EntityGraph(
-      attributePaths = {"material", "location", "user", "jobOrder", "mission", "owningOrgUnit"})
+  @EntityGraph(attributePaths = {"material", "location", "user", "owningOrgUnit"})
   @Query(
       """
       SELECT i FROM InventoryItem i WHERE i.personal = false AND i.material.id = :materialId AND
       i.user.id = :userId AND i.location.id = :locationId AND ((:quality IS NULL AND
-      i.quality IS NULL) OR i.quality = :quality) AND ((:jobOrderId IS NULL AND i.jobOrder
-      IS NULL) OR i.jobOrder.id = :jobOrderId) AND ((:missionId IS NULL AND i.mission IS
-      NULL) OR i.mission.id = :missionId) AND ((:owningOrgUnitId IS NULL AND
+      i.quality IS NULL) OR i.quality = :quality) AND ((:owningOrgUnitId IS NULL AND
       i.owningOrgUnit IS NULL) OR i.owningOrgUnit.id = :owningOrgUnitId) AND
       """
           + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE
@@ -286,8 +310,6 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("userId") UUID userId,
       @Param("locationId") UUID locationId,
       @Param("quality") Integer quality,
-      @Param("jobOrderId") UUID jobOrderId,
-      @Param("missionId") UUID missionId,
       @Param("owningOrgUnitId") UUID owningOrgUnitId,
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
@@ -302,15 +324,12 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * job-order / mission / owning-org-unit arguments match rows where that association is {@code
    * null}.
    */
-  @EntityGraph(
-      attributePaths = {"material", "location", "user", "jobOrder", "mission", "owningOrgUnit"})
+  @EntityGraph(attributePaths = {"material", "location", "user", "owningOrgUnit"})
   @Query(
       """
       SELECT i FROM InventoryItem i WHERE i.user.id = :userId AND i.material.id = :materialId AND
       i.location.id = :locationId AND ((:quality IS NULL AND i.quality IS NULL) OR
-      i.quality = :quality) AND ((:jobOrderId IS NULL AND i.jobOrder IS NULL) OR
-      i.jobOrder.id = :jobOrderId) AND ((:missionId IS NULL AND i.mission IS NULL) OR
-      i.mission.id = :missionId) AND i.personal = :personal AND ((:owningOrgUnitId IS NULL
+      i.quality = :quality) AND i.personal = :personal AND ((:owningOrgUnitId IS NULL
       AND i.owningOrgUnit IS NULL) OR i.owningOrgUnit.id = :owningOrgUnitId) ORDER BY
       i.createdAt ASC
       """)
@@ -319,8 +338,6 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("materialId") UUID materialId,
       @Param("locationId") UUID locationId,
       @Param("quality") Integer quality,
-      @Param("jobOrderId") UUID jobOrderId,
-      @Param("missionId") UUID missionId,
       @Param("personal") Boolean personal,
       @Param("owningOrgUnitId") UUID owningOrgUnitId,
       Pageable pageable);
@@ -337,7 +354,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   @Query(
       """
       SELECT i.material as material, CASE WHEN SUM(i.amount) > 0 THEN SUM(CAST(i.quality AS
-      double) * i.amount) / SUM(i.amount) ELSE 0.0 END as quality, SUM(i.amount) as amount
+      double) * i.amount) / SUM(i.amount) ELSE 0.0 END as quality, MAX(i.quality) as maxQuality,
+      SUM(i.amount) as amount
       FROM InventoryItem i WHERE i.personal = false AND
       """
           + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE
@@ -353,33 +371,37 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * fetches the configured relations via {@code @EntityGraph}.
    */
   @EntityGraph(attributePaths = {"user", "location", "material", "owningOrgUnit"})
-  List<InventoryItem> findByJobOrderIdAndMaterialId(UUID jobOrderId, UUID materialId);
+  @Query(
+      """
+      SELECT i FROM InventoryItem i WHERE i.material.id = :materialId AND EXISTS (SELECT 1 FROM
+      InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrder.id = :jobOrderId)
+      """)
+  List<InventoryItem> findByJobOrderIdAndMaterialId(
+      @Param("jobOrderId") UUID jobOrderId, @Param("materialId") UUID materialId);
 
   /** Derived Spring-Data query - returns entities matching {@code JobOrderIdOrdered}. */
   @EntityGraph(attributePaths = {"user", "location", "material", "owningOrgUnit"})
   @Query(
       """
-      SELECT i FROM InventoryItem i WHERE i.jobOrder.id = :jobOrderId ORDER BY i.user.username
+      SELECT i FROM InventoryItem i WHERE EXISTS (SELECT 1 FROM InventoryJobOrderAllocation ja
+      WHERE ja.inventoryItem = i AND ja.jobOrder.id = :jobOrderId) ORDER BY i.user.username
       ASC, i.location.name ASC, i.material.name ASC, i.quality DESC, i.amount DESC
       """)
   List<InventoryItem> findByJobOrderIdOrdered(@Param("jobOrderId") UUID jobOrderId);
 
   /**
-   * Returns the total {@code amount} of one material assigned to one job-order whose quality meets
-   * or exceeds the threshold; {@code 0.0} if there is no matching row. A {@code null} minQuality
-   * (Keine) imposes no quality floor — all qualities count. Native query because the {@code
-   * COALESCE} + {@code SUM} combination simplifies the null-handling at the call site (the
-   * job-order completion check would otherwise need a separate empty/null guard).
+   * Returns the total quantity of one material <em>allocated</em> to one job-order whose entry
+   * quality meets or exceeds the threshold; {@code 0.0} if there is no matching allocation. Since
+   * Variante C (REQ-INV-027) the sum is over the per-entry job-order allocation amounts, so an
+   * order is credited only its allocated share of a split entry, not the whole row. A {@code null}
+   * minQuality (Keine) imposes no quality floor — all qualities count.
    */
   @Query(
-      value =
-          """
-          SELECT COALESCE(SUM(amount), 0.0) FROM inventory_item
-          WHERE material_id = :materialId
-          AND job_order_id = :jobOrderId
-          AND (:minQuality IS NULL OR quality >= :minQuality)
-          """,
-      nativeQuery = true)
+      """
+      SELECT COALESCE(SUM(a.amount), 0.0) FROM InventoryJobOrderAllocation a
+      WHERE a.inventoryItem.material.id = :materialId AND a.jobOrder.id = :jobOrderId
+      AND (:minQuality IS NULL OR a.inventoryItem.quality >= :minQuality)
+      """)
   Double sumAmountByMaterialAndJobOrderAndMinQuality(
       @Param("materialId") UUID materialId,
       @Param("jobOrderId") UUID jobOrderId,
@@ -395,47 +417,52 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    *
    * @param jobOrderIds the orders whose linked stock to project; an empty collection yields an
    *     empty list.
-   * @return one {@link JobOrderMaterialStockRow} per linked inventory item, never {@code null}.
+   * @return one {@link JobOrderMaterialStockRow} per job-order allocation, never {@code null}.
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow(i.jobOrder.id, i.material.id, i.quality, i.amount)
-      FROM InventoryItem i WHERE i.jobOrder.id IN :jobOrderIds
+      SELECT new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow(a.jobOrder.id, a.inventoryItem.material.id, a.inventoryItem.quality, a.amount)
+      FROM InventoryJobOrderAllocation a WHERE a.jobOrder.id IN :jobOrderIds
       """)
   List<de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow>
       findMaterialStockRowsByJobOrderIds(@Param("jobOrderIds") Collection<UUID> jobOrderIds);
 
   /**
-   * Bulk-clears the {@code jobOrder} reference on every inventory item linked to the given
-   * job-order so the items survive the job-order's deletion as unassigned stock.
+   * Drops every job-order allocation of the given order (Variante C, REQ-INV-027) so an order
+   * activity that detaches stock releases only the order's allocated slice while the owning entries
+   * survive as (partially) unassigned stock (R2). A plain bulk {@code DELETE}: {@code
+   * a.jobOrder.id} is the allocation's own FK column, so no join is implied. Not needed on a
+   * job-order <em>delete</em>, where the {@code job_order_id ON DELETE CASCADE} (V217) removes the
+   * allocations for free.
+   *
+   * @param jobOrderId the order whose allocations to drop.
    */
   @Modifying
-  @Query("UPDATE InventoryItem i SET i.jobOrder = null WHERE i.jobOrder.id = :jobOrderId")
-  void unlinkJobOrder(@Param("jobOrderId") UUID jobOrderId);
+  @Query("DELETE FROM InventoryJobOrderAllocation a WHERE a.jobOrder.id = :jobOrderId")
+  void deleteJobOrderAllocationsByJobOrder(@Param("jobOrderId") UUID jobOrderId);
 
   /**
-   * Bulk-clears {@code jobOrder} only on items of one specific material under the job-order; used
-   * by the handover flow when a single material gets returned. {@code clearAutomatically =
-   * flushAutomatically = true} flushes pending changes first and clears the persistence context
-   * afterwards so any subsequent {@code repository.save(entity)} call in the same transaction does
-   * not collide with a stale {@code @Version} - see the loop-bulk-update note in CLAUDE.md.
+   * Drops the job-order allocations of one specific material under the order (Variante C,
+   * REQ-INV-027) — the allocation counterpart of {@link #unlinkJobOrderMaterial(UUID, UUID)}, run
+   * alongside it in the handover / material-removal flows so released stock loses only that order's
+   * slice while the entry (its other allocations and its amount) survives (R2). The material filter
+   * is a subquery over {@link InventoryItem} because {@code a.inventoryItem.material.id} would
+   * imply a join a bulk {@code DELETE} may not carry, whereas {@code a.inventoryItem.id} is the
+   * allocation's own FK column. Carries {@code clearAutomatically = flushAutomatically = true} so a
+   * subsequent {@code repository.save(entity)} in the same handover loop does not collide with a
+   * stale {@code @Version} — the loop-bulk-update discipline (CLAUDE.md).
+   *
+   * @param jobOrderId the order whose allocations to drop.
+   * @param materialId the material to restrict the drop to.
    */
   @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query(
       """
-      UPDATE InventoryItem i SET i.jobOrder = null WHERE i.jobOrder.id = :jobOrderId AND
-      i.material.id = :materialId
+      DELETE FROM InventoryJobOrderAllocation a WHERE a.jobOrder.id = :jobOrderId AND
+      a.inventoryItem.id IN (SELECT i.id FROM InventoryItem i WHERE i.material.id = :materialId)
       """)
-  void unlinkJobOrderMaterial(
+  void deleteJobOrderAllocationsByJobOrderAndMaterial(
       @Param("jobOrderId") UUID jobOrderId, @Param("materialId") UUID materialId);
-
-  /**
-   * Bulk-clears the {@code mission} reference on every inventory item belonging to one of the given
-   * missions so the items survive a mission delete as unassigned stock.
-   */
-  @Modifying
-  @Query("UPDATE InventoryItem i SET i.mission = null WHERE i.mission.id IN :missionIds")
-  void unlinkMissions(@Param("missionIds") List<UUID> missionIds);
 
   /**
    * Bulk-reassigns every inventory item owned by {@code oldUser} to {@code newUser}; used by the
@@ -457,7 +484,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * pessimistic write lock for the duration of the surrounding transaction.
    */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
-  @EntityGraph(attributePaths = {"material", "jobOrder", "user", "location", "owningOrgUnit"})
+  @EntityGraph(attributePaths = {"material", "user", "location", "owningOrgUnit"})
   @Query("SELECT i FROM InventoryItem i WHERE i.id = :id")
   Optional<InventoryItem> findByIdForUpdate(@Param("id") UUID id);
 
@@ -476,17 +503,18 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * <p>The rows are locked {@code PESSIMISTIC_WRITE} ({@code FOR UPDATE}) for the surrounding
    * transaction so two racing writers to the same stack serialise: the merge reads, sums and
    * deletes siblings, which is exactly the read-add-write the append-only model (ADR-0003) removed,
-   * so it re-introduces the lock only on this one path. Every stock-identity column is a
-   * foreign-key or scalar, so the lock targets only {@code inventory_item} rows. Ordered
-   * oldest-first for a deterministic survivor tie-break.
+   * so it re-introduces the lock only on this one path. Ordered oldest-first for a deterministic
+   * survivor tie-break.
+   *
+   * <p>Since Variante C (REQ-INV-027) the group key is the row's <em>physical</em> identity only —
+   * user · material · location · quality · personal · owningOrgUnit; the job-order / mission
+   * earmarks are NOT part of it, so matching rows are folded and their allocations unioned (R1).
    *
    * @param userId the owning user of the stack; never {@code null}.
    * @param materialId the stack's material; never {@code null}.
    * @param locationId the stack's storage location; never {@code null}.
    * @param quality the stack's quality grade; never {@code null}.
    * @param personal the stack's personal flag; never {@code null}.
-   * @param jobOrderId the stack's job-order id, or {@code null} to match rows with no job order.
-   * @param missionId the stack's mission id, or {@code null} to match rows with no mission.
    * @param owningOrgUnitId the stack's owning org-unit pool id, or {@code null} to match rows with
    *     no owning org unit.
    * @return the locked matching rows (excluding offer-backed rows), oldest-first; never {@code
@@ -497,8 +525,6 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       """
       SELECT i FROM InventoryItem i WHERE i.user.id = :userId AND i.material.id = :materialId AND
       i.location.id = :locationId AND i.quality = :quality AND i.personal = :personal AND
-      ((:jobOrderId IS NULL AND i.jobOrder IS NULL) OR i.jobOrder.id = :jobOrderId) AND
-      ((:missionId IS NULL AND i.mission IS NULL) OR i.mission.id = :missionId) AND
       ((:owningOrgUnitId IS NULL AND i.owningOrgUnit IS NULL) OR i.owningOrgUnit.id =
       :owningOrgUnitId) AND NOT EXISTS (SELECT 1 FROM MaterialExchangeOffer o WHERE
       o.inventoryItem = i) ORDER BY i.createdAt ASC, i.id ASC
@@ -509,8 +535,6 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("locationId") UUID locationId,
       @Param("quality") Integer quality,
       @Param("personal") Boolean personal,
-      @Param("jobOrderId") UUID jobOrderId,
-      @Param("missionId") UUID missionId,
       @Param("owningOrgUnitId") UUID owningOrgUnitId);
 
   /**

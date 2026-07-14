@@ -71,8 +71,6 @@ class InventoryItemStackQueryTest {
                     UUID.randomUUID(),
                     500,
                     null,
-                    null,
-                    null,
                     true,
                     null,
                     Set.of(),
@@ -86,8 +84,6 @@ class InventoryItemStackQueryTest {
                     UUID.randomUUID(),
                     UUID.randomUUID(),
                     500,
-                    null,
-                    null,
                     false,
                     null,
                     firstPage)

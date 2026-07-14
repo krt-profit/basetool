@@ -20,9 +20,11 @@
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
@@ -48,6 +50,18 @@ import org.jetbrains.annotations.Nullable;
  * {@code PIECE} material merges it into a matching target stack unconditionally while an {@code
  * SCU} material merges only when this flag is {@code true}. It is never persisted and governs only
  * this one transfer.
+ *
+ * <p>{@link #jobOrderReductions} and {@link #missionReductions} are the Variante-C "deduct from"
+ * plan (REQ-INV-027): because an entry's job-order and mission splits are two independent taggings
+ * of the same stock, the single deducted {@link #amount} is sourced separately per dimension. Each
+ * list names the earmark slices to shrink and by how much; whatever a dimension's reductions leave
+ * uncovered is taken from that dimension's not-yet-assigned rest. A {@code null} / empty list means
+ * "take it all from the rest" (the legacy behaviour, which 422s when the rest is too small). On a
+ * {@link CheckoutType#TRANSFER} the reduced tags move to the new target row (the moved stock stays
+ * earmarked); on a {@link CheckoutType#SELL} the mission reductions additionally drive the proceeds
+ * split — mission {@code j} is credited {@code sellAmount × amount_j / amount} of the sale (for
+ * missions the seller participates in), the rest staying the seller's personal proceeds, so no
+ * separate income-attribution input exists any more.
  */
 public record InventoryItemBookOutDto(
     @NotNull @Min(0) Double amount,
@@ -58,4 +72,6 @@ public record InventoryItemBookOutDto(
     @Min(0) BigDecimal sellAmount,
     @NotNull Long version,
     @Nullable UUID targetOwningOrgUnitId,
-    Boolean mergeStock) {}
+    Boolean mergeStock,
+    @Valid @Nullable List<AllocationReductionDto> jobOrderReductions,
+    @Valid @Nullable List<AllocationReductionDto> missionReductions) {}

@@ -31,12 +31,13 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkCheckoutRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationDimension;
+import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationWriteDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemNoteUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebookDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemUpdateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
@@ -66,10 +67,10 @@ import org.springframework.security.oauth2.jwt.Jwt;
  *   <li>{@code /my-inventory*} derives the owner id from the JWT via {@link
  *       UserService#getUserIdFromJwt} — never a URL parameter. This is the personal-inventory
  *       data-isolation guarantee from CLAUDE.md.
- *   <li>{@code create}, {@code book-out}, {@code update}, {@code update-delivered} and {@code
- *       update-note} read {@code authHelperService.isLogisticianOrAbove()} at the HTTP boundary and
- *       pass the boolean down so the service stays free of {@code SecurityContextHolder} (ArchUnit
- *       rule). The role-driven branch is exercised for both {@code true} and {@code false}.
+ *   <li>{@code create}, {@code book-out}, {@code update-delivered} and {@code update-note} read
+ *       {@code authHelperService.isLogisticianOrAbove()} at the HTTP boundary and pass the boolean
+ *       down so the service stays free of {@code SecurityContextHolder} (ArchUnit rule). The
+ *       role-driven branch is exercised for both {@code true} and {@code false}.
  *   <li>{@code POST /{id}/book-out} returns {@code 200 OK} when the service yields a DTO and {@code
  *       204 No Content} when the row was removed entirely (service returns {@code null}). The
  *       branch decision lives in the controller, not the service.
@@ -98,14 +99,28 @@ class InventoryItemControllerTest {
 
   private static InventoryItemDto inventoryItem(UUID id) {
     return new InventoryItemDto(
-        id, null, null, null, 750, 10.0, false, null, null, null, null, null, null, 1L, null);
+        id,
+        null,
+        null,
+        null,
+        750,
+        10.0,
+        false,
+        java.util.List.of(),
+        0.0,
+        java.util.List.of(),
+        0.0,
+        null,
+        null,
+        1L,
+        null);
   }
 
   // ── GET /aggregated ───────────────────────────────────────────────────
 
   @Test
   void getAggregatedInventory_wrapsPageIntoPageResponse() {
-    AggregatedInventoryDto agg = new AggregatedInventoryDto(null, 750.0, 25.0);
+    AggregatedInventoryDto agg = new AggregatedInventoryDto(null, 750.0, 900.0, 25.0);
     Page<AggregatedInventoryDto> page = new PageImpl<>(List.of(agg), PageRequest.of(0, 20), 1);
     when(inventoryItemService.getAggregatedInventory(any(Pageable.class))).thenReturn(page);
 
@@ -280,8 +295,6 @@ class InventoryItemControllerTest {
             eq(materialId),
             eq(locationId),
             eq(800),
-            eq(jobOrderId),
-            eq(missionId),
             eq(Boolean.TRUE),
             eq(owningOrgUnitId),
             any(Pageable.class)))
@@ -289,7 +302,7 @@ class InventoryItemControllerTest {
 
     PageResponse<InventoryItemDto> result =
         controller.getMyStackEntries(
-            jwt, materialId, locationId, 800, jobOrderId, missionId, true, owningOrgUnitId, 0, 500);
+            jwt, materialId, locationId, 800, true, owningOrgUnitId, 0, 500);
 
     assertThat(result.content()).containsExactly(dto);
     // The owner id is derived from the JWT, never a request parameter (personal-inventory
@@ -303,8 +316,6 @@ class InventoryItemControllerTest {
             eq(materialId),
             eq(locationId),
             eq(800),
-            eq(jobOrderId),
-            eq(missionId),
             eq(Boolean.TRUE),
             eq(owningOrgUnitId),
             pageable.capture());
@@ -322,19 +333,11 @@ class InventoryItemControllerTest {
     InventoryItemDto dto = inventoryItem(UUID.randomUUID());
     Page<InventoryItemDto> page = new PageImpl<>(List.of(dto), PageRequest.of(0, 20), 1);
     when(inventoryItemService.getAllStackEntries(
-            eq(materialId),
-            eq(userId),
-            eq(locationId),
-            isNull(),
-            isNull(),
-            isNull(),
-            isNull(),
-            any(Pageable.class)))
+            eq(materialId), eq(userId), eq(locationId), isNull(), isNull(), any(Pageable.class)))
         .thenReturn(page);
 
     PageResponse<InventoryItemDto> result =
-        controller.getAllStackEntries(
-            materialId, userId, locationId, null, null, null, null, null, null);
+        controller.getAllStackEntries(materialId, userId, locationId, null, null, null, null);
 
     assertThat(result.content()).containsExactly(dto);
     // The squadron-wide drill-down is gated by @PreAuthorize + service scope, not a JWT-owner read.
@@ -343,14 +346,7 @@ class InventoryItemControllerTest {
     ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
     verify(inventoryItemService)
         .getAllStackEntries(
-            eq(materialId),
-            eq(userId),
-            eq(locationId),
-            isNull(),
-            isNull(),
-            isNull(),
-            isNull(),
-            pageable.capture());
+            eq(materialId), eq(userId), eq(locationId), isNull(), isNull(), pageable.capture());
     assertThat(pageable.getValue().getPageSize()).isEqualTo(20);
     assertThat(pageable.getValue().getPageNumber()).isZero();
   }
@@ -365,7 +361,7 @@ class InventoryItemControllerTest {
     UUID locationId = UUID.randomUUID();
     InventoryItemCreateDto createDto =
         new InventoryItemCreateDto(
-            null, materialId, locationId, 750, 25.0, false, null, null, null, null);
+            null, materialId, locationId, 750, 25.0, false, null, null, null, null, null, null);
     InventoryItemDto persisted = inventoryItem(UUID.randomUUID());
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
@@ -395,6 +391,8 @@ class InventoryItemControllerTest {
             null,
             null,
             null,
+            null,
+            null,
             null);
     InventoryItemDto persisted = inventoryItem(UUID.randomUUID());
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
@@ -417,7 +415,7 @@ class InventoryItemControllerTest {
     UUID ownerId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
     InventoryItemBookOutDto bookOutDto =
-        new InventoryItemBookOutDto(5.0, null, null, null, null, null, 1L, null, null);
+        new InventoryItemBookOutDto(5.0, null, null, null, null, null, 1L, null, null, null, null);
     InventoryItemDto persisted = inventoryItem(itemId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
@@ -437,7 +435,7 @@ class InventoryItemControllerTest {
     UUID ownerId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
     InventoryItemBookOutDto bookOutDto =
-        new InventoryItemBookOutDto(25.0, null, null, null, null, null, 1L, null, null);
+        new InventoryItemBookOutDto(25.0, null, null, null, null, null, 1L, null, null, null, null);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
     when(inventoryItemService.bookOutInventoryItem(itemId, bookOutDto, ownerId, true))
@@ -567,7 +565,7 @@ class InventoryItemControllerTest {
     Jwt jwt = jwt("alice-sub");
     UUID ownerId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
-    UpdateDeliveredRequest request = new UpdateDeliveredRequest(true, 1L);
+    UpdateDeliveredRequest request = new UpdateDeliveredRequest(true, UUID.randomUUID(), 1L);
     InventoryItemDto persisted = inventoryItem(itemId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
@@ -585,7 +583,7 @@ class InventoryItemControllerTest {
     Jwt jwt = jwt("alice-sub");
     UUID ownerId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
-    UpdateDeliveredRequest request = new UpdateDeliveredRequest(false, 2L);
+    UpdateDeliveredRequest request = new UpdateDeliveredRequest(false, UUID.randomUUID(), 2L);
     InventoryItemDto persisted = inventoryItem(itemId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
@@ -596,48 +594,6 @@ class InventoryItemControllerTest {
 
     assertThat(result).isSameAs(persisted);
     verify(inventoryItemService).updateDelivered(itemId, request, ownerId, false);
-  }
-
-  // ── PUT /inventory/{id} (soft-association update) ────────────────────
-
-  @Test
-  void updateInventoryItem_logisticianBranch_passesTrueToService() {
-    Jwt jwt = jwt("alice-sub");
-    UUID ownerId = UUID.randomUUID();
-    UUID itemId = UUID.randomUUID();
-    InventoryItemUpdateDto updateDto =
-        new InventoryItemUpdateDto(
-            UUID.randomUUID(), UUID.randomUUID(), 800, 12.0, false, null, null, 1L, null);
-    InventoryItemDto persisted = inventoryItem(itemId);
-    when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
-    when(inventoryItemService.updateInventoryItem(itemId, updateDto, ownerId, true))
-        .thenReturn(persisted);
-
-    InventoryItemDto result = controller.updateInventoryItem(jwt, itemId, updateDto);
-
-    assertThat(result).isSameAs(persisted);
-    verify(inventoryItemService).updateInventoryItem(itemId, updateDto, ownerId, true);
-  }
-
-  @Test
-  void updateInventoryItem_nonLogisticianBranch_passesFalseToService() {
-    Jwt jwt = jwt("alice-sub");
-    UUID ownerId = UUID.randomUUID();
-    UUID itemId = UUID.randomUUID();
-    InventoryItemUpdateDto updateDto =
-        new InventoryItemUpdateDto(
-            UUID.randomUUID(), UUID.randomUUID(), 800, 12.0, false, null, null, 1L, null);
-    InventoryItemDto persisted = inventoryItem(itemId);
-    when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
-    when(inventoryItemService.updateInventoryItem(itemId, updateDto, ownerId, false))
-        .thenReturn(persisted);
-
-    InventoryItemDto result = controller.updateInventoryItem(jwt, itemId, updateDto);
-
-    assertThat(result).isSameAs(persisted);
-    verify(inventoryItemService).updateInventoryItem(itemId, updateDto, ownerId, false);
   }
 
   // ── DELETE /inventory/all (ADMIN-only nuke) ──────────────────────────
@@ -653,5 +609,58 @@ class InventoryItemControllerTest {
     assertThat(response.getStatusCode().value()).isEqualTo(204);
     assertThat(response.getBody()).isNull();
     verify(inventoryItemService).deleteAllGlobalInventory();
+  }
+
+  // ── POST/PATCH/DELETE /inventory/{id}/allocation (Variante C splits) ──
+
+  @Test
+  void addAllocation_delegatesIdAndDto_withoutJwtOrRoleHelper() {
+    UUID itemId = UUID.randomUUID();
+    InventoryAllocationWriteDto dto =
+        new InventoryAllocationWriteDto(
+            InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 4.0, 1L);
+    InventoryItemDto persisted = inventoryItem(itemId);
+    when(inventoryItemService.addAllocation(itemId, dto)).thenReturn(persisted);
+
+    InventoryItemDto result = controller.addAllocation(itemId, dto);
+
+    // The allocation endpoints are gated purely by @PreAuthorize(@ownerScopeService
+    // .canEditInventoryItem) plus the service's personal-entry guard — no JWT-owner read and no
+    // isLogistician boundary flag, so neither helper is consulted.
+    assertThat(result).isSameAs(persisted);
+    verify(inventoryItemService).addAllocation(itemId, dto);
+    verifyNoInteractions(userService, authHelperService);
+  }
+
+  @Test
+  void changeAllocation_delegatesIdAndDto() {
+    UUID itemId = UUID.randomUUID();
+    InventoryAllocationWriteDto dto =
+        new InventoryAllocationWriteDto(
+            InventoryAllocationDimension.MISSION, UUID.randomUUID(), 6.0, 2L);
+    InventoryItemDto persisted = inventoryItem(itemId);
+    when(inventoryItemService.changeAllocation(itemId, dto)).thenReturn(persisted);
+
+    InventoryItemDto result = controller.changeAllocation(itemId, dto);
+
+    assertThat(result).isSameAs(persisted);
+    verify(inventoryItemService).changeAllocation(itemId, dto);
+    verifyNoInteractions(userService, authHelperService);
+  }
+
+  @Test
+  void removeAllocation_delegatesIdAndDto() {
+    UUID itemId = UUID.randomUUID();
+    InventoryAllocationWriteDto dto =
+        new InventoryAllocationWriteDto(
+            InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), null, 3L);
+    InventoryItemDto persisted = inventoryItem(itemId);
+    when(inventoryItemService.removeAllocation(itemId, dto)).thenReturn(persisted);
+
+    InventoryItemDto result = controller.removeAllocation(itemId, dto);
+
+    assertThat(result).isSameAs(persisted);
+    verify(inventoryItemService).removeAllocation(itemId, dto);
+    verifyNoInteractions(userService, authHelperService);
   }
 }

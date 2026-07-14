@@ -30,6 +30,8 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
+import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
+import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
@@ -37,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -80,24 +83,51 @@ class InventoryCheckoutServiceAuditTest {
     UUID itemId = UUID.randomUUID();
     UUID ownerId = UUID.randomUUID();
 
+    UUID orderId = UUID.randomUUID();
     User owner = new User();
     owner.setId(ownerId);
+
+    JobOrder order = new JobOrder();
+    order.setId(orderId);
+    order.setDisplayId(42);
 
     InventoryItem item = new InventoryItem();
     item.setId(itemId);
     item.setVersion(1L);
     item.setUser(owner);
-    item.setDelivered(false);
+    item.setAmount(5.0);
+    // Variante C (REQ-INV-027): delivered lives on the job-order slice, not the entry. Earmark the
+    // entry's stock to the requested order so updateDelivered has that order's slice to flip.
+    InventoryJobOrderAllocation slice = InventoryAllocations.addJobOrder(item, order, 5.0, false);
 
-    UpdateDeliveredRequest request = new UpdateDeliveredRequest(true, 1L);
+    UpdateDeliveredRequest request = new UpdateDeliveredRequest(true, orderId, 1L);
 
-    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+    when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
     when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
-    when(inventoryItemMapper.toDto(item)).thenReturn(null);
+    // A non-null DTO: updateDelivered wraps it with the post-commit force-increment version
+    // (withVersion), so a null mapping would NPE (REQ-INV-027).
+    when(inventoryItemMapper.toDto(item))
+        .thenReturn(
+            new de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto(
+                itemId,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                java.util.List.of(),
+                0.0,
+                java.util.List.of(),
+                0.0,
+                null,
+                null,
+                1L,
+                null));
 
     service.updateDelivered(itemId, request, ownerId, false);
 
-    assertTrue(item.getDelivered(), "the delivered flag is flipped to true");
+    assertTrue(slice.getDelivered(), "the order's slice is flipped to delivered");
     verify(auditService)
         .record(
             eq(AuditEventType.INVENTORY_ITEM_DELIVERY_TOGGLED),

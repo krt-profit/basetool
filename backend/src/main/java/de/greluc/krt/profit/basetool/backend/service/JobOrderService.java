@@ -318,7 +318,9 @@ public class JobOrderService {
     }
 
     if (isTerminal && !wasTerminal) {
-      inventoryItemRepository.unlinkJobOrder(jobOrder.getId());
+      // R2 (REQ-INV-027): drop the order's allocation slices, so the entries stay in the Lager
+      // as (partially) unassigned stock rather than keeping a phantom link.
+      inventoryItemRepository.deleteJobOrderAllocationsByJobOrder(jobOrder.getId());
     }
 
     // COMPLETED is funneled to one event type whether reached manually here or auto via a handover
@@ -527,7 +529,8 @@ public class JobOrderService {
     // THEN run the clearAutomatically inventory unlinks — once per removed material, after the
     // persist. Each detaches the context, so `managed` must not be touched afterwards.
     for (UUID removedId : removedMaterialIds) {
-      inventoryItemRepository.unlinkJobOrderMaterial(id, removedId);
+      // R2 (REQ-INV-027): drop the order's allocation slices for the removed material.
+      inventoryItemRepository.deleteJobOrderAllocationsByJobOrderAndMaterial(id, removedId);
     }
 
     // Re-fetch a managed instance for the post-clear reads (claim reconciliation, audit, DTO).
@@ -774,7 +777,8 @@ public class JobOrderService {
     Set<UUID> noLongerRequired = new LinkedHashSet<>(requiredBefore);
     noLongerRequired.removeAll(jobOrderItemService.requiredMaterialIds(jobOrder));
     for (UUID removedMaterialId : noLongerRequired) {
-      inventoryItemRepository.unlinkJobOrderMaterial(id, removedMaterialId);
+      // R2 (REQ-INV-027): drop the order's allocation slices for the no-longer-required material.
+      inventoryItemRepository.deleteJobOrderAllocationsByJobOrderAndMaterial(id, removedMaterialId);
     }
 
     // Re-fetch a managed instance for the post-clear reads (claim reconciliation, audit, DTO).
@@ -838,7 +842,7 @@ public class JobOrderService {
     // afterwards (the audit table keeps a plain UUID, no FK to job_order).
     final UUID deletedId = jobOrder.getId();
     final String deletedLabel = orderLabel(jobOrder);
-    inventoryItemRepository.unlinkJobOrder(id);
+    // The order's allocation slices vanish with it via the job_order_id ON DELETE CASCADE (V217).
     jobOrderRepository.delete(jobOrder);
     jobOrderRepository.flush();
     if (priority != null) {
@@ -891,7 +895,8 @@ public class JobOrderService {
     // Snapshot the label before the @Modifying(clearAutomatically) bulk unlink detaches the
     // context.
     final String label = orderLabel(jobOrder);
-    inventoryItemRepository.unlinkJobOrderMaterial(jobOrderId, materialId);
+    // R2 (REQ-INV-027): drop the order's allocation slices for the unlinked material.
+    inventoryItemRepository.deleteJobOrderAllocationsByJobOrderAndMaterial(jobOrderId, materialId);
 
     jobOrder.getMaterials().removeIf(m -> m.getMaterial().getId().equals(materialId));
     jobOrderRepository.save(jobOrder);
@@ -912,7 +917,7 @@ public class JobOrderService {
    */
   @Transactional
   public void unlinkInventoryItem(UUID jobOrderId, UUID inventoryItemId) {
-    JobOrder jobOrder =
+    final JobOrder jobOrder =
         jobOrderRepository
             .findById(jobOrderId)
             .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
@@ -923,11 +928,15 @@ public class JobOrderService {
             .orElseThrow(
                 () -> new NotFoundException("InventoryItem not found: " + inventoryItemId));
 
-    if (item.getJobOrder() == null || !item.getJobOrder().getId().equals(jobOrderId)) {
+    if (item.getJobOrderAllocations().stream()
+        .noneMatch(a -> a.getJobOrder() != null && a.getJobOrder().getId().equals(jobOrderId))) {
       throw new NotFoundException("InventoryItem not linked to job order: " + inventoryItemId);
     }
 
-    item.setJobOrder(null);
+    // R2 (REQ-INV-027): drop this order's allocation slice on the managed entry (orphan-removal
+    // deletes it on flush); the entry stays in the Lager as (partially) unassigned stock.
+    item.getJobOrderAllocations()
+        .removeIf(a -> a.getJobOrder() != null && a.getJobOrder().getId().equals(jobOrderId));
     auditService.record(
         AuditEventType.JOB_ORDER_INVENTORY_UNLINKED,
         jobOrderId,
@@ -1015,7 +1024,9 @@ public class JobOrderService {
       // ObjectOptimisticLockingFailureException on the subsequent flush at transaction end.
       jobOrderRepository.flush();
       jobOrderPriorityService.normalizePriorities();
-      inventoryItemRepository.unlinkJobOrder(jobOrder.getId());
+      // R2 (REQ-INV-027): release the completed order's allocation slices, leaving the entries as
+      // (partially) unassigned stock.
+      inventoryItemRepository.deleteJobOrderAllocationsByJobOrder(jobOrder.getId());
       // Single funnel for auto-completion (every handover path completes through here): one
       // JOB_ORDER_COMPLETED event, recorded only on the actual OPEN/IN_PROGRESS → COMPLETED edge.
       auditService.record(

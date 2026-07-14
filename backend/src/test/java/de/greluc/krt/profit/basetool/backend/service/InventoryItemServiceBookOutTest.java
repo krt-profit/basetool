@@ -33,18 +33,21 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.exception.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.model.FinanceType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
+import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.model.dto.AllocationReductionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
@@ -56,7 +59,9 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepos
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -675,14 +680,18 @@ class InventoryItemServiceBookOutTest {
   class SellTests {
 
     @Test
-    void sellWithMission_createsMissionFinanceEntryIncome() {
+    void sellDeductingFromMission_createsProportionalMissionFinanceEntryIncome() {
+      // Variante C (REQ-INV-027, coupled proceeds): the seller takes the sold SCU out of a mission
+      // earmark they participate in — one INCOME MissionFinanceEntry credited sellAmount *
+      // scu/sold.
       Mission mission = new Mission();
       mission.setId(UUID.randomUUID());
       MissionParticipant participant = new MissionParticipant();
       participant.setId(UUID.randomUUID());
 
       InventoryItem item = newItem(10.0, 1L);
-      item.setMission(mission);
+      // Earmark part of the 10 SCU to the mission; the partial sell deducts the sold 1 SCU from it.
+      InventoryAllocations.addMission(item, mission, 4.0);
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       when(missionParticipantRepository.findByMissionIdAndUserId(mission.getId(), OWNER_ID))
@@ -690,7 +699,12 @@ class InventoryItemServiceBookOutTest {
 
       service.bookOutInventoryItem(
           ITEM_ID,
-          newDto(1.0, null, null, CheckoutType.SELL, "TDD", BigDecimal.valueOf(500), 1L),
+          newSellDto(
+              1.0,
+              "TDD",
+              BigDecimal.valueOf(500),
+              1L,
+              List.of(new AllocationReductionDto(mission.getId(), 1.0))),
           OWNER_ID,
           false);
 
@@ -699,7 +713,8 @@ class InventoryItemServiceBookOutTest {
       verify(missionFinanceEntryRepository).save(captor.capture());
       MissionFinanceEntry entry = captor.getValue();
       assertEquals(FinanceType.INCOME, entry.getType());
-      assertEquals(BigDecimal.valueOf(500), entry.getAmount());
+      // The whole sold 1 SCU came from the mission earmark -> 500 * 1.0 / 1.0 = 500.
+      assertEquals(0, entry.getAmount().compareTo(BigDecimal.valueOf(500)));
       assertSame(mission, entry.getMission());
       assertSame(participant, entry.getParticipant());
       assert entry.getNote().contains("Quantanium");
@@ -707,8 +722,55 @@ class InventoryItemServiceBookOutTest {
     }
 
     @Test
-    void fullSellWithMission_createsIncomeAndDeletesRow() {
-      // Gap 1: a SELL of the WHOLE mission-linked stack (amount == available). The squadron INCOME
+    void sellDeductingFromMultipleMissions_booksProportionalIncomePerMission() {
+      // The seller sources the sold SCU across two earmarked missions; each mission's income is
+      // proportional to the SCU taken from it, the rest of the sold SCU staying personal.
+      Mission missionA = new Mission();
+      missionA.setId(UUID.randomUUID());
+      Mission missionB = new Mission();
+      missionB.setId(UUID.randomUUID());
+      MissionParticipant participantA = new MissionParticipant();
+      participantA.setId(UUID.randomUUID());
+      MissionParticipant participantB = new MissionParticipant();
+      participantB.setId(UUID.randomUUID());
+
+      InventoryItem item = newItem(10.0, 1L);
+      InventoryAllocations.addMission(item, missionA, 1.0);
+      InventoryAllocations.addMission(item, missionB, 1.0);
+
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+      when(missionParticipantRepository.findByMissionIdAndUserId(missionA.getId(), OWNER_ID))
+          .thenReturn(Optional.of(participantA));
+      when(missionParticipantRepository.findByMissionIdAndUserId(missionB.getId(), OWNER_ID))
+          .thenReturn(Optional.of(participantB));
+
+      // Sell 1 SCU, sourcing 0.6 from A and 0.3 from B (0.1 from the rest -> personal).
+      service.bookOutInventoryItem(
+          ITEM_ID,
+          newSellDto(
+              1.0,
+              "TDD",
+              BigDecimal.valueOf(500),
+              1L,
+              List.of(
+                  new AllocationReductionDto(missionA.getId(), 0.6),
+                  new AllocationReductionDto(missionB.getId(), 0.3))),
+          OWNER_ID,
+          false);
+
+      // 500 * 0.6 = 300 to A, 500 * 0.3 = 150 to B; the remaining 0.1 SCU (50) stays personal.
+      ArgumentCaptor<MissionFinanceEntry> captor =
+          ArgumentCaptor.forClass(MissionFinanceEntry.class);
+      verify(missionFinanceEntryRepository, org.mockito.Mockito.times(2)).save(captor.capture());
+      assertEquals(0, captor.getAllValues().get(0).getAmount().compareTo(BigDecimal.valueOf(300)));
+      assertSame(missionA, captor.getAllValues().get(0).getMission());
+      assertEquals(0, captor.getAllValues().get(1).getAmount().compareTo(BigDecimal.valueOf(150)));
+      assertSame(missionB, captor.getAllValues().get(1).getMission());
+    }
+
+    @Test
+    void fullSellFromMission_createsIncomeAndDeletesRow() {
+      // A SELL of the WHOLE mission-linked stack (amount == available). The squadron INCOME
       // MissionFinanceEntry must be created off the still-managed row BEFORE the depletion branch
       // deletes it, the source row is delete()d (not saveAndFlush()ed), the method returns null so
       // the frontend drops the depleted row, and the SOLD audit still carries the pre-delete id.
@@ -718,7 +780,9 @@ class InventoryItemServiceBookOutTest {
       participant.setId(UUID.randomUUID());
 
       InventoryItem item = newItem(5.0, 1L);
-      item.setMission(mission);
+      // The whole 5 SCU is earmarked to the mission; the full sale sources all 5 SCU from it, so
+      // its whole earmark is deducted and the mission is credited the whole proceeds.
+      InventoryAllocations.addMission(item, mission, 5.0);
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       when(missionParticipantRepository.findByMissionIdAndUserId(mission.getId(), OWNER_ID))
@@ -727,7 +791,12 @@ class InventoryItemServiceBookOutTest {
       InventoryItemDto result =
           service.bookOutInventoryItem(
               ITEM_ID,
-              newDto(5.0, null, null, CheckoutType.SELL, "TDD", BigDecimal.valueOf(500), 1L),
+              newSellDto(
+                  5.0,
+                  "TDD",
+                  BigDecimal.valueOf(500),
+                  1L,
+                  List.of(new AllocationReductionDto(mission.getId(), 5.0))),
               OWNER_ID,
               false);
 
@@ -737,7 +806,7 @@ class InventoryItemServiceBookOutTest {
       verify(missionFinanceEntryRepository).save(captor.capture());
       MissionFinanceEntry entry = captor.getValue();
       assertEquals(FinanceType.INCOME, entry.getType());
-      assertEquals(BigDecimal.valueOf(500), entry.getAmount());
+      assertEquals(0, entry.getAmount().compareTo(BigDecimal.valueOf(500)));
       assertSame(mission, entry.getMission());
       assertSame(participant, entry.getParticipant());
 
@@ -752,33 +821,140 @@ class InventoryItemServiceBookOutTest {
     }
 
     @Test
-    void sellWithMission_butCallerNotParticipant_throwsBadRequest() {
+    void sellFromMission_callerNotParticipant_creditsPersonallyNoEntry() {
+      // Coupled proceeds: SCU sold out of a mission the seller is NOT part of cannot credit that
+      // mission (a finance entry needs a participant), so that share stays personal — no throw.
       Mission mission = new Mission();
       mission.setId(UUID.randomUUID());
       InventoryItem item = newItem(10.0, 1L);
-      item.setMission(mission);
+      InventoryAllocations.addMission(item, mission, 1.0);
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       when(missionParticipantRepository.findByMissionIdAndUserId(mission.getId(), OWNER_ID))
           .thenReturn(Optional.empty());
 
+      service.bookOutInventoryItem(
+          ITEM_ID,
+          newSellDto(
+              1.0,
+              "TDD",
+              BigDecimal.TEN,
+              1L,
+              List.of(new AllocationReductionDto(mission.getId(), 1.0))),
+          OWNER_ID,
+          false);
+      verify(missionFinanceEntryRepository, never()).save(any());
+    }
+
+    @Test
+    void sellDeductingFromMission_notEarmarkedOnTheRow_throwsBadRequest() {
+      Mission earmarked = new Mission();
+      earmarked.setId(UUID.randomUUID());
+      InventoryItem item = newItem(10.0, 1L);
+      InventoryAllocations.addMission(item, earmarked, 1.0);
+
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+
+      // Deduct from a DIFFERENT mission the row does not earmark -> 400 while resolving the plan.
       assertThrows(
           BadRequestException.class,
           () ->
               service.bookOutInventoryItem(
                   ITEM_ID,
-                  newDto(1.0, null, null, CheckoutType.SELL, "TDD", BigDecimal.TEN, 1L),
+                  newSellDto(
+                      1.0,
+                      "TDD",
+                      BigDecimal.TEN,
+                      1L,
+                      List.of(new AllocationReductionDto(UUID.randomUUID(), 1.0))),
                   OWNER_ID,
                   false));
       verify(missionFinanceEntryRepository, never()).save(any());
     }
 
     @Test
-    void sellWithoutMission_skipsFinanceEntry() {
-      // No mission attached -> the SELL just decrements the item, no
-      // MissionFinanceEntry side-effect.
+    void sellReductionsExceedingSoldAmount_throwsBadRequest() {
+      Mission missionA = new Mission();
+      missionA.setId(UUID.randomUUID());
+      Mission missionB = new Mission();
+      missionB.setId(UUID.randomUUID());
       InventoryItem item = newItem(10.0, 1L);
-      item.setMission(null);
+      InventoryAllocations.addMission(item, missionA, 1.0);
+      InventoryAllocations.addMission(item, missionB, 1.0);
+
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+
+      // 0.6 + 0.6 = 1.2 SCU sourced for a 1.0 SCU sale -> 400 (the plan exceeds the sold amount).
+      assertThrows(
+          BadRequestException.class,
+          () ->
+              service.bookOutInventoryItem(
+                  ITEM_ID,
+                  newSellDto(
+                      1.0,
+                      "TDD",
+                      BigDecimal.valueOf(500),
+                      1L,
+                      List.of(
+                          new AllocationReductionDto(missionA.getId(), 0.6),
+                          new AllocationReductionDto(missionB.getId(), 0.6))),
+                  OWNER_ID,
+                  false));
+      verify(missionFinanceEntryRepository, never()).save(any());
+    }
+
+    @Test
+    void sellDuplicateReductionTarget_throwsBadRequest() {
+      Mission mission = new Mission();
+      mission.setId(UUID.randomUUID());
+      InventoryItem item = newItem(10.0, 1L);
+      InventoryAllocations.addMission(item, mission, 2.0);
+
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+
+      // The same mission appears twice in the deduct-from plan -> 400 while resolving.
+      assertThrows(
+          BadRequestException.class,
+          () ->
+              service.bookOutInventoryItem(
+                  ITEM_ID,
+                  newSellDto(
+                      1.0,
+                      "TDD",
+                      BigDecimal.valueOf(500),
+                      1L,
+                      List.of(
+                          new AllocationReductionDto(mission.getId(), 0.5),
+                          new AllocationReductionDto(mission.getId(), 0.5))),
+                  OWNER_ID,
+                  false));
+      verify(missionFinanceEntryRepository, never()).save(any());
+    }
+
+    @Test
+    void sellWithNoMissionReductions_isFullyPersonalSale_skipsFinanceEntry() {
+      // Variante C: a SELL that sources nothing from a mission earmark is a fully-personal sale
+      // that
+      // credits no mission — allowed even for a mission-earmarked row, never touching the ledger.
+      Mission mission = new Mission();
+      mission.setId(UUID.randomUUID());
+      InventoryItem item = newItem(10.0, 1L);
+      InventoryAllocations.addMission(item, mission, 1.0);
+
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+
+      service.bookOutInventoryItem(
+          ITEM_ID, newSellDto(1.0, "TDD", BigDecimal.TEN, 1L, List.of()), OWNER_ID, false);
+
+      verify(missionFinanceEntryRepository, never()).save(any());
+      verify(missionParticipantRepository, never()).findByMissionIdAndUserId(any(), any());
+    }
+
+    @Test
+    void sellWithoutMission_skipsFinanceEntry() {
+      // No mission earmarked and no attributions -> the SELL just decrements the item, no
+      // MissionFinanceEntry side-effect and no participant lookup.
+      InventoryItem item = newItem(10.0, 1L);
 
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
@@ -908,7 +1084,9 @@ class InventoryItemServiceBookOutTest {
       participant.setId(UUID.randomUUID());
 
       InventoryItem item = newItem(10.0, 1L);
-      item.setMission(mission);
+      // Variante C: earmark only part of the 10 SCU to the mission so the row still fits its
+      // mission allocation after this partial sell decrements it (sum(mission) <= remaining, R5).
+      InventoryAllocations.addMission(item, mission, 1.0);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       when(missionParticipantRepository.findByMissionIdAndUserId(mission.getId(), OWNER_ID))
           .thenReturn(Optional.of(participant));
@@ -916,7 +1094,12 @@ class InventoryItemServiceBookOutTest {
 
       service.bookOutInventoryItem(
           ITEM_ID,
-          newDto(1.0, null, null, CheckoutType.SELL, "TDD", BigDecimal.valueOf(500), 1L),
+          newSellDto(
+              1.0,
+              "TDD",
+              BigDecimal.valueOf(500),
+              1L,
+              List.of(new AllocationReductionDto(mission.getId(), 1.0))),
           OWNER_ID,
           false);
 
@@ -955,6 +1138,117 @@ class InventoryItemServiceBookOutTest {
   }
 
   // ---------------------------------------------------------------
+  // Variante C "deduct from" plan (REQ-INV-027)
+  // ---------------------------------------------------------------
+
+  @Nested
+  class ReductionPlanTests {
+
+    @Test
+    void discardDeductingFromOrderTag_shrinksThatTagAndAmount() {
+      JobOrder order = new JobOrder();
+      order.setId(UUID.randomUUID());
+      InventoryItem item = newItem(10.0, 1L);
+      InventoryAllocations.addJobOrder(item, order, 6.0, false); // rest = 4
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+      when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
+
+      // Discard 3, all sourced from the order tag -> the tag drops 6 -> 3, the amount 10 -> 7.
+      InventoryItemBookOutDto dto =
+          new InventoryItemBookOutDto(
+              3.0,
+              null,
+              null,
+              CheckoutType.DISCARD,
+              null,
+              null,
+              1L,
+              null,
+              null,
+              List.of(new AllocationReductionDto(order.getId(), 3.0)),
+              null);
+
+      service.bookOutInventoryItem(ITEM_ID, dto, OWNER_ID, false);
+
+      assertEquals(7.0, item.getAmount());
+      assertEquals(3.0, InventoryAllocations.jobOrderSlice(item, order.getId()).getAmount(), 1e-9);
+    }
+
+    @Test
+    void discardUnderAssignedPlan_throwsOverAllocation() {
+      JobOrder order = new JobOrder();
+      order.setId(UUID.randomUUID());
+      InventoryItem item = newItem(10.0, 1L);
+      InventoryAllocations.addJobOrder(item, order, 8.0, false); // rest = 2
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+
+      // Discard 5 but source nothing from the tag: the rest (2) cannot absorb it -> 422.
+      InventoryItemBookOutDto dto =
+          new InventoryItemBookOutDto(
+              5.0, null, null, CheckoutType.DISCARD, null, null, 1L, null, null, List.of(), null);
+
+      assertThrows(
+          OverAllocationException.class,
+          () -> service.bookOutInventoryItem(ITEM_ID, dto, OWNER_ID, false));
+    }
+
+    @Test
+    void transferCarriesReducedTagsToDestination() {
+      UUID targetUserId = UUID.randomUUID();
+      User targetUser = new User();
+      targetUser.setId(targetUserId);
+      JobOrder order = new JobOrder();
+      order.setId(UUID.randomUUID());
+      Mission mission = new Mission();
+      mission.setId(UUID.randomUUID());
+
+      InventoryItem item = newItem(10.0, 1L);
+      InventoryAllocations.addJobOrder(item, order, 6.0, true);
+      InventoryAllocations.addMission(item, mission, 4.0);
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+      when(userRepository.findById(targetUserId)).thenReturn(Optional.of(targetUser));
+      when(inventoryItemRepository.save(any(InventoryItem.class)))
+          .thenAnswer(inv -> inv.getArgument(0));
+
+      // Move 3 SCU, sourcing 3 from the order tag and 2 from the mission tag.
+      InventoryItemBookOutDto dto =
+          new InventoryItemBookOutDto(
+              3.0,
+              targetUserId,
+              null,
+              CheckoutType.TRANSFER,
+              null,
+              null,
+              1L,
+              null,
+              null,
+              List.of(new AllocationReductionDto(order.getId(), 3.0)),
+              List.of(new AllocationReductionDto(mission.getId(), 2.0)));
+
+      service.bookOutInventoryItem(ITEM_ID, dto, OWNER_ID, false);
+
+      ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
+      verify(inventoryItemRepository, org.mockito.Mockito.atLeastOnce()).save(captor.capture());
+      InventoryItem moved =
+          captor.getAllValues().stream()
+              .filter(i -> i.getUser() == targetUser)
+              .findFirst()
+              .orElseThrow(() -> new AssertionError("expected the moved row to be saved"));
+
+      // The moved row carries the reduced tags (order delivered flag inherited); the source
+      // shrinks.
+      assertEquals(3.0, InventoryAllocations.jobOrderSlice(moved, order.getId()).getAmount(), 1e-9);
+      org.junit.jupiter.api.Assertions.assertTrue(
+          InventoryAllocations.jobOrderSlice(moved, order.getId()).getDelivered());
+      assertEquals(
+          2.0, InventoryAllocations.missionSlice(moved, mission.getId()).getAmount(), 1e-9);
+      assertEquals(3.0, InventoryAllocations.jobOrderSlice(item, order.getId()).getAmount(), 1e-9);
+      assertEquals(2.0, InventoryAllocations.missionSlice(item, mission.getId()).getAmount(), 1e-9);
+      assertEquals(7.0, item.getAmount());
+    }
+  }
+
+  // ---------------------------------------------------------------
   // helpers
   // ---------------------------------------------------------------
 
@@ -980,7 +1274,49 @@ class InventoryItemServiceBookOutTest {
       BigDecimal sellAmount,
       Long version) {
     return new InventoryItemBookOutDto(
-        amount, targetUserId, targetLocationId, type, terminal, sellAmount, version, null, null);
+        amount,
+        targetUserId,
+        targetLocationId,
+        type,
+        terminal,
+        sellAmount,
+        version,
+        null,
+        null,
+        null,
+        null);
+  }
+
+  /**
+   * Builds a {@code SELL} book-out DTO carrying the mission "deduct from" plan (Variante C). The
+   * coupled proceeds are derived from it: each mission is credited a share of {@code sellAmount}
+   * proportional to the SCU sourced from its earmark.
+   *
+   * @param amount the sold quantity
+   * @param terminal the sale terminal
+   * @param sellAmount the total sale proceeds
+   * @param version the optimistic-lock version
+   * @param missionReductions the SCU sourced per mission earmark
+   * @return the SELL DTO
+   */
+  private static InventoryItemBookOutDto newSellDto(
+      double amount,
+      String terminal,
+      BigDecimal sellAmount,
+      Long version,
+      List<AllocationReductionDto> missionReductions) {
+    return new InventoryItemBookOutDto(
+        amount,
+        null,
+        null,
+        CheckoutType.SELL,
+        terminal,
+        sellAmount,
+        version,
+        null,
+        null,
+        null,
+        missionReductions);
   }
 
   // --- R5.d.g TRANSFER picker delegation -----------------------------------
@@ -1031,7 +1367,17 @@ class InventoryItemServiceBookOutTest {
 
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
-            5.0, targetUserId, null, CheckoutType.TRANSFER, null, null, 1L, pickedOrgUnitId, null);
+            5.0,
+            targetUserId,
+            null,
+            CheckoutType.TRANSFER,
+            null,
+            null,
+            1L,
+            pickedOrgUnitId,
+            null,
+            null,
+            null);
 
     service.bookOutInventoryItem(itemId, dto, owner.getId(), false);
 
@@ -1059,10 +1405,10 @@ class InventoryItemServiceBookOutTest {
         500,
         amount,
         false,
-        null,
-        null,
-        null,
-        null,
+        java.util.List.of(),
+        0.0,
+        java.util.List.of(),
+        0.0,
         null,
         null,
         1L,

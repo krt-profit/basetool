@@ -90,6 +90,68 @@ class LiveSyncSectionMapParityTest {
   }
 
   @Test
+  void materialCollectionSeamMap_isASubsetOfTheOrderTopicWhitelist() throws IOException {
+    // #1309: the standalone material-collection page joins order:{id} to refresh its table on a
+    // delivered flip / row move, but renders only a SUBSET of the ORDER sections (it reuses the
+    // existing `materials` key), so it cannot match the full whitelist like orders-detail. Assert
+    // every key it names is a real ORDER section — a stray/typo key the relay would silently drop
+    // (stranding peers stale, REQ-FE-010) still fails the build.
+    Set<String> jsKeys =
+        seamMapKeys("/static/js/material-collection.js", "MATERIAL_COLLECTION_SECTIONS");
+    assertThat(jsKeys)
+        .as(
+            "MATERIAL_COLLECTION_SECTIONS keys in material-collection.js vs"
+                + " LiveSyncTopicClass.ORDER whitelist")
+        .isSubsetOf(LiveSyncTopicClass.ORDER.allowedSections());
+  }
+
+  @Test
+  void inventoryAllSeamMap_matchesTheInventoryAllTopicWhitelist() throws IOException {
+    // #1307: the shared Lager's INVENTORY_ALL_SECTIONS receiver map must mirror the
+    // LiveSyncTopicClass.INVENTORY_ALL whitelist (the broadcast derives its keys from this map).
+    Set<String> jsKeys = seamMapKeys("/static/js/inventory-admin.js", "INVENTORY_ALL_SECTIONS");
+    assertThat(jsKeys)
+        .as(
+            "INVENTORY_ALL_SECTIONS keys in inventory-admin.js vs LiveSyncTopicClass.INVENTORY_ALL"
+                + " whitelist")
+        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.INVENTORY_ALL.allowedSections());
+  }
+
+  @Test
+  void inventoryMySeamMap_matchesTheInventoryAllTopicWhitelist() throws IOException {
+    // #1309: the personal Lager joins the same `inventory` room, so its receiver map must mirror
+    // the
+    // same whitelist (a different container, the same `stock` key).
+    Set<String> jsKeys = seamMapKeys("/static/js/inventory-my.js", "INVENTORY_MY_SECTIONS");
+    assertThat(jsKeys)
+        .as("INVENTORY_MY_SECTIONS keys in inventory-my.js vs LiveSyncTopicClass.INVENTORY_ALL")
+        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.INVENTORY_ALL.allowedSections());
+  }
+
+  @Test
+  void inventoryIndexSeamMap_matchesTheInventoryAllTopicWhitelist() throws IOException {
+    // #1309: the aggregated overview joins the same `inventory` room (receive-only).
+    Set<String> jsKeys = seamMapKeys("/static/js/inventory-index.js", "INVENTORY_INDEX_SECTIONS");
+    assertThat(jsKeys)
+        .as(
+            "INVENTORY_INDEX_SECTIONS keys in inventory-index.js vs"
+                + " LiveSyncTopicClass.INVENTORY_ALL")
+        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.INVENTORY_ALL.allowedSections());
+  }
+
+  @Test
+  void inventoryMaterialSeamMap_matchesTheInventoryAllTopicWhitelist() throws IOException {
+    // #1309: the per-material drilldown joins the same `inventory` room (receive-only).
+    Set<String> jsKeys =
+        seamMapKeys("/static/js/inventory-material.js", "INVENTORY_MATERIAL_SECTIONS");
+    assertThat(jsKeys)
+        .as(
+            "INVENTORY_MATERIAL_SECTIONS keys in inventory-material.js vs"
+                + " LiveSyncTopicClass.INVENTORY_ALL")
+        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.INVENTORY_ALL.allowedSections());
+  }
+
+  @Test
   void bankStaffAccountSeamMap_matchesTheBankAccountTopicWhitelist() throws IOException {
     Set<String> jsKeys = seamMapKeys("/static/js/bank.js", "BANK_ACCOUNT_SECTIONS");
     assertThat(jsKeys)
@@ -152,7 +214,10 @@ class LiveSyncSectionMapParityTest {
         List.of(
             "/static/js/materialboerse.js",
             "/static/js/materialboerse-release.js",
-            "/static/js/inventory-materialboerse.js")) {
+            "/static/js/inventory-materialboerse.js",
+            // #1309: a stock-reducing inventory write clamps offers, so it pokes the board too.
+            "/static/js/inventory-admin.js",
+            "/static/js/inventory-my.js")) {
       Matcher matcher = sendChanged.matcher(readResource(module));
       while (matcher.find()) {
         callsSeen++;

@@ -714,7 +714,9 @@ sanitising/dedup, full seam-map whitelist relay for the mission topic, no-op on 
 `LiveSyncSubscriptionAuthorizerTest` (mission: allowed on authorized read, refused on 403/404,
 fail-open on transient, malformed topic rejected) · `LiveSyncSectionMapParityTest` (seam map ↔
 registry whitelist set-equality) · `MissionLiveSyncE2eTest` (two-context live participant-add
-propagation + no-reload assertion) · **Code:** `LiveSyncWebSocketHandler` (`allowChangedFrame` /
+propagation + no-reload assertion) · `InventorySharedLagerLiveSyncE2eTest` (two-context shared-Lager
+allocation-chip propagation + no-reload assertion, #1307) · **Code:** `LiveSyncWebSocketHandler`
+(`allowChangedFrame` /
 `allowPresenceFrame` / `MAX_SECTION_KEY_LENGTH`) / `LiveSyncTopicClass` (mission row),
 `LiveSyncPresenceService` (`MAX_SECTIONS_PER_TOPIC`),
 `mission-presence.js` (adapter: `sendChanged` / `krt:mission-changed` / `krt:mission-resync`),
@@ -961,6 +963,33 @@ this requirement exists to prevent, #1102). Covered topics and their section whi
 | `bank` (staff-global)    | grid, requestQueue, manage, grants                                                                                | no            | `ROLE_BANK_EMPLOYEE` (local check)                                                                    |
 | `orgunit-bank` (global)  | orgUnitBank, orgUnitBankSettings                                                                                  | no            | member-or-above (the `/org-unit-bank` page gate, local check)                                         |
 | `materialboard` (global) | board                                                                                                             | no            | authenticated                                                                                         |
+| `inventory` (global)     | stock                                                                                                             | no            | authenticated (every viewer re-fetches its own owner/org-unit-scoped view)                            |
+
+The `inventory` room is the squadron Lager (#1307/#1309): a single opaque `stock` section stands for
+"the inventory changed". **All** inventory views subscribe and re-pull their own fragment on a peer's
+write — the shared `/inventory/all` and personal `/inventory/my` grouped tables (`filterInventory` /
+`filterMyInventory`, including their lazily-loaded stack entries, so a collapsed stack re-fetches its
+chips on the next expand), the aggregated `/inventory` overview and the per-material
+`/inventory/material/{id}` drilldown (each `krtFetch.swap` its `?fragment=results` container). Every
+inventory write (allocation add/change/remove, book-out, transfer, personal-rebook, bulk-checkout,
+delete-all, note) broadcasts it, from whichever page made it. Because it is a global room but each
+viewer's fragment is owner- and org-unit-scoped, a cross-scope peer refresh (another squadron, or a
+personal-only change seen by a shared view) is a harmless no-op. The same inventory writes also
+cross-publish to the `order:{id}` room (the order material collection tracks the earmark roll-up) and
+the `materialboard` room (a stock-reducing write clamps an offer server-side), so those surfaces
+reflect inventory changes live too. The affected order ids are read off the entry's leaf chips before
+the write; the sole exception is the admin `DELETE /inventory/all` full wipe, which cannot enumerate
+them client-side — its board and inventory rooms are still poked, but an open order collection
+self-heals on the next interaction (an accepted limitation for that rare nuke).
+
+The standalone order **material-collection** page (`/orders/{id}/material-collection`) joins the same
+`order:{id}` room in its own right (#1309): its per-row delivered toggle and owner/location moves
+broadcast `order:{id}` `materials`/`aggregated`, and it re-fetches its `?fragment=results` collection
+table fragment in place on any peer change (its three row controls delegate on `document` so they
+survive the swap; the owner combobox is re-enhanced on `krt:swapped`). It renders a **subset** of the
+ORDER sections (reusing the existing `materials` key), so — unlike `orders-detail.js`, whose seam map
+must match the full ORDER whitelist — its `MATERIAL_COLLECTION_SECTIONS` is parity-checked as a
+**subset** of `LiveSyncTopicClass.ORDER` (a stray/typo key still fails the build).
 
 The server-side **topic-class registry** (the `LiveSyncTopicClass` enum) is the single source of
 truth for this table. The REQ-FE-010 **three-mirror-points rule applies per topic**: the acting page's seam map,

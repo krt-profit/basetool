@@ -19,22 +19,18 @@
 
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
+import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Data transfer record carrying Inventory Item Update payload.
+ * Frontend mirror of the backend mission quantity slice of an inventory entry (Variante C,
+ * REQ-INV-027): the amount of an entry's stock earmarked to one mission, rendered as a chip with
+ * its amount.
  *
- * <p>The trailing {@code mergeStock} field is the per-action stock-merge opt-in (REQ-INV-026):
- * honoured only for an {@code SCU} material (a {@code PIECE} edit always merges); {@code
- * null}/{@code false} keeps the row separate.
+ * @param missionId the earmarked mission's id.
+ * @param missionName the earmarked mission's name (chip label).
+ * @param missionPlannedStartTime the earmarked mission's planned start time, or {@code null}.
+ * @param amount the SCU/piece amount of the entry earmarked to this mission.
  */
-public record InventoryItemUpdateDto(
-    UUID materialId,
-    UUID locationId,
-    Integer quality,
-    Double amount,
-    Boolean personal,
-    UUID jobOrderId,
-    UUID missionId,
-    Long version,
-    Boolean mergeStock) {}
+public record MissionAllocationDto(
+    UUID missionId, String missionName, Instant missionPlannedStartTime, Double amount) {}

@@ -108,6 +108,14 @@ async function executeBulkCheckout() {
     if (!window.krtFetch) {
         return;
     }
+    // Collect every earmarked order across the checked entries before the write (a full bulk
+    // book-out zeroes their order slices), deduped, so those order collections refresh too.
+    const affectedOrderIds = [];
+    ids.forEach(function (itemId) {
+        collectLeafOrderIds(itemId).forEach(function (orderId) {
+            if (affectedOrderIds.indexOf(orderId) < 0) affectedOrderIds.push(orderId);
+        });
+    });
     // #577 part 2: route through the new POST /inventory/bulk-checkout frontend proxy (the
     // former direct browser call to the backend /api/v1/... path had no frontend route, so the
     // bulk action never reached the backend). krtFetch handles CSRF + retry-on-403 and drives
@@ -136,6 +144,9 @@ async function executeBulkCheckout() {
                 bulkCount.textContent = '';
             }
             filterMyInventory();
+            broadcastInventoryChanged();
+            broadcastOrdersChanged(affectedOrderIds);
+            broadcastBoardChanged();
         },
     });
 }
@@ -308,6 +319,72 @@ function resetMyInventoryFilter() {
     if (document.getElementById('missionHeader'))
         updateSelectState('missionAll', 'missionCheck', 'missionHeader');
     filterMyInventory();
+}
+
+// Live peer-sync for the personal Lager (REQ-FE-010 / REQ-FE-015, #1307/#1309). /inventory/my joins
+// the same global "inventory" room as the shared Lager, so a change to the viewer's own stock made
+// elsewhere (e.g. an admin edits it on /inventory/all, or another tab) refreshes this view, and this
+// page's writes tell those other inventory views. One opaque "stock" section = the whole owned table.
+const INVENTORY_MY_SECTIONS = {
+    stock: { container: '#myInventoryTableContainer', fragmentValue: 'stock' },
+};
+
+// Broadcast that this viewer's stock changed; keys derive from the seam map so they can never drift
+// from the whitelist, and the relay excludes the origin socket (no self-refresh). Exposed on window
+// so the shared note modal (inventory-note-modal.js) can notify from either inventory page.
+function broadcastInventoryChanged() {
+    if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
+        window.krtLiveSync.sendChanged('inventory', Object.keys(INVENTORY_MY_SECTIONS));
+    }
+}
+window.krtNotifyInventoryChanged = broadcastInventoryChanged;
+
+// Cross-feature live-sync (#1309): an inventory write also changes surfaces in OTHER rooms.
+// broadcastOrdersChanged tells each affected job order's detail viewers to re-pull their material
+// collection (its stock column tracks the earmark roll-up), and broadcastBoardChanged tells the
+// Materialbörse to re-pull its board after a stock-reducing write (the backend clamps an offer down
+// to the remaining stock). The actor is not in those rooms, so there is no self-refresh.
+function broadcastOrdersChanged(orderIds) {
+    if (!window.krtLiveSync || typeof window.krtLiveSync.sendChanged !== 'function') return;
+    (orderIds || []).forEach(function (orderId) {
+        if (orderId)
+            window.krtLiveSync.sendChanged('order:' + orderId, ['materials', 'aggregated']);
+    });
+}
+function broadcastBoardChanged() {
+    if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
+        window.krtLiveSync.sendChanged('materialboard', ['board']);
+    }
+}
+// The job-order target-ids currently earmarked on an entry's leaf row (read before a stock write).
+function collectLeafOrderIds(itemId) {
+    const leaf = document.querySelector('.tree-row--leaf[data-item-id="' + itemId + '"]');
+    if (!leaf) return [];
+    const ids = [];
+    leaf.querySelectorAll(
+        '.assoc-split[data-assoc-field="JOB_ORDER"] [data-assoc-chip][data-target-id]',
+    ).forEach(function (chip) {
+        const id = chip.getAttribute('data-target-id');
+        if (id && ids.indexOf(id) < 0) ids.push(id);
+    });
+    return ids;
+}
+
+// Inbound peer changes: re-fetch this viewer's own filtered owned table in place (filterMyInventory
+// preserves the filter + tree expansion; a collapsed stack re-fetches its chips on next expand).
+if (
+    window.krtLiveSync &&
+    typeof window.krtLiveSync.createReceiver === 'function' &&
+    document.getElementById('myInventoryTableContainer')
+) {
+    window.krtLiveSync.createReceiver({
+        topic: 'inventory',
+        sections: INVENTORY_MY_SECTIONS,
+        coalesceMs: 1500,
+        refresh: function () {
+            filterMyInventory();
+        },
+    });
 }
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -493,10 +570,6 @@ function buildStackEntriesUrl(headerRow, page) {
     params.set('locationId', headerRow.getAttribute('data-location-id'));
     const quality = headerRow.getAttribute('data-quality');
     if (quality !== null && quality !== '') params.set('quality', quality);
-    const jobOrderId = headerRow.getAttribute('data-job-order-id');
-    if (jobOrderId) params.set('jobOrderId', jobOrderId);
-    const missionId = headerRow.getAttribute('data-mission-id');
-    if (missionId) params.set('missionId', missionId);
     params.set('personal', headerRow.getAttribute('data-personal') || 'false');
     const owningOrgUnitId = headerRow.getAttribute('data-owning-org-unit-id');
     if (owningOrgUnitId) params.set('owningOrgUnitId', owningOrgUnitId);
@@ -537,6 +610,13 @@ function loadStackEntries(headerRow, page) {
         .then(function (html) {
             content.innerHTML = html;
             headerRow.setAttribute('data-stack-loaded', 'true');
+            // The entries are injected via innerHTML (not krtFetch.swap), so no krt:swapped fires —
+            // enhance the Variante-C allocation "+ Zuordnen" <select data-krt-combobox> popovers by
+            // hand (REQ-INV-027), else they stay raw native selects instead of the HUD combobox and
+            // the add-open reset (hidden.krtCombobox.setValue / input focus) has nothing to target.
+            if (typeof window.krtEnhanceComboboxes === 'function') {
+                window.krtEnhanceComboboxes(content);
+            }
             // Newly injected checkboxes must be reflected in the bulk-checkout state.
             updateBulkCheckoutState();
         })
@@ -744,6 +824,11 @@ function toggleUmbuchenMode() {
         targetUser.required = true;
         targetLocation.required = true;
     }
+    // The transfer "Herkunft" picker only applies to LOCATION mode; recompute after the display
+    // toggle so switching to PERSONAL re-enables the submit and switching back re-gates it.
+    if (window.krtHerkunft) {
+        window.krtHerkunft.recompute('umbuchen');
+    }
 }
 
 function openUmbuchenModal(
@@ -820,10 +905,19 @@ function openUmbuchenModal(
     document.querySelector('input[name="umbuchenMode"][value="LOCATION"]').checked = true;
     toggleUmbuchenMode();
     document.getElementById('umbuchenModal').style.display = 'block';
+    // Variante C (REQ-INV-027): build the transfer "Herkunft" picker (the moved row inherits the
+    // reduced tags). It lives inside the LOCATION-only transfer fields, so it self-hides in PERSONAL
+    // mode; populate after the modal is shown so its initial validity gates the submit button.
+    if (window.krtHerkunft) {
+        window.krtHerkunft.populate('umbuchen', id);
+    }
 }
 
 function closeUmbuchenModal() {
     if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
+    if (window.krtHerkunft) {
+        window.krtHerkunft.reset('umbuchen');
+    }
     document.getElementById('umbuchenModal').style.display = 'none';
 }
 
@@ -861,6 +955,17 @@ function submitUmbuchen(event) {
             mergeStock: mergeStock,
         };
     } else {
+        // Variante C (REQ-INV-027): a transfer carries its reduced tags onto the moved row. An
+        // invalid plan already disables the submit button; guard the Enter-key path too.
+        if (window.krtHerkunft && !window.krtHerkunft.isValid('umbuchen')) {
+            if (typeof window.showFrontendErrorToast === 'function') {
+                window.showFrontendErrorToast(assocI18n.overallocated);
+            }
+            return;
+        }
+        const reductions = window.krtHerkunft
+            ? window.krtHerkunft.collect('umbuchen')
+            : { jobOrderReductions: null, missionReductions: null };
         url = '/inventory/' + umbuchenItemId + '/transfer';
         payload = {
             amount: amount,
@@ -871,9 +976,14 @@ function submitUmbuchen(event) {
                 document.getElementById('umbuchenTargetOwningOrgUnitId').value || null,
             version: version,
             mergeStock: mergeStock,
+            jobOrderReductions: reductions.jobOrderReductions,
+            missionReductions: reductions.missionReductions,
         };
     }
 
+    // Read the earmarked orders before the write. Only a LOCATION transfer touches order slices; the
+    // PERSONAL rebook is refused on an allocated row, so it only clamps offers (board), not orders.
+    const affectedOrderIds = mode === 'PERSONAL' ? [] : collectLeafOrderIds(umbuchenItemId);
     umbuchenInFlight = true;
     if (submitBtn) submitBtn.disabled = true;
     window.krtFetch
@@ -887,6 +997,9 @@ function submitUmbuchen(event) {
             onSuccess: function () {
                 closeUmbuchenModal();
                 filterMyInventory();
+                broadcastInventoryChanged();
+                broadcastOrdersChanged(affectedOrderIds);
+                broadcastBoardChanged();
             },
         })
         .then(function () {
@@ -926,6 +1039,19 @@ function submitBookOut(event) {
     // Ausbuchen now only discards or sells — the TRANSFER (Umbuchung) mode moved to the
     // dedicated Umbuchen modal. The backend book-out endpoint still receives the same DTO shape;
     // the transfer-only fields stay null.
+    // Variante C (REQ-INV-027): the "Herkunft" picker chooses which order/mission slices (or the
+    // rest) the deduction comes from and, for a SELL, which missions get the coupled proceeds. An
+    // invalid plan already disables the submit button; guard the Enter-key path too. A null list
+    // means "take it from the rest" (SELL → that portion is personal).
+    if (window.krtHerkunft && !window.krtHerkunft.isValid('bookout')) {
+        if (typeof window.showFrontendErrorToast === 'function') {
+            window.showFrontendErrorToast(assocI18n.overallocated);
+        }
+        return;
+    }
+    const reductions = window.krtHerkunft
+        ? window.krtHerkunft.collect('bookout')
+        : { jobOrderReductions: null, missionReductions: null };
     const payload = {
         amount: amount,
         type: type,
@@ -933,8 +1059,12 @@ function submitBookOut(event) {
         sellAmount:
             type === 'SELL' && sellAmountEl.value !== '' ? Number(sellAmountEl.value) : null,
         version: parseInt(document.getElementById('version').value, 10),
+        jobOrderReductions: reductions.jobOrderReductions,
+        missionReductions: reductions.missionReductions,
     };
     const submitBtn = document.getElementById('bookOutSubmitBtn');
+    // Read the earmarked orders before the write (the leaf is replaced on the post-write re-swap).
+    const affectedOrderIds = collectLeafOrderIds(bookOutItemId);
     bookOutInFlight = true;
     if (submitBtn) {
         submitBtn.disabled = true;
@@ -950,6 +1080,9 @@ function submitBookOut(event) {
             onSuccess: function () {
                 closeBookOutModal();
                 filterMyInventory();
+                broadcastInventoryChanged();
+                broadcastOrdersChanged(affectedOrderIds);
+                broadcastBoardChanged();
             },
         })
         .then(function () {
@@ -1057,11 +1190,19 @@ function openBookOutModal(id, amount, version, materialId, userId, locationId, q
     }
 
     document.getElementById('bookOutModal').style.display = 'block';
+    // Variante C (REQ-INV-027): build the "Herkunft" (deduct-from) picker from this entry's chips
+    // now that the modal is shown, so its initial validity gates the submit button.
+    if (window.krtHerkunft) {
+        window.krtHerkunft.populate('bookout', id);
+    }
 }
 
 function closeBookOutModal() {
     if (typeof window.resetUnsavedChanges === 'function') {
         window.resetUnsavedChanges();
+    }
+    if (window.krtHerkunft) {
+        window.krtHerkunft.reset('bookout');
     }
     document.getElementById('bookOutModal').style.display = 'none';
 }
@@ -1073,127 +1214,201 @@ window.onclick = function (event) {
     }
 };
 
-async function updateInventoryAssociation(selectElement) {
-    const id = selectElement.getAttribute('data-id');
-    // Serialize per inventory row so the row's two association selects (jobOrderId + missionId) can
-    // be changed back-to-back without the second shipping a stale version and 409-ing: the actual
-    // write (which reads the version + builds the dto) runs only after the previous same-row write
-    // settled and synced the fresh version back onto the row's data-version controls.
-    if (window.krtFetch && typeof window.krtFetch.serialize === 'function') {
-        return window.krtFetch.serialize('inv-assoc:' + id, function () {
-            return doUpdateInventoryAssociation(selectElement, id);
-        });
-    }
-    return doUpdateInventoryAssociation(selectElement, id);
+// ── Variante C allocation chips (REQ-INV-027) ──────────────────────────────
+// Each .assoc-split (one per dimension per entry) renders its job-order / mission
+// allocations as chips + a trailing rest chip, plus a "+ Zuordnen" combobox
+// popover. Add / edit / remove call the per-allocation endpoints
+// (POST/PATCH/DELETE /inventory/{id}/allocation) and update the split in place
+// from the returned InventoryItemDto (chips + rest + version), so the drilled-down
+// stack stays expanded and no full-page reload is needed (REQ-FE-001).
+const ASSOC_EPS = 0.0005;
+
+// Formats an amount for a chip / rest label: whole for PIECE, three decimals for SCU.
+function assocFormatAmount(amount, isPiece) {
+    const n = typeof amount === 'number' ? amount : parseFloat(amount);
+    if (isNaN(n)) return '0';
+    return isPiece ? String(Math.round(n)) : n.toFixed(3);
 }
 
-async function doUpdateInventoryAssociation(selectElement, id) {
-    const version = parseInt(selectElement.getAttribute('data-version'));
-
-    // Wir benötigen die anderen Felder für das DTO
-    const materialId = selectElement.getAttribute('data-material-id');
-    const locationId = selectElement.getAttribute('data-location-id');
-    const quality = parseInt(selectElement.getAttribute('data-quality'));
-    const amount = parseFloat(selectElement.getAttribute('data-amount'));
-    const personal = selectElement.getAttribute('data-personal') === 'true';
-
-    // Finde das andere select (jobOrderId/missionId), da wir beide Werte senden müssen oder null
-    const tr = selectElement.closest('.tree-row');
-    const allSelects = tr.querySelectorAll('.association-select');
-    let jobOrderId = null;
-    let missionId = null;
-
-    allSelects.forEach((s) => {
-        const f = s.getAttribute('data-field');
-        if (f === 'jobOrderId' && s.value) jobOrderId = s.value;
-        if (f === 'missionId' && s.value) missionId = s.value;
+// Hides every open allocation popover except `except` (the one being opened).
+function assocCloseAllPops(except) {
+    document.querySelectorAll('[data-assoc-pop]').forEach(function (p) {
+        if (p !== except) p.classList.add('krtm-hidden');
     });
+}
 
-    const dto = {
-        materialId: materialId,
-        locationId: locationId,
-        quality: quality,
-        amount: amount,
-        personal: personal,
-        jobOrderId: jobOrderId,
-        missionId: missionId,
-        version: version,
+// Switches a popover to its combobox (pick) section.
+function assocShowPickSection(pop) {
+    const pick = pop.querySelector('[data-assoc-pop-pick]');
+    const amount = pop.querySelector('[data-assoc-pop-amount]');
+    if (pick) pick.classList.remove('krtm-hidden');
+    if (amount) amount.classList.add('krtm-hidden');
+}
+
+// Switches a popover to its amount-editor section; `showRemove` reveals Entfernen (edit mode).
+function assocShowAmountSection(pop, showRemove) {
+    const pick = pop.querySelector('[data-assoc-pop-pick]');
+    const amount = pop.querySelector('[data-assoc-pop-amount]');
+    if (pick) pick.classList.add('krtm-hidden');
+    if (amount) amount.classList.remove('krtm-hidden');
+    const removeBtn = pop.querySelector('[data-trigger="inv-my-assoc-remove"]');
+    if (removeBtn) removeBtn.classList.toggle('krtm-hidden', !showRemove);
+}
+
+// Builds one allocation chip element from a returned allocation DTO.
+function assocBuildChip(field, alloc, isPiece) {
+    const isOrder = field === 'JOB_ORDER';
+    const chip = document.createElement('span');
+    chip.className = 'assoc-chip ' + (isOrder ? 'assoc-chip--order' : 'assoc-chip--mission');
+    chip.setAttribute('role', 'button');
+    chip.setAttribute('tabindex', '0');
+    chip.setAttribute('data-trigger', 'inv-my-assoc-edit');
+    chip.setAttribute('data-assoc-chip', isOrder ? 'jobOrder' : 'mission');
+    chip.setAttribute('data-target-id', isOrder ? alloc.jobOrderId : alloc.missionId);
+    chip.setAttribute('data-amount', alloc.amount);
+    const label = isOrder ? '#' + alloc.jobOrderDisplayId : alloc.missionName;
+    chip.appendChild(document.createTextNode(label + ' · '));
+    const amt = document.createElement('span');
+    amt.className = 'assoc-chip__amt';
+    amt.textContent = assocFormatAmount(alloc.amount, isPiece);
+    chip.appendChild(amt);
+    return chip;
+}
+
+// Recomputes a rest chip's tone + label: 0 -> success, unassigned remainder -> muted "frei",
+// over-allocation (negative) -> danger.
+function assocUpdateRestChip(el, rest) {
+    if (!el) return;
+    el.classList.remove('chip--success', 'chip--muted', 'chip--danger');
+    if (rest == null || Math.abs(rest) <= ASSOC_EPS) {
+        el.classList.add('chip--success');
+        el.textContent = assocI18n.restZero;
+    } else if (rest < 0) {
+        el.classList.add('chip--danger');
+        el.textContent = assocI18n.restOver.replace('{0}', assocFormatAmount(-rest, false));
+    } else {
+        el.classList.add('chip--muted');
+        el.textContent = assocI18n.restFree.replace('{0}', assocFormatAmount(rest, false));
+    }
+}
+
+// Re-renders a split's chips + rest from the returned entry DTO and propagates the fresh
+// entry version to every data-version control in the leaf row (both dimensions share the token).
+function assocRerender(split, dto) {
+    const field = split.getAttribute('data-assoc-field');
+    const isPiece = split.getAttribute('data-piece') === 'true';
+    const isOrder = field === 'JOB_ORDER';
+    const allocs = (isOrder ? dto.jobOrderAllocations : dto.missionAllocations) || [];
+    const rest = isOrder ? dto.jobOrderRest : dto.missionRest;
+    split.querySelectorAll('[data-assoc-chip]').forEach(function (c) {
+        c.remove();
+    });
+    const addWrap = split.querySelector('.assoc-add-wrap');
+    allocs.forEach(function (a) {
+        split.insertBefore(assocBuildChip(field, a, isPiece), addWrap);
+    });
+    assocUpdateRestChip(split.querySelector('[data-assoc-rest]'), rest);
+    if (
+        dto.version != null &&
+        window.krtFetch &&
+        typeof window.krtFetch.syncVersion === 'function'
+    ) {
+        const leaf = split.closest('.tree-row--leaf');
+        if (leaf) window.krtFetch.syncVersion(leaf, dto.version);
+    }
+}
+
+// Sends the allocation write, serialized per entry so a rapid second edit of the same row waits
+// for the fresh version (REQ-INV-026 / REQ-FE-003 avoid a self-inflicted 409).
+function assocSubmit(split, pop, method) {
+    const entryId = split.getAttribute('data-entry-id');
+    const field = split.getAttribute('data-assoc-field');
+    const targetId = pop.getAttribute('data-assoc-target');
+    const isPiece = split.getAttribute('data-piece') === 'true';
+    let amount = null;
+    if (method !== 'DELETE') {
+        const input = pop.querySelector('[data-assoc-amount-input]');
+        amount = parseFloat(input ? input.value : '');
+        if (isNaN(amount) || amount <= 0 || (isPiece && amount % 1 !== 0)) {
+            if (typeof window.showFrontendErrorToast === 'function') {
+                window.showFrontendErrorToast(assocI18n.amountRequired);
+            }
+            return;
+        }
+        amount = Math.round(amount * 1000) / 1000;
+    }
+    const run = function () {
+        // Read the entry version at SEND time, not click time (REQ-FE-003): both chip dimensions
+        // share the entry @Version and the inv-assoc key, so a rapid 2nd edit of the same entry is
+        // queued behind the 1st — which force-increments the version and syncs it onto data-version
+        // via assocRerender. Reading data-version here (inside the serialized task) picks up that
+        // fresh value, avoiding a self-inflicted 409.
+        const version = parseInt(split.getAttribute('data-version'), 10);
+        const body = { field: field, targetId: targetId, amount: amount, version: version };
+        return assocSend(entryId, method, body, split, pop);
     };
+    if (window.krtFetch && typeof window.krtFetch.serialize === 'function') {
+        return window.krtFetch.serialize('inv-assoc:' + entryId, run);
+    }
+    return run();
+}
 
+async function assocSend(entryId, method, body, split, pop) {
     // #577: CSRF via the shared krtCsrf single source of truth (REQ-FE-002) with retry-on-403.
     let headers = window.krtCsrf
         ? window.krtCsrf.headers()
         : { 'Content-Type': 'application/json' };
-
-    function sendAssoc() {
-        return fetch('/inventory/' + id + '/update-associations', {
-            method: 'PUT',
+    function send() {
+        return fetch('/inventory/' + entryId + '/allocation', {
+            method: method,
             headers: headers,
-            body: JSON.stringify(dto),
+            body: JSON.stringify(body),
         });
     }
-
     try {
-        let response = await sendAssoc();
+        let response = await send();
         if (response.status === 403 && window.krtCsrf && window.krtCsrf.refresh) {
             const refreshed = await window.krtCsrf.refresh();
             if (refreshed) {
                 headers = window.krtCsrf.headers();
-                response = await sendAssoc();
+                response = await send();
             }
         }
-
         if (response.ok) {
-            let updated = null;
+            let dto = null;
             try {
-                updated = await response.json();
+                dto = await response.json();
             } catch {
                 /* tolerate empty body */
             }
-
+            if (dto) assocRerender(split, dto);
+            pop.classList.add('krtm-hidden');
             if (typeof window.showFrontendSuccessToast === 'function') {
-                window.showFrontendSuccessToast(assocI18n.success);
-            } else {
-                console.info(assocI18n.success);
+                window.showFrontendSuccessToast(assocI18n.saved);
             }
-
-            // REQ-INV-026: an association change is no longer a pure in-place edit — for a PIECE
-            // material the backend now folds matching sibling rows into this one (their amounts
-            // summed, the siblings DELETED, delivered reset). When that happens a targeted
-            // syncVersion is not enough: the folded-away rows would linger as phantoms and the
-            // survivor's amount/data-amount would be stale, and a follow-up edit would re-send the
-            // stale amount and silently drop the folded quantity. The returned amount differing from
-            // the amount we sent flags the fold, so re-swap the whole grouped table (as the
-            // book-out / Umbuchen handlers do). Otherwise keep the lightweight version-only sync:
-            // propagate the AUTHORITATIVE new version to every data-version control in the leaf row.
-            if (updated && updated.amount != null && updated.amount !== amount) {
-                filterMyInventory();
-            } else if (updated && updated.version != null && window.krtFetch) {
-                window.krtFetch.syncVersion(
-                    selectElement.closest('.tree-row--leaf'),
-                    updated.version,
-                );
+            broadcastInventoryChanged();
+            // A job-order earmark change shifts that order's material collection.
+            if (body && body.field === 'JOB_ORDER') {
+                broadcastOrdersChanged([body.targetId]);
             }
         } else if (response.status === 409) {
             if (typeof window.showFrontendErrorToast === 'function') {
                 window.showFrontendErrorToast(assocI18n.conflict);
-            } else {
-                console.error(assocI18n.conflict);
             }
             setTimeout(() => location.reload(), 2000);
-        } else {
+        } else if (response.status === 422) {
+            // Over-allocation (REQ-INV-027 R5): a toast, not a reload — the pop stays open so the
+            // user can lower the amount.
             if (typeof window.showFrontendErrorToast === 'function') {
-                window.showFrontendErrorToast(assocI18n.failed);
-            } else {
-                console.error(assocI18n.failed);
+                window.showFrontendErrorToast(assocI18n.overallocated);
             }
+        } else if (typeof window.showFrontendErrorToast === 'function') {
+            window.showFrontendErrorToast(assocI18n.failed);
         }
     } catch (e) {
         console.error(e);
         if (typeof window.showFrontendErrorToast === 'function') {
             window.showFrontendErrorToast(assocI18n.failed);
-        } else {
-            console.error(assocI18n.failed);
         }
     }
 }
@@ -1236,8 +1451,92 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         toggleGroupCheckboxes(el);
     });
     window.krtEvents.on('change', 'inv-my-update-bulk-state', updateBulkCheckoutState);
-    window.krtEvents.on('change', 'inv-my-update-assoc', function (el) {
-        updateInventoryAssociation(el);
+    // Variante C allocation chips (REQ-INV-027).
+    window.krtEvents.on('click', 'inv-my-assoc-add-open', function (el) {
+        const split = el.closest('.assoc-split');
+        const pop = split ? split.querySelector('[data-assoc-pop]') : null;
+        if (!pop) return;
+        const wasHidden = pop.classList.contains('krtm-hidden');
+        assocCloseAllPops(pop);
+        if (wasHidden) {
+            pop.removeAttribute('data-assoc-target');
+            assocShowPickSection(pop);
+            const hidden = pop.querySelector('input[type="hidden"]');
+            if (hidden && hidden.krtCombobox) hidden.krtCombobox.setValue('');
+            pop.classList.remove('krtm-hidden');
+            const cbInput = pop.querySelector('.krt-combobox__input');
+            if (cbInput) cbInput.focus();
+        } else {
+            pop.classList.add('krtm-hidden');
+        }
+    });
+    window.krtEvents.on('change', 'inv-my-assoc-pick', function (el) {
+        const value = el.value;
+        if (!value) return;
+        const pop = el.closest('[data-assoc-pop]');
+        if (!pop) return;
+        pop.setAttribute('data-assoc-target', value);
+        pop.setAttribute('data-assoc-mode', 'add');
+        assocShowAmountSection(pop, false);
+        const input = pop.querySelector('[data-assoc-amount-input]');
+        if (input) {
+            input.value = '';
+            input.focus();
+        }
+    });
+    window.krtEvents.on('click', 'inv-my-assoc-edit', function (el) {
+        const split = el.closest('.assoc-split');
+        const pop = split ? split.querySelector('[data-assoc-pop]') : null;
+        if (!pop) return;
+        assocCloseAllPops(pop);
+        pop.setAttribute('data-assoc-target', el.getAttribute('data-target-id'));
+        pop.setAttribute('data-assoc-mode', 'edit');
+        assocShowAmountSection(pop, true);
+        const input = pop.querySelector('[data-assoc-amount-input]');
+        if (input) input.value = el.getAttribute('data-amount');
+        pop.classList.remove('krtm-hidden');
+        if (input) input.focus();
+    });
+    window.krtEvents.on('click', 'inv-my-assoc-save', function (el) {
+        const pop = el.closest('[data-assoc-pop]');
+        const split = el.closest('.assoc-split');
+        if (!pop || !split) return;
+        assocSubmit(split, pop, pop.getAttribute('data-assoc-mode') === 'edit' ? 'PATCH' : 'POST');
+    });
+    window.krtEvents.on('click', 'inv-my-assoc-remove', function (el) {
+        const pop = el.closest('[data-assoc-pop]');
+        const split = el.closest('.assoc-split');
+        if (!pop || !split) return;
+        assocSubmit(split, pop, 'DELETE');
+    });
+    // Close popovers on an outside click; keyboard: Enter saves the amount, Enter/Space opens a
+    // chip's editor (the chips are role=button but a <span> gets no synthetic click on key press).
+    document.addEventListener('click', function (e) {
+        if (
+            !e.target.closest('[data-assoc-pop]') &&
+            !e.target.closest('.assoc-add') &&
+            !e.target.closest('[data-assoc-chip]')
+        ) {
+            assocCloseAllPops(null);
+        }
+    });
+    document.addEventListener('keydown', function (e) {
+        if (!e.target || typeof e.target.matches !== 'function') return;
+        if (e.key === 'Enter' && e.target.matches('[data-assoc-amount-input]')) {
+            e.preventDefault();
+            const pop = e.target.closest('[data-assoc-pop]');
+            const split = e.target.closest('.assoc-split');
+            if (pop && split) {
+                assocSubmit(
+                    split,
+                    pop,
+                    pop.getAttribute('data-assoc-mode') === 'edit' ? 'PATCH' : 'POST',
+                );
+            }
+        } else if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-assoc-chip]')) {
+            e.preventDefault();
+            e.target.click();
+        }
     });
     window.krtEvents.on('click', 'inv-my-bookout', function (el) {
         openBookOutModal(

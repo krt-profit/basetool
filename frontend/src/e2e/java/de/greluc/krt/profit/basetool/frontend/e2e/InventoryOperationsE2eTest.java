@@ -48,19 +48,23 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * <p>One method per operation — <em>einbuchen</em> (create), <em>ausbuchen</em> (DISCARD, partial
  * and full), <em>umbuchen</em> (TRANSFER), <em>verkaufen</em> (SELL), and the two append-only-safe
  * association edits, <em>zuweisen zu einem Auftrag</em> (job order) and <em>zuweisen zu einem
- * Einsatz</em> (mission) — plus three edge cases: over-booking past the held amount, a no-op
- * transfer to the same user+location, and the cross-field invariant that a personal entry may carry
- * neither a job order nor a mission. The append-only model means TRANSFER and create insert new
- * rows while DISCARD/SELL decrement (and delete at the {@code 1e-4} epsilon), so each scenario uses
- * its <strong>own unique material</strong> to stay isolated in the shared, sequentially-run stack.
+ * Einsatz</em> (mission) — plus the <em>Herkunft</em> deduct-from picker (REQ-INV-027), which both
+ * gates a book-out when the rest cannot cover it and directs the deduction onto a chosen earmark,
+ * and three edge cases: over-booking past the held amount, a no-op transfer to the same
+ * user+location, and the cross-field invariant that a personal entry may carry neither a job order
+ * nor a mission. The append-only model means TRANSFER and create insert new rows while DISCARD/SELL
+ * decrement (and delete at the {@code 1e-4} epsilon), so each scenario uses its <strong>own unique
+ * material</strong> to stay isolated in the shared, sequentially-run stack.
  *
  * <p><b>Drive via UI, verify via API.</b> Every mutation goes through the real Thymeleaf form /
- * book -out modal / inline association select — i.e. the genuine frontend → backend → DB path. The
- * outcome is then asserted by reading the same grouped endpoint the {@code /inventory/my} view
- * itself uses ({@code GET /api/v1/inventory/my-inventory/grouped?materialIds=…}) through {@link
- * BackendSeeder}, which is far more robust than re-expanding the lazily-loaded, grouped tree table
- * and never races the post-write render. The grouped query returns every row the caller owns
- * regardless of the {@code personal} flag, so the seeded non-personal rows surface there.
+ * book-out modal / allocation-chip combobox — i.e. the genuine frontend → backend → DB path. The
+ * book-out / transfer / sell outcomes are then asserted by reading the same grouped endpoint the
+ * {@code /inventory/my} view itself uses ({@code GET /api/v1/inventory/my-inventory/grouped?…})
+ * through {@link BackendSeeder}, which is far more robust than re-expanding the lazily-loaded,
+ * grouped tree table and never races the post-write render. The grouped query returns every row the
+ * caller owns regardless of the {@code personal} flag, so the seeded non-personal rows surface
+ * there. The two allocation scenarios instead assert the rendered chip, since the grouped endpoint
+ * no longer carries the per-entry job-order / mission allocation (Variante C, REQ-INV-027).
  *
  * <p><b>Cache-awareness.</b> The create-form material/location dropdowns come from the frontend's
  * 10-minute cached lookups, so — like {@code JobOrderCreateE2eTest} — the create flow selects
@@ -68,8 +72,8 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * freshly-seeded entry is listed. The Umbuchen modal's transfer dropdown is likewise cached, so the
  * same-location edge case anchors its row at the bootstrap-seeded {@code E2E Refinery Hub} (always
  * cached) to make the Umbuchen modal preselect the source as the transfer target. The job-order and
- * mission lookups are <em>not</em> cached, so freshly seeded ones appear in the association selects
- * at once.
+ * mission lookups are <em>not</em> cached, so freshly seeded ones appear in the allocation-chip
+ * combobox at once.
  */
 @Tag("e2e")
 class InventoryOperationsE2eTest {
@@ -117,6 +121,9 @@ class InventoryOperationsE2eTest {
   private static String assignOrderItemId;
   private static String assignMissionMatId;
   private static String assignMissionItemId;
+  private static String herkunftMatId;
+  private static String herkunftItemId;
+  private static String herkunftOrderId;
   private static String overbookMatId;
   private static String overbookItemId;
   private static String sameLocMatId;
@@ -181,6 +188,16 @@ class InventoryOperationsE2eTest {
     assignMissionItemId =
         seeder.createInventoryItem(
             USERNAME, PASSWORD, assignMissionMatId, opsHubLocId, SEED_QUALITY, 100);
+
+    // Deduct-from ("Herkunft") picker fixture: a job-order-eligible 100-SCU row plus an order that
+    // requests it, so the flow can earmark 70 (rest 30) and then book out from the tag.
+    herkunftMatId = seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, "E2E Inv Herkunft Mat");
+    herkunftItemId =
+        seeder.createInventoryItem(
+            USERNAME, PASSWORD, herkunftMatId, opsHubLocId, SEED_QUALITY, 100);
+    herkunftOrderId =
+        seeder.createJobOrder(
+            USERNAME, PASSWORD, IRIDIUM_ID, "E2E Inv Herkunft Order", herkunftMatId, 650, 100);
 
     overbookMatId = seeder.createRefineryMaterial(USERNAME, PASSWORD, "E2E Inv Overbook Mat");
     overbookItemId =
@@ -348,9 +365,10 @@ class InventoryOperationsE2eTest {
   }
 
   /**
-   * <em>Zuweisen zu einem Auftrag.</em> Picks a job order in the row's inline Auftrag select (an
-   * AJAX {@code PUT /inventory/{id}/update-associations}); the owned stack then carries that job
-   * order id.
+   * <em>Zuweisen zu einem Auftrag.</em> Adds a job-order allocation chip on the entry (Variante C,
+   * REQ-INV-027): opens the "+ Zuordnen" combobox, picks the order, enters the amount and saves (an
+   * AJAX {@code POST /inventory/{id}/allocation}). The entry's Auftrag split then shows the order's
+   * chip, re-rendered in place from the returned DTO without a reload.
    */
   @Test
   void zuweisenAssignsStockToAJobOrder() {
@@ -358,23 +376,24 @@ class InventoryOperationsE2eTest {
         "inventory-zuweisen-auftrag",
         page -> {
           openMyInventoryToEntry(page, assignOrderMatId, assignOrderItemId);
-          page.waitForResponse(
-              response -> response.url().contains("/update-associations"),
-              () ->
-                  page.locator(
-                          "select[data-field='jobOrderId'][data-id='" + assignOrderItemId + "']")
-                      .selectOption(assignOrderId));
+          assignAllocationViaChip(page, assignOrderItemId, "JOB_ORDER", assignOrderId, "100");
 
-          assertEquals(
-              assignOrderId,
-              firstStackJobOrderId(stacksForMaterial(assignOrderMatId)),
-              "stack should now carry the assigned job order");
+          assertThat(
+                  page.locator(
+                      "div.assoc-split[data-entry-id='"
+                          + assignOrderItemId
+                          + "'][data-assoc-field='JOB_ORDER']"
+                          + " [data-assoc-chip='jobOrder'][data-target-id='"
+                          + assignOrderId
+                          + "']"))
+              .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
         });
   }
 
   /**
-   * <em>Zuweisen zu einem Einsatz.</em> Picks a mission in the row's inline Einsatz select (the
-   * same AJAX association update); the owned stack then carries that mission id.
+   * <em>Zuweisen zu einem Einsatz.</em> Adds a mission allocation chip on the entry (Variante C,
+   * REQ-INV-027) through the same "+ Zuordnen" combobox → {@code POST /inventory/{id}/allocation};
+   * the entry's Einsatz split then shows the mission's chip.
    */
   @Test
   void zuweisenAssignsStockToAMission() {
@@ -382,17 +401,88 @@ class InventoryOperationsE2eTest {
         "inventory-zuweisen-einsatz",
         page -> {
           openMyInventoryToEntry(page, assignMissionMatId, assignMissionItemId);
-          page.waitForResponse(
-              response -> response.url().contains("/update-associations"),
-              () ->
-                  page.locator(
-                          "select[data-field='missionId'][data-id='" + assignMissionItemId + "']")
-                      .selectOption(missionId));
+          assignAllocationViaChip(page, assignMissionItemId, "MISSION", missionId, "100");
 
+          assertThat(
+                  page.locator(
+                      "div.assoc-split[data-entry-id='"
+                          + assignMissionItemId
+                          + "'][data-assoc-field='MISSION']"
+                          + " [data-assoc-chip='mission'][data-target-id='"
+                          + missionId
+                          + "']"))
+              .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
+        });
+  }
+
+  /**
+   * <em>Herkunft-Picker (REQ-INV-027).</em> The Ausbuchen deduct-from picker both gates and directs
+   * a book-out. Earmarks 70 of a 100-SCU row to a job order (rest 30), opens the book-out modal and
+   * books out 50: with the order input left at 0 the 30 rest cannot cover the 50, so the picker
+   * disables the submit and shows the "assign at least" warning; entering 40 into the order input
+   * satisfies the plan and re-enables it. After the write the row holds 50 and the order chip has
+   * shrunk from 70 to 30 — proving the 40 came out of the chosen tag (not silently from the rest),
+   * the client-side mirror of {@code InventoryCheckoutService.resolveReductionPlan}.
+   */
+  @Test
+  void herkunftPickerGatesTheRestAndDeductsFromTheChosenTag() {
+    runFlow(
+        "inventory-herkunft-picker",
+        page -> {
+          // Earmark 70 of the 100-SCU row to the job order (rest = 30).
+          openMyInventoryToEntry(page, herkunftMatId, herkunftItemId);
+          assignAllocationViaChip(page, herkunftItemId, "JOB_ORDER", herkunftOrderId, "70");
+
+          // Re-open on a fresh page so the book-out modal builds its picker from the persisted
+          // chip.
+          openBookOutModal(page, herkunftMatId, herkunftItemId);
+          page.locator("input[name='type'][value='DISCARD']").check();
+
+          Locator submit = page.locator("#bookOutSubmitBtn");
+          Locator orderInput =
+              page.locator(
+                  "#bookOutModal [data-herkunft-dim='JOB_ORDER']"
+                      + " [data-herkunft-input][data-herkunft-target='"
+                      + herkunftOrderId
+                      + "']");
+          Locator warn =
+              page.locator("#bookOutModal [data-herkunft-dim='JOB_ORDER'] [data-herkunft-warn]");
+
+          // Book out 50: with the tag at 0 the 30 rest cannot cover it, so the picker gates the
+          // submit and states the minimum that must go to the tag.
+          page.locator("#amount").fill("50");
+          assertThat(submit).isDisabled();
+          assertThat(warn).isVisible();
+
+          // Direct 40 of the 50 to the order tag — the plan is now valid and the submit re-enables.
+          orderInput.fill("40");
+          assertThat(submit).isEnabled();
+
+          submitBookOutInPlace(page);
+
+          // Stock dropped by the full 50 ...
           assertEquals(
-              missionId,
-              firstStackMissionId(stacksForMaterial(assignMissionMatId)),
-              "stack should now carry the assigned mission");
+              50.0, totalAmount(stacksForMaterial(herkunftMatId)), AMOUNT_DELTA, "100 - 50 = 50");
+          // ... and exactly 40 came out of the order earmark (70 - 40 = 30), not the rest. The
+          // partial book-out leaves the row, so the tree restores and the reduced chip re-renders.
+          Locator orderChip =
+              page.locator(
+                  "div.assoc-split[data-entry-id='"
+                      + herkunftItemId
+                      + "'][data-assoc-field='JOB_ORDER'] [data-assoc-chip='jobOrder']"
+                      + "[data-target-id='"
+                      + herkunftOrderId
+                      + "']");
+          // 40 of the 50 booked out came from the order tag (70 - 40 = 30), not the rest. The
+          // book-out re-swap re-renders the reduced chip asynchronously, so assert the chip's
+          // data-amount with an auto-retrying matcher rather than reading it once: a slower browser
+          // can otherwise still expose the pre-swap 70 at read time (firefox flake). The pattern
+          // tolerates the Double's rendered forms (30 / 30.0 / 30.000).
+          assertThat(orderChip)
+              .hasAttribute(
+                  "data-amount",
+                  Pattern.compile("^30(\\.0+)?$"),
+                  new LocatorAssertions.HasAttributeOptions().setTimeout(20_000));
         });
   }
 
@@ -446,9 +536,10 @@ class InventoryOperationsE2eTest {
   }
 
   /**
-   * Edge case: the create form refuses to mark an entry personal while it carries a mission (the
-   * cross-field invariant in REQ-INV), re-rendering the form inline with a field error instead of
-   * persisting.
+   * Edge case: a personal entry cannot carry an assignment (REQ-INV, REQ-INV-027). Since Variante C
+   * the create form splits at check-in via repeatable allocation rows; ticking "personal" hides and
+   * clears those sections, so the invariant is enforced in the UI (the backend also rejects a
+   * personal+assignment create with a 422, covered by the controller unit test).
    */
   @Test
   void edgeCasePersonalEntryCannotCarryAnAssignment() {
@@ -462,28 +553,24 @@ class InventoryOperationsE2eTest {
           page.locator("#locationId").selectOption(new SelectOption().setIndex(1));
           page.locator("#quality").fill(String.valueOf(SEED_QUALITY));
           page.locator("#amount").fill("5");
-          page.locator("#personal").check();
-          // Index 0 is the "-- Kein Einsatz --" placeholder; index 1 is the seeded mission.
-          page.locator("#missionId").selectOption(new SelectOption().setIndex(1));
-          // #577: the cross-field rule now comes back as a 422 from the AJAX twin — no navigation,
-          // the form stays put and the error surfaces as a toast.
-          page.evaluate("window.__krtNoReload = true;");
-          page.evaluate(
-              "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
-                  + " 'none'; } }");
-          page.waitForResponse(
-              r -> r.url().contains("/inventory/input") && "POST".equals(r.request().method()),
-              () -> page.locator("form[action$='/inventory/input'] button[type='submit']").click());
 
-          assertEquals(
-              Boolean.TRUE,
-              page.evaluate("window.__krtNoReload === true"),
-              "a rejected personal+assignment create must not navigate (in-place 422)");
-          assertThat(page).hasURL(Pattern.compile(".*/inventory/input.*"));
-          // The 422 surfaces as the JS-built dynamic toast (.notification-toast.error-toast, no
-          // id),
-          // not the server-rendered flash toast — the AJAX path never re-renders the page.
-          assertThat(page.locator(".notification-toast.error-toast").first()).isVisible();
+          // Add a mission earmark via the split-at-check-in UI: index 0 is the placeholder, index 1
+          // the seeded mission.
+          page.locator("[data-trigger='inv-input-add-mission']").click();
+          page.locator("#missionAllocRows [data-alloc-target]")
+              .first()
+              .selectOption(new SelectOption().setIndex(1));
+          assertThat(page.locator("#missionAllocRows [data-alloc-row]")).hasCount(1);
+
+          // Marking the entry personal hides and clears both allocation sections — a personal entry
+          // can never carry an assignment.
+          page.locator("#personal").check();
+
+          assertThat(page.locator("#missionAllocGroup"))
+              .hasClass(Pattern.compile(".*krtm-hidden.*"));
+          assertThat(page.locator("#jobOrderAllocGroup"))
+              .hasClass(Pattern.compile(".*krtm-hidden.*"));
+          assertThat(page.locator("#missionAllocRows [data-alloc-row]")).hasCount(0);
         });
   }
 
@@ -578,12 +665,90 @@ class InventoryOperationsE2eTest {
   private static void openMyInventoryToEntry(Page page, String materialId, String itemId) {
     E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/my");
     page.waitForLoadState();
-    page.locator("div.tree-row--group[data-material-id='" + materialId + "']").click();
-    page.locator("div.stack-header[data-material-id='" + materialId + "']").click();
+    // The Lager tree persists + restores its group / stack expansion per user in localStorage
+    // (REQ-INV-002, restored on DOMContentLoaded), so a material opened earlier in the same flow
+    // comes back already expanded. Each expansion is therefore idempotent: click to open only while
+    // its container is still collapsed, since a blind toggle click on an already-open row would
+    // collapse it (the deterministic failure when this helper ran twice for the same material).
+    // The guard reads the container's computed display, not Playwright visibility: a restored-open
+    // stack is display:block yet momentarily zero-height while its lazy leaf rows fetch, which
+    // isVisible() would misread as hidden and wrongly collapse.
+    Locator groupRow = page.locator("div.tree-row--group[data-material-id='" + materialId + "']");
+    assertThat(groupRow).isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
+    if (isCollapsed(
+        page,
+        "div.tree-row--group[data-material-id='" + materialId + "'] + div.tree-group-items")) {
+      groupRow.click();
+    }
+    Locator stackHeader = page.locator("div.stack-header[data-material-id='" + materialId + "']");
+    assertThat(stackHeader).isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
+    if (isCollapsed(
+        page, "div.stack-header[data-material-id='" + materialId + "'] + div.tree-stack-entries")) {
+      stackHeader.click();
+    }
     // 20 s, not the 5 s default: the lazy stack-entries fetch + render is slow on WebKit under
     // load.
     assertThat(page.locator("div.tree-row--leaf[data-item-id='" + itemId + "']"))
         .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
+  }
+
+  /**
+   * Reports whether the Lager tree container matched by {@code selector} is collapsed, reading its
+   * synchronously-set computed {@code display} rather than Playwright visibility. A restored-open
+   * stack is {@code display: block} yet momentarily zero-height while its lazy leaf rows fetch, so
+   * {@code isVisible()} would misread it as hidden; the computed {@code display} is unambiguous.
+   *
+   * @param page the authenticated page
+   * @param selector the CSS selector of the group-items / stack-entries container
+   * @return {@code true} when the container is absent or {@code display: none}, {@code false} when
+   *     it is shown
+   */
+  private static boolean isCollapsed(Page page, String selector) {
+    Object display =
+        page.evaluate(
+            "sel => { const el = document.querySelector(sel);"
+                + " return el ? getComputedStyle(el).display : 'none'; }",
+            selector);
+    return "none".equals(display);
+  }
+
+  /**
+   * Adds a Variante-C allocation chip to a stack entry via the inline "+ Zuordnen" combobox
+   * (REQ-INV-027): opens the popover of the entry's {@code field} split, picks the target option in
+   * the enhanced searchable combobox by its value, fills the amount and clicks Speichern, waiting
+   * for the in-place {@code POST /inventory/{id}/allocation} to settle. Drops the fixed footer (it
+   * can otherwise intercept the trusted clicks) and asserts the write did not reload the page.
+   *
+   * @param page the authenticated page expanded to the entry (see {@link #openMyInventoryToEntry})
+   * @param itemId the entry whose split to edit
+   * @param field the allocation dimension, {@code JOB_ORDER} or {@code MISSION}
+   * @param targetId the job-order / mission id to allocate (the combobox option value)
+   * @param amount the amount to allocate (must not exceed the entry's amount)
+   */
+  private static void assignAllocationViaChip(
+      Page page, String itemId, String field, String targetId, String amount) {
+    Locator split =
+        page.locator(
+            "div.assoc-split[data-entry-id='" + itemId + "'][data-assoc-field='" + field + "']");
+    page.evaluate("window.__krtNoReload = true;");
+    page.evaluate(
+        "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
+            + " 'none'; } }");
+    split.locator("button[data-trigger='inv-my-assoc-add-open']").click();
+    Locator pop = split.locator("[data-assoc-pop]");
+    // The "+ Zuordnen" <select data-krt-combobox> is enhanced into a .krt-combobox: click the
+    // textbox to open the listbox, then pick the option by its data-value (the target UUID, since
+    // the visible label is the display id / mission name, not the id).
+    pop.locator(".krt-combobox__input").click();
+    pop.locator("li.krt-combobox__option[data-value='" + targetId + "']").click();
+    pop.locator("[data-assoc-amount-input]").fill(amount);
+    page.waitForResponse(
+        r -> r.url().contains("/allocation") && "POST".equals(r.request().method()),
+        () -> pop.locator("button[data-trigger='inv-my-assoc-save']").click());
+    assertEquals(
+        Boolean.TRUE,
+        page.evaluate("window.__krtNoReload === true"),
+        "the in-place allocation write must not reload the page");
   }
 
   /**
@@ -760,42 +925,5 @@ class InventoryOperationsE2eTest {
    */
   private static int stackCount(JsonArray stacks) {
     return stacks.size();
-  }
-
-  /**
-   * Reads the job order id of the first stack (single-row scenarios have exactly one).
-   *
-   * @param stacks the stacks of one material
-   * @return the first stack's job order id, or {@code null} if unset / no stack
-   */
-  private static String firstStackJobOrderId(JsonArray stacks) {
-    return firstStackString(stacks, "jobOrderId");
-  }
-
-  /**
-   * Reads the mission id of the first stack (single-row scenarios have exactly one).
-   *
-   * @param stacks the stacks of one material
-   * @return the first stack's mission id, or {@code null} if unset / no stack
-   */
-  private static String firstStackMissionId(JsonArray stacks) {
-    return firstStackString(stacks, "missionId");
-  }
-
-  /**
-   * Reads a string field from the first stack, treating a missing/JSON-null value as {@code null}.
-   *
-   * @param stacks the stacks of one material
-   * @param field the field name to read
-   * @return the field value of the first stack, or {@code null}
-   */
-  private static String firstStackString(JsonArray stacks, String field) {
-    if (stacks.isEmpty()) {
-      return null;
-    }
-    JsonObject stack = stacks.get(0).getAsJsonObject();
-    return stack.has(field) && !stack.get(field).isJsonNull()
-        ? stack.get(field).getAsString()
-        : null;
   }
 }

@@ -210,6 +210,11 @@ function runNoteUpdate(btn, id, noteValue) {
                                 p.title = txt;
                             }
                         });
+                        // A note is shown on the shared /all and personal /my Lager alike; tell other
+                        // viewers to refresh (REQ-FE-010). The page module sets this notifier.
+                        if (typeof window.krtNotifyInventoryChanged === 'function') {
+                            window.krtNotifyInventoryChanged();
+                        }
                     })
                     .catch(function () {
                         // If the JSON parsing or DOM sync fails for any reason, reload the page

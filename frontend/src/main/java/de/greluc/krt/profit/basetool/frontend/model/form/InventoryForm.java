@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.model.form;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import lombok.Data;
 
@@ -67,4 +69,26 @@ public class InventoryForm {
    * merges); defaults to {@code false} so an untouched SCU book-in stays append-only.
    */
   private Boolean mergeStock = false;
+
+  /**
+   * Variante-C split-at-check-in (REQ-INV-027, R4): the per-target job-order earmarks the user
+   * entered in the create form, bound from indexed params (e.g. {@code
+   * jobOrderAllocations[0].targetId} / {@code jobOrderAllocations[0].amount}). Empty when no split
+   * was entered — the backend then falls back to the single {@link #jobOrderId}.
+   */
+  private List<AllocationRow> jobOrderAllocations = new ArrayList<>();
+
+  /** The mission counterpart of {@link #jobOrderAllocations} (falls back to {@link #missionId}). */
+  private List<AllocationRow> missionAllocations = new ArrayList<>();
+
+  /**
+   * One split-at-check-in earmark row: a job-order / mission target and the amount of the new entry
+   * to assign to it. Mutable (Lombok {@code @Data} no-arg constructor) so Spring MVC can grow the
+   * list during indexed form binding.
+   */
+  @Data
+  public static class AllocationRow {
+    private UUID targetId;
+    private Double amount;
+  }
 }

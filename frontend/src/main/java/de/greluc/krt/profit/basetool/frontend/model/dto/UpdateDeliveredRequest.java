@@ -20,9 +20,16 @@
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 import jakarta.validation.constraints.NotNull;
+import java.util.UUID;
 
 /**
- * Request DTO for updating the delivered status of an inventory item. Includes the version field
- * for optimistic locking.
+ * Frontend mirror of the backend delivered-toggle request. Since Variante C (REQ-INV-027) {@code
+ * delivered} lives on the per-order job-order slice, so {@code jobOrderId} names the earmarked
+ * order whose slice to flip; {@code version} is the owning entry's optimistic-locking token.
+ *
+ * @param delivered the new delivered state of the order's slice
+ * @param jobOrderId the earmarked job order whose slice to toggle
+ * @param version the owning inventory entry's optimistic-locking version
  */
-public record UpdateDeliveredRequest(@NotNull Boolean delivered, @NotNull Long version) {}
+public record UpdateDeliveredRequest(
+    @NotNull Boolean delivered, @NotNull UUID jobOrderId, @NotNull Long version) {}

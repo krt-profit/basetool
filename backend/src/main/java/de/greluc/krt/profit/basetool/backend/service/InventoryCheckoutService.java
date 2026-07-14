@@ -21,13 +21,18 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.exception.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.model.FinanceType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
+import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
+import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
+import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
+import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
@@ -45,12 +50,16 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepos
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -66,7 +75,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Extracted from {@code InventoryItemService} (#921, L2) as the mutating cluster of the former
  * god-class: the book-out flow ({@link #bookOutInventoryItem} with its per-type {@link
- * #bookOutTransfer} / {@link #createSaleFinanceEntry} branches and the {@link #recordBookOutTail}
+ * #bookOutTransfer} / {@link #createSaleFinanceEntries} branches and the {@link #recordBookOutTail}
  * audit tail), the personal↔shared rebooking ({@link #rebookPersonal}), the bulk checkout ({@link
  * #bulkCheckout}), the delivered-flag toggle ({@link #updateDelivered}) and the admin global-wipe
  * ({@link #deleteAllGlobalInventory}). {@code InventoryItemService} keeps the identical public
@@ -192,16 +201,43 @@ public class InventoryCheckoutService {
     final String materialName = item.getMaterial() != null ? item.getMaterial().getName() : "—";
     final UUID sourceOwnerId = item.getUser().getId();
     final boolean depleted = remainingAmount <= QUANTITY_EPSILON;
-    UUID financeEntryId = null;
+    List<UUID> financeEntryIds = List.of();
 
     if (checkoutType == CheckoutType.TRANSFER) {
       // A TRANSFER is guaranteed to carry at least one target here (the up-front guard rejects the
-      // target-less case), so the branch is unconditional on the type.
+      // target-less case), so the branch is unconditional on the type. It resolves + applies its
+      // own
+      // "deduct from" plan (and carries the reduced tags onto the moved row) inside
+      // bookOutTransfer.
       return bookOutTransfer(
           item, dto, remainingAmount, sourceId, sourceLabel, materialName, depleted);
-    } else if (checkoutType == CheckoutType.SELL && item.getMission() != null) {
-      financeEntryId = createSaleFinanceEntry(item, dto, currentUserId);
     }
+
+    // Variante C (REQ-INV-027): resolve the "deduct from" plan for the two independent dimensions
+    // against the pre-decrement slices. A null list defaults to "rest first, forced remainder
+    // spread
+    // across the tags"; an explicit list is validated (unknown / duplicate / over-slice /
+    // over-total
+    // => 400, an under-assigned plan whose rest cannot absorb the remainder => 422).
+    Map<UUID, Double> orderReductions =
+        AllocationReductions.resolveReductionPlan(
+            item, dto.jobOrderReductions(), dto.amount(), true);
+    Map<UUID, Double> missionReductions =
+        AllocationReductions.resolveReductionPlan(
+            item, dto.missionReductions(), dto.amount(), false);
+
+    if (checkoutType == CheckoutType.SELL) {
+      // Coupled proceeds (REQ-INV-027): each mission's credited income is proportional to the SCU
+      // deducted from its earmark; the uncredited rest (unassigned + non-participated missions)
+      // stays
+      // the seller's personal proceeds. Read the mission slices for the credit BEFORE applying the
+      // reductions, which shrink / remove them.
+      financeEntryIds = createSaleFinanceEntries(item, dto, currentUserId, missionReductions);
+    }
+    // Apply the plan to the source's slices (shrinks / removes the tags); the amount is lowered
+    // below.
+    AllocationReductions.applyPlan(item, orderReductions, true);
+    AllocationReductions.applyPlan(item, missionReductions, false);
 
     if (remainingAmount <= QUANTITY_EPSILON) { // Floating point precision safety
       inventoryItemRepository.delete(item);
@@ -213,12 +249,17 @@ public class InventoryCheckoutService {
           sourceOwnerId,
           dto,
           0.0,
-          financeEntryId);
+          financeEntryIds);
       return null;
     } else {
       item.setAmount(remainingAmount);
-      // saveAndFlush so a partial book-out's response carries the fresh @Version (see
-      // updateInventoryItem) — otherwise a follow-up edit of the reduced row 409s.
+      // Variante C (REQ-INV-027, R5): a book-out does NOT auto-shrink the entry's earmarks. If the
+      // reduced amount no longer covers them, block (422) so the user lowers the allocations first.
+      if (!InventoryAllocations.fits(item)) {
+        throw new OverAllocationException();
+      }
+      // saveAndFlush so a partial book-out's response carries the fresh @Version — otherwise a
+      // follow-up edit of the reduced row 409s.
       InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
       // Ratchet any active Materialbörse offer on this row down to the reduced stock
       // (REQ-MARKET-013).
@@ -231,7 +272,7 @@ public class InventoryCheckoutService {
           sourceOwnerId,
           dto,
           remainingAmount,
-          financeEntryId);
+          financeEntryIds);
       return inventoryItemMapper.toDto(saved);
     }
   }
@@ -300,13 +341,31 @@ public class InventoryCheckoutService {
     newItem.setQuality(item.getQuality());
     newItem.setAmount(InventoryItem.roundToScuScale(dto.amount()));
     newItem.setPersonal(item.getPersonal());
-    newItem.setJobOrder(item.getJobOrder());
-    newItem.setMission(item.getMission());
-    InventoryItem savedNew = inventoryItemRepository.save(newItem);
+    // Variante C (REQ-INV-027, "Marken mitnehmen"): resolve the "deduct from" plan against the
+    // source's pre-decrement slices, carry the reduced tags onto the moved row (each tag moves with
+    // exactly the SCU deducted from it), then shrink the source's slices by the same plan. A full
+    // move with no explicit plan defaults to "all slices in full", so the moved row inherits every
+    // earmark; a partial move with no plan takes it all from the rest, leaving the moved row
+    // unassigned and the source's tags intact (both the legacy behaviours).
+    Map<UUID, Double> orderReductions =
+        AllocationReductions.resolveReductionPlan(
+            item, dto.jobOrderReductions(), dto.amount(), true);
+    Map<UUID, Double> missionReductions =
+        AllocationReductions.resolveReductionPlan(
+            item, dto.missionReductions(), dto.amount(), false);
+    applyTransferInherit(item, newItem, orderReductions, missionReductions);
+    final InventoryItem savedNew = inventoryItemRepository.save(newItem);
+    AllocationReductions.applyPlan(item, orderReductions, true);
+    AllocationReductions.applyPlan(item, missionReductions, false);
     if (remainingAmount <= QUANTITY_EPSILON) {
       inventoryItemRepository.delete(item);
     } else {
       item.setAmount(remainingAmount);
+      // R5 backstop: the plan already keeps Σ(dimension) ≤ the reduced amount by construction; the
+      // fits() guard stays as defence in depth and 422s if that invariant were ever violated.
+      if (!InventoryAllocations.fits(item)) {
+        throw new OverAllocationException();
+      }
       // saveAndFlush the reduced source row for parity with the discard/sell fall-through below:
       // the returned DTO is the new target row, but flushing keeps the source row's @Version
       // current within the transaction so any future in-place consumer of a transfer cannot 409.
@@ -333,39 +392,122 @@ public class InventoryCheckoutService {
   }
 
   /**
-   * Creates the {@link MissionFinanceEntry} for a {@code SELL} book-out of a mission-linked row:
-   * the caller must be a participant of the item's mission, and the sale is recorded as squadron
-   * {@code INCOME} of {@code dto.sellAmount()}. The DISCARD/SELL consume tail then decrements the
-   * source row as usual.
+   * Books the coupled per-mission income for a {@code SELL} book-out (Variante C, REQ-INV-027). The
+   * proceeds follow the sale's mission "deduct from" plan: each mission the seller took sold SCU
+   * out of is credited a share of {@code dto.sellAmount()} proportional to that SCU — {@code
+   * sellAmount × deductedScu / totalSoldScu} — as one squadron {@code INCOME} {@link
+   * MissionFinanceEntry}. The uncredited remainder (SCU taken from the mission rest, plus any
+   * deducted from a mission the seller does not participate in) stays the seller's personal
+   * proceeds; no separate money-attribution input exists. An empty plan (nothing deducted from a
+   * mission earmark) is a fully-personal sale.
    *
-   * @param item the managed source row (mission-linked)
-   * @param dto the book-out request (read for sell amount, terminal, amount)
+   * <p>Read the mission slices BEFORE the reductions are applied (which shrinks / removes them). A
+   * mission the seller does not participate in cannot receive a {@link MissionFinanceEntry} (it
+   * structurally requires a {@link MissionParticipant}), so that share simply falls to personal
+   * rather than being an error.
+   *
+   * @param item the managed source row (its mission allocations loaded within the tx)
+   * @param dto the book-out request (read for the sell amount, terminal, total sold amount)
    * @param currentUserId the selling participant's user id
-   * @return the created finance-entry id (read off the managed entity, so a unit-test mock's null
-   *     {@code save()} return does not matter)
-   * @throws BadRequestException when the caller is not a participant of the item's mission
+   * @param missionReductions the resolved mission plan (missionId → deducted SCU), unique per
+   *     mission
+   * @return the created finance-entry ids (read off the managed entities, so a unit-test mock's
+   *     null {@code save()} return does not matter); empty for a fully-personal sale
    */
-  private UUID createSaleFinanceEntry(
-      InventoryItem item, InventoryItemBookOutDto dto, UUID currentUserId) {
-    MissionParticipant participant =
-        missionParticipantRepository
-            .findByMissionIdAndUserId(item.getMission().getId(), currentUserId)
-            .orElseThrow(
-                () ->
-                    new BadRequestException(
-                        "You must be a participant of the mission to sell its items"));
+  private List<UUID> createSaleFinanceEntries(
+      InventoryItem item,
+      InventoryItemBookOutDto dto,
+      UUID currentUserId,
+      Map<UUID, Double> missionReductions) {
+    BigDecimal totalSold = BigDecimal.valueOf(dto.amount() != null ? dto.amount() : 0.0);
+    if (missionReductions.isEmpty() || totalSold.signum() <= 0) {
+      // Nothing deducted from a mission earmark (or a degenerate zero sale) => fully-personal sale.
+      return List.of();
+    }
+    BigDecimal proceeds = dto.sellAmount() != null ? dto.sellAmount() : BigDecimal.ZERO;
 
-    MissionFinanceEntry entry = new MissionFinanceEntry();
-    entry.setMission(item.getMission());
-    entry.setParticipant(participant);
-    entry.setType(FinanceType.INCOME);
-    entry.setAmount(dto.sellAmount());
-    entry.setNote(
-        "Sale of " + dto.amount() + "x " + item.getMaterial().getName() + " at " + dto.terminal());
-    missionFinanceEntryRepository.save(entry);
-    // Read the id off the managed entity (set by save()); the dedicated capture avoids relying on
-    // the save() return value, which a unit-test mock leaves null.
-    return entry.getId();
+    // Build every entry BEFORE persisting any, so a mid-loop skip leaves the ledger consistent.
+    List<MissionFinanceEntry> entries = new ArrayList<>();
+    for (Map.Entry<UUID, Double> reduction : missionReductions.entrySet()) {
+      InventoryMissionAllocation slice =
+          InventoryAllocations.missionSlice(item, reduction.getKey());
+      if (slice == null || slice.getMission() == null) {
+        continue;
+      }
+      Mission mission = slice.getMission();
+      MissionParticipant participant =
+          missionParticipantRepository
+              .findByMissionIdAndUserId(mission.getId(), currentUserId)
+              .orElse(null);
+      if (participant == null) {
+        // Sold SCU earmarked to a mission the seller is not part of => that share stays personal.
+        continue;
+      }
+      BigDecimal credit =
+          proceeds
+              .multiply(BigDecimal.valueOf(reduction.getValue()))
+              .divide(totalSold, 4, RoundingMode.HALF_UP);
+      if (credit.signum() <= 0) {
+        continue;
+      }
+      MissionFinanceEntry entry = new MissionFinanceEntry();
+      entry.setMission(mission);
+      entry.setParticipant(participant);
+      entry.setType(FinanceType.INCOME);
+      entry.setAmount(credit);
+      entry.setNote(
+          "Sale of "
+              + dto.amount()
+              + "x "
+              + item.getMaterial().getName()
+              + " at "
+              + dto.terminal());
+      entries.add(entry);
+    }
+
+    List<UUID> financeEntryIds = new ArrayList<>();
+    for (MissionFinanceEntry entry : entries) {
+      missionFinanceEntryRepository.save(entry);
+      // Read the id off the managed entity (set by save()); the dedicated capture avoids relying on
+      // the save() return value, which a unit-test mock leaves null.
+      financeEntryIds.add(entry.getId());
+    }
+    return financeEntryIds;
+  }
+
+  /**
+   * Carries the reduced tags of a transfer onto the moved row ("Marken mitnehmen", REQ-INV-027):
+   * each planned reduction becomes a same-size earmark on {@code target}, inheriting the source
+   * order slice's delivered flag. Must run BEFORE the reductions are applied, which shrinks the
+   * source slices, since it reads their managed {@code JobOrder} / {@code Mission} and delivered
+   * state.
+   *
+   * @param source the source row whose slices are read for the tags; never {@code null}
+   * @param target the freshly built moved row to earmark; never {@code null}
+   * @param orderReductions the job-order plan (orderId → SCU)
+   * @param missionReductions the mission plan (missionId → SCU)
+   */
+  private void applyTransferInherit(
+      InventoryItem source,
+      InventoryItem target,
+      Map<UUID, Double> orderReductions,
+      Map<UUID, Double> missionReductions) {
+    for (Map.Entry<UUID, Double> reduction : orderReductions.entrySet()) {
+      InventoryJobOrderAllocation slice =
+          InventoryAllocations.jobOrderSlice(source, reduction.getKey());
+      if (slice != null && slice.getJobOrder() != null) {
+        JobOrder order = slice.getJobOrder();
+        InventoryAllocations.addJobOrder(
+            target, order, reduction.getValue(), Boolean.TRUE.equals(slice.getDelivered()));
+      }
+    }
+    for (Map.Entry<UUID, Double> reduction : missionReductions.entrySet()) {
+      InventoryMissionAllocation slice =
+          InventoryAllocations.missionSlice(source, reduction.getKey());
+      if (slice != null && slice.getMission() != null) {
+        InventoryAllocations.addMission(target, slice.getMission(), reduction.getValue());
+      }
+    }
   }
 
   /**
@@ -380,7 +522,8 @@ public class InventoryCheckoutService {
    * @param ownerId the source row owner's id
    * @param dto the book-out request (read for terminal/sell amount)
    * @param remaining the post-decrement amount (0 when the row was depleted)
-   * @param financeEntryId the created finance entry id for a SELL with a mission, or {@code null}
+   * @param financeEntryIds the created per-mission finance entry ids for a SELL (empty for a
+   *     fully-personal sale that credited no mission)
    */
   private void recordBookOutTail(
       CheckoutType type,
@@ -390,7 +533,7 @@ public class InventoryCheckoutService {
       UUID ownerId,
       InventoryItemBookOutDto dto,
       double remaining,
-      UUID financeEntryId) {
+      List<UUID> financeEntryIds) {
     boolean rowDepleted = remaining <= QUANTITY_EPSILON;
     if (type == CheckoutType.SELL) {
       auditService.record(
@@ -402,7 +545,13 @@ public class InventoryCheckoutService {
               .with("amount", dto.amount())
               .with("terminal", dto.terminal())
               .with("sellAmount", dto.sellAmount())
-              .with("financeEntry", financeEntryId != null ? financeEntryId : "-")
+              .with(
+                  "financeEntries",
+                  financeEntryIds.stream()
+                      .filter(id -> id != null)
+                      .map(UUID::toString)
+                      .reduce((a, b) -> a + "," + b)
+                      .orElse("-"))
               .with("depleted", rowDepleted));
     } else {
       auditService.record(
@@ -434,8 +583,8 @@ public class InventoryCheckoutService {
    *
    * <p>The personalize direction refuses a source row bound to a job order or mission: a {@code
    * personal = true} row may never carry either association (the invariant {@code
-   * InventoryItemService.createInventoryItem} and {@code InventoryItemService.updateInventoryItem}
-   * also enforce), and silently dropping the link would lose the assignment.
+   * InventoryItemService.createInventoryItem} and the allocation writes also enforce), and silently
+   * dropping the link would lose the assignment.
    *
    * @param id the source inventory row id
    * @param dto the rebooking payload (amount, version, target org-unit pool)
@@ -472,7 +621,8 @@ public class InventoryCheckoutService {
 
     // Personalize (shared -> personal): a personal row may never carry a job order or mission, so
     // refuse an assigned source rather than silently dropping the link.
-    if (targetPersonal && (item.getJobOrder() != null || item.getMission() != null)) {
+    if (targetPersonal
+        && (!item.getJobOrderAllocations().isEmpty() || !item.getMissionAllocations().isEmpty())) {
       throw new BadRequestException(
           "Stock assigned to a job order or mission cannot be marked personal");
     }
@@ -508,14 +658,20 @@ public class InventoryCheckoutService {
     newItem.setQuality(item.getQuality());
     newItem.setAmount(InventoryItem.roundToScuScale(dto.amount()));
     newItem.setPersonal(targetPersonal);
-    newItem.setJobOrder(targetPersonal ? null : item.getJobOrder());
-    newItem.setMission(targetPersonal ? null : item.getMission());
+    // Variante C (REQ-INV-027): the moved row is unassigned — a personalize target carries no
+    // earmark (personal stock never does), and a de-personalize source is itself personal so has no
+    // allocations to inherit. Re-assign the shared result via chips.
     InventoryItem savedNew = inventoryItemRepository.save(newItem);
 
     if (depleted) {
       inventoryItemRepository.delete(item);
     } else {
       item.setAmount(remainingAmount);
+      // R5: the source keeps its allocations (a personalize leaves the shared remainder earmarked);
+      // block (422) if the reduced amount no longer covers them.
+      if (!InventoryAllocations.fits(item)) {
+        throw new OverAllocationException();
+      }
       // saveAndFlush (not save) keeps the source row's @Version current within the transaction so a
       // follow-up in-place edit of the reduced row cannot 409 (REQ-FE-003 parity with book-out).
       inventoryItemRepository.saveAndFlush(item);
@@ -551,13 +707,13 @@ public class InventoryCheckoutService {
    * <p>The merge runs for a {@code PIECE} material <em>unconditionally</em> and for an {@code SCU}
    * material only when {@code clientRequestedMerge} is {@code true} — the per-action modal opt-in
    * the caller ticked for this single write; it is never persisted. The survivor is the passed-in
-   * {@code row}: every other row that shares its stock identity (the append-only stack key minus
-   * the {@code delivered} marker — user · material · location · quality · personal · jobOrder ·
-   * mission · owningOrgUnit) is folded into it — amounts summed, distinct notes concatenated — and
-   * deleted. The merged row is reset to {@code delivered = false} (the "Geliefert" marker is not
-   * part of the key and has no unambiguous combined value). The merge group is loaded {@code FOR
-   * UPDATE} so two racing same-stack writers serialise (re-introducing, only here, the lock the
-   * append-only model of ADR-0003 removed).
+   * {@code row}: every other row that shares its <em>physical</em> stock identity (Variante C,
+   * REQ-INV-027: user · material · location · quality · personal · owningOrgUnit — the earmarks are
+   * NO longer part of the key) is folded into it — amounts summed, distinct notes concatenated,
+   * their job-order / mission allocations unioned into the survivor (summed per target, job-order
+   * delivered OR-combined, rule R1) — and deleted. The merge group is loaded {@code FOR UPDATE} so
+   * two racing same-stack writers serialise (re-introducing, only here, the lock the append-only
+   * model of ADR-0003 removed).
    *
    * <p><strong>Materialbörse safety:</strong> a row that itself backs an offer is returned
    * untouched (never a survivor that changes, never folded away), and offer-backed sibling rows are
@@ -603,8 +759,6 @@ public class InventoryCheckoutService {
             row.getLocation().getId(),
             row.getQuality(),
             row.getPersonal(),
-            row.getJobOrder() != null ? row.getJobOrder().getId() : null,
-            row.getMission() != null ? row.getMission().getId() : null,
             row.getOwningOrgUnit() != null ? row.getOwningOrgUnit().getId() : null);
 
     // The survivor is the just-written row; fold every other matching (non-offer-backed) row into
@@ -625,9 +779,15 @@ public class InventoryCheckoutService {
 
     row.setAmount(InventoryItem.roundToScuScale(total));
     row.setNote(mergeNotes(notes));
-    // The merged stack is reset to not-delivered: the "Geliefert" marker is not part of the merge
-    // key, and combining a delivered with a non-delivered contribution has no single truth.
-    row.setDelivered(false);
+    // Variante C (REQ-INV-027, R1): merge on physical identity (the key no longer carries the
+    // job-order / mission earmark), so union the victims' allocations into the survivor — sum per
+    // order / mission id (the per-dimension unique constraint allows one slice per target), and
+    // OR-combine the job-order delivered flag (delivered if any folded part was). The survivor's
+    // amount already absorbed the victims (total above), so Σ ≤ amount holds; the victims'
+    // allocations vanish with them (FK ON DELETE CASCADE) once copied.
+    for (InventoryItem victim : victims) {
+      InventoryAllocations.unionInto(row, victim);
+    }
 
     inventoryItemRepository.deleteAll(victims);
     // saveAndFlush so the response DTO carries the post-merge amount and the fresh @Version, and
@@ -766,15 +926,11 @@ public class InventoryCheckoutService {
             "You are not allowed to check out inventory item: " + itemId);
       }
 
-      // Clear associations on the managed entity – no @Modifying query inside the loop
-      item.setJobOrder(null);
-      item.setMission(null);
-
       toDelete.add(itemId);
     }
 
-    // Flush association changes, then delete all in one batch
-    inventoryItemRepository.flush();
+    // Delete all in one batch; each row's job-order / mission allocations cascade away with it
+    // (FK ON DELETE CASCADE, V217), so no per-row association clear is needed.
     inventoryItemRepository.deleteAllById(toDelete);
     log.info(
         "Bulk checkout completed: {} items removed for user {}", toDelete.size(), currentUserId);
@@ -800,9 +956,13 @@ public class InventoryCheckoutService {
   @Transactional
   public InventoryItemDto updateDelivered(
       UUID id, UpdateDeliveredRequest request, UUID currentUserId, boolean isLogistician) {
+    // OPTIMISTIC_FORCE_INCREMENT: delivered now lives on the inverse-side job-order slice, so
+    // changing it would not dirty the entry row on its own — force-bump the entry @Version (the
+    // single client-echoed token for the whole split) so a stale echo still 409s and the response
+    // carries the fresh version for the in-place DOM sync.
     InventoryItem item =
         inventoryItemRepository
-            .findById(id)
+            .findByIdForAllocationWrite(id)
             .orElseThrow(() -> new NotFoundException("Inventory item not found"));
 
     if (!item.getUser().getId().equals(currentUserId) && !isLogistician) {
@@ -811,10 +971,20 @@ public class InventoryCheckoutService {
 
     OptimisticLock.check(item.getVersion(), request.version(), InventoryItem.class, id);
 
-    item.setDelivered(request.delivered());
-    // saveAndFlush so the response carries the flushed @Version — the material-collection delivered
-    // checkbox syncs the returned version onto the row in place (no reload), so a plain save would
-    // return the stale pre-flush version and a second consecutive toggle of the same row would 409.
+    // Variante A (REQ-INV-027): the toggle is (entry, order)-scoped — an entry serving several
+    // orders can be delivered for one and still open for another. Flip only the requested order's
+    // slice; an absent slice means the order is no longer earmarked on this entry (stale UI) → 404.
+    InventoryJobOrderAllocation slice =
+        item.getJobOrderAllocations().stream()
+            .filter(
+                a ->
+                    a.getJobOrder() != null && request.jobOrderId().equals(a.getJobOrder().getId()))
+            .findFirst()
+            .orElseThrow(
+                () ->
+                    new NotFoundException(
+                        "Job-order allocation not found for this inventory item"));
+    slice.setDelivered(request.delivered());
     InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
     auditService.record(
         AuditEventType.INVENTORY_ITEM_DELIVERY_TOGGLED,
@@ -822,7 +992,13 @@ public class InventoryCheckoutService {
         InventoryAuditLabels.label(item),
         item.getUser().getId(),
         AuditDetails.of("delivered", request.delivered())
-            .with("jobOrder", InventoryAuditLabels.jobOrderRef(saved)));
-    return inventoryItemMapper.toDto(saved);
+            .with("jobOrder", "#" + slice.getJobOrder().getDisplayId()));
+    // OPTIMISTIC_FORCE_INCREMENT bumps the entry @Version at commit, so `saved` still carries the
+    // pre-increment value here — hand the client the post-commit version (loaded + 1) so a
+    // follow-up
+    // toggle of the same row echoes it and does not 409 (REQ-FE-003, REQ-INV-027).
+    return inventoryItemMapper
+        .toDto(saved)
+        .withVersion(InventoryAllocations.forcedNextVersion(saved));
   }
 }

@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.support;
 
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
+import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
+import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
 
 /**
  * Shared renderers for the audit-subject strings of an inventory row, so the item-CRUD service and
@@ -45,12 +47,36 @@ public final class InventoryAuditLabels {
   }
 
   /**
-   * Renders an inventory row's job-order reference for an audit details payload.
+   * Renders an inventory row's job-order reference for an audit details payload. Since Variante C
+   * (REQ-INV-027) the job-order link lives in the allocation table, so this reads the entry's first
+   * job-order slice — exactly one during the soak.
    *
-   * @param item the inventory row
-   * @return {@code #<displayId>} when the row is linked to a job order, {@code -} otherwise
+   * @param item the inventory row (allocations lazily loaded but must be within the tx)
+   * @return {@code #<displayId>} of the entry's first earmarked job order, {@code -} when none
    */
   public static String jobOrderRef(InventoryItem item) {
-    return item.getJobOrder() != null ? "#" + item.getJobOrder().getDisplayId() : "-";
+    return item.getJobOrderAllocations().stream()
+        .map(InventoryJobOrderAllocation::getJobOrder)
+        .filter(jobOrder -> jobOrder != null)
+        .findFirst()
+        .map(jobOrder -> "#" + jobOrder.getDisplayId())
+        .orElse("-");
+  }
+
+  /**
+   * Renders an inventory row's mission reference (the mission name) for an audit details payload —
+   * the mission counterpart of {@link #jobOrderRef(InventoryItem)}, reading the entry's first
+   * mission slice (exactly one during the soak).
+   *
+   * @param item the inventory row (allocations lazily loaded but must be within the tx)
+   * @return the name of the entry's first earmarked mission, {@code -} when none
+   */
+  public static String missionName(InventoryItem item) {
+    return item.getMissionAllocations().stream()
+        .map(InventoryMissionAllocation::getMission)
+        .filter(mission -> mission != null)
+        .findFirst()
+        .map(mission -> mission.getName())
+        .orElse("-");
   }
 }

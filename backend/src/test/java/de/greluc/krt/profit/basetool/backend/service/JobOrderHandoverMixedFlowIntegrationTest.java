@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -145,7 +146,10 @@ class JobOrderHandoverMixedFlowIntegrationTest {
           inv1.setMaterial(aslarite);
           inv1.setQuality(800);
           inv1.setAmount(1.835);
-          inv1.setJobOrder(jobOrder);
+          // Variante C (REQ-INV-027): earmark the whole row to the order via a job-order slice
+          // (the former scalar setJobOrder). Full-amount earmark, undelivered; the handover shrinks
+          // the slice in lock-step with the entry amount, so R5 (Σ slice ≤ amount) always holds.
+          InventoryAllocations.addJobOrder(inv1, jobOrder, inv1.getAmount(), false);
           inv1 = inventoryItemRepository.save(inv1);
 
           InventoryItem inv2 = new InventoryItem();
@@ -159,7 +163,10 @@ class JobOrderHandoverMixedFlowIntegrationTest {
           inv2.setMaterial(ouratite);
           inv2.setQuality(900);
           inv2.setAmount(5.730999999999999);
-          inv2.setJobOrder(jobOrder);
+          // Variante C (REQ-INV-027): earmark the whole row to the order via a job-order slice
+          // (the former scalar setJobOrder). Full-amount earmark, undelivered; the two handovers
+          // shrink the slice in lock-step with the entry amount, so R5 (Σ slice ≤ amount) holds.
+          InventoryAllocations.addJobOrder(inv2, jobOrder, inv2.getAmount(), false);
           inv2 = inventoryItemRepository.save(inv2);
 
           return new Fixture(jobOrder.getId(), inv1.getId(), inv2.getId());
@@ -180,8 +187,8 @@ class JobOrderHandoverMixedFlowIntegrationTest {
             "swing-by",
             "KARTELL",
             List.of(
-                new JobOrderHandoverItemCreateDto(f.invItem1Id(), 1.8),
-                new JobOrderHandoverItemCreateDto(f.invItem2Id(), 2.0)));
+                new JobOrderHandoverItemCreateDto(f.invItem1Id(), 1.8, null),
+                new JobOrderHandoverItemCreateDto(f.invItem2Id(), 2.0, null)));
     jobOrderHandoverService.createHandover(f.jobOrderId(), firstDto);
 
     Material ouratiteRef =
@@ -227,7 +234,7 @@ class JobOrderHandoverMixedFlowIntegrationTest {
             Instant.now(),
             "swing-by",
             "KARTELL",
-            List.of(new JobOrderHandoverItemCreateDto(f.invItem2Id(), 3.7)));
+            List.of(new JobOrderHandoverItemCreateDto(f.invItem2Id(), 3.7, null)));
     jobOrderHandoverService.createHandover(f.jobOrderId(), secondDto);
 
     transactionTemplate.executeWithoutResult(

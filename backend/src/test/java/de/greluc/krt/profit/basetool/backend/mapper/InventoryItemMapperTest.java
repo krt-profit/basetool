@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -91,11 +92,14 @@ class InventoryItemMapperTest {
     item.setQuality(800);
     item.setAmount(12.5);
     item.setPersonal(false);
-    item.setJobOrder(jobOrder);
-    item.setMission(mission);
     item.setNote("Strict QC");
-    item.setDelivered(true);
     item.setVersion(7L);
+    // Variante C (REQ-INV-027): earmarks live on the allocation collections, not the
+    // dropped scalar jobOrder/mission/delivered columns. A single job-order slice carries
+    // the delivered flag; the mapper projects each dimension into the jobOrderAllocations /
+    // missionAllocations chip lists asserted below.
+    InventoryAllocations.addJobOrder(item, jobOrder, item.getAmount(), true);
+    InventoryAllocations.addMission(item, mission, item.getAmount());
 
     // When
     InventoryItemDto dto = mapper.toDto(item);
@@ -109,11 +113,13 @@ class InventoryItemMapperTest {
     assertEquals("Strict QC", dto.note());
     assertEquals(7L, dto.version());
 
-    // Flattened FK references
-    assertEquals(jobOrderId, dto.jobOrderId());
-    assertEquals(42, dto.jobOrderDisplayId());
-    assertEquals(missionId, dto.missionId());
-    assertEquals("Op Sunfire", dto.missionName());
+    // Variante-C allocation chips (one slice per dimension)
+    assertEquals(1, dto.jobOrderAllocations().size());
+    assertEquals(jobOrderId, dto.jobOrderAllocations().get(0).jobOrderId());
+    assertEquals(42, dto.jobOrderAllocations().get(0).jobOrderDisplayId());
+    assertEquals(1, dto.missionAllocations().size());
+    assertEquals(missionId, dto.missionAllocations().get(0).missionId());
+    assertEquals("Op Sunfire", dto.missionAllocations().get(0).missionName());
 
     // Nested reference DTOs
     assertNotNull(dto.user());
@@ -131,7 +137,7 @@ class InventoryItemMapperTest {
   }
 
   @Test
-  void toDto_withoutJobOrderOrMission_shouldKeepNulls() {
+  void toDto_withoutJobOrderOrMission_shouldKeepEmptyAllocations() {
     // Given an item that is unattached to a job order or mission
     User user = new User();
     user.setId(UUID.randomUUID());
@@ -148,17 +154,15 @@ class InventoryItemMapperTest {
     item.setQuality(500);
     item.setAmount(1.0);
     item.setPersonal(true);
-    item.setJobOrder(null);
-    item.setMission(null);
+    // No allocations added: a fresh entry's job-order / mission slice collections are
+    // empty, so the mapper produces empty jobOrderAllocations / missionAllocations lists.
 
     // When
     InventoryItemDto dto = mapper.toDto(item);
 
     // Then
-    assertNull(dto.jobOrderId());
-    assertNull(dto.jobOrderDisplayId());
-    assertNull(dto.missionId());
-    assertNull(dto.missionName());
+    assertTrue(dto.jobOrderAllocations().isEmpty());
+    assertTrue(dto.missionAllocations().isEmpty());
     assertTrue(dto.personal());
   }
 

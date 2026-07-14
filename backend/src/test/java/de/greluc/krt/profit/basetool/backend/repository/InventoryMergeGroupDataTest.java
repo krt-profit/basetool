@@ -47,16 +47,19 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Data-level coverage for {@link InventoryItemRepository#findMergeGroupForUpdate} against the real
  * Postgres test schema (Testcontainers + Flyway via the {@code test} profile) — the runtime
- * stock-merge grouping query (REQ-INV-026, ADR-0097). The query's risky shape (NULL-as-equal
- * predicates on the three nullable association dimensions, the correlated {@code NOT EXISTS} offer
- * exclusion, and {@code @Lock(PESSIMISTIC_WRITE)} + {@code ORDER BY}) can only be validated against
- * a real database — a mock cannot catch a mis-generated join that silently drops NULL rows. The
- * {@link InventoryStockMergeTest} sibling only mocks this call, so its correctness is pinned here.
+ * stock-merge grouping query (REQ-INV-026, ADR-0097). The query's risky shape (the NULL-as-equal
+ * predicate on the nullable {@code owningOrgUnit} dimension, the correlated {@code NOT EXISTS}
+ * offer exclusion, and {@code @Lock(PESSIMISTIC_WRITE)} + {@code ORDER BY}) can only be validated
+ * against a real database — a mock cannot catch a mis-generated join that silently drops NULL rows.
+ * The {@link InventoryStockMergeTest} sibling only mocks this call, so its correctness is pinned
+ * here.
  *
- * <p>{@code owningOrgUnit} stands in for all three nullable dimensions: {@code jobOrder}, {@code
- * mission} and {@code owningOrgUnit} use the identical {@code ((:x IS NULL AND i.y IS NULL) OR
- * i.y.id = :x)} JPQL predicate, so exercising the NULL-vs-set matching on one covers the shape of
- * all three.
+ * <p>Since Variante C (REQ-INV-027) the merge-group key is the row's <em>physical</em> identity
+ * only — user · material · location · quality · personal · owningOrgUnit; the former {@code
+ * jobOrder} / {@code mission} earmark dimensions are no longer part of it (they moved onto the
+ * allocation tables). {@code owningOrgUnit} is the sole nullable dimension, matched with the {@code
+ * ((:x IS NULL AND i.y IS NULL) OR i.y.id = :x)} JPQL predicate, so exercising the NULL-vs-set
+ * matching on it covers that predicate's shape.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -110,7 +113,7 @@ class InventoryMergeGroupDataTest {
 
     List<InventoryItem> group =
         inventoryItemRepository.findMergeGroupForUpdate(
-            user.getId(), material.getId(), location.getId(), QUALITY, false, null, null, null);
+            user.getId(), material.getId(), location.getId(), QUALITY, false, null);
 
     assertThat(group)
         .extracting(InventoryItem::getId)
@@ -127,20 +130,13 @@ class InventoryMergeGroupDataTest {
     // never the org-stamped sibling.
     List<InventoryItem> nullGroup =
         inventoryItemRepository.findMergeGroupForUpdate(
-            user.getId(), material.getId(), location.getId(), QUALITY, false, null, null, null);
+            user.getId(), material.getId(), location.getId(), QUALITY, false, null);
     assertThat(nullGroup).extracting(InventoryItem::getId).containsExactly(nullOrgRow.getId());
 
     // Query with the org id must return ONLY the org-stamped row.
     List<InventoryItem> orgGroup =
         inventoryItemRepository.findMergeGroupForUpdate(
-            user.getId(),
-            material.getId(),
-            location.getId(),
-            QUALITY,
-            false,
-            null,
-            null,
-            orgUnit.getId());
+            user.getId(), material.getId(), location.getId(), QUALITY, false, orgUnit.getId());
     assertThat(orgGroup).extracting(InventoryItem::getId).containsExactly(orgStampedRow.getId());
   }
 
@@ -153,7 +149,7 @@ class InventoryMergeGroupDataTest {
 
     List<InventoryItem> group =
         inventoryItemRepository.findMergeGroupForUpdate(
-            user.getId(), material.getId(), location.getId(), QUALITY, false, null, null, null);
+            user.getId(), material.getId(), location.getId(), QUALITY, false, null);
 
     assertThat(group).extracting(InventoryItem::getId).containsExactly(match.getId());
   }
@@ -176,7 +172,7 @@ class InventoryMergeGroupDataTest {
 
     List<InventoryItem> group =
         inventoryItemRepository.findMergeGroupForUpdate(
-            user.getId(), material.getId(), location.getId(), QUALITY, false, null, null, null);
+            user.getId(), material.getId(), location.getId(), QUALITY, false, null);
 
     // The offer-backed sibling is excluded by the NOT EXISTS, so a merge never folds (and deletes)
     // a row the Materialbörse still references (ON DELETE CASCADE, V210).
@@ -185,8 +181,9 @@ class InventoryMergeGroupDataTest {
 
   /**
    * Persists one inventory row sharing the fixture user / material / location, with the given
-   * amount, quality, personal flag and (nullable) owning org unit; the three association dimensions
-   * ({@code jobOrder}, {@code mission}) stay null.
+   * amount, quality, personal flag and (nullable) owning org unit. The row carries no job-order or
+   * mission allocations, so its earmark dimensions play no part in the merge-group key, which since
+   * Variante C is the row's physical identity only.
    *
    * @param amount the row's quantity.
    * @param quality the quality grade.

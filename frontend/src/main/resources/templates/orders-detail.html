@@ -1163,6 +1163,12 @@
     const MSG_HANDOVER_REPORT_VALIDATION_HANDLE = /*[[#{orders.handover.report.validation.handle}]]*/ 'Bitte Handle des Empf\u00e4ngers ausf\u00fcllen.';
     const MSG_HANDOVER_REPORT_VALIDATION_ITEMS = /*[[#{orders.handover.report.validation.items}]]*/ 'Bitte mindestens einen Material-/Lagereintrag hinzuf\u00fcgen.';
     const MSG_HANDOVER_REPORT_VALIDATION_AMOUNT = /*[[#{orders.handover.report.validation.amount}]]*/ 'Die eingegebene Menge f\u00fcr "{0}" \u00fcberschreitet den verf\u00fcgbaren Bestand ({1}).';
+    // Variante-C handover mission "Herkunft" picker (REQ-INV-027): shown per row only when the
+    // selected entry is earmarked to >=2 missions and the handed amount cannot come entirely from the
+    // mission rest (the ambiguous case). Reuses the inventory herkunft rest/min strings.
+    const MSG_HANDOVER_MISSION_HERKUNFT = /*[[#{orders.handover.mission.herkunft}]]*/ 'Herkunft (Eins\u00e4tze)';
+    const MSG_HANDOVER_MISSION_REST = /*[[#{inventory.herkunft.rest}]]*/ 'Vom Rest: {0}';
+    const MSG_HANDOVER_MISSION_MIN = /*[[#{inventory.herkunft.min}]]*/ 'Mindestens {0} auf Marken zuweisen';
 
     const MSG_OWNER = /*[[#{orders.detail.inventory.owner}]]*/ 'Besitzer';
     const MSG_LOCATION = /*[[#{orders.detail.inventory.location}]]*/ 'Ort';

@@ -54,6 +54,11 @@
             </div>
         </div>
 
+        <!-- Live-sync results container (REQ-FE-010, #1309): inventory-material.js re-fetches this
+             fragment (?fragment=results -> inventoryMaterialResults) when a peer's stock change lands
+             in the shared "inventory" room, so the drilldown refreshes in place without a reload. -->
+        <div id="inventory-material-results">
+        <th:block th:fragment="inventoryMaterialResults">
         <div class="overflow-x-auto">
             <div class="table-responsive">
             <table class="krt-table">
@@ -82,8 +87,11 @@
             </table>
             </div>
         </div>
+        </th:block>
+        </div>
     </div>
 </main>
 <th:block th:replace="~{fragments/toast :: toast}" />
+<script th:src="@{/js/inventory-material.js}" th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

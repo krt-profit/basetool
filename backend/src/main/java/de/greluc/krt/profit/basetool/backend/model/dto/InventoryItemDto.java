@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -27,6 +28,13 @@ import java.util.UUID;
  * contribution as its own append-only row (no destructive merge), {@code createdAt} carries the
  * row's creation instant so the UI can order the individual entries of a grouped stack oldest-first
  * and show when each contribution was recorded.
+ *
+ * <p>Variante C (REQ-INV-027) carries the two independent quantity splits: {@code
+ * jobOrderAllocations} / {@code missionAllocations} list the earmarked orders/missions each with
+ * their own amount, and {@code jobOrderRest} / {@code missionRest} are the still-unallocated
+ * remainder per dimension ({@code amount − Σ}) the UI renders as the rest-chip. Both are the
+ * authoritative multi-earmark view; the former single {@code jobOrderId} / {@code missionId}
+ * scalars were dropped once every consumer read the allocations.
  */
 public record InventoryItemDto(
     UUID id,
@@ -36,11 +44,43 @@ public record InventoryItemDto(
     Integer quality,
     Double amount,
     Boolean personal,
-    UUID jobOrderId,
-    Integer jobOrderDisplayId,
-    UUID missionId,
-    String missionName,
+    List<JobOrderAllocationDto> jobOrderAllocations,
+    Double jobOrderRest,
+    List<MissionAllocationDto> missionAllocations,
+    Double missionRest,
     String note,
     SquadronReferenceDto owningSquadron,
     Long version,
-    Instant createdAt) {}
+    Instant createdAt) {
+
+  /**
+   * Returns a copy of this projection with {@link #version} replaced. Used by the force-increment
+   * write paths (the per-order delivered toggle and the allocation add/change/remove endpoints):
+   * those only mutate an inverse-side allocation slice, so they force-bump the entry's
+   * {@code @Version} via {@code OPTIMISTIC_FORCE_INCREMENT}, which Hibernate applies at transaction
+   * commit — the entity mapped in-transaction therefore still carries the pre-increment value. The
+   * client must echo the post-commit version ({@code loaded + 1}) on its next write to the same
+   * entry, or the follow-up optimistic-lock check 409s (REQ-FE-003, REQ-INV-027).
+   *
+   * @param newVersion the version the client should echo on its next write.
+   * @return a copy of this DTO carrying {@code newVersion}.
+   */
+  public InventoryItemDto withVersion(Long newVersion) {
+    return new InventoryItemDto(
+        id,
+        user,
+        material,
+        location,
+        quality,
+        amount,
+        personal,
+        jobOrderAllocations,
+        jobOrderRest,
+        missionAllocations,
+        missionRest,
+        note,
+        owningSquadron,
+        newVersion,
+        createdAt);
+  }
+}

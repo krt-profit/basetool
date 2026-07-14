@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-13.
-> **Owner area:** INV · **Related ADRs:** ADR-0003, ADR-0097
+> **Owner area:** INV · **Related ADRs:** ADR-0003, ADR-0097, ADR-0098
 
 # Inventory Lager — append-only entries & group-on-read
 
@@ -24,9 +24,22 @@ without the opt-in is unchanged (append-only). The rules live in
 [REQ-INV-026](#req-inv-026--write-time-stock-merge-for-piece-auto-and-scu-per-action-opt-in) below;
 REQ-INV-001 is amended accordingly.
 
-The **stock identity** ("stack key") is the inventory natural key: owner (`user`),
-`material`, `location`, `quality`, the optional `mission` / `jobOrder` association, the
-`personal` flag, and the owning org-unit pool (`owningOrgUnit`).
+**Amendment (#1182, ADR-0098 — Variante C / "Modell G").** An inventory→job-order and an
+inventory→mission association is no longer a single scalar column each but a **to-many quantity
+split**: an entry may earmark parts of its amount to **several** job orders and **several** missions
+at once, each earmark carrying its own amount, split independently per dimension. The earmarks
+therefore leave the stock-identity key — a row now stacks on its **physical identity only** — and
+move down to the individual entry as amount chips. Per dimension the Σ of the slice amounts must stay
+within the entry's amount (rule R5, HTTP 422 on breach); `delivered` becomes a per-(entry, job-order)
+slice; a book-out / transfer chooses per dimension which earmarks (or the rest) its quantity is
+deducted from, with a `SELL` crediting each mission proportionally to the SCU it sourced from that
+mission; and the write-time merge unions the folded rows' allocations. The full rules live in
+[REQ-INV-027](#req-inv-027--inventory-associations-are-to-many-quantity-splits-variante-c) below.
+
+The **stock identity** ("stack key") is the inventory **physical** natural key: owner (`user`),
+`material`, `location`, `quality`, the `personal` flag, and the owning org-unit pool
+(`owningOrgUnit`). Since Variante C (ADR-0098, REQ-INV-027) the job-order / mission earmarks are
+**no** longer part of it — they are per-entry to-many allocations, not a stack dimension.
 
 ## Requirements
 
@@ -357,6 +370,170 @@ dataset matches the new write behaviour. `SCU` rows and offer-backed rows are le
 `inventory-my.html` / `inventory-my.js`, `inventory-admin.html` / `inventory-admin.js` · **Issues:**
 
 # 1182 · **ADR:** ADR-0097
+
+### REQ-INV-027 — Inventory associations are to-many quantity splits (Variante C)
+
+An inventory entry's job-order and mission associations are **two independent to-many quantity
+splits** ("Modell G"), not a single scalar each. An entry may earmark parts of its `amount` to
+**several** job orders and **several** missions at once, each earmark carrying its own amount; the
+two dimensions are split independently. The earmarks are stored as per-entry **allocation** rows
+(`inventory_item_job_order_allocation`, `inventory_item_mission_allocation`; V217), each with a
+`UNIQUE(inventory_item_id, target_id)` so a target appears at most once per entry per dimension, and
+`ON DELETE CASCADE` on both foreign keys. The former scalar `inventory_item.job_order_id` /
+`mission_id` / `delivered` columns are dropped (V218).
+
+**R5 — per-dimension coverage.** Per dimension, the Σ of the slice amounts must stay within the
+entry's own `amount`. Any write that would raise a dimension's Σ above the entry amount — or lower
+the entry amount below an existing Σ (book-out consume, transfer / rebook source remainder, handover)
+— is rejected with **HTTP 422** (`OverAllocationException`, `code = OVER_ALLOCATION`); the amounts
+are never silently shrunk, the user reduces the allocations first. An unallocated remainder
+(`amount − Σ`) is allowed and shown as a muted "frei" chip.
+
+**Stacking (physical identity only).** Since the earmarks left the stack key (see Context), an entry
+stacks on its physical identity only (owner · material · location · quality · personal · owning org
+unit); the group-on-read display shows the earmarks as amount chips on the individual leaf entry,
+not on the stack. Stacking, filters and job-order / mission fulfilment sums all read the allocation
+tables — an order is credited only its **allocated** share of a split entry, not the whole row.
+
+**Projection (chips only).** The outbound `InventoryItemDto` carries the two allocation lists
+(`jobOrderAllocations` / `missionAllocations`) with their per-dimension unallocated rest, and **no**
+per-entry association scalar (the transitional first-allocation `jobOrderId` / `missionId` fields are
+gone once every reader consumes the allocations). Every read-only inventory listing that shows an
+entry's orders — including the mission detail page's Lagereinträge table — renders **all** of the
+entry's order chips with their amounts, not just the first.
+
+**Assignment writes.** The earmarks are edited through dedicated per-allocation endpoints `POST` /
+`PATCH` / `DELETE /api/v1/inventory/{id}/allocation` (add / change amount / remove), each gated by
+`isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)` — the same owner-scoped
+inventory-edit gate, **no new role**. They refuse a personal entry (personal stock carries no
+assignment), refuse a job-order target whose material the order does not require (REQ-ORDERS-018),
+reject a duplicate target, hold PIECE amounts whole, and enforce R5. Each mutation is audited
+(`INVENTORY_ALLOCATION_ADDED` / `_CHANGED` / `_REMOVED`, REQ-AUDIT-001). The entry's `@Version` is the
+single optimistic-lock token for its allocations (an inverse-side slice change force-increments it).
+
+**Split at check-in (R4).** The create payload additionally accepts per-dimension allocation lists,
+so a book-in can be earmarked to several orders / missions with their own amounts in one shot,
+under the same guards + R5. An empty list falls back to no assignment.
+
+**Delivered is per-(entry, job-order) slice (Variante A).** The "Geliefert" marker moved onto the
+job-order allocation: an entry serving several orders can be delivered for one and open for another.
+The order material-collection reads the slice's flag and shows the amount **allocated to that order**
+(with the entry's total physical stock as context), while that total still backs the full-row
+owner / location transfer.
+
+**Merge unions allocations (R1).** The write-time stock merge (REQ-INV-026) folds on physical
+identity and **unions** the folded rows' allocations into the survivor — summed per target, the
+job-order delivered flag OR-combined. Because the survivor's amount already absorbed the folded
+amounts, R5 is preserved under the fold.
+
+**A book-out / transfer chooses which earmarks it deducts from.** Because the two dimensions are
+independent, a book-out or transfer of quantity X carries a per-dimension **"deduct from" plan**
+(`jobOrderReductions` / `missionReductions` on `InventoryItemBookOutDto`, each an
+`AllocationReductionDto{targetId, amount}`): each dimension's plan names how much of X comes out of
+which earmark slice, and whatever it leaves uncovered is taken from that dimension's not-yet-assigned
+rest. A plan is validated against the pre-decrement slices — an unknown / duplicate / over-slice
+target or a Σ over X is a 400, and an under-assigned plan whose rest cannot cover the remainder is a
+422 — and a `null` list defaults to "take it all from the rest" (a full move then inherits every
+earmark, a partial move leaves the tags intact). On a `TRANSFER` the reduced tags **move onto the new
+row** (the moved stock stays earmarked to the same order / mission for the deducted amount).
+
+The Ausbuchen and Umbuchen (Ort / Nutzer) modals render an interactive **"Herkunft" picker**
+(`inventory-herkunft.js`, shared by the personal and global pages): one amount input per earmark tag
+per dimension, read straight from the source leaf row's chips. The inputs default to `0` — the whole
+deduction is taken from the not-yet-assigned rest ("Rest zuerst, Rest leer lassen") — and the picker
+mirrors the backend rules client-side, disabling the submit and stating the minimum that must be
+assigned to tags when the deduction exceeds a dimension's rest. For a `SELL` it also shows the coupled
+per-mission proceeds estimate. A submit sends only the non-zero inputs as the plan; an entry with no
+earmarks hides the picker and submits the legacy `null` plan.
+
+**A job-order handover draws only from its own order's slice, and clamps the mission dimension.** A
+partial handover of quantity X to an order shrinks **that order's own slice** by X and lowers the
+entry amount by X. X is capped at that order's slice on the entry — a handover fulfils only its own
+order, so it may never draw from a sibling order's slice or from the free rest; the frontend sets the
+amount field's max to that slice and the backend rejects an over-slice amount with **HTTP 400**.
+Because only the fulfilled order's slice and the entry amount drop by the same X, R5 holds on the
+job-order dimension with no sibling slice or rest touched. The same physical SCU leave the entry's
+mission earmarks too, so the mission dimension is reduced by exactly the same X — resolved through the
+shared `AllocationReductions` resolver (rest-first, then proportional by default, so a dual-tagged
+partial handover no longer 422s). The handover item DTO carries an optional
+`missionReductions` plan, and the handover modal renders the mission picker **only for the ambiguous
+case** — the entry is earmarked to two or more missions and X exceeds the mission rest, so more than
+one distribution is possible; otherwise the auto-clamp applies with no prompt.
+
+**SELL proceeds are coupled to the mission deduct-from plan.** A `SELL` credits each mission a share
+of the sale proceeds **proportional to the SCU deducted from its earmark** — `sellAmount ×
+amount_j / X`, one squadron-`INCOME` `MissionFinanceEntry` per credited mission — with the rest (SCU
+taken from the mission rest, plus SCU deducted from a mission the seller does not participate in)
+staying the seller's personal proceeds. Only missions the seller participates in receive an entry;
+there is no separate income-attribution input.
+
+**Acceptance**
+
+- [ ] An entry can hold several job-order and several mission allocations at once, each with its own
+  amount; adding one via `POST /{id}/allocation` returns the updated entry with the new chip.
+- [ ] Raising a dimension's Σ above the entry amount, or lowering the entry amount below an existing
+  Σ, yields HTTP 422 and mutates nothing.
+- [ ] The group-on-read stack key no longer contains the job-order / mission earmark; two entries
+  differing only in their earmarks stack together, and the earmarks render as leaf chips.
+- [ ] A personal entry rejects any allocation, and a job-order allocation whose material the order
+  does not require is rejected (REQ-ORDERS-018).
+- [ ] `delivered` toggled for one order leaves the entry's other orders unchanged; the order
+  material-collection shows the amount allocated to that order.
+- [ ] A stock merge sums the folded rows' allocations per target and OR-combines job-order delivered.
+- [ ] A book-out / transfer "deduct from" plan is validated against the slices (unknown / duplicate /
+  over-slice / over-total → 400; an under-assigned plan the rest cannot cover → 422); a transfer
+  carries the reduced tags onto the moved row; a `null` plan takes it all from the rest.
+- [ ] The Ausbuchen and Umbuchen modals render the "Herkunft" picker (one input per tag per
+  dimension, defaulting to 0 = from the rest), block the submit while the plan is invalid, and send
+  only the non-zero inputs; an entry with no earmarks hides the picker.
+- [ ] A partial handover of a dual-tagged (order + mission) entry clamps the mission dimension by the
+  handed amount instead of 422-ing (rest-first, then proportional by default); the handover modal
+  shows the mission picker only when two or more missions and the handed amount exceeds the mission
+  rest (the ambiguous case), and an explicit `missionReductions` plan is honoured/validated.
+- [ ] A handover cannot exceed the order's own slice on the entry: the amount field's max is that
+  slice, and an over-slice amount is rejected with HTTP 400 — a sibling order's slice and the free
+  rest are never drawn from, so a multi-order entry cannot be silently over-allocated by a handover.
+- [ ] A SELL credits each mission proportionally to the SCU deducted from its earmark
+  (`sellAmount × scu/sold`), leaves the rest (unassigned + non-participated) personal, and books no
+  entry when nothing is deducted from a mission earmark.
+- [ ] Each allocation add / change / remove records the matching `INVENTORY_ALLOCATION_*` audit event.
+
+**Enforced by:** `InventoryItemServiceTest`, `InventoryItemServiceBookOutTest`,
+`InventoryCheckoutServiceAuditTest`, `InventoryStockMergeTest`, `JobOrderHandoverServiceTest`,
+`InventoryAllocationSoakDataTest`, `InventoryItemControllerTest`, `InventoryPageControllerMvcTest`,
+`DatabaseIndexMigrationTest`, e2e `InventoryOperationsE2eTest` (Herkunft picker gate + deduct-from) ·
+**Code:** `InventoryJobOrderAllocation`, `InventoryMissionAllocation`,
+`support/InventoryAllocations`, `InventoryItemController` (allocation endpoints),
+`InventoryItemService#createInventoryItem`, `InventoryCheckoutService` (book-out / merge / SELL),
+`InventoryAggregationService#getMaterialCollection`, `InventoryItemMapper`,
+`V217__add_inventory_allocation_tables.sql`, `V218__drop_inventory_scalar_associations.sql`,
+`fragments/inventory-stack-entries.html`, `inventory-my.js` / `inventory-admin.js`,
+`inventory-herkunft.js` (deduct-from picker), `inventory-input.html` / `inventory-input.js` ·
+**Issues:** #1182 · **ADR:** ADR-0098
+
+### REQ-INV-028 — Aggregated per-material overview shows average and maximum quality
+
+The per-material Lager overview (`GET /inventory`, `AggregatedInventoryDto`) rolls the in-scope
+non-personal stock up to one row per material, showing the total amount, the **amount-weighted
+average** quality and the **maximum** available quality (the best single entry's quality). The three
+aggregates come from one grouped query — amount-weighted average, `MAX(quality)`, `SUM(amount)` over
+`GROUP BY material`; the row links through to the per-material drilldown (`/inventory/all` filtered to
+the material).
+
+**Acceptance**
+
+- [ ] `/inventory` lists one row per material with the columns material · Ø quality · **max quality**
+  · total amount, the max-quality column sitting between the average and the total.
+- [ ] The max quality equals the highest `quality` of any of the material's in-scope non-personal
+  entries; the average is amount-weighted; both are `0` for a material with no stock.
+- [ ] The projection is scope-filtered (strict-staffel / admin-all) exactly like the rest of the
+  Lager ([`org-unit-tenancy.md`](org-unit-tenancy.md) `REQ-ORG-003`) and excludes personal entries.
+
+**Enforced by:** `InventoryItemServiceTest#getAggregatedInventory_shouldReturnPage`,
+`InventoryItemControllerTest`, `InventoryPageControllerMvcTest` · **Code:**
+`InventoryItemRepository#getAggregatedInventory`,
+`InventoryAggregationService#getAggregatedInventory`, `AggregatedInventoryDto`,
+`templates/inventory-index.html` · **Issues:** —
 
 ## Out of scope
 

@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
+import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedInventoryDto;
@@ -36,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -108,7 +110,8 @@ public class InventoryAggregationService {
                     obj[1] != null
                         ? Math.round(((Number) obj[1]).doubleValue() * 100.0) / 100.0
                         : 0.0,
-                    obj[2] != null ? ((Number) obj[2]).doubleValue() : 0.0));
+                    obj[2] != null ? ((Number) obj[2]).doubleValue() : 0.0,
+                    obj[3] != null ? ((Number) obj[3]).doubleValue() : 0.0));
   }
 
   /**
@@ -353,10 +356,6 @@ public class InventoryAggregationService {
               refs.user(),
               refs.location(),
               refs.quality(),
-              refs.jobOrderId(),
-              refs.jobOrderDisplayId(),
-              refs.missionId(),
-              refs.missionName(),
               refs.personal(),
               refs.owningSquadron(),
               amt,
@@ -394,8 +393,6 @@ public class InventoryAggregationService {
     probe.setMaterial(aggregate.material());
     probe.setLocation(aggregate.location());
     probe.setQuality(aggregate.quality());
-    probe.setJobOrder(aggregate.jobOrder());
-    probe.setMission(aggregate.mission());
     probe.setPersonal(aggregate.personal());
     probe.setOwningOrgUnit(aggregate.owningOrgUnit());
     return inventoryItemMapper.toDto(probe);
@@ -412,8 +409,6 @@ public class InventoryAggregationService {
    * @param materialId the stack's material
    * @param locationId the stack's storage location
    * @param quality the stack's quality grade, or {@code null}
-   * @param jobOrderId the stack's job-order id, or {@code null}
-   * @param missionId the stack's mission id, or {@code null}
    * @param personal whether the stack is private stock (defaults to {@code false} when {@code
    *     null})
    * @param owningOrgUnitId the stack's owning org-unit pool id, or {@code null}
@@ -425,8 +420,6 @@ public class InventoryAggregationService {
       UUID materialId,
       UUID locationId,
       Integer quality,
-      UUID jobOrderId,
-      UUID missionId,
       Boolean personal,
       UUID owningOrgUnitId,
       Pageable pageable) {
@@ -438,8 +431,6 @@ public class InventoryAggregationService {
             materialId,
             locationId,
             quality,
-            jobOrderId,
-            missionId,
             personal != null ? personal : Boolean.FALSE,
             owningOrgUnitId,
             pageable)
@@ -457,8 +448,6 @@ public class InventoryAggregationService {
    * @param userId the stack's owning user
    * @param locationId the stack's storage location
    * @param quality the stack's quality grade, or {@code null}
-   * @param jobOrderId the stack's job-order id, or {@code null}
-   * @param missionId the stack's mission id, or {@code null}
    * @param owningOrgUnitId the stack's owning org-unit pool id, or {@code null}
    * @param pageable the page request (the query forces oldest-first by creation instant)
    * @return one page of the stack's entries, oldest-first
@@ -468,8 +457,6 @@ public class InventoryAggregationService {
       UUID userId,
       UUID locationId,
       Integer quality,
-      UUID jobOrderId,
-      UUID missionId,
       UUID owningOrgUnitId,
       Pageable pageable) {
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
@@ -479,8 +466,6 @@ public class InventoryAggregationService {
             userId,
             locationId,
             quality,
-            jobOrderId,
-            missionId,
             owningOrgUnitId,
             scope.adminAllScope(),
             scope.activeOrgUnitId(),
@@ -558,6 +543,24 @@ public class InventoryAggregationService {
                   item.getUser().getDisplayName() != null
                       ? item.getUser().getDisplayName()
                       : item.getUser().getUsername();
+              // Variante C (REQ-INV-027): both the delivered flag and the order-relevant quantity
+              // are per-order — read this order's own job-order slice (batched via @BatchSize), not
+              // the whole entry. `delivered` is the slice's flag (an entry serving several orders
+              // shows the right state for each); `allocatedQuantity` is the slice's amount, i.e.
+              // the
+              // share actually earmarked to THIS order, which is what counts toward its fulfilment.
+              // `quantity` stays the entry's total physical stock — it backs the full-row owner /
+              // location transfer (data-amount) and is shown as context alongside the allocated
+              // share.
+              Optional<InventoryJobOrderAllocation> slice =
+                  item.getJobOrderAllocations().stream()
+                      .filter(
+                          a ->
+                              a.getJobOrder() != null && jobOrderId.equals(a.getJobOrder().getId()))
+                      .findFirst();
+              boolean delivered =
+                  slice.map(a -> Boolean.TRUE.equals(a.getDelivered())).orElse(false);
+              Double allocatedQuantity = slice.map(a -> a.getAmount()).orElse(item.getAmount());
               return new MaterialCollectionEntryDto(
                   item.getId(),
                   item.getVersion() != null ? item.getVersion() : 0L,
@@ -568,7 +571,8 @@ public class InventoryAggregationService {
                   item.getMaterial().getName(),
                   item.getQuality() != null ? item.getQuality().doubleValue() : null,
                   item.getAmount(),
-                  Boolean.TRUE.equals(item.getDelivered()));
+                  allocatedQuantity,
+                  delivered);
             })
         .toList();
   }

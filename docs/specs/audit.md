@@ -37,11 +37,16 @@ snapshot, an optional target-user reference, and a compact details payload.
 
 Coverage is **complete**, including the cross-area writers and the system/automatic mutations:
 
-- **Lager** — create / edit / note / book-out (consume, transfer, sell) / personal-marker rebooking
-  (Umbuchung — `INVENTORY_ITEM_DEPERSONALIZED` for personal→shared, `INVENTORY_ITEM_PERSONALIZED` for
-  shared→personal, REQ-INV-007) / write-time stock merge (`INVENTORY_ITEM_MERGED` — `PIECE`
-  automatically, `SCU` on the per-action opt-in, REQ-INV-026) / delivery-toggle /
-  bulk-checkout / global wipe; plus the cross-area writers (refinery store → `INVENTORY_RECEIVED_FROM_REFINERY`,
+- **Lager** — create / edit / note / book-out (consume, transfer, sell — a mission-earmarked `SELL`
+  books the seller-chosen per-mission `INCOME` attributions, REQ-INV-027) / **quantity-split
+  assignment** (add / change amount / remove a job-order or mission allocation —
+  `INVENTORY_ALLOCATION_ADDED` / `INVENTORY_ALLOCATION_CHANGED` / `INVENTORY_ALLOCATION_REMOVED`,
+  Variante C, REQ-INV-027) / personal-marker rebooking (Umbuchung — `INVENTORY_ITEM_DEPERSONALIZED`
+  for personal→shared, `INVENTORY_ITEM_PERSONALIZED` for shared→personal, REQ-INV-007) / write-time
+  stock merge (`INVENTORY_ITEM_MERGED` — `PIECE` automatically, `SCU` on the per-action opt-in,
+  REQ-INV-026) / per-(entry, job-order) delivery-toggle (`INVENTORY_ITEM_DELIVERY_TOGGLED` —
+  `delivered` lives on the job-order allocation since Variante C, REQ-INV-027) / bulk-checkout /
+  global wipe; plus the cross-area writers (refinery store → `INVENTORY_RECEIVED_FROM_REFINERY`,
   job-order handover → `INVENTORY_HANDED_OVER`), the org-unit re-stamp on membership change, and the
   owner-reassignment on user deletion.
 - **Aufträge** — create (material/item) / edit / status / priority / blueprint-coverage variant-counting

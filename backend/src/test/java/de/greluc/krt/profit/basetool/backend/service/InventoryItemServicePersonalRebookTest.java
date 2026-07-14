@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -55,6 +54,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepos
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -340,11 +340,9 @@ class InventoryItemServicePersonalRebookTest {
 
     @Test
     void partial_carriesSourceOrgUnit_dropsAssociations_andDecrementsSource() {
-      // Given: a shared row of 10 units with no associations; rebook 4 into the private pool.
+      // Given: a shared row of 10 units with no allocations; rebook 4 into the private pool.
       InventoryItem item = newItem(10.0, 1L, /* personal= */ false);
       item.setOwningOrgUnit(sourceOrgUnit);
-      item.setJobOrder(null);
-      item.setMission(null);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
       // When
@@ -352,7 +350,7 @@ class InventoryItemServicePersonalRebookTest {
           service.rebookPersonal(ITEM_ID, dto(4.0, 1L, null), OWNER_ID, false);
 
       // Then: the new row is personal, carries the SOURCE row's org-unit stamp (no resolver call),
-      // job-order / mission null.
+      // and holds no job-order / mission allocations.
       assertSame(SENTINEL, result);
       ArgumentCaptor<InventoryItem> saveCaptor = ArgumentCaptor.forClass(InventoryItem.class);
       verify(inventoryItemRepository).save(saveCaptor.capture());
@@ -361,8 +359,9 @@ class InventoryItemServicePersonalRebookTest {
       assertEquals(4.0, newRow.getAmount());
       assertSame(
           sourceOrgUnit, newRow.getOwningOrgUnit(), "private row carries the source stamp over");
-      assertNull(newRow.getJobOrder(), "personal row never carries a job order");
-      assertNull(newRow.getMission(), "personal row never carries a mission");
+      assertTrue(
+          newRow.getJobOrderAllocations().isEmpty(), "personal row never carries a job order");
+      assertTrue(newRow.getMissionAllocations().isEmpty(), "personal row never carries a mission");
       assertSame(owner, newRow.getUser());
 
       // And: the personalize direction never consults the picker resolver.
@@ -389,7 +388,7 @@ class InventoryItemServicePersonalRebookTest {
       InventoryItem item = newItem(10.0, 1L, /* personal= */ false);
       JobOrder jobOrder = new JobOrder();
       jobOrder.setId(UUID.randomUUID());
-      item.setJobOrder(jobOrder);
+      InventoryAllocations.addJobOrder(item, jobOrder, item.getAmount(), false);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
       // When / Then
@@ -411,7 +410,7 @@ class InventoryItemServicePersonalRebookTest {
       InventoryItem item = newItem(10.0, 1L, /* personal= */ false);
       Mission mission = new Mission();
       mission.setId(UUID.randomUUID());
-      item.setMission(mission);
+      InventoryAllocations.addMission(item, mission, item.getAmount());
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
       // When / Then
@@ -482,10 +481,10 @@ class InventoryItemServicePersonalRebookTest {
         500,
         4.0,
         false,
-        null,
-        null,
-        null,
-        null,
+        java.util.List.of(),
+        0.0,
+        java.util.List.of(),
+        0.0,
         null,
         null,
         1L,

@@ -23,16 +23,18 @@ import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorRespons
 
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BulkCheckoutRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryAllocationInput;
+import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryAllocationWriteDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemNoteUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemPersonalRebookDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemUpdateDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.InventoryForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +43,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -102,8 +105,7 @@ public class InventoryWriteController {
       BindingResult bindingResult,
       Model model,
       RedirectAttributes redirectAttributes) {
-    if (Boolean.TRUE.equals(form.getPersonal())
-        && (form.getJobOrderId() != null || form.getMissionId() != null)) {
+    if (formPersonalWithAssignment(form)) {
       bindingResult.rejectValue(
           "personal",
           "error.inventory.personal.assignment",
@@ -127,7 +129,9 @@ public class InventoryWriteController {
               form.getMissionId(),
               form.getJobOrderId(),
               form.getOwningOrgUnitId(),
-              form.getMergeStock());
+              form.getMergeStock(),
+              toAllocationInputs(form.getJobOrderAllocations()),
+              toAllocationInputs(form.getMissionAllocations()));
       backendApiClient.post("/api/v1/inventory", request, InventoryItemDto.class);
       redirectAttributes.addFlashAttribute("successToast", "success.inventory.add");
     } catch (BackendServiceException e) {
@@ -172,8 +176,7 @@ public class InventoryWriteController {
   @ResponseBody
   public org.springframework.http.ResponseEntity<Object> addInventoryItemAjax(
       @Valid @ModelAttribute("inventoryForm") InventoryForm form, BindingResult bindingResult) {
-    if (Boolean.TRUE.equals(form.getPersonal())
-        && (form.getJobOrderId() != null || form.getMissionId() != null)) {
+    if (formPersonalWithAssignment(form)) {
       return inventoryValidationError("INVENTORY_PERSONAL_ASSIGNMENT");
     }
     if (bindingResult.hasErrors()) {
@@ -191,7 +194,9 @@ public class InventoryWriteController {
               form.getMissionId(),
               form.getJobOrderId(),
               form.getOwningOrgUnitId(),
-              form.getMergeStock());
+              form.getMergeStock(),
+              toAllocationInputs(form.getJobOrderAllocations()),
+              toAllocationInputs(form.getMissionAllocations()));
       backendApiClient.post("/api/v1/inventory", request, InventoryItemDto.class);
       return org.springframework.http.ResponseEntity.ok(
           java.util.Map.of("targetUrl", inventorySourceTarget(form.getSource())));
@@ -202,6 +207,42 @@ public class InventoryWriteController {
       log.error("Failed to add inventory item (ajax)", e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
     }
+  }
+
+  /**
+   * Whether a create form marks the entry personal while also carrying any assignment — a single
+   * job order / mission or a Variante-C split-at-check-in earmark (REQ-INV-027, R4). Personal stock
+   * can never be assigned, so this drives the friendly pre-backend rejection on both create paths.
+   *
+   * @param form the bound create form.
+   * @return {@code true} when the entry is personal and carries at least one assignment.
+   */
+  private static boolean formPersonalWithAssignment(InventoryForm form) {
+    if (!Boolean.TRUE.equals(form.getPersonal())) {
+      return false;
+    }
+    return form.getJobOrderId() != null
+        || form.getMissionId() != null
+        || !toAllocationInputs(form.getJobOrderAllocations()).isEmpty()
+        || !toAllocationInputs(form.getMissionAllocations()).isEmpty();
+  }
+
+  /**
+   * Maps the create form's split-at-check-in rows to the backend allocation-input list
+   * (REQ-INV-027, R4), dropping incomplete rows (a target or amount the user left blank).
+   *
+   * @param rows the bound allocation rows; may be {@code null}.
+   * @return the non-blank allocation inputs; never {@code null}.
+   */
+  private static List<InventoryAllocationInput> toAllocationInputs(
+      List<InventoryForm.AllocationRow> rows) {
+    if (rows == null) {
+      return List.of();
+    }
+    return rows.stream()
+        .filter(row -> row != null && row.getTargetId() != null && row.getAmount() != null)
+        .map(row -> new InventoryAllocationInput(row.getTargetId(), row.getAmount()))
+        .toList();
   }
 
   /**
@@ -297,7 +338,14 @@ public class InventoryWriteController {
               form.getSellAmount(),
               form.getVersion(),
               form.getTargetOwningOrgUnitId(),
-              form.getMergeStock());
+              form.getMergeStock(),
+              // The no-JS classic fallback cannot collect a "deduct from" plan; both lists stay
+              // null
+              // so the backend defaults to "take it from the rest" (a SELL through it is therefore
+              // a
+              // fully-personal sale). The JS path sends the plan on the /transfer route.
+              null,
+              null);
       backendApiClient.post("/api/v1/inventory/" + id + "/book-out", request, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "success.inventory.bookout");
     } catch (BackendServiceException e) {
@@ -454,34 +502,101 @@ public class InventoryWriteController {
   }
 
   /**
-   * AJAX endpoint that updates the soft associations of an inventory item (mission, job order,
-   * note). Distinct from {@link #transferInventoryItem} — this is a metadata-only update, no
-   * quantity changes. Propagates the backend's status code verbatim so the AJAX layer can map a 409
-   * to a dedicated optimistic-lock toast.
+   * AJAX endpoint that proxies an inventory allocation add (Variante C, REQ-INV-027) to the
+   * backend: earmarks part of an entry's quantity to a job order or mission. Relays the backend
+   * status verbatim through {@link
+   * de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses#propagateBackendError} so
+   * the RFC&nbsp;7807 {@code code} survives — the AJAX layer keeps its 409-reload vs 422-toast
+   * (over-allocation) distinction.
    *
-   * @param id inventory item id
-   * @param dto update payload
-   * @return the updated item on success, propagated backend status on failure
+   * @param id the inventory entry id.
+   * @param dto the allocation write payload (dimension, target, amount, echoed version).
+   * @return the updated entry on success, propagated backend status/body on failure.
    */
-  @PutMapping("/{id}/update-associations")
+  @PostMapping("/{id}/allocation")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<InventoryItemDto> updateAssociations(
-      @PathVariable @NotNull UUID id, @RequestBody @Valid InventoryItemUpdateDto dto) {
+  public org.springframework.http.ResponseEntity<Object> addAllocation(
+      @PathVariable @NotNull UUID id, @RequestBody @Valid InventoryAllocationWriteDto dto) {
     try {
       InventoryItemDto updated =
-          backendApiClient.put("/api/v1/inventory/" + id, dto, InventoryItemDto.class);
+          backendApiClient.post(
+              "/api/v1/inventory/" + id + "/allocation", dto, InventoryItemDto.class);
       return org.springframework.http.ResponseEntity.ok(updated);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+    } catch (BackendServiceException e) {
       log.debug(
-          "Failed to update inventory item associations: status={}, {}",
-          e.getStatusCode(),
-          e.getMessage());
-      return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+          "Failed to add inventory allocation: status={}, {}", e.getStatusCode(), e.getMessage());
+      return propagateBackendError(e);
     } catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
-      log.error("Failed to update inventory item associations: {}", e.getMessage());
+      log.error("Failed to add inventory allocation: {}", e.getMessage());
       return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
     } catch (Exception e) {
-      log.error("Failed to update inventory item associations", e);
+      log.error("Failed to add inventory allocation", e);
+      return org.springframework.http.ResponseEntity.status(500).build();
+    }
+  }
+
+  /**
+   * AJAX endpoint that proxies an inventory allocation amount change (Variante C, REQ-INV-027).
+   * Same verbatim status relay as {@link #addAllocation}.
+   *
+   * @param id the inventory entry id.
+   * @param dto the allocation write payload (dimension, target, new amount, echoed version).
+   * @return the updated entry on success, propagated backend status/body on failure.
+   */
+  @PatchMapping("/{id}/allocation")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Object> changeAllocation(
+      @PathVariable @NotNull UUID id, @RequestBody @Valid InventoryAllocationWriteDto dto) {
+    try {
+      InventoryItemDto updated =
+          backendApiClient.patch(
+              "/api/v1/inventory/" + id + "/allocation", dto, InventoryItemDto.class);
+      return org.springframework.http.ResponseEntity.ok(updated);
+    } catch (BackendServiceException e) {
+      log.debug(
+          "Failed to change inventory allocation: status={}, {}",
+          e.getStatusCode(),
+          e.getMessage());
+      return propagateBackendError(e);
+    } catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
+      log.error("Failed to change inventory allocation: {}", e.getMessage());
+      return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+    } catch (Exception e) {
+      log.error("Failed to change inventory allocation", e);
+      return org.springframework.http.ResponseEntity.status(500).build();
+    }
+  }
+
+  /**
+   * AJAX endpoint that proxies an inventory allocation removal (Variante C, REQ-INV-027). The
+   * backend DELETE carries the slice identity (dimension + target + echoed version) in the body, so
+   * the payload is relayed through the body-carrying {@code delete} client overload. Same verbatim
+   * status relay as {@link #addAllocation}.
+   *
+   * @param id the inventory entry id.
+   * @param dto the allocation write payload (dimension, target, echoed version; amount ignored).
+   * @return the updated entry on success, propagated backend status/body on failure.
+   */
+  @DeleteMapping("/{id}/allocation")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Object> removeAllocation(
+      @PathVariable @NotNull UUID id, @RequestBody @Valid InventoryAllocationWriteDto dto) {
+    try {
+      InventoryItemDto updated =
+          backendApiClient.delete(
+              "/api/v1/inventory/" + id + "/allocation", dto, InventoryItemDto.class);
+      return org.springframework.http.ResponseEntity.ok(updated);
+    } catch (BackendServiceException e) {
+      log.debug(
+          "Failed to remove inventory allocation: status={}, {}",
+          e.getStatusCode(),
+          e.getMessage());
+      return propagateBackendError(e);
+    } catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
+      log.error("Failed to remove inventory allocation: {}", e.getMessage());
+      return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();
+    } catch (Exception e) {
+      log.error("Failed to remove inventory allocation", e);
       return org.springframework.http.ResponseEntity.status(500).build();
     }
   }

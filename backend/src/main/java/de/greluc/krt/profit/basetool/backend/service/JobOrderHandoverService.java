@@ -38,9 +38,11 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -190,13 +192,15 @@ public class JobOrderHandoverService {
               .findByIdForUpdate(itemDto.inventoryItemId())
               .orElseThrow(() -> new NotFoundException("Inventory item not found"));
 
-      if (inventoryItem.getJobOrder() == null
-          || !inventoryItem.getJobOrder().getId().equals(jobOrderId)) {
+      if (inventoryItem.getJobOrderAllocations().stream()
+          .noneMatch(a -> a.getJobOrder() != null && a.getJobOrder().getId().equals(jobOrderId))) {
         // Plan §4.4 cross-staffel pre-write guard: the handover may only mutate inventory items
-        // that are bound to the current order via job_order_id. A mismatch means either a stale
-        // client payload or a concurrent unlink — in both cases the handover cannot proceed and
-        // the application is in an inconsistent state for this request. GlobalExceptionHandler
-        // maps IllegalStateException to 400 so the wire format stays the same as before.
+        // that are bound to the current order — since Variante C (REQ-INV-027) that binding lives
+        // in
+        // the allocation table, so the item must carry a job-order slice for this order. A mismatch
+        // means either a stale client payload or a concurrent unlink — in both cases the handover
+        // cannot proceed and the application is in an inconsistent state for this request.
+        // GlobalExceptionHandler maps IllegalStateException to 400 so the wire format is unchanged.
         throw new IllegalStateException("Inventory item does not belong to this JobOrder");
       }
 
@@ -208,6 +212,21 @@ public class JobOrderHandoverService {
       }
       if (itemDto.amount() > inventoryItem.getAmount() + QUANTITY_EPSILON) {
         throw new BadRequestException("Cannot hand over more than the available amount");
+      }
+      // Variante C (REQ-INV-027): the handover fulfils THIS order, so it may draw only from this
+      // order's own earmark on the entry — never from a sibling order's slice or the free rest. Cap
+      // the handed amount at the entry's job-order slice for this order (defence in depth behind
+      // the
+      // frontend, which sets the amount field's max to the same slice). Reducing only that slice
+      // then keeps R5 (Σ job-order ≤ amount) without touching any other order chip or the rest —
+      // the
+      // silent sibling over-allocation was possible only because this cap was missing.
+      var orderSlice = InventoryAllocations.jobOrderSlice(inventoryItem, jobOrderId);
+      double orderSliceAmount =
+          orderSlice != null && orderSlice.getAmount() != null ? orderSlice.getAmount() : 0.0;
+      if (itemDto.amount() > orderSliceAmount + QUANTITY_EPSILON) {
+        throw new BadRequestException(
+            "Cannot hand over more than the amount earmarked to this job order");
       }
       QuantityType quantityType =
           inventoryItem.getMaterial() != null
@@ -245,6 +264,19 @@ public class JobOrderHandoverService {
       if (remainingAmount <= QUANTITY_EPSILON) {
         inventoryItemRepository.delete(inventoryItem);
       } else {
+        // Variante C (REQ-INV-027): the handover fulfils this job order, so the handed stock leaves
+        // inventory AND its earmark to the order — shrink that order slice by the handed amount.
+        // The
+        // same physical SCU also leave any mission earmark, so the mission dimension is clamped by
+        // the same amount: resolve its "deduct from" plan against the PRE-decrement slices (an
+        // explicit plan from the handover modal picker, else rest-first then proportional) and
+        // apply
+        // it, keeping R5 without a 422 for a dual-tagged partial handover.
+        Map<UUID, Double> missionPlan =
+            AllocationReductions.resolveReductionPlan(
+                inventoryItem, itemDto.missionReductions(), itemDto.amount(), false);
+        InventoryAllocations.reduceJobOrder(inventoryItem, jobOrderId, itemDto.amount());
+        AllocationReductions.applyPlan(inventoryItem, missionPlan, false);
         inventoryItem.setAmount(remainingAmount);
         inventoryItemRepository.save(inventoryItem);
       }
@@ -281,7 +313,11 @@ public class JobOrderHandoverService {
     // this once at the end (instead of inside the loop) is what makes the multi-material
     // completion flow safe with respect to optimistic locking.
     for (UUID materialId : materialsToUnlink) {
-      inventoryItemRepository.unlinkJobOrderMaterial(jobOrderId, materialId);
+      // R2 (REQ-INV-027): release the fulfilled material's allocation slices, so the leftover
+      // stock stays in the Lager as (partially) unassigned rather than keeping a phantom order
+      // link.
+      inventoryItemRepository.deleteJobOrderAllocationsByJobOrderAndMaterial(
+          jobOrderId, materialId);
     }
 
     // Re-fetch the JobOrder so the completion check runs on a freshly managed aggregate

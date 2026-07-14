@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryStackDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionAllocationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -90,7 +91,10 @@ class InventoryPageControllerMvcTest {
         .perform(get("/inventory"))
         .andExpect(status().isOk())
         .andExpect(view().name("inventory-index"))
-        .andExpect(model().attributeExists("aggregated"));
+        .andExpect(model().attributeExists("aggregated"))
+        // REQ-INV-027: the aggregated Lager gained a "maximum quality" column between avg quality
+        // and total quantity, so the table is now four columns wide (the empty-state row spans 4).
+        .andExpect(content().string(containsString("colspan=\"4\"")));
   }
 
   @Test
@@ -153,7 +157,30 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString("data-text-sell=\"Verkaufen\"")))
         .andExpect(content().string(not(containsString("data-text-transfer"))))
         .andExpect(content().string(containsString("id=\"umbuchenModal\"")))
-        .andExpect(content().string(containsString("id=\"umbuchenSubmitBtn\"")));
+        .andExpect(content().string(containsString("id=\"umbuchenSubmitBtn\"")))
+        // Variante C (REQ-INV-027): the "Herkunft" (deduct-from) picker sections render in both the
+        // Ausbuchen and Umbuchen modals, wired to their shared inventory-herkunft.js module.
+        .andExpect(content().string(containsString("data-herkunft=\"bookout\"")))
+        .andExpect(content().string(containsString("data-herkunft=\"umbuchen\"")))
+        .andExpect(content().string(containsString("/js/inventory-herkunft.js")));
+  }
+
+  // REQ-INV-027: the personal Lager's Ausbuchen + Umbuchen modals carry the same "Herkunft"
+  // (deduct-from) picker sections and load the shared inventory-herkunft.js module.
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewMyInventory_ShouldRenderHerkunftPicker() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/my"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-herkunft=\"bookout\"")))
+        .andExpect(content().string(containsString("data-herkunft=\"umbuchen\"")))
+        .andExpect(content().string(containsString("data-herkunft-body")))
+        .andExpect(content().string(containsString("/js/inventory-herkunft.js")));
   }
 
   // covers REQ-INV-001 (SCU amount input) / REQ-INV-002 (PIECE amount input) — see
@@ -215,12 +242,13 @@ class InventoryPageControllerMvcTest {
   /**
    * Fragment-render guard for the personal Lager's lazy stack-entries drill-down ({@code
    * /inventory/my/stack/entries}). The append-only Lager loads a stack's entries on expand, not
-   * inline, so this is where the per-entry association select lives. Regression: a refinery order
-   * assigned to a (now non-active) mission produces an entry whose mission is no longer returned by
-   * {@code /api/v1/missions/lookup}; the mission must still appear via a fallback {@code <option
-   * selected>}. Stubs the backend stack-entries page with that entry and asserts the real {@code
-   * stackEntriesMy} fragment carries the entry row (id) and the fallback option — so a Thymeleaf
-   * 500 (stale {@code #{...}} key) fails the build.
+   * inline, so this is where the per-entry Variante-C allocation chips (REQ-INV-027) live.
+   * Regression: a refinery order assigned to a (now non-active) mission produces an entry whose
+   * mission is no longer returned by {@code /api/v1/missions/lookup}; the mission must still appear
+   * because its chip renders from the entry's own {@code missionAllocations}, independent of the
+   * (empty) candidate lookup. Stubs the backend stack-entries page with that allocation and asserts
+   * the real {@code stackEntriesMy} fragment carries the entry row (id) and the mission chip — so a
+   * Thymeleaf 500 (stale {@code #{...}} key / bad SpEL) fails the build.
    */
   @Test
   @WithMockUser(roles = "KRT_MEMBER", username = "test-user-123")
@@ -241,10 +269,10 @@ class InventoryPageControllerMvcTest {
             90,
             10.0,
             false,
+            java.util.List.of(),
             null,
-            null,
-            missionId,
-            missionName,
+            java.util.List.of(new MissionAllocationDto(missionId, missionName, null, 4.0)),
+            6.0,
             null,
             null,
             1L,
@@ -272,9 +300,12 @@ class InventoryPageControllerMvcTest {
                 .param("personal", "false"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("data-item-id=\"" + itemId + "\"")))
-        .andExpect(content().string(containsString("value=\"" + missionId + "\"")))
-        .andExpect(content().string(containsString(missionName)))
-        .andExpect(content().string(containsString("selected=\"selected\"")));
+        // Variante C (REQ-INV-027): the mission is an allocation chip, not a scalar <option>.
+        // The archived mission still shows because the chip renders from the entry's own
+        // allocation, independent of whether the mission is still in the active lookup.
+        .andExpect(content().string(containsString("assoc-chip--mission")))
+        .andExpect(content().string(containsString("data-target-id=\"" + missionId + "\"")))
+        .andExpect(content().string(containsString(missionName)));
   }
 
   /**
@@ -304,9 +335,9 @@ class InventoryPageControllerMvcTest {
             90,
             10.0,
             false,
+            java.util.List.of(),
             null,
-            null,
-            null,
+            java.util.List.of(),
             null,
             null,
             null,
@@ -353,8 +384,10 @@ class InventoryPageControllerMvcTest {
    * Same as {@link #viewMyStackEntries_ShouldRenderEntryRowsWithMissionFallbackOption()} for the
    * logistician/admin stack-entries drill-down ({@code /inventory/all/stack/entries} → {@code
    * stackEntriesAdmin} fragment), which additionally carries the owning {@code userId} in the stack
-   * key and renders the editable association dropdowns (and the archived-mission fallback option)
-   * under {@code sec:authorize}.
+   * key. Since Variante C (REQ-INV-027) the mission is an editable allocation chip (gated behind
+   * {@code sec:authorize} for association-capable roles), not a scalar {@code <option>}; the
+   * archived mission still shows because its chip renders from the entry's own {@code
+   * missionAllocations}, independent of the (empty) active-mission lookup.
    */
   @Test
   @WithMockUser(roles = "LOGISTICIAN", username = "logi-user")
@@ -375,10 +408,10 @@ class InventoryPageControllerMvcTest {
             90,
             10.0,
             false,
+            java.util.List.of(),
             null,
-            null,
-            missionId,
-            missionName,
+            java.util.List.of(new MissionAllocationDto(missionId, missionName, null, 4.0)),
+            6.0,
             null,
             null,
             1L,
@@ -406,9 +439,12 @@ class InventoryPageControllerMvcTest {
                 .param("missionId", missionId.toString()))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("data-item-id=\"" + itemId + "\"")))
-        .andExpect(content().string(containsString("value=\"" + missionId + "\"")))
-        .andExpect(content().string(containsString(missionName)))
-        .andExpect(content().string(containsString("selected=\"selected\"")));
+        // Variante C (REQ-INV-027): the mission is an editable allocation chip, not a scalar
+        // <option>. The archived mission still shows because the chip renders from the entry's own
+        // allocation, independent of whether the mission is still in the active lookup.
+        .andExpect(content().string(containsString("assoc-chip--mission")))
+        .andExpect(content().string(containsString("data-target-id=\"" + missionId + "\"")))
+        .andExpect(content().string(containsString(missionName)));
   }
 
   /**
@@ -426,7 +462,6 @@ class InventoryPageControllerMvcTest {
     UUID materialId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    UUID jobOrderId = UUID.randomUUID();
     String locationName = "Port Olisar Hangar 7";
 
     InventoryStackDto stack =
@@ -434,10 +469,6 @@ class InventoryPageControllerMvcTest {
             new UserReferenceDto(userId, "tester", "Tester", "Tester", null),
             new LocationReferenceDto(locationId, locationName),
             95,
-            jobOrderId,
-            4242,
-            null,
-            null,
             false,
             null,
             12.5,
@@ -491,7 +522,6 @@ class InventoryPageControllerMvcTest {
     UUID materialId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    UUID jobOrderId = UUID.randomUUID();
     String locationName = "Everus Harbor Storage";
     String ownerName = "Logi Owner";
 
@@ -500,10 +530,6 @@ class InventoryPageControllerMvcTest {
             new UserReferenceDto(userId, "owner", "Owner", ownerName, null),
             new LocationReferenceDto(locationId, locationName),
             80,
-            jobOrderId,
-            777,
-            null,
-            null,
             false,
             null,
             7.0,
@@ -559,5 +585,25 @@ class InventoryPageControllerMvcTest {
         .andExpect(view().name("inventory-input"))
         .andExpect(model().attribute("missions", empty()))
         .andExpect(model().attribute("materials", hasSize(1)));
+  }
+
+  // covers REQ-INV-027 (R4): the create form carries the Variante-C split-at-check-in allocation
+  // sections + their hidden row templates that inventory-input.js clones.
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewInputPage_RendersSplitAtCheckInAllocationControls() throws Exception {
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/input"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("inventory-input"))
+        .andExpect(content().string(containsString("id=\"jobOrderAllocRows\"")))
+        .andExpect(content().string(containsString("id=\"missionAllocRows\"")))
+        .andExpect(content().string(containsString("data-trigger=\"inv-input-add-order\"")))
+        .andExpect(content().string(containsString("data-trigger=\"inv-input-add-mission\"")))
+        .andExpect(content().string(containsString("id=\"jobOrderRowTemplate\"")));
   }
 }
