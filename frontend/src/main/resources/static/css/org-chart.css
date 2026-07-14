@@ -680,7 +680,7 @@ main.oc-page .oc-greeting .oc-edit-toggle {
     padding: 0;
     background: none;
     border: none;
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-size: 1.75rem;
     line-height: 1;
     cursor: pointer;

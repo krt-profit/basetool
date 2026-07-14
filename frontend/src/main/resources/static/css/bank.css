@@ -26,7 +26,7 @@
     font-size: 0.62rem;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-weight: var(--fw-bold);
 }
 
@@ -75,7 +75,7 @@
 
 .kpi-card .kpi-sub {
     font-size: 0.66rem;
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-variant-numeric: tabular-nums;
 }
 
@@ -123,7 +123,7 @@
 }
 
 .kpi-delta--flat {
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
 }
 
 .kpi-card--closed {
@@ -231,7 +231,7 @@
     gap: 14px;
     flex-wrap: wrap;
     font-size: 0.7rem;
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     margin-top: 8px;
 }
 
@@ -485,7 +485,7 @@ tr.is-inert td {
     left: 8px;
     width: 15px;
     height: 15px;
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     pointer-events: none;
 }
 
@@ -512,7 +512,7 @@ tr.is-inert td {
 }
 
 .bank-facts .fact-key {
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     text-transform: uppercase;
     font-size: 0.6rem;
     letter-spacing: 0.08em;
@@ -573,7 +573,7 @@ tr.is-inert td {
 }
 
 .bank-kv .bank-kv-key {
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
 }
 
 .bank-kv .bank-kv-value {
@@ -601,7 +601,7 @@ tr.is-inert td {
     text-transform: uppercase;
     letter-spacing: 0.08em;
     font-weight: var(--fw-bold);
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
 }
 
 .bank-check-label {
@@ -649,7 +649,7 @@ tr.is-inert td {
 
 .bank-field-hint {
     font-size: 0.66rem;
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     margin-top: 3px;
 }
 
@@ -677,11 +677,11 @@ tr.is-inert td {
 }
 
 .bank-amount--zero {
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
 }
 
 .bank-note-cell {
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     max-width: 220px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -788,7 +788,7 @@ tr.is-inert td {
 .bank-detail-item .bank-detail-label {
     flex: 0 0 7rem;
     padding-top: 1px;
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-size: 0.66rem;
     font-weight: var(--fw-bold);
     text-transform: uppercase;
@@ -820,7 +820,7 @@ tr.is-inert td {
     text-transform: uppercase;
     letter-spacing: 0.08em;
     font-weight: var(--fw-bold);
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
 }
 
 /*
@@ -1025,7 +1025,7 @@ tr.is-inert td {
 
 .ou-row .r-sub {
     font-size: 0.68rem;
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-variant-numeric: tabular-nums;
     margin-top: 2px;
 }
@@ -1046,7 +1046,7 @@ tr.is-inert td {
 }
 
 .ou-row .unit {
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-weight: 400;
     font-size: 0.62em;
 }
@@ -1056,7 +1056,7 @@ tr.is-inert td {
 }
 
 .r-noziel {
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-size: 0.72rem;
 }
 
@@ -1070,7 +1070,7 @@ tr.is-inert td {
     justify-content: space-between;
     gap: 8px;
     font-size: 0.68rem;
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     margin-top: 4px;
 }
 
@@ -1159,7 +1159,7 @@ tr.is-inert td {
 
 .ou-card-sub {
     font-size: 0.68rem;
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-variant-numeric: tabular-nums;
     margin-top: 2px;
 }
@@ -1180,7 +1180,7 @@ tr.is-inert td {
 }
 
 .ou-card-bal .unit {
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
     font-weight: 400;
     font-size: 0.6em;
 }
@@ -1506,7 +1506,7 @@ tr.is-inert td {
     font-size: 0.7rem;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: var(--color-gray-2);
+    color: var(--color-gray-2-text);
 }
 
 /* Chart + booking-history layout (REQ-BANK-052): stacked by default (chart above the history),
