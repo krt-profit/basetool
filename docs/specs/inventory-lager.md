@@ -473,7 +473,8 @@ there is no separate income-attribution input.
 **Enforced by:** `InventoryItemServiceTest`, `InventoryItemServiceBookOutTest`,
 `InventoryCheckoutServiceAuditTest`, `InventoryStockMergeTest`, `JobOrderHandoverServiceTest`,
 `InventoryAllocationSoakDataTest`, `InventoryItemControllerTest`, `InventoryPageControllerMvcTest`,
-`DatabaseIndexMigrationTest` · **Code:** `InventoryJobOrderAllocation`, `InventoryMissionAllocation`,
+`DatabaseIndexMigrationTest`, e2e `InventoryOperationsE2eTest` (Herkunft picker gate + deduct-from) ·
+**Code:** `InventoryJobOrderAllocation`, `InventoryMissionAllocation`,
 `support/InventoryAllocations`, `InventoryItemController` (allocation endpoints),
 `InventoryItemService#createInventoryItem`, `InventoryCheckoutService` (book-out / merge / SELL),
 `InventoryAggregationService#getMaterialCollection`, `InventoryItemMapper`,
