@@ -90,6 +90,22 @@ class LiveSyncSectionMapParityTest {
   }
 
   @Test
+  void materialCollectionSeamMap_isASubsetOfTheOrderTopicWhitelist() throws IOException {
+    // #1309: the standalone material-collection page joins order:{id} to refresh its table on a
+    // delivered flip / row move, but renders only a SUBSET of the ORDER sections (it reuses the
+    // existing `materials` key), so it cannot match the full whitelist like orders-detail. Assert
+    // every key it names is a real ORDER section — a stray/typo key the relay would silently drop
+    // (stranding peers stale, REQ-FE-010) still fails the build.
+    Set<String> jsKeys =
+        seamMapKeys("/static/js/material-collection.js", "MATERIAL_COLLECTION_SECTIONS");
+    assertThat(jsKeys)
+        .as(
+            "MATERIAL_COLLECTION_SECTIONS keys in material-collection.js vs"
+                + " LiveSyncTopicClass.ORDER whitelist")
+        .isSubsetOf(LiveSyncTopicClass.ORDER.allowedSections());
+  }
+
+  @Test
   void inventoryAllSeamMap_matchesTheInventoryAllTopicWhitelist() throws IOException {
     // #1307: the shared Lager's INVENTORY_ALL_SECTIONS receiver map must mirror the
     // LiveSyncTopicClass.INVENTORY_ALL whitelist (the broadcast derives its keys from this map).

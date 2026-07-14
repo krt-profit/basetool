@@ -24,8 +24,12 @@
  * In-place #577 collection writes through the shared krtFetch/krtCsrf foundation: an owner/location
  * change transfers the row's full amount (the backend deletes the source item and appends a new
  * target item, whose id/version is re-keyed onto the <tr> in place), and the delivered checkbox PATCHes
- * with a syncVersion + revert-on-failure. Delegated on data-role="owner-select" so it survives the
- * searchable-combobox enhancement.
+ * with a syncVersion + revert-on-failure. All three row controls delegate on document so they survive
+ * both the searchable-combobox enhancement and the live-sync fragment swap.
+ *
+ * #1309 (REQ-FE-010): the page joins the order:{id} live-sync room and re-fetches its
+ * collectionResults fragment in place when a peer flips a delivered flag or moves a row, and
+ * broadcasts the same (order:{id} materials/aggregated) on its own writes.
  *
  * The MSG_OWNER_UPDATED / MSG_LOCATION_UPDATED / MSG_DELIVERED_UPDATED / MSG_ERROR_GENERIC toast
  * strings are defined by the inline Thymeleaf bootstrap block of material-collection.html, which
@@ -44,6 +48,20 @@
 
 function collectionRow(inventoryId) {
     return document.querySelector('tr[data-inventory-id="' + inventoryId + '"]');
+}
+
+// #1309 (REQ-FE-010): tell other viewers of THIS order (order:{id}) that its material collection
+// changed — a delivered flip or a row move (owner/location transfer) — so their standalone
+// collection page re-fetches its table in place and the order-detail materials/aggregated sections
+// follow. The relay excludes the acting socket, so this never echoes back to the caller.
+function broadcastCollectionChanged() {
+    if (
+        window.orderId &&
+        window.krtLiveSync &&
+        typeof window.krtLiveSync.sendChanged === 'function'
+    ) {
+        window.krtLiveSync.sendChanged('order:' + window.orderId, ['materials', 'aggregated']);
+    }
 }
 
 async function collectionTransfer(inventoryId, target, successMessage) {
@@ -90,6 +108,7 @@ async function collectionTransfer(inventoryId, target, successMessage) {
                     deliveredCheckbox.checked = false;
                 }
             }
+            broadcastCollectionChanged();
         },
     });
     // Re-enable the row's selects whether the move succeeded (the row was re-keyed and stays
@@ -99,65 +118,92 @@ async function collectionTransfer(inventoryId, target, successMessage) {
     });
 }
 
-// The owner picker is upgraded into a searchable combobox by the global enhancer, which replaces
-// the <select> (so a per-element listener bound on load would be lost). Delegate on the preserved
-// data-role instead — the combobox copies data-role + data-inventory-id onto its hidden input,
-// which is what dispatches the change once enhanced (and the plain <select> still matches before
-// enhancement / no-JS).
+// All three row controls (owner + location transfer, delivered toggle) bind with ONE delegated
+// change listener on document — not per-element — so they survive the live-sync fragment swap
+// (REQ-FE-010) that re-renders the table; the owner combobox is re-enhanced by krt-searchable-select
+// on the krt:swapped event. The combobox copies data-role + data-inventory-id onto its hidden input,
+// which dispatches the change once enhanced (and the plain <select> still matches before enhancement
+// / no-JS).
 document.addEventListener('change', function (e) {
     const el = e.target;
-    if (!el.matches || !el.matches('[data-role="owner-select"]')) {
-        return;
+    if (!el || !el.matches) return;
+    if (el.matches('[data-role="owner-select"]')) {
+        collectionTransfer(
+            el.getAttribute('data-inventory-id'),
+            { targetUserId: el.value },
+            MSG_OWNER_UPDATED,
+        );
+    } else if (el.matches('.location-select')) {
+        collectionTransfer(
+            el.getAttribute('data-inventory-id'),
+            { targetLocationId: el.value },
+            MSG_LOCATION_UPDATED,
+        );
+    } else if (el.matches('.delivered-checkbox')) {
+        onDeliveredToggle(el);
     }
-    collectionTransfer(
-        el.getAttribute('data-inventory-id'),
-        { targetUserId: el.value },
-        MSG_OWNER_UPDATED,
-    );
 });
 
-document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('.location-select').forEach(function (select) {
-        select.addEventListener('change', function () {
-            collectionTransfer(
-                this.getAttribute('data-inventory-id'),
-                { targetLocationId: this.value },
-                MSG_LOCATION_UPDATED,
-            );
-        });
+// Persist a delivered flip in place (PATCH + syncVersion via containerSelector), toast, broadcast the
+// change to peers, and revert the native checkbox on failure so it never lies until a reload (mirrors
+// the status <select> revert on a failed order-status change).
+async function onDeliveredToggle(cb) {
+    const inventoryId = cb.getAttribute('data-inventory-id');
+    const row = collectionRow(inventoryId);
+    if (!window.krtFetch || !row) return;
+    const previous = !cb.checked; // state before this toggle, for revert-on-failure
+    const result = await window.krtFetch.write({
+        method: 'PATCH',
+        url: '/inventory/' + inventoryId + '/delivered',
+        payload: {
+            delivered: cb.checked,
+            // Variante C (REQ-INV-027): delivered is per-order — this whole page is one job
+            // order's collection, so send its id and the backend flips only that slice.
+            jobOrderId: cb.getAttribute('data-job-order-id'),
+            version: parseInt(row.getAttribute('data-version'), 10),
+        },
+        containerSelector: 'tr[data-inventory-id="' + inventoryId + '"]',
+        toast: false,
+        errorMessage: MSG_ERROR_GENERIC,
+        onSuccess: function () {
+            window.showFrontendSuccessToast(MSG_DELIVERED_UPDATED);
+            broadcastCollectionChanged();
+        },
     });
+    if (!result || !result.ok) {
+        cb.checked = previous;
+    }
+}
 
-    document.querySelectorAll('.delivered-checkbox').forEach(function (checkbox) {
-        checkbox.addEventListener('change', async function () {
-            const cb = this;
-            const inventoryId = cb.getAttribute('data-inventory-id');
-            const row = collectionRow(inventoryId);
-            if (!window.krtFetch || !row) return;
-            const previous = !cb.checked; // state before this toggle, for revert-on-failure
-            const result = await window.krtFetch.write({
-                method: 'PATCH',
-                url: '/inventory/' + inventoryId + '/delivered',
-                payload: {
-                    delivered: cb.checked,
-                    // Variante C (REQ-INV-027): delivered is per-order — this whole page is one job
-                    // order's collection, so send its id and the backend flips only that slice.
-                    jobOrderId: cb.getAttribute('data-job-order-id'),
-                    version: parseInt(row.getAttribute('data-version'), 10),
-                },
-                containerSelector: 'tr[data-inventory-id="' + inventoryId + '"]',
-                toast: false,
-                errorMessage: MSG_ERROR_GENERIC,
-                onSuccess: function () {
-                    window.showFrontendSuccessToast(MSG_DELIVERED_UPDATED);
-                },
-            });
-            // A failed write (409 stale version / 5xx) already surfaced an error toast via
-            // krtFetch.handleProblem, but the native checkbox kept its new, unpersisted state —
-            // revert it so the control matches the persisted flag instead of lying until a reload
-            // (mirrors the status <select> revert on a failed order-status change).
-            if (!result || !result.ok) {
-                cb.checked = previous;
-            }
+// #1309 (REQ-FE-010): single source of truth for the receiver + the parity test. It reuses the ORDER
+// topic's existing `materials` section — this page renders a SUBSET of that topic, so no new section
+// key is introduced and LiveSyncTopicClass.ORDER stays the whitelist. A peer's delivered flip / row
+// move on this order re-fetches the collection table fragment in place.
+const MATERIAL_COLLECTION_SECTIONS = {
+    materials: { container: '#material-collection-results', fragmentValue: 'results' },
+};
+
+document.addEventListener('DOMContentLoaded', function () {
+    if (
+        window.orderId &&
+        window.krtLiveSync &&
+        typeof window.krtLiveSync.createReceiver === 'function' &&
+        window.krtFetch &&
+        typeof window.krtFetch.swap === 'function' &&
+        document.getElementById('material-collection-results')
+    ) {
+        window.krtLiveSync.createReceiver({
+            topic: 'order:' + window.orderId,
+            sections: MATERIAL_COLLECTION_SECTIONS,
+            coalesceMs: 1500,
+            refresh: function () {
+                window.krtFetch.swap({
+                    url: '/orders/' + window.orderId + '/material-collection',
+                    container: '#material-collection-results',
+                    fragmentValue: MATERIAL_COLLECTION_SECTIONS.materials.fragmentValue,
+                    history: false,
+                });
+            },
         });
-    });
+    }
 });

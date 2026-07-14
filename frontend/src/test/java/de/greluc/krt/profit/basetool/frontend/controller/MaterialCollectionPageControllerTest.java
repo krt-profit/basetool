@@ -55,7 +55,7 @@ class MaterialCollectionPageControllerTest {
         .thenReturn(locations);
 
     // When
-    String viewName = controller.viewMaterialCollection(jobOrderId, model);
+    String viewName = controller.viewMaterialCollection(jobOrderId, null, model);
 
     // Then — #1193: the owner picker searches on demand, so no user roster is preloaded/modelled.
     assertEquals("material-collection", viewName);
@@ -63,6 +63,28 @@ class MaterialCollectionPageControllerTest {
     assertEquals(entries, model.getAttribute("entries"));
     assertNull(model.getAttribute("users"));
     assertEquals(locations, model.getAttribute("locations"));
+  }
+
+  @Test
+  void viewMaterialCollection_shouldReturnFragment_whenFragmentIsResults() {
+    // Given
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    MaterialCollectionPageController controller =
+        new MaterialCollectionPageController(backendApiClient);
+    Model model = new ConcurrentModel();
+    UUID jobOrderId = UUID.randomUUID();
+
+    when(backendApiClient.get(contains("/material-collection"), anyTypeRef()))
+        .thenReturn(List.of());
+    when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
+        .thenReturn(List.of());
+
+    // When — the live-sync receiver (REQ-FE-010) re-fetches ?fragment=results to swap the table.
+    String viewName = controller.viewMaterialCollection(jobOrderId, "results", model);
+
+    // Then — only the collectionResults fragment is rendered, with the model still populated.
+    assertEquals("material-collection :: collectionResults", viewName);
+    assertEquals(jobOrderId, model.getAttribute("jobOrderId"));
   }
 
   @Test
@@ -80,7 +102,7 @@ class MaterialCollectionPageControllerTest {
         .thenReturn(List.of());
 
     // When
-    String viewName = controller.viewMaterialCollection(jobOrderId, model);
+    String viewName = controller.viewMaterialCollection(jobOrderId, null, model);
 
     // Then
     assertEquals("material-collection", viewName);
@@ -104,7 +126,7 @@ class MaterialCollectionPageControllerTest {
         .thenThrow(new BackendServiceException("Backend error", null, 500));
 
     // When
-    String viewName = controller.viewMaterialCollection(jobOrderId, model);
+    String viewName = controller.viewMaterialCollection(jobOrderId, null, model);
 
     // Then
     assertEquals("material-collection", viewName);

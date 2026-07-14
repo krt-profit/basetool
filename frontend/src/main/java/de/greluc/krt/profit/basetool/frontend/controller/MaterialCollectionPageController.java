@@ -36,6 +36,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 /**
  * Frontend controller for the material collection overview page of a job order. Loads inventory
@@ -71,14 +72,23 @@ public class MaterialCollectionPageController {
    * searchable combobox (remote-users, #1193) that seeds each entry's current owner from {@code
    * MaterialCollectionEntryDto.ownerName()}, so the whole roster is no longer preloaded here.
    *
+   * <p>When called with {@code ?fragment=results} it returns only the {@code collectionResults}
+   * fragment (the entries table / empty state) rather than the full page — the live-sync receiver
+   * ({@code material-collection.js}, REQ-FE-010) re-fetches it to swap the table in place when a
+   * peer flips a delivered flag or moves a row.
+   *
    * @param jobOrderId job order id passed through to the template
+   * @param fragment when {@code results}, render only the {@code collectionResults} fragment
    * @param model Thymeleaf model populated with {@code jobOrderId}, {@code entries}, {@code
    *     locations}
-   * @return the {@code material-collection} view name
+   * @return the {@code material-collection} view name, or its {@code collectionResults} fragment
    */
   @GetMapping("/{jobOrderId}/material-collection")
   @PreAuthorize("isAuthenticated()")
-  public String viewMaterialCollection(@PathVariable UUID jobOrderId, Model model) {
+  public String viewMaterialCollection(
+      @PathVariable UUID jobOrderId,
+      @RequestParam(name = "fragment", required = false) String fragment,
+      Model model) {
     List<MaterialCollectionEntryDto> entries = Collections.emptyList();
     List<LocationReferenceDto> locations = Collections.emptyList();
 
@@ -102,6 +112,9 @@ public class MaterialCollectionPageController {
     model.addAttribute("jobOrderId", jobOrderId);
     model.addAttribute("entries", entries);
     model.addAttribute("locations", locations);
+    if ("results".equals(fragment)) {
+      return "material-collection :: collectionResults";
+    }
     return "material-collection";
   }
 }

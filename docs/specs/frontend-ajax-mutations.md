@@ -982,6 +982,15 @@ the write; the sole exception is the admin `DELETE /inventory/all` full wipe, wh
 them client-side — its board and inventory rooms are still poked, but an open order collection
 self-heals on the next interaction (an accepted limitation for that rare nuke).
 
+The standalone order **material-collection** page (`/orders/{id}/material-collection`) joins the same
+`order:{id}` room in its own right (#1309): its per-row delivered toggle and owner/location moves
+broadcast `order:{id}` `materials`/`aggregated`, and it re-fetches its `?fragment=results` collection
+table fragment in place on any peer change (its three row controls delegate on `document` so they
+survive the swap; the owner combobox is re-enhanced on `krt:swapped`). It renders a **subset** of the
+ORDER sections (reusing the existing `materials` key), so — unlike `orders-detail.js`, whose seam map
+must match the full ORDER whitelist — its `MATERIAL_COLLECTION_SECTIONS` is parity-checked as a
+**subset** of `LiveSyncTopicClass.ORDER` (a stray/typo key still fails the build).
+
 The server-side **topic-class registry** (the `LiveSyncTopicClass` enum) is the single source of
 truth for this table. The REQ-FE-010 **three-mirror-points rule applies per topic**: the acting page's seam map,
 the registry whitelist and the receiving page's apply map must change together in the same PR, and
