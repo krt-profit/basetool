@@ -165,18 +165,12 @@
 }
 
 body {
-    background-color: var(--color-bg-black);
     /*
-     * Faint ambient honeycomb (Wabenmuster) over the black page background, per the
-     * design-system UI kit. The SVG ships its #E77E23 strokes at 0.1 opacity, so it
-     * reads as a subtle texture (and shows through the translucent .hud-box surfaces)
-     * rather than decoration. background-attachment: fixed keeps the texture still
-     * while content scrolls; the 46x26.56px tile preserves the SVG's 72:41.57 ratio.
+     * Flat black page background per the design-system UI kit and REQ-UI-003. The
+     * former faint ambient honeycomb (Wabenmuster) texture layer has been removed —
+     * the page is now plain black with no background image.
      */
-    background-image: url('../images/honeycomb-bg.svg');
-    background-repeat: repeat;
-    background-size: 46px 26.56px;
-    background-attachment: fixed;
+    background-color: var(--color-bg-black);
     color: var(--color-gray-1);
     font-family: var(--font-body);
     font-weight: var(--fw-thin);
@@ -4819,7 +4813,7 @@ textarea:focus-visible,
     background: rgb(231 126 35 / 6%);
 }
 /* gray-1 + regular weight: gray-2 at thin weight was unreadable over the
-   honeycomb backdrop shining through the semi-transparent zones. */
+   dark page background showing through the semi-transparent zones. */
 .drop-hint {
     border: 1px dashed var(--color-gray-3);
     color: var(--color-gray-1);

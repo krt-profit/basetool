@@ -57,7 +57,10 @@ and the logo; page surfaces and the data-cell grid stay neutral (black / `#14141
 ### REQ-UI-003 — Dark-only surfaces
 
 Backgrounds are **`#000000`** (page) and **`#141414`** (Grau 4 — header, footer, tables,
-cards, sidebar). `color-scheme: dark`; there is **no light theme**.
+cards, sidebar). The page background is **flat** — no ambient pattern or texture (the former
+honeycomb/Wabenmuster wash was removed 2026-07); a subtle radial **top bloom**
+(`rgba(231,126,35,0.10)` fading to transparent) over the black is permitted on the
+login / entry surfaces. `color-scheme: dark`; there is **no light theme**.
 
 ### REQ-UI-004 — Typography
 
