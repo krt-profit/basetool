@@ -147,7 +147,8 @@ class InventoryItemServiceTest {
 
   @Test
   void getAggregatedInventory_shouldReturnPage() {
-    Object[] obj = new Object[] {new Material(), 10.0, 5L};
+    // material, weighted-avg quality, MAX quality, total amount (REQ-INV-027 max-quality column).
+    Object[] obj = new Object[] {new Material(), 10.0, 900, 5L};
     Page<Object[]> page = new PageImpl<Object[]>(List.<Object[]>of(obj));
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
@@ -162,6 +163,7 @@ class InventoryItemServiceTest {
     assertNotNull(result);
     assertEquals(1, result.getTotalElements());
     assertEquals(10, result.getContent().get(0).quality());
+    assertEquals(900, result.getContent().get(0).maxQuality());
     assertEquals(5L, result.getContent().get(0).amount());
   }
 

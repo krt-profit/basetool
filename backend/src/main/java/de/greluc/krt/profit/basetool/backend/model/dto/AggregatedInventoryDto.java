@@ -19,5 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
-/** Data transfer record carrying Aggregated Inventory payload. */
-public record AggregatedInventoryDto(MaterialDto material, Double quality, Double amount) {}
+/**
+ * Data transfer record carrying Aggregated Inventory payload for the per-material Lager overview.
+ *
+ * @param material the aggregated material.
+ * @param quality the amount-weighted <em>average</em> quality across the material's stock.
+ * @param maxQuality the <em>highest</em> quality available for the material (the best single
+ *     entry's quality); {@code 0.0} when the material has no stock.
+ * @param amount the total quantity of the material in stock.
+ */
+public record AggregatedInventoryDto(
+    MaterialDto material, Double quality, Double maxQuality, Double amount) {}

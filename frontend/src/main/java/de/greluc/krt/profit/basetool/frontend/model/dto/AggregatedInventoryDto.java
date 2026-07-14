@@ -19,5 +19,11 @@
 
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
-/** Data transfer record carrying Aggregated Inventory payload. */
-public record AggregatedInventoryDto(MaterialDto material, Double quality, Double amount) {}
+/**
+ * Frontend mirror of the backend {@code AggregatedInventoryDto} (per the {@code
+ * feedback_backend_frontend_dto_mirror} memory): the per-material Lager overview row — {@code
+ * quality} is the amount-weighted average, {@code maxQuality} the highest available quality, {@code
+ * amount} the total stock.
+ */
+public record AggregatedInventoryDto(
+    MaterialDto material, Double quality, Double maxQuality, Double amount) {}

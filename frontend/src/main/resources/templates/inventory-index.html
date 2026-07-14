@@ -69,9 +69,10 @@
             <table class="krt-table">
                 <thead>
                     <tr>
-                        <th>Material</th>
-                        <th>Ø Qualität</th>
-                        <th>Gesamtmenge</th>
+                        <th th:text="#{inventory.aggregated.col.material}">Material</th>
+                        <th th:text="#{inventory.aggregated.col.avgQuality}">Ø Qualität</th>
+                        <th th:text="#{inventory.aggregated.col.maxQuality}">Max. Qualität</th>
+                        <th th:text="#{inventory.aggregated.col.totalAmount}">Gesamtmenge</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -81,13 +82,14 @@
                         class="clickable-row krtm-cursor-pointer-74fa">
                         <td th:text="${item.material.name}" class="krtm-color-var-color-white-c482">Material</td>
                         <td th:text="${item.quality != null ? #numbers.formatDecimal(item.quality, 1, 'NONE', 2, 'DEFAULT') : '0.00'}">100.00</td>
+                        <td th:text="${item.maxQuality != null ? #numbers.formatDecimal(item.maxQuality, 1, 'NONE', 2, 'DEFAULT') : '0.00'}">100.00</td>
                         <td th:switch="${item.material.quantityType}">
                             <span th:case="'PIECE'" th:text="|${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'} #{material.quantity.piece}|">10 Stück</span>
                             <span th:case="*" th:text="|${item.amount != null ? #numbers.formatDecimal(item.amount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|">10.500 SCU</span>
                         </td>
                     </tr>
                     <tr th:if="${#lists.isEmpty(aggregated)}">
-                        <td colspan="3" class="text-center text-muted">Keine Einträge vorhanden.</td>
+                        <td colspan="4" class="text-center text-muted" th:text="#{inventory.aggregated.empty}">Keine Einträge vorhanden.</td>
                     </tr>
                 </tbody>
             </table>

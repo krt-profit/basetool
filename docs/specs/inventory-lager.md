@@ -453,6 +453,30 @@ creditable; an empty attribution list is a fully-personal sale that credits no m
 `fragments/inventory-stack-entries.html`, `inventory-my.js` / `inventory-admin.js`,
 `inventory-input.html` / `inventory-input.js` · **Issues:** #1182 · **ADR:** ADR-0098
 
+### REQ-INV-028 — Aggregated per-material overview shows average and maximum quality
+
+The per-material Lager overview (`GET /inventory`, `AggregatedInventoryDto`) rolls the in-scope
+non-personal stock up to one row per material, showing the total amount, the **amount-weighted
+average** quality and the **maximum** available quality (the best single entry's quality). The three
+aggregates come from one grouped query — amount-weighted average, `MAX(quality)`, `SUM(amount)` over
+`GROUP BY material`; the row links through to the per-material drilldown (`/inventory/all` filtered to
+the material).
+
+**Acceptance**
+
+- [ ] `/inventory` lists one row per material with the columns material · Ø quality · **max quality**
+  · total amount, the max-quality column sitting between the average and the total.
+- [ ] The max quality equals the highest `quality` of any of the material's in-scope non-personal
+  entries; the average is amount-weighted; both are `0` for a material with no stock.
+- [ ] The projection is scope-filtered (strict-staffel / admin-all) exactly like the rest of the
+  Lager ([`org-unit-tenancy.md`](org-unit-tenancy.md) `REQ-ORG-003`) and excludes personal entries.
+
+**Enforced by:** `InventoryItemServiceTest#getAggregatedInventory_shouldReturnPage`,
+`InventoryItemControllerTest`, `InventoryPageControllerMvcTest` · **Code:**
+`InventoryItemRepository#getAggregatedInventory`,
+`InventoryAggregationService#getAggregatedInventory`, `AggregatedInventoryDto`,
+`templates/inventory-index.html` · **Issues:** —
+
 ## Out of scope
 
 - Tenancy / visibility scope of inventory (strict-staffel Lager-View) is governed by

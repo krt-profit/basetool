@@ -354,7 +354,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   @Query(
       """
       SELECT i.material as material, CASE WHEN SUM(i.amount) > 0 THEN SUM(CAST(i.quality AS
-      double) * i.amount) / SUM(i.amount) ELSE 0.0 END as quality, SUM(i.amount) as amount
+      double) * i.amount) / SUM(i.amount) ELSE 0.0 END as quality, MAX(i.quality) as maxQuality,
+      SUM(i.amount) as amount
       FROM InventoryItem i WHERE i.personal = false AND
       """
           + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE

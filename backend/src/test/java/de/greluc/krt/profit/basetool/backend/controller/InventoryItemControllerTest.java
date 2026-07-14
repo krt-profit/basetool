@@ -124,7 +124,7 @@ class InventoryItemControllerTest {
 
   @Test
   void getAggregatedInventory_wrapsPageIntoPageResponse() {
-    AggregatedInventoryDto agg = new AggregatedInventoryDto(null, 750.0, 25.0);
+    AggregatedInventoryDto agg = new AggregatedInventoryDto(null, 750.0, 900.0, 25.0);
     Page<AggregatedInventoryDto> page = new PageImpl<>(List.of(agg), PageRequest.of(0, 20), 1);
     when(inventoryItemService.getAggregatedInventory(any(Pageable.class))).thenReturn(page);
 

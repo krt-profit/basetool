@@ -91,7 +91,10 @@ class InventoryPageControllerMvcTest {
         .perform(get("/inventory"))
         .andExpect(status().isOk())
         .andExpect(view().name("inventory-index"))
-        .andExpect(model().attributeExists("aggregated"));
+        .andExpect(model().attributeExists("aggregated"))
+        // REQ-INV-027: the aggregated Lager gained a "maximum quality" column between avg quality
+        // and total quantity, so the table is now four columns wide (the empty-state row spans 4).
+        .andExpect(content().string(containsString("colspan=\"4\"")));
   }
 
   @Test

@@ -110,7 +110,8 @@ public class InventoryAggregationService {
                     obj[1] != null
                         ? Math.round(((Number) obj[1]).doubleValue() * 100.0) / 100.0
                         : 0.0,
-                    obj[2] != null ? ((Number) obj[2]).doubleValue() : 0.0));
+                    obj[2] != null ? ((Number) obj[2]).doubleValue() : 0.0,
+                    obj[3] != null ? ((Number) obj[3]).doubleValue() : 0.0));
   }
 
   /**

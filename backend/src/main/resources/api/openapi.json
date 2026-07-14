@@ -60352,6 +60352,10 @@
             "type" : "number",
             "format" : "double"
           },
+          "maxQuality" : {
+            "type" : "number",
+            "format" : "double"
+          },
           "amount" : {
             "type" : "number",
             "format" : "double"
