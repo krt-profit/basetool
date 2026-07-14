@@ -673,12 +673,51 @@ class InventoryOperationsE2eTest {
   private static void openMyInventoryToEntry(Page page, String materialId, String itemId) {
     E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/my");
     page.waitForLoadState();
-    page.locator("div.tree-row--group[data-material-id='" + materialId + "']").click();
-    page.locator("div.stack-header[data-material-id='" + materialId + "']").click();
+    // The Lager tree persists + restores its group / stack expansion per user in localStorage
+    // (REQ-INV-002, restored on DOMContentLoaded), so a material opened earlier in the same flow
+    // comes back already expanded. Each expansion is therefore idempotent: click to open only while
+    // its container is still collapsed, since a blind toggle click on an already-open row would
+    // collapse it (the deterministic failure when this helper ran twice for the same material).
+    // The guard reads the container's computed display, not Playwright visibility: a restored-open
+    // stack is display:block yet momentarily zero-height while its lazy leaf rows fetch, which
+    // isVisible() would misread as hidden and wrongly collapse.
+    Locator groupRow = page.locator("div.tree-row--group[data-material-id='" + materialId + "']");
+    assertThat(groupRow).isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
+    if (isCollapsed(
+        page,
+        "div.tree-row--group[data-material-id='" + materialId + "'] + div.tree-group-items")) {
+      groupRow.click();
+    }
+    Locator stackHeader = page.locator("div.stack-header[data-material-id='" + materialId + "']");
+    assertThat(stackHeader).isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
+    if (isCollapsed(
+        page, "div.stack-header[data-material-id='" + materialId + "'] + div.tree-stack-entries")) {
+      stackHeader.click();
+    }
     // 20 s, not the 5 s default: the lazy stack-entries fetch + render is slow on WebKit under
     // load.
     assertThat(page.locator("div.tree-row--leaf[data-item-id='" + itemId + "']"))
         .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
+  }
+
+  /**
+   * Reports whether the Lager tree container matched by {@code selector} is collapsed, reading its
+   * synchronously-set computed {@code display} rather than Playwright visibility. A restored-open
+   * stack is {@code display: block} yet momentarily zero-height while its lazy leaf rows fetch, so
+   * {@code isVisible()} would misread it as hidden; the computed {@code display} is unambiguous.
+   *
+   * @param page the authenticated page
+   * @param selector the CSS selector of the group-items / stack-entries container
+   * @return {@code true} when the container is absent or {@code display: none}, {@code false} when
+   *     it is shown
+   */
+  private static boolean isCollapsed(Page page, String selector) {
+    Object display =
+        page.evaluate(
+            "sel => { const el = document.querySelector(sel);"
+                + " return el ? getComputedStyle(el).display : 'none'; }",
+            selector);
+    return "none".equals(display);
   }
 
   /**
