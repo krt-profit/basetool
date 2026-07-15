@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.4.1](https://github.com/krt-profit/basetool/releases/tag/v1.4.1) - 2026-07-15
+
 ### Added
 
 - **Aufträge: Neue Herstellung-Funktion für Item-Aufträge.** Für einen Item-Auftrag lassen sich jetzt die bereits hergestellten Einheiten erfassen; die Buchung verbraucht dabei den verknüpften Lagerbestand (die für die Menge benötigten Materialien werden aus den zugeordneten Lagereinträgen abgezogen). Die Auslieferung eines Item-Auftrags setzt nun eine vorherige Herstellung voraus — es kann höchstens so viel ausgeliefert werden, wie hergestellt wurde (REQ-ORDERS-025).
@@ -9,16 +11,23 @@
 ### Changed
 
 - **Aufträge: Die Auftragsdetailseite ist neu gestaltet — gegliedert in Reiter und ein Kennzahlen-Band.** Die zuvor untereinander gestapelten Abschnitte sind jetzt auf Reiter verteilt, und die wichtigsten Auftragskennzahlen (u. a. Fortschritt aus hergestellter/ausgelieferter Menge) stehen kompakt in einem Kennzahlen-Band am Seitenkopf (REQ-ORDERS-026).
+
 - **Aufträge-Übersicht: Die Materialliste je Auftrag ist jetzt ein- und ausklappbar** (standardmäßig eingeklappt); der Zustand wird pro Nutzer lokal im Browser gespeichert und bleibt über Filterwechsel und Neuladen erhalten (REQ-ORDERS-027).
+
 - **Aufträge-Übersicht: Der Staffel-Filter ist jetzt eine Mehrfachauswahl.** Statt nur „Eigene Staffel / Alle Staffeln" lassen sich per Auswahl-Dropdown gezielt die anzuzeigenden Staffeln ankreuzen (alle aktiven Staffeln, standardmäßig alle ausgewählt). Der Filterzustand wird lokal beim Nutzer gespeichert (REQ-ORDERS-027).
 
 ### Fixed
 
 - **Lager: Bei Materialien mit Mengentyp „Stück" werden Mengen jetzt überall als ganze Zahlen ohne Nachkommastellen angezeigt.** In den Auftrags- und Einsatz-Chips, den Rest-Chips, den Herkunft-Pickern beim Aus- und Umbuchen sowie im Übergabe-Dialog stand bisher z. B. „5,000" statt „5". Die drei Nachkommastellen bleiben SCU-Materialien vorbehalten (REQ-INV-027).
+
 - **Monitoring: Der kritische Alarm `ContainerRestartLoop` schlägt nicht mehr fälschlich bei einem einzelnen Container-Neustart (etwa einem regulären Deploy von backend/frontend/ingest) an.** Er zählte Neustarts mit `increase()` auf der Metrik `container_start_time_seconds` — einer Gauge mit dem Unix-Startzeitpunkt, deren Differenz bei jedem Neustart die Sekunden/Tage zwischen altem und neuem Start ergab und so schon ab dem ersten Neustart über den Schwellwert 3 sprang. Er nutzt jetzt `changes()` (echte Neustart-Zählung, wie das Grafana-Panel) und meldet erst ab mehr als drei Neustarts in 15 Minuten; abgesichert durch einen promtool-Test (REQ-OBS-014).
+
 - **Monitoring: Der Alarm `FrontendLoginBroken` schlägt nicht mehr fälschlich bei Scanner-/Bot-Zugriffen auf den OAuth-Callback an.** Ein leerer oder unvollständiger Aufruf von `/login/oauth2/code/*` wirft in Spring Security `invalid_request` (noch vor jedem Token-Austausch); dieser Code floss bisher in den `provider_error`-Zähler und konnte den Alarm in verkehrsarmen Zeiten ohne echten Ausfall auslösen. `invalid_request` wird jetzt wie die State-Fehler dem harmlosen `invalid_state`-Bereich zugeordnet, sodass `provider_error` nur noch echte Token-/IdP-Brüche zählt (REQ-OBS-011).
+
 - **Monitoring: Der kritische Alarm `PostgresFatalOrPanic` schlägt nicht mehr bei harmlosen FATAL-Zeilen eines Datenbank-Neustarts an.** `PANIC` löst weiterhin bedingungslos aus; bei `FATAL` werden die bekannten harmlosen Lebenszyklus-Meldungen (Datenbank startet gerade / fährt herunter / im Wiederherstellungsmodus / Verbindung durch Admin-Befehl beendet) ausgenommen, während sicherheitsrelevante FATALs (fehlgeschlagene Authentifizierung, unbekannte Rolle/Datenbank, zu viele Clients) weiterhin melden.
+
 - **Monitoring: Zusammenhängende Ausfälle erzeugen jetzt deutlich weniger Alarm-Mails.** Alertmanager unterdrückt die Ressourcen-Warnungen (`ContainerWorkingSetHigh` u. a.) eines neustartenden Containers unter dessen `ContainerRestartLoop` und die von einem ausgefallenen Scrape-Ziel abgeleiteten Warnungen unter dessen `TargetDown`; zudem werden Benachrichtigungen nur noch nach `alertname` gruppiert, sodass ein mehrere Ziele betreffender `TargetDown` in einer Mail zusammengefasst wird (REQ-OBS-014).
+
 - **Monitoring: Alloy-Speicherlimit von 256M auf 384M angehoben und `GOMEMLIMIT` von 230MiB auf 300MiB gesenkt, um die wiederkehrenden `ContainerWorkingSetHigh`-Warnungen für Alloy zu beheben.** `GOMEMLIMIT` lag bei ~90 % des Limits — genau auf der Alarmschwelle — und ADR-0095 (zusätzlicher App-stdout-Versand) hatte den Arbeitsspeicher erhöht, ohne das Limit anzupassen. Der neue `GOMEMLIMIT` (~78 %) liegt bewusst unter der Schwelle. Greift beim nächsten Monitoring-Deploy (Alloy wird neu erstellt).
 
 ## [v1.4.0](https://github.com/krt-profit/basetool/releases/tag/v1.4.0) - 2026-07-14
