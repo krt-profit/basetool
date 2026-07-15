@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Monitoring: Das Containers-Dashboard zeigt neben „CPU Throttled Seconds" jetzt „CPU Throttled Period Ratio %".** Das neue Panel bildet den Anteil der gedrosselten CFS-Perioden ab (die latenzrelevante Kennzahl statt der reinen Drossel-Sekunden) und markiert mit einer roten 25%-Linie die Schwelle des Alerts `ContainerCpuThrottledHigh`, sodass echtes CPU-Throttling auf einen Blick von harmlosen Burst-Spitzen unterscheidbar ist (REQ-OBS-014).
+
 ## [v1.4.5](https://github.com/krt-profit/basetool/releases/tag/v1.4.5) - 2026-07-15
 
 ### Fixed
