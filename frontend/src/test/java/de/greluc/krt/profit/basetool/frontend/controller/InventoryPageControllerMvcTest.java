@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.frontend.controller.InventoryPageController
 import de.greluc.krt.profit.basetool.frontend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryStackDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderAllocationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto;
@@ -306,6 +307,68 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString("assoc-chip--mission")))
         .andExpect(content().string(containsString("data-target-id=\"" + missionId + "\"")))
         .andExpect(content().string(containsString(missionName)));
+  }
+
+  /**
+   * PIECE amounts render whole (REQ-INV-027): a {@code PIECE} material's allocation chip and rest
+   * chip must show {@code 5} / {@code 10}, never {@code 5.000} / {@code 10.000}. Seeds a PIECE
+   * entry (amount 10) with a job-order slice of 5 and asserts the rendered {@code stackEntriesMy}
+   * fragment carries the order chip but no three-decimal amount anywhere — so a {@code
+   * formatDecimal} regression on the chips / rest chip fails the build.
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER", username = "test-user-123")
+  void viewMyStackEntries_ShouldRenderPieceAmountsWhole() throws Exception {
+    UUID itemId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    UUID orderId = UUID.randomUUID();
+
+    InventoryItemDto item =
+        new InventoryItemDto(
+            itemId,
+            new UserReferenceDto(userId, "tester", "Tester", "Tester", null),
+            new MaterialReferenceDto(materialId, "Titanium Bolt", "PIECE"),
+            new LocationReferenceDto(locationId, "ARC-L1"),
+            90,
+            10.0,
+            false,
+            java.util.List.of(new JobOrderAllocationDto(orderId, 42, 5.0)),
+            5.0,
+            java.util.List.of(),
+            10.0,
+            null,
+            null,
+            1L,
+            Instant.parse("2026-02-03T10:15:30Z"));
+
+    when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenAnswer(
+            inv -> {
+              String url = inv.getArgument(0);
+              if (url.contains("/inventory/my-inventory/stack/entries")) {
+                return new PageResponse<>(List.of(item), 0, 20, 1, 1, Collections.emptyList());
+              }
+              return Collections.emptyList();
+            });
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(
+            get("/inventory/my/stack/entries")
+                .param("materialId", materialId.toString())
+                .param("locationId", locationId.toString())
+                .param("quality", "90")
+                .param("personal", "false"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-item-id=\"" + itemId + "\"")))
+        .andExpect(content().string(containsString("assoc-chip--order")))
+        // PIECE renders whole: neither the chip (5) nor the rest chips (5 / 10) show three
+        // decimals.
+        .andExpect(content().string(not(containsString("5.000"))))
+        .andExpect(content().string(not(containsString("10.000"))));
   }
 
   /**
