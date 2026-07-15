@@ -846,6 +846,33 @@ class JobOrderItemDetailRenderTest {
         .doesNotContain("<html");
   }
 
+  // Log-noise / wasted round-trip guard: the members-only coverage endpoint must be hit ONLY for
+  // the two renders that actually consume the attribute — the full page and its own
+  // fragment=blueprint-owners swap. A swap of any other section (header/items/kpi/…) discards the
+  // attribute, so re-fetching it there was pure waste and — since the endpoint 403s for a
+  // non-member of the responsible org unit — spammed the backend log with a WARN on every unrelated
+  // swap an open detail page issued (133 identical ACCESS_DENIED warnings from one viewer in a
+  // single 30-min session). Pin that a non-blueprint section swap issues no coverage call.
+  @Test
+  void itemOrder_nonBlueprintFragmentSwap_doesNotFetchBlueprintCoverage() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+        .thenReturn(oneLineItemOrder(orderId));
+
+    mockMvc
+        .perform(
+            get("/orders/" + orderId)
+                .param("fragment", "items")
+                .with(authentication(logisticianToken(userId))))
+        .andExpect(status().isOk());
+
+    verify(backendApiClient, never())
+        .get(
+            eq("/api/v1/orders/" + orderId + "/item-blueprint-owners"),
+            eq(JobOrderItemBlueprintOwnersDto.class));
+  }
+
   @Test
   void itemOrder_nonMember_blueprintCoverageSectionOmitted() throws Exception {
     // Given: a non-member viewing a public SK item order — the members-only coverage endpoint is

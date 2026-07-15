@@ -526,7 +526,16 @@ public class JobOrderPageController {
       // non-member viewing an otherwise-public SK order), so the call is isolated in its own
       // try/catch — on any failure the section is simply omitted rather than failing the whole
       // page.
-      if ("ITEM".equals(order.type())) {
+      //
+      // The attribute is only ever rendered on the full page (pane-blueprints) or its own in-place
+      // swap (fragment=blueprint-owners, the count-variants toggle re-render); every other section
+      // swap — header, items, item-handovers, kpi, assignees, … — discards it. Fetching it on those
+      // swaps too was a wasted backend round-trip for members and, because the endpoint is
+      // members-only (403 for a non-member of the responsible org unit), a stream of 403/WARN log
+      // noise on the backend for every unrelated swap a non-member's open detail page issued. Scope
+      // the fetch to the two renders that actually consume it.
+      if ("ITEM".equals(order.type())
+          && (fragment == null || "blueprint-owners".equalsIgnoreCase(fragment))) {
         try {
           model.addAttribute(
               "itemBlueprintOwners",
