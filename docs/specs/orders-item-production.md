@@ -44,6 +44,13 @@ deliverable quantity of a line at `manufacturedAmount − deliveredAmount`, not 
 deliveredAmount`: a unit can only be handed over once it has been produced. Attempting to deliver
 more than the manufactured-but-undelivered quantity is rejected with HTTP 400.
 
+The *Item-Übergaben* tab surfaces this to the operator. While the order is not yet fully delivered
+(`isFullyDelivered` false) but nothing is manufactured-but-undelivered to hand over, it shows a hint
+that no manufactured items are available for handover and points the operator at the Herstellung step
+(now on the *Bestellte Items* tab). The "all items delivered" note shows only once every ordered unit
+is delivered (`isFullyDelivered` — every line's `deliveredAmount ≥ amount`). Both empty states leave
+`hasOutstandingItemLines` false, so that flag plus `isFullyDelivered` disambiguate them.
+
 **Booking.** A production run is booked through
 `POST /api/v1/orders/{id}/items/{itemId}/production`
 (`JobOrderItemProductionService.bookProduction`), gated `(hasRole('LOGISTICIAN') or
@@ -160,10 +167,11 @@ exists. The tab sets:
 
 - **`MATERIAL`** — *Materialien*, *Bearbeiter* (unless requester-redacted view), *Übergaben*, and
   *Verknüpft* (only when orphaned linked inventory is present).
-- **`ITEM`** — *Bestellte Items*, *Aggregierte Materialien* (unless requester view), *Blaupausen*
-  (only when the caller may see the blueprint-coverage view, `REQ-ORDERS-016`), *Bearbeiter* (unless
-  requester view), *Herstellung* (LOGISTICIAN+ editors only — the production booking surface of
-  `REQ-ORDERS-025`), *Item-Übergaben*, and *Verknüpft* (as above).
+- **`ITEM`** — *Bestellte Items* (which, for a LOGISTICIAN+ editor, also carries the production
+  booking surface of `REQ-ORDERS-025` — see below; there is no separate *Herstellung* tab),
+  *Aggregierte Materialien* (unless requester view), *Blaupausen* (only when the caller may see the
+  blueprint-coverage view, `REQ-ORDERS-016`), *Bearbeiter* (unless requester view), *Item-Übergaben*,
+  and *Verknüpft* (as above).
 
 **Tab behaviour.** Tabs use the WAI-ARIA tabs pattern (`role="tablist"/"tab"/"tabpanel"`,
 `aria-selected`, `aria-controls`, roving `tabindex`). The active tab resolves from a **`?tab=`** URL
@@ -177,19 +185,36 @@ This is a **presentation restructure**: every backend contract, DTO, optimistic-
 permission gate of the previous panel layout is preserved; the redacted requester view
 (`REQ-ORDERS-023`) keeps hiding the same sections.
 
+The **production booking surface folds into the *Bestellte Items* tab** for LOGISTICIAN+ editors —
+there is no separate *Herstellung* tab. Each item line carries a leading chevron that reveals the
+per-unit material demand (*Bedarf je Stück*) in a collapsible sub-row (hidden by default, mirroring
+the bank request table's Notiz/Begründung detail row, so a multi-material recipe no longer widens the
+row) and, as the last column, a *Herstellung erfassen* button that opens the booking modal.
+Manufactured and delivered each render a progress bar. The machine-readable per-material demand the
+modal consumes stays on the main row, so booking is unaffected; a booking re-renders the *Bestellte
+Items* section rather than a separate production section. Requesters/read-only viewers see the plain
+status columns without the chevron, demand sub-row or button.
+
 **Acceptance**
 
 - [ ] A `MATERIAL` order shows the material KPI tiles and the material tab set; an `ITEM` order shows
   the item KPI tiles and the item tab set.
 - [ ] The claims KPI tile renders only for an SK-public order (claims supported); a strict-staffel
   order omits it.
-- [ ] The Herstellung tab renders only for a LOGISTICIAN+ editor of an `ITEM` order; a read-only or
-  requester viewer does not see it.
+- [ ] The *Bestellte Items* tab shows the chevron/demand sub-row and the *Herstellung erfassen*
+  button only for a LOGISTICIAN+ editor of an `ITEM` order; a read-only or requester viewer sees only
+  the plain status columns (no separate *Herstellung* tab exists).
 - [ ] `?tab=<key>` selects that tab on load and is honoured over `#tab=`, `localStorage`, and the
   default; back/forward re-applies the tab.
 - [ ] Arrow-key navigation moves selection along the tablist; `aria-selected` tracks the active tab.
 - [ ] Requester-redacted views omit the same tabs (Bearbeiter, Aggregierte Materialien, Übergaben)
   they omitted before.
+- [ ] On the *Bestellte Items* tab a line's per-unit demand is hidden behind a chevron and revealed
+  in a sub-row on click; both Hergestellt and Geliefert render a progress bar; booking a production
+  run from that tab still works (its machine-readable demand stays on the main row).
+- [ ] The Item-Übergaben tab shows the "record production first" hint while the order is not fully
+  delivered and nothing is manufactured-but-undelivered, and the "all delivered" note only once every
+  ordered unit is delivered (`isFullyDelivered`).
 
 **Enforced by:** `JobOrderItemDetailRenderTest`, `JobOrderListRenderTest`,
 `JobOrderPageControllerNoReloadMvcTest` (tab panes, KPI tiles, conditional tabs, no-reload swaps) ·

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Aufträge: Die Herstellung ist in den Reiter „Bestellte Items" integriert; der eigene Herstellung-Reiter entfällt.** Der Button „Herstellung erfassen" steht jetzt als letzte Spalte je Position im Reiter „Bestellte Items", die Bauplan-Spalte entfällt. Der Materialbedarf je Stück steht dort in einer per Pfeil ausklappbaren Unterzeile (standardmäßig eingeklappt, analog zu Notiz/Begründung in der Bank-Antragstabelle). Zusätzlich haben „Hergestellt" und „Geliefert" nun jeweils einen Fortschrittsbalken (REQ-ORDERS-025, REQ-ORDERS-026).
+
+- **Aufträge: Der Reiter „Item-Übergaben" zeigt „Alle Items wurden vollständig übergeben" nur noch, wenn der Auftrag wirklich vollständig ausgeliefert ist.** Ist noch nichts zur Übergabe hergestellt (oder es fehlt noch Herstellung), weist der Reiter jetzt darauf hin, dass zuerst die Herstellung zu erfassen ist — statt der irreführenden Vollständig-Meldung (REQ-ORDERS-025).
+
 ### Fixed
 
 - **Lager: Die Checkbox „Mit vorhandenem Bestand zusammenführen" im Einbuchen-Dialog ist wieder normal groß.** Eine seitenweite Formatregel streckte die Checkbox auf volle Breite mit großem Innenabstand; sie nimmt jetzt wie die übrigen Kontrollkästchen die Standardgröße an (betrifft auch die Checkbox „Als persönlicher Eintrag markieren").

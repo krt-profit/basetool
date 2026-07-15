@@ -514,6 +514,7 @@ public class JobOrderPageController {
         model.addAttribute("itemHandoverForm", new JobOrderItemHandoverForm());
       }
       model.addAttribute("hasOutstandingItemLines", hasOutstandingItemLines(order));
+      model.addAttribute("isFullyDelivered", isFullyDelivered(order));
       // Kennzahlen-Band (KPI strip): derived totals rendered between the header and the tabs
       // (REQ-ORDERS-026). Computed server-side so the fragment stays presentation-only and the
       // ?fragment=kpi swap re-renders the same numbers after a claim / handover / production
@@ -573,7 +574,6 @@ public class JobOrderPageController {
         case "items" -> "orders-detail :: itemsSection";
         case "item-handovers" -> "orders-detail :: itemHandoverSection";
         case "item-handover-lines" -> "orders-detail :: itemHandoverLines";
-        case "production" -> "orders-detail :: productionSection";
         case "blueprint-owners" -> "orders-detail :: blueprintOwnersSection";
         case "assignees" -> "orders-detail :: assigneesSection";
         default -> "orders-detail";
@@ -925,6 +925,35 @@ public class JobOrderPageController {
       }
     }
     return false;
+  }
+
+  /**
+   * Whether every line of the loaded item order is fully delivered (deliveredAmount ≥ amount for
+   * all lines). Gates the item-handover tab's "all items delivered" note so it shows only once the
+   * whole order is delivered — distinct from the "record production first" hint that shows while
+   * the order is not yet fully delivered but nothing is manufactured-but-undelivered to hand over
+   * (both leave {@link #hasOutstandingItemLines} false, REQ-ORDERS-025). Always {@code false} for
+   * material orders or an order with no item lines.
+   *
+   * @param order the loaded order (any kind)
+   * @return {@code true} if the order is an item order with at least one line and every line's
+   *     delivered amount meets its ordered amount
+   */
+  private boolean isFullyDelivered(JobOrderDto order) {
+    if (order == null
+        || !"ITEM".equals(order.type())
+        || order.items() == null
+        || order.items().isEmpty()) {
+      return false;
+    }
+    for (JobOrderItemDto item : order.items()) {
+      int amount = item.amount() != null ? item.amount() : 0;
+      int delivered = item.deliveredAmount() != null ? item.deliveredAmount() : 0;
+      if (delivered < amount) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**

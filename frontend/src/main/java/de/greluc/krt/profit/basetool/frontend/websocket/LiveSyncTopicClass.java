@@ -121,7 +121,6 @@ public enum LiveSyncTopicClass {
           "handovers",
           "item-handovers",
           "item-handover-lines",
-          "production",
           "blueprint-owners",
           "assignees"),
       false,
