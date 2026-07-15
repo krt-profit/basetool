@@ -70,6 +70,12 @@ Two facts bound the value:
 - **Accepted cost:** the full INFO console stream (~150 MB/day/app, already present as masked JSON) is
   double-shipped → roughly 10–15 GB extra in Loki at 744 h retention; a residual raw-stderr PII surface
   remains (mitigated, not eliminated, by the shipper mask); two more low-cardinality `app` labels.
+- **Alloy memory (recorded retroactively, 2026-07-15).** This ADR sized only the Loki storage cost, not
+  Alloy's own footprint: the double-shipped stdout + the RE2 masking stages of the three busiest apps
+  raised Alloy's steady-state working set, and its memory limit was left at 256M — so Alloy began
+  riding above the `ContainerWorkingSetHigh` 90% line and paged chronically. The limit was raised to
+  384M and `GOMEMLIMIT` lowered to 300MiB (~78%, below the alert threshold) in
+  `docker-compose.monitoring.yml`, closing the monitoring-moves-with-change gap this ADR left open.
 - **Reverses** the REQ-OBS-007 file-only decision (ADR-0072) for these three streams. @greluc signed
   off on the reversal (2026-07-12) and REQ-OBS-007 is amended in the same change.
 

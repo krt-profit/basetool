@@ -259,13 +259,17 @@ services:
     # syslog:adm-owned /var/log/auth.log. Re-verify both GIDs if the alloy base image ever changes.
     cap_drop: [ALL]
     group_add: ["473", "4"]
-    # GOMEMLIMIT is a SOFT cap set ~90% of the 256M hard limit below so the Go GC reclaims heap and
-    # returns it to the OS BEFORE the cgroup OOM-kills Alloy. Without it Alloy's working set creeps
-    # monotonically toward the cgroup limit (Go frees memory lazily when there is no pressure), which
-    # eventually trips ContainerOomKilled and cuts the log/trace shipping stream. Keep it a notch under
-    # deploy.resources.limits.memory whenever that limit changes.
+    # GOMEMLIMIT is a SOFT cap that makes the Go GC reclaim and return memory to the OS BEFORE the
+    # cgroup OOM-kills Alloy. It must sit DELIBERATELY BELOW the ContainerWorkingSetHigh 90% line, NOT
+    # at it: GOMEMLIMIT bounds the Go runtime's managed memory, but container_memory_working_set_bytes
+    # ALSO counts non-runtime RSS (page cache from the ~8 file tailers + docker log source, MADV_FREE
+    # pages the kernel has not yet reclaimed). The prior 230MiB was ~90% of the old 256M hard limit —
+    # the SAME ratio as the alert — so the managed target plus that off-heap overhead parked the working
+    # set right on the 90% line and ContainerWorkingSetHigh fired chronically (2026-07-15). 300MiB is
+    # ~78% of the 384M limit below, leaving real headroom for the non-runtime overhead under the alert
+    # threshold. Keep GOMEMLIMIT at ~75-80% of deploy.resources.limits.memory whenever that changes.
     environment:
-      GOMEMLIMIT: "230MiB"
+      GOMEMLIMIT: "300MiB"
     command:
       - run
       - --server.http.listen-addr=0.0.0.0:12345
@@ -284,10 +288,14 @@ services:
     deploy:
       resources:
         limits:
-          # 256M (was 192M): Alloy's OTLP receiver+exporter, ~8 file tailers and the docker log source
-          # settle around 180-200M, so 192M ran within ~5% of the limit and crept upward. 256M gives
-          # real headroom; GOMEMLIMIT above keeps the Go heap from drifting back into the OOM zone.
-          memory: 256M
+          # 384M (was 256M, orig 192M): ADR-0095 (2026-07-12) added the three busiest apps' full
+          # stdout/stderr via loki.source.docker + RE2 masking on top of the OTLP receiver+exporter and
+          # ~8 file tailers, raising Alloy's steady-state working set without a compensating limit bump —
+          # so it kept riding >90% of 256M and tripped ContainerWorkingSetHigh (2026-07-15). 384M gives
+          # real headroom above that workload; GOMEMLIMIT above (300MiB, ~78%) sits below the 90% alert
+          # line so a healthy GC-at-target no longer reads as an imminent OOM. Bump to 512M / GOMEMLIMIT
+          # 400MiB if prod working-set data shows Alloy sustaining above ~330M.
+          memory: 384M
           pids: 512
     networks:
       - net-monitoring-core

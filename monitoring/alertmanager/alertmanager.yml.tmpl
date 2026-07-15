@@ -18,7 +18,12 @@ global:
 
 route:
   receiver: 'email'
-  group_by: ['alertname', 'job']
+  # Group by alertname only. Grouping ALSO by `job` fanned TargetDown out into one e-mail per down
+  # scrape job, so a single outage that dropped several targets sent several mails; the alert already
+  # names the instance in its annotation, so `job` in the group key only splits notifications without
+  # adding routing signal. Batching per alertname collapses a multi-target TargetDown (and the
+  # per-container ContainerRestartLoop burst) into one mail.
+  group_by: ['alertname']
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 4h
@@ -107,3 +112,31 @@ inhibit_rules:
     target_matchers:
       - alertname = "HostDiskWarning"
     equal: ['mountpoint']
+
+  # 4. A restart-looping container suppresses its OWN resource-pressure warnings — a container that is
+  #    crash-looping trivially trips working-set / OOM / CPU-throttle / pids warnings as a SYMPTOM, and
+  #    those carry no independent signal while ContainerRestartLoop (critical) already pages. Joined on
+  #    `name` (present on every cAdvisor container series), so it only ever suppresses the SAME
+  #    container's warnings, never an unrelated one. During the 2026-07-15 cascade this collapses the
+  #    per-container ContainerWorkingSetHigh noise under the restart-loop page.
+  - source_matchers:
+      - alertname = "ContainerRestartLoop"
+    target_matchers:
+      - severity = "warning"
+      - alertname =~ "ContainerWorkingSetHigh|ContainerOomKilled|ContainerCpuThrottledHigh|ContainerPidsHigh"
+    equal: ['name']
+
+  # 5. A down scrape target suppresses every warning derived from that same target's series — its
+  #    metrics are stale while it is down, so any warning keyed to it is noise. Joined on `instance`;
+  #    BOTH sides require instance=~".+" so a warning WITHOUT an instance label is never a target
+  #    (Alertmanager treats missing==missing as equal, which would otherwise let one TargetDown inhibit
+  #    every instance-less warning). This complements rule 1 (which joins on `application`, dropped by
+  #    the app warnings that aggregate with `sum by (application)` but keep `instance`), e.g. it mutes
+  #    KeycloakLoginErrorSpike (instance=keycloak:9000) when the keycloak scrape goes down.
+  - source_matchers:
+      - alertname = "TargetDown"
+      - instance =~ ".+"
+    target_matchers:
+      - severity = "warning"
+      - instance =~ ".+"
+    equal: ['instance']

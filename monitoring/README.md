@@ -183,9 +183,14 @@ Keep triage fast: confirm the signal in the matching Grafana dashboard, then act
 **Root-cause inhibition.** Alertmanager suppresses derived warnings under their root cause so an
 outage pages once, not many times: a `TargetDown` on an app scrape suppresses that app's
 `application`-scoped warnings, a `BlackboxProbeFailed` suppresses that endpoint's
-`CertificateExpiringSoon` / `Edge*` posture alerts, and `HostDiskCritical` suppresses
-`HostDiskWarning` for the same mountpoint. If an expected warning is missing during an incident,
-check whether its root-cause critical is firing.
+`CertificateExpiringSoon` / `Edge*` posture alerts, `HostDiskCritical` suppresses
+`HostDiskWarning` for the same mountpoint, a `ContainerRestartLoop` suppresses that same container's
+resource-pressure warnings (`ContainerWorkingSetHigh` / `ContainerOomKilled` /
+`ContainerCpuThrottledHigh` / `ContainerPidsHigh`, joined on `name`), and a `TargetDown` suppresses
+every `instance`-scoped warning derived from that dead target's series. Notifications are grouped by
+`alertname` only, so a multi-target `TargetDown` (or a multi-container restart burst) batches into one
+mail. If an expected warning is missing during an incident, check whether its root-cause critical is
+firing.
 
 One edge assertion runs **outside** this stack: the daily
 [`edge-deny-probe`](../.github/workflows/edge-deny-probe.yml) GitHub Action asserts from a

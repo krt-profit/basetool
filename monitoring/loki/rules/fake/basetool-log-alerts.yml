@@ -39,14 +39,28 @@ groups:
       #     summary: "SSH login accepted from an unexpected source network"
       #     description: "A successful SSH login originated outside the operator's known networks — possible key theft. Verify it was you."
 
+      # FATAL is Postgres's log level for many BENIGN connection-lifecycle events that occur on every
+      # restart/deploy: a client (a dependent app retry-connecting) that hits the DB while it is
+      # starting up, shutting down or in recovery, or a connection terminated by an admin command. The
+      # unfiltered "FATAL|PANIC" matcher paged CRITICAL on every DB recreate (the 2026-07-15 restart
+      # cascade) from those lifecycle lines. The four excluded substrings are the standard Postgres
+      # server messages for exactly those benign cases; SECURITY-relevant FATALs (password
+      # authentication failed, role/database does not exist, too many clients) are NOT excluded and
+      # still page. PANIC stays effectively unconditional: a PANIC line (WAL/checkpoint/corruption) never
+      # contains one of these connection-lifecycle phrases, so the != filters never drop a PANIC. Single
+      # combined rate() on purpose — a two-term sum(PANIC)+sum(FATAL) would drop to an empty vector (and
+      # miss a real FATAL) whenever one term has no matching lines. These are documented first-cut line
+      # filters — verify/adjust against real prod Loki lines on the test stack per the file header +
+      # rollout runbook.
       - alert: PostgresFatalOrPanic
-        expr: sum(rate({app=~"postgres-.+"} |~ "FATAL|PANIC" [5m])) > 0
+        expr: |
+          sum(rate({app=~"postgres-.+"} |~ "FATAL|PANIC" != "the database system is starting up" != "the database system is shutting down" != "the database system is in recovery mode" != "terminating connection due to administrator command" [5m])) > 0
         for: 2m
         labels:
           severity: critical
         annotations:
           summary: "PostgreSQL FATAL/PANIC in logs"
-          description: "A PostgreSQL container logged FATAL or PANIC lines."
+          description: "A PostgreSQL container logged a PANIC or a non-benign FATAL line (benign connection-lifecycle FATALs during a restart — starting up / shutting down / in recovery / admin-terminated — are excluded)."
 
       # JVM native-thread exhaustion breadcrumb (ADR-0095). The `<svc>-stdout` streams carry the
       # JVM/glibc native errors that bypass logback and never reach the masked JSON file — including the
