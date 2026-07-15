@@ -34,7 +34,7 @@
  * synchronous script at the same end-of-body position, never with defer.
  */
 
-/* global MSG_HANDOVER_SUCCESS, MSG_HANDOVER_FAILED, MSG_HANDOVER_NOITEMS, labelPiece, labelScu, scuHintText, labelMenge, ORDER_AGE_YELLOW, ORDER_AGE_RED, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_STATUS_SUCCESS, MSG_STATUS_ERROR, ORDER_CONFLICT, MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL, MSG_DELETE_ERROR, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_MATERIAL_INVALID, MSG_CLAIM_TITLE_ADD, MSG_CLAIM_TITLE_EDIT, MSG_CLAIM_MAX_HINT, MSG_QUALITY_GOOD, MSG_QUALITY_NONE, MSG_CLAIM_SUCCESS, MSG_CLAIM_WITHDRAW_SUCCESS, MSG_CLAIM_ERROR, MSG_CLAIM_VALIDATION_SQUADRON, MSG_CLAIM_VALIDATION_AMOUNT, MSG_CLAIM_VALIDATION_OVERCLAIM, MSG_BP_COUNTING_SUCCESS, MSG_BP_COUNTING_ERROR, MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_HANDOVER_MISSION_HERKUNFT, MSG_HANDOVER_MISSION_REST, MSG_HANDOVER_MISSION_MIN, MSG_OWNER, MSG_LOCATION, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_UNLINK_TOOLTIP, MSG_INVENTORY_UNLINK_SUCCESS, MSG_INVENTORY_UNLINK_ERROR, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, I18N_ADDED, I18N_REMOVED, I18N_NOTE_SAVED, I18N_NOTE_DELETED, I18N_ADD_ERROR, I18N_REMOVE_ERROR, I18N_NOTE_ERROR, I18N_NOTE_CONFLICT, I18N_NOTE_FORBIDDEN, I18N_NOTE_FOR, showFrontendErrorToast, showFrontendSuccessToast, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR */
+/* global MSG_HANDOVER_SUCCESS, MSG_HANDOVER_FAILED, MSG_HANDOVER_NOITEMS, labelPiece, labelScu, scuHintText, labelMenge, ORDER_AGE_YELLOW, ORDER_AGE_RED, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_STATUS_SUCCESS, MSG_STATUS_ERROR, ORDER_CONFLICT, MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL, MSG_DELETE_ERROR, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_MATERIAL_INVALID, MSG_CLAIM_TITLE_ADD, MSG_CLAIM_TITLE_EDIT, MSG_CLAIM_MAX_HINT, MSG_QUALITY_GOOD, MSG_QUALITY_NONE, MSG_CLAIM_SUCCESS, MSG_CLAIM_WITHDRAW_SUCCESS, MSG_CLAIM_ERROR, MSG_CLAIM_VALIDATION_SQUADRON, MSG_CLAIM_VALIDATION_AMOUNT, MSG_CLAIM_VALIDATION_OVERCLAIM, MSG_BP_COUNTING_SUCCESS, MSG_BP_COUNTING_ERROR, MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_HANDOVER_MISSION_HERKUNFT, MSG_HANDOVER_MISSION_REST, MSG_HANDOVER_MISSION_MIN, MSG_OWNER, MSG_LOCATION, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_UNLINK_TOOLTIP, MSG_INVENTORY_UNLINK_SUCCESS, MSG_INVENTORY_UNLINK_ERROR, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, I18N_ADDED, I18N_REMOVED, I18N_NOTE_SAVED, I18N_NOTE_DELETED, I18N_ADD_ERROR, I18N_REMOVE_ERROR, I18N_NOTE_ERROR, I18N_NOTE_CONFLICT, I18N_NOTE_FORBIDDEN, I18N_NOTE_FOR, showFrontendErrorToast, showFrontendSuccessToast, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR, PRODUCTION_I18N */
 
 let cachedInventoryItems = [];
 let isInventoryCached = false;
@@ -48,6 +48,7 @@ let isInventoryCached = false;
 // receive-side refresh (the three-mirror-points rule). ORDER_SECTIONS is that single source of truth.
 const ORDER_SECTIONS = {
     header: { container: '#order-header-results', fragmentValue: 'header' },
+    kpi: { container: '#order-kpi-results', fragmentValue: 'kpi' },
     materials: { container: '#order-materials-results', fragmentValue: 'materials' },
     aggregated: { container: '#order-aggregated-results', fragmentValue: 'aggregated' },
     items: { container: '#order-items-results', fragmentValue: 'items' },
@@ -60,6 +61,7 @@ const ORDER_SECTIONS = {
         container: '#item-handover-lines',
         fragmentValue: 'item-handover-lines',
     },
+    production: { container: '#order-production-results', fragmentValue: 'production' },
     'blueprint-owners': {
         container: '#blueprint-owners-section',
         fragmentValue: 'blueprint-owners',
@@ -1645,6 +1647,401 @@ async function toggleInventory(row) {
     }
 }
 
+// ---- Tab navigation (REQ-ORDERS-026) — the mission-detail .tab-nav pattern ----------------------
+// The overview + KPI band stay; the sections below live one per .tab-pane. Deeplink via ?tab= / #tab=
+// (falls back to localStorage then the first present tab), ArrowLeft/ArrowRight roving-tabindex nav,
+// aria-selected toggled at runtime. Panes are all server-rendered; switching only toggles `.on`.
+(function () {
+    const nav = document.querySelector('.tab-nav[role="tablist"]');
+    if (!nav) {
+        return;
+    }
+    const tabs = Array.prototype.slice.call(nav.querySelectorAll('.tab[data-tab]'));
+    if (tabs.length === 0) {
+        return;
+    }
+    const validKeys = tabs.map(function (t) {
+        return t.getAttribute('data-tab');
+    });
+    const storeKey = 'orders-detail-tab';
+
+    function apply(key) {
+        tabs.forEach(function (t) {
+            const on = t.getAttribute('data-tab') === key;
+            t.classList.toggle('active', on);
+            t.setAttribute('aria-selected', String(on));
+            t.tabIndex = on ? 0 : -1;
+        });
+        document.querySelectorAll('.tab-panes .tab-pane').forEach(function (p) {
+            p.classList.toggle('on', p.id === 'pane-' + key);
+        });
+        try {
+            localStorage.setItem(storeKey, key);
+        } catch (_e) {
+            /* private mode: no persistence */
+        }
+    }
+
+    function resolveInitial(useStore) {
+        const q = new URLSearchParams(window.location.search).get('tab');
+        if (q && validKeys.indexOf(q) >= 0) {
+            return q;
+        }
+        const h = (window.location.hash.match(/tab=([\w-]+)/) || [])[1];
+        if (h && validKeys.indexOf(h) >= 0) {
+            return h;
+        }
+        if (useStore) {
+            try {
+                const s = localStorage.getItem(storeKey);
+                if (s && validKeys.indexOf(s) >= 0) {
+                    return s;
+                }
+            } catch (_e) {
+                /* private mode: no persistence */
+            }
+        }
+        return validKeys[0];
+    }
+
+    function show(key, push) {
+        if (validKeys.indexOf(key) < 0) {
+            return;
+        }
+        apply(key);
+        if (push) {
+            const url = new URL(window.location);
+            url.searchParams.set('tab', key);
+            url.hash = '';
+            history.pushState({ tab: key }, '', url);
+        }
+    }
+
+    tabs.forEach(function (t) {
+        t.addEventListener('click', function () {
+            show(t.getAttribute('data-tab'), true);
+        });
+    });
+    nav.addEventListener('keydown', function (e) {
+        if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') {
+            return;
+        }
+        const i = tabs.indexOf(document.activeElement);
+        if (i < 0) {
+            return;
+        }
+        e.preventDefault();
+        const next = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+        next.focus();
+        show(next.getAttribute('data-tab'), true);
+    });
+    window.addEventListener('popstate', function () {
+        apply(resolveInitial(false));
+    });
+    apply(resolveInitial(true));
+})();
+
+// ---- Herstellung (production booking, REQ-ORDERS-025) -------------------------------------------
+// The modal lets a logistician record how many units of an ordered item were manufactured and, per
+// required material, exactly which linked inventory entries the material was drawn from. The demand
+// per material scales the line's snapshot (requiredTotal × k / lineAmount, rounded for the quantity
+// type) exactly as the backend does; "buchen" is enabled only when every material is covered.
+let _prodMaterials = [];
+let _prodContext = null;
+
+function _prodRound3(x) {
+    return Math.round(x * 1000) / 1000;
+}
+
+function _prodRoundForType(x, quantityType) {
+    return quantityType === 'PIECE' ? Math.round(x) : _prodRound3(x);
+}
+
+function _prodFmtNum(x, quantityType) {
+    return quantityType === 'PIECE' ? String(Math.round(x)) : _prodRound3(x).toFixed(3);
+}
+
+function _prodFmtQty(x, quantityType) {
+    return quantityType === 'PIECE'
+        ? String(Math.round(x)) + ' ' + PRODUCTION_I18N.unitPiece
+        : _prodRound3(x).toFixed(3) + ' ' + PRODUCTION_I18N.unitScu;
+}
+
+function openProductionModal(button) {
+    const orderId = button.getAttribute('data-order-id');
+    const itemId = button.getAttribute('data-item-id');
+    const itemName = button.getAttribute('data-item-name') || '';
+    const lineAmount = parseInt(button.getAttribute('data-amount'), 10) || 0;
+    const manufactured = parseInt(button.getAttribute('data-manufactured'), 10) || 0;
+    const version = button.getAttribute('data-version');
+    const remaining = Math.max(0, lineAmount - manufactured);
+
+    _prodContext = { orderId, itemId, lineAmount, manufactured, version, remaining };
+    _prodMaterials = [];
+
+    const title = document.getElementById('production-modal-title');
+    if (title) {
+        title.textContent = PRODUCTION_I18N.record + ' — ' + itemName;
+    }
+
+    const amtInput = document.getElementById('production-amount');
+    if (amtInput) {
+        amtInput.max = remaining;
+        amtInput.value = remaining > 0 ? 1 : 0;
+        amtInput.oninput = _prodReconcile;
+    }
+    const hint = document.getElementById('production-remaining-hint');
+    if (hint) {
+        hint.textContent =
+            PRODUCTION_I18N.remaining +
+            ': ' +
+            remaining +
+            ' (' +
+            manufactured +
+            ' / ' +
+            lineAmount +
+            ' ' +
+            PRODUCTION_I18N.alreadyMade +
+            ')';
+    }
+
+    const container = document.getElementById('production-materials');
+    if (container) {
+        container.innerHTML = '';
+    }
+
+    const modal = document.getElementById('production-modal');
+    if (modal) {
+        modal.classList.add('krtm-modal-open');
+        modal.classList.remove('krtm-hidden');
+        modal.style.removeProperty('display');
+    }
+
+    const row = button.closest('tr');
+    const demandLis = row ? row.querySelectorAll('.od-production-demand li') : [];
+    demandLis.forEach(function (li) {
+        const mat = {
+            materialId: li.getAttribute('data-material-id'),
+            materialName: li.getAttribute('data-material-name') || '',
+            quantityType: li.getAttribute('data-quantity-type') || 'SCU',
+            requiredTotal: parseFloat(li.getAttribute('data-required-total')) || 0,
+            entries: [],
+        };
+        _prodMaterials.push(mat);
+        const card = document.createElement('div');
+        card.className = 'card card--inset mb-1';
+        card.setAttribute('data-prod-material', mat.materialId);
+        card.innerHTML =
+            '<div class="card-head"><h3 class="card-title">' +
+            escapeHtml(mat.materialName) +
+            '</h3><span class="chip chip--muted" data-prod-chip></span></div>' +
+            '<div data-prod-entries><p class="text-muted">' +
+            escapeHtml(PRODUCTION_I18N.loadingStock) +
+            '</p></div>';
+        if (container) {
+            container.appendChild(card);
+        }
+        fetch('/orders/' + orderId + '/materials/' + mat.materialId + '/inventory')
+            .then(function (r) {
+                return r.ok ? r.json() : [];
+            })
+            .then(function (items) {
+                mat.entries = (items || [])
+                    .map(function (it) {
+                        const alloc = (it.jobOrderAllocations || []).find(function (a) {
+                            return a.jobOrderId === orderId;
+                        });
+                        const slice = alloc && alloc.amount != null ? alloc.amount : 0;
+                        return {
+                            inventoryItemId: it.id,
+                            ownerName: it.user ? it.user.effectiveName : '-',
+                            location: it.location ? it.location.name : '-',
+                            quality: it.quality != null ? it.quality : '-',
+                            slice: slice,
+                            stock: it.amount != null ? it.amount : 0,
+                            version: it.version,
+                        };
+                    })
+                    .filter(function (e) {
+                        return e.slice > 0;
+                    });
+                _renderProdMaterialEntries(card, mat);
+                _prodReconcile();
+            })
+            .catch(function () {
+                _renderProdMaterialEntries(card, mat);
+                _prodReconcile();
+            });
+    });
+    _prodReconcile();
+}
+
+function _renderProdMaterialEntries(card, mat) {
+    const entriesEl = card.querySelector('[data-prod-entries]');
+    if (!entriesEl) {
+        return;
+    }
+    if (mat.entries.length === 0) {
+        entriesEl.innerHTML =
+            '<p class="text-muted">' + escapeHtml(PRODUCTION_I18N.noStock) + '</p>';
+        return;
+    }
+    let html = '';
+    mat.entries.forEach(function (e, idx) {
+        const cap = Math.min(e.slice, e.stock);
+        html +=
+            '<div class="od-prod-entry"><div class="od-prod-src">' +
+            escapeHtml(e.ownerName) +
+            ' · ' +
+            escapeHtml(String(e.location)) +
+            ' <small>' +
+            escapeHtml(MSG_QUALITY) +
+            ' ' +
+            escapeHtml(String(e.quality)) +
+            ' · ' +
+            escapeHtml(PRODUCTION_I18N.available) +
+            ' ' +
+            escapeHtml(_prodFmtQty(cap, mat.quantityType)) +
+            '</small></div><input type="number" min="0" step="' +
+            (mat.quantityType === 'PIECE' ? '1' : 'any') +
+            '" value="0" data-prod-alloc data-prod-idx="' +
+            idx +
+            '"></div>';
+    });
+    entriesEl.innerHTML = html;
+    entriesEl.querySelectorAll('[data-prod-alloc]').forEach(function (inp) {
+        inp.addEventListener('input', _prodReconcile);
+    });
+}
+
+function _prodReconcile() {
+    if (!_prodContext) {
+        return;
+    }
+    const amtInput = document.getElementById('production-amount');
+    let k = parseInt(amtInput ? amtInput.value : '0', 10);
+    if (!isFinite(k) || k < 1) {
+        k = 0;
+    }
+    let allCovered = k >= 1 && k <= _prodContext.remaining;
+    _prodMaterials.forEach(function (mat) {
+        const demand = _prodRoundForType(
+            (mat.requiredTotal * k) / (_prodContext.lineAmount || 1),
+            mat.quantityType,
+        );
+        const card = document.querySelector('[data-prod-material="' + mat.materialId + '"]');
+        if (!card) {
+            return;
+        }
+        let assigned = 0;
+        card.querySelectorAll('[data-prod-alloc]').forEach(function (inp) {
+            assigned += parseFloat(inp.value) || 0;
+        });
+        assigned = mat.quantityType === 'PIECE' ? Math.round(assigned) : _prodRound3(assigned);
+        const rest = _prodRound3(demand - assigned);
+        const chip = card.querySelector('[data-prod-chip]');
+        if (chip) {
+            chip.textContent = PRODUCTION_I18N.reconcile
+                .replace('{0}', _prodFmtNum(demand, mat.quantityType))
+                .replace('{1}', _prodFmtNum(assigned, mat.quantityType))
+                .replace('{2}', _prodFmtNum(rest, mat.quantityType));
+            chip.className =
+                'chip ' +
+                (Math.abs(rest) < 1e-4
+                    ? 'chip--success'
+                    : rest < 0
+                      ? 'chip--danger'
+                      : 'chip--muted');
+        }
+        if (Math.abs(rest) >= 1e-4) {
+            allCovered = false;
+        }
+    });
+    const bookBtn = document.getElementById('production-book-btn');
+    if (bookBtn) {
+        bookBtn.disabled = !allCovered;
+    }
+}
+
+function bookProduction() {
+    if (!_prodContext) {
+        return;
+    }
+    const amtInput = document.getElementById('production-amount');
+    const k = parseInt(amtInput ? amtInput.value : '0', 10);
+    if (!isFinite(k) || k < 1 || k > _prodContext.remaining) {
+        showFrontendErrorToast(PRODUCTION_I18N.allocError);
+        return;
+    }
+    const consumption = [];
+    let ok = true;
+    _prodMaterials.forEach(function (mat) {
+        const demand = _prodRoundForType(
+            (mat.requiredTotal * k) / (_prodContext.lineAmount || 1),
+            mat.quantityType,
+        );
+        let assigned = 0;
+        const card = document.querySelector('[data-prod-material="' + mat.materialId + '"]');
+        if (card) {
+            card.querySelectorAll('[data-prod-alloc]').forEach(function (inp) {
+                const v = parseFloat(inp.value) || 0;
+                if (v > 0) {
+                    const idx = parseInt(inp.getAttribute('data-prod-idx'), 10);
+                    const entry = mat.entries[idx];
+                    if (entry) {
+                        consumption.push({
+                            inventoryItemId: entry.inventoryItemId,
+                            materialId: mat.materialId,
+                            amount: v,
+                            version: entry.version,
+                        });
+                        assigned += v;
+                    }
+                }
+            });
+        }
+        assigned = mat.quantityType === 'PIECE' ? Math.round(assigned) : _prodRound3(assigned);
+        if (Math.abs(demand - assigned) >= 1e-4) {
+            ok = false;
+        }
+    });
+    if (!ok) {
+        showFrontendErrorToast(PRODUCTION_I18N.allocError);
+        return;
+    }
+
+    krtOrderWrite({
+        method: 'POST',
+        url: '/orders/' + _prodContext.orderId + '/items/' + _prodContext.itemId + '/production',
+        payload: {
+            amount: k,
+            version: _prodContext.version ? parseInt(_prodContext.version, 10) : null,
+            consumption: consumption,
+        },
+        toast: false,
+        errorMessage: PRODUCTION_I18N.allocError,
+        onSuccess: function () {
+            const modal = document.getElementById('production-modal');
+            if (modal) {
+                modal.classList.remove('krtm-modal-open');
+                modal.classList.add('krtm-hidden');
+            }
+            showFrontendSuccessToast(PRODUCTION_I18N.booked);
+            if (window.krtRefreshOrderSection) {
+                window.krtRefreshOrderSection([
+                    'items',
+                    'aggregated',
+                    'production',
+                    'header',
+                    'kpi',
+                    'item-handovers',
+                    'item-handover-lines',
+                ]);
+            }
+        },
+    });
+}
+
 // CSP-safe delegated bindings (replaces the 18 inline on*= handlers in this template).
 // Modal open/close on style.display still uses the global open-modal-display /
 // close-modal-display common-handlers; the rest call into page-local functions defined
@@ -1687,6 +2084,8 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         withdrawClaimAction();
     });
     window.krtEvents.on('click', 'od-open-handover', openHandoverModal);
+    window.krtEvents.on('click', 'od-open-production', openProductionModal);
+    window.krtEvents.on('click', 'od-book-production', bookProduction);
     window.krtEvents.on('click', 'od-download-report', function (el) {
         downloadHandoverReport(el);
     });

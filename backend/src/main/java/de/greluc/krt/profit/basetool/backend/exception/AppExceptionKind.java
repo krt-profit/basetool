@@ -90,6 +90,21 @@ public enum AppExceptionKind {
       "Over-allocation",
       ErrorDisclosurePolicy.STANDARD),
 
+  /**
+   * {@code ProductionAllocationException} — a well-formed, version-current production booking whose
+   * amount exceeds the item line's remaining-to-manufacture, or whose per-material consumption does
+   * not exactly cover the required demand (REQ-ORDERS-025). Like {@link #OVER_ALLOCATION} it is a
+   * {@code 422} so the frontend renders an inline toast rather than a {@code 409} reload prompt.
+   */
+  PRODUCTION_ALLOCATION(
+      HttpStatus.UNPROCESSABLE_CONTENT,
+      "PRODUCTION_ALLOCATION",
+      "problem.production_allocation.title",
+      "problem.production_allocation.detail",
+      "production-allocation",
+      "Production allocation",
+      ErrorDisclosurePolicy.STANDARD),
+
   /** {@code DuplicateEntityException} — service-layer uniqueness check. */
   DUPLICATE_ENTITY(
       HttpStatus.CONFLICT,

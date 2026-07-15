@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.ItemDerivationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemBlueprintOwnersDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
@@ -46,7 +47,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
@@ -533,6 +536,11 @@ public class JobOrderPageController {
         model.addAttribute("itemHandoverForm", new JobOrderItemHandoverForm());
       }
       model.addAttribute("hasOutstandingItemLines", hasOutstandingItemLines(order));
+      // Kennzahlen-Band (KPI strip): derived totals rendered between the header and the tabs
+      // (REQ-ORDERS-026). Computed server-side so the fragment stays presentation-only and the
+      // ?fragment=kpi swap re-renders the same numbers after a claim / handover / production
+      // booking.
+      model.addAttribute("kpi", computeKpi(order));
 
       // Item-order blueprint coverage: which members of the responsible squadron/SK own the
       // blueprints for the ordered items. The backend gates this members-only (it returns 403 for a
@@ -582,10 +590,12 @@ public class JobOrderPageController {
         case "materials" -> "orders-detail :: materialsSection";
         case "aggregated" -> "orders-detail :: aggregatedSection";
         case "header" -> "orders-detail :: orderHeader";
+        case "kpi" -> "orders-detail :: kpiSection";
         case "handovers" -> "orders-detail :: materialHandoverSection";
         case "items" -> "orders-detail :: itemsSection";
         case "item-handovers" -> "orders-detail :: itemHandoverSection";
         case "item-handover-lines" -> "orders-detail :: itemHandoverLines";
+        case "production" -> "orders-detail :: productionSection";
         case "blueprint-owners" -> "orders-detail :: blueprintOwnersSection";
         case "assignees" -> "orders-detail :: assigneesSection";
         default -> "orders-detail";
@@ -916,26 +926,117 @@ public class JobOrderPageController {
   }
 
   /**
-   * Reports whether an item order still has at least one ordered-item line with outstanding
-   * (ordered minus delivered) whole units. Gates the item-handover button: once every line is fully
-   * delivered the order is COMPLETED and the button is hidden. Always {@code false} for material
-   * orders or an order with no item lines.
+   * Reports whether an item order has at least one ordered-item line that is deliverable now — i.e.
+   * has manufactured-but-not-yet-delivered whole units. Since delivery is gated by manufacture
+   * (REQ-ORDERS-025), the item-handover button appears only when there is something manufactured
+   * left to hand over, not merely something still ordered. Always {@code false} for material orders
+   * or an order with no item lines.
    *
    * @param order the loaded order (any kind)
-   * @return {@code true} if any item line has a positive outstanding quantity
+   * @return {@code true} if any item line has a positive manufactured-but-undelivered quantity
    */
   private boolean hasOutstandingItemLines(JobOrderDto order) {
     if (order == null || !"ITEM".equals(order.type()) || order.items() == null) {
       return false;
     }
     for (JobOrderItemDto item : order.items()) {
-      int ordered = item.amount() != null ? item.amount() : 0;
+      int manufactured = item.manufacturedAmount() != null ? item.manufacturedAmount() : 0;
       int delivered = item.deliveredAmount() != null ? item.deliveredAmount() : 0;
-      if (ordered - delivered > 0) {
+      if (manufactured - delivered > 0) {
         return true;
       }
     }
     return false;
+  }
+
+  /**
+   * Computes the Kennzahlen-Band (KPI strip) values from the already-loaded order, so the {@code
+   * kpiSection} fragment stays presentation-only (REQ-ORDERS-026). For a MATERIAL order: how many
+   * material requirements are fulfilled (currentStock ≥ amount) with a percentage bar, the
+   * still-open material quantity (Σ max(0, amount − stock)), the claim count and the handover
+   * count. For an ITEM order: delivered vs. ordered whole units with a bar, the still-open
+   * aggregated-material quantity, the claim count and the item-handover count. All sums null-guard
+   * the redacted requester view (where stock/claims are absent) so the tiles render zeros rather
+   * than throwing.
+   *
+   * @param order the loaded order (any kind)
+   * @return an insertion-ordered map of KPI values keyed for the fragment ({@code fulfilled},
+   *     {@code total}, {@code fulfilledPct}, {@code delivered}, {@code amount}, {@code
+   *     deliveredPct}, {@code openAmount}, {@code claims}, {@code handovers})
+   */
+  private Map<String, Object> computeKpi(JobOrderDto order) {
+    Map<String, Object> kpi = new LinkedHashMap<>();
+    kpi.put("fulfilled", 0);
+    kpi.put("total", 0);
+    kpi.put("fulfilledPct", 0);
+    kpi.put("delivered", 0);
+    kpi.put("amount", 0);
+    kpi.put("deliveredPct", 0);
+    kpi.put("openAmount", 0.0);
+    kpi.put("claims", 0);
+    kpi.put("handovers", 0);
+    // Only SK-public orders carry material claims (the backend populates openAmount for them); a
+    // private squadron order has none, so its claims KPI tile is suppressed rather than showing a
+    // permanent zero.
+    kpi.put("supportsClaims", false);
+    if (order == null) {
+      return kpi;
+    }
+
+    double openAmount = 0.0;
+    int claims = 0;
+    boolean supportsClaims = false;
+    if ("ITEM".equals(order.type())) {
+      int delivered = 0;
+      int amount = 0;
+      if (order.items() != null) {
+        for (JobOrderItemDto item : order.items()) {
+          amount += item.amount() != null ? item.amount() : 0;
+          delivered += item.deliveredAmount() != null ? item.deliveredAmount() : 0;
+        }
+      }
+      if (order.aggregatedMaterials() != null) {
+        for (var agg : order.aggregatedMaterials()) {
+          double required = agg.totalQuantity() != null ? agg.totalQuantity() : 0.0;
+          double stock = agg.currentStock() != null ? agg.currentStock() : 0.0;
+          openAmount += Math.max(0.0, required - stock);
+          claims += agg.claims() != null ? agg.claims().size() : 0;
+          if (agg.openAmount() != null) {
+            supportsClaims = true;
+          }
+        }
+      }
+      kpi.put("delivered", delivered);
+      kpi.put("amount", amount);
+      kpi.put("deliveredPct", amount > 0 ? (delivered * 100 / amount) : 0);
+      kpi.put("handovers", order.itemHandovers() != null ? order.itemHandovers().size() : 0);
+    } else {
+      int fulfilled = 0;
+      int total = 0;
+      if (order.materials() != null) {
+        total = order.materials().size();
+        for (JobOrderMaterialDto mat : order.materials()) {
+          double required = mat.amount() != null ? mat.amount() : 0.0;
+          double stock = mat.currentStock() != null ? mat.currentStock() : 0.0;
+          if (stock >= required) {
+            fulfilled++;
+          }
+          openAmount += Math.max(0.0, required - stock);
+          claims += mat.claims() != null ? mat.claims().size() : 0;
+          if (mat.openAmount() != null) {
+            supportsClaims = true;
+          }
+        }
+      }
+      kpi.put("fulfilled", fulfilled);
+      kpi.put("total", total);
+      kpi.put("fulfilledPct", total > 0 ? (fulfilled * 100 / total) : 0);
+      kpi.put("handovers", order.handovers() != null ? order.handovers().size() : 0);
+    }
+    kpi.put("openAmount", openAmount);
+    kpi.put("claims", claims);
+    kpi.put("supportsClaims", supportsClaims);
+    return kpi;
   }
 
   private List<SquadronDto> fetchSquadrons() {

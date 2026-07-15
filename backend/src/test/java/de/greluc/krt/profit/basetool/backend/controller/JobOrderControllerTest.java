@@ -37,6 +37,8 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemBlueprintOwnersDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemProductionCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateJobOrderBlueprintCountingDto;
@@ -45,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderHandoverReportService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderHandoverService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemBlueprintOwnersService;
+import de.greluc.krt.profit.basetool.backend.service.JobOrderItemProductionService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
@@ -104,6 +107,7 @@ class JobOrderControllerTest {
   @Mock private JobOrderQueryService jobOrderQueryService;
   @Mock private JobOrderItemBlueprintOwnersService jobOrderItemBlueprintOwnersService;
   @Mock private JobOrderHandoverService jobOrderHandoverService;
+  @Mock private JobOrderItemProductionService jobOrderItemProductionService;
   @Mock private JobOrderHandoverReportService jobOrderHandoverReportService;
   @Mock private UserService userService;
   @Mock private AuthHelperService authHelperService;
@@ -685,6 +689,28 @@ class JobOrderControllerTest {
 
     assertThat(result).isSameAs(persisted);
     verify(jobOrderHandoverService).createHandover(jobOrderId, dto);
+  }
+
+  // ── POST /api/v1/orders/{id}/items/{itemId}/production ───────────────
+
+  @Test
+  void bookProduction_delegatesToService() {
+    UUID jobOrderId = UUID.randomUUID();
+    UUID itemId = UUID.randomUUID();
+    JobOrderItemProductionCreateDto dto = new JobOrderItemProductionCreateDto(3, 7L, List.of());
+    JobOrderItemDto persisted =
+        new JobOrderItemDto(itemId, null, null, 5, 3, 0, null, List.of(), 8L);
+    when(jobOrderItemProductionService.bookProduction(jobOrderId, itemId, dto))
+        .thenReturn(persisted);
+
+    JobOrderItemDto result = controller.bookProduction(jobOrderId, itemId, dto);
+
+    // The Herstellung endpoint (REQ-ORDERS-025) is a thin pass-through: the LOGISTICIAN+ /
+    // canEditJobOrder gate lives in @PreAuthorize, and the whole allocation/optimistic-lock
+    // machinery lives in JobOrderItemProductionService. The controller must forward both path
+    // ids and the body verbatim and return the refreshed item-line DTO unchanged.
+    assertThat(result).isSameAs(persisted);
+    verify(jobOrderItemProductionService).bookProduction(jobOrderId, itemId, dto);
   }
 
   // ── GET /api/v1/orders/{jobOrderId}/handovers/{handoverId}/report ────
