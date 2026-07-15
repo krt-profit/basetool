@@ -175,9 +175,10 @@ class JobOrderTenancyE2eTest {
       Page page = context.newPage();
       try {
         E2eSupport.login(page, baseUrl, OFFICER_USER, OFFICER_PASSWORD);
-        // scope=all returns the caller's natural cross-staffel union (own squadron + SK-public),
-        // unfiltered by the "mine" active-squadron narrowing.
-        E2eSupport.navigate(page, baseUrl + "/orders?scope=all&status=OPEN");
+        // The default order list (no Staffel narrowing selected) shows the caller's natural
+        // cross-staffel union — own squadron + SK-public — governed purely by backend tenancy
+        // scoping.
+        E2eSupport.navigate(page, baseUrl + "/orders?status=OPEN");
         page.waitForLoadState();
         assertThat(page.getByTestId("nav-logout")).isVisible();
 
