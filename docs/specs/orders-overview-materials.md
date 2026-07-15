@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-09.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-15.
 > **Owner area:** ORDERS · **Related ADRs:** none
 
 # Order-overview Materialien column
@@ -132,15 +132,15 @@ on the first page in the common case. The default status filter (`OPEN`+`IN_PROG
 queue — the only draggable rows, since completed/rejected orders carry no priority — naturally
 bounded. A crafted out-of-list `size` snaps back to the default; the sort stays `priority,asc` so
 queue order is preserved across pages. Page and size links MUST keep the active status and
-squadron-scope filter, and the pagination controls live **inside** the `ordersResults` AJAX-swap
-fragment so a filter change re-renders them.
+squadron filter (the repeatable `squadronId` params, REQ-ORDERS-027), and the pagination controls
+live **inside** the `ordersResults` AJAX-swap fragment so a filter change re-renders them.
 
 **Acceptance**
 
 - [ ] A result spanning more than one page renders the page-nav and the 50/100/200 size picker; a
   short result (≤ the smallest size, single page) renders neither.
-- [ ] Every page-nav and size-picker link carries the active `status` (repeatable) and `scope`
-  params; changing the size jumps back to page 0.
+- [ ] Every page-nav and size-picker link carries the active `status` and `squadronId` (both
+  repeatable) params; changing the size jumps back to page 0.
 - [ ] The drag-reorder still persists and re-renders within the current page (sort stays
   `priority,asc`).
 - [ ] A `?size=` outside {50,100,200} falls back to 100; a negative `?page=` clamps to 0.
@@ -177,6 +177,54 @@ backend change is needed and the order-list endpoint gains no query; the badge r
 **Enforced by:** `JobOrderListRenderTest` (frontend render — responsible-badge assertion) ·
 **Code:** `templates/orders-index.html`, `JobOrderDto.responsibleOrgUnit`,
 `.order-responsible-label` (`styles.css`), `orders.index.responsible` (i18n) · **Issues:** #1188
+
+### REQ-ORDERS-027 — Overview: collapsible material sublist + multi-squadron filter
+
+Two order-overview affordances, both persisted per-user in the browser's `localStorage` (the same
+client-side persistence the Lager tree uses, REQ-INV-002 — not a server cookie):
+
+**Collapsible material sublist.** Each order row's **Materialien** cell (REQ-ORDERS-017) MUST be
+collapsible: a toggle button (caret + the `orders.index.materials` label + the material count) shows
+or hides the material tables. It MUST start **collapsed** by default. The set of expanded order ids
+is stored in `localStorage` and re-applied on load **and after every results-fragment swap** (a
+filter change, a live-sync refresh, a drag-reorder), so a user's expand/collapse choices survive the
+in-place re-renders. Order ids are globally unique, so a single per-browser key suffices.
+
+**Multi-squadron filter.** The former mine/all squadron **scope toggle** is replaced by a
+multi-select checkbox **dropdown** (the `.multi-select-container` idiom shared with the Lager
+filters) listing **all active squadrons** plus an "Alle" select-all. It MUST default to **all
+checked** (= no narrowing, the new default — every scoped order, incl. SK-only). The selection is
+persisted in `localStorage` and re-applied on load. Because the queue is paginated server-side
+(REQ-ORDERS-020), the filter is applied **server-side**: the selected squadron ids are echoed as
+repeatable `squadronId` query params and the backend keeps only orders whose responsible OR
+requesting org unit is in the set (`JobOrderController.getAllJobOrders` → `JobOrderQueryService` →
+`JobOrderRepository.findScopedJobOrders`, `List<UUID> squadronId`). "All checked" sends **no**
+`squadronId` (no narrowing); a subset sends its ids; "none checked" sends a nil-UUID sentinel (empty
+result). The filter is a pure display preference layered on the caller's visibility scope (Phase 3,
+
+# 343) — it can only narrow, never widen — and is absent for the requester "Meine Auftraege" view. On
+
+load the client re-fetches only when the server did not already render the persisted selection (so a
+pagination reload carrying the ids is not clobbered back to page 1).
+
+**Acceptance**
+
+- [ ] Each order row's material sublist starts collapsed; toggling it expands/collapses it, and the
+  state survives a filter change / fragment swap and a page reload (per-user localStorage).
+- [ ] The squadron filter is a multi-select dropdown of all active squadrons, all checked by default.
+- [ ] Unchecking some squadrons narrows the list to orders whose responsible OR requesting unit is a
+  checked squadron; all-checked shows every scoped order (incl. SK-only); the state persists in
+  localStorage across reloads.
+- [ ] The backend list endpoint accepts repeatable `squadronId` params; an empty/absent selection
+  applies no squadron narrowing.
+
+**Enforced by:** `JobOrderListRenderTest` / `JobOrderPaginationMvcTest` (frontend render + filter
+threading), `JobOrderControllerTest` (`getAllJobOrders_forwardsSquadronIdFilter`),
+`JobOrderServiceAssigneeAndListTest` / `JobOrderScopeQueryIntegrationTest` (scoped multi-squadron
+query) · **Code:** `templates/orders-index.html`, `static/js/orders-index.js`,
+`JobOrderPageController.viewOrders` / `fetchActiveSquadrons` / `buildPaginationBaseUrl`,
+`JobOrderController.getAllJobOrders`, `JobOrderQueryService.getAllJobOrders`,
+`JobOrderRepository.findScopedJobOrders`
 
 ## Out of scope
 

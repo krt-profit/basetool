@@ -19305,8 +19305,11 @@
           "in" : "query",
           "required" : false,
           "schema" : {
-            "type" : "string",
-            "format" : "uuid"
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "format" : "uuid"
+            }
           }
         }, {
           "name" : "page",

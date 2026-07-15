@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -71,8 +72,8 @@ public class JobOrderQueryService {
    * Paged list with optional status filter. Status is the primary discriminator the UI offers as a
    * filter; without it the call returns every status.
    *
-   * <p>Delegates to {@link #getAllJobOrders(List, UUID, Pageable)} with a {@code null} squadron
-   * display filter — the visibility scope (Phase 3, #343) is always applied regardless.
+   * <p>Delegates to the squadron-filtered overload with a {@code null} squadron display filter —
+   * the visibility scope (Phase 3, #343) is always applied regardless.
    *
    * @param statuses optional status filter; null/empty means "all"
    * @param pageable page request
@@ -98,18 +99,19 @@ public class JobOrderQueryService {
    * (and is not an admin) is not part of the order workflow and receives an empty page — the
    * SK-public union is suppressed for them too.
    *
-   * <p>The {@code squadronId} parameter is a pure UI display preference layered on top of the scope
-   * (the orders-index "involving my squadron" toggle, matching responsible OR requesting side); it
-   * can only narrow the already-scoped result, never widen it.
+   * <p>The {@code squadronIds} parameter is a pure UI display preference layered on top of the
+   * scope (the orders-index multi-squadron picker, matching responsible OR requesting side); it can
+   * only narrow the already-scoped result, never widen it. Null/empty means "no display
+   * restriction".
    *
    * @param statuses optional status filter; null/empty means "all"
-   * @param squadronId optional display filter (matches responsible OR requesting); null means "no
-   *     display restriction"
+   * @param squadronIds optional display filter (matches responsible OR requesting); null/empty
+   *     means "no display restriction" (all scoped orders)
    * @param pageable page request
    * @return paged job orders as DTOs, scoped to the caller's visibility
    */
   public Page<JobOrderDto> getAllJobOrders(
-      List<JobOrderStatus> statuses, UUID squadronId, Pageable pageable) {
+      List<JobOrderStatus> statuses, Collection<UUID> squadronIds, Pageable pageable) {
     // Viewer-side profit gate: only members of a profit-eligible org unit (or admins) may see the
     // order queue at all. A non-profit caller gets an empty page instead of the SK-public union, so
     // the list stays invisible to them — the create flow stays open elsewhere. Mirrors the detail
@@ -123,10 +125,17 @@ public class JobOrderQueryService {
     List<JobOrderStatus> effectiveStatuses =
         (statuses == null || statuses.isEmpty()) ? List.of(JobOrderStatus.values()) : statuses;
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    // Null/empty selection disables the squadron display filter. The IN clause is never bound with
+    // an empty collection: a non-empty placeholder is passed when the filter is off (it is
+    // short-circuited by :noSquadronFilter and never matches a real org unit anyway).
+    boolean noSquadronFilter = squadronIds == null || squadronIds.isEmpty();
+    Collection<UUID> effectiveSquadronIds =
+        noSquadronFilter ? Set.of(new UUID(0L, 0L)) : squadronIds;
     Page<JobOrder> page =
         jobOrderRepository.findScopedJobOrders(
             effectiveStatuses,
-            squadronId,
+            noSquadronFilter,
+            effectiveSquadronIds,
             scope.adminAllScope(),
             scope.activeOrgUnitId(),
             scope.memberOrgUnitIds(),
@@ -141,10 +150,9 @@ public class JobOrderQueryService {
    * Paged list of the orders the caller's own org unit(s) <em>requested</em> — the requester-side
    * "Meine Auftr&auml;ge" list (REQ-ORDERS-023). Returns every order whose requesting org unit is
    * one the caller is a <em>direct</em> member of, regardless of profit eligibility and independent
-   * of the responsible-scoped queue in {@link #getAllJobOrders(List, UUID, Pageable)} (which never
-   * grants the requester side visibility). Each returned DTO is redacted for the requester at the
-   * controller boundary (no Bearbeiter, no materials summary). An anonymous / memberless caller
-   * gets an empty page.
+   * of the responsible-scoped main queue (which never grants the requester side visibility). Each
+   * returned DTO is redacted for the requester at the controller boundary (no Bearbeiter, no
+   * materials summary). An anonymous / memberless caller gets an empty page.
    *
    * @param statuses optional status filter; null/empty means "all"
    * @param pageable page request

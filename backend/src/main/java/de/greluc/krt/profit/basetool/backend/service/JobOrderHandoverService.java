@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderHandover;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderHandoverItem;
+import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverDto;
@@ -143,6 +144,18 @@ public class JobOrderHandoverService {
         jobOrderRepository
             .findById(jobOrderId)
             .orElseThrow(() -> new NotFoundException("JobOrder not found"));
+
+    if (jobOrder.getType() == JobOrderType.ITEM) {
+      // A material handover must never run against an ITEM order. An item order's linked stock IS
+      // the material to be produced, and the Herstellung step (JobOrderItemProductionService,
+      // REQ-ORDERS-025) is the single path that consumes it — a material handover here would draw
+      // the same inventory down a second time. Item orders are fulfilled via item handovers
+      // (finished units), which never touch material stock. Guarded server-side (the UI already
+      // hides the material-handover button on item orders) so a crafted request cannot
+      // double-reduce
+      // the linked inventory.
+      throw new BadRequestException("Material handover is not available for item orders");
+    }
 
     JobOrderHandover handover = new JobOrderHandover();
     handover.setJobOrder(jobOrder);

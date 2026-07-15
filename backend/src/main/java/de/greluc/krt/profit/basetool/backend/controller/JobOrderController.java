@@ -604,7 +604,8 @@ public class JobOrderController {
    *
    * @param status optional status filter (logical OR across values)
    * @param squadronId optional display filter; matches orders whose responsible OR requesting org
-   *     unit equals this id. {@code null} means "no display restriction" (full scoped view).
+   *     unit is one of the given ids. Repeatable ({@code squadronId=a&squadronId=b}); empty/absent
+   *     means "no display restriction" (full scoped view).
    * @return paged job-order DTOs visible to the caller
    */
   @GetMapping
@@ -615,7 +616,7 @@ public class JobOrderController {
   @Transactional(readOnly = true)
   public PageResponse<JobOrderDto> getAllJobOrders(
       @RequestParam(required = false) List<JobOrderStatus> status,
-      @RequestParam(required = false) UUID squadronId,
+      @RequestParam(required = false) List<UUID> squadronId,
       @RequestParam(required = false, defaultValue = "0") int page,
       @RequestParam(required = false, defaultValue = "20") int size,
       @RequestParam(required = false, defaultValue = "priority,asc") String sort) {

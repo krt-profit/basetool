@@ -111,11 +111,11 @@ class JobOrderPaginationMvcTest {
             content()
                 .string(
                     containsString(
-                        "/orders?status=OPEN&amp;status=IN_PROGRESS&amp;scope=mine&amp;page=0&amp;size=100")))
-        .andExpect(content().string(containsString("scope=mine&amp;page=2&amp;size=100")))
+                        "/orders?status=OPEN&amp;status=IN_PROGRESS&amp;page=0&amp;size=100")))
+        .andExpect(content().string(containsString("page=2&amp;size=100")))
         // size picker: the two non-active sizes are links back to page 0
-        .andExpect(content().string(containsString("scope=mine&amp;page=0&amp;size=50")))
-        .andExpect(content().string(containsString("scope=mine&amp;page=0&amp;size=200")));
+        .andExpect(content().string(containsString("page=0&amp;size=50")))
+        .andExpect(content().string(containsString("page=0&amp;size=200")));
   }
 
   // covers REQ-ORDERS-020 — paging and re-sizing keep the active status filter in every link.
@@ -129,15 +129,9 @@ class JobOrderPaginationMvcTest {
         .perform(get("/orders").param("status", "COMPLETED").param("page", "1"))
         .andExpect(status().isOk())
         .andExpect(
-            content()
-                .string(
-                    containsString(
-                        "/orders?status=COMPLETED&amp;scope=mine&amp;page=2&amp;size=100")))
+            content().string(containsString("/orders?status=COMPLETED&amp;page=2&amp;size=100")))
         .andExpect(
-            content()
-                .string(
-                    containsString(
-                        "/orders?status=COMPLETED&amp;scope=mine&amp;page=0&amp;size=50")));
+            content().string(containsString("/orders?status=COMPLETED&amp;page=0&amp;size=50")));
   }
 
   // covers REQ-FE-005 — an AJAX swap request (fragment=results) renders only the inner table +

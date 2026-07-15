@@ -9,6 +9,8 @@
 ### Changed
 
 - **Aufträge: Die Auftragsdetailseite ist neu gestaltet — gegliedert in Reiter und ein Kennzahlen-Band.** Die zuvor untereinander gestapelten Abschnitte sind jetzt auf Reiter verteilt, und die wichtigsten Auftragskennzahlen (u. a. Fortschritt aus hergestellter/ausgelieferter Menge) stehen kompakt in einem Kennzahlen-Band am Seitenkopf (REQ-ORDERS-026).
+- **Aufträge-Übersicht: Die Materialliste je Auftrag ist jetzt ein- und ausklappbar** (standardmäßig eingeklappt); der Zustand wird pro Nutzer lokal im Browser gespeichert und bleibt über Filterwechsel und Neuladen erhalten (REQ-ORDERS-027).
+- **Aufträge-Übersicht: Der Staffel-Filter ist jetzt eine Mehrfachauswahl.** Statt nur „Eigene Staffel / Alle Staffeln" lassen sich per Auswahl-Dropdown gezielt die anzuzeigenden Staffeln ankreuzen (alle aktiven Staffeln, standardmäßig alle ausgewählt). Der Filterzustand wird lokal beim Nutzer gespeichert (REQ-ORDERS-027).
 
 ### Fixed
 
