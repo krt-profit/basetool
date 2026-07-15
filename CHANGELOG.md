@@ -10,6 +10,10 @@
 
 - **Aufträge: Die aggregierten Materialien eines Item-Auftrags zeigen jetzt nur noch den offenen Bedarf für die noch nicht hergestellten Einheiten.** Jede Herstellungsbuchung verringert den aggregierten Bedarf (und die Kennzahl „Offene Menge") anteilig — unabhängig davon, ob das Material ausgebucht oder als „Nicht ausbuchen" markiert wurde; eine vollständig hergestellte Position trägt 0 bei. Die Eintragungen-Zielmenge (Material-Claims) bleibt bewusst auf dem vollen Auftragsbedarf (REQ-ORDERS-025).
 
+### Fixed
+
+- **Lager: Das „Auftrag"- und „Einsatz"-Dropdown der Zuordnung wird nicht mehr abgeschnitten, wenn es unten aus der Tabelle herausragt.** Das „+ Zuordnen"-Popover wurde vom horizontal scrollenden Tabellencontainer am unteren Rand beschnitten (in Firefox wie Chrome sichtbar als Unterbrechung); es wird jetzt wie die Suchfeld-Dropdowns fest am Auslöser verankert und überlagert den Rand vollständig (REQ-UI-011, REQ-INV-027).
+
 ## [v1.4.2](https://github.com/krt-profit/basetool/releases/tag/v1.4.2) - 2026-07-15
 
 ### Changed
