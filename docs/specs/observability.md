@@ -483,7 +483,9 @@ transaction per pass) rather than per-scrape.
   backend is up) plus, since #1041 item 10, `AuditDomainSilenceAnomaly` (a single domain silent for
   14 d while others stay active — the domain-lost-its-wiring failure mode the global sum masks;
   `PROMOTION` / `PERSONAL_INVENTORY` / `MARKET` are excluded as legitimately-quiet and reviewed on
-  the operations dashboard's per-domain table instead).
+  the operations dashboard's per-domain table instead). Item-order production bookings need no
+  dedicated meter — `JOB_ORDER_PRODUCTION_BOOKED` and `INVENTORY_CONSUMED_BY_PRODUCTION` roll into
+  the existing `JOB_ORDER` and `INVENTORY` domain counts (REQ-ORDERS-025).
 - `basetool_material_exchange_active_count{status="ACTIVE"}` gauge sampled by
   `BusinessMetricsCollector` — the number of active Materialbörse offers on the board, spanning
   **both** offer kinds (material and item, REQ-MARKET-012), via `countByStatus(ACTIVE)`

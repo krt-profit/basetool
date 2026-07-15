@@ -118,6 +118,7 @@ class JobOrderListRenderTest {
             new BlueprintReferenceDto(UUID.randomUUID(), "ZZZ Unrendered Item Name", "wiki-zzz"),
             2,
             0,
+            0,
             null,
             List.of(),
             1L);

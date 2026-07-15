@@ -30,6 +30,7 @@ import java.util.UUID;
  * @param gameItem the requested finished item
  * @param blueprint the chosen recipe
  * @param amount requested whole-unit count
+ * @param manufacturedAmount whole units already manufactured (production booked)
  * @param deliveredAmount whole units already handed over
  * @param parentItemId the parent line this was adopted from, or {@code null}
  * @param materials the snapshotted material requirements
@@ -40,6 +41,7 @@ public record JobOrderItemDto(
     GameItemReferenceDto gameItem,
     BlueprintReferenceDto blueprint,
     Integer amount,
+    Integer manufacturedAmount,
     Integer deliveredAmount,
     UUID parentItemId,
     List<JobOrderItemMaterialDto> materials,

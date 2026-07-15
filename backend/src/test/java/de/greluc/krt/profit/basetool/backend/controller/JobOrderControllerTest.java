@@ -37,6 +37,8 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemBlueprintOwnersDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemProductionCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateJobOrderBlueprintCountingDto;
@@ -45,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderHandoverReportService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderHandoverService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemBlueprintOwnersService;
+import de.greluc.krt.profit.basetool.backend.service.JobOrderItemProductionService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
@@ -104,6 +107,7 @@ class JobOrderControllerTest {
   @Mock private JobOrderQueryService jobOrderQueryService;
   @Mock private JobOrderItemBlueprintOwnersService jobOrderItemBlueprintOwnersService;
   @Mock private JobOrderHandoverService jobOrderHandoverService;
+  @Mock private JobOrderItemProductionService jobOrderItemProductionService;
   @Mock private JobOrderHandoverReportService jobOrderHandoverReportService;
   @Mock private UserService userService;
   @Mock private AuthHelperService authHelperService;
@@ -243,21 +247,22 @@ class JobOrderControllerTest {
   @Test
   void getAllJobOrders_forwardsSquadronIdFilter() {
     JobOrderDto dto = jobOrderDto(UUID.randomUUID());
-    UUID squadronId = UUID.randomUUID();
+    List<UUID> squadronIds = List.of(UUID.randomUUID(), UUID.randomUUID());
     Page<JobOrderDto> page = new PageImpl<>(List.of(dto), PageRequest.of(0, 20), 1);
     when(jobOrderQueryService.getAllJobOrders(
-            eq(List.of(JobOrderStatus.OPEN)), eq(squadronId), any(Pageable.class)))
+            eq(List.of(JobOrderStatus.OPEN)), eq(squadronIds), any(Pageable.class)))
         .thenReturn(page);
 
     PageResponse<JobOrderDto> result =
-        controller.getAllJobOrders(List.of(JobOrderStatus.OPEN), squadronId, 0, 20, "priority,asc");
+        controller.getAllJobOrders(
+            List.of(JobOrderStatus.OPEN), squadronIds, 0, 20, "priority,asc");
 
-    // The squadronId param MUST reach the service verbatim — the orders-index "Nur eigene Staffel"
-    // toggle (MULTI_SQUADRON_PLAN.md §5.3) relies on this pass-through to short-circuit the
-    // cross-staffel union to the caller's own squadron on creating- or requesting-side match.
+    // The repeatable squadronId params MUST reach the service verbatim — the orders-index
+    // multi-squadron picker (REQ-ORDERS-027) relies on this pass-through to narrow the scoped union
+    // to the selected squadrons on the responsible- or requesting-side match.
     assertThat(result.content()).containsExactly(dto);
     verify(jobOrderQueryService)
-        .getAllJobOrders(eq(List.of(JobOrderStatus.OPEN)), eq(squadronId), any(Pageable.class));
+        .getAllJobOrders(eq(List.of(JobOrderStatus.OPEN)), eq(squadronIds), any(Pageable.class));
   }
 
   // ── GET /api/v1/orders/lookup ────────────────────────────────────────
@@ -685,6 +690,28 @@ class JobOrderControllerTest {
 
     assertThat(result).isSameAs(persisted);
     verify(jobOrderHandoverService).createHandover(jobOrderId, dto);
+  }
+
+  // ── POST /api/v1/orders/{id}/items/{itemId}/production ───────────────
+
+  @Test
+  void bookProduction_delegatesToService() {
+    UUID jobOrderId = UUID.randomUUID();
+    UUID itemId = UUID.randomUUID();
+    JobOrderItemProductionCreateDto dto = new JobOrderItemProductionCreateDto(3, 7L, List.of());
+    JobOrderItemDto persisted =
+        new JobOrderItemDto(itemId, null, null, 5, 3, 0, null, List.of(), 8L);
+    when(jobOrderItemProductionService.bookProduction(jobOrderId, itemId, dto))
+        .thenReturn(persisted);
+
+    JobOrderItemDto result = controller.bookProduction(jobOrderId, itemId, dto);
+
+    // The Herstellung endpoint (REQ-ORDERS-025) is a thin pass-through: the LOGISTICIAN+ /
+    // canEditJobOrder gate lives in @PreAuthorize, and the whole allocation/optimistic-lock
+    // machinery lives in JobOrderItemProductionService. The controller must forward both path
+    // ids and the body verbatim and return the refreshed item-line DTO unchanged.
+    assertThat(result).isSameAs(persisted);
+    verify(jobOrderItemProductionService).bookProduction(jobOrderId, itemId, dto);
   }
 
   // ── GET /api/v1/orders/{jobOrderId}/handovers/{handoverId}/report ────

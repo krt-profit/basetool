@@ -101,6 +101,9 @@ public enum AuditEventType {
   /** Inventory stock was decremented/deleted by a job-order handover (cross-domain). */
   INVENTORY_HANDED_OVER(AuditDomain.INVENTORY),
 
+  /** Inventory stock was decremented/deleted by a job-order production booking (cross-domain). */
+  INVENTORY_CONSUMED_BY_PRODUCTION(AuditDomain.INVENTORY),
+
   /** A user's inventory rows were re-stamped onto/off an org unit on a membership change. */
   INVENTORY_ORG_RESTAMPED(AuditDomain.INVENTORY),
 
@@ -169,6 +172,9 @@ public enum AuditEventType {
 
   /** An item handover was recorded against a job order. */
   JOB_ORDER_ITEM_HANDOVER_CREATED(AuditDomain.JOB_ORDER),
+
+  /** A production booking was recorded against an item order (units manufactured). */
+  JOB_ORDER_PRODUCTION_BOOKED(AuditDomain.JOB_ORDER),
 
   /** A squadron claim on a public SK order was created or updated (upsert). */
   JOB_ORDER_CLAIM_UPSERTED(AuditDomain.JOB_ORDER),

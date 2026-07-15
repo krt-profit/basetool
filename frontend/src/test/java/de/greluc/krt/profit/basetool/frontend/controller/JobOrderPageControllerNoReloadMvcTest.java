@@ -41,6 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.frontend.config.CapabilityFlagsAdvice;
 import de.greluc.krt.profit.basetool.frontend.model.dto.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.time.Instant;
@@ -434,6 +435,75 @@ class JobOrderPageControllerNoReloadMvcTest {
                         + "\",\"amount\":2}]}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.version").value(6));
+  }
+
+  private static String productionBody(UUID inventoryItemId, UUID materialId) {
+    return "{\"amount\":2,\"version\":1,\"consumption\":[{\"inventoryItemId\":\""
+        + inventoryItemId
+        + "\",\"materialId\":\""
+        + materialId
+        + "\",\"amount\":10.0,\"version\":3}]}";
+  }
+
+  // ------------------------------------------------------------------------
+  // bookProductionAjax — POST /orders/{id}/items/{itemId}/production (REQ-ORDERS-025 Herstellung).
+  // Relays the production booking to the backend, then re-fetches the order so the detail page can
+  // swap the items / production / kpi sections in place. A backend 409 (OPTIMISTIC_LOCK) or 422
+  // (PRODUCTION_ALLOCATION) must be propagated verbatim via propagateBackendError — not swallowed
+  // into a 500 — so krtFetch can distinguish a reload-and-retry from an inline hint.
+  // ------------------------------------------------------------------------
+
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
+  void bookProductionAjax_AsLogistician_RelaysAndReturnsRefreshedOrder() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID itemId = UUID.randomUUID();
+    // After the booking the endpoint re-fetches the order so the bumped manufactured amounts + the
+    // fresh @Version flow to the client.
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+        .thenReturn(materialOrder(orderId, 7L));
+
+    mockMvc
+        .perform(
+            post("/orders/" + orderId + "/items/" + itemId + "/production")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(productionBody(UUID.randomUUID(), UUID.randomUUID())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.version").value(7));
+
+    verify(backendApiClient)
+        .post(
+            eq("/api/v1/orders/" + orderId + "/items/" + itemId + "/production"),
+            any(),
+            eq(JobOrderItemDto.class));
+  }
+
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
+  void bookProductionAjax_WhenBackendConflicts_PropagatesProblemJson() throws Exception {
+    // A concurrent line edit bumped the version → the backend answers 409 OPTIMISTIC_LOCK.
+    // propagateBackendError must re-emit application/problem+json (not swallow it into a 500) so
+    // the
+    // Herstellung modal can offer a reload instead of a generic toast.
+    UUID orderId = UUID.randomUUID();
+    UUID itemId = UUID.randomUUID();
+    when(backendApiClient.post(
+            eq("/api/v1/orders/" + orderId + "/items/" + itemId + "/production"),
+            any(),
+            eq(JobOrderItemDto.class)))
+        .thenThrow(new BackendServiceException("Conflict", null, 409));
+
+    mockMvc
+        .perform(
+            post("/orders/" + orderId + "/items/" + itemId + "/production")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(productionBody(UUID.randomUUID(), UUID.randomUUID())))
+        .andExpect(status().isConflict())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+
+    verify(backendApiClient, never()).get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class));
   }
 
   @Test

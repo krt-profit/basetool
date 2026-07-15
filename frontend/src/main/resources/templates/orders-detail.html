@@ -41,6 +41,127 @@
                 font-size: 0.8rem;
                 min-height: 44px;
             }
+
+            /* Kennzahlen-Band (KPI strip, REQ-ORDERS-026): derived-total tiles between the
+               overview card and the tabs. Page-scoped so it does not collide with the page-scoped
+               .kpi-total in bank.css. Collapses to 2 / 1 columns on narrow devices. */
+            .kpi-band {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 12px;
+                margin-bottom: var(--space-6);
+            }
+            .kpi-band .kpi-total {
+                background: var(--color-bg-dark-gray);
+                border: var(--border-hairline);
+                border-left: 4px solid var(--color-primary);
+                padding: 10px 14px;
+            }
+            .kpi-band .kpi-label {
+                font-size: 0.62rem;
+                text-transform: uppercase;
+                letter-spacing: 0.1em;
+                color: var(--color-gray-2-text);
+                font-weight: var(--fw-bold);
+            }
+            .kpi-band .kpi-value {
+                font-family: var(--font-headline);
+                font-weight: var(--fw-bold);
+                font-size: 1.2rem;
+                color: var(--color-white);
+                margin-top: 2px;
+                font-variant-numeric: tabular-nums;
+            }
+            .kpi-band .kpi-unit {
+                font-size: 0.8rem;
+                color: var(--color-gray-2-text);
+            }
+            @media (width <= 768px) {
+                .kpi-band {
+                    grid-template-columns: repeat(2, 1fr);
+                }
+            }
+            @media (width <= 460px) {
+                .kpi-band {
+                    grid-template-columns: 1fr;
+                }
+            }
+
+            /* Mini progress bars. .progress-mini is the block bar inside a KPI tile; .mini-bar is
+               the inline bar in table cells (Hergestellt / Geliefert). Fill widths are applied
+               CSP-safely from data-krtm-width by inline-style-apply.js (ADR-0093). */
+            .progress-mini {
+                height: 7px;
+                background: var(--color-surface-input);
+                border: var(--border-hairline);
+                overflow: hidden;
+            }
+            .progress-mini > i {
+                display: block;
+                height: 100%;
+                background: var(--color-success);
+            }
+            .mini-bar {
+                display: inline-flex;
+                vertical-align: middle;
+                width: 88px;
+                height: 5px;
+                margin-right: 6px;
+                background: var(--color-surface-input);
+                border: var(--border-hairline);
+                overflow: hidden;
+            }
+            .mini-bar > i {
+                display: block;
+                height: 100%;
+                background: var(--color-primary);
+            }
+            .mini-bar > i.is-complete {
+                background: var(--color-success);
+            }
+
+            /* Tab panes (mission-detail pattern): hidden by default, shown when the JS controller
+               (orders-detail.js) adds .on to the active pane. Scoped to .tab-panes so it never
+               reaches the mission-detail page's own .tab-pane rules. */
+            .tab-panes {
+                border: var(--border-hairline);
+                border-top: none;
+                background: var(--color-bg-dark-gray);
+            }
+            .tab-panes .tab-pane {
+                display: none;
+                padding: 16px 16px 18px;
+            }
+            .tab-panes .tab-pane.on {
+                display: block;
+            }
+            .tab-panes .tab-pane > :first-child {
+                margin-top: 0;
+            }
+
+            /* Herstellung modal: one row per linked inventory entry (source + amount input) inside
+               each material's reconciliation card. */
+            .od-prod-entry {
+                display: grid;
+                grid-template-columns: 1fr 110px;
+                gap: 12px;
+                align-items: center;
+                padding: 8px 0;
+            }
+            .od-prod-entry + .od-prod-entry {
+                border-top: var(--border-hairline);
+            }
+            .od-prod-src {
+                font-size: 0.86rem;
+                color: var(--color-gray-1);
+            }
+            .od-prod-src small {
+                color: var(--color-gray-2-text);
+            }
+            .od-prod-entry input {
+                width: 100%;
+                min-height: 44px;
+            }
         </style>
     </th:block>
 </head>
@@ -213,11 +334,64 @@
             </select>
         </div>
         </th:block></div>
+    </div>
 
+    <!-- Kennzahlen-Band (KPI strip) between the overview card and the tabs. Its own AJAX swap
+         container so a claim / handover / production booking re-renders the derived totals in place
+         via GET /orders/{id}?fragment=kpi (REQ-FE-015, section key `kpi`). Values are computed
+         server-side (JobOrderPageController.computeKpi) into the `kpi` map. -->
+    <div id="order-kpi-results" class="mt-2"><th:block th:fragment="kpiSection">
+        <div class="kpi-band" th:if="${kpi != null}">
+            <!-- MATERIAL: materials fulfilled · open material quantity · claims · handovers -->
+            <div th:if="${order.type != 'ITEM'}" class="kpi-total">
+                <div class="kpi-label" th:text="#{orders.detail.kpi.materialsFulfilled}">Materialien erfüllt</div>
+                <div class="kpi-value" th:text="|${kpi.fulfilled} / ${kpi.total}|">2 / 5</div>
+                <div class="progress-mini krtm-margin-top-0-5rem-fc21"><i th:attr="data-krtm-width=${kpi.fulfilledPct}"></i></div>
+            </div>
+            <div th:if="${order.type == 'ITEM'}" class="kpi-total">
+                <div class="kpi-label" th:text="#{orders.detail.kpi.itemsDelivered}">Items geliefert</div>
+                <div class="kpi-value" th:text="|${kpi.delivered} / ${kpi.amount}|">11 / 18</div>
+                <div class="progress-mini krtm-margin-top-0-5rem-fc21"><i th:attr="data-krtm-width=${kpi.deliveredPct}"></i></div>
+            </div>
+            <div class="kpi-total">
+                <div class="kpi-label" th:text="${order.type == 'ITEM'} ? #{orders.detail.kpi.openMaterialAmount} : #{orders.detail.kpi.openAmount}">Offene Menge</div>
+                <div class="kpi-value">
+                    <span th:text="${#numbers.formatDecimal(kpi.openAmount, 1, 'DEFAULT', 3, 'DEFAULT')}">1.160</span>
+                    <span class="kpi-unit" th:text="#{material.quantity.scu}">SCU</span>
+                </div>
+            </div>
+            <div th:if="${kpi.supportsClaims}" class="kpi-total">
+                <div class="kpi-label" th:text="#{orders.detail.kpi.claims}">Eingetragen (Claims)</div>
+                <div class="kpi-value" th:text="${kpi.claims}">5</div>
+            </div>
+            <div class="kpi-total">
+                <div class="kpi-label" th:text="#{orders.detail.kpi.handovers}">Übergaben</div>
+                <div class="kpi-value" th:text="${kpi.handovers}">2</div>
+            </div>
+        </div>
+    </th:block></div>
+
+    <!-- Tab navigation (mission-detail pattern): each section below is one pane. Tabs + panes carry
+         the same conditions the sections do, so a tab shows only when its pane exists. The JS
+         controller (orders-detail.js) wires the ?tab= deeplink, arrow-key nav and aria-selected; the
+         active tab is white with a 3px orange underline (.tab.active). -->
+    <div class="tab-nav" role="tablist" th:aria-label="#{orders.detail.title}">
+        <button th:if="${order.type != 'ITEM'}" class="tab" id="tab-materials" type="button" role="tab" aria-selected="false" aria-controls="pane-materials" data-tab="materials"><span th:text="#{orders.detail.materials.title}">Materialien</span> <span class="tab-count" th:text="${order.materials != null ? order.materials.size() : 0}">0</span></button>
+        <button th:if="${order.type == 'ITEM'}" class="tab" id="tab-items" type="button" role="tab" aria-selected="false" aria-controls="pane-items" data-tab="items"><span th:text="#{orders.detail.items.title}">Bestellte Items</span> <span class="tab-count" th:text="${order.items != null ? order.items.size() : 0}">0</span></button>
+        <button th:if="${order.type == 'ITEM' and !requesterView}" class="tab" id="tab-aggregated" type="button" role="tab" aria-selected="false" aria-controls="pane-aggregated" data-tab="aggregated"><span th:text="#{orders.detail.aggregated.title}">Aggregierte Materialien</span> <span class="tab-count" th:text="${order.aggregatedMaterials != null ? order.aggregatedMaterials.size() : 0}">0</span></button>
+        <button th:if="${itemBlueprintOwners != null}" class="tab" id="tab-blueprints" type="button" role="tab" aria-selected="false" aria-controls="pane-blueprints" data-tab="blueprints"><span th:text="#{orders.detail.tab.blueprints}">Blaupausen</span> <span class="tab-count" th:text="${itemBlueprintOwners.owners != null ? itemBlueprintOwners.owners.size() : 0}">0</span></button>
+        <button th:unless="${requesterView}" class="tab" id="tab-assignees" type="button" role="tab" aria-selected="false" aria-controls="pane-assignees" data-tab="assignees"><span th:text="#{orders.detail.assignees.title}">Bearbeiter</span> <span class="tab-count" th:text="${order.assignees != null ? order.assignees.size() : 0}">0</span></button>
+        <button th:if="${order.type == 'ITEM' and isLogistician}" class="tab" id="tab-production" type="button" role="tab" aria-selected="false" aria-controls="pane-production" data-tab="production"><span th:text="#{orders.detail.production.title}">Herstellung</span> <span class="tab-count" th:text="${order.items != null ? order.items.size() : 0}">0</span></button>
+        <button th:if="${order.type != 'ITEM' and !requesterView}" class="tab" id="tab-handovers" type="button" role="tab" aria-selected="false" aria-controls="pane-handovers" data-tab="handovers"><span th:text="#{orders.detail.handovers.title}">Übergaben</span> <span class="tab-count" th:text="${order.handovers != null ? order.handovers.size() : 0}">0</span></button>
+        <button th:if="${order.type == 'ITEM' and !requesterView}" class="tab" id="tab-item-handovers" type="button" role="tab" aria-selected="false" aria-controls="pane-item-handovers" data-tab="item-handovers"><span th:text="#{orders.detail.itemHandovers.title}">Item-Übergaben</span> <span class="tab-count" th:text="${order.itemHandovers != null ? order.itemHandovers.size() : 0}">0</span></button>
+        <button th:if="${orphanedInventory != null and !orphanedInventory.isEmpty()}" class="tab" id="tab-verkn" type="button" role="tab" aria-selected="false" aria-controls="pane-verkn" data-tab="verkn"><span th:text="#{orders.detail.tab.linked}">Verknüpft</span> <span class="tab-count" th:text="${orphanedInventory != null ? orphanedInventory.size() : 0}">0</span></button>
+    </div>
+
+    <div class="tab-panes">
         <!-- MATERIAL orders: the direct material-requirement table (click a row to expand the
              linked-inventory drill-down). ITEM orders render the ordered-items table plus the
-             internal aggregated-materials view further below instead. -->
-        <th:block th:if="${order.type != 'ITEM'}">
+             internal aggregated-materials view in their own panes instead. -->
+        <section th:if="${order.type != 'ITEM'}" id="pane-materials" class="tab-pane" role="tabpanel" aria-labelledby="tab-materials">
         <!-- In-place AJAX swap container (#571/#575): a claim create/edit/withdraw re-renders this
              section via GET /orders/{id}?fragment=materials. The #order-materials-results wrapper
              persists (only its innerHTML is replaced); the claim/inventory triggers inside are
@@ -312,13 +486,13 @@
         </table>
         </div>
         </th:block></div>
-        </th:block>
+        </section>
 
-        <!-- ITEM orders: (1) the ordered finished items with delivery progress and sub-assembly
-             provenance, (2) a warning banner for items whose blueprint derived no procurable
-             material, and (3) the internal aggregated-materials view (one row per material+quality,
-             unit-formatted by quantityType). Mirrors the material layout as closely as possible. -->
-        <th:block th:if="${order.type == 'ITEM'}">
+        <!-- ITEM orders — pane 1 "Bestellte Items": the ordered finished items with delivery +
+             manufacturing progress and sub-assembly provenance, plus a warning banner for items
+             whose blueprint derived no procurable material. The aggregated-materials view is its own
+             pane below. -->
+        <section th:if="${order.type == 'ITEM'}" id="pane-items" class="tab-pane" role="tabpanel" aria-labelledby="tab-items">
         <!-- In-place AJAX swap container (#575): an item handover re-renders the ordered-items
              table (delivered/outstanding per row) via GET /orders/{id}?fragment=items. -->
         <!-- mt-2: the wrapper makes the section-title a :first-child, zeroing its 2rem top
@@ -332,6 +506,7 @@
                 <th th:text="#{orders.detail.item.name}">Item</th>
                 <th th:text="#{orders.detail.item.blueprint}">Bauplan</th>
                 <th th:text="#{orders.detail.item.amount}">Anzahl</th>
+                <th th:text="#{orders.detail.item.manufactured}">Hergestellt</th>
                 <th th:text="#{orders.detail.item.delivered}">Geliefert</th>
                 <th th:text="#{orders.detail.item.outstanding}">Ausstehend</th>
             </tr>
@@ -349,6 +524,10 @@
                     <span th:if="${item.blueprint == null}" class="text-muted">-</span>
                 </td>
                 <td th:text="${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'}"></td>
+                <td th:with="mfg=${item.manufacturedAmount != null ? item.manufacturedAmount : 0},amt=${item.amount != null ? item.amount : 0}">
+                    <span class="mini-bar"><i th:attr="data-krtm-width=${amt > 0 ? (mfg * 100 / amt) : 0}" th:classappend="${amt > 0 and mfg >= amt} ? ' is-complete' : ''"></i></span>
+                    <span th:text="${#numbers.formatInteger(mfg, 1)}">0</span>
+                </td>
                 <td th:text="${item.deliveredAmount != null ? #numbers.formatInteger(item.deliveredAmount, 1) : '0'}"></td>
                 <td>
                     <span th:with="outstanding=${(item.amount != null ? item.amount : 0) - (item.deliveredAmount != null ? item.deliveredAmount : 0)}"
@@ -357,7 +536,7 @@
                 </td>
             </tr>
             <tr th:if="${order.items == null or order.items.isEmpty()}">
-                <td colspan="5" class="text-center text-muted" th:text="#{orders.detail.items.empty}">Keine Items vorhanden.</td>
+                <td colspan="6" class="text-center text-muted" th:text="#{orders.detail.items.empty}">Keine Items vorhanden.</td>
             </tr>
             </tbody>
         </table>
@@ -374,7 +553,10 @@
                 <li th:each="name : ${itemsWithoutMaterials}" th:text="${name}"></li>
             </ul>
         </div>
+        </section>
 
+        <!-- ITEM orders — pane "Aggregierte Materialien". -->
+        <section th:if="${order.type == 'ITEM' and !requesterView}" id="pane-aggregated" class="tab-pane" role="tabpanel" aria-labelledby="tab-aggregated">
         <!-- In-place AJAX swap container (#571/#575): for ITEM orders the claims live on the
              aggregated table; a claim create/edit/withdraw re-renders it via ?fragment=aggregated. -->
         <div id="order-aggregated-results" class="mt-2" th:unless="${requesterView}"><th:block th:fragment="aggregatedSection">
@@ -462,14 +644,15 @@
         </table>
         </div>
         </th:block></div>
-        </th:block>
+        </section>
 
-        <!-- Orphaned linked inventory (REQ-ORDERS-019): inventory linked to this order whose
-             material the order does not require, so it never appears in the material/aggregated
-             tables above. Rendered for both order kinds; populated server-side
+        <!-- Orphaned linked inventory (REQ-ORDERS-019) — pane "Verknüpft": inventory linked to this
+             order whose material the order does not require, so it never appears in the
+             material/aggregated tables above. Rendered for both order kinds; populated server-side
              (JobOrderPageController.viewOrderDetail). The link is undone from the Lager by setting
              the entry's "Auftrag" back to "Kein Auftrag". -->
-        <div th:if="${orphanedInventory != null and !orphanedInventory.isEmpty()}" class="alert alert-warning mt-2">
+        <section th:if="${orphanedInventory != null and !orphanedInventory.isEmpty()}" id="pane-verkn" class="tab-pane" role="tabpanel" aria-labelledby="tab-verkn">
+        <div class="alert alert-warning">
             <strong th:text="#{orders.detail.orphanedInventory.title}">Verknüpfter, nicht benötigter Bestand</strong>
             <p class="krtm-margin-0-5rem-0-0-7775" th:text="#{orders.detail.orphanedInventory.body}">Dieser Lagerbestand ist dem Auftrag zugeordnet, gehört aber zu keinem benötigten Material und erscheint daher nicht in den Materiallisten. Die Zuordnung kann im Lager aufgehoben werden.</p>
             <div class="table-responsive krtm-margin-top-0-5rem-fc21">
@@ -498,6 +681,7 @@
                 </table>
             </div>
         </div>
+        </section>
 
         <!-- Section-refresh error fragment (#575, mirrors the #574 fix): returned (HTTP 200) by
              GET /orders/{id}?fragment=… when the backend read fails, so an in-place swap shows a
@@ -520,6 +704,7 @@
              the actor's own oaSend keeps its bespoke outerHTML swap of the inner #assignees-section
              (the fragment root). The wrapper carries the requesterView gate so the container is
              absent — and the peer refresh skips it — for a redacted requester view. -->
+        <section th:unless="${requesterView}" id="pane-assignees" class="tab-pane" role="tabpanel" aria-labelledby="tab-assignees">
         <div id="order-assignees-results" th:unless="${requesterView}">
         <div class="krtm-margin-top-2rem-daaa" id="assignees-section" th:fragment="assigneesSection" th:data-order-id="${order.id}" th:unless="${requesterView}">
         <h3 class="section-title" th:text="#{orders.detail.assignees.title}">Bearbeiter</h3>
@@ -587,12 +772,14 @@
         </div>
         </div>
         </div>
+        </section>
 
-        <!-- Blueprint coverage (Blaupausen-Verfügbarkeit). ITEM orders only, and only populated when
-             the viewer is a member of the responsible squadron/SK — the backend gates the data
-             members-only (canSeeJobOrderBlueprintOwners), and JobOrderPageController omits the model
-             attribute when the call is forbidden, so a non-member viewing a public SK order never
-             sees this section. Person-centric primary list + a per-item coverage table. -->
+        <!-- Blueprint coverage (Blaupausen-Verfügbarkeit) — pane "Blaupausen". ITEM orders only, and
+             only populated when the viewer is a member of the responsible squadron/SK — the backend
+             gates the data members-only (canSeeJobOrderBlueprintOwners), and JobOrderPageController
+             omits the model attribute when the call is forbidden, so a non-member viewing a public SK
+             order never sees this section. Person-centric primary list + a per-item coverage table. -->
+        <section th:if="${itemBlueprintOwners != null}" id="pane-blueprints" class="tab-pane" role="tabpanel" aria-labelledby="tab-blueprints">
         <section
           th:if="${itemBlueprintOwners != null}"
           id="blueprint-owners-section"
@@ -680,10 +867,11 @@
             </div>
           </details>
         </th:block></section>
+        </section>
 
-        <!-- Material handover workflow. ITEM orders get their own item-handover UI in a later
-             phase; for now the material-specific handover protocol is hidden for item orders. -->
-        <th:block th:if="${order.type != 'ITEM'}">
+        <!-- Material handover workflow — pane "Übergaben". ITEM orders get their own item-handover
+             pane; the material-specific handover protocol is hidden for item orders. -->
+        <section th:if="${order.type != 'ITEM'}" id="pane-handovers" class="tab-pane" role="tabpanel" aria-labelledby="tab-handovers">
         <!-- In-place AJAX swap container (#575): a material handover re-renders this section (the
              handover history gains a row) via GET /orders/{id}?fragment=handovers. The "Übergabe
              protokollieren" button + the per-row report-download are document-delegated, so they
@@ -740,12 +928,13 @@
             </div>
         </div>
         </th:block></div>
-        </th:block>
+        </section>
 
-        <!-- ITEM orders: handover workflow. Logisticians log per-line whole-unit deliveries; the
-             backend decrements outstanding amounts and auto-completes the order once every line is
-             fully delivered. Each persisted handover offers a PDF delivery note. -->
-        <th:block th:if="${order.type == 'ITEM'}">
+        <!-- ITEM orders: handover workflow — pane "Item-Übergaben". Logisticians log per-line
+             whole-unit deliveries; the backend decrements outstanding amounts and auto-completes the
+             order once every line is fully delivered. Each persisted handover offers a PDF delivery
+             note. -->
+        <section th:if="${order.type == 'ITEM'}" id="pane-item-handovers" class="tab-pane" role="tabpanel" aria-labelledby="tab-item-handovers">
         <!-- In-place AJAX swap container (#575): an item handover re-renders this section (history
              gains a row; the open button hides once every line is delivered) via
              GET /orders/{id}?fragment=item-handovers. -->
@@ -802,7 +991,81 @@
             </div>
         </div>
         </th:block></div>
-        </th:block>
+        </section>
+
+        <!-- ITEM orders — pane "Herstellung" (NEW, REQ-ORDERS-025). Bearbeiter record how many units
+             of an ordered item have been manufactured, independent of delivery; booking a run
+             reduces the linked stock the manufacture consumed. Logisticians only (canEditJobOrder).
+             In-place AJAX swap container: a production booking re-renders items / aggregated / this
+             pane via ?fragment=production (and header + kpi). -->
+        <section th:if="${order.type == 'ITEM' and isLogistician}" id="pane-production" class="tab-pane" role="tabpanel" aria-labelledby="tab-production">
+        <div id="order-production-results"><th:block th:fragment="productionSection">
+        <p class="text-muted krtm-margin-top-0-font-size-0-84rem" th:text="#{orders.detail.production.intro}">Erfasse, wie viele Einheiten bereits hergestellt wurden — unabhängig von der Auslieferung.</p>
+        <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+            <tr>
+                <th th:text="#{orders.detail.item.name}">Item</th>
+                <th th:text="#{orders.detail.item.manufactured}">Hergestellt</th>
+                <th th:text="#{orders.detail.production.perUnit}">Bedarf je Stück</th>
+                <th class="krtm-text-align-right"></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="item : ${order.items}"
+                th:with="mfg=${item.manufacturedAmount != null ? item.manufacturedAmount : 0},amt=${item.amount != null ? item.amount : 0},complete=${(item.amount != null ? item.amount : 0) > 0 and (item.manufacturedAmount != null ? item.manufacturedAmount : 0) >= (item.amount != null ? item.amount : 0)}">
+                <td>
+                    <span th:text="${item.gameItem != null ? item.gameItem.name() : '-'}"></span>
+                    <span th:if="${item.parentItemId != null}" class="subassembly-tag" th:text="#{orders.detail.item.subassembly}" th:title="#{orders.detail.item.subassembly}">Unterbaugruppe</span>
+                </td>
+                <td>
+                    <span class="mini-bar"><i th:attr="data-krtm-width=${amt > 0 ? (mfg * 100 / amt) : 0}" th:classappend="${complete} ? ' is-complete' : ''"></i></span>
+                    <span th:text="|${#numbers.formatInteger(mfg, 1)} / ${#numbers.formatInteger(amt, 1)}|">0 / 0</span>
+                </td>
+                <td class="text-muted">
+                    <span th:if="${item.materials == null or item.materials.isEmpty()}" th:text="#{orders.detail.production.noMaterials}">—</span>
+                    <th:block th:each="m,st : ${item.materials}" th:with="perUnit=${amt > 0 ? (m.requiredQuantity != null ? m.requiredQuantity : 0) / amt : 0}">
+                        <span th:text="${m.material != null ? m.material.name() : '-'}"></span>
+                        <span th:switch="${m.material != null ? m.material.quantityType() : 'SCU'}">
+                            <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(perUnit, 1)} #{material.quantity.piece}|"></span>
+                            <span th:case="*" th:text="|${#numbers.formatDecimal(perUnit, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
+                        </span><span th:if="${!st.last}"> · </span>
+                    </th:block>
+                    <!-- Machine-readable per-material demand for the production modal (read by
+                         orders-detail.js openProductionModal). required-total is the whole-line
+                         demand; the JS scales it to the entered unit count exactly as the backend
+                         does (requiredTotal × k / lineAmount, rounded for the quantity type). -->
+                    <ul class="od-production-demand krtm-display-none-5790" hidden aria-hidden="true">
+                        <li th:each="m : ${item.materials}"
+                            th:data-material-id="${m.material != null ? m.material.id() : ''}"
+                            th:data-material-name="${m.material != null ? m.material.name() : ''}"
+                            th:data-quantity-type="${m.material != null ? m.material.quantityType() : 'SCU'}"
+                            th:data-required-total="${m.requiredQuantity != null ? m.requiredQuantity : 0}"></li>
+                    </ul>
+                </td>
+                <td class="krtm-text-align-right">
+                    <span th:if="${complete}" class="chip chip--success" th:text="#{orders.detail.production.complete}">vollständig</span>
+                    <button th:unless="${complete}" type="button" class="btn btn-outline krtm-min-height-36px-1df5"
+                            data-trigger="od-open-production"
+                            th:data-order-id="${order.id}"
+                            th:data-item-id="${item.id}"
+                            th:data-item-name="${item.gameItem != null ? item.gameItem.name() : ''}"
+                            th:data-amount="${amt}"
+                            th:data-manufactured="${mfg}"
+                            th:data-version="${item.version}">
+                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                        <span th:text="#{orders.detail.production.record}">Herstellung erfassen</span>
+                    </button>
+                </td>
+            </tr>
+            <tr th:if="${order.items == null or order.items.isEmpty()}">
+                <td colspan="4" class="text-center text-muted" th:text="#{orders.detail.items.empty}">Keine Items vorhanden.</td>
+            </tr>
+            </tbody>
+        </table>
+        </div>
+        </th:block></div>
+        </section>
     </div>
 </main>
 
@@ -1061,12 +1324,13 @@
                  + recipient above stay put, so the form's submit listener and the one-shot datetime
                  enhancer both survive. -->
             <div id="item-handover-lines"><th:block th:fragment="itemHandoverLines">
-            <!-- One row per outstanding ordered-item line. Inputs are named by request-param index so
+            <!-- One row per deliverable ordered-item line. Inputs are named by request-param index so
                  Spring binds them onto itemHandoverForm.entries; the controller drops empty rows. The
-                 outstanding value is computed once on the iterating th:block (th:with runs after
-                 th:each) so the inner th:if and the cap can both read it. -->
+                 deliverable value is manufactured − delivered (REQ-ORDERS-025: a unit can only be
+                 delivered once it has been manufactured), computed once on the iterating th:block
+                 (th:with runs after th:each) so the inner th:if and the cap can both read it. -->
             <th:block th:each="item, stat : ${order.items}"
-                      th:with="outstanding=${(item.amount != null ? item.amount : 0) - (item.deliveredAmount != null ? item.deliveredAmount : 0)}">
+                      th:with="outstanding=${(item.manufacturedAmount != null ? item.manufacturedAmount : 0) - (item.deliveredAmount != null ? item.deliveredAmount : 0)}">
                 <div th:if="${outstanding > 0}" class="item-handover-line krtm-display-grid-grid-template-columns-2fr-1fr-g-b40a">
                     <div>
                         <label class="form-label-sm" th:text="${item.gameItem != null ? item.gameItem.name() : '-'}">Item</label>
@@ -1089,6 +1353,31 @@
                 <button type="submit" class="btn btn--cta krtm-min-height-44px-1df5" data-testid="item-handover-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.detail.save}">Speichern</span></button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- Herstellung modal (REQ-ORDERS-025): populated per item line by orders-detail.js. Class-based
+     open/close (ADR-0093). The per-material reconciliation cards + inventory-entry rows are built by
+     the JS (openProductionModal) from the row's data + a per-material inventory fetch; "buchen" is
+     enabled only when every material's demand is exactly covered. -->
+<div sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:if="${order.type == 'ITEM' and isLogistician}" id="production-modal" class="modal krtm-display-none-5790">
+    <div class="modal-content hud-box krtm-width-100-max-width-700px-max-height-90vh-ov-0acc">
+        <button type="button" class="btn-close krtm-position-absolute-right-1rem-top-1rem-backgr-0703" data-trigger="close-modal-display" data-modal-id="production-modal">&times;</button>
+        <h2 class="krtm-color-var-color-primary-margin-bottom-1-5rem-c7ac" id="production-modal-title" th:text="#{orders.detail.production.record}">Herstellung erfassen</h2>
+        <div class="krt-form" id="production-form" th:data-order-id="${order.id}">
+            <div class="form-group mb-1">
+                <label for="production-amount" class="form-label" th:text="#{orders.detail.production.amount}">Anzahl herstellen</label>
+                <input type="number" id="production-amount" step="1" min="1" value="1" class="w-full krtm-min-height-44px-1df5">
+                <small class="text-muted" id="production-remaining-hint"></small>
+            </div>
+            <h3 class="section-title" th:text="#{orders.detail.production.consumption}">Materialverbrauch &amp; Lagerentnahme</h3>
+            <p class="text-muted krtm-font-size-0-85rem-margin-bottom-1rem-f3e3" th:text="#{orders.detail.production.consumptionHint}">Wähle je Material, aus welchen verknüpften Lagereinträgen und in welcher Menge entnommen wird.</p>
+            <div id="production-materials"></div>
+            <div class="krtm-display-flex-gap-1rem-justify-content-flex-e-1385">
+                <button type="button" class="btn btn-ghost krtm-min-height-44px-1df5" data-trigger="close-modal-display" data-modal-id="production-modal" th:text="#{orders.detail.cancel}">Abbrechen</button>
+                <button type="button" class="btn btn--cta krtm-min-height-44px-1df5" id="production-book-btn" data-trigger="od-book-production"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.detail.production.book}">Herstellung buchen</span></button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -1198,6 +1487,23 @@
     const I18N_NOTE_CONFLICT = /*[[#{orders.detail.assignees.note.conflict}]]*/ 'Der Eintrag wurde zwischenzeitlich ge\u00e4ndert. Bitte lade die Seite neu.';
     const I18N_NOTE_FORBIDDEN = /*[[#{orders.detail.assignees.note.forbidden}]]*/ 'Du darfst diesen Eintrag nicht bearbeiten.';
     const I18N_NOTE_FOR = /*[[#{orders.detail.assignees.note.for}]]*/ 'Notiz f\u00fcr {0}';
+
+    // Herstellung (production booking, REQ-ORDERS-025) strings consumed by the page module's
+    // production modal (openProductionModal / bookProduction).
+    const PRODUCTION_I18N = {
+        record: /*[[#{orders.detail.production.record}]]*/ 'Herstellung erfassen',
+        book: /*[[#{orders.detail.production.book}]]*/ 'Herstellung buchen',
+        reconcile: /*[[#{orders.detail.production.reconcile}]]*/ 'ben\u00f6tigt {0} \u00b7 zugewiesen {1} \u00b7 Rest {2}',
+        available: /*[[#{orders.detail.production.available}]]*/ 'Verf\u00fcgbar',
+        remaining: /*[[#{orders.detail.production.remaining}]]*/ 'Offen',
+        alreadyMade: /*[[#{orders.detail.production.alreadyMade}]]*/ 'bereits hergestellt',
+        noStock: /*[[#{orders.detail.production.noStock}]]*/ 'Keine verkn\u00fcpften Lagereintr\u00e4ge f\u00fcr dieses Material.',
+        loadingStock: /*[[#{orders.detail.production.loadingStock}]]*/ 'Lade Lagereintr\u00e4ge \u2026',
+        allocError: /*[[#{error.production.allocation}]]*/ 'Zuweisung deckt den Materialbedarf nicht exakt.',
+        booked: /*[[#{success.production.booked}]]*/ 'Herstellung gebucht \u2014 Materialbedarf und Lagerbestand reduziert.',
+        unitScu: /*[[#{material.quantity.scu}]]*/ 'SCU',
+        unitPiece: /*[[#{material.quantity.piece}]]*/ 'St\u00fcck'
+    };
 
     // Live multi-user sync (REQ-FE-010 / REQ-FE-015, ADR-0094): window.orderId keys the order:{id}
     // room the detail page subscribes to; the two strings feed the deferred-refresh pill and the

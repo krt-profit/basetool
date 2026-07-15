@@ -47,12 +47,14 @@ Coverage is **complete**, including the cross-area writers and the system/automa
   REQ-INV-026) / per-(entry, job-order) delivery-toggle (`INVENTORY_ITEM_DELIVERY_TOGGLED` —
   `delivered` lives on the job-order allocation since Variante C, REQ-INV-027) / bulk-checkout /
   global wipe; plus the cross-area writers (refinery store → `INVENTORY_RECEIVED_FROM_REFINERY`,
-  job-order handover → `INVENTORY_HANDED_OVER`), the org-unit re-stamp on membership change, and the
+  job-order handover → `INVENTORY_HANDED_OVER`, job-order item-production consumption →
+  `INVENTORY_CONSUMED_BY_PRODUCTION`), the org-unit re-stamp on membership change, and the
   owner-reassignment on user deletion.
 - **Aufträge** — create (material/item) / edit / status / priority / blueprint-coverage variant-counting
   toggle / delete / completion (a single funnel — manual and auto-completion via handover both record
   exactly one `JOB_ORDER_COMPLETED`) / reassign / assignee add/remove/note / material+inventory unlink /
-  material+item handover / claim upsert+withdraw. A requesting-owner edit (REQ-ORDERS-023) reuses the
+  material+item handover / item-production booking (`JOB_ORDER_PRODUCTION_BOOKED` — recording
+  manufactured units and consuming the linked inventory, REQ-ORDERS-025) / claim upsert+withdraw. A requesting-owner edit (REQ-ORDERS-023) reuses the
   existing `JOB_ORDER_UPDATED` / `JOB_ORDER_ITEM_UPDATED` / `JOB_ORDER_MATERIAL_UNLINKED` events with a
   bounded `byRequester=true` details flag (no new event type; the actor already identifies who edited).
 - **Raffinerie** — order create / update / cancel / store; refining-method reference CRUD; the

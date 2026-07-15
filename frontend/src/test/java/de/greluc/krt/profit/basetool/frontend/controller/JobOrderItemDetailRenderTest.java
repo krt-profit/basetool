@@ -153,6 +153,7 @@ class JobOrderItemDetailRenderTest {
             new GameItemReferenceDto(UUID.randomUUID(), "A03 Sniper Rifle", "WEAPON"),
             new BlueprintReferenceDto(UUID.randomUUID(), "A03 Sniper Rifle", "wiki-a03"),
             3,
+            2,
             1,
             null,
             List.of(
@@ -165,6 +166,7 @@ class JobOrderItemDetailRenderTest {
             new GameItemReferenceDto(UUID.randomUUID(), "A03 Optic Scope", "WEAPON_ATTACHMENT"),
             new BlueprintReferenceDto(UUID.randomUUID(), "A03 Optic Scope", "wiki-scope"),
             2,
+            0,
             0,
             parentId,
             List.of(),
@@ -278,6 +280,7 @@ class JobOrderItemDetailRenderTest {
             new BlueprintReferenceDto(UUID.randomUUID(), "A03 Sniper Rifle", "wiki-a03"),
             3,
             0,
+            0,
             null,
             List.of(new JobOrderItemMaterialDto(UUID.randomUUID(), agricium, 12.0, "NONE", 1L)),
             1L);
@@ -350,6 +353,7 @@ class JobOrderItemDetailRenderTest {
             new BlueprintReferenceDto(UUID.randomUUID(), "A03 Sniper Rifle", "wiki-a03"),
             3,
             3,
+            3,
             null,
             List.of(
                 new JobOrderItemMaterialDto(
@@ -415,6 +419,7 @@ class JobOrderItemDetailRenderTest {
             lineId,
             new GameItemReferenceDto(UUID.randomUUID(), "A03 Sniper Rifle", "WEAPON"),
             new BlueprintReferenceDto(UUID.randomUUID(), "A03 Sniper Rifle", "wiki-a03"),
+            3,
             3,
             1,
             null,
@@ -612,6 +617,7 @@ class JobOrderItemDetailRenderTest {
             new GameItemReferenceDto(UUID.randomUUID(), "A03 Sniper Rifle", "WEAPON"),
             new BlueprintReferenceDto(UUID.randomUUID(), "A03 Sniper Rifle", "wiki-a03"),
             3,
+            0,
             0,
             null,
             List.of(

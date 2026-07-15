@@ -169,7 +169,7 @@ class RolePermissionsE2eTest {
       Page page = context.newPage();
       try {
         E2eSupport.login(page, baseUrl, user, password);
-        E2eSupport.navigate(page, baseUrl + "/orders/" + jobOrderId);
+        E2eSupport.navigate(page, baseUrl + "/orders/" + jobOrderId + "?tab=handovers");
         page.waitForLoadState();
         assertThat(page.getByTestId("nav-logout")).isVisible();
         if (expectedVisible) {

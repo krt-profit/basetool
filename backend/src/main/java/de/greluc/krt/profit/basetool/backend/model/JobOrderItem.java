@@ -46,9 +46,11 @@ import org.jetbrains.annotations.Nullable;
  * {@link GameItem} is requested, in which quantity ({@link #amount} whole units), produced via the
  * {@link #blueprint} the requester chose for this line (relevant when an item has more than one
  * blueprint). The derived material requirements are snapshotted into {@link #materials} at creation
- * time; {@link #deliveredAmount} tracks fulfilment via item handovers. When the line was adopted
- * from another line's blueprint sub-assembly suggestion, {@link #parentItem} records that
- * provenance.
+ * time; {@link #manufacturedAmount} tracks how many units have been produced (consuming linked
+ * stock) and {@link #deliveredAmount} tracks fulfilment via item handovers, holding the invariant
+ * {@code 0 <= deliveredAmount <= manufacturedAmount <= amount} (a unit can only be delivered once
+ * it has been manufactured). When the line was adopted from another line's blueprint sub-assembly
+ * suggestion, {@link #parentItem} records that provenance.
  */
 @Entity
 @Getter
@@ -91,6 +93,15 @@ public class JobOrderItem extends AbstractEntity<UUID> {
   @Column(name = "delivered_amount", nullable = false)
   @Builder.Default
   private Integer deliveredAmount = 0;
+
+  /**
+   * Number of whole units already manufactured (production booked, consuming the order's linked
+   * stock); starts at zero. Bounded by {@code deliveredAmount <= manufacturedAmount <= amount} — a
+   * unit must be manufactured before it can be delivered.
+   */
+  @Column(name = "manufactured_amount", nullable = false)
+  @Builder.Default
+  private Integer manufacturedAmount = 0;
 
   /**
    * The parent line this one was adopted from when accepting a blueprint sub-assembly suggestion,

@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.ItemDerivationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemBlueprintOwnersDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
@@ -46,7 +47,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
@@ -97,15 +100,6 @@ public class JobOrderPageController {
 
   private static final List<String> VALID_STATUSES =
       List.of("OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED");
-
-  /**
-   * Accepted values for the orders-index squadron-scope toggle (MULTI_SQUADRON_PLAN.md section
-   * 5.3). {@code mine} restricts to orders whose creating OR requesting squadron equals the
-   * caller's active squadron; {@code all} returns the cross-staffel union (the backend's natural
-   * behaviour for Job Orders). Persisted in the {@code orders_filter_scope} cookie alongside the
-   * status filter.
-   */
-  private static final List<String> VALID_SQUADRON_SCOPES = List.of("mine", "all");
 
   /**
    * Selectable page sizes for the order list. Larger than the shared 10/50/100 contract
@@ -170,31 +164,23 @@ public class JobOrderPageController {
           new ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>() {};
 
   /**
-   * Renders the job-order list ({@code /orders}). Two persisted filters drive the view:
+   * Renders the job-order list ({@code /orders}). Two filters drive the view:
    *
    * <ul>
    *   <li>Status filter — three-stage precedence: explicit query parameter wins, otherwise the
    *       {@code orders_filter_status} cookie (validated against {@link #VALID_STATUSES}),
-   *       otherwise the default of {@code OPEN} + {@code IN_PROGRESS}.
-   *   <li>Squadron scope toggle — explicit {@code scope} query parameter wins ({@code mine} = only
-   *       orders whose creating OR requesting squadron equals the caller's active squadron, {@code
-   *       all} = cross-staffel union), otherwise the {@code orders_filter_scope} cookie, otherwise
-   *       the plan-mandated default of {@code mine} for users with an active squadron context
-   *       (MULTI_SQUADRON_PLAN.md section 5.3). Callers with no active context (admins in "all
-   *       squadrons" mode, anonymous) collapse silently to {@code all} regardless of the requested
-   *       scope.
+   *       otherwise the default of {@code OPEN} + {@code IN_PROGRESS}. Persisted in a 30-day
+   *       cookie.
+   *   <li>Squadron filter (multi-select, REQ-ORDERS-027) — a repeatable {@code squadronId} query
+   *       parameter names the selected squadrons (matching responsible OR requesting side). An
+   *       empty/absent selection means "all squadrons" (no narrowing), the default. Its state is
+   *       persisted client-side in localStorage by {@code orders-index.js} (not a server cookie),
+   *       so the controller simply honours the ids it receives.
    * </ul>
    *
-   * <p>Cookie updates: both filters write a 30-day cookie scoped to {@code /orders} whenever the
-   * user changes them explicitly. Re-rendering the page without an explicit value preserves the
-   * cookie untouched so back/forward navigation keeps the persisted state.
-   *
    * @param status optional explicit status filter
-   * @param scope optional explicit squadron-scope filter ({@code mine}/{@code all})
+   * @param squadronId optional repeatable squadron display filter (empty = all squadrons)
    * @param cookieStatus previous persisted status filter from the cookie
-   * @param cookieScope previous persisted squadron-scope filter from the cookie
-   * @param activeSquadronId active squadron context surfaced by {@code OrgUnitContextAdvice}; used
-   *     to translate {@code scope=mine} into a backend {@code squadronId} param.
    * @param page zero-based page index, defaulted/clamped to 0 (REQ-ORDERS-020)
    * @param size requested page size; only {@link #PAGE_SIZES} are honoured, else {@link
    *     #DEFAULT_PAGE_SIZE}
@@ -210,10 +196,8 @@ public class JobOrderPageController {
   @PreAuthorize("isAuthenticated()")
   public String viewOrders(
       @RequestParam(required = false) List<String> status,
-      @RequestParam(required = false) String scope,
+      @RequestParam(required = false) List<UUID> squadronId,
       @CookieValue(name = "orders_filter_status", required = false) String cookieStatus,
-      @CookieValue(name = "orders_filter_scope", required = false) String cookieScope,
-      @ModelAttribute("activeSquadronId") UUID activeSquadronId,
       @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
       @ModelAttribute("canViewOwnJobOrders") boolean canViewOwnJobOrders,
       @RequestParam(required = false) Integer page,
@@ -251,27 +235,14 @@ public class JobOrderPageController {
       response.addCookie(cookie);
     }
 
-    // Resolve the squadron-scope filter with the same three-stage precedence (param > cookie >
-    // default). "mine" is the plan-mandated default per section 5.3; only callers with a resolvable
-    // active squadron can act on it, so admins in "all squadrons" mode silently collapse to "all"
-    // regardless of cookie / param value (no squadron context to filter on).
-    String resolvedScope;
-    if (scope != null && !scope.isBlank() && VALID_SQUADRON_SCOPES.contains(scope)) {
-      resolvedScope = scope;
-      Cookie scopeCookie = new Cookie("orders_filter_scope", resolvedScope);
-      scopeCookie.setPath("/orders");
-      scopeCookie.setMaxAge(30 * 24 * 60 * 60); // 30 days
-      scopeCookie.setHttpOnly(true);
-      scopeCookie.setSecure(true);
-      response.addCookie(scopeCookie);
-    } else if (cookieScope != null
-        && !cookieScope.isBlank()
-        && VALID_SQUADRON_SCOPES.contains(cookieScope)) {
-      resolvedScope = cookieScope;
-    } else {
-      resolvedScope = "mine";
-    }
-    boolean filterToOwnSquadron = "mine".equals(resolvedScope) && activeSquadronId != null;
+    // Squadron display filter (multi-select, REQ-ORDERS-027): the picker's selected squadron ids
+    // arrive as repeatable squadronId params (echoed by orders-index.js from its per-user
+    // localStorage state). An empty/absent selection means "all squadrons" (no narrowing) — the new
+    // default, replacing the former mine/all scope toggle. Only applies to the main queue, never
+    // the
+    // requester "Meine Auftraege" list (which is keyed on the caller's own requesting units).
+    List<UUID> selectedSquadronIds =
+        (squadronId == null) ? List.of() : squadronId.stream().filter(id -> id != null).toList();
     int effectivePage = page == null || page < 0 ? 0 : page;
     int effectiveSize = size != null && PAGE_SIZES.contains(size) ? size : DEFAULT_PAGE_SIZE;
 
@@ -282,11 +253,16 @@ public class JobOrderPageController {
     try {
       String statusParam = String.join(",", status);
       // The requester "Meine Auftraege" list (REQ-ORDERS-023) is keyed on the caller's own
-      // requesting
-      // org units and takes no squadron display filter; the main queue keeps the "involving my
-      // squadron" toggle. Both are paginated server-side (REQ-ORDERS-020), sorted priority,asc.
-      String squadronParam =
-          !requesterView && filterToOwnSquadron ? "&squadronId=" + activeSquadronId : "";
+      // requesting org units and takes no squadron display filter; the main queue applies the
+      // multi-squadron picker (matches responsible OR requesting). Both are paginated server-side
+      // (REQ-ORDERS-020), sorted priority,asc.
+      StringBuilder squadronParamBuilder = new StringBuilder();
+      if (!requesterView) {
+        for (UUID sid : selectedSquadronIds) {
+          squadronParamBuilder.append("&squadronId=").append(sid);
+        }
+      }
+      String squadronParam = squadronParamBuilder.toString();
       String listBase = requesterView ? "/api/v1/orders/requested" : "/api/v1/orders";
       p =
           backendApiClient.get(
@@ -344,13 +320,16 @@ public class JobOrderPageController {
     model.addAttribute("orders", orders);
     model.addAttribute("ordersPage", p);
     model.addAttribute("pageSizes", PAGE_SIZES);
-    model.addAttribute("paginationBaseUrl", buildPaginationBaseUrl(status, resolvedScope));
+    model.addAttribute("paginationBaseUrl", buildPaginationBaseUrl(status, selectedSquadronIds));
     model.addAttribute("selectedStatuses", status);
-    model.addAttribute("selectedScope", resolvedScope);
-    // Effective state, after collapsing "mine" to "all" when there is no active squadron context
-    // (admin all-squadrons mode). The template uses this to render the toggle as informational-
-    // only rather than active when the user cannot meaningfully act on "mine".
-    model.addAttribute("scopeFilterApplied", filterToOwnSquadron);
+    // The multi-squadron picker (REQ-ORDERS-027): the active squadrons to offer + the currently
+    // selected ids. An empty selection renders every box checked (the "all squadrons" default); the
+    // client then reconciles the checkboxes against its localStorage on load. Omitted for the
+    // requester view, whose list carries no squadron filter.
+    if (!requesterView) {
+      model.addAttribute("squadrons", fetchActiveSquadrons());
+      model.addAttribute("selectedSquadronIds", selectedSquadronIds);
+    }
     model.addAttribute("ageYellowDays", yellowDays);
     model.addAttribute("ageRedDays", redDays);
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
@@ -361,20 +340,22 @@ public class JobOrderPageController {
 
   /**
    * Builds the {@code baseUrl} the pagination fragment threads {@code page}/{@code size} onto so
-   * page and size links keep the active status + scope filter. The repeatable {@code status} params
-   * and the {@code scope} radio value are reproduced exactly as the filter form submits them; the
-   * tokens are fixed enum/keyword names, so no extra escaping is required.
+   * page and size links keep the active status + squadron filter. The repeatable {@code status} and
+   * {@code squadronId} params are reproduced exactly as the filter submits them; the tokens are
+   * fixed enum names / UUIDs, so no extra escaping is required.
    *
    * @param status the resolved (never empty) status filter
-   * @param scope the resolved squadron-scope value ({@code mine}/{@code all})
-   * @return {@code /orders?status=...&scope=...} carrying the current filter
+   * @param squadronIds the selected squadron ids (empty = no squadron filter)
+   * @return {@code /orders?status=...&squadronId=...} carrying the current filter
    */
-  private static String buildPaginationBaseUrl(List<String> status, String scope) {
+  private static String buildPaginationBaseUrl(List<String> status, List<UUID> squadronIds) {
     List<String> queryParts = new ArrayList<>();
     for (String s : status) {
       queryParts.add("status=" + s);
     }
-    queryParts.add("scope=" + scope);
+    for (UUID sid : squadronIds) {
+      queryParts.add("squadronId=" + sid);
+    }
     return "/orders?" + String.join("&", queryParts);
   }
 
@@ -533,6 +514,11 @@ public class JobOrderPageController {
         model.addAttribute("itemHandoverForm", new JobOrderItemHandoverForm());
       }
       model.addAttribute("hasOutstandingItemLines", hasOutstandingItemLines(order));
+      // Kennzahlen-Band (KPI strip): derived totals rendered between the header and the tabs
+      // (REQ-ORDERS-026). Computed server-side so the fragment stays presentation-only and the
+      // ?fragment=kpi swap re-renders the same numbers after a claim / handover / production
+      // booking.
+      model.addAttribute("kpi", computeKpi(order));
 
       // Item-order blueprint coverage: which members of the responsible squadron/SK own the
       // blueprints for the ordered items. The backend gates this members-only (it returns 403 for a
@@ -582,10 +568,12 @@ public class JobOrderPageController {
         case "materials" -> "orders-detail :: materialsSection";
         case "aggregated" -> "orders-detail :: aggregatedSection";
         case "header" -> "orders-detail :: orderHeader";
+        case "kpi" -> "orders-detail :: kpiSection";
         case "handovers" -> "orders-detail :: materialHandoverSection";
         case "items" -> "orders-detail :: itemsSection";
         case "item-handovers" -> "orders-detail :: itemHandoverSection";
         case "item-handover-lines" -> "orders-detail :: itemHandoverLines";
+        case "production" -> "orders-detail :: productionSection";
         case "blueprint-owners" -> "orders-detail :: blueprintOwnersSection";
         case "assignees" -> "orders-detail :: assigneesSection";
         default -> "orders-detail";
@@ -916,26 +904,117 @@ public class JobOrderPageController {
   }
 
   /**
-   * Reports whether an item order still has at least one ordered-item line with outstanding
-   * (ordered minus delivered) whole units. Gates the item-handover button: once every line is fully
-   * delivered the order is COMPLETED and the button is hidden. Always {@code false} for material
-   * orders or an order with no item lines.
+   * Reports whether an item order has at least one ordered-item line that is deliverable now — i.e.
+   * has manufactured-but-not-yet-delivered whole units. Since delivery is gated by manufacture
+   * (REQ-ORDERS-025), the item-handover button appears only when there is something manufactured
+   * left to hand over, not merely something still ordered. Always {@code false} for material orders
+   * or an order with no item lines.
    *
    * @param order the loaded order (any kind)
-   * @return {@code true} if any item line has a positive outstanding quantity
+   * @return {@code true} if any item line has a positive manufactured-but-undelivered quantity
    */
   private boolean hasOutstandingItemLines(JobOrderDto order) {
     if (order == null || !"ITEM".equals(order.type()) || order.items() == null) {
       return false;
     }
     for (JobOrderItemDto item : order.items()) {
-      int ordered = item.amount() != null ? item.amount() : 0;
+      int manufactured = item.manufacturedAmount() != null ? item.manufacturedAmount() : 0;
       int delivered = item.deliveredAmount() != null ? item.deliveredAmount() : 0;
-      if (ordered - delivered > 0) {
+      if (manufactured - delivered > 0) {
         return true;
       }
     }
     return false;
+  }
+
+  /**
+   * Computes the Kennzahlen-Band (KPI strip) values from the already-loaded order, so the {@code
+   * kpiSection} fragment stays presentation-only (REQ-ORDERS-026). For a MATERIAL order: how many
+   * material requirements are fulfilled (currentStock ≥ amount) with a percentage bar, the
+   * still-open material quantity (Σ max(0, amount − stock)), the claim count and the handover
+   * count. For an ITEM order: delivered vs. ordered whole units with a bar, the still-open
+   * aggregated-material quantity, the claim count and the item-handover count. All sums null-guard
+   * the redacted requester view (where stock/claims are absent) so the tiles render zeros rather
+   * than throwing.
+   *
+   * @param order the loaded order (any kind)
+   * @return an insertion-ordered map of KPI values keyed for the fragment ({@code fulfilled},
+   *     {@code total}, {@code fulfilledPct}, {@code delivered}, {@code amount}, {@code
+   *     deliveredPct}, {@code openAmount}, {@code claims}, {@code handovers})
+   */
+  private Map<String, Object> computeKpi(JobOrderDto order) {
+    Map<String, Object> kpi = new LinkedHashMap<>();
+    kpi.put("fulfilled", 0);
+    kpi.put("total", 0);
+    kpi.put("fulfilledPct", 0);
+    kpi.put("delivered", 0);
+    kpi.put("amount", 0);
+    kpi.put("deliveredPct", 0);
+    kpi.put("openAmount", 0.0);
+    kpi.put("claims", 0);
+    kpi.put("handovers", 0);
+    // Only SK-public orders carry material claims (the backend populates openAmount for them); a
+    // private squadron order has none, so its claims KPI tile is suppressed rather than showing a
+    // permanent zero.
+    kpi.put("supportsClaims", false);
+    if (order == null) {
+      return kpi;
+    }
+
+    double openAmount = 0.0;
+    int claims = 0;
+    boolean supportsClaims = false;
+    if ("ITEM".equals(order.type())) {
+      int delivered = 0;
+      int amount = 0;
+      if (order.items() != null) {
+        for (JobOrderItemDto item : order.items()) {
+          amount += item.amount() != null ? item.amount() : 0;
+          delivered += item.deliveredAmount() != null ? item.deliveredAmount() : 0;
+        }
+      }
+      if (order.aggregatedMaterials() != null) {
+        for (var agg : order.aggregatedMaterials()) {
+          double required = agg.totalQuantity() != null ? agg.totalQuantity() : 0.0;
+          double stock = agg.currentStock() != null ? agg.currentStock() : 0.0;
+          openAmount += Math.max(0.0, required - stock);
+          claims += agg.claims() != null ? agg.claims().size() : 0;
+          if (agg.openAmount() != null) {
+            supportsClaims = true;
+          }
+        }
+      }
+      kpi.put("delivered", delivered);
+      kpi.put("amount", amount);
+      kpi.put("deliveredPct", amount > 0 ? (delivered * 100 / amount) : 0);
+      kpi.put("handovers", order.itemHandovers() != null ? order.itemHandovers().size() : 0);
+    } else {
+      int fulfilled = 0;
+      int total = 0;
+      if (order.materials() != null) {
+        total = order.materials().size();
+        for (JobOrderMaterialDto mat : order.materials()) {
+          double required = mat.amount() != null ? mat.amount() : 0.0;
+          double stock = mat.currentStock() != null ? mat.currentStock() : 0.0;
+          if (stock >= required) {
+            fulfilled++;
+          }
+          openAmount += Math.max(0.0, required - stock);
+          claims += mat.claims() != null ? mat.claims().size() : 0;
+          if (mat.openAmount() != null) {
+            supportsClaims = true;
+          }
+        }
+      }
+      kpi.put("fulfilled", fulfilled);
+      kpi.put("total", total);
+      kpi.put("fulfilledPct", total > 0 ? (fulfilled * 100 / total) : 0);
+      kpi.put("handovers", order.handovers() != null ? order.handovers().size() : 0);
+    }
+    kpi.put("openAmount", openAmount);
+    kpi.put("claims", claims);
+    kpi.put("supportsClaims", supportsClaims);
+    return kpi;
   }
 
   private List<SquadronDto> fetchSquadrons() {
@@ -949,6 +1028,21 @@ public class JobOrderPageController {
       log.error("Failed to fetch squadrons", e);
     }
     return new ArrayList<>();
+  }
+
+  /**
+   * The active squadrons offered by the orders-overview multi-squadron filter (REQ-ORDERS-027),
+   * sorted by name. Inactive squadrons are dropped so the picker never lists a retired Staffel.
+   *
+   * @return the active squadrons, name-sorted; never {@code null}
+   */
+  private List<SquadronDto> fetchActiveSquadrons() {
+    return fetchSquadrons().stream()
+        .filter(s -> Boolean.TRUE.equals(s.active()))
+        .sorted(
+            java.util.Comparator.comparing(
+                s -> s.name() != null ? s.name() : "", String.CASE_INSENSITIVE_ORDER))
+        .toList();
   }
 
   /**

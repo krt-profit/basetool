@@ -114,17 +114,32 @@ class JobOrderItemHandoverE2eTest {
         createItemOrderForTwoUnits(page, baseUrl, handle);
 
         // The guest cannot read the queue, but this admin can resolve the new order's id by handle.
-        JsonObject order = new BackendSeeder().findOrderByHandle(USERNAME, PASSWORD, handle);
+        BackendSeeder seeder = new BackendSeeder();
+        JsonObject order = seeder.findOrderByHandle(USERNAME, PASSWORD, handle);
         assertNotNull(order, "the created ITEM order must be readable by the admin");
         String id = order.get("id").getAsString();
-        String detailUrl = baseUrl + "/orders/" + id;
 
-        E2eSupport.navigate(page, detailUrl);
+        // Delivery is gated by manufacture (REQ-ORDERS-025): manufacture both ordered units first
+        // so
+        // the order becomes deliverable. Production consumes linked recipe-material stock, seeded
+        // here
+        // through the API before the item-handover UI flow.
+        String locationId =
+            seeder.createLocation(USERNAME, PASSWORD, "E2E Item HO Loc " + UUID.randomUUID());
+        seeder.manufactureItemOrderLineFully(USERNAME, PASSWORD, id, locationId);
+
+        String detailUrl = baseUrl + "/orders/" + id;
+        // The item-handover controls live in a non-default tab pane (an item order defaults to the
+        // "items" tab), so deeplink straight to the item-handovers tab before asserting or driving
+        // them; the /items/edit route below is a separate page and keeps the bare detail URL.
+        String itemHandoverUrl = detailUrl + "?tab=item-handovers";
+
+        E2eSupport.navigate(page, itemHandoverUrl);
         assertThat(page.getByTestId("item-handover-open")).isVisible();
 
         // Partial handover: deliver one of two units. The log-handover button must remain.
         recordItemHandover(page, "1", "E2E Item Recipient A");
-        E2eSupport.navigate(page, detailUrl);
+        E2eSupport.navigate(page, itemHandoverUrl);
         assertThat(
                 page.getByTestId("item-handover-row")
                     .filter(new Locator.FilterOptions().setHasText("E2E Item Recipient A")))
@@ -138,9 +153,9 @@ class JobOrderItemHandoverE2eTest {
 
         // Completing handover: deliver the last unit; the order auto-completes and the log-handover
         // button disappears once no line is outstanding.
-        E2eSupport.navigate(page, detailUrl);
+        E2eSupport.navigate(page, itemHandoverUrl);
         recordItemHandover(page, "1", "E2E Item Recipient B");
-        E2eSupport.navigate(page, detailUrl);
+        E2eSupport.navigate(page, itemHandoverUrl);
         assertThat(page.getByTestId("item-handover-open")).hasCount(0);
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "joborder-item-handover");
