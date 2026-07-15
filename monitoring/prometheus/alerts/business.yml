@@ -412,13 +412,18 @@ groups:
       # false-fired (2026-07-12): members hold 30-day "stay logged in" sessions, so genuinely fresh
       # successful logins are sparse — frequently ZERO per 15m window, especially off-hours — while a
       # single benign failure is trivial to produce. Unauthenticated bots/scanners hitting the OAuth
-      # callback /login/oauth2/code/keycloak (BotProtectionFilter does NOT shield it), plus
-      # abandoned / expired-state / back-button logins, all raise reason="invalid_state". So
-      # "failures>0 with zero successes" is a NORMAL healthy state here, not a break. A genuine
-      # all-users state/session-loss break (SameSite or cookie-domain regression, Redis unreachable,
-      # broken session deserialisation) also shows as invalid_state, but it is corroborated by the
-      # frontend `redis` readiness indicator / TargetDown / deploy-time e2e — folding it in here is
-      # exactly what made this alert noisy.
+      # callback /login/oauth2/code/keycloak (BotProtectionFilter does NOT shield it) raise
+      # reason="invalid_request" (a bare/partial callback is not a valid authorization response, so
+      # OAuth2LoginAuthenticationFilter rejects it BEFORE any token exchange), and abandoned /
+      # expired-state / back-button logins raise the state codes — LoginFailureMetricsHandler folds
+      # ALL of these into the benign reason="invalid_state" bucket (2026-07-15 fix), so none of this
+      # noise reaches provider_error. Before that fix invalid_request leaked into provider_error and
+      # off-peak scanner traffic tripped this alert with nothing broken. So "provider_error failures
+      # with zero successes" is now the token-exchange break mode only. A genuine all-users
+      # state/session-loss break (SameSite or cookie-domain regression, Redis unreachable, broken
+      # session deserialisation) shows as invalid_state, corroborated by the frontend `redis`
+      # readiness indicator / TargetDown / deploy-time e2e — folding it in here is exactly what made
+      # this alert noisy.
       #
       # >= 3 over 15m + for:10m: a real code-to-token/JWKS break fails EVERY attempt so provider_error
       # climbs fast and stays, while a lone transient token-endpoint blip (one flaky exchange, a brief

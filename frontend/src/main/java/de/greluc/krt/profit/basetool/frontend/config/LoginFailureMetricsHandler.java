@@ -39,11 +39,15 @@ import org.springframework.security.web.authentication.SimpleUrlAuthenticationFa
  * <p>The {@code reason} tag is derived from the exception <b>type</b> and, for an {@link
  * OAuth2AuthenticationException}, its bounded OAuth2 error <b>code</b> — never the raw, provider-
  * supplied error description (which could be arbitrary and would blow up the metric cardinality).
- * It collapses to three buckets: {@code invalid_state} (the authorization-request / state check
- * failed), {@code provider_error} (any other OAuth2 error — a bad IdP response or a failed
- * code-to-token exchange, the failure class {@code KeycloakLoginErrorSpike}'s event regex misses)
- * and {@code other} (a non-OAuth2 authentication exception). See {@link LoginSuccessMetricsHandler}
- * for the paired success signal (#1041 item 18, REQ-OBS-011).
+ * It collapses to three buckets: {@code invalid_state} (a benign authorization-response / {@code
+ * state}-validation failure raised BEFORE any token exchange — the state check failed OR the
+ * callback was not a valid authorization response, i.e. a scanner/probe or stale bookmark hitting
+ * the {@code /login/oauth2/code/*} callback), {@code provider_error} (a genuine post-authorization
+ * failure — a bad IdP response or a failed code-to-token exchange, the failure class {@code
+ * KeycloakLoginErrorSpike}'s event regex misses) and {@code other} (a non-OAuth2 authentication
+ * exception). Keeping malformed-callback traffic OUT of {@code provider_error} is what stops it
+ * false-tripping {@code FrontendLoginBroken}; see {@link #isStateError(String)}. See {@link
+ * LoginSuccessMetricsHandler} for the paired success signal (#1041 item 18, REQ-OBS-011).
  */
 public class LoginFailureMetricsHandler extends SimpleUrlAuthenticationFailureHandler {
 
@@ -107,16 +111,36 @@ public class LoginFailureMetricsHandler extends SimpleUrlAuthenticationFailureHa
   }
 
   /**
-   * Recognises the OAuth2 error codes Spring Security raises when the authorization request cannot
-   * be correlated to the callback — i.e. the {@code state} check failed or the saved request was
-   * lost. Anything else maps to {@code provider_error}.
+   * Recognises the OAuth2 error codes Spring Security raises at the authorization-response / {@code
+   * state}-validation stage — BEFORE any code-to-token exchange — so they are benign and must never
+   * inflate {@code provider_error}. Two shapes land here:
+   *
+   * <ul>
+   *   <li>the saved authorization request could not be correlated to the callback (the state check
+   *       failed / the request was lost): {@code authorization_request_not_found}, {@code
+   *       invalid_state_parameter}, {@code invalid_state};
+   *   <li>the callback was not a valid authorization response at all: {@code invalid_request}.
+   *       {@code OAuth2LoginAuthenticationFilter} throws this from {@code attemptAuthentication}
+   *       when {@code isAuthorizationResponse(params)} fails (a bare or partial hit to the
+   *       path-only-matched {@code /login/oauth2/code/*} callback — no {@code code}/{@code state}),
+   *       i.e. exactly the traffic a scanner/probe or a stale bookmark generates. It is raised
+   *       before the authorization-request lookup and before the {@code AuthenticationManager}
+   *       runs, so it can NEVER be a token-exchange failure. Leaving it out of this set let those
+   *       malformed-callback hits fall through to {@code provider_error} and, off-peak with no
+   *       fresh successes, trip {@code FrontendLoginBroken} with nothing actually broken.
+   * </ul>
+   *
+   * <p>Anything else — {@code invalid_grant}, {@code server_error}, {@code invalid_token_response},
+   * … — is a genuine post-authorization token/IdP failure and correctly maps to {@code
+   * provider_error}, the class the {@code FrontendLoginBroken} alert exists to catch.
    *
    * @param code the OAuth2 error code, or {@code null}
-   * @return {@code true} when the code denotes an authorization-request / state failure
+   * @return {@code true} when the code denotes a benign authorization-response / state failure
    */
   private static boolean isStateError(@Nullable String code) {
     return "authorization_request_not_found".equals(code)
         || "invalid_state_parameter".equals(code)
-        || "invalid_state".equals(code);
+        || "invalid_state".equals(code)
+        || "invalid_request".equals(code);
   }
 }

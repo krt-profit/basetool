@@ -1,0 +1,41 @@
+# promtool unit test for the ContainerRestartLoop metric fix (2026-07-15 false-critical fix).
+#
+# Proves the corrected expr `changes(container_start_time_seconds{name=~".+"}[15m]) > 3`:
+#   - does NOT fire for a container that restarted only ONCE (a routine deploy recreate of
+#     backend/frontend/ingest — the false CRITICAL the old `increase()` on the start-time GAUGE paged,
+#     because increase() returned the epoch-delta between the old and new start times, not a count);
+#   - STILL fires (critical) for a container that genuinely restarted 4+ times inside the 15m window.
+#
+# Run locally (no promtool installed on the host — use an ephemeral container, see
+# monitoring/README.md monitoring-config lint recipe):
+#   docker run --rm -v "$PWD/monitoring/prometheus:/work" -w /work \
+#     prom/prometheus:v3.13.0 promtool test rules tests/containerrestartloop_changes_test.yml
+
+rule_files:
+  - ../alerts/infrastructure.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: ContainerRestartLoop counts restarts, not the start-time delta
+    interval: 1m
+    input_series:
+      # backend restarts exactly ONCE (start time jumps 1000 -> 2000 at t9): a routine recreate.
+      # changes() over any 15m window is <= 1, so it MUST NOT page — the whole point of the fix.
+      - series: 'container_start_time_seconds{name="backend"}'
+        values: "1000x8 2000x30"
+      # frontend restarts 8 times in the first 8 minutes (start time steps every minute), then settles:
+      # changes() over the trailing 15m window is 8 (> 3) continuously through t=15m, so with for:5m it
+      # MUST page critical — a genuine crash loop is still caught.
+      - series: 'container_start_time_seconds{name="frontend"}'
+        values: "1000 2000 3000 4000 5000 6000 7000 8000 9000x30"
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: ContainerRestartLoop
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              name: frontend
+            exp_annotations:
+              summary: "Container restart loop: frontend"
+              description: "Container frontend restarted more than 3 times in 15 minutes."

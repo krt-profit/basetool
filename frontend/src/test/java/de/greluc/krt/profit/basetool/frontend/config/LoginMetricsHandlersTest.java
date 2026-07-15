@@ -70,6 +70,13 @@ class LoginMetricsHandlersTest {
         .isEqualTo(MetricNames.LOGIN_REASON_INVALID_STATE);
     assertThat(LoginFailureMetricsHandler.reasonFor(oauth2("invalid_state_parameter")))
         .isEqualTo(MetricNames.LOGIN_REASON_INVALID_STATE);
+    // invalid_request is raised by OAuth2LoginAuthenticationFilter for a bare/partial callback (a
+    // scanner/probe or stale bookmark hitting /login/oauth2/code/*) BEFORE any token exchange, so
+    // it
+    // must be a benign state failure, not provider_error — otherwise it false-trips
+    // FrontendLoginBroken.
+    assertThat(LoginFailureMetricsHandler.reasonFor(oauth2("invalid_request")))
+        .isEqualTo(MetricNames.LOGIN_REASON_INVALID_STATE);
   }
 
   @Test

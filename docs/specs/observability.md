@@ -609,9 +609,14 @@ the 403). They drive `FrontendLoginBroken` (>= 3 `reason="provider_error"` failu
 concurrent successes, sustained 10m — the code-to-token / JWKS / bad-IdP-response break
 `KeycloakLoginErrorSpike`'s event regex misses because it fails *after* the user already authenticated
 at Keycloak; the failure side is scoped to `provider_error` and floored so the benign `invalid_state`
-noise — unauthenticated bots hitting the OAuth callback, abandoned / expired-state logins — cannot trip
-it when fresh successes are naturally sparse under the 30-day login window, and a state/session-loss
-break surfaces as `invalid_state` and via the `redis` readiness indicator instead) and
+noise cannot trip it when fresh successes are naturally sparse under the 30-day login window.
+Unauthenticated bots hitting the bare OAuth callback raise `invalid_request` — a bare/partial callback
+is not a valid authorization response, so `OAuth2LoginAuthenticationFilter` rejects it before any token
+exchange — and abandoned / expired-state logins raise the state codes; `LoginFailureMetricsHandler`
+folds **both** into the `invalid_state` bucket (2026-07-15 fix — before it, `invalid_request` leaked
+into `provider_error` and off-peak scanner traffic false-tripped the alert), keeping `provider_error` a
+genuine post-authorization token/IdP-break signal. A state/session-loss break also surfaces as
+`invalid_state` and via the `redis` readiness indicator instead) and
 `CsrfRejectionSpike` (a systematic CSRF-wiring regression that `krtFetch`'s silent single-retry
 otherwise masks as intermittent failed writes). The pre-auth `BotProtectionFilter` adds
 `basetool_bot_blocked_total{rule}` (#1041 item 19; `rule` = `method` / `path_prefix` /
@@ -850,7 +855,12 @@ therefore alerts on:
   (critical) and `CoreContainerMetricsMissing` (warning) guard the named-series count;
   `ContainerOomKilled` and `ContainerCpuThrottledHigh` (warning) surface a single OOM kill and
   sustained CFS throttling that the coarse `ContainerRestartLoop` / `ContainerWorkingSetHigh` alerts
-  miss.
+  miss. `ContainerRestartLoop` counts restarts with `changes(container_start_time_seconds[15m]) > 3`,
+  **not** `increase()` — that metric is a start-time *gauge* (Unix epoch), so `increase()` returned the
+  epoch delta between the old and new start times and paged CRITICAL on any single restart, including a
+  routine deploy recreate of backend/frontend/ingest (fixed 2026-07-15; the sibling Grafana "Container
+  Restarts" panel already used `changes()`; locked by
+  `tests/containerrestartloop_changes_test.yml`).
 - **cgroup-pids exhaustion.** The `pids` cgroup cap (2048 for the four JVM containers
   backend/frontend/ingest/keycloak) limits **every** task in the container, not just JVM threads —
   unreaped child-process zombies and the OS carrier threads behind virtual threads both count against
@@ -875,6 +885,24 @@ therefore alerts on:
   `node_filesystem_*`). The 2048 cap is
   hardcoded to stay in lockstep with `JvmThreadsHigh` and the compose `pids` limit; do **not** raise
   the cap to silence the alert.
+- **Alertmanager routing & root-cause suppression.** One real fault fans out into many true-positive
+  downstream symptoms; the notification plane collapses them so an operator sees the cause, not the
+  storm. The route groups by `alertname` only (`group_by: ['alertname']`) — grouping *also* by `job`
+  needlessly split a multi-target `TargetDown` into one mail per job. Five `inhibit_rules` suppress a
+  strictly-more-root cause's symptoms, each joined on a label the two alerts actually share so a
+  missing-label match can never over-suppress: (1) an app `TargetDown` mutes that app's warnings
+  (`application`); (2) a `BlackboxProbeFailed` mutes that endpoint's cert/edge alerts (`instance`); (3)
+  `HostDiskCritical` mutes `HostDiskWarning` (`mountpoint`); (4) a `ContainerRestartLoop` mutes that
+  **same** container's resource-pressure warnings — working-set / OOM / CPU-throttle / pids, which a
+  crash-looping container trips as a symptom (`name`); (5) a `TargetDown` mutes every warning derived
+  from that dead target's series (`instance`, both sides gated `instance=~".+"`). Rules 4–5 were added
+  after the 2026-07-15 cascade (a Postgres FATAL crash-looped the `depends_on` chain) sent ~18 mails.
+  Cross-service symptoms that carry no shared join label (`FrontendLoginBroken`,
+  `BackendCallFailureSustained`, the label-less sync-zero warnings) and the independent criticals still
+  fire — inhibition suppresses the *notification*, never the firing, and criticals must keep paging.
+  The template is rendered by the runbook with `envsubst` and validated with `amtool check-config`;
+  because monitoring configs are inode-pinned bind mounts the reconcile force-recreates Alertmanager to
+  apply a change (verify `AlertmanagerConfigReloadFailed == 0` after deploy).
 
 All labels stay bounded (REQ-OBS-006): these alerts read only the exporters' own low-cardinality
 series (`job` / `instance` / `reason` / `name` / `path` / `health_type` / `component`), never per-user
@@ -882,8 +910,10 @@ or free-text values.
 
 **Enforced by:** `monitoring/prometheus/alerts/meta.yml` (`meta-self-health` + `meta-log-pipeline`
 groups, incl. `MonitoringReconcileDisabled`) · `monitoring/prometheus/alerts/infrastructure.yml`
-(container guards, incl. `ContainerPidsHigh`) · `monitoring/prometheus/tests/` (`promtool test rules`
-units, incl. `monitoring_reconcile_disabled_test.yml`) · `docker-compose.monitoring.yml` (cadvisor
+(container guards, incl. `ContainerPidsHigh` + the `changes()`-based `ContainerRestartLoop`) ·
+`monitoring/alertmanager/alertmanager.yml.tmpl` (route grouping + the five root-cause `inhibit_rules`) ·
+`monitoring/prometheus/tests/` (`promtool test rules` units, incl. `monitoring_reconcile_disabled_test.yml`
+and `containerrestartloop_changes_test.yml`) · `docker-compose.monitoring.yml` (cadvisor
 `process` metric group enabling `container_threads`/`container_processes`) ·
 `monitoring/prometheus/prometheus.yml` (the `blackbox-exporter` self-metrics scrape job) ·
 `scripts/deploy.sh` (`reconcile_monitoring_reload(s)` self-healing force-recreate + the

@@ -76,8 +76,18 @@ groups:
           summary: "systemd unit failed: {{ $labels.name }}"
           description: "The systemd unit {{ $labels.name }} is in the failed state (e.g. iri-deploy / iri-backup / iri-restore-drill)."
 
+      # container_start_time_seconds is a cAdvisor GAUGE holding the container's Unix epoch start time,
+      # NOT a monotonic restart counter. increase() over it returns the DELTA between the old and new
+      # start timestamps on a restart (seconds..days), so a SINGLE restart of any container that had
+      # been up more than ~3s exceeded ">3" and paged CRITICAL — which is what a routine deploy recreate
+      # of backend/frontend/ingest did (v1.4.0, 2026-07-15). changes() counts how many times the series
+      # VALUE changed in the window — i.e. actual restarts — which is the intended ">3 restarts/15m"
+      # semantics and matches the sibling Grafana "Container Restarts" panel (02-containers.json, which
+      # already uses changes()). A genuine 4+ crash loop still fires after for:5m; a lone restart no
+      # longer pages (single-restart faults stay covered by ContainerOomKilled / ContainerPidsHigh /
+      # TargetDown). Locked by tests/containerrestartloop_changes_test.yml.
       - alert: ContainerRestartLoop
-        expr: increase(container_start_time_seconds{name=~".+"}[15m]) > 3
+        expr: changes(container_start_time_seconds{name=~".+"}[15m]) > 3
         for: 5m
         labels:
           severity: critical
