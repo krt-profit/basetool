@@ -1779,6 +1779,23 @@ function _prodDemand(mat, k) {
     }, 0);
 }
 
+// Toggle the collapsible "Bedarf je Stück" demand sub-row in the Herstellung table (the chevron
+// button carries aria-controls -> the sub-row's id). Mirrors the bank booking-detail toggle: flip
+// aria-expanded and the target's hidden attribute; the page CSS rotates the chevron off
+// [aria-expanded='true'].
+function _odToggleDemandRow(control) {
+    if (!control) {
+        return;
+    }
+    const expanded = control.getAttribute('aria-expanded') === 'true';
+    control.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+    const id = control.getAttribute('aria-controls');
+    const target = id ? document.getElementById(id) : null;
+    if (target) {
+        target.hidden = expanded;
+    }
+}
+
 function openProductionModal(button) {
     const orderId = button.getAttribute('data-order-id');
     const itemId = button.getAttribute('data-item-id');
@@ -2112,6 +2129,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('click', 'od-open-handover', openHandoverModal);
     window.krtEvents.on('click', 'od-open-production', openProductionModal);
     window.krtEvents.on('click', 'od-book-production', bookProduction);
+    window.krtEvents.on('click', 'od-toggle-demand', _odToggleDemandRow);
     window.krtEvents.on('click', 'od-download-report', function (el) {
         downloadHandoverReport(el);
     });

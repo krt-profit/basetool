@@ -514,6 +514,7 @@ public class JobOrderPageController {
         model.addAttribute("itemHandoverForm", new JobOrderItemHandoverForm());
       }
       model.addAttribute("hasOutstandingItemLines", hasOutstandingItemLines(order));
+      model.addAttribute("hasManufacturedItems", hasManufacturedItems(order));
       // Kennzahlen-Band (KPI strip): derived totals rendered between the header and the tabs
       // (REQ-ORDERS-026). Computed server-side so the fragment stays presentation-only and the
       // ?fragment=kpi swap re-renders the same numbers after a claim / handover / production
@@ -921,6 +922,28 @@ public class JobOrderPageController {
       int manufactured = item.manufacturedAmount() != null ? item.manufacturedAmount() : 0;
       int delivered = item.deliveredAmount() != null ? item.deliveredAmount() : 0;
       if (manufactured - delivered > 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Whether the loaded item order has any manufactured units recorded across its lines.
+   * Distinguishes a still-nothing-made order (delivery impossible — the item-handover tab shows a
+   * "manufacture first" hint) from a fully-delivered one (it shows "all delivered"), since both
+   * leave {@link #hasOutstandingItemLines} false (REQ-ORDERS-025). Always {@code false} for
+   * material orders or an order with no item lines.
+   *
+   * @param order the loaded order (any kind)
+   * @return {@code true} if any item line has a positive manufactured amount
+   */
+  private boolean hasManufacturedItems(JobOrderDto order) {
+    if (order == null || !"ITEM".equals(order.type()) || order.items() == null) {
+      return false;
+    }
+    for (JobOrderItemDto item : order.items()) {
+      if (item.manufacturedAmount() != null && item.manufacturedAmount() > 0) {
         return true;
       }
     }

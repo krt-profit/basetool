@@ -117,9 +117,11 @@ class JobOrderProductionE2eTest {
         String id = order.get("id").getAsString();
 
         // Delivery is gated by manufacture: with manufactured = 0 the item-handover control is not
-        // rendered yet (REQ-ORDERS-025).
+        // rendered yet, and the tab explains why instead of showing a misleading "all delivered"
+        // note (REQ-ORDERS-025).
         E2eSupport.navigate(page, baseUrl + "/orders/" + id + "?tab=item-handovers");
         assertThat(page.getByTestId("item-handover-open")).hasCount(0);
+        assertThat(page.getByTestId("item-handover-none-manufactured")).isVisible();
 
         // Link one inventory entry of the order's exact derived recipe material, so the production
         // modal has stock to consume. The recipe material is resolved from the persisted order

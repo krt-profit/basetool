@@ -44,6 +44,13 @@ deliverable quantity of a line at `manufacturedAmount − deliveredAmount`, not 
 deliveredAmount`: a unit can only be handed over once it has been produced. Attempting to deliver
 more than the manufactured-but-undelivered quantity is rejected with HTTP 400.
 
+The *Item-Übergaben* tab surfaces this to the operator. When nothing has been manufactured yet
+(`hasManufacturedItems` false — no line has a positive `manufacturedAmount`) it shows a hint that no
+handover can be booked until production is recorded, instead of the misleading "all items delivered"
+note. That "all delivered" note now shows only once something *has* been manufactured and every
+manufactured unit is delivered; both states leave `hasOutstandingItemLines` false, so the two flags
+together disambiguate them.
+
 **Booking.** A production run is booked through
 `POST /api/v1/orders/{id}/items/{itemId}/production`
 (`JobOrderItemProductionService.bookProduction`), gated `(hasRole('LOGISTICIAN') or
@@ -177,6 +184,12 @@ This is a **presentation restructure**: every backend contract, DTO, optimistic-
 permission gate of the previous panel layout is preserved; the redacted requester view
 (`REQ-ORDERS-023`) keeps hiding the same sections.
 
+On the *Herstellung* tab each item line's per-unit material demand (*Bedarf je Stück*) sits in a
+collapsible sub-row toggled by a leading chevron (hidden by default), mirroring the bank request
+table's Notiz/Begründung detail row, so a multi-material recipe no longer widens the row. The
+machine-readable per-material demand the production modal consumes stays on the main row, so the
+booking flow is unaffected.
+
 **Acceptance**
 
 - [ ] A `MATERIAL` order shows the material KPI tiles and the material tab set; an `ITEM` order shows
@@ -190,6 +203,11 @@ permission gate of the previous panel layout is preserved; the redacted requeste
 - [ ] Arrow-key navigation moves selection along the tablist; `aria-selected` tracks the active tab.
 - [ ] Requester-redacted views omit the same tabs (Bearbeiter, Aggregierte Materialien, Übergaben)
   they omitted before.
+- [ ] On the Herstellung tab a line's per-unit demand is hidden behind a chevron and revealed in a
+  sub-row on click; booking a production run still works (its machine-readable demand stays on the
+  main row).
+- [ ] The Item-Übergaben tab shows the "record production first" hint when nothing has been
+  manufactured, and the "all delivered" note only once everything manufactured has been delivered.
 
 **Enforced by:** `JobOrderItemDetailRenderTest`, `JobOrderListRenderTest`,
 `JobOrderPageControllerNoReloadMvcTest` (tab panes, KPI tiles, conditional tabs, no-reload swaps) ·
