@@ -1744,7 +1744,9 @@ async function toggleInventory(row) {
 // The modal lets a logistician record how many units of an ordered item were manufactured and, per
 // required material, exactly which linked inventory entries the material was drawn from. The demand
 // per material scales the line's snapshot (requiredTotal × k / lineAmount, rounded for the quantity
-// type) exactly as the backend does; "buchen" is enabled only when every material is covered.
+// type) exactly as the backend does; "buchen" is enabled only when every non-skipped material is
+// covered. A material whose "Nicht ausbuchen" checkbox is ticked is recorded but not booked out —
+// its demand is excluded from the gate and it is posted in skippedMaterialIds instead.
 let _prodMaterials = [];
 let _prodContext = null;
 
@@ -1879,15 +1881,26 @@ function openProductionModal(button) {
         const card = document.createElement('div');
         card.className = 'card card--inset mb-1';
         card.setAttribute('data-prod-material', mat.materialId);
+        // "Nicht ausbuchen": when checked, this material is recorded but not booked out — its demand
+        // drops out of the reconcile gate and no consumption is posted for it (skippedMaterialIds).
         card.innerHTML =
             '<div class="card-head"><h3 class="card-title">' +
             escapeHtml(mat.materialName) +
             '</h3><span class="chip chip--muted" data-prod-chip></span></div>' +
+            '<label class="od-prod-skip" title="' +
+            escapeHtml(PRODUCTION_I18N.skipHint) +
+            '"><input type="checkbox" data-prod-skip> ' +
+            escapeHtml(PRODUCTION_I18N.skipLabel) +
+            '</label>' +
             '<div data-prod-entries><p class="text-muted">' +
             escapeHtml(PRODUCTION_I18N.loadingStock) +
             '</p></div>';
         if (container) {
             container.appendChild(card);
+        }
+        const skipCb = card.querySelector('[data-prod-skip]');
+        if (skipCb) {
+            skipCb.addEventListener('change', _prodReconcile);
         }
         fetch('/orders/' + orderId + '/materials/' + mat.materialId + '/inventory')
             .then(function (r) {
@@ -1973,18 +1986,33 @@ function _prodReconcile() {
     }
     let allCovered = k >= 1 && k <= _prodContext.remaining;
     _prodMaterials.forEach(function (mat) {
-        const demand = _prodDemand(mat, k);
         const card = document.querySelector('[data-prod-material="' + mat.materialId + '"]');
         if (!card) {
             return;
         }
+        const skipCb = card.querySelector('[data-prod-skip]');
+        const skipped = !!(skipCb && skipCb.checked);
+        const chip = card.querySelector('[data-prod-chip]');
+        // A skipped material is recorded but not booked out: disable its stock inputs, flag the card
+        // and never count it against the "buchen" gate.
+        card.classList.toggle('od-prod-skipped', skipped);
+        card.querySelectorAll('[data-prod-alloc]').forEach(function (inp) {
+            inp.disabled = skipped;
+        });
+        if (skipped) {
+            if (chip) {
+                chip.textContent = PRODUCTION_I18N.skipped;
+                chip.className = 'chip chip--muted';
+            }
+            return;
+        }
+        const demand = _prodDemand(mat, k);
         let assigned = 0;
         card.querySelectorAll('[data-prod-alloc]').forEach(function (inp) {
             assigned += parseFloat(inp.value) || 0;
         });
         assigned = mat.quantityType === 'PIECE' ? Math.round(assigned) : _prodRound3(assigned);
         const rest = _prodRound3(demand - assigned);
-        const chip = card.querySelector('[data-prod-chip]');
         if (chip) {
             chip.textContent = PRODUCTION_I18N.reconcile
                 .replace('{0}', _prodFmtNum(demand, mat.quantityType))
@@ -2019,11 +2047,19 @@ function bookProduction() {
         return;
     }
     const consumption = [];
+    const skippedMaterialIds = [];
     let ok = true;
     _prodMaterials.forEach(function (mat) {
+        const card = document.querySelector('[data-prod-material="' + mat.materialId + '"]');
+        const skipCb = card ? card.querySelector('[data-prod-skip]') : null;
+        // A material marked "nicht ausbuchen" is posted in skippedMaterialIds (the backend drops its
+        // demand) and contributes no consumption.
+        if (skipCb && skipCb.checked) {
+            skippedMaterialIds.push(mat.materialId);
+            return;
+        }
         const demand = _prodDemand(mat, k);
         let assigned = 0;
-        const card = document.querySelector('[data-prod-material="' + mat.materialId + '"]');
         if (card) {
             card.querySelectorAll('[data-prod-alloc]').forEach(function (inp) {
                 const v = parseFloat(inp.value) || 0;
@@ -2059,6 +2095,7 @@ function bookProduction() {
             amount: k,
             version: _prodContext.version ? parseInt(_prodContext.version, 10) : null,
             consumption: consumption,
+            skippedMaterialIds: skippedMaterialIds,
         },
         toast: false,
         errorMessage: PRODUCTION_I18N.allocError,

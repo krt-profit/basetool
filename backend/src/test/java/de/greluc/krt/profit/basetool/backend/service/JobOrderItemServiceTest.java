@@ -243,6 +243,52 @@ class JobOrderItemServiceTest {
   }
 
   @Test
+  void aggregateMaterialsReducesOutstandingDemandByManufacturedUnits() {
+    // A 4-unit line needing 160 SCU Steel total; 1 unit already manufactured leaves 3 → the
+    // outstanding aggregate is only 160 × 3 / 4 = 120 (REQ-ORDERS-025).
+    Material steel = material("Steel", QuantityType.SCU);
+    stubMapper(steel);
+
+    JobOrderItem line = JobOrderItem.builder().amount(4).manufacturedAmount(1).build();
+    line.addMaterial(
+        JobOrderItemMaterial.builder()
+            .material(steel)
+            .requiredQuantity(160.0)
+            .qualityRequirement(QualityRequirement.NONE)
+            .build());
+    JobOrder order = JobOrder.builder().type(JobOrderType.ITEM).build();
+    order.addItem(line);
+
+    List<AggregatedMaterialDto> aggregated = service.aggregateMaterials(order);
+
+    assertThat(aggregated).hasSize(1);
+    assertThat(aggregated.get(0).totalQuantity()).isEqualTo(120.0);
+  }
+
+  @Test
+  void aggregateMaterialsIsZeroForAFullyManufacturedLine() {
+    // Every ordered unit produced → no outstanding material demand, but the bucket row is kept so
+    // its quality/claims stay visible (REQ-ORDERS-025).
+    Material steel = material("Steel", QuantityType.SCU);
+    stubMapper(steel);
+
+    JobOrderItem line = JobOrderItem.builder().amount(2).manufacturedAmount(2).build();
+    line.addMaterial(
+        JobOrderItemMaterial.builder()
+            .material(steel)
+            .requiredQuantity(80.0)
+            .qualityRequirement(QualityRequirement.NONE)
+            .build());
+    JobOrder order = JobOrder.builder().type(JobOrderType.ITEM).build();
+    order.addItem(line);
+
+    List<AggregatedMaterialDto> aggregated = service.aggregateMaterials(order);
+
+    assertThat(aggregated).hasSize(1);
+    assertThat(aggregated.get(0).totalQuantity()).isEqualTo(0.0);
+  }
+
+  @Test
   void deriveForPreviewReturnsResolvedMaterialsSubAssembliesAndUnresolvedNames() {
     GameItem weapon = gameItem("Ballista", GameItemKind.WEAPON);
     Material steel = material("Steel", QuantityType.SCU);

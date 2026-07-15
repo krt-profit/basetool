@@ -41,9 +41,12 @@ import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.QuantityTypeRounding;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -70,7 +73,9 @@ import org.springframework.transaction.annotation.Transactional;
  * unlink to defer. The material demand for {@code N} units of a line is the line's snapshotted
  * per-unit recipe scaled to {@code N} ({@code requiredQuantity × N / lineAmount}, per-material,
  * rounded for the material's quantity type) — the same snapshot that feeds the aggregated-materials
- * view. The consumption plan must cover that demand for every required material exactly.
+ * view. The consumption plan must cover that demand for every required material exactly, except for
+ * materials the operator opted out of via {@code skippedMaterialIds}: those are dropped from the
+ * demand map, so the plan neither requires nor may name them and their linked stock is untouched.
  */
 @Service
 @RequiredArgsConstructor
@@ -115,11 +120,14 @@ public class JobOrderItemProductionService {
    * Books a production run against one item line: validates the amount against the line's
    * remaining-to-manufacture and the consumption against the required per-material demand, reduces
    * the consumed linked inventory, increments {@code manufacturedAmount}, and audits the JOB_ORDER
-   * booking plus each cross-domain INVENTORY reduction.
+   * booking plus each cross-domain INVENTORY reduction. Materials the operator listed in {@code
+   * dto.skippedMaterialIds} are excluded from the demand-coverage check and left un-booked-out — no
+   * inventory is consumed for them.
    *
    * @param jobOrderId the item order that owns the line
    * @param jobOrderItemId the ordered item line being produced
-   * @param dto the production payload (amount, line version, per-entry consumption)
+   * @param dto the production payload (amount, line version, per-entry consumption, skipped
+   *     materials)
    * @return the refreshed ordered-item line DTO (with the advanced {@code manufacturedAmount} and
    *     version)
    * @throws NotFoundException when the order, the line, or a consumed inventory entry is unknown
@@ -167,13 +175,26 @@ public class JobOrderItemProductionService {
       throw new ProductionAllocationException();
     }
 
+    // Materials the operator marked "nicht ausbuchen": their demand is dropped from the coverage
+    // check and their linked stock is left untouched (nothing is consumed for them). A null list is
+    // treated as "none skipped".
+    final Set<UUID> skippedMaterials =
+        dto.skippedMaterialIds() == null ? Set.of() : new HashSet<>(dto.skippedMaterialIds());
+
     // Required per-material demand for `amount` units, scaled from the line's snapshot (the same
     // snapshot that feeds the aggregated-materials view). requiredQuantity holds the demand for the
-    // whole ordered amount, so scale it to `amount` and round for the material's quantity type.
+    // whole ordered amount, so scale it to `amount` and round for the material's quantity type. A
+    // skipped material is excluded here, so the coverage check below neither requires nor allows
+    // consumption for it.
     Map<UUID, Double> demandByMaterial = new LinkedHashMap<>();
+    final Set<UUID> skippedRequiredMaterials = new LinkedHashSet<>();
     for (JobOrderItemMaterial req : line.getMaterials()) {
       Material material = req.getMaterial();
       if (material == null) {
+        continue;
+      }
+      if (skippedMaterials.contains(material.getId())) {
+        skippedRequiredMaterials.add(material.getId());
         continue;
       }
       double reqTotal = req.getRequiredQuantity() == null ? 0.0 : req.getRequiredQuantity();
@@ -309,7 +330,8 @@ public class JobOrderItemProductionService {
         null,
         AuditDetails.of("item", jobOrderItemId)
             .with("amount", amount)
-            .with("consumed", dto.consumption().size()));
+            .with("consumed", dto.consumption().size())
+            .with("skipped", skippedRequiredMaterials.size()));
 
     return jobOrderItemService.toItemDtos(jobOrder).stream()
         .filter(d -> d.id().equals(jobOrderItemId))

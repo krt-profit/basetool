@@ -197,12 +197,16 @@ public class JobOrderItemService {
   }
 
   /**
-   * Aggregates every snapshotted material requirement across all ordered lines into one row per
-   * {@code (material, quality)}, summing the quantities. SCU materials sort first, then by name,
-   * then GOOD before NONE — matching the material-handover table ordering.
+   * Aggregates the <b>outstanding</b> material demand across all ordered lines into one row per
+   * {@code (material, quality)}. Each line contributes only the material for its units not yet
+   * manufactured — {@code requiredQuantity × (amount − manufacturedAmount) / amount} — so a
+   * production booking (REQ-ORDERS-025) shrinks the aggregate proportionally, regardless of whether
+   * the material was booked out of stock or marked "nicht ausbuchen"; a fully manufactured line
+   * contributes 0. SCU materials sort first, then by name, then GOOD before NONE — matching the
+   * material-handover table ordering.
    *
    * @param order the (item) job order to aggregate
-   * @return the aggregated material rows; empty for a material order
+   * @return the aggregated outstanding-material rows; empty for a material order
    */
   @NotNull
   public List<AggregatedMaterialDto> aggregateMaterials(@NotNull JobOrder order) {
@@ -211,11 +215,21 @@ public class JobOrderItemService {
     Map<Key, Double> sums = new LinkedHashMap<>();
     Map<UUID, Material> materials = new LinkedHashMap<>();
     for (JobOrderItem item : order.getItems()) {
+      // Outstanding demand only: the material for the units still to be manufactured. Every
+      // production booking advances manufacturedAmount — whether it booked the material out of
+      // stock
+      // or the operator marked it "nicht ausbuchen" (REQ-ORDERS-025) — so this aggregate shrinks
+      // proportionally as production progresses, and a fully manufactured line contributes 0. The
+      // row is kept (possibly 0) so a material's quality bucket and its claims stay visible.
+      int lineAmount = item.getAmount() != null ? item.getAmount() : 0;
+      int manufactured = item.getManufacturedAmount() != null ? item.getManufacturedAmount() : 0;
+      int remaining = Math.max(0, lineAmount - manufactured);
       for (JobOrderItemMaterial req : item.getMaterials()) {
         Material material = req.getMaterial();
         Key key = new Key(material.getId(), req.getQualityRequirement());
-        sums.merge(
-            key, req.getRequiredQuantity() == null ? 0.0 : req.getRequiredQuantity(), Double::sum);
+        double reqTotal = req.getRequiredQuantity() == null ? 0.0 : req.getRequiredQuantity();
+        double outstanding = lineAmount > 0 ? reqTotal * remaining / lineAmount : 0.0;
+        sums.merge(key, outstanding, Double::sum);
         materials.putIfAbsent(material.getId(), material);
       }
     }

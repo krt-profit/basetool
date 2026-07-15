@@ -266,16 +266,24 @@ whose label flips with state (e.g. the org-chart edit toggle) keep their text la
 
 ### REQ-UI-011 — Overlay popups are not clipped by their container
 
-Floating popups that overflow their host field — currently the searchable-select dropdown
-(`.krt-combobox__listbox`, the type-to-filter list that progressively enhances a `<select>`) —
-must overlay the surrounding chrome, **not** be cropped by an ancestor's `overflow`. Inside a
-modal this matters specifically: `.krt-modal-body` scrolls (`overflow-y: auto`), so an in-flow
-`position: absolute` popup would be chopped at the body's bottom edge — i.e. behind the pinned
-`.krt-modal-foot` action bar. The popup is therefore anchored to its field in viewport space
-(`position: fixed`, set by `krt-searchable-select.js`), kept glued to the field while the window
-or any scroll container scrolls/resizes, and flipped above the field when there is more room
-there than below (`.krt-combobox__listbox--above`); its height is capped to the available space
-on the chosen side so no option lands off-screen.
+Floating popups that overflow their host field — the searchable-select dropdown
+(`.krt-combobox__listbox`, the type-to-filter list that progressively enhances a `<select>`) and
+the inventory allocation popover (`.assoc-pop`, the Variante-C "+ Zuordnen" order/mission picker
+in the Lager tree, REQ-INV-027) — must overlay the surrounding chrome, **not** be cropped by an
+ancestor's `overflow`. Two ancestor shapes make this bite: inside a modal `.krt-modal-body`
+scrolls (`overflow-y: auto`), so an in-flow `position: absolute` popup would be chopped at the
+body's bottom edge — i.e. behind the pinned `.krt-modal-foot` action bar; and in the Lager tree
+the table sits in horizontally-scrolling wrappers (`#tableContainer.overflow-x-auto` +
+`.table-responsive`), whose `overflow-x: auto` **forces `overflow-y` to `auto` too** (a CSS
+invariant — you cannot pair horizontal scroll with visible vertical overflow), so an absolute
+popover is likewise clipped at their bottom edge (both Firefox and Chrome). The popup is therefore
+anchored to its trigger in viewport space (`position: fixed`), kept glued to it while the window
+or any scroll container scrolls/resizes: the searchable-select list by `krt-searchable-select.js`
+(`positionListbox` / reposition on scroll+resize), flipped above the field when there is more room
+there than below (`.krt-combobox__listbox--above`) with its height capped to the available space so
+no option lands off-screen; the allocation popover by `inventory-admin.js` / `inventory-my.js`
+(`assocPositionPop` / `assocRepositionOpenPop`), re-anchored to the `.assoc-add-wrap` trigger's rect
+on open and on every scroll/resize.
 
 **Acceptance**
 
@@ -284,9 +292,13 @@ on the chosen side so no option lands off-screen.
   action bar.
 - [ ] A searchable select low in the viewport flips its list upward instead of overflowing
   off-screen.
+- [ ] The "+ Zuordnen" order/mission popover on a Lager entry near the table's bottom edge renders
+  in full — input and option list both — instead of being cut off where it crosses the container
+  boundary (regression: Firefox and Chrome clipped the absolute popover there).
 
 **Enforced by:** code/design review · **Code:** `static/js/krt-searchable-select.js`,
-`static/css/styles.css` (`.krt-combobox__listbox`, `.krt-combobox__listbox--above`).
+`static/js/inventory-admin.js`, `static/js/inventory-my.js`,
+`static/css/styles.css` (`.krt-combobox__listbox`, `.krt-combobox__listbox--above`, `.assoc-pop`).
 
 ### REQ-UI-012 — User-facing labels show the display name, never the raw username
 
