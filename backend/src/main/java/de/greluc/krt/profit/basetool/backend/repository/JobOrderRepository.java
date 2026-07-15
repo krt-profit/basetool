@@ -133,16 +133,20 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    *   <li><b>Status filter.</b> The order's status must be in {@code statuses}. The service passes
    *       the full enum set to disable status filtering (mirroring {@code searchMissions}), so the
    *       {@code IN} clause is never bound with an empty collection.
-   *   <li><b>Optional {@code squadronId} display filter.</b> A pure UI preference on top of the
-   *       scope gate — the orders-index "involving my squadron" toggle, matching responsible OR
-   *       requesting side. {@code null} disables it. It can only ever narrow the already-scoped
-   *       result, never widen it past the security scope above.
+   *   <li><b>Optional squadron display filter.</b> A pure UI preference on top of the scope gate —
+   *       the orders-index multi-squadron picker, matching responsible OR requesting side. When
+   *       {@code noSquadronFilter} is {@code true} the filter is disabled (all scoped orders); else
+   *       an order is kept iff its responsible OR requesting org unit is in {@code squadronIds}. It
+   *       can only ever narrow the already-scoped result, never widen it past the security scope
+   *       above.
    * </ol>
    *
    * @param statuses status values to keep; pass the full enum set to disable status filtering
    *     (never empty).
-   * @param squadronId optional display filter (responsible OR requesting side); {@code null}
-   *     disables it.
+   * @param noSquadronFilter {@code true} to disable the squadron display filter (show all scoped
+   *     orders); {@code false} to keep only orders matching {@code squadronIds}.
+   * @param squadronIds the selected squadron ids to match (responsible OR requesting side); never
+   *     bound empty — pass a non-empty placeholder when {@code noSquadronFilter} is {@code true}.
    * @param isAdminAllScope {@code true} iff the caller is an admin without an active selection —
    *     disables the scope filter entirely.
    * @param activeOrgUnitId the single OrgUnit the caller is pinned to, or {@code null}.
@@ -165,11 +169,12 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   @Query(
       "SELECT o FROM JobOrder o WHERE "
           + ScopeSpecifications.JOB_ORDER_SCOPE_PREDICATE
-          + " AND o.status IN :statuses AND (:squadronId IS NULL OR o.responsibleOrgUnit.id ="
-          + " :squadronId OR o.requestingOrgUnit.id = :squadronId)")
+          + " AND o.status IN :statuses AND (:noSquadronFilter = TRUE OR o.responsibleOrgUnit.id IN"
+          + " :squadronIds OR o.requestingOrgUnit.id IN :squadronIds)")
   Page<JobOrder> findScopedJobOrders(
       @Param("statuses") List<JobOrderStatus> statuses,
-      @Param("squadronId") UUID squadronId,
+      @Param("noSquadronFilter") boolean noSquadronFilter,
+      @Param("squadronIds") java.util.Collection<UUID> squadronIds,
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,

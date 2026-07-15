@@ -40,7 +40,7 @@ import org.springframework.http.HttpStatus;
  * ErrorDisclosurePolicy} covering the one behavioural fork (message suppression + ERROR logging for
  * {@code ExternalServiceException}/{@code ReportGenerationException}).
  *
- * <p><b>Seven of the nine subtypes never override an accessor.</b> They pass their fixed {@link
+ * <p><b>Nine of the ten subtypes never override an accessor.</b> They pass their fixed {@link
  * AppExceptionKind} constant to the {@link #AppException(AppExceptionKind, String)} constructor and
  * inherit {@link #status()}/{@link #code()}/{@link #titleKey()}/{@link #detailKey()}/{@link
  * #typeSuffix()}/{@link #logLabel()}/{@link #disclosurePolicy()} unchanged — all of them simply
@@ -57,7 +57,7 @@ import org.springframework.http.HttpStatus;
  * other {@code AppException} for consistency, even though that dedicated handler does not consult
  * it.
  *
- * <p>The permits-list below is exhaustive over the {@code exception} package — all nine subclasses
+ * <p>The permits-list below is exhaustive over the {@code exception} package — all ten subclasses
  * live here, so the seal is well-formed with zero external subclasses (verified, ADR-0047: no
  * package-cycle risk since {@code exception} already depends only on {@code support} / the JDK /
  * Spring framework types).
@@ -71,6 +71,7 @@ public abstract sealed class AppException extends RuntimeException
         ExternalServiceException,
         NotFoundException,
         OverAllocationException,
+        ProductionAllocationException,
         ReportGenerationException {
 
   /**

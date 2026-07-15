@@ -112,7 +112,7 @@ class JobOrderAssigneeNotesE2eTest {
   @Test
   void enrollAddEditDeleteNoteThenUnenroll() {
     String baseUrl = STACK.baseUrl();
-    String detailUrl = baseUrl + "/orders/" + jobOrderId;
+    String detailUrl = baseUrl + "/orders/" + jobOrderId + "?tab=assignees";
     Path storageState = E2eSupport.authenticatedStorageState(browser, baseUrl, USERNAME, PASSWORD);
     try (BrowserContext context =
         browser.newContext(

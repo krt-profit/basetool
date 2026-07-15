@@ -106,6 +106,27 @@ class JobOrderHandoverServiceTest {
   }
 
   @Test
+  void createHandover_shouldRejectItemOrder_soProductionRemainsTheSoleMaterialConsumer() {
+    // Given: a material handover posted against an ITEM order (only reachable via a crafted
+    // request;
+    // the UI hides the button on item orders). It must be refused so it cannot draw the linked
+    // stock
+    // down a second time — the Herstellung step already consumes it (REQ-ORDERS-025).
+    order.setType(de.greluc.krt.profit.basetool.backend.model.JobOrderType.ITEM);
+    JobOrderHandoverItemCreateDto itemDto =
+        new JobOrderHandoverItemCreateDto(inventoryId, 4.0, null);
+    JobOrderHandoverCreateDto createDto =
+        new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", "Rogue", List.of(itemDto));
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+
+    // When / Then: rejected before any inventory is touched.
+    assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
+    assertEquals(10.0, inventoryItem.getAmount());
+    verify(inventoryItemRepository, never()).save(any());
+    verify(inventoryItemRepository, never()).delete(any());
+  }
+
+  @Test
   void createHandover_shouldReduceInventoryAmount_whenAmountIsSmallerThanStock() {
     // Given
     JobOrderHandoverItemCreateDto itemDto =

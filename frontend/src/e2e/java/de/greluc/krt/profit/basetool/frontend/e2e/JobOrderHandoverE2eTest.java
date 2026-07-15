@@ -164,7 +164,7 @@ class JobOrderHandoverE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        E2eSupport.navigate(page, baseUrl + "/orders/" + jobOrderId);
+        E2eSupport.navigate(page, baseUrl + "/orders/" + jobOrderId + "?tab=handovers");
 
         // Opening the modal lazily fetches the order's linked inventory per material; the "add row"
         // button snapshots that cache at click time, so the cache must be populated first. Gate on
@@ -223,7 +223,7 @@ class JobOrderHandoverE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        E2eSupport.navigate(page, baseUrl + "/orders/" + singleEntryOrderId);
+        E2eSupport.navigate(page, baseUrl + "/orders/" + singleEntryOrderId + "?tab=handovers");
         openHandoverModal(page);
 
         page.locator("#add-handover-item-btn").click();
@@ -269,7 +269,7 @@ class JobOrderHandoverE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        E2eSupport.navigate(page, baseUrl + "/orders/" + multiEntryOrderId);
+        E2eSupport.navigate(page, baseUrl + "/orders/" + multiEntryOrderId + "?tab=handovers");
         openHandoverModal(page);
 
         // First entry: hand over 40 of 100.

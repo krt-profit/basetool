@@ -1266,6 +1266,54 @@ public class JobOrderWriteController {
   }
 
   /**
+   * AJAX relay for booking a production run ("Herstellung", REQ-ORDERS-025) against one ordered
+   * item line: forwards the payload to the backend, then re-fetches and returns the refreshed order
+   * so {@code orders-detail.js} can swap the items / production / kpi sections in place. A 409
+   * (OPTIMISTIC_LOCK) or 422 (PRODUCTION_ALLOCATION) is relayed verbatim via {@link
+   * #propagateBackendError} so the client can distinguish a reload-and-retry from an inline hint.
+   *
+   * @param id job-order id
+   * @param itemId ordered item-line id
+   * @param dto the production payload (amount, line version, per-entry consumption)
+   * @return the refreshed order on success, or the relayed backend error
+   */
+  @PostMapping(
+      value = "/{id}/items/{itemId}/production",
+      consumes = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @PreAuthorize(
+      "hasRole('"
+          + Roles.LOGISTICIAN
+          + "') or hasRole('"
+          + Roles.OFFICER
+          + "') or hasRole('"
+          + Roles.ADMIN
+          + "')")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Object> bookProductionAjax(
+      @PathVariable UUID id,
+      @PathVariable UUID itemId,
+      @RequestBody
+          de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemProductionCreateDto dto) {
+    try {
+      backendApiClient.post(
+          "/api/v1/orders/" + id + "/items/" + itemId + "/production",
+          dto,
+          de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemDto.class);
+      JobOrderDto order = backendApiClient.get("/api/v1/orders/" + id, JobOrderDto.class);
+      return org.springframework.http.ResponseEntity.ok(order);
+    } catch (BackendServiceException bse) {
+      de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging.warn(
+          log, "POST /api/v1/orders/{id}/items/{itemId}/production (ajax)", id, bse);
+      return propagateBackendError(bse);
+    } catch (Exception e) {
+      log.error("Failed to book production (ajax) for order {} item {}", id, itemId, e);
+      return org.springframework.http.ResponseEntity.status(
+              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+          .build();
+    }
+  }
+
+  /**
    * Removes a material requirement from the order without deleting any associated inventory items
    * (the items keep their job-order link cleared by the backend).
    *

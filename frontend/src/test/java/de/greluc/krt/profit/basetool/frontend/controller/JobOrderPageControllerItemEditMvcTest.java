@@ -196,6 +196,7 @@ class JobOrderPageControllerItemEditMvcTest {
             new BlueprintReferenceDto(blueprintId, "P8-SC SMG", "BP_CRAFT_behr_smg_ballistic_01"),
             5,
             0,
+            0,
             null,
             List.of(),
             1L);

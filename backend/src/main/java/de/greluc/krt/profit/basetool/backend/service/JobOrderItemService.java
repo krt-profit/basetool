@@ -315,6 +315,7 @@ public class JobOrderItemService {
         gameItem == null ? null : gameItemRef(gameItem),
         blueprint == null ? null : blueprintRef(blueprint),
         item.getAmount(),
+        item.getManufacturedAmount(),
         item.getDeliveredAmount(),
         item.getParentItem() == null ? null : item.getParentItem().getId(),
         materials,

@@ -30,8 +30,10 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemBlueprintOwnersDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemProductionCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateJobOrderBlueprintCountingDto;
@@ -42,6 +44,7 @@ import de.greluc.krt.profit.basetool.backend.service.JobOrderHandoverService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemBlueprintOwnersService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemHandoverReportService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemHandoverService;
+import de.greluc.krt.profit.basetool.backend.service.JobOrderItemProductionService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderService;
@@ -112,6 +115,7 @@ public class JobOrderController {
   private final JobOrderItemService jobOrderItemService;
   private final JobOrderItemBlueprintOwnersService jobOrderItemBlueprintOwnersService;
   private final JobOrderItemHandoverService jobOrderItemHandoverService;
+  private final JobOrderItemProductionService jobOrderItemProductionService;
   private final JobOrderItemHandoverReportService jobOrderItemHandoverReportService;
   private final JobOrderHandoverService jobOrderHandoverService;
   private final JobOrderHandoverReportService jobOrderHandoverReportService;
@@ -170,6 +174,55 @@ public class JobOrderController {
   public JobOrderItemHandoverDto createItemHandover(
       @PathVariable UUID id, @RequestBody @Valid JobOrderItemHandoverCreateDto dto) {
     return jobOrderItemHandoverService.createItemHandover(id, dto);
+  }
+
+  /**
+   * Books a production run ("Herstellung", REQ-ORDERS-025) against one ordered item line: records
+   * the manufactured unit count and reduces the linked inventory the manufacture consumed. Same
+   * authorisation as the handovers (LOGISTICIAN+). The consumption plan must exactly cover the
+   * required per-material demand; a mismatch is a 422 (code {@code PRODUCTION_ALLOCATION}), a stale
+   * line/entry version a 409 (code {@code OPTIMISTIC_LOCK}).
+   *
+   * @param id job-order id
+   * @param itemId ordered item-line id
+   * @param dto production payload (amount, line version, per-entry consumption)
+   * @return the refreshed ordered item-line DTO
+   */
+  @PostMapping("/{id}/items/{itemId}/production")
+  @ResponseStatus(HttpStatus.CREATED)
+  @Operation(
+      summary = "Book production for an item line",
+      description =
+          "Records how many units of an ordered item were manufactured and reduces the linked"
+              + " inventory consumed. The consumption must exactly cover the required material"
+              + " demand.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "201", description = "Production booked."),
+    @ApiResponse(responseCode = "400", description = "Not an item order / invalid consumption."),
+    @ApiResponse(responseCode = "403", description = "Forbidden – insufficient role."),
+    @ApiResponse(
+        responseCode = "404",
+        description = "Order, item line, or inventory entry not found."),
+    @ApiResponse(
+        responseCode = "409",
+        description = "Conflict – optimistic locking failure (version mismatch)."),
+    @ApiResponse(
+        responseCode = "422",
+        description = "Amount exceeds remaining-to-manufacture or consumption misses the demand.")
+  })
+  @PreAuthorize(
+      "(hasRole('"
+          + Roles.LOGISTICIAN
+          + "') or hasRole('"
+          + Roles.OFFICER
+          + "') or hasRole('"
+          + Roles.ADMIN
+          + "')) and @ownerScopeService.canEditJobOrder(#id)")
+  public JobOrderItemDto bookProduction(
+      @PathVariable UUID id,
+      @PathVariable UUID itemId,
+      @RequestBody @Valid JobOrderItemProductionCreateDto dto) {
+    return jobOrderItemProductionService.bookProduction(id, itemId, dto);
   }
 
   /**
@@ -551,7 +604,8 @@ public class JobOrderController {
    *
    * @param status optional status filter (logical OR across values)
    * @param squadronId optional display filter; matches orders whose responsible OR requesting org
-   *     unit equals this id. {@code null} means "no display restriction" (full scoped view).
+   *     unit is one of the given ids. Repeatable ({@code squadronId=a&squadronId=b}); empty/absent
+   *     means "no display restriction" (full scoped view).
    * @return paged job-order DTOs visible to the caller
    */
   @GetMapping
@@ -562,7 +616,7 @@ public class JobOrderController {
   @Transactional(readOnly = true)
   public PageResponse<JobOrderDto> getAllJobOrders(
       @RequestParam(required = false) List<JobOrderStatus> status,
-      @RequestParam(required = false) UUID squadronId,
+      @RequestParam(required = false) List<UUID> squadronId,
       @RequestParam(required = false, defaultValue = "0") int page,
       @RequestParam(required = false, defaultValue = "20") int size,
       @RequestParam(required = false, defaultValue = "priority,asc") String sort) {

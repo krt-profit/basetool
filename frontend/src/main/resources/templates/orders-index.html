@@ -45,21 +45,36 @@
                 <input type="checkbox" name="status" value="COMPLETED" th:checked="${selectedStatuses != null and selectedStatuses.contains('COMPLETED')}">
                 <span th:text="#{status.COMPLETED}">Abgeschlossen</span>
             </label>
-            <!-- Squadron scope toggle (MULTI_SQUADRON_PLAN.md §5.3): default "mine" (matches
-                 creating OR requesting = active squadron); flip to "all" for the cross-staffel
-                 union. Collapses silently to "all" for users with no active squadron context
-                 (admins in "all squadrons" mode) — the backend filter is a display preference,
-                 not an access-control gate. -->
+            <!-- Squadron multi-select filter (REQ-ORDERS-027): check the squadrons whose orders to
+                 show (matching responsible OR requesting side). All active squadrons are offered;
+                 default = all checked (= no narrowing). The selection is persisted per-user in
+                 localStorage by orders-index.js (not a server cookie) and re-applied on load. The
+                 dropdown mirrors the Lager multi-select (.multi-select-container). The backend filter
+                 is a display preference, not an access-control gate. -->
             <th:block th:unless="${requesterView}">
             <span th:text="#{orders.index.filter.scope}" class="krtm-font-weight-700-font-size-0-8rem-color-var-c-372a">Staffel:</span>
-            <label class="flex-gap-2xs">
-                <input type="radio" name="scope" value="mine" th:checked="${selectedScope == null or selectedScope == 'mine'}">
-                <span th:text="#{orders.index.filter.scope.mine}">Eigene Staffel</span>
-            </label>
-            <label class="flex-gap-2xs">
-                <input type="radio" name="scope" value="all" th:checked="${selectedScope == 'all'}">
-                <span th:text="#{orders.index.filter.scope.all}">Alle Staffeln</span>
-            </label>
+            <div class="multi-select-container" id="squadronFilterContainer">
+                <div class="multi-select-header" data-trigger="ord-toggle-squadron-multi"
+                     data-multi-target="squadronOptions"
+                     th:data-all="#{filter.all}" th:data-selected="#{filter.selected}" id="squadronHeader">
+                    <span class="selected-text" id="squadronSelectedText" th:text="#{filter.all}">Alle</span>
+                </div>
+                <div class="multi-select-options" id="squadronOptions">
+                    <label class="multi-select-option">
+                        <span th:text="#{filter.all}">Alle</span>
+                        <input type="checkbox" id="sqAll" value="ALL"
+                               data-trigger="ord-toggle-squadron-all"
+                               data-all-id="sqAll" data-check-class="sqCheck" data-header-id="squadronHeader">
+                    </label>
+                    <label class="multi-select-option" th:each="sq : ${squadrons}">
+                        <span th:text="${sq.shorthand() != null ? sq.shorthand() : sq.name()}" th:title="${sq.name()}">IRI</span>
+                        <input type="checkbox" class="sqCheck" name="squadronId" th:value="${sq.id}"
+                               th:checked="${selectedSquadronIds == null or selectedSquadronIds.isEmpty() or selectedSquadronIds.contains(sq.id)}"
+                               data-trigger="ord-update-squadron-state"
+                               data-all-id="sqAll" data-check-class="sqCheck" data-header-id="squadronHeader">
+                    </label>
+                </div>
+            </div>
             </th:block>
             <button type="submit" class="btn btn-ghost krtm-padding-0-25rem-0-75rem-font-size-0-8rem-e5f2" th:text="#{orders.index.filter.apply}">Filtern</button>
         </form>
@@ -129,7 +144,17 @@
                     <br>
                     <span th:text="${order.handle}"></span>
                 </td>
-                <td class="p-0">
+                <td class="p-0" th:with="matCount=${order.type == 'ITEM' ? (order.aggregatedMaterials != null ? order.aggregatedMaterials.size() : 0) : (order.materials != null ? order.materials.size() : 0)}">
+                    <!-- Collapsible material sublist (default collapsed, per-user localStorage state
+                         restored on load + after every fragment swap by orders-index.js — the same
+                         idiom as the Lager tree, REQ-INV-002). The toggle button + the count stay
+                         visible; only the tables collapse. -->
+                    <button type="button" class="btn btn-ghost ord-materials-toggle" data-trigger="ord-toggle-materials" th:data-order-id="${order.id}" aria-expanded="false">
+                        <span class="toggle-icon" aria-hidden="true">&#9654;</span>
+                        <span th:text="#{orders.index.materials}">Materialien</span>
+                        <span class="text-muted" th:text="'(' + ${matCount} + ')'">(0)</span>
+                    </button>
+                    <div class="ord-materials-body krtm-display-none-5790" th:data-order-materials="${order.id}">
                     <!-- Both order kinds render the same material-requirement summary: the material
                          name, the total required amount and the collection progress (stock / required).
                          MATERIAL orders use their per-line requirements; ITEM orders use the
@@ -189,6 +214,7 @@
                             </tr>
                         </tbody>
                     </table>
+                    </div>
                     </div>
                 </td>
                 <td class="nowrap">

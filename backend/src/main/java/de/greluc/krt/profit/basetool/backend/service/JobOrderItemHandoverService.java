@@ -80,7 +80,7 @@ public class JobOrderItemHandoverService {
    * @return the persisted handover as a DTO
    * @throws NotFoundException when the order does not exist
    * @throws BadRequestException when the order is not an item order, an entry references a line not
-   *     on the order, or an entry exceeds the line's outstanding quantity
+   *     on the order, or an entry exceeds the line's manufactured-but-undelivered quantity
    */
   @Transactional
   public JobOrderItemHandoverDto createItemHandover(
@@ -113,10 +113,15 @@ public class JobOrderItemHandoverService {
                               + " does not belong to job order "
                               + jobOrderId));
 
-      int outstanding = line.getAmount() - line.getDeliveredAmount();
+      // A unit can only be delivered once it has been manufactured (REQ-ORDERS-025), so the
+      // deliverable ceiling is the manufactured-but-not-yet-delivered quantity, not amount −
+      // delivered. Legacy rows were backfilled with manufactured := delivered, so already-delivered
+      // lines stay valid; further delivery requires booking production first.
+      int outstanding = line.getManufacturedAmount() - line.getDeliveredAmount();
       if (entryDto.amount() > outstanding) {
         throw new BadRequestException(
-            "Cannot hand over more than the outstanding amount for item line " + line.getId());
+            "Cannot hand over more than the manufactured-but-undelivered amount for item line "
+                + line.getId());
       }
       // Dirty-checked mutation only — no explicit save(), so no version double-bump.
       line.setDeliveredAmount(line.getDeliveredAmount() + entryDto.amount());

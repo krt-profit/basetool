@@ -190,40 +190,55 @@ class JobOrderServiceAssigneeAndListTest {
     void nullStatusList_passesFullEnumSet() {
       Page<JobOrder> page = new PageImpl<>(List.of(newJobOrder(JobOrderStatus.OPEN)));
       when(jobOrderRepository.findScopedJobOrders(
-              allStatuses, null, true, null, Set.of(), pageable))
+              allStatuses, true, Set.of(new UUID(0L, 0L)), true, null, Set.of(), pageable))
           .thenReturn(page);
 
       Page<JobOrderDto> result = queryService.getAllJobOrders(null, pageable);
 
       assertEquals(1, result.getTotalElements());
       verify(jobOrderRepository)
-          .findScopedJobOrders(allStatuses, null, true, null, Set.of(), pageable);
+          .findScopedJobOrders(
+              allStatuses, true, Set.of(new UUID(0L, 0L)), true, null, Set.of(), pageable);
     }
 
     @Test
     void emptyStatusList_passesFullEnumSet() {
       Page<JobOrder> page = new PageImpl<>(List.of(newJobOrder(JobOrderStatus.OPEN)));
       when(jobOrderRepository.findScopedJobOrders(
-              allStatuses, null, true, null, Set.of(), pageable))
+              allStatuses, true, Set.of(new UUID(0L, 0L)), true, null, Set.of(), pageable))
           .thenReturn(page);
 
       queryService.getAllJobOrders(List.of(), pageable);
 
       verify(jobOrderRepository)
-          .findScopedJobOrders(allStatuses, null, true, null, Set.of(), pageable);
+          .findScopedJobOrders(
+              allStatuses, true, Set.of(new UUID(0L, 0L)), true, null, Set.of(), pageable);
     }
 
     @Test
     void populatedStatusList_forwardsStatusesAndScope() {
       Page<JobOrder> page = new PageImpl<>(List.of(newJobOrder(JobOrderStatus.OPEN)));
       when(jobOrderRepository.findScopedJobOrders(
-              List.of(JobOrderStatus.OPEN), null, true, null, Set.of(), pageable))
+              List.of(JobOrderStatus.OPEN),
+              true,
+              Set.of(new UUID(0L, 0L)),
+              true,
+              null,
+              Set.of(),
+              pageable))
           .thenReturn(page);
 
       queryService.getAllJobOrders(List.of(JobOrderStatus.OPEN), pageable);
 
       verify(jobOrderRepository)
-          .findScopedJobOrders(List.of(JobOrderStatus.OPEN), null, true, null, Set.of(), pageable);
+          .findScopedJobOrders(
+              List.of(JobOrderStatus.OPEN),
+              true,
+              Set.of(new UUID(0L, 0L)),
+              true,
+              null,
+              Set.of(),
+              pageable);
     }
 
     @Test
@@ -231,14 +246,26 @@ class JobOrderServiceAssigneeAndListTest {
       Page<JobOrder> page = new PageImpl<>(List.of(newJobOrder(JobOrderStatus.OPEN)));
       UUID squadronId = UUID.randomUUID();
       when(jobOrderRepository.findScopedJobOrders(
-              List.of(JobOrderStatus.OPEN), squadronId, true, null, Set.of(), pageable))
+              List.of(JobOrderStatus.OPEN),
+              false,
+              Set.of(squadronId),
+              true,
+              null,
+              Set.of(),
+              pageable))
           .thenReturn(page);
 
-      queryService.getAllJobOrders(List.of(JobOrderStatus.OPEN), squadronId, pageable);
+      queryService.getAllJobOrders(List.of(JobOrderStatus.OPEN), Set.of(squadronId), pageable);
 
       verify(jobOrderRepository)
           .findScopedJobOrders(
-              List.of(JobOrderStatus.OPEN), squadronId, true, null, Set.of(), pageable);
+              List.of(JobOrderStatus.OPEN),
+              false,
+              Set.of(squadronId),
+              true,
+              null,
+              Set.of(),
+              pageable);
     }
 
     @Test
@@ -246,13 +273,14 @@ class JobOrderServiceAssigneeAndListTest {
       Page<JobOrder> page = new PageImpl<>(List.of(newJobOrder(JobOrderStatus.OPEN)));
       UUID squadronId = UUID.randomUUID();
       when(jobOrderRepository.findScopedJobOrders(
-              allStatuses, squadronId, true, null, Set.of(), pageable))
+              allStatuses, false, Set.of(squadronId), true, null, Set.of(), pageable))
           .thenReturn(page);
 
-      queryService.getAllJobOrders(List.of(), squadronId, pageable);
+      queryService.getAllJobOrders(List.of(), Set.of(squadronId), pageable);
 
       verify(jobOrderRepository)
-          .findScopedJobOrders(allStatuses, squadronId, true, null, Set.of(), pageable);
+          .findScopedJobOrders(
+              allStatuses, false, Set.of(squadronId), true, null, Set.of(), pageable);
     }
 
     @Test
@@ -265,13 +293,15 @@ class JobOrderServiceAssigneeAndListTest {
       Set<UUID> union = Set.of(sqA, sqB);
       when(ownerScopeService.currentScopePredicate())
           .thenReturn(new ScopePredicate(false, null, union));
-      when(jobOrderRepository.findScopedJobOrders(allStatuses, null, false, null, union, pageable))
+      when(jobOrderRepository.findScopedJobOrders(
+              allStatuses, true, Set.of(new UUID(0L, 0L)), false, null, union, pageable))
           .thenReturn(page);
 
       queryService.getAllJobOrders(null, pageable);
 
       verify(jobOrderRepository)
-          .findScopedJobOrders(allStatuses, null, false, null, union, pageable);
+          .findScopedJobOrders(
+              allStatuses, true, Set.of(new UUID(0L, 0L)), false, null, union, pageable);
     }
 
     @Test
@@ -284,7 +314,7 @@ class JobOrderServiceAssigneeAndListTest {
           new PageImpl<>(
               List.of(newJobOrder(JobOrderStatus.OPEN), newJobOrder(JobOrderStatus.IN_PROGRESS)));
       when(jobOrderRepository.findScopedJobOrders(
-              allStatuses, null, true, null, Set.of(), pageable))
+              allStatuses, true, Set.of(new UUID(0L, 0L)), true, null, Set.of(), pageable))
           .thenReturn(page);
 
       queryService.getAllJobOrders(null, pageable);
@@ -307,7 +337,7 @@ class JobOrderServiceAssigneeAndListTest {
 
       JobOrder order = newJobOrder(JobOrderStatus.OPEN);
       when(jobOrderRepository.findScopedJobOrders(
-              allStatuses, null, true, null, Set.of(), pageable))
+              allStatuses, true, Set.of(new UUID(0L, 0L)), true, null, Set.of(), pageable))
           .thenReturn(new PageImpl<>(List.of(order)));
       when(jobOrderMapper.toDto(order))
           .thenReturn(

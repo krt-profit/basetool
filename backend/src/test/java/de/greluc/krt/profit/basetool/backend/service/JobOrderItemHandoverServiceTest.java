@@ -52,9 +52,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Unit tests for {@link JobOrderItemHandoverService}: delivered-count increments, over-delivery and
- * foreign-line rejection, the non-item-order guard, and auto-completion when every line is fully
- * delivered.
+ * Unit tests for {@link JobOrderItemHandoverService}: delivered-count increments, over-delivery
+ * (capped at the manufactured-but-undelivered quantity, REQ-ORDERS-025) and foreign-line rejection,
+ * the non-item-order guard, and auto-completion when every line is fully delivered.
  */
 @ExtendWith(MockitoExtension.class)
 class JobOrderItemHandoverServiceTest {
@@ -78,7 +78,15 @@ class JobOrderItemHandoverServiceTest {
   void setUp() {
     orderId = UUID.randomUUID();
     lineId = UUID.randomUUID();
-    line = JobOrderItem.builder().id(lineId).amount(5).deliveredAmount(0).build();
+    // Fully manufactured so delivery up to the ordered amount is allowed (delivery is gated by
+    // manufacture, REQ-ORDERS-025).
+    line =
+        JobOrderItem.builder()
+            .id(lineId)
+            .amount(5)
+            .deliveredAmount(0)
+            .manufacturedAmount(5)
+            .build();
     order = JobOrder.builder().type(JobOrderType.ITEM).status(JobOrderStatus.OPEN).build();
     order.addItem(line);
 
@@ -127,7 +135,19 @@ class JobOrderItemHandoverServiceTest {
 
     assertThatThrownBy(() -> service.createItemHandover(orderId, payload(lineId, 6)))
         .isInstanceOf(BadRequestException.class)
-        .hasMessageContaining("outstanding");
+        .hasMessageContaining("manufactured");
+    assertThat(line.getDeliveredAmount()).isZero();
+  }
+
+  @Test
+  void createItemHandoverRejectsDeliveryBeyondManufactured() {
+    // Only 2 of 5 manufactured — a unit can only be delivered once it has been manufactured.
+    line.setManufacturedAmount(2);
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+
+    assertThatThrownBy(() -> service.createItemHandover(orderId, payload(lineId, 3)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessageContaining("manufactured");
     assertThat(line.getDeliveredAmount()).isZero();
   }
 

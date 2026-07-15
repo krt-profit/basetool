@@ -129,7 +129,8 @@ class JobOrderScopeQueryIntegrationTest {
     // order alone (all requesters are squadron A here).
     Set<UUID> visible =
         jobOrderRepository
-            .findScopedJobOrders(ALL_STATUSES, squadronBId, true, null, Set.of(), ALL_ROWS)
+            .findScopedJobOrders(
+                ALL_STATUSES, false, Set.of(squadronBId), true, null, Set.of(), ALL_ROWS)
             .stream()
             .map(JobOrder::getId)
             .collect(Collectors.toSet());
@@ -182,7 +183,8 @@ class JobOrderScopeQueryIntegrationTest {
     return jobOrderRepository
         .findScopedJobOrders(
             ALL_STATUSES,
-            null,
+            true,
+            Set.of(new UUID(0L, 0L)),
             scope.adminAllScope(),
             scope.activeOrgUnitId(),
             scope.memberOrgUnitIds(),

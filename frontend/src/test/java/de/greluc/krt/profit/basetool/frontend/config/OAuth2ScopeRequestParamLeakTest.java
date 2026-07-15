@@ -50,13 +50,16 @@ import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.web.context.request.RequestContextHolder;
 
 /**
- * Regression guard for the OAuth2 refresh-token {@code invalid_scope} failure (REQ-SEC-012): the
- * job-orders "Staffel" filter submits a request parameter literally named {@code scope} with value
- * {@code all} / {@code mine}, and Spring's default {@code DefaultOAuth2AuthorizedClientManager}
- * mapper would copy that into the refresh-token grant — which Keycloak then rejects ("Invalid
- * scopes: all/mine"), bouncing the whole SSO session into re-authentication. {@link
- * WebClientConfig#NO_REQUEST_DERIVED_ATTRIBUTES} severs that path; these tests pin both the bug
- * (default mapper leaks) and the fix (configured mapper drops the parameter).
+ * Regression guard for the OAuth2 refresh-token {@code invalid_scope} failure (REQ-SEC-012): any
+ * request parameter literally named {@code scope} reaching {@code
+ * DefaultOAuth2AuthorizedClientManager} is, under Spring's default mapper, copied into the
+ * refresh-token grant — which Keycloak then rejects ("Invalid scopes: ..."), bouncing the SSO
+ * session into re-authentication. The original trigger was the job-orders "Staffel" filter, which
+ * once submitted {@code scope=all} / {@code scope=mine}; that filter now narrows by {@code
+ * squadronId} and no longer sends {@code scope}, but the guard stays because {@link
+ * WebClientConfig#NO_REQUEST_DERIVED_ATTRIBUTES} must sever the path for <em>any</em> stray {@code
+ * scope} parameter, whatever its source. These tests pin both the bug (default mapper leaks) and
+ * the fix (configured mapper drops the parameter).
  */
 class OAuth2ScopeRequestParamLeakTest {
 
@@ -154,7 +157,7 @@ class OAuth2ScopeRequestParamLeakTest {
     OAuth2AuthorizationContext context = captureContext(true, "all");
     assertNull(
         context.getAttribute(OAuth2AuthorizationContext.REQUEST_SCOPE_ATTRIBUTE_NAME),
-        "the Staffel filter's scope=all must not become the refresh-token grant scope");
+        "a stray scope=all request param must not become the refresh-token grant scope");
   }
 
   @Test
@@ -162,6 +165,6 @@ class OAuth2ScopeRequestParamLeakTest {
     OAuth2AuthorizationContext context = captureContext(true, "mine");
     assertNull(
         context.getAttribute(OAuth2AuthorizationContext.REQUEST_SCOPE_ATTRIBUTE_NAME),
-        "the Staffel filter's scope=mine must not become the refresh-token grant scope");
+        "a stray scope=mine request param must not become the refresh-token grant scope");
   }
 }
