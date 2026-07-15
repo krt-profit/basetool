@@ -283,7 +283,10 @@ or any scroll container scrolls/resizes: the searchable-select list by `krt-sear
 there than below (`.krt-combobox__listbox--above`) with its height capped to the available space so
 no option lands off-screen; the allocation popover by `inventory-admin.js` / `inventory-my.js`
 (`assocPositionPop` / `assocRepositionOpenPop`), re-anchored to the `.assoc-add-wrap` trigger's rect
-on open and on every scroll/resize.
+on open and on every scroll/resize, and likewise **flipped above the trigger** (bottom-anchored)
+when there is less room below it than the popover needs and more room above — a fixed box cannot be
+scrolled into view, so a trigger low in the viewport would otherwise drop its amount input +
+Speichern below the fold, unreachable.
 
 **Acceptance**
 
@@ -295,6 +298,9 @@ on open and on every scroll/resize.
 - [ ] The "+ Zuordnen" order/mission popover on a Lager entry near the table's bottom edge renders
   in full — input and option list both — instead of being cut off where it crosses the container
   boundary (regression: Firefox and Chrome clipped the absolute popover there).
+- [ ] The "+ Zuordnen" popover on a Lager entry low in the viewport flips above its trigger so its
+  amount input + Speichern stay on-screen, instead of dropping below the fold where the fixed
+  popover cannot be scrolled into view.
 
 **Enforced by:** code/design review · **Code:** `static/js/krt-searchable-select.js`,
 `static/js/inventory-admin.js`, `static/js/inventory-my.js`,
