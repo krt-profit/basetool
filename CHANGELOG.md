@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.4.4](https://github.com/krt-profit/basetool/releases/tag/v1.4.4) - 2026-07-15
+
 ### Added
 
 - **Aufträge: Beim Erfassen einer Herstellung lässt sich je Material festlegen, dass es nicht ausgebucht werden soll.** Der Herstellen-Dialog hat jetzt pro Material eine Checkbox „Nicht ausbuchen": Ist sie gesetzt, wird dieses Material von der Lagerentnahme ausgenommen — die Herstellung wird gebucht, der verknüpfte Lagerbestand des Materials bleibt aber unverändert (REQ-ORDERS-025).
