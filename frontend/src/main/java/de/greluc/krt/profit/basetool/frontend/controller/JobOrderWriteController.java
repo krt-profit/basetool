@@ -1268,9 +1268,10 @@ public class JobOrderWriteController {
   /**
    * AJAX relay for booking a production run ("Herstellung", REQ-ORDERS-025) against one ordered
    * item line: forwards the payload to the backend, then re-fetches and returns the refreshed order
-   * so {@code orders-detail.js} can swap the items / production / kpi sections in place. A 409
-   * (OPTIMISTIC_LOCK) or 422 (PRODUCTION_ALLOCATION) is relayed verbatim via {@link
-   * #propagateBackendError} so the client can distinguish a reload-and-retry from an inline hint.
+   * so {@code orders-detail.js} can swap the items / aggregated / header / kpi / item-handovers
+   * sections in place (the Herstellung surface lives in the items section). A 409 (OPTIMISTIC_LOCK)
+   * or 422 (PRODUCTION_ALLOCATION) is relayed verbatim via {@link #propagateBackendError} so the
+   * client can distinguish a reload-and-retry from an inline hint.
    *
    * @param id job-order id
    * @param itemId ordered item-line id

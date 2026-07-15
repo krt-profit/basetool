@@ -216,8 +216,11 @@ status columns without the chevron, demand sub-row or button.
   delivered and nothing is manufactured-but-undelivered, and the "all delivered" note only once every
   ordered unit is delivered (`isFullyDelivered`).
 
-**Enforced by:** `JobOrderItemDetailRenderTest`, `JobOrderListRenderTest`,
-`JobOrderPageControllerNoReloadMvcTest` (tab panes, KPI tiles, conditional tabs, no-reload swaps) ·
+**Enforced by:** `JobOrderItemDetailRenderTest` (item tab set + KPI tiles; the folded-in Herstellung
+button and per-unit-demand chevron in the items table; the `isFullyDelivered` item-handover message
+split; no separate production tab), `JobOrderListRenderTest`, `JobOrderPageControllerNoReloadMvcTest`
+(no-reload section swaps, the production-booking relay) and `JobOrderProductionE2eTest` (the full UI
+booking flow + the produce-first hint) ·
 **Code:** `orders-detail.html` (`kpiSection` fragment, `.tab-nav` + `.tab-panes`), `orders-detail.js`
 (tab controller, `ORDER_SECTIONS` seam map), `JobOrderPageController` · **Issues:** #1182
 
