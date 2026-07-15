@@ -56,9 +56,10 @@ is delivered (`isFullyDelivered` — every line's `deliveredAmount ≥ amount`).
 (`JobOrderItemProductionService.bookProduction`), gated `(hasRole('LOGISTICIAN') or
 hasRole('OFFICER') or hasRole('ADMIN')) and @ownerScopeService.canEditJobOrder(#id)` — the same
 authorisation as the item handovers. The payload is `JobOrderItemProductionCreateDto` (`amount` ≥ 1,
-the line `version`, and a `consumption` list of `JobOrderItemProductionConsumptionDto`, each naming
-an `inventoryItemId`, the `materialId` it holds, a positive `amount`, and the entry `version`). The
-service:
+the line `version`, a `consumption` list of `JobOrderItemProductionConsumptionDto`, each naming an
+`inventoryItemId`, the `materialId` it holds, a positive `amount`, and the entry `version`, and an
+optional `skippedMaterialIds` — the required materials the operator marked "nicht ausbuchen" and does
+not want booked out of stock). The service:
 
 - Loads the order and **rejects a non-`ITEM` order** with HTTP 400 (`BadRequestException`, "not an
   item order").
@@ -70,9 +71,12 @@ service:
 - Computes the **required per-material demand** for `amount` units from the line's **snapshotted
   recipe** (`JobOrderItemMaterial`, the same snapshot that feeds the aggregated-materials view):
   `demand = roundForQuantityType(requiredQuantity × amount / lineAmount)` per material, summed per
-  material id. The `consumption` plan MUST **exactly cover** every required material's demand (equal
-  within an SCU floating-point epsilon) and MUST NOT name a material the line does not require;
-  either mismatch is a `ProductionAllocationException` → HTTP **422**.
+  material id. A material listed in **`skippedMaterialIds`** ("nicht ausbuchen") is **excluded from
+  the demand map**, so it is neither required to be covered nor may be named by a `consumption`
+  entry, and none of its linked stock is touched. The `consumption` plan MUST **exactly cover** every
+  remaining (non-skipped) required material's demand (equal within an SCU floating-point epsilon) and
+  MUST NOT name a material the line does not require or has skipped; either mismatch is a
+  `ProductionAllocationException` → HTTP **422**.
 - For **each consumption entry**, under a pessimistic write lock
   (`inventoryItemRepository.findByIdForUpdate`): checks the entry's own optimistic lock
   (`OptimisticLock.check`, stale → 409); requires the entry to be **earmarked to this order**
@@ -90,16 +94,34 @@ service:
   the new stock.
 - Advances `manufacturedAmount` by `amount` via Hibernate dirty checking (no explicit `save`, single
   `@Version` bump) and flushes so the returned DTO carries the advanced line version.
-- **Audits**: one `JOB_ORDER_PRODUCTION_BOOKED` (domain `JOB_ORDER`) for the booking plus one
-  `INVENTORY_CONSUMED_BY_PRODUCTION` (domain `INVENTORY`) per consumed entry, from snapshots captured
-  before the writes; no user free text / no PII in the details payload (`REQ-AUDIT-001`).
+
+Because the manufactured counter advances on **every** booking — whether the material was booked out
+of stock or marked skipped — the **aggregated-materials demand shrinks with production**:
+`JobOrderItemService.aggregateMaterials` sums only the material for the units **not yet
+manufactured** per line (`requiredQuantity × (amount − manufacturedAmount) / amount` per material,
+rounded per bucket), so the *Aggregierte Materialien* view and the item-order *Offene Menge* KPI
+(derived from `totalQuantity`) drop by the manufactured portion and reach 0 once a bucket is fully
+manufactured (the row is kept so its quality bucket and claims stay visible). This is what makes a
+skipped material's demand actually disappear even though its stock was never drawn down. The
+squadron **material-claim** targets (`MaterialClaimService.requiredByBucket`, the Eintragungen supply
+sign-up) intentionally stay on the **full** order requirement — a supply commitment is against the
+whole order, independent of how far production has progressed.
+- **Audits**: one `JOB_ORDER_PRODUCTION_BOOKED` (domain `JOB_ORDER`) for the booking — its details
+recording the manufactured `amount`, the number of `consumed` entries and the count of `skipped`
+(not-booked-out) materials — plus one `INVENTORY_CONSUMED_BY_PRODUCTION` (domain `INVENTORY`) per
+consumed entry, from snapshots captured before the writes; no user free text / no PII in the details
+payload (`REQ-AUDIT-001`). A skipped material produces no `INVENTORY_CONSUMED_BY_PRODUCTION` event.
 - Returns the refreshed ordered-item-line DTO (advanced `manufacturedAmount` + version).
 
 Aufträge and Mein Inventar are **audited areas**, so both event types are recorded, added to the
 unified viewer's per-area filter, and carried in the DE/EN i18n labels (`REQ-AUDIT-001`,
 [`audit.md`](audit.md)).
 
-**Frontend.** The relay `JobOrderWriteController.bookProductionAjax`
+**Frontend.** The Herstellung modal renders one reconciliation card per required material; each card
+carries a **"Nicht ausbuchen" checkbox** (`data-prod-skip`). Ticking it flags the card, disables that
+material's stock inputs, drops the material from the "buchen" coverage gate, and adds its id to the
+posted `skippedMaterialIds` (no `consumption` is sent for it) — so the operator can record production
+while leaving a material's linked stock untouched. The relay `JobOrderWriteController.bookProductionAjax`
 (`POST /orders/{id}/items/{itemId}/production`, consumes JSON) forwards the payload to the backend,
 re-fetches the order, and returns it so `orders-detail.js` re-renders the affected sections in place
 (no reload, `REQ-FE-001`). A `BackendServiceException` is relayed **verbatim** via
@@ -119,6 +141,15 @@ apply map.
   (`PRODUCTION_ALLOCATION`).
 - [ ] A consumption plan that under- or over-covers any required material, or names a material the
   line does not require, is rejected with 422.
+- [ ] A material listed in `skippedMaterialIds` ("nicht ausbuchen") advances `manufacturedAmount`
+  without any coverage requirement and without touching its linked stock (no
+  `INVENTORY_CONSUMED_BY_PRODUCTION` event); naming a skipped material in `consumption` is rejected
+  with 422.
+- [ ] The aggregated-materials demand (and the item-order *Offene Menge* KPI) reflects only the
+  not-yet-manufactured units: booking `N` units reduces each line's contribution to `requiredQuantity
+  × (amount − manufacturedAmount) / amount`, reaching 0 for a fully manufactured line — regardless of
+  whether the material was booked out or skipped. The material-claim (Eintragungen) target stays on
+  the full order requirement.
 - [ ] A consumption entry not earmarked to the order, or holding a different material, or drawing
   more than the order's slice/stock, is rejected (400 / 422 respectively); a whole depletion deletes
   the row and a partial draw decrements amount + order slice and clamps the mission earmarks.
@@ -132,7 +163,9 @@ apply map.
   peer without a reload.
 
 **Enforced by:** `JobOrderItemProductionServiceTest` (amount/coverage/slice caps, delete-on-depletion,
-mission auto-clamp, 409/422 mapping, audit), `JobOrderControllerTest` (`bookProduction` auth +
+mission auto-clamp, 409/422 mapping, audit, skipped/not-booked-out material),
+`JobOrderItemServiceTest` (aggregate reduced by manufactured units, 0 for a fully manufactured line),
+`JobOrderControllerTest` (`bookProduction` auth +
 mapping), `JobOrderItemHandoverServiceTest` (delivery capped at manufactured-but-undelivered),
 `V219MigrationTest` (backfill + CHECK constraints) · **Code:**
 `JobOrderItemProductionService.bookProduction`, `JobOrderController.bookProduction`,
