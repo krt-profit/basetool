@@ -1767,6 +1767,18 @@ function _prodFmtQty(x, quantityType) {
         : _prodRound3(x).toFixed(3) + ' ' + PRODUCTION_I18N.unitScu;
 }
 
+// Per-material demand for k units, mirroring the backend: sum the rounded per-row demands
+// (roundForQuantityType(requiredTotal * k / lineAmount)) across every snapshot row that maps to this
+// material. Rounding each row before summing — not summing the raw totals first — keeps the frontend
+// "buchen" gate in lockstep with the backend's exact-coverage 422, because round(a)+round(b) can
+// differ from round(a+b) for PIECE materials.
+function _prodDemand(mat, k) {
+    const lineAmount = _prodContext && _prodContext.lineAmount ? _prodContext.lineAmount : 1;
+    return mat.requiredTotals.reduce(function (sum, rt) {
+        return sum + _prodRoundForType((rt * k) / lineAmount, mat.quantityType);
+    }, 0);
+}
+
 function openProductionModal(button) {
     const orderId = button.getAttribute('data-order-id');
     const itemId = button.getAttribute('data-item-id');
@@ -1819,14 +1831,34 @@ function openProductionModal(button) {
 
     const row = button.closest('tr');
     const demandLis = row ? row.querySelectorAll('.od-production-demand li') : [];
+    // A line's material snapshot can carry more than one row for the same material — a blueprint that
+    // lists an ingredient twice, or a RESOURCE plus a bridged non-craftable ITEM that map to the same
+    // Material. The backend aggregates demand per material id (demandByMaterial.merge over the rounded
+    // per-row demands); mirror that here so each distinct material yields exactly one card. Otherwise
+    // two cards share a data-prod-material value, querySelector reads only the first, and the second
+    // row's demand can never be reconciled — the "buchen" button stays disabled forever.
+    const byMaterialId = new Map();
     demandLis.forEach(function (li) {
-        const mat = {
-            materialId: li.getAttribute('data-material-id'),
+        const materialId = li.getAttribute('data-material-id');
+        if (!materialId) {
+            return;
+        }
+        const requiredTotal = parseFloat(li.getAttribute('data-required-total')) || 0;
+        const existing = byMaterialId.get(materialId);
+        if (existing) {
+            // Keep the per-row totals separate so demand stays a sum of rounded rows (see _prodDemand).
+            existing.requiredTotals.push(requiredTotal);
+            return;
+        }
+        byMaterialId.set(materialId, {
+            materialId: materialId,
             materialName: li.getAttribute('data-material-name') || '',
             quantityType: li.getAttribute('data-quantity-type') || 'SCU',
-            requiredTotal: parseFloat(li.getAttribute('data-required-total')) || 0,
+            requiredTotals: [requiredTotal],
             entries: [],
-        };
+        });
+    });
+    byMaterialId.forEach(function (mat) {
         _prodMaterials.push(mat);
         const card = document.createElement('div');
         card.className = 'card card--inset mb-1';
@@ -1925,10 +1957,7 @@ function _prodReconcile() {
     }
     let allCovered = k >= 1 && k <= _prodContext.remaining;
     _prodMaterials.forEach(function (mat) {
-        const demand = _prodRoundForType(
-            (mat.requiredTotal * k) / (_prodContext.lineAmount || 1),
-            mat.quantityType,
-        );
+        const demand = _prodDemand(mat, k);
         const card = document.querySelector('[data-prod-material="' + mat.materialId + '"]');
         if (!card) {
             return;
@@ -1976,10 +2005,7 @@ function bookProduction() {
     const consumption = [];
     let ok = true;
     _prodMaterials.forEach(function (mat) {
-        const demand = _prodRoundForType(
-            (mat.requiredTotal * k) / (_prodContext.lineAmount || 1),
-            mat.quantityType,
-        );
+        const demand = _prodDemand(mat, k);
         let assigned = 0;
         const card = document.querySelector('[data-prod-material="' + mat.materialId + '"]');
         if (card) {
