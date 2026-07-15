@@ -115,47 +115,14 @@
       "options": {}
     },
     {
-      "id": 4,
-      "type": "timeseries",
-      "title": "CPU Throttled Seconds per Container",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 8
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "expr": "rate(container_cpu_cfs_throttled_seconds_total{name=~\".+\"}[5m])",
-          "legendFormat": "{{name}}",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "options": {}
-    },
-    {
       "id": 5,
       "type": "timeseries",
       "title": "Container Restarts (1h)",
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 16
+        "x": 12,
+        "y": 8
       },
       "datasource": {
         "type": "prometheus",
@@ -181,14 +148,100 @@
       "options": {}
     },
     {
+      "id": 4,
+      "type": "timeseries",
+      "title": "CPU Throttled Seconds per Container",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "rate(container_cpu_cfs_throttled_seconds_total{name=~\".+\"}[5m])",
+          "legendFormat": "{{name}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "CPU Throttled Period Ratio % per Container",
+      "description": "Share of CFS scheduling periods in which the container was throttled against its cpus limit — the latency-relevant severity signal that pairs with the raw 'CPU Throttled Seconds' panel to its left. Unlike the raw throttled-seconds count, this ratio is what actually maps to added request latency. The red 25% line marks the ContainerCpuThrottledHigh alert threshold (rate(...throttled_periods)/rate(...periods) > 0.25 for 15m, REQ-OBS-014); a container sustained near that line is CPU-starved against its cpus limit and is a candidate for a raised limit.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "rate(container_cpu_cfs_throttled_periods_total{name=~\".+\"}[5m]) / rate(container_cpu_cfs_periods_total{name=~\".+\"}[5m]) * 100",
+          "legendFormat": "{{name}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "custom": {
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 25
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
       "id": 6,
       "type": "timeseries",
       "title": "Network RX/TX per Container",
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 16
+        "x": 0,
+        "y": 24
       },
       "datasource": {
         "type": "prometheus",
