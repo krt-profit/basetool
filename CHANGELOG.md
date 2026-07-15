@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Lager: Das „Auftrag"- und „Einsatz"-Dropdown der Zuordnung wird nicht mehr abgeschnitten, wenn es unten aus der Tabelle herausragt.** Das „+ Zuordnen"-Popover wurde vom horizontal scrollenden Tabellencontainer am unteren Rand beschnitten (in Firefox wie Chrome sichtbar als Unterbrechung); es wird jetzt wie die Suchfeld-Dropdowns fest am Auslöser verankert und überlagert den Rand vollständig (REQ-UI-011, REQ-INV-027).
+
 ## [v1.4.2](https://github.com/krt-profit/basetool/releases/tag/v1.4.2) - 2026-07-15
 
 ### Changed

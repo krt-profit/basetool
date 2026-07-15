@@ -1237,6 +1237,27 @@ function assocCloseAllPops(except) {
     });
 }
 
+// Anchors a `position: fixed` allocation popover to its trigger in viewport space. The
+// popover is fixed (not absolute) so the horizontally-scrolling ancestors
+// (#tableContainer.overflow-x-auto + .table-responsive) can't crop it at their bottom edge;
+// fixed positioning drops the stylesheet's top/left, so they are recomputed here from the
+// trigger wrap's rect (mirrors the old `top: calc(100% + 5px); left: 0`).
+function assocPositionPop(pop) {
+    const wrap = pop.closest('.assoc-add-wrap');
+    if (!wrap) return;
+    const rect = wrap.getBoundingClientRect();
+    pop.style.left = rect.left + 'px';
+    pop.style.top = rect.bottom + 5 + 'px';
+}
+
+// Keeps the currently-open popover glued to its trigger as the window or the table's own
+// scroll container moves (capture catches inner-container scrolls, which do not bubble).
+// Only one popover is open at a time (assocCloseAllPops), so the first visible one wins.
+function assocRepositionOpenPop() {
+    const pop = document.querySelector('[data-assoc-pop]:not(.krtm-hidden)');
+    if (pop) assocPositionPop(pop);
+}
+
 // Switches a popover to its combobox (pick) section.
 function assocShowPickSection(pop) {
     const pick = pop.querySelector('[data-assoc-pop-pick]');
@@ -1465,6 +1486,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             const hidden = pop.querySelector('input[type="hidden"]');
             if (hidden && hidden.krtCombobox) hidden.krtCombobox.setValue('');
             pop.classList.remove('krtm-hidden');
+            assocPositionPop(pop);
             const cbInput = pop.querySelector('.krt-combobox__input');
             if (cbInput) cbInput.focus();
         } else {
@@ -1496,6 +1518,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         const input = pop.querySelector('[data-assoc-amount-input]');
         if (input) input.value = el.getAttribute('data-amount');
         pop.classList.remove('krtm-hidden');
+        assocPositionPop(pop);
         if (input) input.focus();
     });
     window.krtEvents.on('click', 'inv-my-assoc-save', function (el) {
@@ -1510,6 +1533,10 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         if (!pop || !split) return;
         assocSubmit(split, pop, 'DELETE');
     });
+    // Keep the fixed popover anchored to its trigger while the page or the table's own
+    // horizontal scroll container moves (capture reaches inner-container scrolls that don't bubble).
+    window.addEventListener('scroll', assocRepositionOpenPop, true);
+    window.addEventListener('resize', assocRepositionOpenPop);
     // Close popovers on an outside click; keyboard: Enter saves the amount, Enter/Space opens a
     // chip's editor (the chips are role=button but a <span> gets no synthetic click on key press).
     document.addEventListener('click', function (e) {
