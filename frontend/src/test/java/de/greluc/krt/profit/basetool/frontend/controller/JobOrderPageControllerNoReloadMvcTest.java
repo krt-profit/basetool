@@ -448,7 +448,8 @@ class JobOrderPageControllerNoReloadMvcTest {
   // ------------------------------------------------------------------------
   // bookProductionAjax — POST /orders/{id}/items/{itemId}/production (REQ-ORDERS-025 Herstellung).
   // Relays the production booking to the backend, then re-fetches the order so the detail page can
-  // swap the items / production / kpi sections in place. A backend 409 (OPTIMISTIC_LOCK) or 422
+  // swap the items / aggregated / header / kpi / item-handovers sections in place (the Herstellung
+  // surface lives in the items section). A backend 409 (OPTIMISTIC_LOCK) or 422
   // (PRODUCTION_ALLOCATION) must be propagated verbatim via propagateBackendError — not swallowed
   // into a 500 — so krtFetch can distinguish a reload-and-retry from an inline hint.
   // ------------------------------------------------------------------------

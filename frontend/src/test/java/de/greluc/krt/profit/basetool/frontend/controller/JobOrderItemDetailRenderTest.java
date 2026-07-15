@@ -402,6 +402,100 @@ class JobOrderItemDetailRenderTest {
     assertThat(html)
         .as("material-collection button stays reachable after delivery")
         .contains("/orders/" + orderId + "/material-collection");
+    // Delivery-gating message split (REQ-ORDERS-025): once every ordered unit is delivered
+    // (isFullyDelivered), the "all items delivered" note shows and the produce-first hint does not.
+    assertThat(html)
+        .as("all-delivered note shows once fully delivered")
+        .contains("data-testid=\"item-handover-all-delivered\"");
+    assertThat(html)
+        .as("produce-first hint hidden once fully delivered")
+        .doesNotContain("data-testid=\"item-handover-none-manufactured\"");
+    // The Herstellung surface folded into the items tab (#1317) — there is no separate tab/pane.
+    assertThat(html)
+        .as("no separate Herstellung tab")
+        .doesNotContain("id=\"tab-production\"")
+        .doesNotContain("id=\"pane-production\"");
+  }
+
+  @Test
+  void itemOrderDetail_NotFullyDelivered_FoldsHerstellungIntoItemsTabWithProduceFirstHint()
+      throws Exception {
+    // Given: a not-yet-delivered item order (3 ordered, 0 manufactured, 0 delivered) with a
+    // material,
+    // viewed by a logistician. Nothing is manufactured-but-undelivered (no handover button) and the
+    // order is not fully delivered -> the produce-first hint shows, not the "all delivered" note;
+    // and
+    // the production surface folds into the items tab rather than a separate Herstellung tab.
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    JobOrderItemDto line =
+        new JobOrderItemDto(
+            UUID.randomUUID(),
+            new GameItemReferenceDto(UUID.randomUUID(), "A03 Sniper Rifle", "WEAPON"),
+            new BlueprintReferenceDto(UUID.randomUUID(), "A03 Sniper Rifle", "wiki-a03"),
+            3,
+            0,
+            0,
+            null,
+            List.of(
+                new JobOrderItemMaterialDto(
+                    UUID.randomUUID(), material("Agricium", "SCU"), 12.0, "NONE", 1L)),
+            1L);
+    JobOrderDto order =
+        new JobOrderDto(
+            orderId,
+            12,
+            null,
+            null,
+            "Handle",
+            null,
+            1,
+            "IN_PROGRESS",
+            "ITEM",
+            true,
+            List.of(),
+            List.of(line),
+            List.of(
+                new AggregatedMaterialDto(
+                    material("Agricium", "SCU"), "NONE", 12.0, 12.0, List.of(), null)),
+            List.of(),
+            List.of(),
+            List.of(),
+            Instant.now(),
+            1L,
+            false);
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+        .thenReturn(order);
+
+    // When
+    String html =
+        mockMvc
+            .perform(get("/orders/" + orderId).with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    // Then: the Herstellung surface is in the items tab — the record button and the chevron that
+    // reveals the per-unit demand render there, with no separate Herstellung tab/pane.
+    assertThat(html)
+        .as("Herstellung erfassen button folded into the items tab")
+        .contains("data-trigger=\"od-open-production\"");
+    assertThat(html)
+        .as("per-unit demand chevron present for a line with materials")
+        .contains("data-trigger=\"od-toggle-demand\"");
+    assertThat(html)
+        .as("no separate Herstellung tab/pane")
+        .doesNotContain("id=\"tab-production\"")
+        .doesNotContain("id=\"pane-production\"");
+    // And the message split: while not fully delivered, the produce-first hint shows and the
+    // all-delivered note does not.
+    assertThat(html)
+        .as("produce-first hint shows while not fully delivered")
+        .contains("data-testid=\"item-handover-none-manufactured\"");
+    assertThat(html)
+        .as("all-delivered note hidden while not fully delivered")
+        .doesNotContain("data-testid=\"item-handover-all-delivered\"");
   }
 
   @Test
@@ -750,6 +844,33 @@ class JobOrderItemDetailRenderTest {
     assertThat(html)
         .as("a fragment swap returns the panel alone, not the whole page")
         .doesNotContain("<html");
+  }
+
+  // Log-noise / wasted round-trip guard: the members-only coverage endpoint must be hit ONLY for
+  // the two renders that actually consume the attribute — the full page and its own
+  // fragment=blueprint-owners swap. A swap of any other section (header/items/kpi/…) discards the
+  // attribute, so re-fetching it there was pure waste and — since the endpoint 403s for a
+  // non-member of the responsible org unit — spammed the backend log with a WARN on every unrelated
+  // swap an open detail page issued (133 identical ACCESS_DENIED warnings from one viewer in a
+  // single 30-min session). Pin that a non-blueprint section swap issues no coverage call.
+  @Test
+  void itemOrder_nonBlueprintFragmentSwap_doesNotFetchBlueprintCoverage() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+        .thenReturn(oneLineItemOrder(orderId));
+
+    mockMvc
+        .perform(
+            get("/orders/" + orderId)
+                .param("fragment", "items")
+                .with(authentication(logisticianToken(userId))))
+        .andExpect(status().isOk());
+
+    verify(backendApiClient, never())
+        .get(
+            eq("/api/v1/orders/" + orderId + "/item-blueprint-owners"),
+            eq(JobOrderItemBlueprintOwnersDto.class));
   }
 
   @Test

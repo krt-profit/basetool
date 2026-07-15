@@ -14,6 +14,8 @@
 
 ### Fixed
 
+- **Aufträge: Die Detailseite eines Item-Auftrags erzeugt keine unnötigen Zugriffe mehr auf die mitgliederinterne Blaupausen-Abdeckung.** Die Abdeckungs-Ansicht wurde bei jedem Abschnitts-Nachladen (Kopf, Positionen, Kennzahlen, …) erneut vom Backend geholt, obwohl sie nur auf der Vollseite bzw. beim eigenen Nachladen des Blaupausen-Abschnitts angezeigt wird. Für Nicht-Mitglieder der bearbeitenden Staffel/SK antwortete der mitgliederinterne Endpunkt jedes Mal mit 403 und flutete das Backend-Log mit `ACCESS_DENIED`-Warnungen; der Abruf ist jetzt auf die beiden Renderings beschränkt, die die Daten tatsächlich anzeigen (REQ-ORDERS-016).
+
 - **Lager: Das „Auftrag"- und „Einsatz"-Dropdown der Zuordnung wird nicht mehr abgeschnitten, wenn es unten aus der Tabelle herausragt.** Das „+ Zuordnen"-Popover wurde vom horizontal scrollenden Tabellencontainer am unteren Rand beschnitten (in Firefox wie Chrome sichtbar als Unterbrechung); es wird jetzt wie die Suchfeld-Dropdowns fest am Auslöser verankert und überlagert den Rand vollständig (REQ-UI-011, REQ-INV-027).
 
 ## [v1.4.2](https://github.com/krt-profit/basetool/releases/tag/v1.4.2) - 2026-07-15
