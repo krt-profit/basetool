@@ -720,21 +720,19 @@ tbody tr:nth-child(even):hover {
     outline: none;
 }
 
+/* Fixed — not absolute — so the two horizontally-scrolling ancestors
+   (#tableContainer.overflow-x-auto + .table-responsive, whose overflow-x:auto forces
+   overflow-y to auto) cannot crop the popover at their bottom edge; Firefox and Chrome
+   alike clip an absolute descendant there. Fixed positioning needs explicit coordinates,
+   so inventory-admin.js / inventory-my.js anchor top/left to the trigger's rect on open
+   and keep it glued on scroll/resize (assocPositionPop). */
 .assoc-pop {
-    position: absolute;
-    top: calc(100% + 5px);
-    left: 0;
+    position: fixed;
     z-index: 60;
     width: 260px;
     background-color: var(--color-bg-dark-gray);
     border: 1px solid var(--color-primary);
     box-shadow: var(--shadow-dropdown, 0 4px 10px rgb(0 0 0 / 60%));
-}
-
-.assoc-pop .krt-combobox__listbox {
-    position: static;
-    border: none;
-    box-shadow: none;
 }
 
 .assoc-pop__menge {
