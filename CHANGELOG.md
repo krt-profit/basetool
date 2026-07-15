@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.4.5](https://github.com/krt-profit/basetool/releases/tag/v1.4.5) - 2026-07-15
+
 ### Fixed
 
 - **Lager: Das „+ Zuordnen"-Popover einer Lagerzeile am unteren Bildschirmrand klappt jetzt nach oben auf, statt unten aus dem Sichtbereich zu rutschen.** Seit der Umstellung auf feste Positionierung (v1.4.3) konnten Mengenfeld und „Speichern"-Button unter den Bildschirmrand fallen und waren dort nicht erreichbar (ein festes Element lässt sich nicht in den Sichtbereich scrollen); das Popover flippt nun wie die Suchfeld-Dropdowns über den Auslöser (REQ-UI-011, REQ-INV-027).
