@@ -1241,13 +1241,27 @@ function assocCloseAllPops(except) {
 // popover is fixed (not absolute) so the horizontally-scrolling ancestors
 // (#tableContainer.overflow-x-auto + .table-responsive) can't crop it at their bottom edge;
 // fixed positioning drops the stylesheet's top/left, so they are recomputed here from the
-// trigger wrap's rect (mirrors the old `top: calc(100% + 5px); left: 0`).
+// trigger wrap's rect (mirrors the old `top: calc(100% + 5px); left: 0`). When the trigger sits
+// near the viewport bottom there is no room to drop the popover downward — and a fixed box can't
+// be scrolled into view — so it flips above the trigger (bottom-anchored, so a later switch to
+// the taller/shorter amount section stays glued to the trigger). Mirrors krt-searchable-select's
+// positionListbox (REQ-UI-011). Runs while the popover is visible so offsetHeight is measurable.
 function assocPositionPop(pop) {
     const wrap = pop.closest('.assoc-add-wrap');
     if (!wrap) return;
     const rect = wrap.getBoundingClientRect();
+    const gap = 5;
+    const below = window.innerHeight - rect.bottom;
+    const above = rect.top;
+    const flipUp = below < pop.offsetHeight + gap && above > below;
     pop.style.left = rect.left + 'px';
-    pop.style.top = rect.bottom + 5 + 'px';
+    if (flipUp) {
+        pop.style.top = 'auto';
+        pop.style.bottom = window.innerHeight - rect.top + gap + 'px';
+    } else {
+        pop.style.bottom = 'auto';
+        pop.style.top = rect.bottom + gap + 'px';
+    }
 }
 
 // Keeps the currently-open popover glued to its trigger as the window or the table's own
