@@ -140,7 +140,7 @@ class CrossStaffelJobOrderE2eTest {
       Page page = context.newPage();
       try {
         E2eSupport.login(page, baseUrl, OFFICER_USER, OFFICER_PASSWORD);
-        E2eSupport.navigate(page, baseUrl + "/orders/" + jobOrderId);
+        E2eSupport.navigate(page, baseUrl + "/orders/" + jobOrderId + "?tab=handovers");
         // Opening the modal lazily fetches the order's linked inventory per material; gate on that
         // response (page-side eval is blocked by the strict CSP).
         page.waitForResponse(

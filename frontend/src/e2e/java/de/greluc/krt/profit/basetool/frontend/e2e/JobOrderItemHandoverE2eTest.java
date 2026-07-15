@@ -118,13 +118,17 @@ class JobOrderItemHandoverE2eTest {
         assertNotNull(order, "the created ITEM order must be readable by the admin");
         String id = order.get("id").getAsString();
         String detailUrl = baseUrl + "/orders/" + id;
+        // The item-handover controls live in a non-default tab pane (an item order defaults to the
+        // "items" tab), so deeplink straight to the item-handovers tab before asserting or driving
+        // them; the /items/edit route below is a separate page and keeps the bare detail URL.
+        String itemHandoverUrl = detailUrl + "?tab=item-handovers";
 
-        E2eSupport.navigate(page, detailUrl);
+        E2eSupport.navigate(page, itemHandoverUrl);
         assertThat(page.getByTestId("item-handover-open")).isVisible();
 
         // Partial handover: deliver one of two units. The log-handover button must remain.
         recordItemHandover(page, "1", "E2E Item Recipient A");
-        E2eSupport.navigate(page, detailUrl);
+        E2eSupport.navigate(page, itemHandoverUrl);
         assertThat(
                 page.getByTestId("item-handover-row")
                     .filter(new Locator.FilterOptions().setHasText("E2E Item Recipient A")))
@@ -138,9 +142,9 @@ class JobOrderItemHandoverE2eTest {
 
         // Completing handover: deliver the last unit; the order auto-completes and the log-handover
         // button disappears once no line is outstanding.
-        E2eSupport.navigate(page, detailUrl);
+        E2eSupport.navigate(page, itemHandoverUrl);
         recordItemHandover(page, "1", "E2E Item Recipient B");
-        E2eSupport.navigate(page, detailUrl);
+        E2eSupport.navigate(page, itemHandoverUrl);
         assertThat(page.getByTestId("item-handover-open")).hasCount(0);
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "joborder-item-handover");
