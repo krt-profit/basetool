@@ -171,7 +171,6 @@ public class JobOrderItemProductionService {
     // snapshot that feeds the aggregated-materials view). requiredQuantity holds the demand for the
     // whole ordered amount, so scale it to `amount` and round for the material's quantity type.
     Map<UUID, Double> demandByMaterial = new LinkedHashMap<>();
-    Map<UUID, Material> materialsById = new LinkedHashMap<>();
     for (JobOrderItemMaterial req : line.getMaterials()) {
       Material material = req.getMaterial();
       if (material == null) {
@@ -181,7 +180,6 @@ public class JobOrderItemProductionService {
       double demand =
           QuantityTypeRounding.roundForQuantityType(reqTotal * amount / line.getAmount(), material);
       demandByMaterial.merge(material.getId(), demand, Double::sum);
-      materialsById.putIfAbsent(material.getId(), material);
     }
 
     // The consumption must exactly cover every required material's demand, and may not name a
