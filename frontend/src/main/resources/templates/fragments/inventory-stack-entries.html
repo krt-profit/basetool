@@ -60,7 +60,7 @@
                                   th:title="#{inventory.assoc.amount}">
                                 <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
                                 <span class="assoc-chip__amt"
-                                      th:text="${#numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
+                                      th:text="${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(a.amount, 1, 'NONE') : #numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
                             </span>
                             <span class="assoc-add-wrap">
                                 <button type="button" class="assoc-add"
@@ -97,7 +97,7 @@
                             </span>
                             <span class="chip" data-assoc-rest
                                   th:classappend="${entry.jobOrderRest == null or (entry.jobOrderRest &gt;= -0.0005 and entry.jobOrderRest &lt;= 0.0005)} ? 'chip--success' : (${entry.jobOrderRest &lt; 0} ? 'chip--danger' : 'chip--muted')"
-                                  th:text="${entry.jobOrderRest == null or (entry.jobOrderRest &gt;= -0.0005 and entry.jobOrderRest &lt;= 0.0005)} ? #{inventory.assoc.rest.zero} : (${entry.jobOrderRest &lt; 0} ? #{inventory.assoc.rest.over(${#numbers.formatDecimal(-entry.jobOrderRest, 1, 'NONE', 3, 'DEFAULT')})} : #{inventory.assoc.rest.free(${#numbers.formatDecimal(entry.jobOrderRest, 1, 'NONE', 3, 'DEFAULT')})})">Rest 0</span>
+                                  th:text="${entry.jobOrderRest == null or (entry.jobOrderRest &gt;= -0.0005 and entry.jobOrderRest &lt;= 0.0005)} ? #{inventory.assoc.rest.zero} : (${entry.jobOrderRest &lt; 0} ? #{inventory.assoc.rest.over(${(entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(-entry.jobOrderRest, 1, 'NONE') : #numbers.formatDecimal(-entry.jobOrderRest, 1, 'NONE', 3, 'DEFAULT'))})} : #{inventory.assoc.rest.free(${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(entry.jobOrderRest, 1, 'NONE') : #numbers.formatDecimal(entry.jobOrderRest, 1, 'NONE', 3, 'DEFAULT')})})">Rest 0</span>
                         </div>
                     </div>
                     <!-- Einsatz split: same shape, no material-required filter (any mission is
@@ -120,7 +120,7 @@
                                   th:title="#{inventory.assoc.amount}">
                                 <span th:text="${a.missionName}">Nachtfalke</span> ·
                                 <span class="assoc-chip__amt"
-                                      th:text="${#numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
+                                      th:text="${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(a.amount, 1, 'NONE') : #numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
                             </span>
                             <span class="assoc-add-wrap">
                                 <button type="button" class="assoc-add"
@@ -157,7 +157,7 @@
                             </span>
                             <span class="chip" data-assoc-rest
                                   th:classappend="${entry.missionRest == null or (entry.missionRest &gt;= -0.0005 and entry.missionRest &lt;= 0.0005)} ? 'chip--success' : (${entry.missionRest &lt; 0} ? 'chip--danger' : 'chip--muted')"
-                                  th:text="${entry.missionRest == null or (entry.missionRest &gt;= -0.0005 and entry.missionRest &lt;= 0.0005)} ? #{inventory.assoc.rest.zero} : (${entry.missionRest &lt; 0} ? #{inventory.assoc.rest.over(${#numbers.formatDecimal(-entry.missionRest, 1, 'NONE', 3, 'DEFAULT')})} : #{inventory.assoc.rest.free(${#numbers.formatDecimal(entry.missionRest, 1, 'NONE', 3, 'DEFAULT')})})">Rest 0</span>
+                                  th:text="${entry.missionRest == null or (entry.missionRest &gt;= -0.0005 and entry.missionRest &lt;= 0.0005)} ? #{inventory.assoc.rest.zero} : (${entry.missionRest &lt; 0} ? #{inventory.assoc.rest.over(${(entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(-entry.missionRest, 1, 'NONE') : #numbers.formatDecimal(-entry.missionRest, 1, 'NONE', 3, 'DEFAULT'))})} : #{inventory.assoc.rest.free(${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(entry.missionRest, 1, 'NONE') : #numbers.formatDecimal(entry.missionRest, 1, 'NONE', 3, 'DEFAULT')})})">Rest 0</span>
                         </div>
                     </div>
                 </div>
@@ -289,7 +289,7 @@
                                       th:title="#{inventory.assoc.amount}">
                                     <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
                                     <span class="assoc-chip__amt"
-                                          th:text="${#numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
+                                          th:text="${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(a.amount, 1, 'NONE') : #numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
                                 </span>
                                 <span class="assoc-add-wrap">
                                     <button type="button" class="assoc-add"
@@ -331,12 +331,12 @@
                                       class="assoc-chip assoc-chip--order">
                                     <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
                                     <span class="assoc-chip__amt"
-                                          th:text="${#numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
+                                          th:text="${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(a.amount, 1, 'NONE') : #numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
                                 </span>
                             </th:block>
                             <span class="chip" data-assoc-rest
                                   th:classappend="${entry.jobOrderRest == null or (entry.jobOrderRest &gt;= -0.0005 and entry.jobOrderRest &lt;= 0.0005)} ? 'chip--success' : (${entry.jobOrderRest &lt; 0} ? 'chip--danger' : 'chip--muted')"
-                                  th:text="${entry.jobOrderRest == null or (entry.jobOrderRest &gt;= -0.0005 and entry.jobOrderRest &lt;= 0.0005)} ? #{inventory.assoc.rest.zero} : (${entry.jobOrderRest &lt; 0} ? #{inventory.assoc.rest.over(${#numbers.formatDecimal(-entry.jobOrderRest, 1, 'NONE', 3, 'DEFAULT')})} : #{inventory.assoc.rest.free(${#numbers.formatDecimal(entry.jobOrderRest, 1, 'NONE', 3, 'DEFAULT')})})">Rest 0</span>
+                                  th:text="${entry.jobOrderRest == null or (entry.jobOrderRest &gt;= -0.0005 and entry.jobOrderRest &lt;= 0.0005)} ? #{inventory.assoc.rest.zero} : (${entry.jobOrderRest &lt; 0} ? #{inventory.assoc.rest.over(${(entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(-entry.jobOrderRest, 1, 'NONE') : #numbers.formatDecimal(-entry.jobOrderRest, 1, 'NONE', 3, 'DEFAULT'))})} : #{inventory.assoc.rest.free(${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(entry.jobOrderRest, 1, 'NONE') : #numbers.formatDecimal(entry.jobOrderRest, 1, 'NONE', 3, 'DEFAULT')})})">Rest 0</span>
                         </div>
                     </div>
                     <!-- Einsatz split: same shape, no material-required filter (any mission is
@@ -361,7 +361,7 @@
                                       th:title="#{inventory.assoc.amount}">
                                     <span th:text="${a.missionName}">Nachtfalke</span> ·
                                     <span class="assoc-chip__amt"
-                                          th:text="${#numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
+                                          th:text="${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(a.amount, 1, 'NONE') : #numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
                                 </span>
                                 <span class="assoc-add-wrap">
                                     <button type="button" class="assoc-add"
@@ -403,12 +403,12 @@
                                       class="assoc-chip assoc-chip--mission">
                                     <span th:text="${a.missionName}">Nachtfalke</span> ·
                                     <span class="assoc-chip__amt"
-                                          th:text="${#numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
+                                          th:text="${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(a.amount, 1, 'NONE') : #numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
                                 </span>
                             </th:block>
                             <span class="chip" data-assoc-rest
                                   th:classappend="${entry.missionRest == null or (entry.missionRest &gt;= -0.0005 and entry.missionRest &lt;= 0.0005)} ? 'chip--success' : (${entry.missionRest &lt; 0} ? 'chip--danger' : 'chip--muted')"
-                                  th:text="${entry.missionRest == null or (entry.missionRest &gt;= -0.0005 and entry.missionRest &lt;= 0.0005)} ? #{inventory.assoc.rest.zero} : (${entry.missionRest &lt; 0} ? #{inventory.assoc.rest.over(${#numbers.formatDecimal(-entry.missionRest, 1, 'NONE', 3, 'DEFAULT')})} : #{inventory.assoc.rest.free(${#numbers.formatDecimal(entry.missionRest, 1, 'NONE', 3, 'DEFAULT')})})">Rest 0</span>
+                                  th:text="${entry.missionRest == null or (entry.missionRest &gt;= -0.0005 and entry.missionRest &lt;= 0.0005)} ? #{inventory.assoc.rest.zero} : (${entry.missionRest &lt; 0} ? #{inventory.assoc.rest.over(${(entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(-entry.missionRest, 1, 'NONE') : #numbers.formatDecimal(-entry.missionRest, 1, 'NONE', 3, 'DEFAULT'))})} : #{inventory.assoc.rest.free(${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(entry.missionRest, 1, 'NONE') : #numbers.formatDecimal(entry.missionRest, 1, 'NONE', 3, 'DEFAULT')})})">Rest 0</span>
                         </div>
                     </div>
                 </div>

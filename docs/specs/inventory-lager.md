@@ -400,7 +400,10 @@ tables — an order is credited only its **allocated** share of a split entry, n
 per-entry association scalar (the transitional first-allocation `jobOrderId` / `missionId` fields are
 gone once every reader consumes the allocations). Every read-only inventory listing that shows an
 entry's orders — including the mission detail page's Lagereinträge table — renders **all** of the
-entry's order chips with their amounts, not just the first.
+entry's order chips with their amounts, not just the first. Every amount the split UI shows — the
+order / mission chips, the rest chip, the book-out / Umbuchen and handover deduct-from pickers and
+their hints — renders **whole (no decimals) for a `PIECE` material** and to three decimals only for
+`SCU`.
 
 **Assignment writes.** The earmarks are edited through dedicated per-allocation endpoints `POST` /
 `PATCH` / `DELETE /api/v1/inventory/{id}/allocation` (add / change amount / remove), each gated by

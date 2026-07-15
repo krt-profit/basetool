@@ -896,7 +896,7 @@
                                               class="assoc-chip assoc-chip--order">
                                             <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
                                             <span class="assoc-chip__amt"
-                                                  th:text="${#numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
+                                                  th:text="${item.material?.quantityType == 'PIECE' ? #numbers.formatInteger(a.amount, 1, 'NONE') : #numbers.formatDecimal(a.amount, 1, 'NONE', 3, 'DEFAULT')}">1.000</span>
                                         </span>
                                         <span th:if="${#lists.isEmpty(item.jobOrderAllocations)}">-</span>
                                     </td>

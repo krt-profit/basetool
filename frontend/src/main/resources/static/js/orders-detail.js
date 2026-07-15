@@ -195,6 +195,19 @@ function orderSliceAmount(inv) {
     return slice && typeof slice.amount === 'number' ? slice.amount : 0;
 }
 
+// Formats a handover amount whole (no decimals) for a PIECE material, three decimals for SCU —
+// matches the inventory chip / krtScuInput convention so the picker never shows "5.000" for pieces.
+function _handoverFmtAmount(n, isPiece) {
+    return isPiece ? String(Math.round(n)) : Number(n).toFixed(3);
+}
+
+// Whether the entry selected in a handover row holds a PIECE-counted material.
+function _handoverRowIsPiece(row) {
+    const sel = row.querySelector('select');
+    const inv = sel ? cachedInventoryItems.find((i) => i.id === sel.value) : null;
+    return !!(inv && inv.material && inv.material.quantityType === 'PIECE');
+}
+
 async function openHandoverModal() {
     document.getElementById('handover-modal').style.display = 'flex';
     if (!isInventoryCached) {
@@ -312,6 +325,7 @@ function _refreshHandoverMissionPicker(row) {
     const inv = sel ? cachedInventoryItems.find((i) => i.id === sel.value) : null;
     const missions = inv && Array.isArray(inv.missionAllocations) ? inv.missionAllocations : [];
     const missionRest = inv && typeof inv.missionRest === 'number' ? inv.missionRest : 0;
+    const isPiece = !!(inv && inv.material && inv.material.quantityType === 'PIECE');
     const handed =
         amtInput && window.krtScuInput ? window.krtScuInput.parse(amtInput.value) : Number.NaN;
     const ambiguous = missions.length >= 2 && isFinite(handed) && handed > missionRest + 0.0005;
@@ -356,7 +370,7 @@ function _refreshHandoverMissionPicker(row) {
             const input = document.createElement('input');
             input.type = 'number';
             input.min = '0';
-            input.step = '0.001';
+            input.step = isPiece ? '1' : '0.001';
             input.max = String(m.amount);
             input.value = '0';
             input.style.width = '6rem';
@@ -367,7 +381,7 @@ function _refreshHandoverMissionPicker(row) {
             const max = document.createElement('span');
             max.style.fontSize = '0.7rem';
             max.style.color = 'var(--color-gray-2-text)';
-            max.textContent = '/ ' + m.amount.toFixed(3);
+            max.textContent = '/ ' + _handoverFmtAmount(m.amount, isPiece);
             line.appendChild(name);
             line.appendChild(input);
             line.appendChild(max);
@@ -390,6 +404,7 @@ function _updateHandoverMissionRest(row) {
     if (!holder || !sel || !amtInput) return;
     const inv = cachedInventoryItems.find((i) => i.id === sel.value);
     const missionRest = inv && typeof inv.missionRest === 'number' ? inv.missionRest : 0;
+    const isPiece = !!(inv && inv.material && inv.material.quantityType === 'PIECE');
     const handed = window.krtScuInput
         ? window.krtScuInput.parse(amtInput.value)
         : parseFloat(amtInput.value);
@@ -406,8 +421,11 @@ function _updateHandoverMissionRest(row) {
     restEl.classList.toggle('chip--danger', invalid);
     restEl.classList.toggle('chip--muted', !invalid);
     restEl.textContent = invalid
-        ? MSG_HANDOVER_MISSION_MIN.replace('{0}', minRequired.toFixed(3))
-        : MSG_HANDOVER_MISSION_REST.replace('{0}', Math.max(0, fromRest).toFixed(3));
+        ? MSG_HANDOVER_MISSION_MIN.replace('{0}', _handoverFmtAmount(minRequired, isPiece))
+        : MSG_HANDOVER_MISSION_REST.replace(
+              '{0}',
+              _handoverFmtAmount(Math.max(0, fromRest), isPiece),
+          );
 }
 
 // Collects a handover row's mission "deduct from" plan from its picker (only inputs > 0), or null
@@ -415,13 +433,14 @@ function _updateHandoverMissionRest(row) {
 function _collectHandoverMissionReductions(row) {
     const holder = row.querySelector('[data-role="mission-herkunft"]');
     if (!holder) return null;
+    const isPiece = _handoverRowIsPiece(row);
     const list = [];
     holder.querySelectorAll('[data-mission-input]').forEach((inp) => {
         const v = parseFloat(inp.value);
         if (!isNaN(v) && v > 0) {
             list.push({
                 targetId: inp.getAttribute('data-mission-id'),
-                amount: Math.round(v * 1000) / 1000,
+                amount: isPiece ? Math.round(v) : Math.round(v * 1000) / 1000,
             });
         }
     });
@@ -436,11 +455,11 @@ function validateHandoverAmounts() {
         if (!sel || !sel.value || !inp || !inp.value) continue;
         const inv = cachedInventoryItems.find((i) => i.id === sel.value);
         if (!inv) continue;
+        const isPiece = !!(inv.material && inv.material.quantityType === 'PIECE');
         const entered = window.krtScuInput.parse(inp.value);
         const sliceMax = orderSliceAmount(inv);
         if (entered > sliceMax) {
-            const isPiece = inv.material && inv.material.quantityType === 'PIECE';
-            const available = isPiece ? sliceMax.toFixed(0) : sliceMax.toFixed(3);
+            const available = _handoverFmtAmount(sliceMax, isPiece);
             const materialName = inv.material ? inv.material.name : sel.value;
             const msg = MSG_HANDOVER_REPORT_VALIDATION_AMOUNT.replace('{0}', materialName).replace(
                 '{1}',
@@ -466,7 +485,10 @@ function validateHandoverAmounts() {
             const minRequired = Math.max(0, entered - missionRest);
             if (overSlice || assigned > entered + 1e-6 || assigned < minRequired - 1e-6) {
                 showFrontendErrorToast(
-                    MSG_HANDOVER_MISSION_MIN.replace('{0}', minRequired.toFixed(3)),
+                    MSG_HANDOVER_MISSION_MIN.replace(
+                        '{0}',
+                        _handoverFmtAmount(minRequired, isPiece),
+                    ),
                 );
                 return false;
             }

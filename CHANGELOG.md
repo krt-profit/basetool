@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Lager: Bei Materialien mit Mengentyp „Stück" werden Mengen jetzt überall als ganze Zahlen ohne Nachkommastellen angezeigt.** In den Auftrags- und Einsatz-Chips, den Rest-Chips, den Herkunft-Pickern beim Aus- und Umbuchen sowie im Übergabe-Dialog stand bisher z. B. „5,000" statt „5". Die drei Nachkommastellen bleiben SCU-Materialien vorbehalten (REQ-INV-027).
+
 ## [v1.4.0](https://github.com/krt-profit/basetool/releases/tag/v1.4.0) - 2026-07-14
 
 ### Changed
@@ -47,6 +51,8 @@
 - **Aufträge: Die Teil-Übergabe eines Lagereintrags, der gleichzeitig einem Auftrag und einem Einsatz zugeordnet ist, schlägt nicht mehr fehl.** Die übergebene Menge verlässt beide Markierungen; die Einsatz-Markierung wird automatisch auf den verbleibenden Bestand gekappt (Rest zuerst, dann anteilig). Ist die Aufteilung mehrdeutig (mehrere Einsätze und der Rest deckt die Menge nicht), lässt der Übergabe-Dialog dich direkt wählen, wie viel von welchem Einsatz abgezogen wird. Außerdem behoben: schnelle aufeinanderfolgende Chip-Änderungen am selben Eintrag lösten fälschlich einen Konflikt-Neuladen aus, und ein N+1-Ladeproblem der Zuordnungs-Referenzen (REQ-INV-027, REQ-DATA-003, REQ-FE-003).
 
 - **Aufträge: Eine Auftrags-Übergabe kann jetzt höchstens die dem Auftrag zugeordnete Menge eines Lagereintrags hergeben.** Bei einem Eintrag, dessen Bestand auf mehrere Aufträge aufgeteilt ist, ließ sich bisher mehr für einen Auftrag übergeben, als ihm zugeordnet war — der Überschuss ging still zulasten der anderen Aufträge bzw. des freien Rests und verletzte deren Deckung. Das Mengenfeld ist jetzt auf die dem Auftrag zugeordnete Menge begrenzt, und das Backend lehnt eine zu große Menge mit HTTP 400 ab (REQ-INV-027).
+
+- **Lager: Bei Materialien mit Mengentyp „Stück" werden Mengen jetzt überall als ganze Zahlen ohne Nachkommastellen angezeigt.** In den Auftrags- und Einsatz-Chips, den Rest-Chips, den Herkunft-Pickern beim Aus- und Umbuchen sowie im Übergabe-Dialog stand bisher z. B. „5,000" statt „5". Die drei Nachkommastellen bleiben SCU-Materialien vorbehalten (REQ-INV-027).
 
 - **Aufträge: Die „Geliefert"-Umschaltung auf der Material-Sammlungs-Seite erscheint jetzt live bei anderen Betrachtern.** Setzt jemand auf `/orders/{id}/material-collection` einen Lagereintrag auf geliefert oder verschiebt ihn (Besitzer/Standort), aktualisiert sich die Tabelle bei anderen Betrachtern derselben Seite sowie die Materialsammlung auf der Auftrag-Detailseite jetzt ohne manuelles Neuladen; bisher blieben sie bis zum Reload veraltet (REQ-FE-010).
 

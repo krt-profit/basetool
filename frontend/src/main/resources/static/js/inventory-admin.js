@@ -1130,8 +1130,9 @@ function assocBuildChip(field, alloc, isPiece) {
 }
 
 // Recomputes a rest chip's tone + label: 0 -> success, unassigned remainder -> muted "frei",
-// over-allocation (negative) -> danger.
-function assocUpdateRestChip(el, rest) {
+// over-allocation (negative) -> danger. isPiece formats the amount whole (no decimals) for a
+// PIECE material, three decimals for SCU.
+function assocUpdateRestChip(el, rest, isPiece) {
     if (!el) return;
     el.classList.remove('chip--success', 'chip--muted', 'chip--danger');
     if (rest == null || Math.abs(rest) <= ASSOC_EPS) {
@@ -1139,10 +1140,10 @@ function assocUpdateRestChip(el, rest) {
         el.textContent = assocI18n.restZero;
     } else if (rest < 0) {
         el.classList.add('chip--danger');
-        el.textContent = assocI18n.restOver.replace('{0}', assocFormatAmount(-rest, false));
+        el.textContent = assocI18n.restOver.replace('{0}', assocFormatAmount(-rest, isPiece));
     } else {
         el.classList.add('chip--muted');
-        el.textContent = assocI18n.restFree.replace('{0}', assocFormatAmount(rest, false));
+        el.textContent = assocI18n.restFree.replace('{0}', assocFormatAmount(rest, isPiece));
     }
 }
 
@@ -1161,7 +1162,7 @@ function assocRerender(split, dto) {
     allocs.forEach(function (a) {
         split.insertBefore(assocBuildChip(field, a, isPiece), addWrap);
     });
-    assocUpdateRestChip(split.querySelector('[data-assoc-rest]'), rest);
+    assocUpdateRestChip(split.querySelector('[data-assoc-rest]'), rest, isPiece);
     if (
         dto.version != null &&
         window.krtFetch &&
