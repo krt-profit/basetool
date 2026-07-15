@@ -61,7 +61,6 @@ const ORDER_SECTIONS = {
         container: '#item-handover-lines',
         fragmentValue: 'item-handover-lines',
     },
-    production: { container: '#order-production-results', fragmentValue: 'production' },
     'blueprint-owners': {
         container: '#blueprint-owners-section',
         fragmentValue: 'blueprint-owners',
@@ -2074,7 +2073,6 @@ function bookProduction() {
                 window.krtRefreshOrderSection([
                     'items',
                     'aggregated',
-                    'production',
                     'header',
                     'kpi',
                     'item-handovers',

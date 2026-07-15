@@ -437,7 +437,6 @@
         <button th:if="${order.type == 'ITEM' and !requesterView}" class="tab" id="tab-aggregated" type="button" role="tab" aria-selected="false" aria-controls="pane-aggregated" data-tab="aggregated"><span th:text="#{orders.detail.aggregated.title}">Aggregierte Materialien</span> <span class="tab-count" th:text="${order.aggregatedMaterials != null ? order.aggregatedMaterials.size() : 0}">0</span></button>
         <button th:if="${itemBlueprintOwners != null}" class="tab" id="tab-blueprints" type="button" role="tab" aria-selected="false" aria-controls="pane-blueprints" data-tab="blueprints"><span th:text="#{orders.detail.tab.blueprints}">Blaupausen</span> <span class="tab-count" th:text="${itemBlueprintOwners.owners != null ? itemBlueprintOwners.owners.size() : 0}">0</span></button>
         <button th:unless="${requesterView}" class="tab" id="tab-assignees" type="button" role="tab" aria-selected="false" aria-controls="pane-assignees" data-tab="assignees"><span th:text="#{orders.detail.assignees.title}">Bearbeiter</span> <span class="tab-count" th:text="${order.assignees != null ? order.assignees.size() : 0}">0</span></button>
-        <button th:if="${order.type == 'ITEM' and isLogistician}" class="tab" id="tab-production" type="button" role="tab" aria-selected="false" aria-controls="pane-production" data-tab="production"><span th:text="#{orders.detail.production.title}">Herstellung</span> <span class="tab-count" th:text="${order.items != null ? order.items.size() : 0}">0</span></button>
         <button th:if="${order.type != 'ITEM' and !requesterView}" class="tab" id="tab-handovers" type="button" role="tab" aria-selected="false" aria-controls="pane-handovers" data-tab="handovers"><span th:text="#{orders.detail.handovers.title}">Übergaben</span> <span class="tab-count" th:text="${order.handovers != null ? order.handovers.size() : 0}">0</span></button>
         <button th:if="${order.type == 'ITEM' and !requesterView}" class="tab" id="tab-item-handovers" type="button" role="tab" aria-selected="false" aria-controls="pane-item-handovers" data-tab="item-handovers"><span th:text="#{orders.detail.itemHandovers.title}">Item-Übergaben</span> <span class="tab-count" th:text="${order.itemHandovers != null ? order.itemHandovers.size() : 0}">0</span></button>
         <button th:if="${orphanedInventory != null and !orphanedInventory.isEmpty()}" class="tab" id="tab-verkn" type="button" role="tab" aria-selected="false" aria-controls="pane-verkn" data-tab="verkn"><span th:text="#{orders.detail.tab.linked}">Verknüpft</span> <span class="tab-count" th:text="${orphanedInventory != null ? orphanedInventory.size() : 0}">0</span></button>
@@ -556,43 +555,102 @@
         <div id="order-items-results" class="mt-2"><th:block th:fragment="itemsSection">
         <h3 class="section-title" th:text="#{orders.detail.items.title}">Bestellte Items</h3>
         <div class="table-responsive">
+        <!-- The Herstellung surface folds into this table (#1317 follow-up): logisticians get a
+             leading chevron that reveals the per-unit material demand, and a trailing "Herstellung
+             erfassen" button per line; there is no separate Herstellung tab. Manufactured and
+             delivered both carry a progress bar. The production columns render only for logisticians;
+             requesters/read-only viewers see the plain status columns. -->
         <table class="data-table">
             <thead>
             <tr>
+                <th th:if="${isLogistician}" class="od-prod-expand-col"></th>
                 <th th:text="#{orders.detail.item.name}">Item</th>
-                <th th:text="#{orders.detail.item.blueprint}">Bauplan</th>
                 <th th:text="#{orders.detail.item.amount}">Anzahl</th>
                 <th th:text="#{orders.detail.item.manufactured}">Hergestellt</th>
                 <th th:text="#{orders.detail.item.delivered}">Geliefert</th>
                 <th th:text="#{orders.detail.item.outstanding}">Ausstehend</th>
+                <th th:if="${isLogistician}" class="krtm-text-align-right"></th>
             </tr>
             </thead>
             <tbody>
-            <tr th:each="item : ${order.items}">
+            <th:block th:each="item : ${order.items}"
+                th:with="mfg=${item.manufacturedAmount != null ? item.manufacturedAmount : 0},dlv=${item.deliveredAmount != null ? item.deliveredAmount : 0},amt=${item.amount != null ? item.amount : 0},complete=${(item.amount != null ? item.amount : 0) > 0 and (item.manufacturedAmount != null ? item.manufacturedAmount : 0) >= (item.amount != null ? item.amount : 0)},hasDemand=${item.materials != null and !item.materials.isEmpty()},demandId='od-prod-demand-' + ${item.id}">
+            <tr>
+                <td th:if="${isLogistician}" class="od-prod-expand-cell">
+                    <button th:if="${hasDemand}" type="button" class="od-prod-toggle"
+                            data-trigger="od-toggle-demand" aria-expanded="false"
+                            th:attr="aria-controls=${demandId}"
+                            th:aria-label="#{orders.detail.production.perUnit}">
+                        <svg class="krt-icon od-prod-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+                    </button>
+                </td>
                 <td>
                     <span th:text="${item.gameItem != null ? item.gameItem.name() : '-'}"></span>
                     <span th:if="${item.parentItemId != null}" class="subassembly-tag" th:text="#{orders.detail.item.subassembly}" th:title="#{orders.detail.item.subassembly}">Unterbaugruppe</span>
+                    <!-- Machine-readable per-material demand for the production modal (read by
+                         orders-detail.js openProductionModal via the button's closest <tr>). Kept on
+                         the main row so the modal finds it independently of the collapsible demand
+                         sub-row below. Logisticians only (the production surface). -->
+                    <ul th:if="${isLogistician}" class="od-production-demand krtm-display-none-5790" hidden aria-hidden="true">
+                        <li th:each="m : ${item.materials}"
+                            th:data-material-id="${m.material != null ? m.material.id() : ''}"
+                            th:data-material-name="${m.material != null ? m.material.name() : ''}"
+                            th:data-quantity-type="${m.material != null ? m.material.quantityType() : 'SCU'}"
+                            th:data-required-total="${m.requiredQuantity != null ? m.requiredQuantity : 0}"></li>
+                    </ul>
                 </td>
+                <td th:text="${#numbers.formatInteger(amt, 1)}">0</td>
                 <td>
-                    <span th:if="${item.blueprint != null}"
-                          th:text="${item.blueprint.scwikiKey() != null ? item.blueprint.scwikiKey() : item.blueprint.outputName()}"
-                          th:title="${item.blueprint.outputName()}"></span>
-                    <span th:if="${item.blueprint == null}" class="text-muted">-</span>
-                </td>
-                <td th:text="${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'}"></td>
-                <td th:with="mfg=${item.manufacturedAmount != null ? item.manufacturedAmount : 0},amt=${item.amount != null ? item.amount : 0}">
                     <span class="mini-bar"><i th:attr="data-krtm-width=${amt > 0 ? (mfg * 100 / amt) : 0}" th:classappend="${amt > 0 and mfg >= amt} ? ' is-complete' : ''"></i></span>
                     <span th:text="${#numbers.formatInteger(mfg, 1)}">0</span>
                 </td>
-                <td th:text="${item.deliveredAmount != null ? #numbers.formatInteger(item.deliveredAmount, 1) : '0'}"></td>
                 <td>
-                    <span th:with="outstanding=${(item.amount != null ? item.amount : 0) - (item.deliveredAmount != null ? item.deliveredAmount : 0)}"
+                    <span class="mini-bar"><i th:attr="data-krtm-width=${amt > 0 ? (dlv * 100 / amt) : 0}" th:classappend="${amt > 0 and dlv >= amt} ? ' is-complete' : ''"></i></span>
+                    <span th:text="${#numbers.formatInteger(dlv, 1)}">0</span>
+                </td>
+                <td>
+                    <span th:with="outstanding=${amt - dlv}"
                           th:class="${outstanding > 0} ? 'text-warning' : 'text-success'"
                           th:text="${#numbers.formatInteger(outstanding, 1)}"></span>
                 </td>
+                <td th:if="${isLogistician}" class="krtm-text-align-right">
+                    <span th:if="${complete}" class="chip chip--success" th:text="#{orders.detail.production.complete}">vollständig</span>
+                    <button th:unless="${complete}" type="button" class="btn btn-outline krtm-min-height-36px-1df5"
+                            data-trigger="od-open-production"
+                            th:data-order-id="${order.id}"
+                            th:data-item-id="${item.id}"
+                            th:data-item-name="${item.gameItem != null ? item.gameItem.name() : ''}"
+                            th:data-amount="${amt}"
+                            th:data-manufactured="${mfg}"
+                            th:data-version="${item.version}">
+                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                        <span th:text="#{orders.detail.production.record}">Herstellung erfassen</span>
+                    </button>
+                </td>
             </tr>
+            <!-- Collapsible "Bedarf je Stück" sub-row (mirrors the bank request table's Notiz /
+                 Begründung detail row): the per-material per-unit demand, hidden by default and
+                 revealed by the chevron. Logisticians only; the JS scales requiredQuantity to the
+                 entered unit count exactly as the backend does. -->
+            <tr class="od-prod-demand-row" th:if="${isLogistician and hasDemand}" th:id="${demandId}" hidden>
+                <td colspan="7" class="od-prod-demand-cell">
+                    <div class="od-prod-demand-body">
+                        <span class="od-prod-demand-label" th:text="#{orders.detail.production.perUnit}">Bedarf je Stück</span>
+                        <span class="od-prod-demand-value">
+                            <th:block th:each="m,st : ${item.materials}" th:with="perUnit=${amt > 0 ? (m.requiredQuantity != null ? m.requiredQuantity : 0) / amt : 0}">
+                                <span th:text="${m.material != null ? m.material.name() : '-'}"></span>
+                                <span th:switch="${m.material != null ? m.material.quantityType() : 'SCU'}">
+                                    <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(perUnit, 1)} #{material.quantity.piece}|"></span>
+                                    <span th:case="*" th:text="|${#numbers.formatDecimal(perUnit, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
+                                </span><span th:if="${!st.last}"> · </span>
+                            </th:block>
+                        </span>
+                    </div>
+                </td>
+            </tr>
+            </th:block>
             <tr th:if="${order.items == null or order.items.isEmpty()}">
-                <td colspan="6" class="text-center text-muted" th:text="#{orders.detail.items.empty}">Keine Items vorhanden.</td>
+                <td th:attr="colspan=${isLogistician ? 7 : 5}" class="text-center text-muted" th:text="#{orders.detail.items.empty}">Keine Items vorhanden.</td>
             </tr>
             </tbody>
         </table>
@@ -1006,11 +1064,13 @@
             <button th:if="${hasOutstandingItemLines}" type="button" class="btn btn-outline krtm-min-height-44px-1df5" data-testid="item-handover-open" data-trigger="open-modal-display" data-modal-id="item-handover-modal"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clipboard-check"/></svg> <span th:text="#{orders.detail.itemHandover}">Item-Übergabe protokollieren</span></button>
             <a th:href="@{/orders/{id}/material-collection(id=${order.id})}" class="btn btn-ghost krtm-min-height-44px-display-inline-flex-align-it-37c8"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-list"/></svg> <span th:text="#{orders.detail.materialCollection}">Materialsammelübersicht</span></a>
         </div>
-        <!-- Delivery is gated by manufacture (REQ-ORDERS-025): with nothing manufactured yet there is
-             nothing to hand over, so point the logistician at the Herstellung step rather than the
-             misleading "all delivered" note (which applies only once something HAS been made). -->
-        <p sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:if="${!hasOutstandingItemLines and !hasManufacturedItems}" class="text-muted krtm-margin-top-1rem-a6cb" data-testid="item-handover-none-manufactured" th:text="#{orders.detail.itemHandover.noneManufactured}">Es kann keine Übergabe gebucht werden, da noch keine hergestellten Items verbucht sind. Erfasse zuerst die Herstellung.</p>
-        <p sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:if="${!hasOutstandingItemLines and hasManufacturedItems}" class="text-muted krtm-margin-top-1rem-a6cb" th:text="#{orders.detail.itemHandover.allDelivered}">Alle Items wurden vollständig übergeben.</p>
+        <!-- Delivery is gated by manufacture (REQ-ORDERS-025). Two distinct empty states, since both
+             leave hasOutstandingItemLines false: when the order is NOT yet fully delivered there is
+             nothing manufactured-but-undelivered to hand over, so point the logistician at the
+             Herstellung step (now on the "Bestellte Items" tab); the "all delivered" note shows only
+             once every ordered unit is delivered (isFullyDelivered). -->
+        <p sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:if="${!hasOutstandingItemLines and !isFullyDelivered}" class="text-muted krtm-margin-top-1rem-a6cb" data-testid="item-handover-none-manufactured" th:text="#{orders.detail.itemHandover.noneManufactured}">Es sind keine hergestellten Items zur Übergabe vorhanden. Erfasse zuerst die Herstellung im Reiter „Bestellte Items".</p>
+        <p sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:if="${!hasOutstandingItemLines and isFullyDelivered}" class="text-muted krtm-margin-top-1rem-a6cb" th:text="#{orders.detail.itemHandover.allDelivered}">Alle Items wurden vollständig übergeben.</p>
 
         <div th:if="${order.itemHandovers != null and !order.itemHandovers.isEmpty()}" class="mt-2">
             <div class="table-responsive">
@@ -1053,100 +1113,6 @@
         </th:block></div>
         </section>
 
-        <!-- ITEM orders — pane "Herstellung" (NEW, REQ-ORDERS-025). Bearbeiter record how many units
-             of an ordered item have been manufactured, independent of delivery; booking a run
-             reduces the linked stock the manufacture consumed. Logisticians only (canEditJobOrder).
-             In-place AJAX swap container: a production booking re-renders items / aggregated / this
-             pane via ?fragment=production (and header + kpi). -->
-        <section th:if="${order.type == 'ITEM' and isLogistician}" id="pane-production" class="tab-pane" role="tabpanel" aria-labelledby="tab-production">
-        <div id="order-production-results"><th:block th:fragment="productionSection">
-        <p class="text-muted krtm-margin-top-0-font-size-0-84rem" th:text="#{orders.detail.production.intro}">Erfasse, wie viele Einheiten bereits hergestellt wurden — unabhängig von der Auslieferung.</p>
-        <div class="table-responsive">
-        <table class="data-table">
-            <thead>
-            <tr>
-                <th class="od-prod-expand-col"></th>
-                <th th:text="#{orders.detail.item.name}">Item</th>
-                <th th:text="#{orders.detail.item.manufactured}">Hergestellt</th>
-                <th class="krtm-text-align-right"></th>
-            </tr>
-            </thead>
-            <tbody>
-            <th:block th:each="item : ${order.items}"
-                th:with="mfg=${item.manufacturedAmount != null ? item.manufacturedAmount : 0},amt=${item.amount != null ? item.amount : 0},complete=${(item.amount != null ? item.amount : 0) > 0 and (item.manufacturedAmount != null ? item.manufacturedAmount : 0) >= (item.amount != null ? item.amount : 0)},hasDemand=${item.materials != null and !item.materials.isEmpty()},demandId='od-prod-demand-' + ${item.id}">
-            <tr>
-                <td class="od-prod-expand-cell">
-                    <button th:if="${hasDemand}" type="button" class="od-prod-toggle"
-                            data-trigger="od-toggle-demand" aria-expanded="false"
-                            th:attr="aria-controls=${demandId}"
-                            th:aria-label="#{orders.detail.production.perUnit}">
-                        <svg class="krt-icon od-prod-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
-                    </button>
-                </td>
-                <td>
-                    <span th:text="${item.gameItem != null ? item.gameItem.name() : '-'}"></span>
-                    <span th:if="${item.parentItemId != null}" class="subassembly-tag" th:text="#{orders.detail.item.subassembly}" th:title="#{orders.detail.item.subassembly}">Unterbaugruppe</span>
-                    <!-- Machine-readable per-material demand for the production modal (read by
-                         orders-detail.js openProductionModal via the button's closest <tr>).
-                         required-total is the whole-line demand; the JS scales it to the entered
-                         unit count exactly as the backend does. Kept on the main row so the modal
-                         still finds it independently of the collapsible demand sub-row below. -->
-                    <ul class="od-production-demand krtm-display-none-5790" hidden aria-hidden="true">
-                        <li th:each="m : ${item.materials}"
-                            th:data-material-id="${m.material != null ? m.material.id() : ''}"
-                            th:data-material-name="${m.material != null ? m.material.name() : ''}"
-                            th:data-quantity-type="${m.material != null ? m.material.quantityType() : 'SCU'}"
-                            th:data-required-total="${m.requiredQuantity != null ? m.requiredQuantity : 0}"></li>
-                    </ul>
-                </td>
-                <td>
-                    <span class="mini-bar"><i th:attr="data-krtm-width=${amt > 0 ? (mfg * 100 / amt) : 0}" th:classappend="${complete} ? ' is-complete' : ''"></i></span>
-                    <span th:text="|${#numbers.formatInteger(mfg, 1)} / ${#numbers.formatInteger(amt, 1)}|">0 / 0</span>
-                </td>
-                <td class="krtm-text-align-right">
-                    <span th:if="${complete}" class="chip chip--success" th:text="#{orders.detail.production.complete}">vollständig</span>
-                    <button th:unless="${complete}" type="button" class="btn btn-outline krtm-min-height-36px-1df5"
-                            data-trigger="od-open-production"
-                            th:data-order-id="${order.id}"
-                            th:data-item-id="${item.id}"
-                            th:data-item-name="${item.gameItem != null ? item.gameItem.name() : ''}"
-                            th:data-amount="${amt}"
-                            th:data-manufactured="${mfg}"
-                            th:data-version="${item.version}">
-                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
-                        <span th:text="#{orders.detail.production.record}">Herstellung erfassen</span>
-                    </button>
-                </td>
-            </tr>
-            <!-- Collapsible "Bedarf je Stück" sub-row (mirrors the bank request table's Notiz /
-                 Begründung detail row): the per-material per-unit demand, hidden by default and
-                 revealed by the chevron. Only rendered when the item derives materials; the JS scales
-                 requiredQuantity to the entered unit count exactly as the backend does. -->
-            <tr class="od-prod-demand-row" th:if="${hasDemand}" th:id="${demandId}" hidden>
-                <td colspan="4" class="od-prod-demand-cell">
-                    <div class="od-prod-demand-body">
-                        <span class="od-prod-demand-label" th:text="#{orders.detail.production.perUnit}">Bedarf je Stück</span>
-                        <span class="od-prod-demand-value">
-                            <th:block th:each="m,st : ${item.materials}" th:with="perUnit=${amt > 0 ? (m.requiredQuantity != null ? m.requiredQuantity : 0) / amt : 0}">
-                                <span th:text="${m.material != null ? m.material.name() : '-'}"></span>
-                                <span th:switch="${m.material != null ? m.material.quantityType() : 'SCU'}">
-                                    <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(perUnit, 1)} #{material.quantity.piece}|"></span>
-                                    <span th:case="*" th:text="|${#numbers.formatDecimal(perUnit, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
-                                </span><span th:if="${!st.last}"> · </span>
-                            </th:block>
-                        </span>
-                    </div>
-                </td>
-            </tr>
-            </th:block>
-            <tr th:if="${order.items == null or order.items.isEmpty()}">
-                <td colspan="4" class="text-center text-muted" th:text="#{orders.detail.items.empty}">Keine Items vorhanden.</td>
-            </tr>
-            </tbody>
-        </table>
-        </div>
-        </th:block></div>
-        </section>
     </div>
 </main>
 

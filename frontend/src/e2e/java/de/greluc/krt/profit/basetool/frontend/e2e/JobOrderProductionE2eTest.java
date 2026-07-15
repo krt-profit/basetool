@@ -45,9 +45,10 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *
  * <p>The fixture creates a one-unit order of the bootstrap-seeded orderable widget (its blueprint
  * derives a single RESOURCE material at 1.0 SCU/unit), then links one inventory entry of that exact
- * recipe material to the order over the API. The flow then drives the real production modal on the
- * "Herstellung" tab: it enters an amount, allocates the required demand from the linked stock
- * entry, and books once the reconcile chip reports full coverage.
+ * recipe material to the order over the API. The flow then drives the real production modal from
+ * the "Bestellte Items" tab (the production surface folds into it): it enters an amount, allocates
+ * the required demand from the linked stock entry, and books once the reconcile chip reports full
+ * coverage.
  *
  * <p>Three things are asserted end-to-end: before production the item-handover control is absent
  * (delivery gated); the booking succeeds through the UI; and afterwards the persisted {@code
@@ -183,16 +184,19 @@ class JobOrderProductionE2eTest {
   }
 
   /**
-   * Opens the production modal on the Herstellung tab, allocates the required demand from the
-   * single linked stock entry, and books the manufacture of one unit, awaiting the production POST
-   * so the mutation is not dropped.
+   * Opens the production modal from the "Bestellte Items" tab, allocates the required demand from
+   * the single linked stock entry, and books the manufacture of one unit, awaiting the production
+   * POST so the mutation is not dropped.
    *
    * @param page the page to drive
    * @param baseUrl the frontend origin
    * @param orderId the item order to book production against
    */
   private static void bookProductionOfOneUnit(Page page, String baseUrl, String orderId) {
-    E2eSupport.navigate(page, baseUrl + "/orders/" + orderId + "?tab=production");
+    // The production surface folds into the "Bestellte Items" tab (#1317 follow-up): the
+    // "Herstellung
+    // erfassen" button is the last column there, and there is no separate Herstellung tab.
+    E2eSupport.navigate(page, baseUrl + "/orders/" + orderId + "?tab=items");
     page.locator("[data-trigger='od-open-production']").first().click();
 
     // The modal lazily fetches the material's linked inventory; wait for the per-entry allocation

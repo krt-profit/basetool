@@ -4,9 +4,9 @@
 
 ### Changed
 
-- **Aufträge: Der Materialbedarf je Stück im Herstellung-Reiter ist jetzt einklappbar.** In der Herstellungs-Tabelle steht „Bedarf je Stück" nicht mehr als eigene Spalte, sondern in einer per Pfeil ausklappbaren Unterzeile je Position (standardmäßig eingeklappt) — analog zu Notiz/Begründung in der Bank-Antragstabelle, sodass Positionen mit mehreren Materialien die Zeile nicht mehr in die Breite ziehen (REQ-ORDERS-026).
+- **Aufträge: Die Herstellung ist in den Reiter „Bestellte Items" integriert; der eigene Herstellung-Reiter entfällt.** Der Button „Herstellung erfassen" steht jetzt als letzte Spalte je Position im Reiter „Bestellte Items", die Bauplan-Spalte entfällt. Der Materialbedarf je Stück steht dort in einer per Pfeil ausklappbaren Unterzeile (standardmäßig eingeklappt, analog zu Notiz/Begründung in der Bank-Antragstabelle). Zusätzlich haben „Hergestellt" und „Geliefert" nun jeweils einen Fortschrittsbalken (REQ-ORDERS-025, REQ-ORDERS-026).
 
-- **Aufträge: Der Reiter „Item-Übergaben" erklärt jetzt, wenn noch nichts hergestellt wurde.** Solange für einen Item-Auftrag keine hergestellten Einheiten verbucht sind, weist der Reiter darauf hin, dass keine Übergabe gebucht werden kann und zuerst die Herstellung zu erfassen ist — statt der irreführenden Meldung „Alle Items wurden vollständig übergeben" (REQ-ORDERS-025).
+- **Aufträge: Der Reiter „Item-Übergaben" zeigt „Alle Items wurden vollständig übergeben" nur noch, wenn der Auftrag wirklich vollständig ausgeliefert ist.** Ist noch nichts zur Übergabe hergestellt (oder es fehlt noch Herstellung), weist der Reiter jetzt darauf hin, dass zuerst die Herstellung zu erfassen ist — statt der irreführenden Vollständig-Meldung (REQ-ORDERS-025).
 
 ## [v1.4.1](https://github.com/krt-profit/basetool/releases/tag/v1.4.1) - 2026-07-15
 
