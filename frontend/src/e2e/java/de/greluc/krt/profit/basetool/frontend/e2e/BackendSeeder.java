@@ -1333,6 +1333,102 @@ public final class BackendSeeder {
   }
 
   /**
+   * Books production (Herstellung) for an item order's single line up to its full ordered amount,
+   * so the manufactured amount reaches the ordered amount and the line becomes deliverable
+   * (REQ-ORDERS-025). For each derived recipe material it links exactly the required stock at the
+   * given location and consumes it through {@code POST
+   * /api/v1/orders/{id}/items/{itemId}/production}. Since delivery is now gated by manufacture,
+   * item handover flows must call this first.
+   *
+   * @param username the Keycloak username of the (logistician/admin) test user
+   * @param password the Keycloak password of the test user
+   * @param orderId the item order whose single line to fully manufacture
+   * @param locationId the storage location for the linked recipe-material stock
+   */
+  public void manufactureItemOrderLineFully(
+      String username, String password, String orderId, String locationId) {
+    JsonObject order =
+        JsonParser.parseString(getBody(username, password, "/api/v1/orders/" + orderId))
+            .getAsJsonObject();
+    JsonObject item = order.getAsJsonArray("items").get(0).getAsJsonObject();
+    String itemId = item.get("id").getAsString();
+    long itemVersion = item.get("version").getAsLong();
+    int lineAmount = item.get("amount").getAsInt();
+
+    StringBuilder consumption = new StringBuilder("[");
+    JsonArray materials = item.getAsJsonArray("materials");
+    for (JsonElement materialElement : materials) {
+      JsonObject mat = materialElement.getAsJsonObject();
+      String materialId = mat.getAsJsonObject("material").get("id").getAsString();
+      double requiredTotal = mat.get("requiredQuantity").getAsDouble();
+      if (requiredTotal <= 0) {
+        continue;
+      }
+      String stockId =
+          createInventoryItemForJobOrder(
+              username, password, materialId, locationId, orderId, 1000, requiredTotal);
+      long stockVersion =
+          orderMaterialStockVersion(username, password, orderId, materialId, stockId);
+      if (consumption.length() > 1) {
+        consumption.append(',');
+      }
+      consumption
+          .append("{\"inventoryItemId\":\"")
+          .append(stockId)
+          .append("\",\"materialId\":\"")
+          .append(materialId)
+          .append("\",\"amount\":")
+          .append(requiredTotal)
+          .append(",\"version\":")
+          .append(stockVersion)
+          .append('}');
+    }
+    consumption.append(']');
+    String body =
+        "{\"amount\":"
+            + lineAmount
+            + ",\"version\":"
+            + itemVersion
+            + ",\"consumption\":"
+            + consumption
+            + "}";
+    postBody(
+        username, password, "/api/v1/orders/" + orderId + "/items/" + itemId + "/production", body);
+  }
+
+  /**
+   * Resolves the current optimistic-lock version of a just-linked inventory entry from the order's
+   * per-material inventory read ({@code GET /api/v1/orders/{id}/materials/{matId}/inventory}), so
+   * the production consumption can echo the correct version instead of guessing it.
+   *
+   * @param username the Keycloak username of the test user
+   * @param password the Keycloak password of the test user
+   * @param orderId the item order the inventory is linked to
+   * @param materialId the recipe material the inventory holds
+   * @param inventoryItemId the id of the linked inventory entry whose version is wanted
+   * @return the inventory entry's current {@code version}
+   * @throws IllegalStateException if the entry is not found in the order's per-material inventory
+   */
+  private long orderMaterialStockVersion(
+      String username, String password, String orderId, String materialId, String inventoryItemId) {
+    JsonArray items =
+        JsonParser.parseString(
+                getBody(
+                    username,
+                    password,
+                    "/api/v1/orders/" + orderId + "/materials/" + materialId + "/inventory"))
+            .getAsJsonArray();
+    for (JsonElement element : items) {
+      JsonObject inventory = element.getAsJsonObject();
+      if (inventoryItemId.equals(inventory.get("id").getAsString())) {
+        return inventory.get("version").getAsLong();
+      }
+    }
+    throw new IllegalStateException(
+        "Linked inventory " + inventoryItemId + " not found for material " + materialId);
+  }
+
+  /**
    * Creates a non-personal inventory item linked to <em>neither</em> a job order <em>nor</em> a
    * mission via {@code POST /api/v1/inventory} and returns its id — the overwhelmingly common Lager
    * case (plain squadron stock). Because the seeding user is an IRIDIUM member, create-time

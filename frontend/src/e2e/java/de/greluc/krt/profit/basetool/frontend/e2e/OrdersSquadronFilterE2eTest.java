@@ -38,14 +38,14 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * toggle is now a localStorage-backed multi-select dropdown of every active squadron, applied
  * SERVER-side (matching an order's responsible OR requesting side) and re-applied on reload.
  *
- * <p>The fixture seeds two fresh profit-eligible squadrons A and B, each responsible for exactly
- * one OPEN order. The flow starts with every squadron checked (the default), deselects squadron B,
- * and asserts B's order drops out of the queue while A's stays — then reloads and asserts the
- * deselection survives from localStorage without any manual re-filtering. The absence assertions
- * key on B's own {@code data-id} and hold regardless of pagination (a filtered-out order is on no
- * page); the initial visibility check uses {@code size=200} so the two freshly seeded orders are on
- * the first page. The actor is {@code test-admin}, whose cross-squadron visibility lets one session
- * see both orders.
+ * <p>The dropdown is populated from the frontend's <b>squadron catalogue cache</b> (2-hour TTL), so
+ * a squadron created mid-suite is not offered as a checkbox — the fixture therefore keys on the
+ * bootstrap-cached IRIDIUM squadron, which is always present. It seeds one OPEN order responsible
+ * to IRIDIUM, deselects IRIDIUM in the filter, and asserts that order drops out of the queue — then
+ * reloads and asserts the deselection survives from localStorage without any manual re-filtering.
+ * The absence assertion keys on the order's own {@code data-id} and holds regardless of pagination
+ * (a filtered-out order is on no page); the initial visibility check uses {@code size=200} so the
+ * freshly seeded order is on the first page. The actor is {@code test-admin} (an IRIDIUM member).
  */
 @Tag("e2e")
 class OrdersSquadronFilterE2eTest {
@@ -56,27 +56,21 @@ class OrdersSquadronFilterE2eTest {
   private static final String ADMIN_USER = System.getProperty("e2e.username", "test-admin");
   private static final String ADMIN_PASSWORD = System.getProperty("e2e.password", "test-admin-pw");
 
-  /** Large page so both freshly seeded orders land on the first page for the initial check. */
+  /** Canonical IRIDIUM squadron id — bootstrap-seeded, so always present in the cached dropdown. */
+  private static final String IRIDIUM_ID = "00000000-0000-0000-0000-000000000001";
+
+  /** Large page so the freshly seeded order lands on the first page for the initial check. */
   private static final String QUEUE_URL_SUFFIX = "/orders?status=OPEN&size=200";
 
   private static Playwright playwright;
   private static Browser browser;
 
   /**
-   * The id of the fresh profit squadron B (responsible for {@link #orderBId}), the one deselected.
+   * An OPEN order whose responsible (and requesting) unit is IRIDIUM — hidden once IRIDIUM is off.
    */
-  private static String squadronBId;
+  private static String iridiumOrderId;
 
-  /** An OPEN order whose responsible (and requesting) unit is squadron A — stays visible. */
-  private static String orderAId;
-
-  /** An OPEN order whose responsible (and requesting) unit is squadron B — filtered out. */
-  private static String orderBId;
-
-  /**
-   * Seeds two fresh profit-eligible squadrons and one OPEN order responsible to each, so the
-   * multi-select filter has two independently addressable squadrons to narrow between.
-   */
+  /** Launches the browser and seeds one IRIDIUM-responsible order for the filter to act on. */
   @BeforeAll
   static void setUp() {
     playwright = Playwright.create();
@@ -84,21 +78,11 @@ class OrdersSquadronFilterE2eTest {
     if (STACK.managesStack()) {
       BackendSeeder seeder = new BackendSeeder();
       seeder.ensureIridiumMembership(ADMIN_USER, ADMIN_PASSWORD);
-
-      String squadronAId =
-          seeder.createSquadron(ADMIN_USER, ADMIN_PASSWORD, "E2E Filter A", "EFLA");
-      seeder.setSquadronProfitEligible(ADMIN_USER, ADMIN_PASSWORD, squadronAId, true);
-      squadronBId = seeder.createSquadron(ADMIN_USER, ADMIN_PASSWORD, "E2E Filter B", "EFLB");
-      seeder.setSquadronProfitEligible(ADMIN_USER, ADMIN_PASSWORD, squadronBId, true);
-
       String materialId =
           seeder.ensureJobOrderMaterial(ADMIN_USER, ADMIN_PASSWORD, "E2E Filter Material");
-      orderAId =
+      iridiumOrderId =
           seeder.createJobOrder(
-              ADMIN_USER, ADMIN_PASSWORD, squadronAId, "E2E Filter A Order", materialId, 650, 25);
-      orderBId =
-          seeder.createJobOrder(
-              ADMIN_USER, ADMIN_PASSWORD, squadronBId, "E2E Filter B Order", materialId, 650, 25);
+              ADMIN_USER, ADMIN_PASSWORD, IRIDIUM_ID, "E2E Filter IRI Order", materialId, 650, 25);
     }
   }
 
@@ -114,13 +98,12 @@ class OrdersSquadronFilterE2eTest {
   }
 
   /**
-   * Deselects squadron B from the multi-select filter (its order disappears, A's stays), then
-   * reloads and asserts the deselection is restored from localStorage and re-applied without any
-   * manual interaction.
+   * Deselects IRIDIUM from the multi-select filter (its order disappears), then reloads and asserts
+   * the deselection is restored from localStorage and re-applied without any manual interaction.
    */
   @Test
   void deselectingASquadronHidesItsOrdersAndPersistsAcrossReload() {
-    assumeTrue(STACK.managesStack(), "needs the ephemeral-seeded squadrons + orders");
+    assumeTrue(STACK.managesStack(), "needs the ephemeral-seeded IRIDIUM order");
     String baseUrl = STACK.baseUrl();
     java.nio.file.Path storageState =
         E2eSupport.authenticatedStorageState(browser, baseUrl, ADMIN_USER, ADMIN_PASSWORD);
@@ -135,24 +118,21 @@ class OrdersSquadronFilterE2eTest {
         page.waitForLoadState();
         assertThat(page.getByTestId("nav-logout")).isVisible();
         // The multi-select renders for the full queue (admin is not the requester-only view), and
-        // with every squadron checked (the default) both seeded orders are visible.
+        // with every squadron checked (the default) the IRIDIUM order is visible.
         assertThat(page.locator("#squadronFilterContainer")).isVisible();
-        assertVisible(page, orderAId);
-        assertVisible(page, orderBId);
+        assertVisible(page, iridiumOrderId);
 
-        // Deselect squadron B: a single checkbox change fires one server-side re-fetch (no rapid
-        // multi-swap race), dropping B's order from the queue while A's stays.
+        // Deselect IRIDIUM: a single checkbox change fires one server-side re-fetch (no rapid
+        // multi-swap race), dropping the IRIDIUM order from the queue.
         page.locator("#squadronHeader").click();
-        page.locator("input.sqCheck[value='" + squadronBId + "']").uncheck();
-        assertAbsent(page, orderBId);
-        assertVisible(page, orderAId);
+        page.locator("input.sqCheck[value='" + IRIDIUM_ID + "']").uncheck();
+        assertAbsent(page, iridiumOrderId);
 
         // The deselection persists: a full reload restores it from localStorage and re-applies it,
-        // so B's order stays hidden without any manual re-filtering.
+        // so the IRIDIUM order stays hidden without any manual re-filtering.
         E2eSupport.navigate(page, baseUrl + QUEUE_URL_SUFFIX);
         page.waitForLoadState();
-        assertAbsent(page, orderBId);
-        assertVisible(page, orderAId);
+        assertAbsent(page, iridiumOrderId);
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "orders-squadron-filter");
         throw failure;
