@@ -23,14 +23,18 @@ import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
 import java.util.List;
 
 /**
- * One aggregation row of an item order's internal material view: the total quantity of a single
- * material needed across the whole order at one quality level. A material required in both
+ * One aggregation row of an item order's internal material view: the still-outstanding quantity of
+ * a single material needed across the whole order at one quality level. A material required in both
  * qualities yields two rows (one {@code GOOD}, one {@code NONE}); the display formats {@code
  * totalQuantity} per {@code material.quantityType} (SCU vs Stück).
  *
  * @param material the aggregated material, with its {@code quantityType} for unit-aware formatting
  * @param qualityRequirement the quality bucket this row sums ({@code GOOD} or {@code NONE})
- * @param totalQuantity the summed required quantity across all item lines for this material+quality
+ * @param totalQuantity the summed <b>outstanding</b> required quantity across all item lines for
+ *     this material+quality — only the demand of the units not yet manufactured ({@code
+ *     requiredQuantity × (amount − manufacturedAmount) / amount} per line, REQ-ORDERS-025), so it
+ *     shrinks as production is booked and is 0 once every line for this bucket is fully
+ *     manufactured
  * @param currentStock the total stock of inventory linked to this order for this material at or
  *     above the bucket's quality floor ({@code GOOD} → 650, {@code NONE} → no floor); drives the
  *     collection-progress shown in the order-overview list, mirroring the MATERIAL requirement

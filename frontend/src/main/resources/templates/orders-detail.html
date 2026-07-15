@@ -219,6 +219,26 @@
                 width: 100%;
                 min-height: 44px;
             }
+            /* "Nicht ausbuchen" opt-out: a compact checkbox row under each material's head. When
+               ticked the card is flagged .od-prod-skipped and its stock inputs are dimmed. */
+            .od-prod-skip {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin: 8px 0 4px;
+                font-size: 0.86rem;
+                color: var(--color-gray-1);
+                cursor: pointer;
+            }
+            .od-prod-skip input {
+                width: 18px;
+                min-height: 18px;
+                accent-color: var(--color-primary);
+                cursor: pointer;
+            }
+            .od-prod-skipped [data-prod-entries] {
+                opacity: 0.45;
+            }
         </style>
     </th:block>
 </head>
@@ -1547,6 +1567,9 @@
         alreadyMade: /*[[#{orders.detail.production.alreadyMade}]]*/ 'bereits hergestellt',
         noStock: /*[[#{orders.detail.production.noStock}]]*/ 'Keine verkn\u00fcpften Lagereintr\u00e4ge f\u00fcr dieses Material.',
         loadingStock: /*[[#{orders.detail.production.loadingStock}]]*/ 'Lade Lagereintr\u00e4ge \u2026',
+        skipLabel: /*[[#{orders.detail.production.skipLabel}]]*/ 'Nicht ausbuchen',
+        skipHint: /*[[#{orders.detail.production.skipHint}]]*/ 'Dieses Material wird nicht aus dem Lager ausgebucht.',
+        skipped: /*[[#{orders.detail.production.skipped}]]*/ 'nicht ausgebucht',
         allocError: /*[[#{error.production.allocation}]]*/ 'Zuweisung deckt den Materialbedarf nicht exakt.',
         booked: /*[[#{success.production.booked}]]*/ 'Herstellung gebucht \u2014 Materialbedarf und Lagerbestand reduziert.',
         unitScu: /*[[#{material.quantity.scu}]]*/ 'SCU',

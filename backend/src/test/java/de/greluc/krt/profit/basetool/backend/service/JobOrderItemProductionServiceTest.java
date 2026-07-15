@@ -62,10 +62,11 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 /**
  * Unit tests for {@link JobOrderItemProductionService#bookProduction}: the happy-path counter bump
  * + inventory reduction + audit, the amount / demand-coverage 422s, the non-item-order and
- * missing-slice guards, the stale-version 409, the depleted-row delete branch, and the
- * no-materials/empty-consumption line. Pure Mockito over the five collaborators; a Steel/SCU item
- * line (amount 4, per-unit demand 40) linked to a 100-SCU inventory entry earmarked in full to the
- * order backs every scenario.
+ * missing-slice guards, the stale-version 409, the depleted-row delete branch, the
+ * no-materials/empty-consumption line, and a material marked "nicht ausbuchen" (skipped: recorded
+ * but not booked out). Pure Mockito over the five collaborators; a Steel/SCU item line (amount 4,
+ * per-unit demand 40) linked to a 100-SCU inventory entry earmarked in full to the order backs
+ * every scenario.
  */
 @ExtendWith(MockitoExtension.class)
 class JobOrderItemProductionServiceTest {
@@ -152,7 +153,8 @@ class JobOrderItemProductionServiceTest {
             LINE_VERSION,
             List.of(
                 new JobOrderItemProductionConsumptionDto(
-                    inventoryId, materialId, 40.0, INVENTORY_VERSION)));
+                    inventoryId, materialId, 40.0, INVENTORY_VERSION)),
+            List.of());
 
     // When
     JobOrderItemDto result = service.bookProduction(orderId, lineId, dto);
@@ -176,7 +178,7 @@ class JobOrderItemProductionServiceTest {
     // Given — 3 of 4 already manufactured, so only 1 unit remains, but 2 are requested.
     line.setManufacturedAmount(3);
     JobOrderItemProductionCreateDto dto =
-        new JobOrderItemProductionCreateDto(2, LINE_VERSION, List.of());
+        new JobOrderItemProductionCreateDto(2, LINE_VERSION, List.of(), List.of());
 
     // When & Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
@@ -195,7 +197,8 @@ class JobOrderItemProductionServiceTest {
             LINE_VERSION,
             List.of(
                 new JobOrderItemProductionConsumptionDto(
-                    inventoryId, materialId, 30.0, INVENTORY_VERSION)));
+                    inventoryId, materialId, 30.0, INVENTORY_VERSION)),
+            List.of());
 
     // When & Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
@@ -213,7 +216,8 @@ class JobOrderItemProductionServiceTest {
             LINE_VERSION,
             List.of(
                 new JobOrderItemProductionConsumptionDto(
-                    inventoryId, materialId, 50.0, INVENTORY_VERSION)));
+                    inventoryId, materialId, 50.0, INVENTORY_VERSION)),
+            List.of());
 
     // When & Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
@@ -229,7 +233,7 @@ class JobOrderItemProductionServiceTest {
     materialOrder.setId(orderId);
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(materialOrder));
     JobOrderItemProductionCreateDto dto =
-        new JobOrderItemProductionCreateDto(1, LINE_VERSION, List.of());
+        new JobOrderItemProductionCreateDto(1, LINE_VERSION, List.of(), List.of());
 
     // When & Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
@@ -246,7 +250,8 @@ class JobOrderItemProductionServiceTest {
             LINE_VERSION + 996L,
             List.of(
                 new JobOrderItemProductionConsumptionDto(
-                    inventoryId, materialId, 40.0, INVENTORY_VERSION)));
+                    inventoryId, materialId, 40.0, INVENTORY_VERSION)),
+            List.of());
 
     // When & Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
@@ -266,7 +271,8 @@ class JobOrderItemProductionServiceTest {
             LINE_VERSION,
             List.of(
                 new JobOrderItemProductionConsumptionDto(
-                    inventoryId, materialId, 40.0, INVENTORY_VERSION)));
+                    inventoryId, materialId, 40.0, INVENTORY_VERSION)),
+            List.of());
 
     // When & Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
@@ -289,7 +295,8 @@ class JobOrderItemProductionServiceTest {
             LINE_VERSION,
             List.of(
                 new JobOrderItemProductionConsumptionDto(
-                    inventoryId, materialId, 40.0, INVENTORY_VERSION)));
+                    inventoryId, materialId, 40.0, INVENTORY_VERSION)),
+            List.of());
 
     // When
     service.bookProduction(orderId, lineId, dto);
@@ -311,13 +318,38 @@ class JobOrderItemProductionServiceTest {
     // Given — an item line with no derivable material requirements: nothing is consumed.
     line.getMaterials().clear();
     JobOrderItemProductionCreateDto dto =
-        new JobOrderItemProductionCreateDto(1, LINE_VERSION, List.of());
+        new JobOrderItemProductionCreateDto(1, LINE_VERSION, List.of(), List.of());
 
     // When
     service.bookProduction(orderId, lineId, dto);
 
     // Then — the counter advances with no inventory access; only the booking audit is emitted.
     assertThat(line.getManufacturedAmount()).isEqualTo(1);
+    verify(inventoryItemRepository, never()).findByIdForUpdate(any());
+    verify(inventoryItemRepository, never()).save(any());
+    verify(inventoryItemRepository, never()).delete(any());
+    verify(auditService, times(1))
+        .record(eq(AuditEventType.JOB_ORDER_PRODUCTION_BOOKED), any(), any(), any(), any());
+    verify(auditService, never())
+        .record(eq(AuditEventType.INVENTORY_CONSUMED_BY_PRODUCTION), any(), any(), any(), any());
+  }
+
+  @Test
+  void bookProduction_materialMarkedSkip_notBookedOut_bumpsManufactured_noInventoryWrites() {
+    // Given — the line's only material (Steel) is marked "nicht ausbuchen", so its 40-SCU demand is
+    // dropped and the consumption plan is empty: production is recorded but no stock is touched.
+    JobOrderItemProductionCreateDto dto =
+        new JobOrderItemProductionCreateDto(1, LINE_VERSION, List.of(), List.of(materialId));
+
+    // When
+    JobOrderItemDto result = service.bookProduction(orderId, lineId, dto);
+
+    // Then — the counter advances with no inventory access; only the booking audit is emitted and
+    // the earmarked entry is left fully intact.
+    assertThat(result.id()).isEqualTo(lineId);
+    assertThat(line.getManufacturedAmount()).isEqualTo(1);
+    assertThat(inventoryItem.getAmount()).isEqualTo(100.0);
+    assertThat(inventoryItem.getJobOrderAllocations().get(0).getAmount()).isEqualTo(100.0);
     verify(inventoryItemRepository, never()).findByIdForUpdate(any());
     verify(inventoryItemRepository, never()).save(any());
     verify(inventoryItemRepository, never()).delete(any());

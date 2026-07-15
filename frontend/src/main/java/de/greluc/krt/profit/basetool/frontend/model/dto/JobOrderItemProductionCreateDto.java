@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Frontend mirror of the backend {@code JobOrderItemProductionCreateDto}: the production booking
@@ -29,6 +30,11 @@ import java.util.List;
  * @param amount the whole units manufactured in this booking
  * @param version the ordered item line's optimistic-lock version
  * @param consumption the per-inventory-entry material draws
+ * @param skippedMaterialIds ids of required materials the operator marked "nicht ausbuchen" — their
+ *     demand is excluded and their linked stock is not consumed
  */
 public record JobOrderItemProductionCreateDto(
-    Integer amount, Long version, List<JobOrderItemProductionConsumptionDto> consumption) {}
+    Integer amount,
+    Long version,
+    List<JobOrderItemProductionConsumptionDto> consumption,
+    List<UUID> skippedMaterialIds) {}

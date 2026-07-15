@@ -55528,6 +55528,13 @@
             "items" : {
               "$ref" : "#/components/schemas/JobOrderItemProductionConsumptionDto"
             }
+          },
+          "skippedMaterialIds" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "format" : "uuid"
+            }
           }
         },
         "required" : [ "amount", "consumption", "version" ]
