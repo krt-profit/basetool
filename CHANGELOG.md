@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Lager: Die Checkbox „Mit vorhandenem Bestand zusammenführen" im Einbuchen-Dialog ist wieder normal groß.** Eine seitenweite Formatregel streckte die Checkbox auf volle Breite mit großem Innenabstand; sie nimmt jetzt wie die übrigen Kontrollkästchen die Standardgröße an (betrifft auch die Checkbox „Als persönlicher Eintrag markieren").
+
 ## [v1.4.1](https://github.com/krt-profit/basetool/releases/tag/v1.4.1) - 2026-07-15
 
 ### Added
