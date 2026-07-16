@@ -959,6 +959,12 @@ class JobOrderItemDetailRenderTest {
     assertThat(html)
         .as("acting-user id stamped for the JS owner fallback")
         .contains("data-acting-user-id=\"" + userId + "\"");
+    // The acting-user display name is stamped too, so a book-in reset can re-seed the owner
+    // combobox's visible label even after a remote search evicted the server-seeded option
+    // (remote mode: a bare setValue(id) with no label would blank the field, REQ-FE-016).
+    assertThat(html)
+        .as("acting-user name stamped for the owner-picker label re-seed")
+        .contains("data-acting-user-name=\"Logi Stician\"");
     // The org-unit picker shell and the two checkboxes render; "dem Auftrag zuordnen" defaults on.
     assertThat(html).as("org-unit picker shell").contains("id=\"production-orgunit\"");
     assertThat(html).as("personal checkbox").contains("id=\"production-personal\"");

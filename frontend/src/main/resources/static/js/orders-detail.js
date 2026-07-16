@@ -1979,15 +1979,27 @@ function _prodActingUserId() {
     return form ? form.getAttribute('data-acting-user-id') || '' : '';
 }
 
+// The acting user's display name, stamped alongside the id on #production-form. Passed as the
+// label when re-seeding the owner combobox on reset: remote-users is a server-searched combobox,
+// so a prior search replaces its loaded item set and evicts the server-seeded acting-user option;
+// a bare setValue(id) with no label would then resolve no label and blank the field (REQ-FE-016).
+// Supplying the label makes the reset re-seed the visible name regardless of the picker's item set.
+function _prodActingUserName() {
+    const form = document.getElementById('production-form');
+    return form ? form.getAttribute('data-acting-user-name') || '' : '';
+}
+
 // Sets an enhanced combobox (or its raw-<select> fallback) to a value, syncing the visible label
-// through the supported controller API (REQ-FE-016).
-function _prodSetPicker(id, value) {
+// through the supported controller API (REQ-FE-016). The optional label seeds the visible text for
+// a value outside the picker's loaded item set (remote mode / programmatic fill); it is ignored
+// when the value resolves against a loaded option.
+function _prodSetPicker(id, value, label) {
     const el = document.getElementById(id);
     if (!el) {
         return;
     }
     if (el.krtCombobox) {
-        el.krtCombobox.setValue(value || '');
+        el.krtCombobox.setValue(value || '', label);
     } else {
         el.value = value || '';
     }
@@ -1998,7 +2010,7 @@ function _prodSetPicker(id, value) {
 // (§5.6), and the org-unit picker repopulated for the resolved owner.
 function _prodResetBookIn() {
     _prodSetPicker('production-location', '');
-    _prodSetPicker('production-owner', _prodActingUserId());
+    _prodSetPicker('production-owner', _prodActingUserId(), _prodActingUserName());
     const personalCb = document.getElementById('production-personal');
     if (personalCb) {
         personalCb.checked = false;

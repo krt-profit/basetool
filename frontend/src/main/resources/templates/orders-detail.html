@@ -1472,7 +1472,7 @@
     <div class="modal-content hud-box krtm-width-100-max-width-700px-max-height-90vh-ov-0acc">
         <button type="button" class="btn-close krtm-position-absolute-right-1rem-top-1rem-backgr-0703" data-trigger="close-modal-display" data-modal-id="production-modal">&times;</button>
         <h2 class="krtm-color-var-color-primary-margin-bottom-1-5rem-c7ac" id="production-modal-title" th:text="#{orders.detail.production.record}">Herstellung erfassen</h2>
-        <div class="krt-form" id="production-form" th:data-order-id="${order.id}" th:data-acting-user-id="${actingUser != null ? actingUser.id : ''}" th:data-responsible-org-unit-id="${order.responsibleOrgUnit != null ? order.responsibleOrgUnit.id() : ''}">
+        <div class="krt-form" id="production-form" th:data-order-id="${order.id}" th:data-acting-user-id="${actingUser != null ? actingUser.id : ''}" th:data-acting-user-name="${actingUser != null ? (actingUser.effectiveName != null ? actingUser.effectiveName : actingUser.username) : ''}" th:data-responsible-org-unit-id="${order.responsibleOrgUnit != null ? order.responsibleOrgUnit.id() : ''}">
             <div class="form-group mb-1">
                 <label for="production-amount" class="form-label" th:text="#{orders.detail.production.amount}">Anzahl herstellen</label>
                 <input type="number" id="production-amount" step="1" min="1" value="1" class="w-full krtm-min-height-44px-1df5">
