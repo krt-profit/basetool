@@ -6,29 +6,30 @@ Für Aufbau, Cross-Browser-Matrix und CI-Workflows der E2E-Suite siehe den Testi
 
 ## Übersicht
 
-|                            ID                            |                       Use Case                        |   Tag   |           Testklasse            |
-|----------------------------------------------------------|-------------------------------------------------------|---------|---------------------------------|
-| [UC-01](UC-01-login.md)                                  | Login via Keycloak                                    | `e2e`   | `LoginSmokeE2eTest`             |
-| [UC-02](UC-02-mission-anlegen.md)                        | Einsatz anlegen                                       | `e2e`   | `MissionCreateE2eTest`          |
-| [UC-03](UC-03-job-order-anlegen.md)                      | Job Order anlegen                                     | `e2e`   | `JobOrderCreateE2eTest`         |
-| [UC-04](UC-04-refinery-order-anlegen.md)                 | Refinery Order anlegen                                | `e2e`   | `RefineryOrderCreateE2eTest`    |
-| [UC-05](UC-05-hangar-schiff-hinzufuegen.md)              | Schiff zum Hangar hinzufügen                          | `e2e`   | `HangarAddShipE2eTest`          |
-| [UC-06](UC-06-job-order-handover.md)                     | Job-Order-Handover protokollieren                     | `e2e`   | `JobOrderHandoverE2eTest`       |
-| [UC-07](UC-07-kernseiten-smoke.md)                       | Kernseiten-Smoke (nicht-destruktiv)                   | `smoke` | `CorePagesSmokeE2eTest`         |
-| [UC-13](UC-13-inventar-operationen.md)                   | Inventar: Ein-/Aus-/Umbuchen, Verkauf, Zuweisung      | `e2e`   | `InventoryOperationsE2eTest`    |
-| [UC-15](UC-15-job-order-bearbeiten.md)                   | Job Order bearbeiten                                  | `e2e`   | `JobOrderEditE2eTest`           |
-| [UC-16](UC-16-job-order-status.md)                       | Job-Order-Status ändern                               | `e2e`   | `JobOrderStatusE2eTest`         |
-| [UC-17](UC-17-item-order-handover.md)                    | Item-Auftrag & Item-Handover                          | `e2e`   | `JobOrderItemHandoverE2eTest`   |
-| [UC-19](UC-19-refinery-order-einlagern.md)               | Refinery Order einlagern (in das Lager)               | `e2e`   | `RefineryOrderStoreE2eTest`     |
-| [UC-20](UC-20-refinery-order-lifecycle.md)               | Refinery Order: Bearbeiten/Abbrechen/Filter/Edges     | `e2e`   | `RefineryOrderLifecycleE2eTest` |
-| [UC-22](UC-22-mission-finanzeintrag.md)                  | Einsatz: Finanzeintrag anlegen & Detail erneut öffnen | `e2e`   | `MissionFinanceEntryE2eTest`    |
-| [UC-23](UC-23-job-order-bearbeiter-notizen.md)           | Job Order: Bearbeiter ein-/austragen & Notizen (AJAX) | `e2e`   | `JobOrderAssigneeNotesE2eTest`  |
-| [UC-24](UC-24-refinery-import-extract.md)                | Refinery Order aus Screenshot-Extract importieren     | `e2e`   | `RefineryImportE2eTest`         |
-| [UC-25](UC-25-befoerderung-themenbereich-crud.md)        | Beförderung: Themenbereich anlegen/umbenennen/löschen | `e2e`   | `PromotionTopicCrudE2eTest`     |
-| [UC-26](UC-26-mein-inventar-crud.md)                     | Mein Inventar: Eintrag anlegen & löschen              | `e2e`   | `PersonalInventoryCrudE2eTest`  |
-| [UC-27](UC-27-benachrichtigung-gelesen.md)               | Benachrichtigung erhalten & als gelesen markieren     | `e2e`   | `NotificationCenterE2eTest`     |
-| [UC-28](UC-28-mitglied-bearbeiten.md)                    | Mitglied bearbeiten (In-Place-Save)                   | `e2e`   | `MemberEditInPlaceE2eTest`      |
-| [UC-29](UC-29-admin-missions-stammdaten-staffel-crud.md) | Admin Missions-Stammdaten: Staffel anlegen & löschen  | `e2e`   | `AdminMissionDataCrudE2eTest`   |
+|                            ID                            |                       Use Case                        |   Tag   |            Testklasse            |
+|----------------------------------------------------------|-------------------------------------------------------|---------|----------------------------------|
+| [UC-01](UC-01-login.md)                                  | Login via Keycloak                                    | `e2e`   | `LoginSmokeE2eTest`              |
+| [UC-02](UC-02-mission-anlegen.md)                        | Einsatz anlegen                                       | `e2e`   | `MissionCreateE2eTest`           |
+| [UC-03](UC-03-job-order-anlegen.md)                      | Job Order anlegen                                     | `e2e`   | `JobOrderCreateE2eTest`          |
+| [UC-04](UC-04-refinery-order-anlegen.md)                 | Refinery Order anlegen                                | `e2e`   | `RefineryOrderCreateE2eTest`     |
+| [UC-05](UC-05-hangar-schiff-hinzufuegen.md)              | Schiff zum Hangar hinzufügen                          | `e2e`   | `HangarAddShipE2eTest`           |
+| [UC-06](UC-06-job-order-handover.md)                     | Job-Order-Handover protokollieren                     | `e2e`   | `JobOrderHandoverE2eTest`        |
+| [UC-07](UC-07-kernseiten-smoke.md)                       | Kernseiten-Smoke (nicht-destruktiv)                   | `smoke` | `CorePagesSmokeE2eTest`          |
+| [UC-13](UC-13-inventar-operationen.md)                   | Inventar: Ein-/Aus-/Umbuchen, Verkauf, Zuweisung      | `e2e`   | `InventoryOperationsE2eTest`     |
+| [UC-15](UC-15-job-order-bearbeiten.md)                   | Job Order bearbeiten                                  | `e2e`   | `JobOrderEditE2eTest`            |
+| [UC-16](UC-16-job-order-status.md)                       | Job-Order-Status ändern                               | `e2e`   | `JobOrderStatusE2eTest`          |
+| [UC-17](UC-17-item-order-handover.md)                    | Item-Auftrag & Item-Handover                          | `e2e`   | `JobOrderItemHandoverE2eTest`    |
+| [UC-19](UC-19-refinery-order-einlagern.md)               | Refinery Order einlagern (in das Lager)               | `e2e`   | `RefineryOrderStoreE2eTest`      |
+| [UC-20](UC-20-refinery-order-lifecycle.md)               | Refinery Order: Bearbeiten/Abbrechen/Filter/Edges     | `e2e`   | `RefineryOrderLifecycleE2eTest`  |
+| [UC-22](UC-22-mission-finanzeintrag.md)                  | Einsatz: Finanzeintrag anlegen & Detail erneut öffnen | `e2e`   | `MissionFinanceEntryE2eTest`     |
+| [UC-23](UC-23-job-order-bearbeiter-notizen.md)           | Job Order: Bearbeiter ein-/austragen & Notizen (AJAX) | `e2e`   | `JobOrderAssigneeNotesE2eTest`   |
+| [UC-24](UC-24-refinery-import-extract.md)                | Refinery Order aus Screenshot-Extract importieren     | `e2e`   | `RefineryImportE2eTest`          |
+| [UC-25](UC-25-befoerderung-themenbereich-crud.md)        | Beförderung: Themenbereich anlegen/umbenennen/löschen | `e2e`   | `PromotionTopicCrudE2eTest`      |
+| [UC-26](UC-26-mein-inventar-crud.md)                     | Mein Inventar: Eintrag anlegen & löschen              | `e2e`   | `PersonalInventoryCrudE2eTest`   |
+| [UC-27](UC-27-benachrichtigung-gelesen.md)               | Benachrichtigung erhalten & als gelesen markieren     | `e2e`   | `NotificationCenterE2eTest`      |
+| [UC-28](UC-28-mitglied-bearbeiten.md)                    | Mitglied bearbeiten (In-Place-Save)                   | `e2e`   | `MemberEditInPlaceE2eTest`       |
+| [UC-29](UC-29-admin-missions-stammdaten-staffel-crud.md) | Admin Missions-Stammdaten: Staffel anlegen & löschen  | `e2e`   | `AdminMissionDataCrudE2eTest`    |
+| [UC-30](UC-30-item-lager-operationen.md)                 | Item-Lager: Ein-/Um-/Ausbuchen, Zuordnungs-Gate, Sync | `e2e`   | `ItemInventoryOperationsE2eTest` |
 
 UC-25 bis UC-29 schließen die zuvor offenen E2E-Lücken der auditierten Bereiche **Beförderung** (UC-25) und **Mein Inventar** (UC-26), der **Benachrichtigungen** (UC-27), der ADMIN-**Mitgliederverwaltung** (UC-28) und des Admin-Datenpflege-Clusters (UC-29). Ergänzend deckt der ADMIN-authentifizierte [`AdminPagesSmokeE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/AdminPagesSmokeE2eTest.java) (`@Tag("e2e")`) die reinen Lese-Adminseiten als Page-Load-Smoke ab, und `CorePagesSmokeE2eTest` (`@Tag("smoke")`) lädt jetzt zusätzlich die zuvor ungesmokten Lese-Seiten (`/operations`, `/materials`, `/materials/overview`, `/materials/profit-calculation`, `/ship-data`, `/blueprint-overview`, `/org-chart`, `/notifications`, `/personal-inventory`, `/personal-inventory/blueprints`).
 
