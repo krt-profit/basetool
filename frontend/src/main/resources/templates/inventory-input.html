@@ -75,14 +75,66 @@
 
                 <th:block th:replace="~{fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=*{owningOrgUnitId}, required=false)}"></th:block>
 
+                <!-- Material <-> Item catalog-mode toggle (design §6.2, REQ-INV-029): one shared form,
+                     the toggle swaps only the catalog-specific controls below (material picker + quality
+                     vs. remote item picker). inventory-input.js hides AND disables the inactive block so
+                     its `required` fields never block submit and its values are omitted from the POST
+                     (the client half of the materialId/gameItemId XOR). Redisplay after a classic-path
+                     validation error derives the active mode from which reference the form carries. -->
                 <div class="form-group">
-                    <label for="materialId">Material</label>
-                    <select id="materialId" th:field="*{materialId}" required data-krt-combobox>
-                        <option value="" data-quantity-type="">-- Bitte wählen --</option>
-                        <option th:each="mat : ${materials}" th:value="${mat.id}" th:data-quantity-type="${mat.quantityType}" th:text="${mat.name}"></option>
-                    </select>
+                    <label th:text="#{inventory.form.item.modeLabel}">Eintragsart</label>
+                    <div class="flex-gap-sm krtm-display-flex-gap-1-5rem-7e37">
+                        <label class="krtm-display-flex-align-items-center-gap-0-5rem-f-0218">
+                            <input type="radio" name="inventoryCatalogMode" value="material"
+                                   th:attr="checked=*{gameItemId == null} ? 'checked' : null"
+                                   data-trigger="inv-input-mode-toggle" class="krtm-width-auto-7e37"
+                                   data-testid="inventory-mode-material" />
+                            <span th:text="#{inventory.form.item.mode.material}">Material</span>
+                        </label>
+                        <label class="krtm-display-flex-align-items-center-gap-0-5rem-f-0218">
+                            <input type="radio" name="inventoryCatalogMode" value="item"
+                                   th:attr="checked=*{gameItemId != null} ? 'checked' : null"
+                                   data-trigger="inv-input-mode-toggle" class="krtm-width-auto-7e37"
+                                   data-testid="inventory-mode-item" />
+                            <span th:text="#{inventory.form.item.mode.item}">Item</span>
+                        </label>
+                    </div>
                 </div>
-                
+
+                <div id="mode-material-fields" th:hidden="*{gameItemId != null}">
+                    <div class="form-group">
+                        <label for="materialId">Material</label>
+                        <select id="materialId" th:field="*{materialId}" required data-krt-combobox>
+                            <option value="" data-quantity-type="">-- Bitte wählen --</option>
+                            <option th:each="mat : ${materials}" th:value="${mat.id}" th:data-quantity-type="${mat.quantityType}" th:text="${mat.name}"></option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="quality">Qualität</label>
+                        <input type="number" id="quality" th:field="*{quality}" min="0" max="1000" value="100" required>
+                    </div>
+                </div>
+
+                <!-- Item mode: remote-searched bookable-item picker (design §6.6, REQ-FE-016). No
+                     quality field — item rows carry none (REQ-INV-029). The seeded option keeps the
+                     picked item across a classic-path validation redisplay: its label comes from the
+                     gameItemName echo the page JS mirrors off the committed combobox label (there is
+                     no by-id catalog resolve), falling back to the raw id. -->
+                <div id="mode-item-fields" th:hidden="*{gameItemId == null}">
+                    <div class="form-group">
+                        <label for="gameItemId" th:text="#{inventory.form.item.label}">Item</label>
+                        <select id="gameItemId" th:field="*{gameItemId}" required
+                                data-krt-combobox="remote-game-items"
+                                th:data-combobox-placeholder="#{inventory.form.item.placeholder}">
+                            <option value=""></option>
+                            <option th:if="*{gameItemId != null}" th:value="*{gameItemId}"
+                                    th:text="${#strings.isEmpty(inventoryForm.gameItemName)} ? *{gameItemId} : *{gameItemName}"></option>
+                        </select>
+                        <input type="hidden" th:field="*{gameItemName}" data-role="game-item-name-echo" />
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label for="locationId">Ort</label>
                     <select id="locationId" th:field="*{locationId}" required data-krt-combobox>
@@ -90,12 +142,7 @@
                         <option th:each="loc : ${locations}" th:value="${loc.id}" th:text="${loc.name}"></option>
                     </select>
                 </div>
-                
-                <div class="form-group">
-                    <label for="quality">Qualität</label>
-                    <input type="number" id="quality" th:field="*{quality}" min="0" max="1000" value="100" required>
-                </div>
-                
+
                 <div class="form-group">
                     <label for="amount">Menge <span id="amount-unit"></span><th:block th:replace="~{fragments/scu-hint :: scuHint('amount-scu-hint', true)}"></th:block></label>
                     <input type="text" inputmode="decimal" data-scu-decimal id="amount" th:field="*{amount}" step="0.001" min="0" required>
@@ -113,7 +160,10 @@
                         <div class="flex-gap-sm mb-1" data-alloc-row>
                             <select class="w-full" data-alloc-target>
                                 <option value="" th:text="#{inventory.order.none}">-- Kein Auftrag --</option>
-                                <option th:each="order : ${jobOrders}" th:value="${order.id}" th:data-materials="${order.materials != null and !order.materials.isEmpty() ? #strings.listJoin(order.materials.![material.id], ',') : ''}" th:text="${'#' + order.displayId + ' - ' + order.handle + ' (' + order.status + ')'}"></option>
+                                <!-- data-game-items is the item-mode sibling of data-materials (REQ-INV-031):
+                                 the CSV of gameItems the ITEM order's lines request, filtering the option
+                                 by the picked gameItem exactly like data-materials does per material. -->
+                            <option th:each="order : ${jobOrders}" th:value="${order.id}" th:data-materials="${order.materials != null and !order.materials.isEmpty() ? #strings.listJoin(order.materials.![material.id], ',') : ''}" th:data-game-items="${order.requiredGameItemIds != null and !order.requiredGameItemIds.isEmpty() ? #strings.listJoin(order.requiredGameItemIds, ',') : ''}" th:text="${'#' + order.displayId + ' - ' + order.handle + ' (' + order.status + ')'}"></option>
                             </select>
                             <input type="number" class="assoc-menge-input" data-alloc-amount step="0.001" min="0" th:placeholder="#{inventory.assoc.amount}">
                             <button type="button" class="btn btn-ghost" data-trigger="inv-input-remove-alloc" th:title="#{inventory.assoc.remove}" th:aria-label="#{inventory.assoc.remove}">&#215;</button>

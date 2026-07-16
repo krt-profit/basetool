@@ -246,6 +246,74 @@ class InventoryPageControllerMvcTest {
                         "data-krt-combobox")));
   }
 
+  // covers REQ-INV-031 (design §6.2): the Einbuchen form renders the Material <-> Item catalog-mode
+  // toggle and the remote-game-items picker marker, and the quality field stays confined to the
+  // material block — the item block that follows carries the picker but no quality input.
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewInputPage_rendersCatalogModeToggleAndItemPickerWithoutQuality() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/input"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("inventory-input"))
+        .andExpect(content().string(containsString("name=\"inventoryCatalogMode\"")))
+        .andExpect(content().string(containsString("data-testid=\"inventory-mode-material\"")))
+        .andExpect(content().string(containsString("data-testid=\"inventory-mode-item\"")))
+        .andExpect(content().string(containsString("data-krt-combobox=\"remote-game-items\"")))
+        .andExpect(
+            content()
+                .string(
+                    stringContainsInOrder(
+                        "id=\"mode-material-fields\"",
+                        "id=\"quality\"",
+                        "id=\"mode-item-fields\"",
+                        "id=\"gameItemId\"")));
+  }
+
+  // covers REQ-INV-031 (design §5.3/§6.6): the /inventory/item-search proxy behind the
+  // remote-game-items combobox relays the term to the backend bookable-item catalog with the
+  // token-carrying client and unwraps the page payload into the flat list the picker consumes.
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void itemSearch_unwrapsBackendPageToFlatList() throws Exception {
+    UUID itemId = UUID.randomUUID();
+    PageResponse<InventoryGameItemReferenceDto> page =
+        new PageResponse<>(
+            List.of(new InventoryGameItemReferenceDto(itemId, "Quantum Drive", "RSI", "SHIP_ITEM")),
+            0,
+            50,
+            1,
+            1,
+            Collections.emptyList());
+    when(backendApiClient.get(
+            eq("/api/v1/inventory/item-catalog?q=Quantum&size=50&sort=name,asc"), anyTypeRef()))
+        .thenReturn(page);
+
+    mockMvc
+        .perform(get("/inventory/item-search").param("q", "Quantum"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].id").value(itemId.toString()))
+        .andExpect(jsonPath("$[0].name").value("Quantum Drive"));
+  }
+
+  // covers REQ-INV-031 (design §6.6): a backend failure degrades the item search to an empty list —
+  // the combobox shows "no matches" instead of surfacing the error.
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void itemSearch_backendFailure_returnsEmptyList() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenThrow(new RuntimeException("backend down"));
+
+    mockMvc
+        .perform(get("/inventory/item-search").param("q", "Quantum"))
+        .andExpect(status().isOk())
+        .andExpect(content().json("[]"));
+  }
+
   // REQ-FE-016: the material drilldown's navigate select opts into the combobox enhancement (the
   // change-delegation reads data-trigger/data-url-template off the enhancer's hidden input). The
   // items fetch is stubbed as an empty page; the picker renders independently of the item list.

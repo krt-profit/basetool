@@ -27,14 +27,40 @@ import java.util.List;
 import java.util.UUID;
 import lombok.Data;
 
-/** Form-binding object for Inventory input. */
+/**
+ * Form-binding object for Inventory input. The create form has two catalog modes (design §6.2):
+ * material mode fills {@link #materialId} + {@link #quality}, item mode fills {@link #gameItemId}
+ * (no quality — item rows carry none, REQ-INV-029). Exactly one of the two catalog references must
+ * be set; the XOR and the material-mode quality requirement are cross-field rules enforced by
+ * {@code InventoryWriteController#validateCatalogMode} (a plain {@code @NotNull} on either field
+ * would reject the other mode outright).
+ */
 @Data
 public class InventoryForm {
-  @NotNull private UUID materialId;
+  /** Material-mode catalog reference; {@code null} in item mode (XOR with {@link #gameItemId}). */
+  private UUID materialId;
+
+  /**
+   * Item-mode catalog reference — the bookable {@code GameItem} picked via the {@code
+   * remote-game-items} combobox (design §6.2/§6.6); {@code null} in material mode (XOR with {@link
+   * #materialId}).
+   */
+  private UUID gameItemId;
+
+  /**
+   * Client-echoed display label of the picked game item. Purely presentational: the remote item
+   * picker has no preloaded option list and no by-id resolve endpoint, so the page JS mirrors the
+   * committed combobox label into this hidden field and a classic-path validation redisplay seeds
+   * the picker's single option from it (falling back to the raw id). Never sent to the backend.
+   */
+  private String gameItemName;
 
   @NotNull private UUID locationId;
 
-  @NotNull
+  /**
+   * Material quality grade (0–1000). Required in material mode (enforced as a cross-field rule in
+   * the write controller), absent in item mode — item rows have no quality dimension.
+   */
   @Min(0)
   @Max(1000)
   private Integer quality;

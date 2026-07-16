@@ -92,6 +92,19 @@ public class InventoryPageController {
       new ParameterizedTypeReference<List<UUID>>() {};
 
   /**
+   * Response type for the bookable-item catalog search ({@code GET /api/v1/inventory/item-catalog})
+   * backing the {@code remote-game-items} combobox source's {@code /inventory/item-search} proxy.
+   */
+  private static final ParameterizedTypeReference<
+          PageResponse<
+              de.greluc.krt.profit.basetool.frontend.model.dto.InventoryGameItemReferenceDto>>
+      GAME_ITEM_REFERENCE_PAGE =
+          new ParameterizedTypeReference<
+              PageResponse<
+                  de.greluc.krt.profit.basetool.frontend.model.dto
+                      .InventoryGameItemReferenceDto>>() {};
+
+  /**
    * Response type for the grouped {@code /my} and {@code /all} list views ({@code .../grouped}),
    * decoding the Material-to-Stack grouping records the personal and admin Lager tables render.
    */
@@ -327,6 +340,43 @@ public class InventoryPageController {
       return "inventory-game-item :: inventoryGameItemResults";
     }
     return "inventory-game-item";
+  }
+
+  /**
+   * JSON proxy for the {@code remote-game-items} combobox source (design §6.6, REQ-FE-016): looks
+   * up bookable game items — the output of at least one active blueprint — by a free-text term and
+   * unwraps the backend page into a flat list. Relays with the <em>token-carrying</em> {@link
+   * BackendApiClient#get} (never {@code getPublic}): the backend {@code
+   * /api/v1/inventory/item-catalog} sits under the role-gated {@code /api/v1/inventory/**}
+   * umbrella, unlike the deliberately anonymous {@code /orders/item-search} sibling (design §5.3).
+   * The page size is capped at 50 — the combobox renders at most its {@code maxResults} default of
+   * 50 rows — sorted by {@code name} (the backend's sole whitelisted sort field). An empty list on
+   * backend failure keeps the picker on "no matches" instead of surfacing the error.
+   *
+   * @param q the case-insensitive item-name search term; {@code null}/blank matches all (the
+   *     combobox's browse-mode empty fetch)
+   * @return up to 50 matching bookable game-item references, never {@code null}
+   */
+  @GetMapping("/item-search")
+  @org.springframework.web.bind.annotation.ResponseBody
+  public List<de.greluc.krt.profit.basetool.frontend.model.dto.InventoryGameItemReferenceDto>
+      itemSearch(@RequestParam(required = false) String q) {
+    // Build the URI via UriComponentsBuilder so a crafted `&` in the term cannot inject extra
+    // query parameters — the same L-1 hardening as UserProxyController.forwardSearch.
+    String uri =
+        org.springframework.web.util.UriComponentsBuilder.fromPath("/api/v1/inventory/item-catalog")
+            .queryParam("q", q == null ? "" : q)
+            .queryParam("size", 50)
+            .queryParam("sort", "name,asc")
+            .toUriString();
+    try {
+      PageResponse<de.greluc.krt.profit.basetool.frontend.model.dto.InventoryGameItemReferenceDto>
+          page = backendApiClient.get(uri, GAME_ITEM_REFERENCE_PAGE);
+      return page != null && page.content() != null ? page.content() : List.of();
+    } catch (Exception e) {
+      log.error("Failed to search bookable game items", e);
+      return List.of();
+    }
   }
 
   /**

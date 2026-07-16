@@ -75,13 +75,17 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
  * no-materials/empty-consumption line, and a material marked "nicht ausbuchen" (skipped: recorded
  * but not booked out). Pure Mockito over the five collaborators; a Steel/SCU item line (amount 4,
  * per-unit demand 40) linked to a 100-SCU inventory entry earmarked in full to the order backs
- * every scenario.
+ * every scenario. Every payload carries a {@code bookIn} block — the field is {@code @NotNull}
+ * since the production modal shipped its book-in section (REQ-INV-032; a missing block is a 400 at
+ * the API boundary, pinned by {@code JobOrderItemProductionCreateDtoValidationTest}) — so the
+ * fixture line carries a game item and the book-in collaborators resolve a default target.
  */
 @ExtendWith(MockitoExtension.class)
 class JobOrderItemProductionServiceTest {
 
   private static final long LINE_VERSION = 3L;
   private static final long INVENTORY_VERSION = 7L;
+  private static final UUID BOOK_IN_LOCATION_ID = UUID.randomUUID();
 
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private InventoryItemRepository inventoryItemRepository;
@@ -156,6 +160,40 @@ class JobOrderItemProductionServiceTest {
     lenient()
         .when(jobOrderItemService.toItemDtos(any()))
         .thenReturn(List.of(new JobOrderItemDto(lineId, null, null, 4, 1, 0, null, List.of(), 4L)));
+
+    // REQ-INV-032: bookIn is required on every payload, so the fixture line carries a produced
+    // game item and the book-in collaborators resolve the defaultBookIn() target (acting user,
+    // fixture location, no picker output). Lenient — the guard-path tests throw before book-in.
+    GameItem fixtureGameItem = new GameItem();
+    fixtureGameItem.setId(UUID.randomUUID());
+    fixtureGameItem.setName("Quantum Drive");
+    line.setGameItem(fixtureGameItem);
+    User actor = new User();
+    actor.setId(UUID.randomUUID());
+    Location bookInLocation = new Location();
+    bookInLocation.setId(BOOK_IN_LOCATION_ID);
+    bookInLocation.setName("ARC-L1");
+    lenient().when(userService.getCurrentUser()).thenReturn(Optional.of(actor));
+    lenient()
+        .when(locationRepository.findById(BOOK_IN_LOCATION_ID))
+        .thenReturn(Optional.of(bookInLocation));
+    lenient()
+        .when(inventoryItemRepository.save(any(InventoryItem.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+    lenient()
+        .when(inventoryCheckoutService.mergeStockIfRequested(any(InventoryItem.class), eq(false)))
+        .thenAnswer(inv -> inv.getArgument(0));
+  }
+
+  /**
+   * The standard book-in block of the consumption-focused tests: the fixture location, the acting
+   * user as owner (defaulted), no org-unit picker output, non-personal, default auto-earmark.
+   *
+   * @return the assembled default book-in target
+   */
+  private static JobOrderItemProductionCreateDto.BookInDto defaultBookIn() {
+    return new JobOrderItemProductionCreateDto.BookInDto(
+        BOOK_IN_LOCATION_ID, null, null, null, null);
   }
 
   @Test
@@ -169,12 +207,13 @@ class JobOrderItemProductionServiceTest {
                 new JobOrderItemProductionConsumptionDto(
                     inventoryId, materialId, 40.0, INVENTORY_VERSION)),
             List.of(),
-            null);
+            defaultBookIn());
 
     // When
     JobOrderItemDto result = service.bookProduction(orderId, lineId, dto);
 
-    // Then — the line advances to 1 manufactured, the entry drops to 60 and its slice follows.
+    // Then — the line advances to 1 manufactured, the entry drops to 60 and its slice follows;
+    // the required bookIn additionally creates the produced stock row (REQ-INV-032).
     assertThat(result.id()).isEqualTo(lineId);
     assertThat(line.getManufacturedAmount()).isEqualTo(1);
     assertThat(inventoryItem.getAmount()).isEqualTo(60.0);
@@ -186,6 +225,8 @@ class JobOrderItemProductionServiceTest {
         .record(eq(AuditEventType.JOB_ORDER_PRODUCTION_BOOKED), any(), any(), any(), any());
     verify(auditService, times(1))
         .record(eq(AuditEventType.INVENTORY_CONSUMED_BY_PRODUCTION), any(), any(), any(), any());
+    verify(auditService, times(1))
+        .record(eq(AuditEventType.INVENTORY_RECEIVED_FROM_PRODUCTION), any(), any(), any(), any());
   }
 
   @Test
@@ -193,7 +234,7 @@ class JobOrderItemProductionServiceTest {
     // Given — 3 of 4 already manufactured, so only 1 unit remains, but 2 are requested.
     line.setManufacturedAmount(3);
     JobOrderItemProductionCreateDto dto =
-        new JobOrderItemProductionCreateDto(2, LINE_VERSION, List.of(), List.of(), null);
+        new JobOrderItemProductionCreateDto(2, LINE_VERSION, List.of(), List.of(), defaultBookIn());
 
     // When & Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
@@ -214,7 +255,7 @@ class JobOrderItemProductionServiceTest {
                 new JobOrderItemProductionConsumptionDto(
                     inventoryId, materialId, 30.0, INVENTORY_VERSION)),
             List.of(),
-            null);
+            defaultBookIn());
 
     // When & Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
@@ -234,7 +275,7 @@ class JobOrderItemProductionServiceTest {
                 new JobOrderItemProductionConsumptionDto(
                     inventoryId, materialId, 50.0, INVENTORY_VERSION)),
             List.of(),
-            null);
+            defaultBookIn());
 
     // When & Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
@@ -250,7 +291,7 @@ class JobOrderItemProductionServiceTest {
     materialOrder.setId(orderId);
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(materialOrder));
     JobOrderItemProductionCreateDto dto =
-        new JobOrderItemProductionCreateDto(1, LINE_VERSION, List.of(), List.of(), null);
+        new JobOrderItemProductionCreateDto(1, LINE_VERSION, List.of(), List.of(), defaultBookIn());
 
     // When & Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
@@ -269,7 +310,7 @@ class JobOrderItemProductionServiceTest {
                 new JobOrderItemProductionConsumptionDto(
                     inventoryId, materialId, 40.0, INVENTORY_VERSION)),
             List.of(),
-            null);
+            defaultBookIn());
 
     // When & Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
@@ -291,7 +332,7 @@ class JobOrderItemProductionServiceTest {
                 new JobOrderItemProductionConsumptionDto(
                     inventoryId, materialId, 40.0, INVENTORY_VERSION)),
             List.of(),
-            null);
+            defaultBookIn());
 
     // When & Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
@@ -316,16 +357,16 @@ class JobOrderItemProductionServiceTest {
                 new JobOrderItemProductionConsumptionDto(
                     inventoryId, materialId, 40.0, INVENTORY_VERSION)),
             List.of(),
-            null);
+            defaultBookIn());
 
     // When
     service.bookProduction(orderId, lineId, dto);
 
     // Then — the depleted row is deleted (never saved, never clamped), the line still advances
-    // and the audit trail is emitted.
+    // and the audit trail is emitted. The only save is the required bookIn's fresh stock row.
     assertThat(line.getManufacturedAmount()).isEqualTo(1);
     verify(inventoryItemRepository).delete(inventoryItem);
-    verify(inventoryItemRepository, never()).save(any());
+    verify(inventoryItemRepository, never()).save(inventoryItem);
     verify(materialExchangeOfferRepository, never()).clampOfferedAmountToStock(any(), anyDouble());
     verify(auditService, times(1))
         .record(eq(AuditEventType.INVENTORY_CONSUMED_BY_PRODUCTION), any(), any(), any(), any());
@@ -338,15 +379,15 @@ class JobOrderItemProductionServiceTest {
     // Given — an item line with no derivable material requirements: nothing is consumed.
     line.getMaterials().clear();
     JobOrderItemProductionCreateDto dto =
-        new JobOrderItemProductionCreateDto(1, LINE_VERSION, List.of(), List.of(), null);
+        new JobOrderItemProductionCreateDto(1, LINE_VERSION, List.of(), List.of(), defaultBookIn());
 
     // When
     service.bookProduction(orderId, lineId, dto);
 
-    // Then — the counter advances with no inventory access; only the booking audit is emitted.
+    // Then — the counter advances with no consumption access; besides the booking audit only the
+    // required bookIn's fresh stock row is written.
     assertThat(line.getManufacturedAmount()).isEqualTo(1);
     verify(inventoryItemRepository, never()).findByIdForUpdate(any());
-    verify(inventoryItemRepository, never()).save(any());
     verify(inventoryItemRepository, never()).delete(any());
     verify(auditService, times(1))
         .record(eq(AuditEventType.JOB_ORDER_PRODUCTION_BOOKED), any(), any(), any(), any());
@@ -359,19 +400,20 @@ class JobOrderItemProductionServiceTest {
     // Given — the line's only material (Steel) is marked "nicht ausbuchen", so its 40-SCU demand is
     // dropped and the consumption plan is empty: production is recorded but no stock is touched.
     JobOrderItemProductionCreateDto dto =
-        new JobOrderItemProductionCreateDto(1, LINE_VERSION, List.of(), List.of(materialId), null);
+        new JobOrderItemProductionCreateDto(
+            1, LINE_VERSION, List.of(), List.of(materialId), defaultBookIn());
 
     // When
     JobOrderItemDto result = service.bookProduction(orderId, lineId, dto);
 
-    // Then — the counter advances with no inventory access; only the booking audit is emitted and
-    // the earmarked entry is left fully intact.
+    // Then — the counter advances with no consumption access; the earmarked entry is left fully
+    // intact (the only save is the required bookIn's fresh stock row).
     assertThat(result.id()).isEqualTo(lineId);
     assertThat(line.getManufacturedAmount()).isEqualTo(1);
     assertThat(inventoryItem.getAmount()).isEqualTo(100.0);
     assertThat(inventoryItem.getJobOrderAllocations().get(0).getAmount()).isEqualTo(100.0);
     verify(inventoryItemRepository, never()).findByIdForUpdate(any());
-    verify(inventoryItemRepository, never()).save(any());
+    verify(inventoryItemRepository, never()).save(inventoryItem);
     verify(inventoryItemRepository, never()).delete(any());
     verify(auditService, times(1))
         .record(eq(AuditEventType.JOB_ORDER_PRODUCTION_BOOKED), any(), any(), any(), any());
@@ -418,31 +460,9 @@ class JobOrderItemProductionServiceTest {
         locationId, ownerUserId, owningOrgUnitId, personal, allocateToOrder);
   }
 
-  // covers REQ-INV-032 (bookIn == null keeps the transitional legacy behaviour byte-identically)
-  @Test
-  void bookProduction_nullBookIn_createsNoStockRow_touchesNoBookInCollaborators() {
-    // Given a producible line and the legacy payload without a bookIn block
-    givenProducibleLineWithoutMaterials();
-    JobOrderItemProductionCreateDto dto =
-        new JobOrderItemProductionCreateDto(1, LINE_VERSION, List.of(), List.of(), null);
-
-    // When
-    service.bookProduction(orderId, lineId, dto);
-
-    // Then — the counter advances, but no stock row is created, none of the book-in collaborators
-    // is touched and no INVENTORY_RECEIVED_FROM_PRODUCTION event is written (the pre-item-stock
-    // status quo).
-    assertThat(line.getManufacturedAmount()).isEqualTo(1);
-    verify(inventoryItemRepository, never()).save(any());
-    verifyNoInteractions(
-        userService,
-        userRepository,
-        locationRepository,
-        ownerScopeService,
-        inventoryCheckoutService);
-    verify(auditService, never())
-        .record(eq(AuditEventType.INVENTORY_RECEIVED_FROM_PRODUCTION), any(), any(), any(), any());
-  }
+  // The former nullBookIn legacy no-op test moved: a missing bookIn is now rejected as a 400
+  // validation error at the API boundary (REQ-INV-032 flip), pinned by
+  // JobOrderItemProductionCreateDtoValidationTest — the service never sees a null block.
 
   // covers REQ-INV-032 (bookIn creates the earmarked item row, merges after save, audits)
   @Test
@@ -651,8 +671,9 @@ class JobOrderItemProductionServiceTest {
   // covers REQ-INV-032 (a line without a game item cannot be booked in)
   @Test
   void bookProduction_bookIn_lineWithoutGameItem_throwsBadRequest() {
-    // Given a book-in against the fixture line, which carries no game item
+    // Given a book-in against a line explicitly stripped of its game item (the fixture seeds one)
     line.getMaterials().clear();
+    line.setGameItem(null);
     JobOrderItemProductionCreateDto dto =
         new JobOrderItemProductionCreateDto(
             1,

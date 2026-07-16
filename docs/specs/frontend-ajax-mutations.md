@@ -985,10 +985,10 @@ surfaces reflect inventory changes live too. The affected order ids are read off
 chips before the write; the sole exception is the admin `DELETE /inventory/all` full wipe, which
 cannot enumerate them client-side — its board and inventory rooms are still poked, but an open order
 collection self-heals on the next interaction (an accepted limitation for that rare nuke). A further
-cross-publisher is planned: the production-booking modal on the order detail page will additionally
-poke `inventory`/`stock` when Herstellung starts booking produced item stock in (REQ-INV-032) — that
-publish ships with the follow-up pass that adds the production book-in section, not with the item
-views themselves.
+cross-publisher is the production-booking modal on the order detail page: since Herstellung books
+the produced item stock in (REQ-INV-032, the book-in section), its success handler additionally
+pokes `inventory`/`stock` — the existing seam, so Lager viewers see the fresh stock live with no
+seam-map change.
 
 The standalone order **material-collection** page (`/orders/{id}/material-collection`) joins the same
 `order:{id}` room in its own right (#1309): its per-row delivered toggle and owner/location moves
@@ -1097,10 +1097,14 @@ lookup endpoints feeding the local-filter mode (`GET /api/v1/materials/lookup`,
 (`MaterialService`/`LocationService#LOOKUP_MAX_RESULTS`) — both catalogs are bounded by nature
 (UEX/SC-Wiki sync plus admin curation; users cannot create entries), so the cap only guarantees a
 page can never embed an unbounded catalog payload. Converted sites:
-the inventory Einbuchen material + location pickers, the job-order create/edit material lines
-(server-rendered **and** JS-built rows), the refinery create/details input-material pickers, the
-Umbuchen target-location pickers, the `/inventory/material` navigate select and the admin
-material-alias pickers; the orders item picker already used the component's `remoteSource` API.
+the inventory Einbuchen material + location pickers and its item-mode game-item picker (the
+`remote-game-items` registry source in `krt-catalog-search.js` → the authenticated
+`GET /inventory/item-search` proxy → the role-gated backend `/api/v1/inventory/item-catalog`,
+REQ-INV-029), the job-order create/edit material lines (server-rendered **and** JS-built rows),
+the refinery create/details input-material pickers, the Umbuchen target-location pickers, the
+production modal's book-in location picker (REQ-INV-032), the `/inventory/material` navigate
+select and the admin material-alias pickers; the orders item picker already used the component's
+`remoteSource` API.
 
 **Option-metadata mirror (the load-bearing part).** Enhancing a select **removes** the native
 `<option>` elements, so option-level metadata (`data-quantity-type` on material options,

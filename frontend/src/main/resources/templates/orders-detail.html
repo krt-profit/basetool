@@ -1467,7 +1467,7 @@
     <div class="modal-content hud-box krtm-width-100-max-width-700px-max-height-90vh-ov-0acc">
         <button type="button" class="btn-close krtm-position-absolute-right-1rem-top-1rem-backgr-0703" data-trigger="close-modal-display" data-modal-id="production-modal">&times;</button>
         <h2 class="krtm-color-var-color-primary-margin-bottom-1-5rem-c7ac" id="production-modal-title" th:text="#{orders.detail.production.record}">Herstellung erfassen</h2>
-        <div class="krt-form" id="production-form" th:data-order-id="${order.id}">
+        <div class="krt-form" id="production-form" th:data-order-id="${order.id}" th:data-acting-user-id="${actingUser != null ? actingUser.id : ''}" th:data-responsible-org-unit-id="${order.responsibleOrgUnit != null ? order.responsibleOrgUnit.id() : ''}">
             <div class="form-group mb-1">
                 <label for="production-amount" class="form-label" th:text="#{orders.detail.production.amount}">Anzahl herstellen</label>
                 <input type="number" id="production-amount" step="1" min="1" value="1" class="w-full krtm-min-height-44px-1df5">
@@ -1476,6 +1476,44 @@
             <h3 class="section-title" th:text="#{orders.detail.production.consumption}">Materialverbrauch &amp; Lagerentnahme</h3>
             <p class="text-muted krtm-font-size-0-85rem-margin-bottom-1rem-f3e3" th:text="#{orders.detail.production.consumptionHint}">Wähle je Material, aus welchen verknüpften Lagereinträgen und in welcher Menge entnommen wird.</p>
             <div id="production-materials"></div>
+            <!-- Book-in section (REQ-INV-032, design §6.4): where and for whom the produced units
+                 land as game-item stock. Location = local-filter combobox over ${locations} (§6.2
+                 owner decision); owner = remote-users combobox seeded + preselected with the acting
+                 user (${actingUser}); org-unit picker follows the #1328 Umbuchen semantics (always
+                 rendered for an owner with >=1 membership, concrete default, no empty placeholder,
+                 repopulated by orders-detail.js on owner change); "dem Auftrag zuordnen" defaults
+                 on and is disabled + cleared while "persönlich" is checked (§5.6). -->
+            <h3 class="section-title" th:text="#{orders.production.bookIn.title}">Einlagerung</h3>
+            <p class="text-muted krtm-font-size-0-85rem-margin-bottom-1rem-f3e3" th:text="#{orders.production.bookIn.hint}">Wohin und für wen die hergestellten Einheiten eingelagert werden.</p>
+            <div class="form-group mb-1">
+                <label for="production-location" class="form-label" th:text="#{orders.production.bookIn.location}">Lagerort</label>
+                <select id="production-location" data-prod-location class="w-full" data-krt-combobox data-trigger="od-production-bookin-changed">
+                    <option value=""></option>
+                    <option th:each="loc : ${locations}" th:value="${loc.id}" th:text="${loc.name}"></option>
+                </select>
+            </div>
+            <div class="form-group mb-1">
+                <label for="production-owner" class="form-label" th:text="#{orders.production.bookIn.owner}">Bei wem</label>
+                <select id="production-owner" data-prod-owner class="w-full" data-krt-combobox="remote-users" data-trigger="od-production-owner-changed">
+                    <option th:if="${actingUser != null}" th:value="${actingUser.id}" th:text="${actingUser.effectiveName != null ? actingUser.effectiveName : actingUser.username}" selected></option>
+                </select>
+            </div>
+            <div id="production-orgunit-wrapper" class="form-group mb-1" hidden>
+                <label for="production-orgunit" class="form-label" th:text="#{orders.production.bookIn.orgUnit}">Buchen in OrgUnit</label>
+                <select id="production-orgunit" data-prod-orgunit class="w-full"></select>
+            </div>
+            <div class="form-group mb-1">
+                <label class="flex-gap-sm cursor-pointer m-0">
+                    <input type="checkbox" id="production-personal" data-prod-personal data-trigger="od-production-personal-toggle" class="m-0">
+                    <span th:text="#{orders.production.bookIn.personal}">Als persönlichen Eintrag einlagern</span>
+                </label>
+            </div>
+            <div class="form-group mb-1">
+                <label class="flex-gap-sm cursor-pointer m-0" th:title="#{orders.production.bookIn.allocateHint}">
+                    <input type="checkbox" id="production-allocate" data-prod-allocate class="m-0" checked>
+                    <span th:text="#{orders.production.bookIn.allocate}">Dem Auftrag zuordnen</span>
+                </label>
+            </div>
             <div class="krtm-display-flex-gap-1rem-justify-content-flex-e-1385">
                 <button type="button" class="btn btn-ghost krtm-min-height-44px-1df5" data-trigger="close-modal-display" data-modal-id="production-modal" th:text="#{orders.detail.cancel}">Abbrechen</button>
                 <button type="button" class="btn btn--cta krtm-min-height-44px-1df5" id="production-book-btn" data-trigger="od-book-production"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.detail.production.book}">Herstellung buchen</span></button>
@@ -1608,7 +1646,10 @@
         allocError: /*[[#{error.production.allocation}]]*/ 'Zuweisung deckt den Materialbedarf nicht exakt.',
         booked: /*[[#{success.production.booked}]]*/ 'Herstellung gebucht \u2014 Materialbedarf und Lagerbestand reduziert.',
         unitScu: /*[[#{material.quantity.scu}]]*/ 'SCU',
-        unitPiece: /*[[#{material.quantity.piece}]]*/ 'St\u00fcck'
+        unitPiece: /*[[#{material.quantity.piece}]]*/ 'St\u00fcck',
+        // Book-in section (REQ-INV-032): the location gate's toast when the Enter-key path slips
+        // past the disabled button.
+        bookInLocationRequired: /*[[#{orders.production.bookIn.locationRequired}]]*/ 'Bitte einen Lagerort w\u00e4hlen.'
     };
 
     // Live multi-user sync (REQ-FE-010 / REQ-FE-015, ADR-0094): window.orderId keys the order:{id}

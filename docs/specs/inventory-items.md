@@ -101,21 +101,24 @@ produced units to the producing order by default (`allocateToOrder`, deselectabl
 mutually exclusive with `personal = true` — personal stock never carries allocations).
 Book-in runs in the same transaction as the consumption (slice-first-then-merge
 composition over the REQ-INV-026 merge helper), and is audited as
-`INVENTORY_RECEIVED_FROM_PRODUCTION`. **Rollout:** `bookIn` is optional at the API
-level while the production modal predates it (null ⇒ legacy no-stock behaviour) and
-becomes required when the PR-3 frontend ships.
+`INVENTORY_RECEIVED_FROM_PRODUCTION`. **Rollout:** flipped — `bookIn` is required
+(`@NotNull`); the production modal always sends it, and the transitional
+null-tolerant window (null ⇒ legacy no-stock behaviour) closed when the modal's
+book-in section shipped.
 
 **Acceptance**
 
 - [ ] A production booking with `bookIn` creates (or merges into) the matching item
   stack, earmarked to the order unless deselected; `personal + allocateToOrder` →
   400.
-- [ ] `bookIn == null` behaves exactly like before (counter + consumption only).
+- [ ] A payload without `bookIn` (or without `bookIn.locationId`) is rejected as a
+  400 validation error at the API boundary.
 - [ ] Both audit events (`JOB_ORDER_PRODUCTION_BOOKED`,
   `INVENTORY_RECEIVED_FROM_PRODUCTION`) are written in the same transaction; the
   inventory event carries `jobOrderId`, `gameItemId`, `amount`, `locationId` keys.
 
-**Enforced by:** `JobOrderItemProductionServiceTest` book-in cases · **Code:**
+**Enforced by:** `JobOrderItemProductionServiceTest` book-in cases,
+`JobOrderItemProductionCreateDtoValidationTest` · **Code:**
 `JobOrderItemProductionService`, `JobOrderItemProductionCreateDto` · **Issues:** —
 
 ## Out of scope

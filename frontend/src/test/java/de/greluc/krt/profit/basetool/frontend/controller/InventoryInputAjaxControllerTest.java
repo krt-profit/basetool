@@ -95,6 +95,96 @@ class InventoryInputAjaxControllerTest {
     verify(backendApiClient).post(eq("/api/v1/inventory"), any(), eq(InventoryItemDto.class));
   }
 
+  // covers REQ-INV-031 (item-mode passthrough: the create payload carries gameItemId with a null
+  // quality/material/mission side, and the merge opt-in is forced off — items always auto-merge)
+  @Test
+  @WithMockUser
+  void addInventoryItemAjax_itemMode_sendsGameItemIdWithNullQuality() throws Exception {
+    UUID gameItemId = UUID.randomUUID();
+    mockMvc
+        .perform(
+            post("/inventory/input")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("gameItemId", gameItemId.toString())
+                .param("locationId", LOCATION_ID.toString())
+                .param("amount", "5")
+                .param("source", "my"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.targetUrl").value("/inventory/my"));
+
+    org.mockito.ArgumentCaptor<Object> captor = org.mockito.ArgumentCaptor.captor();
+    verify(backendApiClient)
+        .post(eq("/api/v1/inventory"), captor.capture(), eq(InventoryItemDto.class));
+    de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemCreateDto request =
+        (de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemCreateDto) captor.getValue();
+    org.assertj.core.api.Assertions.assertThat(request.gameItemId()).isEqualTo(gameItemId);
+    org.assertj.core.api.Assertions.assertThat(request.materialId()).isNull();
+    org.assertj.core.api.Assertions.assertThat(request.quality()).isNull();
+    org.assertj.core.api.Assertions.assertThat(request.missionId()).isNull();
+    org.assertj.core.api.Assertions.assertThat(request.mergeStock()).isFalse();
+    org.assertj.core.api.Assertions.assertThat(request.missionAllocations()).isEmpty();
+  }
+
+  // covers REQ-INV-031 (catalog XOR: both references set -> 422 VALIDATION, no backend call)
+  @Test
+  @WithMockUser
+  void addInventoryItemAjax_bothCatalogReferences_returns422() throws Exception {
+    mockMvc
+        .perform(
+            post("/inventory/input")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("materialId", MATERIAL_ID.toString())
+                .param("gameItemId", UUID.randomUUID().toString())
+                .param("locationId", LOCATION_ID.toString())
+                .param("quality", "100")
+                .param("amount", "5")
+                .param("source", "my"))
+        .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.code").value("VALIDATION"));
+
+    verify(backendApiClient, never()).post(anyString(), any(), eq(InventoryItemDto.class));
+  }
+
+  // covers REQ-INV-031 (catalog XOR: neither reference set -> 422 VALIDATION, no backend call)
+  @Test
+  @WithMockUser
+  void addInventoryItemAjax_noCatalogReference_returns422() throws Exception {
+    mockMvc
+        .perform(
+            post("/inventory/input")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("locationId", LOCATION_ID.toString())
+                .param("amount", "5")
+                .param("source", "my"))
+        .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.code").value("VALIDATION"));
+
+    verify(backendApiClient, never()).post(anyString(), any(), eq(InventoryItemDto.class));
+  }
+
+  // covers REQ-INV-031 (material mode still requires a quality — the @NotNull moved into the
+  // cross-field rule so item mode can omit the field)
+  @Test
+  @WithMockUser
+  void addInventoryItemAjax_materialWithoutQuality_returns422() throws Exception {
+    mockMvc
+        .perform(
+            post("/inventory/input")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("materialId", MATERIAL_ID.toString())
+                .param("locationId", LOCATION_ID.toString())
+                .param("amount", "5")
+                .param("source", "my"))
+        .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.code").value("VALIDATION"));
+
+    verify(backendApiClient, never()).post(anyString(), any(), eq(InventoryItemDto.class));
+  }
+
   @Test
   @WithMockUser
   void addInventoryItemAjax_personalWithAssignment_returns422AndDoesNotCallBackend()

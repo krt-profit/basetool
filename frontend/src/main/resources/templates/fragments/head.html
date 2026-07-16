@@ -163,6 +163,15 @@
     -->
     <script th:src="@{/js/krt-user-search.js}" th:attr="nonce=${cspNonce}"></script>
     <!--
+      Shared server-side catalog-search source for the combobox (REQ-FE-016, design §6.6).
+      Registers the `remote-game-items` remoteSource on window.krtComboboxRemoteSources — the
+      bookable game-item picker of the Lager book-in form's item mode. Same ordering contract as
+      krt-user-search.js above: BEFORE the enhancer, no `defer`. (Comment wording note: several
+      MockMvc tests assert a member page does NOT contain the book-in action's literal German
+      label, and this fragment renders on every page — keep that label out of this comment.)
+    -->
+    <script th:src="@{/js/krt-catalog-search.js}" th:attr="nonce=${cspNonce}"></script>
+    <!--
       Searchable combobox enhancer (REQ-FE-011). Loaded globally and synchronously (no `defer`) so
       `window.krtSearchableSelect` exists before any inline page `<script>` that calls it (e.g. the
       orders item-search), and so its DOMContentLoaded / `krt:swapped` auto-initialiser upgrades
