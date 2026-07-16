@@ -21,6 +21,11 @@ package de.greluc.krt.profit.basetool.frontend.service;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -169,12 +174,14 @@ class BackendApiClientHappyPathTest {
   // ── getCached ───────────────────────────────────────────────────────────
   // The @Cacheable annotation is a no-op outside a Spring application
   // context, so the body executes normally — that's all we need to cover.
+  // Plain (single-fetch) paths use ORG_UNITS_ACTIVE, a Fetch.SINGLE catalogue;
+  // page-walked catalogues are covered by the dedicated section below.
 
   @Test
   void getCached_withClassResponseType_parsesBody() {
     server.enqueue(jsonOk("cached"));
 
-    String result = client.getCached(CachedCatalog.SQUADRONS, String.class);
+    String result = client.getCached(CachedCatalog.ORG_UNITS_ACTIVE, String.class);
 
     assertEquals("cached", result);
   }
@@ -183,7 +190,7 @@ class BackendApiClientHappyPathTest {
   void getCached_withClassResponseType_andIsPublicTrue_usesPublicClient() throws Exception {
     server.enqueue(jsonOk("ok"));
 
-    client.getCached(CachedCatalog.SQUADRONS, String.class, true);
+    client.getCached(CachedCatalog.ORG_UNITS_ACTIVE, String.class, true);
 
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertEquals("public", req.getHeader("X-Auth"));
@@ -194,7 +201,7 @@ class BackendApiClientHappyPathTest {
     server.enqueue(jsonOk("[1,2,3]"));
 
     List<Integer> result =
-        client.getCached(CachedCatalog.SQUADRONS, new ParameterizedTypeReference<>() {});
+        client.getCached(CachedCatalog.ORG_UNITS_ACTIVE, new ParameterizedTypeReference<>() {});
 
     assertEquals(List.of(1, 2, 3), result);
   }
@@ -204,10 +211,125 @@ class BackendApiClientHappyPathTest {
     server.enqueue(jsonOk("[]"));
 
     client.getCached(
-        CachedCatalog.SQUADRONS, new ParameterizedTypeReference<List<Integer>>() {}, true);
+        CachedCatalog.ORG_UNITS_ACTIVE, new ParameterizedTypeReference<List<Integer>>() {}, true);
 
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertEquals("public", req.getHeader("X-Auth"));
+  }
+
+  // ── getCached page walk (REQ-ADMIN-003) ─────────────────────────────────
+
+  @Test
+  void getCached_pageWalkedCatalog_mergesAllPagesInOrder() throws Exception {
+    server.enqueue(jsonOk(pageJson(List.of("a", "b"), 0, 2, 3, 2)));
+    server.enqueue(jsonOk(pageJson(List.of("c"), 1, 2, 3, 2)));
+
+    PageResponse<String> result =
+        client.getCached(
+            CachedCatalog.SQUADRONS, new ParameterizedTypeReference<PageResponse<String>>() {});
+
+    assertEquals(List.of("a", "b", "c"), result.content());
+    assertEquals(3L, result.totalElements(), "the merged envelope keeps the backend total");
+    assertEquals(2, server.getRequestCount());
+    RecordedRequest first = server.takeRequest(1, TimeUnit.SECONDS);
+    RecordedRequest second = server.takeRequest(1, TimeUnit.SECONDS);
+    assertEquals("/api/v1/squadrons?size=1000&sort=name,asc&page=0", first.getPath());
+    assertEquals("/api/v1/squadrons?size=1000&sort=name,asc&page=1", second.getPath());
+  }
+
+  @Test
+  void getCached_pageWalkedCatalog_singlePage_makesExactlyOneRequest() {
+    server.enqueue(jsonOk(pageJson(List.of("only"), 0, 1000, 1, 1)));
+
+    PageResponse<String> result =
+        client.getCached(
+            CachedCatalog.SQUADRONS, new ParameterizedTypeReference<PageResponse<String>>() {});
+
+    assertEquals(List.of("only"), result.content());
+    assertEquals(1, server.getRequestCount(), "a one-chunk catalogue must cost one request");
+  }
+
+  @Test
+  void getCached_pageWalkedCatalog_andIsPublicTrue_usesPublicClient() throws Exception {
+    server.enqueue(jsonOk(pageJson(List.of("x"), 0, 1000, 1, 1)));
+
+    client.getCached(
+        CachedCatalog.SQUADRONS, new ParameterizedTypeReference<PageResponse<String>>() {}, true);
+
+    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+    assertEquals("public", req.getHeader("X-Auth"));
+  }
+
+  @Test
+  void getCached_pageWalkedCatalog_classOverload_isRejectedWithoutAnyRequest() {
+    IllegalArgumentException ex =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> client.getCached(CachedCatalog.SQUADRONS, String.class));
+
+    assertTrue(ex.getMessage().contains("SQUADRONS"));
+    assertEquals(0, server.getRequestCount(), "the guard must reject before any backend call");
+  }
+
+  @Test
+  void getCached_pageWalkedCatalog_capHit_stopsAndLogsWarning() {
+    // A backend reporting more pages than the safety cap: the walk must stop at
+    // MAX_CATALOG_PAGES and say so in the log (there is no banner surface for cached pulls).
+    for (int i = 0; i < CatalogPages.MAX_CATALOG_PAGES; i++) {
+      server.enqueue(jsonOk(pageJson(List.of("row" + i), i, 1, 1000, 1000)));
+    }
+    ch.qos.logback.classic.Logger logger =
+        (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(BackendApiClient.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    try {
+      PageResponse<String> result =
+          client.getCached(
+              CachedCatalog.SQUADRONS, new ParameterizedTypeReference<PageResponse<String>>() {});
+
+      assertEquals(CatalogPages.MAX_CATALOG_PAGES, result.content().size());
+      assertEquals(1000L, result.totalElements(), "the total must stay the backend's truth");
+      assertEquals(CatalogPages.MAX_CATALOG_PAGES, server.getRequestCount());
+      assertTrue(
+          appender.list.stream()
+              .anyMatch(
+                  event ->
+                      event.getLevel() == Level.WARN
+                          && event.getFormattedMessage().contains("safety cap")),
+          "hitting the cap must be loud in the log");
+    } finally {
+      logger.detachAppender(appender);
+    }
+  }
+
+  /**
+   * Builds the JSON of one backend {@code PageResponse} chunk for the page-walk tests.
+   *
+   * @param content the page's rows (JSON-encoded as plain strings)
+   * @param page the zero-based page index the backend reports
+   * @param size the page size the backend reports
+   * @param totalElements the total row count the backend reports
+   * @param totalPages the total page count the backend reports (drives the walk's continuation)
+   * @return the serialised page JSON
+   */
+  private static String pageJson(
+      List<String> content, int page, int size, long totalElements, int totalPages) {
+    String rows =
+        content.stream()
+            .map(s -> "\"" + s + "\"")
+            .collect(java.util.stream.Collectors.joining(","));
+    return "{\"content\":["
+        + rows
+        + "],\"page\":"
+        + page
+        + ",\"size\":"
+        + size
+        + ",\"totalElements\":"
+        + totalElements
+        + ",\"totalPages\":"
+        + totalPages
+        + ",\"sort\":[]}";
   }
 
   @Test
