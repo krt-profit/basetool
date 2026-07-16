@@ -24,6 +24,8 @@
 
 - **Lager: Der Umbuchen- und der Ausbuchen-Dialog werden wieder mittig im Fenster angezeigt statt am oberen Rand zu kleben.** Die Dialoge wurden per Inline-`display:block` geöffnet, was die zentrierende Flex-Ausrichtung von `.modal` überschrieb; sie öffnen jetzt mit `display:flex` (#1328).
 
+- **Lager: Das „Buchen in OrgUnit"-Dropdown im Umbuchen-Dialog wird jetzt wirklich angezeigt.** Die Einheiten-Abfrage lief gegen einen Backend-Pfad, den das Frontend nie beantwortet (404) — der Picker blieb dadurch immer verborgen, und ein Umbuchen auf einen Eigentümer mit mehreren Einheiten schlug fehl. Die Abfrage läuft jetzt wie beim Bank-Gegenpartei-Picker über den Frontend-Proxy (REQ-INV-007, #1328).
+
 ## [v1.4.5](https://github.com/krt-profit/basetool/releases/tag/v1.4.5) - 2026-07-15
 
 ### Fixed
