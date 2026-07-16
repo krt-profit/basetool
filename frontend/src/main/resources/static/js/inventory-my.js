@@ -752,8 +752,10 @@ function refreshUmbuchenTransferOrgUnitPicker() {
     }
     // #1328: ?allKinds=true surfaces the target user's Bereich/OL memberships too (not just
     // Staffel/SK — the endpoint default), mirroring the bank counterparty picker (REQ-BANK-044).
-    // The backend resolver already accepts a Bereich/OL owner.
-    fetch('/api/v1/users/' + encodeURIComponent(targetUserId) + '/memberships?allKinds=true', {
+    // The backend resolver already accepts a Bereich/OL owner. The fetch goes through the
+    // frontend's /users/{id}/memberships proxy (UserProxyController) — the frontend origin maps
+    // no /api/v1/users/** route, so the backend path 404s here and silently hides the picker.
+    fetch('/users/' + encodeURIComponent(targetUserId) + '/memberships?allKinds=true', {
         headers: { Accept: 'application/json' },
         credentials: 'same-origin',
     })
@@ -806,8 +808,9 @@ function refreshUmbuchenPersonalOrgUnitPicker(ownerId) {
     if (!ownerId) return;
     // #1328: ?allKinds=true so a Bereich/OL-member owner can de-personalize into their Bereich/OL
     // pool, not only Staffel/SK (the endpoint default). Mirrors the bank counterparty picker
-    // (REQ-BANK-044).
-    fetch('/api/v1/users/' + encodeURIComponent(ownerId) + '/memberships?allKinds=true', {
+    // (REQ-BANK-044). Fetched via the frontend's /users/{id}/memberships proxy — see the
+    // transfer picker above.
+    fetch('/users/' + encodeURIComponent(ownerId) + '/memberships?allKinds=true', {
         headers: { Accept: 'application/json' },
         credentials: 'same-origin',
     })
