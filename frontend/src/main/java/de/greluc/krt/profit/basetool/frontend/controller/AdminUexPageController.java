@@ -30,6 +30,8 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.TerminalDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
+import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
+import de.greluc.krt.profit.basetool.frontend.support.CatalogPages.CompleteCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -95,12 +97,16 @@ public class AdminUexPageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Loads cities, space stations, outposts, POIs and terminals (one paginated call each, capped at
-   * 10 000 rows like the previous flat pages) and groups them by star system. Terminals are
-   * bucketed onto their parent city or station by name within the same star system; any terminal
-   * that lacks a city/station match — typically free-floating orbital terminals — is collected into
-   * a per-system "orphans" list so it stays visible. Backend failures land as an error attribute
-   * rather than blanking the page.
+   * Loads the <em>complete</em> cities, space stations, outposts, POIs and terminals catalogues —
+   * walking every page instead of presenting one capped 10 000-row chunk as the whole list
+   * (REQ-ADMIN-001, ADR-0102) — and groups them by star system. Terminals are bucketed onto their
+   * parent city or station by name within the same star system; any terminal that lacks a
+   * city/station match — typically free-floating orbital terminals — is collected into a per-system
+   * "orphans" list so it stays visible. The summary-chip totals come from the backend-reported
+   * {@code totalElements}, not the fetched list sizes, so they stay truthful even if a page walk
+   * ever hits its safety cap — which additionally raises the {@code catalogTruncated} warning
+   * banner (REQ-ADMIN-002). Backend failures land as an error attribute rather than blanking the
+   * page.
    *
    * @param model Thymeleaf model populated with the sorted star-system tree, total counts and the
    *     most recent UEX sweep timestamp
@@ -109,14 +115,22 @@ public class AdminUexPageController {
   @GetMapping
   public String listData(Model model) {
     try {
-      List<CityDto> cities = parseCities(loadPage("/api/v1/cities?size=10000&sort=name,asc"));
-      List<SpaceStationDto> stations =
-          parseStations(loadPage("/api/v1/space-stations?size=10000&sort=name,asc"));
-      List<OutpostDto> outposts =
-          parseOutposts(loadPage("/api/v1/outposts?size=10000&sort=name,asc"));
-      List<PoiDto> pois = parsePois(loadPage("/api/v1/pois?size=10000&sort=name,asc"));
-      List<TerminalDto> terminals =
-          parseTerminals(loadPage("/api/v1/terminals?size=10000&sort=name,asc"));
+      CompleteCatalog<Map<String, Object>> citiesCatalog =
+          loadCatalog("/api/v1/cities?size=10000&sort=name,asc");
+      CompleteCatalog<Map<String, Object>> stationsCatalog =
+          loadCatalog("/api/v1/space-stations?size=10000&sort=name,asc");
+      CompleteCatalog<Map<String, Object>> outpostsCatalog =
+          loadCatalog("/api/v1/outposts?size=10000&sort=name,asc");
+      CompleteCatalog<Map<String, Object>> poisCatalog =
+          loadCatalog("/api/v1/pois?size=10000&sort=name,asc");
+      CompleteCatalog<Map<String, Object>> terminalsCatalog =
+          loadCatalog("/api/v1/terminals?size=10000&sort=name,asc");
+
+      List<CityDto> cities = parseCities(citiesCatalog.items());
+      List<SpaceStationDto> stations = parseStations(stationsCatalog.items());
+      List<OutpostDto> outposts = parseOutposts(outpostsCatalog.items());
+      List<PoiDto> pois = parsePois(poisCatalog.items());
+      List<TerminalDto> terminals = parseTerminals(terminalsCatalog.items());
 
       List<StarSystemGroup> systems = buildHierarchy(cities, stations, outposts, pois, terminals);
 
@@ -129,11 +143,18 @@ public class AdminUexPageController {
 
       model.addAttribute("starSystems", systems);
       model.addAttribute("latestUexSync", latestSync);
-      model.addAttribute("totalCities", cities.size());
-      model.addAttribute("totalStations", stations.size());
-      model.addAttribute("totalOutposts", outposts.size());
-      model.addAttribute("totalPois", pois.size());
-      model.addAttribute("totalTerminals", terminals.size());
+      model.addAttribute("totalCities", citiesCatalog.totalElements());
+      model.addAttribute("totalStations", stationsCatalog.totalElements());
+      model.addAttribute("totalOutposts", outpostsCatalog.totalElements());
+      model.addAttribute("totalPois", poisCatalog.totalElements());
+      model.addAttribute("totalTerminals", terminalsCatalog.totalElements());
+      model.addAttribute(
+          "catalogTruncated",
+          citiesCatalog.truncated()
+              || stationsCatalog.truncated()
+              || outpostsCatalog.truncated()
+              || poisCatalog.truncated()
+              || terminalsCatalog.truncated());
     } catch (BackendServiceException e) {
       log.debug("Error loading UEX admin data", e);
       model.addAttribute("error", "error.admin.uex.load");
@@ -536,13 +557,22 @@ public class AdminUexPageController {
     return List.copyOf(result);
   }
 
-  private PageResponse<Map<String, Object>> loadPage(String uri) {
-    return backendApiClient.get(uri, MAP_PAGE_TYPE);
+  /**
+   * Walks every page of one UEX-entity resource into a complete catalogue (REQ-ADMIN-001,
+   * ADR-0102). The zero-based page index is appended to the given query string, which already
+   * carries {@code size} and {@code sort}.
+   *
+   * @param resource backend path plus query string, without a {@code page} parameter
+   * @return the assembled catalogue of raw {@code Map} rows; never {@code null}
+   */
+  private CompleteCatalog<Map<String, Object>> loadCatalog(String resource) {
+    return CatalogPages.fetchAll(
+        page -> backendApiClient.get(resource + "&page=" + page, MAP_PAGE_TYPE));
   }
 
-  private List<CityDto> parseCities(PageResponse<Map<String, Object>> page) {
+  private List<CityDto> parseCities(List<Map<String, Object>> rows) {
     return parseAndSort(
-        page,
+        rows,
         m ->
             new CityDto(
                 parseUuid(m.get("id")),
@@ -554,9 +584,9 @@ public class AdminUexPageController {
         CityDto::name);
   }
 
-  private List<SpaceStationDto> parseStations(PageResponse<Map<String, Object>> page) {
+  private List<SpaceStationDto> parseStations(List<Map<String, Object>> rows) {
     return parseAndSort(
-        page,
+        rows,
         m ->
             new SpaceStationDto(
                 parseUuid(m.get("id")),
@@ -568,9 +598,9 @@ public class AdminUexPageController {
         SpaceStationDto::name);
   }
 
-  private List<OutpostDto> parseOutposts(PageResponse<Map<String, Object>> page) {
+  private List<OutpostDto> parseOutposts(List<Map<String, Object>> rows) {
     return parseAndSort(
-        page,
+        rows,
         m ->
             new OutpostDto(
                 parseUuid(m.get("id")),
@@ -582,9 +612,9 @@ public class AdminUexPageController {
         OutpostDto::name);
   }
 
-  private List<PoiDto> parsePois(PageResponse<Map<String, Object>> page) {
+  private List<PoiDto> parsePois(List<Map<String, Object>> rows) {
     return parseAndSort(
-        page,
+        rows,
         m ->
             new PoiDto(
                 parseUuid(m.get("id")),
@@ -596,9 +626,9 @@ public class AdminUexPageController {
         PoiDto::name);
   }
 
-  private List<TerminalDto> parseTerminals(PageResponse<Map<String, Object>> page) {
+  private List<TerminalDto> parseTerminals(List<Map<String, Object>> rows) {
     return parseAndSort(
-        page,
+        rows,
         m ->
             new TerminalDto(
                 parseUuid(m.get("id")),
@@ -620,14 +650,10 @@ public class AdminUexPageController {
   }
 
   private <T> List<T> parseAndSort(
-      PageResponse<Map<String, Object>> page,
+      List<Map<String, Object>> rows,
       java.util.function.Function<Map<String, Object>, T> mapper,
       java.util.function.Function<T, String> nameAccessor) {
-    if (page == null || page.content() == null) {
-      return new ArrayList<>();
-    }
-    List<T> list =
-        page.content().stream().map(mapper).collect(Collectors.toCollection(ArrayList::new));
+    List<T> list = rows.stream().map(mapper).collect(Collectors.toCollection(ArrayList::new));
     list.sort(
         Comparator.comparing(
             t -> {

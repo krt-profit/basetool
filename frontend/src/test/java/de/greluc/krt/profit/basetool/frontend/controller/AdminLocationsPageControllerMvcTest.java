@@ -95,7 +95,8 @@ class AdminLocationsPageControllerMvcTest {
         new PageResponse<>(List.of(location), 0, 1000, 1, 1, Collections.emptyList());
 
     when(backendApiClient.get(
-            eq("/api/v1/locations?size=1000&sort=name,asc&includeHidden=true"), anyTypeRef()))
+            eq("/api/v1/locations?size=1000&sort=name,asc&includeHidden=true&page=0"),
+            anyTypeRef()))
         .thenReturn(page);
 
     mockMvc

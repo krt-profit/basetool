@@ -254,7 +254,10 @@ the source row's current flag, never from the client:
   direct memberships across **all four org-unit kinds** (Staffel + SK + Bereich + OL) via
   `GET /api/v1/users/{id}/memberships?allKinds=true`, mirroring the bank counterparty picker
   (REQ-BANK-044); the resolver already accepts a Bereich/OL pool (REQ-ORG-016), so a Bereich/OL-member
-  owner can book into their Bereich/OL pool, not only their Staffel/SK.
+  owner can book into their Bereich/OL pool, not only their Staffel/SK. The browser reaches that
+  endpoint through the frontend's `/users/{id}/memberships` proxy (`UserProxyController`, which
+  relays `allKinds`) — the frontend origin maps no `/api/v1/users/**` route, so a direct call to the
+  backend path 404s and silently hides the picker.
 - **shared → personal** (personalisieren): the moved quantity becomes the owner's private stock
   (`personal = true`), carrying the source row's existing `owningOrgUnit` over. A source row bound to
   a job order or mission is **refused** (HTTP 400) — a personal row may never carry either

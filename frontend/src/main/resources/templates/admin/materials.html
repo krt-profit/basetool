@@ -109,6 +109,10 @@
         <h1 th:text="#{admin.materials.title}">Materialien verwalten</h1>
     </div>
 
+    <th:block th:if="${catalogTruncated}">
+        <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', 'mt-2')}"></div>
+    </th:block>
+
     <div class="hud-box mt-2">
         <div class="data-section">
             <h2 th:text="#{admin.materials.categories.title}">Kategorien verwalten</h2>

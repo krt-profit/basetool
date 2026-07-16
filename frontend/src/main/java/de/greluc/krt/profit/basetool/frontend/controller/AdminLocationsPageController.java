@@ -26,6 +26,8 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
+import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
+import de.greluc.krt.profit.basetool.frontend.support.CatalogPages.CompleteCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -69,9 +71,11 @@ public class AdminLocationsPageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Fetches all locations (one page of size 1000, including hidden), sorts case-insensitively by
-   * name and renders the table. A backend failure puts an error key in the model rather than
-   * blanking the page.
+   * Fetches <em>all</em> locations — every page, including hidden entries — sorts them
+   * case-insensitively by name and renders the table (REQ-ADMIN-001, ADR-0102). A backend failure
+   * puts an error key in the model rather than blanking the page; a page walk that hits its safety
+   * cap sets {@code catalogTruncated} so the template shows a loud warning banner instead of
+   * silently presenting a partial list (REQ-ADMIN-002).
    *
    * @param model Thymeleaf model populated with the sorted location list
    * @return the {@code admin/locations} view name
@@ -79,18 +83,19 @@ public class AdminLocationsPageController {
   @GetMapping
   public String listData(Model model) {
     try {
-      PageResponse<LocationDto> locationsPage =
-          backendApiClient.get(
-              "/api/v1/locations?size=1000&sort=name,asc&includeHidden=true", LOCATION_PAGE);
+      CompleteCatalog<LocationDto> locationsCatalog =
+          CatalogPages.fetchAll(
+              page ->
+                  backendApiClient.get(
+                      "/api/v1/locations?size=1000&sort=name,asc&includeHidden=true&page=" + page,
+                      LOCATION_PAGE));
 
-      List<LocationDto> locations = new ArrayList<>();
-      if (locationsPage != null && locationsPage.content() != null) {
-        locations = new ArrayList<>(locationsPage.content());
-        locations.sort(
-            Comparator.comparing(
-                l -> l.name() == null ? "" : l.name(), String.CASE_INSENSITIVE_ORDER));
-      }
+      List<LocationDto> locations = new ArrayList<>(locationsCatalog.items());
+      locations.sort(
+          Comparator.comparing(
+              l -> l.name() == null ? "" : l.name(), String.CASE_INSENSITIVE_ORDER));
       model.addAttribute("locations", locations);
+      model.addAttribute("catalogTruncated", locationsCatalog.truncated());
 
     } catch (BackendServiceException e) {
       log.debug("Error loading locations data", e);

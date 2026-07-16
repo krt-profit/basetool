@@ -735,8 +735,10 @@ function refreshUmbuchenTransferOrgUnitPicker() {
     // org-unit kinds — Staffel + SK + Bereich + OL — via ?allKinds=true (mirrors the bank
     // counterparty picker, REQ-BANK-044). The default (allKinds=false) returns only Staffel/SK, so
     // a Bereich/OL-member target could not be booked into their Bereich/OL pool even though the
-    // backend resolver (resolveOrgUnitForPickerOutputNullable) accepts it.
-    fetch('/api/v1/users/' + encodeURIComponent(targetUserId) + '/memberships?allKinds=true', {
+    // backend resolver (resolveOrgUnitForPickerOutputNullable) accepts it. The fetch goes through
+    // the frontend's /users/{id}/memberships proxy (UserProxyController) — the frontend origin
+    // maps no /api/v1/users/** route, so the backend path 404s here and silently hides the picker.
+    fetch('/users/' + encodeURIComponent(targetUserId) + '/memberships?allKinds=true', {
         headers: { Accept: 'application/json' },
         credentials: 'same-origin',
     })

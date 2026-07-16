@@ -75,6 +75,11 @@
              rows survive with no re-init. The toggle is JS-driven (it was already JS-only). -->
         <div class="box-content" id="sc-results">
             <th:block th:fragment="results">
+            <!-- Inside the swapped fragment on purpose: the include-inactive AJAX swap must
+                 re-evaluate the truncation warning (REQ-ADMIN-002). -->
+            <th:block th:if="${catalogTruncated}">
+                <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', 'mb-1')}"></div>
+            </th:block>
             <div th:if="${specialCommands == null or #lists.isEmpty(specialCommands)}" class="krtm-color-var-color-gray-2-padding-1rem-0-5444" th:text="#{admin.specialcommands.empty}">
                 Noch keine Spezialkommandos angelegt.
             </div>
