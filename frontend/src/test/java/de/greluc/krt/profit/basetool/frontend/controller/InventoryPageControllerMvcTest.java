@@ -33,8 +33,9 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import de.greluc.krt.profit.basetool.frontend.controller.InventoryPageController.GroupedInventoryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.AggregatedInventoryDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.GroupedInventoryDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryStackDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderAllocationDto;
@@ -643,6 +644,7 @@ class InventoryPageControllerMvcTest {
     GroupedInventoryDto group =
         new GroupedInventoryDto(
             new MaterialReferenceDto(materialId, "Quantanium", "SCU"),
+            null,
             12.5,
             95.0,
             95,
@@ -703,7 +705,12 @@ class InventoryPageControllerMvcTest {
             1);
     GroupedInventoryDto group =
         new GroupedInventoryDto(
-            new MaterialReferenceDto(materialId, "Laranite", "SCU"), 7.0, 80.0, 80, List.of(stack));
+            new MaterialReferenceDto(materialId, "Laranite", "SCU"),
+            null,
+            7.0,
+            80.0,
+            80,
+            List.of(stack));
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenAnswer(
@@ -770,5 +777,375 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString("data-trigger=\"inv-input-add-order\"")))
         .andExpect(content().string(containsString("data-trigger=\"inv-input-add-mission\"")))
         .andExpect(content().string(containsString("id=\"jobOrderRowTemplate\"")));
+  }
+
+  /** Builds the game-item reference used across the item-view render tests. */
+  private static InventoryGameItemReferenceDto sampleGameItem(UUID gameItemId) {
+    return new InventoryGameItemReferenceDto(
+        gameItemId, "Quantum Drive XL-1", "RSI", "VEHICLE_ITEM");
+  }
+
+  // covers REQ-INV-030: the three Lager pages carry the Material <-> Items view switch as
+  // server-rendered .tab-nav navigation links (view=items query parameter, no client toggling).
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewMyInventory_rendersMaterialItemsViewSwitch() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/my"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-testid=\"lager-view-material\"")))
+        .andExpect(content().string(containsString("data-testid=\"lager-view-items\"")))
+        .andExpect(content().string(containsString("/inventory/my?view=items")));
+  }
+
+  /**
+   * Item-view render guard for the personal Lager (REQ-INV-030): {@code /inventory/my?view=items}
+   * renders the game-item tree — group row with the gameItem name, kind badge and manufacturer, the
+   * gameItemId stack key and a whole-unit amount — with no quality gauge and no mission filter,
+   * while the item filters (gameItem multi-select fed only from stocked items, job orders, personal
+   * flags) replace the material filter bar.
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER", username = "test-user-123")
+  void viewMyInventory_itemsView_rendersItemTreeWithoutQuality() throws Exception {
+    UUID gameItemId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    InventoryStackDto stack =
+        new InventoryStackDto(
+            new UserReferenceDto(userId, "tester", "Tester", "Tester", null),
+            new LocationReferenceDto(locationId, "ARC-L1"),
+            null,
+            false,
+            null,
+            3.0,
+            null,
+            null,
+            2);
+    GroupedInventoryDto group =
+        new GroupedInventoryDto(null, sampleGameItem(gameItemId), 3.0, null, null, List.of(stack));
+
+    when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenAnswer(
+            inv -> {
+              String url = inv.getArgument(0);
+              if (url.contains("/inventory/my-inventory/grouped") && url.contains("catalog=ITEM")) {
+                return List.of(group);
+              }
+              return Collections.emptyList();
+            });
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/my").param("view", "items"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("inventory-my"))
+        // covers REQ-INV-030: item tree renders the gameItem group with its stack key.
+        .andExpect(content().string(containsString("Quantum Drive XL-1")))
+        .andExpect(content().string(containsString("RSI")))
+        .andExpect(content().string(containsString("data-game-item-id=\"" + gameItemId + "\"")))
+        .andExpect(content().string(containsString("lager-items-tree")))
+        // No quality column in the item view: neither the gauge nor the min-quality filter.
+        .andExpect(content().string(not(containsString("tree-gauge"))))
+        .andExpect(content().string(not(containsString("id=\"minQuality\""))))
+        // Item filters present: stocked-items multi-select + job orders + personal flags;
+        // the mission filter does not exist for item rows.
+        .andExpect(content().string(containsString("id=\"gameItemFilterContainer\"")))
+        .andExpect(content().string(containsString("id=\"itemJobOrderFilterContainer\"")))
+        .andExpect(content().string(containsString("id=\"itemPersonalOnly\"")))
+        .andExpect(content().string(not(containsString("id=\"missionFilterContainer\""))))
+        // Whole-unit amount ("Stück"), never a three-decimal SCU rendering.
+        .andExpect(content().string(not(containsString("3.000"))));
+  }
+
+  /**
+   * Item-view render guard for the squadron-wide Lager (REQ-INV-030): {@code
+   * /inventory/all?view=items} renders the game-item tree with the per-owner stack key (userId in
+   * addition to gameItemId) and the item filter bar, without quality or mission dimensions.
+   */
+  @Test
+  @WithMockUser(roles = "LOGISTICIAN", username = "logi-user")
+  void viewAllInventory_itemsView_rendersItemTreeWithoutQuality() throws Exception {
+    UUID gameItemId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    InventoryStackDto stack =
+        new InventoryStackDto(
+            new UserReferenceDto(userId, "owner", "Owner", "Logi Owner", null),
+            new LocationReferenceDto(locationId, "Everus Harbor Storage"),
+            null,
+            false,
+            null,
+            5.0,
+            null,
+            null,
+            1);
+    GroupedInventoryDto group =
+        new GroupedInventoryDto(null, sampleGameItem(gameItemId), 5.0, null, null, List.of(stack));
+
+    when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenAnswer(
+            inv -> {
+              String url = inv.getArgument(0);
+              if (url.contains("/inventory/all/grouped") && url.contains("catalog=ITEM")) {
+                return List.of(group);
+              }
+              return Collections.emptyList();
+            });
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/all").param("view", "items"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("inventory-admin"))
+        .andExpect(content().string(containsString("Quantum Drive XL-1")))
+        .andExpect(content().string(containsString("data-game-item-id=\"" + gameItemId + "\"")))
+        .andExpect(content().string(containsString("data-user-id=\"" + userId + "\"")))
+        .andExpect(content().string(containsString("lager-items-tree")))
+        .andExpect(content().string(not(containsString("tree-gauge"))))
+        .andExpect(content().string(not(containsString("id=\"minQuality\""))))
+        .andExpect(content().string(containsString("id=\"gameItemFilterContainer\"")))
+        .andExpect(content().string(not(containsString("id=\"missionFilterContainer\""))));
+  }
+
+  /**
+   * Item-view render guard for the aggregated overview (REQ-INV-030): {@code /inventory?view=items}
+   * renders per-item totals — name, manufacturer, localized kind, whole amount — without the
+   * material view's quality columns, and its rows navigate to the org-wide item tree pre-filtered
+   * to the clicked gameItem.
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewAggregatedInventory_itemsView_rendersItemColumnsWithoutQuality() throws Exception {
+    UUID gameItemId = UUID.randomUUID();
+    AggregatedInventoryDto row =
+        new AggregatedInventoryDto(null, sampleGameItem(gameItemId), null, null, 7.0);
+    PageResponse<AggregatedInventoryDto> page =
+        new PageResponse<>(List.of(row), 0, 10, 1, 1, Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory").param("view", "items"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("inventory-index"))
+        .andExpect(content().string(containsString("Quantum Drive XL-1")))
+        .andExpect(content().string(containsString("RSI")))
+        // Row click navigates into the org-wide item tree filtered to this gameItem.
+        .andExpect(
+            content()
+                .string(containsString("/inventory/all?view=items&amp;gameItemIds=" + gameItemId)))
+        // No quality columns in the item variant of the aggregated table.
+        .andExpect(content().string(not(containsString("Max. Qualit"))));
+  }
+
+  /**
+   * Drilldown render guard (REQ-INV-030): {@code /inventory/game-item/{gameItemId}} renders the
+   * per-item stock rows (owner, location, whole amount) with the item's display name resolved from
+   * the rows, no quality column and — deliberately — no navigate catalog picker (the item catalog
+   * is thousands of entries; the remote picker ships with the Einbuchen pass).
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewGameItemInventory_rendersDrilldownWithoutNavigatePicker() throws Exception {
+    UUID gameItemId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    InventoryItemDto item =
+        new InventoryItemDto(
+            UUID.randomUUID(),
+            new UserReferenceDto(userId, "tester", "Tester", "Item Owner", null),
+            null,
+            sampleGameItem(gameItemId),
+            new LocationReferenceDto(locationId, "Port Tressler"),
+            null,
+            4.0,
+            false,
+            java.util.List.of(),
+            null,
+            java.util.List.of(),
+            null,
+            null,
+            null,
+            1L,
+            Instant.parse("2026-03-01T00:00:00Z"));
+    PageResponse<InventoryItemDto> page =
+        new PageResponse<>(List.of(item), 0, 1000, 1, 1, Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/game-item/" + gameItemId))
+        .andExpect(status().isOk())
+        .andExpect(view().name("inventory-game-item"))
+        .andExpect(content().string(containsString("Quantum Drive XL-1")))
+        .andExpect(content().string(containsString("Item Owner")))
+        .andExpect(content().string(containsString("Port Tressler")))
+        .andExpect(content().string(containsString("id=\"inventory-game-item-results\"")))
+        .andExpect(content().string(containsString("/js/inventory-game-item.js")))
+        .andExpect(content().string(not(containsString("id=\"materialSelect\""))))
+        .andExpect(content().string(not(containsString("4.000"))));
+  }
+
+  /**
+   * Item stack-entries fragment guard (REQ-INV-030/031): the lazy {@code
+   * /inventory/my/game-item-stack/entries} drill-down renders the game-item leaf row — whole-unit
+   * amount, PIECE-typed action buttons, no mission split, no Materialbörse toggle — and its "+
+   * Zuordnen" picker offers only ITEM orders whose lines request the entry's gameItem
+   * (requiredGameItemIds), never unrelated orders.
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER", username = "test-user-123")
+  void viewMyGameItemStackEntries_rendersItemLeafWithoutMissionSplit() throws Exception {
+    UUID itemId = UUID.randomUUID();
+    UUID gameItemId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    UUID matchingOrderId = UUID.randomUUID();
+    UUID unrelatedOrderId = UUID.randomUUID();
+
+    InventoryItemDto entry =
+        new InventoryItemDto(
+            itemId,
+            new UserReferenceDto(userId, "tester", "Tester", "Tester", null),
+            null,
+            sampleGameItem(gameItemId),
+            new LocationReferenceDto(locationId, "ARC-L1"),
+            null,
+            2.0,
+            false,
+            java.util.List.of(),
+            2.0,
+            java.util.List.of(),
+            null,
+            null,
+            null,
+            1L,
+            Instant.parse("2026-03-01T00:00:00Z"));
+    JobOrderReferenceDto matching =
+        new JobOrderReferenceDto(
+            matchingOrderId,
+            71,
+            "h1",
+            "IN_PROGRESS",
+            null,
+            List.of(),
+            List.of(),
+            List.of(gameItemId));
+    JobOrderReferenceDto unrelated =
+        new JobOrderReferenceDto(
+            unrelatedOrderId,
+            99,
+            "h2",
+            "IN_PROGRESS",
+            null,
+            List.of(),
+            List.of(),
+            List.of(UUID.randomUUID()));
+
+    when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenAnswer(
+            inv -> {
+              String url = inv.getArgument(0);
+              if (url.contains("/inventory/my-inventory/stack/entries")
+                  && url.contains("catalog=ITEM")
+                  && url.contains("gameItemId=" + gameItemId)) {
+                return new PageResponse<>(List.of(entry), 0, 20, 1, 1, Collections.emptyList());
+              }
+              if (url.contains("/orders/lookup")) {
+                return List.of(matching, unrelated);
+              }
+              return Collections.emptyList();
+            });
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(
+            get("/inventory/my/game-item-stack/entries")
+                .param("gameItemId", gameItemId.toString())
+                .param("locationId", locationId.toString())
+                .param("personal", "false"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-item-id=\"" + itemId + "\"")))
+        // No mission dimension on item rows (REQ-INV-031) and no Börse toggle (design §8).
+        .andExpect(content().string(not(containsString("data-assoc-field=\"MISSION\""))))
+        .andExpect(content().string(not(containsString("inv-boerse-toggle"))))
+        // PIECE-typed action buttons keyed on the gameItem, no materialId.
+        .andExpect(content().string(containsString("data-quantity-type=\"PIECE\"")))
+        .andExpect(content().string(containsString("data-game-item-id=\"" + gameItemId + "\"")))
+        .andExpect(content().string(not(containsString("data-material-id"))))
+        // Order picker gate: only the order requesting this gameItem is offered.
+        .andExpect(content().string(containsString("value=\"" + matchingOrderId + "\"")))
+        .andExpect(content().string(not(containsString("value=\"" + unrelatedOrderId + "\""))));
+  }
+
+  /**
+   * Admin variant of the item stack-entries fragment (REQ-INV-030): {@code
+   * /inventory/all/game-item-stack/entries} addresses the per-owner stack by gameItemId + userId
+   * and renders the same quality-less, mission-less item leaf with the admin trigger set.
+   */
+  @Test
+  @WithMockUser(roles = "LOGISTICIAN", username = "logi-user")
+  void viewAllGameItemStackEntries_rendersItemLeaf() throws Exception {
+    UUID itemId = UUID.randomUUID();
+    UUID gameItemId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+
+    InventoryItemDto entry =
+        new InventoryItemDto(
+            itemId,
+            new UserReferenceDto(userId, "tester", "Tester", "Tester", null),
+            null,
+            sampleGameItem(gameItemId),
+            new LocationReferenceDto(locationId, "ARC-L1"),
+            null,
+            2.0,
+            false,
+            java.util.List.of(),
+            2.0,
+            java.util.List.of(),
+            null,
+            null,
+            null,
+            1L,
+            Instant.parse("2026-03-01T00:00:00Z"));
+
+    when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenAnswer(
+            inv -> {
+              String url = inv.getArgument(0);
+              if (url.contains("/inventory/all/stack/entries")
+                  && url.contains("catalog=ITEM")
+                  && url.contains("gameItemId=" + gameItemId)
+                  && url.contains("userId=" + userId)) {
+                return new PageResponse<>(List.of(entry), 0, 20, 1, 1, Collections.emptyList());
+              }
+              return Collections.emptyList();
+            });
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(
+            get("/inventory/all/game-item-stack/entries")
+                .param("gameItemId", gameItemId.toString())
+                .param("userId", userId.toString())
+                .param("locationId", locationId.toString()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-item-id=\"" + itemId + "\"")))
+        .andExpect(content().string(not(containsString("data-assoc-field=\"MISSION\""))))
+        .andExpect(content().string(containsString("data-trigger=\"inv-admin-bookout\"")))
+        .andExpect(content().string(containsString("data-quantity-type=\"PIECE\"")))
+        .andExpect(content().string(not(containsString("data-material-id"))));
   }
 }

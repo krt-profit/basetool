@@ -68,7 +68,7 @@ class InventoryPageControllerTest {
         new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
-    String view = controller.viewAggregatedInventory(null, null, null, model);
+    String view = controller.viewAggregatedInventory(null, null, null, null, model);
 
     assertEquals("inventory-index", view);
     assertTrue(model.containsAttribute("aggregated"));
@@ -81,7 +81,7 @@ class InventoryPageControllerTest {
     when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenThrow(new RuntimeException("Backend error"));
 
-    String view = controller.viewAggregatedInventory(null, null, null, model);
+    String view = controller.viewAggregatedInventory(null, null, null, null, model);
 
     assertEquals("inventory-index", view);
     assertEquals("error.inventory.aggregate.load", model.getAttribute("error"));
@@ -96,7 +96,7 @@ class InventoryPageControllerTest {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
     // When
-    String view = controller.viewAggregatedInventory(null, null, "results", model);
+    String view = controller.viewAggregatedInventory(null, null, null, "results", model);
 
     // Then — only the results fragment is rendered, not the full page.
     assertEquals("inventory-index :: inventoryResults", view);
@@ -139,7 +139,8 @@ class InventoryPageControllerTest {
         new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
-    String view = controller.viewMyInventory(null, null, null, null, false, false, false, model);
+    String view =
+        controller.viewMyInventory(null, null, null, null, null, null, false, false, false, model);
 
     assertEquals("inventory-my", view);
     assertTrue(model.containsAttribute("items"));
@@ -159,7 +160,16 @@ class InventoryPageControllerTest {
     // When
     String view =
         controller.viewMyInventory(
-            List.of(materialId), 500, List.of(jobOrderId), null, false, false, false, model);
+            null,
+            List.of(materialId),
+            500,
+            List.of(jobOrderId),
+            null,
+            null,
+            false,
+            false,
+            false,
+            model);
 
     // Then
     assertEquals("inventory-my", view);
@@ -189,7 +199,8 @@ class InventoryPageControllerTest {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of());
 
     // When
-    String view = controller.viewMyInventory(null, null, null, null, true, false, false, model);
+    String view =
+        controller.viewMyInventory(null, null, null, null, null, null, true, false, false, model);
 
     // Then
     assertEquals("inventory-my", view);
@@ -214,7 +225,8 @@ class InventoryPageControllerTest {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of());
 
     // When
-    String view = controller.viewMyInventory(null, null, null, null, false, true, false, model);
+    String view =
+        controller.viewMyInventory(null, null, null, null, null, null, false, true, false, model);
 
     // Then
     assertEquals("inventory-my", view);
@@ -242,7 +254,8 @@ class InventoryPageControllerTest {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
     // When
-    String view = controller.viewMyInventory(null, null, null, null, false, false, true, model);
+    String view =
+        controller.viewMyInventory(null, null, null, null, null, null, false, false, true, model);
 
     // Then
     assertEquals("inventory-my :: inventoryTableFragment", view);
@@ -256,7 +269,8 @@ class InventoryPageControllerTest {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
     String view =
-        controller.viewAllInventory(List.of(UUID.randomUUID()), 100, null, null, false, model);
+        controller.viewAllInventory(
+            null, List.of(UUID.randomUUID()), 100, null, null, null, false, model);
 
     assertEquals("inventory-admin", view);
     assertTrue(model.containsAttribute("items"));

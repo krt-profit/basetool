@@ -967,20 +967,28 @@ this requirement exists to prevent, #1102). Covered topics and their section whi
 
 The `inventory` room is the squadron Lager (#1307/#1309): a single opaque `stock` section stands for
 "the inventory changed". **All** inventory views subscribe and re-pull their own fragment on a peer's
-write — the shared `/inventory/all` and personal `/inventory/my` grouped tables (`filterInventory` /
-`filterMyInventory`, including their lazily-loaded stack entries, so a collapsed stack re-fetches its
-chips on the next expand), the aggregated `/inventory` overview and the per-material
-`/inventory/material/{id}` drilldown (each `krtFetch.swap` its `?fragment=results` container). Every
-inventory write (allocation add/change/remove, book-out, transfer, personal-rebook, bulk-checkout,
-delete-all, note) broadcasts it, from whichever page made it. Because it is a global room but each
-viewer's fragment is owner- and org-unit-scoped, a cross-scope peer refresh (another squadron, or a
-personal-only change seen by a shared view) is a harmless no-op. The same inventory writes also
-cross-publish to the `order:{id}` room (the order material collection tracks the earmark roll-up) and
-the `materialboard` room (a stock-reducing write clamps an offer server-side), so those surfaces
-reflect inventory changes live too. The affected order ids are read off the entry's leaf chips before
-the write; the sole exception is the admin `DELETE /inventory/all` full wipe, which cannot enumerate
-them client-side — its board and inventory rooms are still poked, but an open order collection
-self-heals on the next interaction (an accepted limitation for that rare nuke).
+write — the shared `/inventory/all` and personal `/inventory/my` grouped tables in **both their
+Material and Items views** (REQ-INV-030: `filterInventory` / `filterMyInventory` rebuild the fragment
+URL from the page's own filter state *including the `view=` parameter*, so a peer's change re-renders
+whichever view is active; the lazily-loaded stack entries ride along, so a collapsed stack — material
+or game-item — re-fetches its chips on the next expand), the aggregated `/inventory` overview (both
+catalogs) and the per-catalog `/inventory/material/{id}` and `/inventory/game-item/{gameItemId}`
+drilldowns (each `krtFetch.swap` its `?fragment=results` container). No new section keys were added
+for the item views — the single `stock` seam covers both catalogs, so the three mirror points stay
+untouched. Every inventory write (allocation add/change/remove, book-out, transfer, personal-rebook,
+bulk-checkout, delete-all, note) broadcasts it, from whichever page made it. Because it is a global
+room but each viewer's fragment is owner- and org-unit-scoped, a cross-scope peer refresh (another
+squadron, or a personal-only change seen by a shared view) is a harmless no-op. The same inventory
+writes also cross-publish to the `order:{id}` room (the order material collection tracks the earmark
+roll-up) and the `materialboard` room (a stock-reducing write clamps an offer server-side), so those
+surfaces reflect inventory changes live too. The affected order ids are read off the entry's leaf
+chips before the write; the sole exception is the admin `DELETE /inventory/all` full wipe, which
+cannot enumerate them client-side — its board and inventory rooms are still poked, but an open order
+collection self-heals on the next interaction (an accepted limitation for that rare nuke). A further
+cross-publisher is planned: the production-booking modal on the order detail page will additionally
+poke `inventory`/`stock` when Herstellung starts booking produced item stock in (REQ-INV-032) — that
+publish ships with the follow-up pass that adds the production book-in section, not with the item
+views themselves.
 
 The standalone order **material-collection** page (`/orders/{id}/material-collection`) joins the same
 `order:{id}` room in its own right (#1309): its per-row delivered toggle and owner/location moves
