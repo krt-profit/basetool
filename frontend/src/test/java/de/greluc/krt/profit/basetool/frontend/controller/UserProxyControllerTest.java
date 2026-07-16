@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -93,6 +94,55 @@ class UserProxyControllerTest {
     assertNotNull(result);
     verify(backendApiClient)
         .get(eq("/api/v1/users/search-bank?query=query&size=1000&sort=username,asc"), anyTypeRef());
+  }
+
+  // The Umbuchen owner pickers (inventory-my.js / inventory-admin.js) and the bank counterparty
+  // picker (REQ-BANK-044) fetch this proxy with ?allKinds=true; the flag must reach the backend
+  // URI or the response silently narrows to Staffel/SK and a Bereich/OL owner disappears from the
+  // picker (#1328).
+  @Test
+  void userMemberships_ShouldForwardAllKindsTrueToBackend() {
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    UserProxyController controller = new UserProxyController(backendApiClient);
+    UUID id = UUID.fromString("00000000-0000-0000-0000-000000000044");
+    when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenReturn(List.of(Map.of("orgUnitId", "u1", "orgUnitName", "IRIDIUM")));
+
+    List<Map<String, Object>> result = controller.userMemberships(id, true);
+
+    assertNotNull(result);
+    verify(backendApiClient)
+        .get(eq("/api/v1/users/" + id + "/memberships?allKinds=true"), anyTypeRef());
+  }
+
+  // Without the opt-in flag the proxy forwards the backend default (Staffel/SK only) explicitly.
+  @Test
+  void userMemberships_ShouldForwardAllKindsFalseByDefault() {
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    UserProxyController controller = new UserProxyController(backendApiClient);
+    UUID id = UUID.fromString("00000000-0000-0000-0000-000000000045");
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of());
+
+    List<Map<String, Object>> result = controller.userMemberships(id, false);
+
+    assertNotNull(result);
+    verify(backendApiClient)
+        .get(eq("/api/v1/users/" + id + "/memberships?allKinds=false"), anyTypeRef());
+  }
+
+  // A null backend payload degrades to an empty list so the dependent picker hides instead of the
+  // page script blowing up on a null iteration.
+  @Test
+  void userMemberships_ShouldReturnEmptyListOnNullBackendResponse() {
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    UserProxyController controller = new UserProxyController(backendApiClient);
+    UUID id = UUID.fromString("00000000-0000-0000-0000-000000000046");
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+
+    List<Map<String, Object>> result = controller.userMemberships(id, true);
+
+    assertNotNull(result);
+    assertTrue(result.isEmpty());
   }
 
   // #1193: the single-user lookup backs the remote-users combobox edit-mode seed (resolve a stored

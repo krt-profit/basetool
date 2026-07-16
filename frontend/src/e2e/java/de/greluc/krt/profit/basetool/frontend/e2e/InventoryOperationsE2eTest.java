@@ -316,7 +316,10 @@ class InventoryOperationsE2eTest {
    * <em>Umbuchen.</em> Transfers 30 of a 100-SCU row to a different location (same user) through
    * the dedicated Umbuchen modal's LOCATION mode (#868 moved the transfer out of the Ausbuchen
    * dialog). The append-only model leaves 70 at the source and inserts a fresh 30 at the
-   * destination, so the material now spans two owned stacks.
+   * destination, so the material now spans two owned stacks. Also asserts the owner org-unit picker
+   * renders preset to the row's owning unit (REQ-INV-007, #1328): its membership fetch must go
+   * through the frontend's {@code /users/{id}/memberships} proxy — the former direct {@code
+   * /api/v1/users/…} browser call had no frontend route, 404ed, and silently hid the picker.
    */
   @Test
   void umbuchenTransfersStockToAnotherLocation() {
@@ -324,6 +327,12 @@ class InventoryOperationsE2eTest {
         "inventory-umbuchen",
         page -> {
           openUmbuchenModal(page, transferMatId, transferItemId);
+          // #1328/REQ-INV-007: the "Buchen in OrgUnit" picker must render for an owner with at
+          // least one membership (test-admin is seeded into IRIDIUM) and be preset to the row's
+          // current owning org unit. It populates from an async membership fetch, so rely on the
+          // assertion's auto-wait.
+          assertThat(page.locator("#umbuchenTargetOwningOrgUnitWrapper")).isVisible();
+          assertThat(page.locator("#umbuchenTargetOwningOrgUnitId")).hasValue(IRIDIUM_ID);
           // LOCATION mode is the Umbuchen modal's default; pick a destination distinct from source.
           String destinationLocationId = selectDifferentUmbuchenLocation(page, opsHubLocId);
           page.locator("#umbuchenAmount").fill("30");
