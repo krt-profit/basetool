@@ -1167,6 +1167,22 @@ public class InventoryItemService {
   }
 
   /**
+   * Returns the game-item stock earmarked to the given job order, grouped per game item for the
+   * order-detail Item-Bestand panel (REQ-ORDERS-028). Delegates to {@link
+   * InventoryAggregationService#getItemStockForJobOrder}.
+   *
+   * @param jobOrderId the UUID of the job order
+   * @return name-sorted list of {@link
+   *     de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemStockGroupDto}; empty when no
+   *     game-item stock is earmarked to the order
+   * @throws NotFoundException when the job order is unknown
+   */
+  public List<de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemStockGroupDto>
+      getItemStockForJobOrder(UUID jobOrderId) {
+    return inventoryAggregationService.getItemStockForJobOrder(jobOrderId);
+  }
+
+  /**
    * Updates the delivered status of an inventory item. Delegates to {@link
    * InventoryCheckoutService#updateDelivered}.
    *

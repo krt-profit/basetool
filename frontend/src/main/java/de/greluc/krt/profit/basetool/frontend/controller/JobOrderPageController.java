@@ -126,6 +126,15 @@ public class JobOrderPageController {
       new ParameterizedTypeReference<List<InventoryItemDto>>() {};
 
   /**
+   * Response type for the order-detail Item-Bestand panel ({@code GET
+   * /api/v1/orders/{id}/item-stock}, REQ-ORDERS-028) — the game-item stock earmarked to the order,
+   * grouped per game item.
+   */
+  private static final ParameterizedTypeReference<
+          List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemStockGroupDto>>
+      LIST_OF_ITEM_STOCK_GROUP = new ParameterizedTypeReference<>() {};
+
+  /**
    * Response type for the item-order blueprint picker ({@code GET
    * /api/v1/orders/item-catalog/{gameItemId}/blueprints}).
    */
@@ -557,6 +566,24 @@ public class JobOrderPageController {
         }
       }
 
+      // Item-Bestand panel (REQ-ORDERS-028): the game-item stock earmarked to this order, grouped
+      // per game item — the item sibling of the Materialsammlung, rendered on the "Bestellte
+      // Items" tab. Only an ITEM order renders the panel and the requester view omits it
+      // (mirroring the aggregated pane), so the fetch is scoped to the full page and the panel's
+      // own `item-stock` section swap; isolated so a failure degrades to the panel's empty state.
+      if ("ITEM".equals(order.type())
+          && !requesterView
+          && (fragment == null || "item-stock".equalsIgnoreCase(fragment))) {
+        try {
+          model.addAttribute(
+              "itemStock",
+              backendApiClient.get(
+                  "/api/v1/orders/" + id + "/item-stock", LIST_OF_ITEM_STOCK_GROUP));
+        } catch (Exception e) {
+          log.debug("Item stock unavailable for order {}: {}", id, e.getMessage());
+        }
+      }
+
       // Orphaned linked inventory (REQ-ORDERS-019): inventory linked to this order whose material
       // the order does not require — invisible in the material tables, surfaced as a warning so a
       // logistician can undo a mis-assignment. Only needed on the full page (not the in-place
@@ -591,6 +618,7 @@ public class JobOrderPageController {
         case "kpi" -> "orders-detail :: kpiSection";
         case "handovers" -> "orders-detail :: materialHandoverSection";
         case "items" -> "orders-detail :: itemsSection";
+        case "item-stock" -> "orders-detail :: itemStockSection";
         case "item-handovers" -> "orders-detail :: itemHandoverSection";
         case "item-handover-lines" -> "orders-detail :: itemHandoverLines";
         case "blueprint-owners" -> "orders-detail :: blueprintOwnersSection";

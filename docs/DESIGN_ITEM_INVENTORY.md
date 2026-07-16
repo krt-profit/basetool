@@ -727,7 +727,10 @@ the core feature stays forward-compatible:
    per-line earmarked item stock on the order detail page, analogous to the
    Materialsammlung — with its **own** item projection (the §4.4 material-only guards on
    the Materialsammlung seams stay), fragment + live-sync section keys per the
-   three-mirror rule. `FE`/`INV`/`ORDERS`/`UI`, `e2e`.
+   three-mirror rule. `FE`/`INV`/`ORDERS`/`UI`, `e2e`. **Shipped** as REQ-ORDERS-028
+   ([`orders-item-production.md`](specs/orders-item-production.md)) — endpoint
+   `GET /api/v1/orders/{id}/item-stock`, `itemStockSection` fragment, `order:{id}`
+   section key `item-stock`.
 5. **Phase 5 — Materialbörse stock-backed item offers** (§8): **directly after PR 3/4 as
    part of the same epic** (owner decision 2026-07-16 — not backlogged), including the
    kind-aware `updateOffer` fix. `MARKET`/`INV`.

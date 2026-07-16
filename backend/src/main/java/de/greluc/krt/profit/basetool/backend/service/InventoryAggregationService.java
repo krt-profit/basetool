@@ -25,11 +25,14 @@ import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
+import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryStackDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemStockEntryDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCollectionEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.projection.InventoryItemStackAggregate;
 import de.greluc.krt.profit.basetool.backend.model.projection.InventoryStackAggregate;
@@ -57,9 +60,11 @@ import org.springframework.transaction.annotation.Transactional;
  * Material→Stack roll-up ({@link #getMyAggregatedInventory} / {@link #getAllAggregatedInventory}
  * over the SQL-computed {@link InventoryStackAggregate} rows), the lazy per-stack drilldowns
  * ({@link #getMyStackEntries} / {@link #getAllStackEntries}), the flat and per-material listings,
- * the craftability stock slices ({@link #getOwnedStockSlices}) and the job-order material
- * collection ({@link #getMaterialCollection}). {@code InventoryItemService} keeps the identical
- * public method signatures and delegates to this service, so controllers and callers are unchanged.
+ * the craftability stock slices ({@link #getOwnedStockSlices}), the job-order material collection
+ * ({@link #getMaterialCollection}) and its game-item sibling, the per-order earmarked item stock
+ * ({@link #getItemStockForJobOrder}, REQ-ORDERS-028). {@code InventoryItemService} keeps the
+ * identical public method signatures and delegates to this service, so controllers and callers are
+ * unchanged.
  *
  * <p>Every method is a pure read — the class is {@code @Transactional(readOnly = true)} and holds
  * no write repositories. Multi-org-unit scoping goes through {@code OwnerScopeService.currentScope
@@ -904,6 +909,105 @@ public class InventoryAggregationService {
                   delivered);
             })
         .toList();
+  }
+
+  /**
+   * Returns the game-item stock earmarked to the given job order, grouped per {@code GameItem} for
+   * the order-detail Item-Bestand panel (REQ-ORDERS-028) — the item sibling of {@link
+   * #getMaterialCollection(UUID)}. Groups are sorted by game-item name (case-insensitive, id as
+   * tiebreaker); each group's entries keep the repository's owner/location display order. The
+   * per-group {@code orderedAmount} / {@code manufacturedAmount} context is summed from the order's
+   * own item lines requesting that game item (0 for an orphaned earmark whose order no longer
+   * requests it). Loads the rows through {@link
+   * InventoryItemRepository#findGameItemRowsByJobOrderIdOrdered(UUID)} (display associations
+   * entity-graphed) and reads each entry's this-order slice off the {@code @BatchSize}-batched
+   * allocation collection, mirroring the material collection — no per-row queries.
+   *
+   * @param jobOrderId the UUID of the job order
+   * @return name-sorted list of {@link JobOrderItemStockGroupDto}; empty when no game-item stock is
+   *     earmarked to the order
+   * @throws NotFoundException when the job order is unknown
+   */
+  public List<JobOrderItemStockGroupDto> getItemStockForJobOrder(UUID jobOrderId) {
+    JobOrder jobOrder =
+        jobOrderRepository
+            .findById(jobOrderId)
+            .orElseThrow(() -> new NotFoundException("Job order not found"));
+
+    // Per-gameItem ordered/manufactured context from the order's own item lines (REQ-ORDERS-025).
+    // getId() on the lazy GameItem proxy resolves from the FK without initialising it, so this
+    // walk issues no per-line catalogue queries; the set is empty for MATERIAL orders.
+    java.util.Map<UUID, int[]> lineTotals = new java.util.HashMap<>();
+    for (de.greluc.krt.profit.basetool.backend.model.JobOrderItem line : jobOrder.getItems()) {
+      if (line.getGameItem() == null) {
+        continue;
+      }
+      int[] totals = lineTotals.computeIfAbsent(line.getGameItem().getId(), k -> new int[2]);
+      totals[0] += line.getAmount() != null ? line.getAmount() : 0;
+      totals[1] += line.getManufacturedAmount() != null ? line.getManufacturedAmount() : 0;
+    }
+
+    // Group the earmarked rows per game item (keyed by id — entity identity is irrelevant here).
+    // The query sorts by owner/location/name, so within a group the entries already carry the
+    // display order; the LinkedHashMap only collects them.
+    java.util.Map<UUID, List<InventoryItem>> byGameItem = new java.util.LinkedHashMap<>();
+    for (InventoryItem row :
+        inventoryItemRepository.findGameItemRowsByJobOrderIdOrdered(jobOrderId)) {
+      byGameItem
+          .computeIfAbsent(row.getGameItem().getId(), k -> new java.util.ArrayList<>())
+          .add(row);
+    }
+
+    List<JobOrderItemStockGroupDto> groups = new java.util.ArrayList<>();
+    byGameItem.forEach(
+        (gameItemId, rows) -> {
+          GameItem gameItem = rows.get(0).getGameItem();
+          List<JobOrderItemStockEntryDto> entries = new java.util.ArrayList<>();
+          long allocatedTotal = 0L;
+          for (InventoryItem row : rows) {
+            String ownerName =
+                row.getUser().getDisplayName() != null
+                    ? row.getUser().getDisplayName()
+                    : row.getUser().getUsername();
+            // Variante C (REQ-INV-027): delivered and the order-relevant quantity are per-order —
+            // read this order's own slice (batched via @BatchSize), never the whole entry. Item
+            // rows hold whole units (REQ-INV-029), so the SCU-typed amounts round loss-free.
+            Optional<InventoryJobOrderAllocation> slice =
+                row.getJobOrderAllocations().stream()
+                    .filter(
+                        a -> a.getJobOrder() != null && jobOrderId.equals(a.getJobOrder().getId()))
+                    .findFirst();
+            long allocatedQuantity =
+                Math.round(
+                    slice.map(InventoryJobOrderAllocation::getAmount).orElse(row.getAmount()));
+            allocatedTotal += allocatedQuantity;
+            entries.add(
+                new JobOrderItemStockEntryDto(
+                    row.getId(),
+                    row.getVersion() != null ? row.getVersion() : 0L,
+                    ownerName,
+                    row.getUser().getId(),
+                    row.getLocation().getName(),
+                    row.getLocation().getId(),
+                    Math.round(row.getAmount()),
+                    allocatedQuantity,
+                    slice.map(a -> Boolean.TRUE.equals(a.getDelivered())).orElse(false)));
+          }
+          int[] totals = lineTotals.getOrDefault(gameItemId, new int[2]);
+          groups.add(
+              new JobOrderItemStockGroupDto(
+                  inventoryItemMapper.gameItemToReferenceDto(gameItem),
+                  totals[0],
+                  totals[1],
+                  allocatedTotal,
+                  entries));
+        });
+    groups.sort(
+        java.util.Comparator.<JobOrderItemStockGroupDto, String>comparing(
+                g -> g.gameItem() != null && g.gameItem().name() != null ? g.gameItem().name() : "",
+                String.CASE_INSENSITIVE_ORDER)
+            .thenComparing(g -> g.gameItem() != null ? String.valueOf(g.gameItem().id()) : ""));
+    return groups;
   }
 
   /**

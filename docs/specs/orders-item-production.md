@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-15.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-16.
 > **Owner area:** ORDERS/UI · **Related ADRs:** [ADR-0099](../adr/0099-job-order-item-production-booking.md),
 > [ADR-0101](../adr/0101-inventory-game-item-rows.md) (production book-in)
 
@@ -19,8 +19,10 @@ The same rework restructured the (by now long) order-detail page onto the missio
 KPI band above a `.tab-nav`, one `.tab-pane` per section, so a `MATERIAL` and an `ITEM` order each
 show only the tabs that apply to it.
 
-This spec governs both halves: the production-booking domain (`REQ-ORDERS-025`) and the tab/KPI
-presentation (`REQ-ORDERS-026`). The decision behind the booking flow is
+This spec governs both halves — the production-booking domain (`REQ-ORDERS-025`) and the tab/KPI
+presentation (`REQ-ORDERS-026`) — plus the order-detail **Item-Bestand panel** that surfaces the
+item stock earmarked to the order (`REQ-ORDERS-028`, the item sibling of the Materialsammlung).
+The decision behind the booking flow is
 [ADR-0099](../adr/0099-job-order-item-production-booking.md).
 
 ## Requirements
@@ -272,6 +274,82 @@ split; no separate production tab), `JobOrderListRenderTest`, `JobOrderPageContr
 booking flow + the produce-first hint) ·
 **Code:** `orders-detail.html` (`kpiSection` fragment, `.tab-nav` + `.tab-panes`), `orders-detail.js`
 (tab controller, `ORDER_SECTIONS` seam map), `JobOrderPageController` · **Issues:** #1182
+
+### REQ-ORDERS-028 — Order detail surfaces the earmarked item stock (Item-Bestand panel)
+
+An `ITEM` order's detail page MUST surface the **game-item stock earmarked to the order**
+([`inventory-items.md`](inventory-items.md) REQ-INV-029/031) — the item sibling of the material
+Materialsammlung — as an **Item-Bestand panel** on the *Bestellte Items* tab. The panel groups the
+order's linked game-item rows **per game item** (name-sorted): each group shows the item (name +
+manufacturer) and a context chip with the order's own progress — the whole-unit sum of the
+earmarked slices plus `manufacturedAmount`/`orderedAmount` from the order's matching lines
+(REQ-ORDERS-025; both `0` for an orphaned earmark, which REQ-ORDERS-019 keeps flagging on the
+*Verknüpft* tab). Each entry row shows owner, location, the **THIS-order earmark slice** in whole
+units (with the entry's total stock as context when the row is only partially earmarked), and a
+**delivered toggle** for the per-(entry, order) delivered marker (Variante C, REQ-INV-027).
+
+**Backend.** `GET /api/v1/orders/{id}/item-stock` (`JobOrderItemStockController`) returns the
+grouped shape (`JobOrderItemStockGroupDto` → `JobOrderItemStockEntryDto`), gated exactly like the
+sibling per-order stock reads: `isAuthenticated() and @ownerScopeService.canSeeJobOrder(#id)`; an
+unknown order is 404. The projection reuses the entity-graphed
+`InventoryItemRepository.findGameItemRowsByJobOrderIdOrdered` (owner/location display order kept
+inside each group) and reads each entry's this-order slice off the `@BatchSize`-batched allocation
+collection — no N+1. The entry `version` is the row's `@Version` (0 for a still-`null` persisted
+version), which the delivered toggle echoes.
+
+**Delivered toggle.** The toggle PATCHes the existing `/inventory/{id}/delivered` (entry id +
+`jobOrderId` + version echo — the same write the Materialsammlung uses, backend gate
+`canEditInventoryItem`, stale version → 409). On success the panel's whole `item-stock` section is
+re-rendered in place through the order seam, refreshing **every** row's `data-version` (the DOM
+version sync rule), and the section is broadcast to peers; on failure the checkbox reverts.
+
+**Live update & peer sync (REQ-FE-001/010/015).** The panel is an AJAX-swappable fragment
+(`itemStockSection`, container `#order-item-stock-results`) with the **new `order:{id}` section key
+`item-stock`**, registered at all three mirror points in the same change: the `ORDER_SECTIONS` seam
+map in `orders-detail.js` (drives both the broadcast and the receive-side apply), the relay's
+`LiveSyncTopicClass.ORDER` whitelist, and — because receivers derive their container map from the
+same seam map — the receiving apply path; `LiveSyncSectionMapParityTest` pins the set-equality. The
+panel refreshes live on: a peer's delivered flip (`item-stock` broadcast), a production booking
+(its success refresh list gains `item-stock` — the book-in auto-earmarks the produced units), and a
+Lager-side earmark change (`inventory-my.js` / `inventory-admin.js` `broadcastOrdersChanged` now
+sends `materials`/`aggregated`/`item-stock` to each affected `order:{id}` room; a section whose
+container a page does not render is silently skipped).
+
+**Redaction.** The panel renders only for an `ITEM` order and is omitted from the
+requester-redacted view (REQ-ORDERS-023), mirroring the *Aggregierte Materialien* pane; the
+entries expose owner name/id exactly like the sibling material linked-stock reads (no additional
+redaction). An order with no earmarked item stock renders an empty-state message.
+
+**Acceptance**
+
+- [ ] An `ITEM` order with game-item rows earmarked to it lists them on the *Bestellte Items* tab,
+  grouped per game item with the allocated/manufactured/ordered context chip; a `MATERIAL` order
+  renders no panel (and the frontend never fetches the endpoint for it); an `ITEM` order without
+  earmarks shows the empty state.
+- [ ] Each entry row shows the THIS-order slice (whole units) — never a sibling order's slice —
+  plus the entry total as context on a partial earmark, and the delivered checkbox reflects the
+  per-(entry, order) marker.
+- [ ] Flipping the delivered toggle persists via `PATCH /inventory/{id}/delivered` with the order
+  id + entry version, re-renders the section in place (fresh `data-version` on every row, no
+  reload) and reaches a peer viewing the same order; a failed write reverts the checkbox.
+- [ ] A production booking with auto-earmark makes the produced stock appear in the panel without
+  a reload (own view and peers); a Lager-side (un)earmark of an item row refreshes peers' panels.
+- [ ] `GET /api/v1/orders/{id}/item-stock` is reachable only by a caller who can see the order
+  (403 otherwise, 404 for an unknown order).
+- [ ] The `item-stock` key is present at the seam map **and** the relay whitelist
+  (`LiveSyncSectionMapParityTest` stays green).
+
+**Enforced by:** `JobOrderItemStockControllerTest` + `InventoryItemServiceTest`
+(`getItemStockForJobOrder` grouping / slice / delivered / orphan context / 404),
+`JobOrderItemDetailRenderTest` (panel + empty state + fragment swap + MATERIAL-order absence),
+`LiveSyncSectionMapParityTest`, `JobOrderProductionE2eTest` (panel populated after a booked
+production with auto-earmark) · **Code:** `JobOrderItemStockController`,
+`InventoryAggregationService.getItemStockForJobOrder`, `JobOrderItemStockGroupDto` /
+`JobOrderItemStockEntryDto`, `JobOrderPageController.viewOrderDetail` (`itemStockSection`
+dispatch), `orders-detail.html` (`itemStockSection` fragment), `orders-detail.js`
+(`ORDER_SECTIONS['item-stock']`, `onItemStockDeliveredToggle`), `LiveSyncTopicClass.ORDER`,
+`inventory-my.js` / `inventory-admin.js` (`broadcastOrdersChanged`) · **Issues:** — · **Design:**
+[`DESIGN_ITEM_INVENTORY.md`](../DESIGN_ITEM_INVENTORY.md) §10 PR 4 / §11.2
 
 ## Out of scope
 

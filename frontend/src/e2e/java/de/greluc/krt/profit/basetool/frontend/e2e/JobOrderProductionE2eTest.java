@@ -61,12 +61,14 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * and the produced widget is visible on {@code /inventory/all?view=items} with its name and
  * whole-unit amount.
  *
- * <p>Four things are asserted end-to-end: before production the item-handover control is absent
+ * <p>Five things are asserted end-to-end: before production the item-handover control is absent
  * (delivery gated); the booking succeeds through the UI; afterwards the persisted {@code
  * manufacturedAmount} is 1 (read back through the backend) and the item-handover control has
- * appeared (delivery unlocked); and the produced stock is visible in the shared Lager's item view
- * (REQ-INV-032). The actor is {@code test-admin}, which satisfies the production role gate through
- * the role hierarchy and is an IRIDIUM member (the order's responsible unit).
+ * appeared (delivery unlocked); the produced stock is visible in the shared Lager's item view
+ * (REQ-INV-032); and — since the book-in auto-earmarks the produced unit to the order — the order
+ * detail's Item-Bestand panel lists the earmarked stock with its per-(entry, order) delivered
+ * toggle (REQ-ORDERS-028). The actor is {@code test-admin}, which satisfies the production role
+ * gate through the role hierarchy and is an IRIDIUM member (the order's responsible unit).
  */
 @Tag("e2e")
 class JobOrderProductionE2eTest {
@@ -181,6 +183,22 @@ class JobOrderProductionE2eTest {
         assertThat(itemGroupRow).containsText(ORDERABLE_ITEM_NAME);
         assertThat(itemGroupRow.locator(".tree-amount"))
             .containsText(Pattern.compile("(?<!\\d)" + Math.round(stockAfter) + "(?!\\d)"));
+
+        // REQ-ORDERS-028: the produced unit was auto-earmarked to the order ("dem Auftrag
+        // zuordnen" defaults on), so the order detail's Item-Bestand panel on the "Bestellte
+        // Items" tab lists the earmarked stock — the widget's group with one entry row carrying
+        // the per-(entry, order) delivered toggle.
+        E2eSupport.navigate(page, baseUrl + "/orders/" + id + "?tab=items");
+        Locator itemStockPanel = page.getByTestId("order-item-stock-panel");
+        assertThat(itemStockPanel)
+            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
+        assertThat(itemStockPanel).containsText(ORDERABLE_ITEM_NAME);
+        assertThat(
+                itemStockPanel.locator(
+                    "input[data-trigger='od-item-stock-delivered'][data-job-order-id='"
+                        + id
+                        + "']"))
+            .hasCount(1);
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "joborder-production");
         throw failure;

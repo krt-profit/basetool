@@ -1011,4 +1011,185 @@ class JobOrderItemDetailRenderTest {
     verify(backendApiClient, times(1))
         .getCached(eq(CachedCatalog.SQUADRONS), anyTypeRef(), eq(true));
   }
+
+  // ---- Item-Bestand panel (REQ-ORDERS-028) ----
+
+  /** One earmarked-stock group of the Item-Bestand panel, for the render tests below. */
+  private static de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemStockGroupDto
+      itemStockGroup(UUID entryId) {
+    return new de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemStockGroupDto(
+        new de.greluc.krt.profit.basetool.frontend.model.dto.InventoryGameItemReferenceDto(
+            UUID.randomUUID(), "Cirrus Optic Scope", "Behring", "WEAPON_ATTACHMENT"),
+        3,
+        1,
+        3L,
+        List.of(
+            new de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemStockEntryDto(
+                entryId,
+                7L,
+                "Alice",
+                UUID.randomUUID(),
+                "Lorville",
+                UUID.randomUUID(),
+                4L,
+                3L,
+                false)));
+  }
+
+  // covers REQ-ORDERS-028 (the ITEM order's detail page renders the earmarked item stock grouped
+  // per game item, with the per-entry delivered toggle carrying the order id + entry version the
+  // PATCH echoes)
+  @Test
+  void itemOrder_rendersItemStockPanelWithDeliveredToggle() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    UUID entryId = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+        .thenReturn(oneLineItemOrder(orderId));
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId + "/item-stock"), anyTypeRef()))
+        .thenReturn(List.of(itemStockGroup(entryId)));
+
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/" + orderId)
+                    .header("Accept-Language", "de")
+                    .with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    // Then: the swap container and the populated panel render with the group's game item and its
+    // ordered/manufactured context chip.
+    assertThat(html).as("item-stock swap container").contains("id=\"order-item-stock-results\"");
+    assertThat(html).as("populated panel").contains("data-testid=\"order-item-stock-panel\"");
+    assertThat(html).as("game-item group name").contains("Cirrus Optic Scope");
+    assertThat(html)
+        .as("group context chip (allocated/manufactured/ordered)")
+        .contains("zugeordnet");
+    // Then: the entry row carries the version the delivered PATCH echoes, and the allocated share
+    // is shown with the entry's total stock as context (whole units).
+    assertThat(html)
+        .as("entry row keyed by entry id")
+        .contains("data-inventory-id=\"" + entryId + "\"");
+    assertThat(html).as("entry row carries the entry @Version").contains("data-version=\"7\"");
+    assertThat(html).as("total-stock context on a partial earmark").contains("von 4 im Bestand");
+    // Then: the delivered toggle is the delegated krtEvents control bound to THIS order.
+    assertThat(html)
+        .as("delivered toggle trigger")
+        .contains("data-trigger=\"od-item-stock-delivered\"");
+    assertThat(html)
+        .as("delivered toggle carries the order id for the per-slice PATCH")
+        .contains("data-job-order-id=\"" + orderId + "\"");
+    assertThat(html)
+        .as("no empty state next to a populated panel")
+        .doesNotContain("data-testid=\"order-item-stock-empty\"");
+  }
+
+  // covers REQ-ORDERS-028 (empty state)
+  @Test
+  void itemOrder_noEarmarkedItemStock_rendersEmptyState() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+        .thenReturn(oneLineItemOrder(orderId));
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId + "/item-stock"), anyTypeRef()))
+        .thenReturn(List.of());
+
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/" + orderId)
+                    .header("Accept-Language", "de")
+                    .with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).as("empty state rendered").contains("data-testid=\"order-item-stock-empty\"");
+    assertThat(html)
+        .as("no populated panel without earmarked stock")
+        .doesNotContain("data-testid=\"order-item-stock-panel\"");
+  }
+
+  // covers REQ-ORDERS-028 (the `item-stock` live-sync section swap returns the panel alone)
+  @Test
+  void itemOrder_itemStockFragment_rendersOnlyThePanel() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    UUID entryId = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+        .thenReturn(oneLineItemOrder(orderId));
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId + "/item-stock"), anyTypeRef()))
+        .thenReturn(List.of(itemStockGroup(entryId)));
+
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/" + orderId)
+                    .param("fragment", "item-stock")
+                    .header("Accept-Language", "de")
+                    .with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .as("the swapped fragment carries the panel")
+        .contains("data-testid=\"order-item-stock-panel\"")
+        .contains("Cirrus Optic Scope");
+    assertThat(html)
+        .as("a fragment swap returns the panel alone, not the whole page")
+        .doesNotContain("<html");
+  }
+
+  // covers REQ-ORDERS-028 (a MATERIAL order renders no Item-Bestand panel and never fetches it)
+  @Test
+  void materialOrder_hasNoItemStockPanel() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    JobOrderMaterialDto mat =
+        new JobOrderMaterialDto(
+            UUID.randomUUID(), material("Agricium", "SCU"), null, 10.0, 0.0, List.of(), null, 1L);
+    JobOrderDto order =
+        new JobOrderDto(
+            orderId,
+            22,
+            null,
+            null,
+            "Handle",
+            null,
+            1,
+            "OPEN",
+            "MATERIAL",
+            true,
+            List.of(mat),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            Instant.now(),
+            1L,
+            false);
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+        .thenReturn(order);
+
+    String html =
+        mockMvc
+            .perform(get("/orders/" + orderId).with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .as("no item-stock container on a material order")
+        .doesNotContain("order-item-stock-results");
+    verify(backendApiClient, never())
+        .get(eq("/api/v1/orders/" + orderId + "/item-stock"), anyTypeRef());
+  }
 }
