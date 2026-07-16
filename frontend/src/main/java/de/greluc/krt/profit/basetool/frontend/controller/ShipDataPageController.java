@@ -28,6 +28,8 @@ import de.greluc.krt.profit.basetool.frontend.model.form.ManufacturerForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ShipTypeForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
+import de.greluc.krt.profit.basetool.frontend.support.CatalogPages.CompleteCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -74,9 +76,12 @@ public class ShipDataPageController {
       new ParameterizedTypeReference<>() {};
 
   /**
-   * Loads the manufacturer and ship-type catalogs (size=1000, including hidden) and seeds empty
-   * forms when not already in the model. Both lists are sorted case-insensitively by name. A
-   * backend failure leaves an error key in the model rather than blanking the page.
+   * Loads the <em>complete</em> manufacturer and ship-type catalogs — every page, not one capped
+   * chunk, including hidden entries (REQ-ADMIN-001, ADR-0101) — and seeds empty forms when not
+   * already in the model. Both lists are sorted case-insensitively by name. A backend failure
+   * leaves an error key in the model rather than blanking the page; a page walk that hits its
+   * safety cap sets {@code catalogTruncated} so the template shows a loud warning banner instead of
+   * silently presenting a partial list (REQ-ADMIN-002).
    *
    * @param model Thymeleaf model populated with both forms, both lists and the optional error key
    * @return the {@code ship-data} view name
@@ -92,29 +97,30 @@ public class ShipDataPageController {
     }
 
     try {
-      PageResponse<ManufacturerDto> manufacturersPage =
-          backendApiClient.get(
-              "/api/v1/manufacturers?size=1000&sort=name,asc&includeHidden=true",
-              MANUFACTURER_PAGE_TYPE);
-
-      List<ManufacturerDto> manufacturers = new ArrayList<>();
-      if (manufacturersPage != null && manufacturersPage.content() != null) {
-        manufacturers = new ArrayList<>(manufacturersPage.content());
-        manufacturers.sort(
-            Comparator.comparing(ManufacturerDto::name, String.CASE_INSENSITIVE_ORDER));
-      }
+      CompleteCatalog<ManufacturerDto> manufacturersCatalog =
+          CatalogPages.fetchAll(
+              page ->
+                  backendApiClient.get(
+                      "/api/v1/manufacturers?size=1000&sort=name,asc&includeHidden=true&page="
+                          + page,
+                      MANUFACTURER_PAGE_TYPE));
+      List<ManufacturerDto> manufacturers = new ArrayList<>(manufacturersCatalog.items());
+      manufacturers.sort(
+          Comparator.comparing(ManufacturerDto::name, String.CASE_INSENSITIVE_ORDER));
       model.addAttribute("manufacturers", manufacturers);
 
-      PageResponse<ShipTypeDto> shipTypesPage =
-          backendApiClient.get(
-              "/api/v1/ship-types?size=1000&sort=name,asc&includeHidden=true", SHIP_TYPE_PAGE_TYPE);
-
-      List<ShipTypeDto> shipTypes = new ArrayList<>();
-      if (shipTypesPage != null && shipTypesPage.content() != null) {
-        shipTypes = new ArrayList<>(shipTypesPage.content());
-        shipTypes.sort(Comparator.comparing(ShipTypeDto::name, String.CASE_INSENSITIVE_ORDER));
-      }
+      CompleteCatalog<ShipTypeDto> shipTypesCatalog =
+          CatalogPages.fetchAll(
+              page ->
+                  backendApiClient.get(
+                      "/api/v1/ship-types?size=1000&sort=name,asc&includeHidden=true&page=" + page,
+                      SHIP_TYPE_PAGE_TYPE));
+      List<ShipTypeDto> shipTypes = new ArrayList<>(shipTypesCatalog.items());
+      shipTypes.sort(Comparator.comparing(ShipTypeDto::name, String.CASE_INSENSITIVE_ORDER));
       model.addAttribute("shipTypes", shipTypes);
+
+      model.addAttribute(
+          "catalogTruncated", manufacturersCatalog.truncated() || shipTypesCatalog.truncated());
 
     } catch (Exception e) {
       log.error("Error loading ship data", e);

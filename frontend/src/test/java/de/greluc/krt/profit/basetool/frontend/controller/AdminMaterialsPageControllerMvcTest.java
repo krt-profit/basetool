@@ -114,7 +114,8 @@ class AdminMaterialsPageControllerMvcTest {
         new PageResponse<>(List.of(material), 0, 1000, 1, 1, Collections.emptyList());
 
     when(backendApiClient.get(
-            eq("/api/v1/materials?size=1000&sort=name,asc&includeHidden=true"), anyTypeRef()))
+            eq("/api/v1/materials?size=1000&sort=name,asc&includeHidden=true&page=0"),
+            anyTypeRef()))
         .thenReturn(materialsPage);
     when(backendApiClient.get(eq("/api/v1/material-categories"), anyTypeRef()))
         .thenReturn(Collections.emptyList());

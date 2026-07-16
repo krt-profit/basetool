@@ -71,6 +71,11 @@
              change); a manual refresh of the swap-synced URL reproduces the filtered state. -->
         <div class="box-content" id="squadrons-results">
             <th:block th:fragment="squadrons-results">
+            <!-- Inside the swapped fragment on purpose: the include-inactive AJAX swap must
+                 re-evaluate the truncation warning (REQ-ADMIN-002). -->
+            <th:block th:if="${squadronsTruncated}">
+                <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', 'mb-1')}"></div>
+            </th:block>
             <div class="table-responsive">
             <table>
                 <thead>
@@ -132,6 +137,11 @@
         <!-- AJAX swap target (REQ-FE-002): include-inactive toggle re-renders only this section. -->
         <div class="box-content" id="jobtypes-results">
             <th:block th:fragment="jobtypes-results">
+            <!-- Inside the swapped fragment on purpose: the include-inactive AJAX swap must
+                 re-evaluate the truncation warning (REQ-ADMIN-002). -->
+            <th:block th:if="${jobTypesTruncated}">
+                <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', 'mb-1')}"></div>
+            </th:block>
             <div class="table-responsive">
             <table>
                 <thead>
@@ -203,6 +213,11 @@
              swapped inner tbody), so it survives the swap. -->
         <div class="box-content" id="freqtypes-results">
             <th:block th:fragment="freqtypes-results">
+            <!-- Inside the swapped fragment on purpose: the include-inactive AJAX swap must
+                 re-evaluate the truncation warning (REQ-ADMIN-002). -->
+            <th:block th:if="${frequencyTypesTruncated}">
+                <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', 'mb-1')}"></div>
+            </th:block>
             <div class="table-responsive">
             <table>
                 <thead>

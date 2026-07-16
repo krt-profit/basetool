@@ -28,6 +28,8 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.SystemSettingDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SystemSettingUpdateDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
+import de.greluc.krt.profit.basetool.frontend.support.CatalogPages.CompleteCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -185,7 +187,8 @@ public class AdminSettingsPageController {
     model.addAttribute("refineryRoundingVersion", refineryRoundingVersion);
     model.addAttribute("transferFeePercent", transferFeePercent.toPlainString());
     model.addAttribute("transferFeeVersion", transferFeeVersion);
-    model.addAttribute("squadrons", fetchSquadronsForPromotionToggle());
+    CompleteCatalog<SquadronDto> squadronCatalog = fetchSquadronsForPromotionToggle();
+    model.addAttribute("squadrons", squadronCatalog.items());
 
     String intakeSpecialCommandId = "";
     Long intakeSpecialCommandVersion = 0L;
@@ -201,61 +204,72 @@ public class AdminSettingsPageController {
     }
     model.addAttribute("intakeSpecialCommandId", intakeSpecialCommandId);
     model.addAttribute("intakeSpecialCommandVersion", intakeSpecialCommandVersion);
-    model.addAttribute("specialCommands", fetchSpecialCommands());
+    CompleteCatalog<SpecialCommandDto> specialCommandCatalog = fetchSpecialCommands();
+    model.addAttribute("specialCommands", specialCommandCatalog.items());
+    model.addAttribute(
+        "catalogTruncated", squadronCatalog.truncated() || specialCommandCatalog.truncated());
 
     return "admin-settings";
   }
 
   /**
-   * Loads every Spezialkommando (alphabetical) for the job-order intake-SK dropdown on the
-   * admin-settings page. A backend failure degrades to an empty list with a logged warning so the
-   * rest of the page still renders.
+   * Loads <em>every</em> Spezialkommando (alphabetical, all pages — REQ-ADMIN-001, ADR-0101) for
+   * the job-order intake-SK dropdown on the admin-settings page. A backend failure degrades to an
+   * empty catalogue with a logged warning so the rest of the page still renders; a page walk that
+   * hits its safety cap is flagged for the page-level warning banner (REQ-ADMIN-002).
    *
-   * @return Spezialkommandos sorted by name, never {@code null}.
+   * @return Spezialkommandos sorted by name plus the truncation flag, never {@code null}.
    */
-  private List<SpecialCommandDto> fetchSpecialCommands() {
+  private CompleteCatalog<SpecialCommandDto> fetchSpecialCommands() {
     try {
-      PageResponse<SpecialCommandDto> page =
-          backendApiClient.get(
-              "/api/v1/special-commands?size=1000&sort=name,asc", SPECIAL_COMMAND_PAGE_TYPE);
-      if (page == null || page.content() == null) {
-        return List.of();
-      }
-      return page.content().stream()
-          .sorted(
-              Comparator.comparing(
-                  s -> s.name() == null ? "" : s.name(), String.CASE_INSENSITIVE_ORDER))
-          .toList();
+      CompleteCatalog<SpecialCommandDto> catalog =
+          CatalogPages.fetchAll(
+              page ->
+                  backendApiClient.get(
+                      "/api/v1/special-commands?size=1000&sort=name,asc&page=" + page,
+                      SPECIAL_COMMAND_PAGE_TYPE));
+      List<SpecialCommandDto> sorted =
+          catalog.items().stream()
+              .sorted(
+                  Comparator.comparing(
+                      s -> s.name() == null ? "" : s.name(), String.CASE_INSENSITIVE_ORDER))
+              .toList();
+      return new CompleteCatalog<>(sorted, catalog.totalElements(), catalog.truncated());
     } catch (Exception e) {
       log.warn(
           "Could not fetch special commands for admin-settings intake picker: {}", e.getMessage());
-      return List.of();
+      return CompleteCatalog.empty();
     }
   }
 
   /**
-   * Loads every active squadron (alphabetical) for the "Beförderungssystem pro Staffel" toggle
-   * section on the admin-settings page. Inactive (soft-deleted) squadrons are filtered out — the
-   * admin re-activates them through the existing squadron CRUD before toggling features. A backend
-   * failure degrades to an empty list with a logged warning so the rest of the page still renders.
+   * Loads <em>every</em> active squadron (alphabetical, all pages — REQ-ADMIN-001, ADR-0101) for
+   * the "Beförderungssystem pro Staffel" toggle section on the admin-settings page. Inactive
+   * (soft-deleted) squadrons are filtered out — the admin re-activates them through the existing
+   * squadron CRUD before toggling features. A backend failure degrades to an empty catalogue with a
+   * logged warning so the rest of the page still renders; a page walk that hits its safety cap is
+   * flagged for the page-level warning banner (REQ-ADMIN-002).
    *
-   * @return active squadrons sorted by name, never {@code null}.
+   * @return active squadrons sorted by name plus the truncation flag, never {@code null}.
    */
-  private List<SquadronDto> fetchSquadronsForPromotionToggle() {
+  private CompleteCatalog<SquadronDto> fetchSquadronsForPromotionToggle() {
     try {
-      PageResponse<SquadronDto> page =
-          backendApiClient.get("/api/v1/squadrons?size=1000&sort=name,asc", SQUADRON_PAGE_TYPE);
-      if (page == null || page.content() == null) {
-        return List.of();
-      }
-      return page.content().stream()
-          .sorted(
-              Comparator.comparing(
-                  s -> s.name() == null ? "" : s.name(), String.CASE_INSENSITIVE_ORDER))
-          .toList();
+      CompleteCatalog<SquadronDto> catalog =
+          CatalogPages.fetchAll(
+              page ->
+                  backendApiClient.get(
+                      "/api/v1/squadrons?size=1000&sort=name,asc&page=" + page,
+                      SQUADRON_PAGE_TYPE));
+      List<SquadronDto> sorted =
+          catalog.items().stream()
+              .sorted(
+                  Comparator.comparing(
+                      s -> s.name() == null ? "" : s.name(), String.CASE_INSENSITIVE_ORDER))
+              .toList();
+      return new CompleteCatalog<>(sorted, catalog.totalElements(), catalog.truncated());
     } catch (Exception e) {
       log.warn("Could not fetch squadrons for admin-settings promotion toggle: {}", e.getMessage());
-      return List.of();
+      return CompleteCatalog.empty();
     }
   }
 

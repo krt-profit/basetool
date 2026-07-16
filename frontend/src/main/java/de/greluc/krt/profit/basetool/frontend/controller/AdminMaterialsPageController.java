@@ -30,6 +30,8 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
+import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
+import de.greluc.krt.profit.basetool.frontend.support.CatalogPages.CompleteCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
@@ -83,11 +85,12 @@ public class AdminMaterialsPageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Loads the full materials list (size=1000, sorted by name asc) plus the category dropdown
-   * source. The "refined materials" model attribute is the same list sorted again
-   * case-insensitively — admins assign raw materials to a refined one even when the UEX flag is
-   * wrong, so the dropdown intentionally includes every material rather than filtering by {@code
-   * isRefined}.
+   * Loads the <em>complete</em> materials list — every page, not one capped chunk — plus the
+   * category dropdown source (REQ-ADMIN-001, ADR-0101). The "refined materials" model attribute is
+   * the same list sorted again case-insensitively — admins assign raw materials to a refined one
+   * even when the UEX flag is wrong, so the dropdown intentionally includes every material rather
+   * than filtering by {@code isRefined}. Should the page walk ever hit its safety cap, {@code
+   * catalogTruncated} renders a loud warning banner (REQ-ADMIN-002).
    *
    * @param model Thymeleaf model populated with materials, refined-materials and categories
    * @return the {@code admin/materials} view name
@@ -98,14 +101,14 @@ public class AdminMaterialsPageController {
       // includeHidden=true: the admin catalog must show wiki-only commodities imported invisible
       // (§4.3) so they can be reviewed and unhidden. Trading pages call the same endpoint without
       // the flag and get only visible rows.
-      PageResponse<MaterialDto> materialsPage =
-          backendApiClient.get(
-              "/api/v1/materials?size=1000&sort=name,asc&includeHidden=true", MATERIAL_PAGE_TYPE);
-
-      List<MaterialDto> materials = new ArrayList<>();
-      if (materialsPage != null && materialsPage.content() != null) {
-        materials = new ArrayList<>(materialsPage.content());
-      }
+      CompleteCatalog<MaterialDto> materialsCatalog =
+          CatalogPages.fetchAll(
+              page ->
+                  backendApiClient.get(
+                      "/api/v1/materials?size=1000&sort=name,asc&includeHidden=true&page=" + page,
+                      MATERIAL_PAGE_TYPE));
+      List<MaterialDto> materials = new ArrayList<>(materialsCatalog.items());
+      model.addAttribute("catalogTruncated", materialsCatalog.truncated());
 
       // Provide a list of all materials for assignment to RAW materials
       // (bypass UEX data errors where refined materials are not marked correctly)
