@@ -52,7 +52,9 @@ public class CachedCatalogListLoader {
 
   /**
    * Fetches a cached catalog page and returns its content as a fresh mutable list, or an empty list
-   * when the page (or its content) is absent or the backend call fails.
+   * when the page (or its content) is absent or the backend call fails. For a {@link
+   * CachedCatalog.Fetch#PAGE_WALK} catalog the "page" is the merged complete catalogue that {@code
+   * getCached} assembled (REQ-ADMIN-003), so the returned list holds every row.
    *
    * @param <T> the catalog row type
    * @param catalog the cached catalog to read

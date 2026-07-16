@@ -21,9 +21,12 @@ package de.greluc.krt.profit.basetool.frontend.service;
 
 import de.greluc.krt.profit.basetool.frontend.exception.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
 import io.github.resilience4j.bulkhead.BulkheadFullException;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.util.List;
 import java.util.concurrent.TimeoutException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -168,7 +171,8 @@ public class BackendApiClient {
    * Cached GET of a {@link CachedCatalog}. Subsequent calls within the catalogue's domain-cache TTL
    * hit the cache; the per-domain named cache is resolved by {@link CatalogCacheResolver}
    * (FE-CACHE-1/2). Only an allowlisted {@link CachedCatalog} can be cached, so a per-principal URI
-   * is unrepresentable.
+   * is unrepresentable. A {@link CachedCatalog.Fetch#PAGE_WALK} catalogue is assembled complete —
+   * every backend page walked and merged before the single cache write (REQ-ADMIN-003).
    *
    * @param catalog the allowlisted catalogue to fetch and cache
    * @param responseType the decoded response type
@@ -182,7 +186,10 @@ public class BackendApiClient {
 
   /**
    * Cached GET of a {@link CachedCatalog} that targets the anonymous public WebClient when {@code
-   * isPublic} is true (a {@code permitAll} catalogue reachable from an unauthenticated page).
+   * isPublic} is true (a {@code permitAll} catalogue reachable from an unauthenticated page). For a
+   * {@link CachedCatalog.Fetch#PAGE_WALK} catalogue this walks and merges every backend page before
+   * caching (REQ-ADMIN-003); a mid-walk failure propagates unchanged, so callers keep their
+   * established degradation contract and no partial catalogue is ever cached.
    *
    * @param catalog the allowlisted catalogue to fetch and cache
    * @param responseType the decoded response type
@@ -193,16 +200,24 @@ public class BackendApiClient {
   @Cacheable(cacheResolver = "catalogCacheResolver", key = "#catalog.name()", sync = true)
   public <T> T getCached(
       CachedCatalog catalog, ParameterizedTypeReference<T> responseType, boolean isPublic) {
-    return executeGet(isPublic ? publicWebClient : webClient, catalog.getUri(), responseType);
+    WebClient client = isPublic ? publicWebClient : webClient;
+    if (catalog.isPageWalked()) {
+      return fetchCompleteCatalog(client, catalog, responseType);
+    }
+    return executeGet(client, catalog.getUri(), responseType);
   }
 
   /**
    * Class-typed cached GET of a {@link CachedCatalog}.
    *
-   * @param catalog the allowlisted catalogue to fetch and cache
+   * @param catalog the allowlisted catalogue to fetch and cache; must not be a {@link
+   *     CachedCatalog.Fetch#PAGE_WALK} catalogue
    * @param responseType the decoded response type
    * @param <T> the response body type
    * @return the decoded (possibly cached) response body
+   * @throws IllegalArgumentException when {@code catalog} is page-walked — a {@code Class} token
+   *     cannot decode the generic {@code PageResponse} the walk requires, and a plain single-page
+   *     GET of such a catalogue would silently truncate it (REQ-ADMIN-003)
    */
   @Cacheable(cacheResolver = "catalogCacheResolver", key = "#catalog.name()", sync = true)
   public <T> T getCached(CachedCatalog catalog, Class<T> responseType) {
@@ -213,15 +228,70 @@ public class BackendApiClient {
    * Class-typed cached GET of a {@link CachedCatalog} that targets the anonymous public WebClient
    * when {@code isPublic} is true.
    *
-   * @param catalog the allowlisted catalogue to fetch and cache
+   * @param catalog the allowlisted catalogue to fetch and cache; must not be a {@link
+   *     CachedCatalog.Fetch#PAGE_WALK} catalogue
    * @param responseType the decoded response type
    * @param isPublic true to use the anonymous {@code publicWebClient}
    * @param <T> the response body type
    * @return the decoded (possibly cached) response body
+   * @throws IllegalArgumentException when {@code catalog} is page-walked — a {@code Class} token
+   *     cannot decode the generic {@code PageResponse} the walk requires, and a plain single-page
+   *     GET of such a catalogue would silently truncate it (REQ-ADMIN-003)
    */
   @Cacheable(cacheResolver = "catalogCacheResolver", key = "#catalog.name()", sync = true)
   public <T> T getCached(CachedCatalog catalog, Class<T> responseType, boolean isPublic) {
+    if (catalog.isPageWalked()) {
+      throw new IllegalArgumentException(
+          "Catalogue "
+              + catalog.name()
+              + " is page-walked and must be read through the ParameterizedTypeReference overload"
+              + " of getCached — a single bounded GET would silently truncate it (REQ-ADMIN-003)");
+    }
     return executeGet(isPublic ? publicWebClient : webClient, catalog.getUri(), responseType);
+  }
+
+  /**
+   * Assembles a {@link CachedCatalog.Fetch#PAGE_WALK} catalogue by walking every backend page
+   * through {@link CatalogPages#fetchAll} ({@code &page=0..n} appended to the pinned URI, whose
+   * {@code size=} is the chunk size) and merging the contents into one synthetic {@link
+   * PageResponse} — the value the caller's {@code @Cacheable} frame then caches, so the cached
+   * entry is always the complete catalogue. Hitting the {@link CatalogPages#MAX_CATALOG_PAGES}
+   * runaway cap logs a warning instead of a banner: these catalogues feed pickers and sidebar
+   * fragments with no page-level truncation surface (REQ-ADMIN-003).
+   *
+   * @param client the WebClient to fetch through (authenticated or public)
+   * @param catalog the page-walked catalogue to assemble
+   * @param responseType the caller's declared response type — always {@code PageResponse<E>} for a
+   *     page-walked catalogue
+   * @param <T> the caller's response body type
+   * @return the merged catalogue as a single {@code PageResponse}
+   */
+  // A PAGE_WALK catalogue is always consumed as PageResponse<E> via the type-ref overload
+  // (FrontendCacheSplitTest pins the modes; the Class overload rejects walked constants), so the
+  // T <-> PageResponse casts below are the unavoidable Object->generic case.
+  @SuppressWarnings("unchecked")
+  private <T> T fetchCompleteCatalog(
+      WebClient client, CachedCatalog catalog, ParameterizedTypeReference<T> responseType) {
+    CatalogPages.CompleteCatalog<Object> walked =
+        CatalogPages.fetchAll(
+            page ->
+                (PageResponse<Object>)
+                    executeGet(client, catalog.getUri() + "&page=" + page, responseType));
+    if (walked.truncated()) {
+      log.warn(
+          "Cached catalogue {} hit the page-walk safety cap of {} pages — the cached list is"
+              + " incomplete until the catalogue shrinks or its chunk size grows",
+          catalog.name(),
+          CatalogPages.MAX_CATALOG_PAGES);
+    }
+    return (T)
+        new PageResponse<>(
+            walked.items(),
+            0,
+            walked.items().size(),
+            walked.totalElements(),
+            walked.items().isEmpty() ? 0 : 1,
+            List.of());
   }
 
   /**
