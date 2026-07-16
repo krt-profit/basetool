@@ -265,8 +265,13 @@ its modal also hosts the relocated location/user transfer (the former book-out `
 personal↔shared toggle is owner-scoped and lives on `/my`). Both owning-org-unit pickers — the
 de-personalize picker (keyed on the row owner) and the location/user transfer picker (keyed on the
 destination user) — offer the selected owner's direct memberships across all four org-unit kinds
-(Staffel + SK + Bereich + OL) and stay hidden when that owner belongs to a single org unit (the
-backend then auto-stamps it), #1328.
+(Staffel + SK + Bereich + OL). Each picker is **shown whenever that owner has at least one
+membership** and is **preset to the row's current owning org unit** (or the owner's primary unit
+when the current unit is not one of the owner's memberships, e.g. a cross-user transfer), so a submit
+that does not touch the picker keeps the stock in its current unit rather than silently reassigning
+it. A picker is hidden only for a membershipless owner — the moved/shared row is then ownerless.
+There is no "keep home unit" placeholder: the picker always carries a concrete preselected unit
+(#1328).
 
 **Acceptance**
 
@@ -278,6 +283,9 @@ backend then auto-stamps it), #1328.
 - [ ] The owning-org-unit picker (de-personalize and location/user transfer) lists the selected
   owner's direct memberships across all four kinds (Staffel + SK + Bereich + OL, via
   `?allKinds=true`); a Bereich/OL-member owner can book into their Bereich/OL pool.
+- [ ] The picker is visible whenever the owner has ≥1 membership (not only ≥2) and is preset to the
+  row's current owning org unit, so submitting without changing it keeps the current unit; it is
+  hidden only for a membershipless owner.
 - [ ] A personalize carries the source row's `owningOrgUnit` over and refuses a source bound to a
   job order or mission with HTTP 400.
 - [ ] A stale `version` yields HTTP 409; a non-owner without an admin/logistician grant yields 403.
