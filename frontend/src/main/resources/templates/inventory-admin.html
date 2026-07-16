@@ -404,7 +404,7 @@
                     </div>
                     <div class="flex-1">
                         <label for="umbuchenTargetLocationId" class="form-label" th:text="#{inventory.bookout.targetLocation}">Umbuchen zu Ort</label>
-                        <select id="umbuchenTargetLocationId" class="w-full">
+                        <select id="umbuchenTargetLocationId" class="w-full" data-krt-combobox>
                             <option th:each="location : ${locations}" th:value="${location.id}" th:text="${location.name}"></option>
                         </select>
                     </div>

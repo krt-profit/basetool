@@ -306,7 +306,7 @@
                         <div class="material-row">
                             <div class="form-group flex-2 mb-0">
                                 <label th:for="'inputMaterialId_' + ${stat.index}" th:text="#{refineryorder.form.material.input}">Eingangsmaterial</label>
-                                <select th:id="'inputMaterialId_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputMaterialId}" required data-trigger="rod-update-output" th:disabled="${!canEdit}">
+                                <select th:id="'inputMaterialId_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputMaterialId}" required data-trigger="rod-update-output" data-krt-combobox th:disabled="${!canEdit}">
                                     <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
                                     <option th:each="mat : ${materials}" th:if="${mat.type == 'RAW' or mat.isManualRawMaterial == true}" th:value="${mat.id}" th:text="${mat.name}" th:attr="data-refined-id=${mat.refinedMaterial != null ? mat.refinedMaterial.id : ''},data-refined-name=${mat.refinedMaterial != null ? mat.refinedMaterial.name : ''}"></option>
                                 </select>
@@ -352,6 +352,15 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Inert option catalog for JS-added rows: addMaterialRow() rebuilds the input-
+                     material picker from these options because the live row's picker is an
+                     enhanced combobox whose clone would be dead (REQ-FE-016). Never enhanced
+                     itself (no data-krt-combobox). -->
+                <select th:if="${canEdit}" id="refinery-material-options-template" class="krtm-display-none-5790">
+                    <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
+                    <option th:each="mat : ${materials}" th:if="${mat.type == 'RAW' or mat.isManualRawMaterial == true}" th:value="${mat.id}" th:text="${mat.name}" th:attr="data-refined-id=${mat.refinedMaterial != null ? mat.refinedMaterial.id : ''},data-refined-name=${mat.refinedMaterial != null ? mat.refinedMaterial.name : ''}"></option>
+                </select>
 
                 <button th:if="${canEdit}" type="button" class="btn-add-row" data-trigger="rod-add-material" th:text="#{refineryorder.form.material.add}">Material hinzufügen</button>
 

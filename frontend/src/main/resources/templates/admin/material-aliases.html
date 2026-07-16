@@ -75,7 +75,7 @@
                 </div>
                 <div class="form-group">
                     <label for="newMaterialId" th:text="#{admin.materialAlias.material}">Material</label>
-                    <select id="newMaterialId" name="materialId" required>
+                    <select id="newMaterialId" name="materialId" required data-krt-combobox>
                         <option value="" th:text="#{admin.materialAlias.material.placeholder}">-- bitte wählen --</option>
                         <option th:each="m : ${materials}" th:value="${m.id}" th:text="${m.name}"></option>
                     </select>
@@ -162,7 +162,7 @@
                 </div>
                 <div class="form-group">
                     <label for="editMaterialId" th:text="#{admin.materialAlias.material}">Material</label>
-                    <select id="editMaterialId" name="materialId" required>
+                    <select id="editMaterialId" name="materialId" required data-krt-combobox>
                         <option th:each="m : ${materials}" th:value="${m.id}" th:text="${m.name}" th:selected="${m.id == aliasToEdit.materialId}"></option>
                     </select>
                 </div>

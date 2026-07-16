@@ -80,14 +80,12 @@ function updateAmountFieldForMaterial(selectElement) {
     const amountInput = document.getElementById('amount');
     const unitSpan = document.getElementById('amount-unit');
     const scuHint = document.getElementById('amount-scu-hint');
-    if (
-        !amountInput ||
-        !selectElement.selectedOptions ||
-        selectElement.selectedOptions.length === 0
-    )
-        return;
+    if (!amountInput) return;
 
-    const qtType = selectElement.selectedOptions[0].getAttribute('data-quantity-type');
+    // The material picker is a searchable combobox (REQ-FE-016): the selected option's
+    // data-quantity-type is mirrored onto the hidden input carrying #materialId, replacing the
+    // former selectedOptions[0] read (the native <option>s are gone after enhancement).
+    const qtType = selectElement.dataset.quantityType || '';
 
     if (qtType === 'PIECE') {
         amountInput.setAttribute('step', '1');

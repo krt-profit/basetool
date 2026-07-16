@@ -244,9 +244,13 @@ class InventoryOperationsE2eTest {
           E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/input?source=my");
           page.waitForLoadState();
 
-          page.locator("#materialId").selectOption(new SelectOption().setIndex(1));
+          // Material + location are searchable comboboxes; the enhancer's hidden input keeps the
+          // original id, so the picked value is still read off #materialId.
+          E2eSupport.selectComboboxFirstOption(
+              page.locator(".krt-combobox:has(#materialId) .krt-combobox__input"));
           String pickedMaterialId = page.locator("#materialId").inputValue();
-          page.locator("#locationId").selectOption(new SelectOption().setIndex(1));
+          E2eSupport.selectComboboxFirstOption(
+              page.locator(".krt-combobox:has(#locationId) .krt-combobox__input"));
           page.locator("#quality").fill(String.valueOf(SEED_QUALITY));
           page.locator("#amount").fill("42");
 
@@ -549,8 +553,10 @@ class InventoryOperationsE2eTest {
           E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/input?source=my");
           page.waitForLoadState();
 
-          page.locator("#materialId").selectOption(new SelectOption().setIndex(1));
-          page.locator("#locationId").selectOption(new SelectOption().setIndex(1));
+          E2eSupport.selectComboboxFirstOption(
+              page.locator(".krt-combobox:has(#materialId) .krt-combobox__input"));
+          E2eSupport.selectComboboxFirstOption(
+              page.locator(".krt-combobox:has(#locationId) .krt-combobox__input"));
           page.locator("#quality").fill(String.valueOf(SEED_QUALITY));
           page.locator("#amount").fill("5");
 
@@ -833,23 +839,28 @@ class InventoryOperationsE2eTest {
   }
 
   /**
-   * Selects, in the Umbuchen modal's transfer-target location dropdown, the first option whose
-   * value differs from the source location, and returns that destination id. Robust to whether the
-   * source location is itself listed in the (cached) dropdown: a different option always exists
-   * because the bootstrap refinery hub is cached and the source here is a separately-created
-   * location.
+   * Selects, in the Umbuchen modal's transfer-target location combobox, the first option whose
+   * value differs from the source location, and returns that destination id. The picker is a
+   * searchable combobox (the native {@code <select>} is replaced and its options only render into
+   * the {@code role=listbox} while the popup is open), so this opens the popup first and reads each
+   * option's {@code data-value}. Robust to whether the source location is itself listed in the
+   * (cached) option set: a different option always exists because the bootstrap refinery hub is
+   * cached and the source here is a separately-created location.
    *
    * @param page the authenticated page with the Umbuchen modal's LOCATION fields visible
    * @param sourceLocationId the row's current (source) location id to avoid
    * @return the chosen destination location id
    */
   private static String selectDifferentUmbuchenLocation(Page page, String sourceLocationId) {
-    Locator options = page.locator("#umbuchenTargetLocationId option");
+    Locator combo = page.locator(".krt-combobox:has(#umbuchenTargetLocationId)");
+    combo.locator(".krt-combobox__input").click();
+    Locator options = combo.locator("li[role='option']");
+    options.first().waitFor();
     int count = options.count();
     for (int i = 0; i < count; i++) {
-      String value = options.nth(i).getAttribute("value");
+      String value = options.nth(i).getAttribute("data-value");
       if (value != null && !value.isBlank() && !value.equals(sourceLocationId)) {
-        page.locator("#umbuchenTargetLocationId").selectOption(value);
+        options.nth(i).click();
         return value;
       }
     }

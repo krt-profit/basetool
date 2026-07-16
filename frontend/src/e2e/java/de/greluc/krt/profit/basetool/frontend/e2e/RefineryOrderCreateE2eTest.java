@@ -120,7 +120,9 @@ class RefineryOrderCreateE2eTest {
         page.locator("#locationId").selectOption(new SelectOption().setLabel("E2E Refinery Hub"));
         page.locator("#refiningMethodId")
             .selectOption(new SelectOption().setLabel("E2E Refining Method"));
-        page.locator("#inputMaterialId_0").selectOption(materialId);
+        // The input-material picker is a searchable combobox; its id stays on the hidden input.
+        E2eSupport.selectComboboxByValue(
+            page.locator(".krt-combobox:has(#inputMaterialId_0) .krt-combobox__input"), materialId);
         // Both the input and the expected output quantity of the goods row are required.
         page.locator("#inputQuantity_0").fill("100");
         page.locator("#outputQuantity_0").fill("100");

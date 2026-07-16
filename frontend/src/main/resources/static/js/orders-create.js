@@ -64,8 +64,16 @@ function refreshMaterialUnit(row) {
     if (!sel || !amountInput) {
         return;
     }
-    const opt = sel.selectedOptions && sel.selectedOptions[0];
-    const qt = opt ? opt.getAttribute('data-quantity-type') : '';
+    // The material picker is a searchable combobox (REQ-FE-016): after enhancement, data-role
+    // lives on the hidden input and the selected option's data-quantity-type is mirrored onto
+    // it. This module's on-load row sync runs at parse time, BEFORE the DOMContentLoaded
+    // enhancer — at that point the raw <select> still answers the data-role query, so fall
+    // back to its selected option (edit mode / validation redisplay).
+    let qt = sel.dataset.quantityType || '';
+    if (!qt && sel.tagName === 'SELECT') {
+        const opt = sel.selectedOptions && sel.selectedOptions[0];
+        qt = (opt && opt.getAttribute('data-quantity-type')) || '';
+    }
     if (qt === 'PIECE') {
         amountInput.setAttribute('step', '1');
         if (unitSpan) unitSpan.textContent = '(' + MSG_UNIT_PIECE + ')';
@@ -122,12 +130,14 @@ function importFromScmdb() {
                 const container = document.getElementById('materials-container');
                 let targetRow = null;
 
-                // Beim ersten gefundenen Material prüfen, ob die erste Zeile leer ist
+                // Beim ersten gefundenen Material prüfen, ob die erste Zeile leer ist. The
+                // material picker is an enhanced combobox, so it is addressed by data-role (the
+                // hidden input) — a bare querySelector('select') would hit the minQuality select.
                 if (!foundAny) {
                     const rows = container.getElementsByClassName('material-row');
                     if (rows.length > 0) {
-                        const firstSelect = rows[0].querySelector('select');
-                        if (!firstSelect.value) {
+                        const firstSelect = rows[0].querySelector('[data-role="material-select"]');
+                        if (firstSelect && !firstSelect.value) {
                             targetRow = rows[0];
                         }
                     }
@@ -138,11 +148,17 @@ function importFromScmdb() {
                     targetRow = container.lastElementChild;
                 }
 
-                const select = targetRow.querySelector('select');
-                const inputs = targetRow.querySelectorAll('input[type="number"]');
-                const amountInput = inputs[0];
+                const matField = targetRow.querySelector('[data-role="material-select"]');
+                const amountInput = targetRow.querySelector('[data-role="material-amount"]');
 
-                select.value = materialId;
+                // setValue() syncs the hidden value, the visible label and the mirrored
+                // option metadata in one step (REQ-FE-016); a bare .value write would leave
+                // the textbox empty and the quantity-type mirror stale.
+                if (matField.krtCombobox) {
+                    matField.krtCombobox.setValue(materialId);
+                } else {
+                    matField.value = materialId;
+                }
                 amountInput.value = amount;
                 refreshMaterialUnit(targetRow);
 
@@ -187,7 +203,7 @@ function addMaterialRow() {
     row.innerHTML = `
         <div class="form-group flex-2 mb-0">
             <label>${MSG_MATERIAL_LABEL}</label>
-            <select name="materials[${materialIndex}].materialId" data-role="material-select" required>${options}</select>
+            <select name="materials[${materialIndex}].materialId" data-role="material-select" data-krt-combobox required>${options}</select>
         </div>
         <div class="form-group flex-1 mb-0">
             <label>${MSG_AMOUNT_LABEL} <span data-role="amount-unit"></span>${scuHintMarkup()}</label>
@@ -200,6 +216,11 @@ function addMaterialRow() {
     `;
 
     container.appendChild(row);
+    // Manually built DOM: the global DOMContentLoaded/krt:swapped enhancer does not see it, so
+    // upgrade the fresh material select in place (REQ-FE-016).
+    if (window.krtEnhanceComboboxes) {
+        window.krtEnhanceComboboxes(row);
+    }
     refreshMaterialUnit(row);
     materialIndex++;
 }

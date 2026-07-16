@@ -679,8 +679,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!sel || !amountInput) {
                 return;
             }
-            const opt = sel.selectedOptions && sel.selectedOptions[0];
-            const qt = opt ? opt.getAttribute('data-quantity-type') : '';
+            // The material picker is a searchable combobox (REQ-FE-016): data-role lives on
+            // the hidden input and the selected option's data-quantity-type is mirrored onto
+            // it. Fallback to the raw <select>'s option covers a not-yet-enhanced row.
+            let qt = sel.dataset.quantityType || '';
+            if (!qt && sel.tagName === 'SELECT') {
+                const opt = sel.selectedOptions && sel.selectedOptions[0];
+                qt = (opt && opt.getAttribute('data-quantity-type')) || '';
+            }
             if (qt === 'PIECE') {
                 amountInput.setAttribute('step', '1');
                 amountInput.setAttribute('min', '1');
@@ -700,43 +706,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         addMaterialBtn.addEventListener('click', () => {
-            const rows = materialsContainer.querySelectorAll('.material-row');
-            const nextIndex = rows.length;
-            if (nextIndex > 0) {
-                const templateRow = rows[0];
-                const newRow = templateRow.cloneNode(true);
-
-                const selects = newRow.querySelectorAll('select');
-                selects.forEach((select) => {
-                    const name = select.getAttribute('name');
-                    if (name) {
-                        select.setAttribute('name', name.replace(/\[\d+\]/, '[' + nextIndex + ']'));
-                        const selectId = select.getAttribute('id');
-                        if (selectId) {
-                            select.setAttribute('id', selectId.replace(/\d+/, nextIndex));
-                        }
-                        // minQuality is a 650/Keine select; default a fresh row to 650. The
-                        // material select resets to the empty "please choose" option.
-                        select.value = name.includes('minQuality') ? '650' : '';
-                    }
-                });
-
-                const inputs = newRow.querySelectorAll('input');
-                inputs.forEach((input) => {
-                    const name = input.getAttribute('name');
-                    if (name) {
-                        input.setAttribute('name', name.replace(/\[\d+\]/, '[' + nextIndex + ']'));
-                        const inputId = input.getAttribute('id');
-                        if (inputId) {
-                            input.setAttribute('id', inputId.replace(/\d+/, nextIndex));
-                        }
-                        input.value = '';
-                    }
-                });
-
-                materialsContainer.appendChild(newRow);
-                refreshEditMaterialUnit(newRow);
+            // A fresh row is cloned from the inert #edit-material-row-template — never from a
+            // live row: the material picker is an enhanced combobox (REQ-FE-016), and a cloned
+            // combobox is dead (listeners dropped, no native <select> left to re-enhance). The
+            // template clone carries raw markup, gets its indexed names, and is enhanced after
+            // insertion.
+            const nextIndex = materialsContainer.querySelectorAll('.material-row').length;
+            const rowTemplate = document.getElementById('edit-material-row-template');
+            if (!rowTemplate) {
+                return;
             }
+            const fragment = rowTemplate.content.cloneNode(true);
+            fragment.querySelectorAll('select, input').forEach((field) => {
+                const name = field.getAttribute('name');
+                if (name) {
+                    field.setAttribute('name', name.replace(/\[\d+\]/, '[' + nextIndex + ']'));
+                }
+            });
+            materialsContainer.appendChild(fragment);
+            const newRow = materialsContainer.lastElementChild;
+            if (window.krtEnhanceComboboxes) {
+                window.krtEnhanceComboboxes(newRow);
+            }
+            refreshEditMaterialUnit(newRow);
         });
 
         materialsContainer.addEventListener('change', (e) => {

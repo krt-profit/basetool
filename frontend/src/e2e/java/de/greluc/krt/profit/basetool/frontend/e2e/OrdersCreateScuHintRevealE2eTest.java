@@ -111,11 +111,18 @@ class OrdersCreateScuHintRevealE2eTest {
         // scuHintMarkup and starts hidden via krtm-hidden).
         page.locator("[data-trigger=\"orders-add-material\"]").click();
         Locator row = page.locator("#materials-container .material-row").last();
-        Locator select = row.locator("[data-role=\"material-select\"]");
 
-        Locator scuOption = select.locator("option[data-quantity-type=\"SCU\"]").first();
+        // The row's material picker is a searchable combobox whose enhanced option list carries no
+        // data-quantity-type (the metadata is mirrored onto the hidden input only once an option is
+        // selected), so the SCU-typed value is looked up on the inert, still-native
+        // #material-options-template the row options are cloned from, then picked by value.
+        Locator scuOption =
+            page.locator("#material-options-template option[data-quantity-type=\"SCU\"]").first();
         if (scuOption.count() > 0) {
-          select.selectOption(scuOption.getAttribute("value"));
+          E2eSupport.selectComboboxByValue(
+              row.locator(
+                  ".krt-combobox:has([data-role=\"material-select\"])" + " .krt-combobox__input"),
+              scuOption.getAttribute("value"));
           assertThat(row.locator(".scu-hint"))
               .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(15_000));
         }

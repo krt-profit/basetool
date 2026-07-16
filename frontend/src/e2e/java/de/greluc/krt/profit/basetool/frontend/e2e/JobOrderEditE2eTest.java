@@ -27,7 +27,6 @@ import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
-import com.microsoft.playwright.options.SelectOption;
 import java.nio.file.Path;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
@@ -125,17 +124,18 @@ class JobOrderEditE2eTest {
         E2eSupport.navigate(page, baseUrl + "/orders/" + jobOrderId);
 
         // The edit button toggles the LOGISTICIAN-gated modal open via the global modal delegation;
-        // the controller pre-fills the form, but the material <select> is built from a
-        // 10-min-cached
-        // material lookup that need not yet contain this order's freshly-seeded material — so its
-        // th:field selection can fall through to the disabled "-- Material wählen --" placeholder
-        // (observed under WebKit, where the order's material was absent from the cached options).
-        // Pick an available option by index to guarantee the required field is set; the test
-        // asserts
-        // only that the amount round-trips, so which material is chosen is immaterial.
+        // the controller pre-fills the form, but the material picker (a searchable combobox — its
+        // data-role now sits on the enhancer's hidden input) is built from a 10-min-cached material
+        // lookup that need not yet contain this order's freshly-seeded material — so its th:field
+        // selection can fall through to an empty picker (observed under WebKit, where the order's
+        // material was absent from the cached options). Pick the first offered option to guarantee
+        // the required field is set; the test asserts only that the amount round-trips, so which
+        // material is chosen is immaterial.
         page.locator("[data-trigger='open-modal-display'][data-modal-id='edit-modal']").click();
-        page.locator("#edit-modal select[data-role='material-select']")
-            .selectOption(new SelectOption().setIndex(1));
+        E2eSupport.selectComboboxFirstOption(
+            page.locator(
+                "#edit-modal .krt-combobox:has([data-role='material-select'])"
+                    + " .krt-combobox__input"));
         page.locator("#edit-modal input[name='materials[0].amount']").fill("250");
         page.locator("#edit-modal #edit-comment").fill(comment);
 

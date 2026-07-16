@@ -63,17 +63,21 @@ function calcScu(index) {
 function updateOutputMaterial(selectElement) {
     const entryBlock = selectElement.closest('.material-entry');
     const outputDisplay = entryBlock.querySelector('span[id^="outputMaterialDisplay_"]');
-    const selectedOption = selectElement.options[selectElement.selectedIndex];
 
-    if (selectedOption) {
-        const refinedName = selectedOption.getAttribute('data-refined-name');
-        if (refinedName) {
-            outputDisplay.innerText = refinedName;
-            outputDisplay.style.opacity = '1';
-        } else {
-            outputDisplay.innerText = '-';
-            outputDisplay.style.opacity = '0.7';
-        }
+    // The input-material picker is a searchable combobox (REQ-FE-016): the selected option's
+    // data-refined-name is mirrored onto the hidden input carrying the control's id. The raw
+    // <select> fallback covers a not-yet-enhanced control (pre-enhancement init pass).
+    let refinedName = selectElement.dataset.refinedName || '';
+    if (!refinedName && selectElement.tagName === 'SELECT') {
+        const selectedOption = selectElement.options[selectElement.selectedIndex];
+        refinedName = (selectedOption && selectedOption.getAttribute('data-refined-name')) || '';
+    }
+    if (refinedName) {
+        outputDisplay.innerText = refinedName;
+        outputDisplay.style.opacity = '1';
+    } else {
+        outputDisplay.innerText = '-';
+        outputDisplay.style.opacity = '0.7';
     }
 
     // Refresh the yield badge against the shared module's map. With no location picked the
@@ -107,6 +111,27 @@ function addMaterialRow() {
     const count = entries.length;
 
     const template = entries[0].cloneNode(true);
+
+    // The input-material picker is an enhanced combobox (REQ-FE-016); its clone is dead
+    // (listeners dropped, duplicated ARIA ids, no native <select> left to re-enhance).
+    // Rebuild a raw select from the inert #refinery-material-options-template, carry over
+    // row 0's id/name (renumbered by the loop below), and let krtEnhanceComboboxes upgrade
+    // it once the row is inserted.
+    const clonedPicker = template.querySelector('.krt-combobox');
+    if (clonedPicker) {
+        const optionsTemplate = document.getElementById('refinery-material-options-template');
+        const hiddenField = clonedPicker.querySelector('input[type="hidden"]');
+        const freshSelect = document.createElement('select');
+        freshSelect.innerHTML = optionsTemplate ? optionsTemplate.innerHTML : '';
+        if (hiddenField) {
+            freshSelect.id = hiddenField.id;
+            freshSelect.name = hiddenField.name;
+        }
+        freshSelect.required = true;
+        freshSelect.setAttribute('data-trigger', 'rfc-update-output');
+        freshSelect.setAttribute('data-krt-combobox', '');
+        clonedPicker.parentNode.replaceChild(freshSelect, clonedPicker);
+    }
 
     // Renumber the title in the header. Source is row 0 ("Material #1") so without an
     // update the cloned row would also read "Material #1" until the page is reloaded.
@@ -187,6 +212,11 @@ function addMaterialRow() {
     });
 
     container.appendChild(template);
+    // Manually built DOM: the global enhancer does not see it, so upgrade the rebuilt
+    // material select in place (REQ-FE-016).
+    if (window.krtEnhanceComboboxes) {
+        window.krtEnhanceComboboxes(template);
+    }
 }
 
 function removeMaterialRow(button) {
@@ -353,9 +383,18 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('click', 'rfc-apply-suggestion', function (el) {
         const materialId = el.getAttribute('data-material-id');
         const entry = el.closest('.material-entry');
-        const select = entry ? entry.querySelector('select[id^="inputMaterialId_"]') : null;
+        // Attribute-only selector: after combobox enhancement the control's id lives on a
+        // hidden <input>, not a <select> (REQ-FE-016).
+        const select = entry ? entry.querySelector('[id^="inputMaterialId_"]') : null;
         if (!select || !materialId) return;
-        select.value = materialId;
+        // setValue() syncs the hidden value, the visible label and the mirrored metadata;
+        // the explicit change dispatch re-derives the output display + yield badge like a
+        // manual pick (setValue itself never fires change).
+        if (select.krtCombobox) {
+            select.krtCombobox.setValue(materialId);
+        } else {
+            select.value = materialId;
+        }
         select.dispatchEvent(new Event('change', { bubbles: true }));
     });
 }
@@ -420,7 +459,9 @@ function _reinitRefineryForm(fromSwap) {
     }
     updateMethodRatings();
     document.querySelectorAll('.material-entry').forEach((_, index) => calcScu(index));
-    document.querySelectorAll('select[id^="inputMaterialId_"]').forEach((select) => {
+    // Attribute-only selector: matches the raw <select> before enhancement and the hidden
+    // <input> carrying the id after it (REQ-FE-016).
+    document.querySelectorAll('[id^="inputMaterialId_"]').forEach((select) => {
         if (select.value) updateOutputMaterial(select);
     });
     if (window.krtRefineryYield) {
