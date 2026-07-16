@@ -385,7 +385,7 @@
                                 <span th:if="${rowIssue.suggestions() != null and !rowIssue.suggestions().isEmpty()}" class="import-suggestions">
                                     <button th:each="suggestion : ${rowIssue.suggestions()}" type="button" class="btn btn-ghost import-suggestion-chip"
                                             data-trigger="rfc-apply-suggestion"
-                                            th:attr="data-material-id=${suggestion.id()}, data-testid='refinery-import-suggestion-' + ${stat.index}"
+                                            th:attr="data-material-id=${suggestion.id()}, data-material-name=${suggestion.name()}, data-testid='refinery-import-suggestion-' + ${stat.index}"
                                             th:text="|${suggestion.name()} (${#numbers.formatInteger(suggestion.score() * 100, 1)}%)|">Stileron (Raw) (89%)</button>
                                 </span>
                             </div>
@@ -394,9 +394,13 @@
                         <div class="material-row">
                             <div class="form-group flex-2 mb-0">
                                 <label th:for="'inputMaterialId_' + ${stat.index}" th:text="#{refineryorder.form.material.input}">Eingangsmaterial</label>
-                                <select th:id="'inputMaterialId_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputMaterialId}" required data-trigger="rfc-update-output">
+                                <!-- Server-side searchable combobox (remote-materials-raw, REQ-FE-016): the raw
+                                     catalog is searched on demand, so only the row's already-chosen material is
+                                     seeded (redisplay/import path) with the refined-output metadata the enhancer
+                                     harvests; a fresh row renders just the placeholder. -->
+                                <select th:id="'inputMaterialId_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputMaterialId}" required data-trigger="rfc-update-output" data-krt-combobox="remote-materials-raw">
                                     <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
-                                    <option th:each="mat : ${materials}" th:if="${mat.type == 'RAW' or mat.isManualRawMaterial == true}" th:value="${mat.id}" th:text="${mat.name}" th:attr="data-refined-id=${mat.refinedMaterial != null ? mat.refinedMaterial.id : ''},data-refined-name=${mat.refinedMaterial != null ? mat.refinedMaterial.name : ''}"></option>
+                                    <option th:each="mat : ${materials}" th:if="${mat.id == good.inputMaterialId}" th:value="${mat.id}" th:text="${mat.name}" th:attr="data-refined-id=${mat.refinedMaterial != null ? mat.refinedMaterial.id : ''},data-refined-name=${mat.refinedMaterial != null ? mat.refinedMaterial.name : ''}"></option>
                                 </select>
                             </div>
 

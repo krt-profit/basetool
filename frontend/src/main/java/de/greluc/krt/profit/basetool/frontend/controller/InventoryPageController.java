@@ -128,7 +128,8 @@ public class InventoryPageController {
 
   /**
    * Response type for the cached location catalog lookup ({@code /api/v1/locations/lookup}) that
-   * feeds the storage-location dropdowns on the list and create views.
+   * feeds the create form's location-picker seed (the list views' Umbuchen location picker searches
+   * server-side instead).
    */
   private static final ParameterizedTypeReference<
           List<de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto>>
@@ -293,7 +294,8 @@ public class InventoryPageController {
   /**
    * Renders the personal inventory list ({@code /inventory/my}). Filters are URL-driven so a user
    * can share a filtered link. {@code fragment=true} returns just the table fragment for AJAX
-   * filter changes.
+   * filter changes. The Umbuchen modal's target-location picker searches locations server-side
+   * (remote-locations combobox), so no locations catalog is added to the model.
    *
    * @param materialIds optional material id filter (multi)
    * @param minQuality optional minimum-quality filter
@@ -370,7 +372,9 @@ public class InventoryPageController {
     // keeping empty items list to not break any existing template iteration if any
     model.addAttribute("items", new ArrayList<>());
     model.addAttribute("materials", fetchMaterials());
-    model.addAttribute("locations", fetchLocations());
+    // The Umbuchen target-location picker (inventory-my.html) searches locations on demand
+    // (remote-locations combobox -> /catalog/location-search), so no locations catalog is
+    // preloaded here; the modal-opening JS seeds the row's current location itself.
     model.addAttribute("jobOrders", fetchActiveJobOrders());
     model.addAttribute("missions", fetchMissions());
     model.addAttribute("users", fetchUsers());
@@ -391,7 +395,9 @@ public class InventoryPageController {
 
   /**
    * Renders the squadron-wide inventory list ({@code /inventory/all}). Same shape as {@link
-   * #viewMyInventory} but the backend endpoint scopes to all users (gated by role at the backend).
+   * #viewMyInventory} but the backend endpoint scopes to all users (gated by role at the backend);
+   * like {@code /my}, the Umbuchen target-location picker searches server-side, so no locations
+   * catalog is added to the model.
    *
    * @param materialIds optional material id filter (multi)
    * @param minQuality optional minimum-quality filter
@@ -457,7 +463,9 @@ public class InventoryPageController {
     model.addAttribute("selectedMinQuality", minQuality);
     model.addAttribute("selectedJobOrderIds", jobOrderIds);
     model.addAttribute("selectedMissionIds", missionIds);
-    model.addAttribute("locations", fetchLocations());
+    // The Umbuchen target-location picker (inventory-admin.html) searches locations on demand
+    // (remote-locations combobox -> /catalog/location-search), so no locations catalog is
+    // preloaded here; the modal-opening JS seeds the row's current location itself.
     model.addAttribute("jobOrders", fetchActiveJobOrders());
     model.addAttribute("missions", fetchMissions());
     // #1193: the /all book-out/transfer target-user picker (inventory-admin.html) now searches

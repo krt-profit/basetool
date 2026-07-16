@@ -81,14 +81,40 @@ public class LocationController {
   }
 
   /**
-   * Lightweight projection for typeaheads — only id and name.
+   * Lightweight projection for typeaheads — only id and name. Deliberately complete: a silent bound
+   * would make locations beyond it unreachable for consumers of the full list. Pickers that must
+   * stay payload-bounded use {@link #searchLocations(String, Integer, Integer, String)}.
    *
-   * @return all locations as reference DTOs
+   * @return all non-hidden locations as reference DTOs
    */
   @GetMapping("/lookup")
   public List<de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto>
       lookupLocations() {
     return locationService.findAllReference();
+  }
+
+  /**
+   * Live search for the location pickers (REQ-FE-016): pages non-hidden locations whose name
+   * contains {@code search}, case-insensitively. Backs the searchable location comboboxes so every
+   * location stays reachable by typing regardless of catalogue size, while each response stays
+   * payload-bounded — the deliberate alternative to preloading (or silently capping) the full list.
+   *
+   * @param search optional name fragment; {@code null}/blank returns the unfiltered first page
+   * @param page zero-based page index (defaulted by {@link PaginationUtil})
+   * @param size page size (clamped by {@link PaginationUtil})
+   * @param sort whitelisted sort ({@code name} or {@code id}), default name ascending
+   * @return one page of matching non-hidden locations as reference DTOs
+   */
+  @GetMapping("/search")
+  public PageResponse<de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto>
+      searchLocations(
+          @RequestParam(required = false) String search,
+          @RequestParam(required = false) Integer page,
+          @RequestParam(required = false) Integer size,
+          @RequestParam(required = false) String sort) {
+    Pageable pageable =
+        PaginationUtil.createPageRequest(page, size, sort, Set.of("name", "id"), "name");
+    return PageResponse.of(locationService.searchReference(search, pageable));
   }
 
   /**

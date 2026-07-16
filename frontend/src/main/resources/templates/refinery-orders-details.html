@@ -306,9 +306,13 @@
                         <div class="material-row">
                             <div class="form-group flex-2 mb-0">
                                 <label th:for="'inputMaterialId_' + ${stat.index}" th:text="#{refineryorder.form.material.input}">Eingangsmaterial</label>
-                                <select th:id="'inputMaterialId_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputMaterialId}" required data-trigger="rod-update-output" th:disabled="${!canEdit}">
+                                <!-- Server-side searchable combobox (remote-materials-raw, REQ-FE-016): the raw
+                                     catalog is searched on demand, so only the row's already-chosen material is
+                                     seeded (edit/redisplay path) with the refined-output metadata the enhancer
+                                     harvests; a blank row renders just the placeholder. -->
+                                <select th:id="'inputMaterialId_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputMaterialId}" required data-trigger="rod-update-output" data-krt-combobox="remote-materials-raw" th:disabled="${!canEdit}">
                                     <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
-                                    <option th:each="mat : ${materials}" th:if="${mat.type == 'RAW' or mat.isManualRawMaterial == true}" th:value="${mat.id}" th:text="${mat.name}" th:attr="data-refined-id=${mat.refinedMaterial != null ? mat.refinedMaterial.id : ''},data-refined-name=${mat.refinedMaterial != null ? mat.refinedMaterial.name : ''}"></option>
+                                    <option th:each="mat : ${materials}" th:if="${mat.id == good.inputMaterialId}" th:value="${mat.id}" th:text="${mat.name}" th:attr="data-refined-id=${mat.refinedMaterial != null ? mat.refinedMaterial.id : ''},data-refined-name=${mat.refinedMaterial != null ? mat.refinedMaterial.name : ''}"></option>
                                 </select>
                             </div>
 

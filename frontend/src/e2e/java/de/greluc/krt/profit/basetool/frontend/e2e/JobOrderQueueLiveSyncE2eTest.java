@@ -25,7 +25,6 @@ import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
-import com.microsoft.playwright.options.SelectOption;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -136,7 +135,7 @@ class JobOrderQueueLiveSyncE2eTest {
         pageA.locator("#requestingOrgUnitId").selectOption(IRIDIUM_ID);
         pageA.locator("#responsibleOrgUnitId").selectOption(IRIDIUM_ID);
         pageA.locator("#handle").fill("E2E live " + UUID.randomUUID());
-        pageA.getByTestId("order-material-select").selectOption(new SelectOption().setIndex(1));
+        E2eSupport.selectComboboxFirstOption(pageA.getByTestId("order-material-select"));
         pageA.getByTestId("order-material-amount").fill("5");
         E2eSupport.clickSubmitClearingFooter(pageA.getByTestId("order-submit"));
         pageA.waitForLoadState();
