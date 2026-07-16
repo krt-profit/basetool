@@ -72,7 +72,7 @@ public class AdminLocationsPageController {
 
   /**
    * Fetches <em>all</em> locations — every page, including hidden entries — sorts them
-   * case-insensitively by name and renders the table (REQ-ADMIN-001, ADR-0101). A backend failure
+   * case-insensitively by name and renders the table (REQ-ADMIN-001, ADR-0102). A backend failure
    * puts an error key in the model rather than blanking the page; a page walk that hits its safety
    * cap sets {@code catalogTruncated} so the template shows a loud warning banner instead of
    * silently presenting a partial list (REQ-ADMIN-002).

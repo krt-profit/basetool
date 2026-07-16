@@ -33,15 +33,25 @@ public final class InventoryAuditLabels {
   private InventoryAuditLabels() {}
 
   /**
-   * Composes the audit subject label for an inventory row — {@code material @ location}, the
-   * deletion-proof identity snapshot stored on each audit event (REQ-AUDIT-001). A missing material
-   * or location renders as an em dash so the label stays well-formed for orphaned rows.
+   * Composes the audit subject label for an inventory row — {@code <catalog entry> @ location}, the
+   * deletion-proof identity snapshot stored on each audit event (REQ-AUDIT-001). The catalog entry
+   * is the material name for a material row and the game-item name for a game-item row (V220,
+   * REQ-INV-029) — without the game-item branch every reused event on an item row would log the
+   * em-dash fallback. A row missing both catalog references or its location renders the affected
+   * part as an em dash so the label stays well-formed for orphaned rows.
    *
    * @param item the inventory row (associations may be lazily loaded but must be within the tx)
-   * @return the {@code material @ location} label
+   * @return the {@code <material|gameItem> @ location} label
    */
   public static String label(InventoryItem item) {
-    String mat = item.getMaterial() != null ? item.getMaterial().getName() : "—";
+    String mat;
+    if (item.getMaterial() != null) {
+      mat = item.getMaterial().getName();
+    } else if (item.getGameItem() != null) {
+      mat = item.getGameItem().getName();
+    } else {
+      mat = "—";
+    }
     String loc = item.getLocation() != null ? item.getLocation().getName() : "—";
     return mat + " @ " + loc;
   }

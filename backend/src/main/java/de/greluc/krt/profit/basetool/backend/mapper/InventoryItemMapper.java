@@ -19,10 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
+import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
 import de.greluc.krt.profit.basetool.backend.model.Location;
+import de.greluc.krt.profit.basetool.backend.model.dto.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderAllocationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
@@ -51,6 +53,11 @@ public interface InventoryItemMapper {
    * SquadronMapper.orgUnitToReferenceDto}, which projects either kind — a Staffel or a
    * Spezialkommando — into the slim owner reference (id/name/shorthand), so SK-owned stock now
    * surfaces its SK badge instead of a blank cell.
+   *
+   * <p>Catalog-discriminated rows (V220, REQ-INV-029): {@code material} and {@code quality} are
+   * {@code null} on a game-item row and map to {@code null} DTO fields without dereferencing;
+   * {@code gameItem} maps through {@link #gameItemToReferenceDto(GameItem)} and is {@code null} on
+   * a material row. Exactly one of the two catalog references is populated.
    *
    * @param inventoryItem the inventory-item entity to project; {@code null} returns {@code null}.
    * @return the populated inventory-item DTO.
@@ -85,6 +92,29 @@ public interface InventoryItemMapper {
 
   /** Nested mapping for the item's {@link Location} (used as {@code uses} target). */
   LocationDto locationToDto(Location location);
+
+  /**
+   * Projects a {@link GameItem} catalogue entity into the slim Lager reference DTO (REQ-INV-029):
+   * id, display name, manufacturer name and kind name. MapStruct picks this method up for the
+   * {@code gameItem} field of {@link #toDto(InventoryItem)}; it is also reused directly by the
+   * item-side aggregation and catalog-search reads so every surface renders the same reference
+   * shape. Dereferences the lazy {@code manufacturer} association — callers must have it fetched
+   * (entity graph) or be inside an open session; batch loading via the {@code Manufacturer}
+   * class-level {@code @BatchSize} keeps the grouped paths free of per-row selects.
+   *
+   * @param gameItem the catalogue entity to project; {@code null} returns {@code null}.
+   * @return the slim reference DTO, or {@code null} for a {@code null} input.
+   */
+  default InventoryGameItemReferenceDto gameItemToReferenceDto(GameItem gameItem) {
+    if (gameItem == null) {
+      return null;
+    }
+    return new InventoryGameItemReferenceDto(
+        gameItem.getId(),
+        gameItem.getName(),
+        gameItem.getManufacturer() != null ? gameItem.getManufacturer().getName() : null,
+        gameItem.getKind() != null ? gameItem.getKind().name() : null);
+  }
 
   /**
    * The still-unallocated job-order remainder of an entry ({@code amount − Σ slice amounts}), SCU-

@@ -26,7 +26,6 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.assertions.LocatorAssertions;
-import com.microsoft.playwright.options.SelectOption;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -109,8 +108,8 @@ class JobOrderCreateE2eTest {
         page.locator("#responsibleOrgUnitId").selectOption(IRIDIUM_ID);
         page.locator("#requestingOrgUnitId").selectOption(IRIDIUM_ID);
         page.locator("#handle").fill("E2E Contact");
-        // Select whatever material the (frontend-cached) dropdown offers — see setUp().
-        page.getByTestId("order-material-select").selectOption(new SelectOption().setIndex(1));
+        // Select whatever material the (frontend-cached) searchable combobox offers — see setUp().
+        E2eSupport.selectComboboxFirstOption(page.getByTestId("order-material-select"));
         page.getByTestId("order-material-amount").fill("100");
         // Wait for the full post-submit redirect to settle before navigating, else WebKit aborts
         // the in-flight redirect GET (HTTP/2 INTERNAL_ERROR) — see E2eSupport#awaitFormPost.

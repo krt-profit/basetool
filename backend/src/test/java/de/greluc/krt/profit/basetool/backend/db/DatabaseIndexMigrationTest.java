@@ -99,6 +99,20 @@ class DatabaseIndexMigrationTest {
     // V143: composite stack-key index backing the group-on-read GROUP BY and the lazy per-stack
     // entries lookup (ADR-0003, REQ-INV-002).
     assertIndexExists(jdbc, "inventory_item", "idx_inventory_item_stack_key");
+    // V220 (REQ-INV-029, ADR-0101): the item-side partial stack-key sibling over game-item rows.
+    // Pin the shape too — the partial WHERE predicate and the key columns are what make the item
+    // stack GROUP BYs and drill-downs index-backed; a rename-preserving narrowing must fail here.
+    assertIndexExists(jdbc, "inventory_item", "idx_inventory_item_item_stack_key");
+    assertIndexDefContains(
+        jdbc,
+        "inventory_item",
+        "idx_inventory_item_item_stack_key",
+        "game_item_id",
+        "user_id",
+        "location_id",
+        "personal",
+        "owning_org_unit_id",
+        "where (game_item_id is not null)");
     // V146 (covers REQ-REFINERY-010): case-insensitive unique index that replaced the V108
     // case-sensitive constraint — guarantees the IgnoreCase alias resolver can never see two
     // case-variant rows for the same (source_system, external_name).

@@ -61,6 +61,7 @@ class InventoryWriteControllerAllocationTest {
         null,
         null,
         null,
+        null,
         750,
         10.0,
         false,

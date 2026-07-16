@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.model.FinanceType;
+import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Location;
@@ -46,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
+import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.AllocationReductionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
@@ -1249,8 +1251,239 @@ class InventoryItemServiceBookOutTest {
   }
 
   // ---------------------------------------------------------------
+  // game-item stock rows (V220, REQ-INV-029/031)
+  // ---------------------------------------------------------------
+
+  @Nested
+  class GameItemRowTests {
+
+    // covers REQ-INV-029 (item book-outs move whole units only)
+    @Test
+    void bookOut_itemRow_fractionalAmount_throwsBadRequest() {
+      // Given a game-item stock row
+      InventoryItem item = newGameItemRow(10.0, 1L);
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+
+      // When / Then — a fractional amount is rejected before any decrement, and the 400 detail
+      // names the row's actual catalog kind (item stock, not PIECE materials)
+      BadRequestException ex =
+          assertThrows(
+              BadRequestException.class,
+              () ->
+                  service.bookOutInventoryItem(
+                      ITEM_ID,
+                      newDto(1.5, null, null, CheckoutType.DISCARD, null, null, 1L),
+                      OWNER_ID,
+                      false));
+      assertEquals("Amount must be a whole number for item stock", ex.getMessage());
+      verify(inventoryItemRepository, never()).save(any());
+      verify(inventoryItemRepository, never()).saveAndFlush(any());
+      verify(inventoryItemRepository, never()).delete(any());
+    }
+
+    // covers REQ-INV-029 (the closed gap: PIECE-material book-outs are whole-number-validated too)
+    @Test
+    void bookOut_pieceMaterial_fractionalAmount_throwsBadRequest() {
+      // Given a PIECE-material row — before V220 the server accepted a fractional book-out here
+      InventoryItem item = newItem(10.0, 1L);
+      item.getMaterial().setQuantityType(QuantityType.PIECE);
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+
+      // When / Then — the 400 detail keeps the material wording on a material row
+      BadRequestException ex =
+          assertThrows(
+              BadRequestException.class,
+              () ->
+                  service.bookOutInventoryItem(
+                      ITEM_ID,
+                      newDto(2.5, null, null, CheckoutType.DISCARD, null, null, 1L),
+                      OWNER_ID,
+                      false));
+      assertEquals("Amount must be a whole number for PIECE materials", ex.getMessage());
+      verify(inventoryItemRepository, never()).save(any());
+      verify(inventoryItemRepository, never()).saveAndFlush(any());
+      verify(inventoryItemRepository, never()).delete(any());
+    }
+
+    // covers REQ-INV-029 (full-depletion escape: a legacy fractional PIECE row can be drained)
+    @Test
+    void bookOut_pieceMaterial_legacyFractionalRow_fullDepletion_isAllowed() {
+      // Given a PIECE-material row holding a legacy fractional amount (created before the
+      // whole-unit guard existed) — without the escape that remainder could never be drained
+      InventoryItem item = newItem(1.5, 1L);
+      item.getMaterial().setQuantityType(QuantityType.PIECE);
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+
+      // When — book out the row's EXACT remaining amount
+      InventoryItemDto result =
+          service.bookOutInventoryItem(
+              ITEM_ID,
+              newDto(1.5, null, null, CheckoutType.DISCARD, null, null, 1L),
+              OWNER_ID,
+              false);
+
+      // Then — the fractional amount is exempt (full depletion): the row is drained and deleted
+      assertNull(result, "a full depletion returns null");
+      verify(inventoryItemRepository).delete(item);
+      verify(inventoryItemRepository, never()).saveAndFlush(any());
+    }
+
+    // covers REQ-INV-029 (a PARTIAL fractional book-out off a fractional PIECE row still 400s)
+    @Test
+    void bookOut_pieceMaterial_legacyFractionalRow_partialFractionalAmount_throwsBadRequest() {
+      // Given the same legacy fractional PIECE row
+      InventoryItem item = newItem(1.5, 1L);
+      item.getMaterial().setQuantityType(QuantityType.PIECE);
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+
+      // When / Then — 0.5 is fractional AND does not deplete the row, so the guard still fires
+      BadRequestException ex =
+          assertThrows(
+              BadRequestException.class,
+              () ->
+                  service.bookOutInventoryItem(
+                      ITEM_ID,
+                      newDto(0.5, null, null, CheckoutType.DISCARD, null, null, 1L),
+                      OWNER_ID,
+                      false));
+      assertEquals("Amount must be a whole number for PIECE materials", ex.getMessage());
+      verify(inventoryItemRepository, never()).saveAndFlush(any());
+      verify(inventoryItemRepository, never()).delete(any());
+    }
+
+    // covers REQ-INV-029 (full-depletion escape on an item row — the guard is row-kind driven)
+    @Test
+    void bookOut_itemRow_legacyFractionalRow_fullDepletion_isAllowed() {
+      // Given a game-item row holding a legacy fractional amount (only reachable via legacy data,
+      // but the guard is row-kind driven, so the escape must hold here too)
+      InventoryItem item = newGameItemRow(1.5, 1L);
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+
+      // When — book out the row's EXACT remaining amount
+      InventoryItemDto result =
+          service.bookOutInventoryItem(
+              ITEM_ID,
+              newDto(1.5, null, null, CheckoutType.DISCARD, null, null, 1L),
+              OWNER_ID,
+              false);
+
+      // Then — exempt from the whole-unit rule: the row is drained and deleted
+      assertNull(result, "a full depletion returns null");
+      verify(inventoryItemRepository).delete(item);
+      verify(inventoryItemRepository, never()).saveAndFlush(any());
+    }
+
+    // covers REQ-INV-029 (a PARTIAL fractional book-out off a fractional item row still 400s)
+    @Test
+    void bookOut_itemRow_legacyFractionalRow_partialFractionalAmount_throwsBadRequest() {
+      // Given the same legacy fractional item row
+      InventoryItem item = newGameItemRow(1.5, 1L);
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+
+      // When / Then — 0.5 is fractional AND does not deplete the row, so the guard still fires
+      // with the item wording
+      BadRequestException ex =
+          assertThrows(
+              BadRequestException.class,
+              () ->
+                  service.bookOutInventoryItem(
+                      ITEM_ID,
+                      newDto(0.5, null, null, CheckoutType.DISCARD, null, null, 1L),
+                      OWNER_ID,
+                      false));
+      assertEquals("Amount must be a whole number for item stock", ex.getMessage());
+      verify(inventoryItemRepository, never()).saveAndFlush(any());
+      verify(inventoryItemRepository, never()).delete(any());
+    }
+
+    // covers REQ-INV-031 (a mission "deduct from" plan on an item row is a contract violation)
+    @Test
+    void bookOut_itemRow_missionReductions_throwsBadRequest() {
+      // Given a game-item stock row and a book-out naming a mission reduction
+      InventoryItem item = newGameItemRow(10.0, 1L);
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+      InventoryItemBookOutDto dto =
+          new InventoryItemBookOutDto(
+              2.0,
+              null,
+              null,
+              CheckoutType.DISCARD,
+              null,
+              null,
+              1L,
+              null,
+              null,
+              null,
+              List.of(new AllocationReductionDto(UUID.randomUUID(), 1.0)));
+
+      // When / Then — rejected explicitly (item rows carry no mission earmarks), never a silent
+      // empty no-op
+      assertThrows(
+          BadRequestException.class,
+          () -> service.bookOutInventoryItem(ITEM_ID, dto, OWNER_ID, false));
+      verify(inventoryItemRepository, never()).save(any());
+      verify(inventoryItemRepository, never()).delete(any());
+    }
+
+    // covers REQ-INV-029 (transfer copies the catalog reference pair as a unit)
+    @Test
+    void transfer_itemRow_copiesGameItemOntoMovedRow() {
+      // Given a game-item stock row transferred to another user
+      UUID targetUserId = UUID.randomUUID();
+      User targetUser = new User();
+      targetUser.setId(targetUserId);
+      InventoryItem item = newGameItemRow(10.0, 1L);
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+      when(userRepository.findById(targetUserId)).thenReturn(Optional.of(targetUser));
+      when(inventoryItemRepository.save(any(InventoryItem.class)))
+          .thenAnswer(inv -> inv.getArgument(0));
+
+      // When — move 4 whole units
+      service.bookOutInventoryItem(
+          ITEM_ID,
+          newDto(4.0, targetUserId, null, CheckoutType.TRANSFER, null, null, 1L),
+          OWNER_ID,
+          false);
+
+      // Then — the moved row carries the gameItem alongside null material/quality; without the
+      // copy it would violate the XOR CHECK (chk_inventory_item_catalog_xor, V220) -> 500 on
+      // every item transfer.
+      ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
+      verify(inventoryItemRepository, org.mockito.Mockito.atLeastOnce()).save(captor.capture());
+      InventoryItem moved =
+          captor.getAllValues().stream()
+              .filter(i -> i.getUser() == targetUser)
+              .findFirst()
+              .orElseThrow(() -> new AssertionError("expected the moved item row to be saved"));
+      assertSame(item.getGameItem(), moved.getGameItem());
+      assertNull(moved.getMaterial());
+      assertNull(moved.getQuality());
+      assertEquals(4.0, moved.getAmount());
+    }
+  }
+
+  // ---------------------------------------------------------------
   // helpers
   // ---------------------------------------------------------------
+
+  /**
+   * Builds a game-item stock row sharing the fixture identity (owner, location, non-personal):
+   * gameItem set, material and quality {@code null} — the V220 catalog shape (REQ-INV-029).
+   *
+   * @param amount the row's amount
+   * @param version the row's optimistic-lock version
+   * @return the assembled item row
+   */
+  private InventoryItem newGameItemRow(double amount, Long version) {
+    InventoryItem item = newItem(amount, version);
+    item.setMaterial(null);
+    item.setQuality(null);
+    GameItem gameItem = new GameItem();
+    gameItem.setId(UUID.randomUUID());
+    gameItem.setName("Quantum Drive");
+    item.setGameItem(gameItem);
+    return item;
+  }
 
   private InventoryItem newItem(double amount, Long version) {
     InventoryItem item = new InventoryItem();
@@ -1399,6 +1632,7 @@ class InventoryItemServiceBookOutTest {
   private static InventoryItemDto sentinelDto(Double amount) {
     return new InventoryItemDto(
         UUID.randomUUID(),
+        null,
         null,
         null,
         null,

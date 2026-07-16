@@ -99,7 +99,7 @@ public class AdminUexPageController {
   /**
    * Loads the <em>complete</em> cities, space stations, outposts, POIs and terminals catalogues —
    * walking every page instead of presenting one capped 10 000-row chunk as the whole list
-   * (REQ-ADMIN-001, ADR-0101) — and groups them by star system. Terminals are bucketed onto their
+   * (REQ-ADMIN-001, ADR-0102) — and groups them by star system. Terminals are bucketed onto their
    * parent city or station by name within the same star system; any terminal that lacks a
    * city/station match — typically free-floating orbital terminals — is collected into a per-system
    * "orphans" list so it stays visible. The summary-chip totals come from the backend-reported
@@ -559,7 +559,7 @@ public class AdminUexPageController {
 
   /**
    * Walks every page of one UEX-entity resource into a complete catalogue (REQ-ADMIN-001,
-   * ADR-0101). The zero-based page index is appended to the given query string, which already
+   * ADR-0102). The zero-based page index is appended to the given query string, which already
    * carries {@code size} and {@code sort}.
    *
    * @param resource backend path plus query string, without a {@code page} parameter

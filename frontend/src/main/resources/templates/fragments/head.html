@@ -163,6 +163,14 @@
     -->
     <script th:src="@{/js/krt-user-search.js}" th:attr="nonce=${cspNonce}"></script>
     <!--
+      Shared server-side catalog-search sources for the combobox (REQ-FE-016): registers the
+      `remote-materials*` / `remote-locations` remoteSource functions so the material/location
+      pickers fetch matching entries on demand instead of preloading the catalog. Must load BEFORE
+      the enhancer below so the registry exists when a marked picker is upgraded. No `defer` for
+      the same reason.
+    -->
+    <script th:src="@{/js/krt-catalog-search.js}" th:attr="nonce=${cspNonce}"></script>
+    <!--
       Searchable combobox enhancer (REQ-FE-011). Loaded globally and synchronously (no `defer`) so
       `window.krtSearchableSelect` exists before any inline page `<script>` that calls it (e.g. the
       orders item-search), and so its DOMContentLoaded / `krt:swapped` auto-initialiser upgrades

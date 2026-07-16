@@ -213,7 +213,7 @@ public class AdminSettingsPageController {
   }
 
   /**
-   * Loads <em>every</em> Spezialkommando (alphabetical, all pages — REQ-ADMIN-001, ADR-0101) for
+   * Loads <em>every</em> Spezialkommando (alphabetical, all pages — REQ-ADMIN-001, ADR-0102) for
    * the job-order intake-SK dropdown on the admin-settings page. A backend failure degrades to an
    * empty catalogue with a logged warning so the rest of the page still renders; a page walk that
    * hits its safety cap is flagged for the page-level warning banner (REQ-ADMIN-002).
@@ -243,7 +243,7 @@ public class AdminSettingsPageController {
   }
 
   /**
-   * Loads <em>every</em> active squadron (alphabetical, all pages — REQ-ADMIN-001, ADR-0101) for
+   * Loads <em>every</em> active squadron (alphabetical, all pages — REQ-ADMIN-001, ADR-0102) for
    * the "Beförderungssystem pro Staffel" toggle section on the admin-settings page. Inactive
    * (soft-deleted) squadrons are filtered out — the admin re-activates them through the existing
    * squadron CRUD before toggling features. A backend failure degrades to an empty catalogue with a

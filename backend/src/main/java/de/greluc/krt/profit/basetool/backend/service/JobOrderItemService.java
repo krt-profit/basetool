@@ -306,6 +306,40 @@ public class JobOrderItemService {
     return ids;
   }
 
+  /**
+   * Collects the distinct game-item ids an order <em>requests</em>: the {@code gameItem} of every
+   * ordered line for an {@code ITEM} order, and the <b>empty set</b> for a {@code MATERIAL} order —
+   * a material order has no item lines, so no game-item stock row may ever be linked to it (empty
+   * set = no link possible, the same semantics as {@link #requiredMaterialIds(JobOrder)}).
+   *
+   * <p>This is the authoritative "may this game-item stock row be linked to this order?" set
+   * (REQ-INV-031, the game-item sibling of REQ-ORDERS-018): the inventory → job-order link gate
+   * ({@code InventoryItemService}) rejects a game item that is not in it, and the order-detail
+   * orphaned-link warning flags already-linked item stock whose game item is absent here. It is a
+   * <em>parallel</em> set to {@link #requiredMaterialIds(JobOrder)}, not a replacement — material
+   * rows stay allocatable to ITEM orders through their blueprint-derived material requirements.
+   *
+   * <p>Walks the lazy {@code items} collection (id-only dereference of each line's {@code
+   * gameItem}), so it must run inside a transaction; every current caller is
+   * {@code @Transactional}.
+   *
+   * @param order the order whose requested game items to collect.
+   * @return the distinct requested game-item ids, insertion-ordered; never {@code null}, empty for
+   *     a MATERIAL order (which accepts no item-stock link).
+   */
+  @NotNull
+  public Set<UUID> requiredGameItemIds(@NotNull JobOrder order) {
+    Set<UUID> ids = new LinkedHashSet<>();
+    if (order.getType() == JobOrderType.ITEM) {
+      for (JobOrderItem item : order.getItems()) {
+        if (item.getGameItem() != null) {
+          ids.add(item.getGameItem().getId());
+        }
+      }
+    }
+    return ids;
+  }
+
   private JobOrderItemDto toItemDto(JobOrderItem item) {
     List<JobOrderItemMaterialDto> materials =
         item.getMaterials().stream()

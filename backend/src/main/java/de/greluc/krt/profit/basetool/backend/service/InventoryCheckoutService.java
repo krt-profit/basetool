@@ -144,8 +144,10 @@ public class InventoryCheckoutService {
    *
    * @throws NotFoundException when the item is unknown
    * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the requested
-   *     amount exceeds the available quantity, when a SELL is missing its terminal or a valid sell
-   *     amount, or when a {@code TRANSFER} carries neither a target user nor a target location
+   *     amount exceeds the available quantity, when a fractional amount is booked off a whole-unit
+   *     row (PIECE material / item stock) without depleting it entirely, when a SELL is missing its
+   *     terminal or a valid sell amount, or when a {@code TRANSFER} carries neither a target user
+   *     nor a target location
    */
   @Transactional
   public InventoryItemDto bookOutInventoryItem(
@@ -163,6 +165,26 @@ public class InventoryCheckoutService {
 
     if (dto.amount() > item.getAmount()) {
       throw new BadRequestException("Cannot book out more than the available amount");
+    }
+
+    // Whole-unit book-out (design §5.1): game-item rows always hold whole units (REQ-INV-029),
+    // and the same check closes the pre-existing gap that PIECE-material book-outs were not
+    // whole-number-validated server-side. The rule lives here because the book-out DTO carries no
+    // catalog reference, so it cannot be bean-validated. Booking out the row's exact remaining
+    // amount is exempt: rows created before this guard existed may hold a fractional amount, and
+    // without the full-depletion escape that remainder could never be drained at all.
+    if (requiresWholeUnits(item)
+        && dto.amount() % 1 != 0
+        && Double.compare(dto.amount(), item.getAmount()) != 0) {
+      throw new BadRequestException(wholeUnitAmountDetail(item));
+    }
+
+    // Game-item rows carry no mission dimension (REQ-INV-031): a mission "deduct from" plan on an
+    // item row is a contract violation, not an empty no-op — reject it explicitly.
+    if (item.getGameItem() != null
+        && dto.missionReductions() != null
+        && !dto.missionReductions().isEmpty()) {
+      throw new BadRequestException("Game-item stock carries no mission earmarks");
     }
 
     CheckoutType checkoutType = dto.type();
@@ -198,7 +220,7 @@ public class InventoryCheckoutService {
     // accurate even when the source is depleted to zero and removed (bulk-clear landmine rules).
     final UUID sourceId = item.getId();
     final String sourceLabel = InventoryAuditLabels.label(item);
-    final String materialName = item.getMaterial() != null ? item.getMaterial().getName() : "—";
+    final String materialName = catalogName(item);
     final UUID sourceOwnerId = item.getUser().getId();
     final boolean depleted = remainingAmount <= QUANTITY_EPSILON;
     List<UUID> financeEntryIds = List.of();
@@ -337,6 +359,9 @@ public class InventoryCheckoutService {
     newItem.setUser(targetUser);
     newItem.setOwningOrgUnit(targetOwningOrgUnit);
     newItem.setMaterial(item.getMaterial());
+    // Copy the catalog reference pair as a unit (design §4.4): without the gameItem the moved
+    // item-row copy would violate the XOR CHECK (chk_inventory_item_catalog_xor, V220) → 500.
+    newItem.setGameItem(item.getGameItem());
     newItem.setLocation(targetLocation);
     newItem.setQuality(item.getQuality());
     newItem.setAmount(InventoryItem.roundToScuScale(dto.amount()));
@@ -455,13 +480,10 @@ public class InventoryCheckoutService {
       entry.setParticipant(participant);
       entry.setType(FinanceType.INCOME);
       entry.setAmount(credit);
-      entry.setNote(
-          "Sale of "
-              + dto.amount()
-              + "x "
-              + item.getMaterial().getName()
-              + " at "
-              + dto.terminal());
+      // catalogName instead of a raw material dereference: unreachable for game-item rows today
+      // (they carry no mission slices, REQ-INV-031), but the null-guard keeps the SELL tail safe
+      // for every row kind (design §4.4 consumer null-branches).
+      entry.setNote("Sale of " + dto.amount() + "x " + catalogName(item) + " at " + dto.terminal());
       entries.add(entry);
     }
 
@@ -592,8 +614,9 @@ public class InventoryCheckoutService {
    * @param isAdmin whether the caller holds an admin role (bypasses the owner check)
    * @return the persisted new-row DTO (the moved quantity in its new pool)
    * @throws NotFoundException when the source row or the picked org unit is unknown
-   * @throws BadRequestException when the amount is non-positive, exceeds the available quantity, or
-   *     a personalize would violate the personal/association invariant
+   * @throws BadRequestException when the amount is non-positive, exceeds the available quantity, is
+   *     fractional on a whole-unit row (PIECE material / item stock) without moving the row's exact
+   *     remaining amount, or a personalize would violate the personal/association invariant
    */
   @Transactional
   public InventoryItemDto rebookPersonal(
@@ -614,6 +637,15 @@ public class InventoryCheckoutService {
     }
     if (dto.amount() > item.getAmount()) {
       throw new BadRequestException("Cannot rebook more than the available amount");
+    }
+    // Whole-unit rebook (design §5.1): game-item rows and PIECE-material rows only ever move whole
+    // units; the rule lives here because the rebook DTO carries no catalog reference. Moving the
+    // row's exact remaining amount is exempt so a fractional remainder from before the guard
+    // existed can still leave its pool instead of being stranded.
+    if (requiresWholeUnits(item)
+        && dto.amount() % 1 != 0
+        && Double.compare(dto.amount(), item.getAmount()) != 0) {
+      throw new BadRequestException(wholeUnitAmountDetail(item));
     }
 
     final boolean sourcePersonal = Boolean.TRUE.equals(item.getPersonal());
@@ -643,7 +675,7 @@ public class InventoryCheckoutService {
     // accurate even when the source is depleted to zero and removed.
     final UUID sourceId = item.getId();
     final String sourceLabel = InventoryAuditLabels.label(item);
-    final String materialName = item.getMaterial() != null ? item.getMaterial().getName() : "—";
+    final String materialName = catalogName(item);
     final UUID ownerId = item.getUser().getId();
 
     // Append-only: insert a new row for the moved quantity with the flipped personal flag; the
@@ -654,6 +686,9 @@ public class InventoryCheckoutService {
     newItem.setUser(item.getUser());
     newItem.setOwningOrgUnit(targetOwningOrgUnit);
     newItem.setMaterial(item.getMaterial());
+    // Copy the catalog reference pair as a unit (design §4.4): without the gameItem the rebooked
+    // item-row copy would violate the XOR CHECK (chk_inventory_item_catalog_xor, V220) → 500.
+    newItem.setGameItem(item.getGameItem());
     newItem.setLocation(item.getLocation());
     newItem.setQuality(item.getQuality());
     newItem.setAmount(InventoryItem.roundToScuScale(dto.amount()));
@@ -704,16 +739,18 @@ public class InventoryCheckoutService {
    * Folds a just-written warehouse row into a single merged stack when the merge applies
    * (REQ-INV-026), and returns the surviving row (or the unchanged input when nothing merges).
    *
-   * <p>The merge runs for a {@code PIECE} material <em>unconditionally</em> and for an {@code SCU}
-   * material only when {@code clientRequestedMerge} is {@code true} — the per-action modal opt-in
-   * the caller ticked for this single write; it is never persisted. The survivor is the passed-in
-   * {@code row}: every other row that shares its <em>physical</em> stock identity (Variante C,
-   * REQ-INV-027: user · material · location · quality · personal · owningOrgUnit — the earmarks are
-   * NO longer part of the key) is folded into it — amounts summed, distinct notes concatenated,
-   * their job-order / mission allocations unioned into the survivor (summed per target, job-order
-   * delivered OR-combined, rule R1) — and deleted. The merge group is loaded {@code FOR UPDATE} so
-   * two racing same-stack writers serialise (re-introducing, only here, the lock the append-only
-   * model of ADR-0003 removed).
+   * <p>The merge runs <em>unconditionally</em> for a {@code PIECE} material and for a game-item row
+   * (item stock follows the PIECE whole-unit auto-merge rule, REQ-INV-029 — the client flag is
+   * irrelevant for both), and for an {@code SCU} material only when {@code clientRequestedMerge} is
+   * {@code true} — the per-action modal opt-in the caller ticked for this single write; it is never
+   * persisted. The survivor is the passed-in {@code row}: every other row that shares its
+   * <em>physical</em> stock identity (Variante C, REQ-INV-027: user · catalog reference · location
+   * · quality · personal · owningOrgUnit — the earmarks are NO longer part of the key; a game-item
+   * stack keys on the game item with material and quality {@code NULL}) is folded into it — amounts
+   * summed, distinct notes concatenated, their job-order / mission allocations unioned into the
+   * survivor (summed per target, job-order delivered OR-combined, rule R1) — and deleted. The merge
+   * group is loaded {@code FOR UPDATE} so two racing same-stack writers serialise (re-introducing,
+   * only here, the lock the append-only model of ADR-0003 removed).
    *
    * <p><strong>Materialbörse safety:</strong> a row that itself backs an offer is returned
    * untouched (never a survivor that changes, never folded away), and offer-backed sibling rows are
@@ -726,21 +763,24 @@ public class InventoryCheckoutService {
    * @param row the just-created / just-edited / just-inserted target row (managed); the merge
    *     survivor.
    * @param clientRequestedMerge the per-action opt-in for an {@code SCU} material (ignored for
-   *     {@code PIECE}, which always merges).
+   *     {@code PIECE} materials and game-item rows, which always merge).
    * @return the surviving merged row (== {@code row}) with the summed amount and combined notes, or
    *     {@code row} unchanged when the merge does not apply or finds no matching sibling.
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public InventoryItem mergeStockIfRequested(InventoryItem row, boolean clientRequestedMerge) {
     final Material material = row.getMaterial();
-    if (material == null) {
-      // A row without a material cannot participate in merge-group matching (the merge key requires
-      // material · quality · …), so it stays unchanged — consistent with append-only/no-merge
-      // behaviour. Returning here also guards the material.getId() dereference below.
+    final boolean gameItemRow = row.getGameItem() != null;
+    if (material == null && !gameItemRow) {
+      // A row with neither catalog reference cannot participate in merge-group matching, so it
+      // stays unchanged — consistent with append-only/no-merge behaviour. Returning here also
+      // guards the material.getQuantityType() dereference below.
       return row;
     }
-    final boolean piece = material.getQuantityType() == QuantityType.PIECE;
-    if (!piece && !clientRequestedMerge) {
+    // Game-item rows always auto-merge (PIECE rule, REQ-INV-029 — the client flag is irrelevant);
+    // a material row merges unconditionally only for PIECE.
+    final boolean autoMerge = gameItemRow || material.getQuantityType() == QuantityType.PIECE;
+    if (!autoMerge && !clientRequestedMerge) {
       // SCU without the per-action opt-in stays append-only (REQ-INV-001).
       return row;
     }
@@ -752,14 +792,26 @@ public class InventoryCheckoutService {
       return row;
     }
 
+    // Catalog-discriminated merge key (REQ-INV-029): a game-item stack passes (gameItemId,
+    // materialId = null, quality = null) through the full seven-argument query; a material stack
+    // keeps the six-argument overload (gameItemId = null) so the pre-V220 behaviour is unchanged.
     final List<InventoryItem> group =
-        inventoryItemRepository.findMergeGroupForUpdate(
-            row.getUser().getId(),
-            material.getId(),
-            row.getLocation().getId(),
-            row.getQuality(),
-            row.getPersonal(),
-            row.getOwningOrgUnit() != null ? row.getOwningOrgUnit().getId() : null);
+        gameItemRow
+            ? inventoryItemRepository.findMergeGroupForUpdate(
+                row.getUser().getId(),
+                null,
+                row.getGameItem().getId(),
+                row.getLocation().getId(),
+                null,
+                row.getPersonal(),
+                row.getOwningOrgUnit() != null ? row.getOwningOrgUnit().getId() : null)
+            : inventoryItemRepository.findMergeGroupForUpdate(
+                row.getUser().getId(),
+                material.getId(),
+                row.getLocation().getId(),
+                row.getQuality(),
+                row.getPersonal(),
+                row.getOwningOrgUnit() != null ? row.getOwningOrgUnit().getId() : null);
 
     // The survivor is the just-written row; fold every other matching (non-offer-backed) row into
     // it. The query locked the whole group FOR UPDATE, so no concurrent writer can double-fold.
@@ -804,8 +856,52 @@ public class InventoryCheckoutService {
         AuditDetails.of("merged", victims.size())
             .with("total", row.getAmount())
             .with("q", row.getQuality())
-            .with("trigger", piece ? "auto" : "manual"));
+            .with("trigger", autoMerge ? "auto" : "manual"));
     return row;
+  }
+
+  /**
+   * Whether a row's catalog kind restricts its amounts to whole units: game-item rows always
+   * (REQ-INV-029) and material rows measured in {@code PIECE}. Null-safe on both catalog
+   * references, so it can be asked of any loaded row.
+   *
+   * @param item the inventory row.
+   * @return {@code true} iff amounts on this row must be whole numbers.
+   */
+  private static boolean requiresWholeUnits(InventoryItem item) {
+    return item.getGameItem() != null
+        || (item.getMaterial() != null
+            && item.getMaterial().getQuantityType() == QuantityType.PIECE);
+  }
+
+  /**
+   * User-facing 400 detail for a fractional amount on a whole-unit row, naming the row's actual
+   * catalog kind — "PIECE materials" on a game-item row would be misleading because item rows carry
+   * no material at all (REQ-INV-029).
+   *
+   * @param item the whole-unit row the amount was rejected for.
+   * @return the catalog-appropriate problem detail.
+   */
+  private static String wholeUnitAmountDetail(InventoryItem item) {
+    return item.getGameItem() != null
+        ? "Amount must be a whole number for item stock"
+        : "Amount must be a whole number for PIECE materials";
+  }
+
+  /**
+   * Null-safe catalog display name of a row for audit/finance snapshots: the material name for a
+   * material row, the game-item name for a game-item row (REQ-INV-029), an em dash for an orphaned
+   * row missing both. Mirrors {@link InventoryAuditLabels#label(InventoryItem)}'s catalog branch
+   * without the location suffix.
+   *
+   * @param item the inventory row (associations lazily loaded but must be within the tx).
+   * @return the row's catalog display name.
+   */
+  private static String catalogName(InventoryItem item) {
+    if (item.getMaterial() != null) {
+      return item.getMaterial().getName();
+    }
+    return item.getGameItem() != null ? item.getGameItem().getName() : "—";
   }
 
   /**

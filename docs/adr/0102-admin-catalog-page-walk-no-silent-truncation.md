@@ -1,4 +1,4 @@
-# ADR-0101 — Admin catalog pages page-walk the complete catalogue instead of rendering one bounded page
+# ADR-0102 — Admin catalog pages page-walk the complete catalogue instead of rendering one bounded page
 
 - **Status:** Accepted
 - **Date:** 2026-07-16

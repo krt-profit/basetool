@@ -151,7 +151,7 @@ public class AdminSpecialCommandsPageController {
 
   /**
    * Fetches the <em>complete</em> SK catalog from the backend — every page, not one capped chunk
-   * (REQ-ADMIN-001, ADR-0101) — and transforms the raw payload into a sorted list of {@link
+   * (REQ-ADMIN-001, ADR-0102) — and transforms the raw payload into a sorted list of {@link
    * SpecialCommandDto} records. Mirrors {@link AdminMissionDataPageController}'s {@code
    * fetchSquadrons} parsing path. The returned wrapper carries the truncation flag for the
    * page-level warning banner (REQ-ADMIN-002).

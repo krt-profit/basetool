@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-16.
-> **Owner area:** ADMIN · **Related ADRs:** ADR-0101
+> **Owner area:** ADMIN · **Related ADRs:** ADR-0102
 
 # Admin catalog pages — complete rendering, no silent truncation
 
@@ -80,7 +80,7 @@ templates · **Issues:** —
 ## Out of scope
 
 - Server-side pagination / search UIs for these admin pages. The pages' interaction model
-  (client-side filter over the full catalogue) is deliberate; ADR-0101 records why page-walking
+  (client-side filter over the full catalogue) is deliberate; ADR-0102 records why page-walking
   was chosen over a pagination UI.
 - Non-admin list surfaces with real pagination (hangar, refinery orders, audit log, sync
   reports, blueprints) — those are governed by their own specs.

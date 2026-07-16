@@ -795,8 +795,13 @@ public class RefineryOrderPageController {
    */
   private List<MissionListDto> fetchMissions(UUID preserveMissionId) {
     try {
+      // The explicit newest-first sort is load-bearing: without it the backend's default is
+      // plannedStartTime ASCENDING, so once more than 1000 missions exist the single fetched page
+      // holds the 1000 OLDEST rows and the three-month window below silently empties — the recent
+      // missions the dropdown is for would sit beyond the page boundary.
       PageResponse<MissionListDto> p =
-          backendApiClient.get("/api/v1/missions?size=1000", MISSION_LIST_PAGE);
+          backendApiClient.get(
+              "/api/v1/missions?size=1000&sort=plannedStartTime,desc", MISSION_LIST_PAGE);
       if (p == null) {
         return new ArrayList<>();
       }

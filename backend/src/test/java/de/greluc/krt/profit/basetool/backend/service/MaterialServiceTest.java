@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceOverviewDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialPriceRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
@@ -67,6 +68,52 @@ class MaterialServiceTest {
   @Mock private MaterialCategoryRepository materialCategoryRepository;
 
   @InjectMocks private MaterialService materialService;
+
+  @Test
+  void findAllReference_returnsTheCompleteUnboundedProjection() {
+    // Given
+    MaterialReferenceDto ref =
+        new MaterialReferenceDto(UUID.randomUUID(), "Agricium", QuantityType.SCU);
+    when(materialRepository.findAllReference()).thenReturn(List.of(ref));
+
+    // When
+    List<MaterialReferenceDto> result = materialService.findAllReference();
+
+    // Then
+    assertEquals(List.of(ref), result);
+    verify(materialRepository).findAllReference();
+  }
+
+  @Test
+  void searchPicker_escapesTheFragmentAndForwardsTheFilterFlags() {
+    // Given
+    Material agricium = new Material();
+    agricium.setName("Agricium 100%");
+    PageRequest pageable = PageRequest.of(0, 25);
+    when(materialRepository.searchPicker("100\\%", true, MaterialType.RAW, false, pageable))
+        .thenReturn(new PageImpl<>(List.of(agricium)));
+
+    // When
+    Page<Material> result = materialService.searchPicker("100%", true, false, pageable);
+
+    // Then
+    assertEquals(List.of(agricium), result.getContent());
+    verify(materialRepository).searchPicker("100\\%", true, MaterialType.RAW, false, pageable);
+  }
+
+  @Test
+  void searchPicker_passesNullThroughAsTheNoFilterMarkerAndRawOnlyFlag() {
+    // Given
+    PageRequest pageable = PageRequest.of(0, 25);
+    when(materialRepository.searchPicker(null, false, MaterialType.RAW, true, pageable))
+        .thenReturn(new PageImpl<>(List.of()));
+
+    // When
+    materialService.searchPicker(null, false, true, pageable);
+
+    // Then
+    verify(materialRepository).searchPicker(null, false, MaterialType.RAW, true, pageable);
+  }
 
   @Test
   void getMaterialPriceOverview_ShouldReturnPageOfOverviews() {

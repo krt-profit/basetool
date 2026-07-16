@@ -24,6 +24,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.stringContainsInOrder;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -184,6 +185,110 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString("/js/inventory-herkunft.js")));
   }
 
+  // REQ-FE-016: the Umbuchen modal's target-location select is a server-side-search combobox
+  // (remote-locations) on both Lager views — the marker value must sit on the (statically
+  // attributed) select, which renders EMPTY (no preloaded catalog options; the modal-opening JS
+  // seeds the row's current location).
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewMyInventory_umbuchenLocationPickerCarriesComboboxMarker() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/my"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "id=\"umbuchenTargetLocationId\" class=\"w-full\""
+                            + " data-krt-combobox=\"remote-locations\"></select>")));
+  }
+
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewAllInventory_umbuchenLocationPickerCarriesComboboxMarker() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/all"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "id=\"umbuchenTargetLocationId\" class=\"w-full\""
+                            + " data-krt-combobox=\"remote-locations\"></select>")));
+  }
+
+  // REQ-FE-016: the Einbuchen form's material AND location selects are server-side-search
+  // comboboxes (remote-materials / remote-locations) — the marker values are asserted in document
+  // order so each is pinned to its own select, not satisfied by the page's remote-users user
+  // picker. The full material catalog must no longer be dumped into the page: with no preselected
+  // form value only the placeholder renders, so a stubbed catalog material's name stays absent.
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewInputPage_materialAndLocationPickersCarryComboboxMarker() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_LOOKUP), anyTypeRef()))
+        .thenReturn(
+            List.of(
+                new MaterialReferenceDto(UUID.randomUUID(), "Quantanium", "SCU"),
+                new MaterialReferenceDto(UUID.randomUUID(), "Laranite", "SCU")));
+    when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/input"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("inventory-input"))
+        .andExpect(
+            content()
+                .string(
+                    stringContainsInOrder(
+                        "id=\"materialId\"",
+                        "data-krt-combobox=\"remote-materials\"",
+                        "id=\"locationId\"",
+                        "data-krt-combobox=\"remote-locations\"")))
+        .andExpect(content().string(not(containsString("Quantanium"))))
+        .andExpect(content().string(not(containsString("Laranite"))));
+  }
+
+  // REQ-FE-016: the material drilldown's navigate select is a server-side-search combobox
+  // (remote-materials); the change-delegation reads data-trigger/data-url-template off the
+  // enhancer's hidden input. Only the currently-viewed material is seeded as an <option> — the
+  // rest of the catalog is fetched on demand, so a second stubbed material's name stays absent.
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewMaterialInventory_navigateSelectCarriesComboboxMarker() throws Exception {
+    UUID selectedMaterialId = UUID.randomUUID();
+    PageResponse<InventoryItemDto> page =
+        new PageResponse<>(List.of(), 0, 10, 0, 1, Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_LOOKUP), anyTypeRef()))
+        .thenReturn(
+            List.of(
+                new MaterialReferenceDto(selectedMaterialId, "Quantanium", "SCU"),
+                new MaterialReferenceDto(UUID.randomUUID(), "Laranite", "SCU")));
+
+    mockMvc
+        .perform(get("/inventory/material/" + selectedMaterialId))
+        .andExpect(status().isOk())
+        .andExpect(view().name("inventory-material"))
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "data-url-template=\"/inventory/material/{value}\""
+                            + " data-krt-combobox=\"remote-materials\"")))
+        .andExpect(content().string(containsString("Quantanium")))
+        .andExpect(content().string(not(containsString("Laranite"))));
+  }
+
   // covers REQ-INV-001 (SCU amount input) / REQ-INV-002 (PIECE amount input) — see
   // docs/specs/inv-material-quantities.md (render-wiring of the shared scu-decimal-input helper).
   @Test
@@ -266,6 +371,7 @@ class InventoryPageControllerMvcTest {
             itemId,
             new UserReferenceDto(userId, "tester", "Tester", "Tester", null),
             new MaterialReferenceDto(materialId, "Quantanium", "SCU"),
+            null,
             new LocationReferenceDto(locationId, "ARC-L1"),
             90,
             10.0,
@@ -330,6 +436,7 @@ class InventoryPageControllerMvcTest {
             itemId,
             new UserReferenceDto(userId, "tester", "Tester", "Tester", null),
             new MaterialReferenceDto(materialId, "Titanium Bolt", "PIECE"),
+            null,
             new LocationReferenceDto(locationId, "ARC-L1"),
             90,
             10.0,
@@ -394,6 +501,7 @@ class InventoryPageControllerMvcTest {
             itemId,
             new UserReferenceDto(userId, "tester", "Tester", "Tester", null),
             new MaterialReferenceDto(materialId, "Quantanium", "SCU"),
+            null,
             new LocationReferenceDto(locationId, "ARC-L1"),
             90,
             10.0,
@@ -411,10 +519,24 @@ class InventoryPageControllerMvcTest {
     // them (the ITEM-order case the old materials-based filter could not handle).
     JobOrderReferenceDto matching =
         new JobOrderReferenceDto(
-            matchingOrderId, 71, "h1", "IN_PROGRESS", null, List.of(), List.of(materialId));
+            matchingOrderId,
+            71,
+            "h1",
+            "IN_PROGRESS",
+            null,
+            List.of(),
+            List.of(materialId),
+            List.of());
     JobOrderReferenceDto unrelated =
         new JobOrderReferenceDto(
-            unrelatedOrderId, 99, "h2", "IN_PROGRESS", null, List.of(), List.of(UUID.randomUUID()));
+            unrelatedOrderId,
+            99,
+            "h2",
+            "IN_PROGRESS",
+            null,
+            List.of(),
+            List.of(UUID.randomUUID()),
+            List.of());
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenAnswer(
@@ -467,6 +589,7 @@ class InventoryPageControllerMvcTest {
             itemId,
             new UserReferenceDto(userId, "tester", "Tester", "Tester", null),
             new MaterialReferenceDto(materialId, "Quantanium", "SCU"),
+            null,
             new LocationReferenceDto(locationId, "ARC-L1"),
             90,
             10.0,

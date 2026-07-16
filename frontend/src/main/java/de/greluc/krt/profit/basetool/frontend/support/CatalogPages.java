@@ -27,11 +27,11 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * Page-walking helper for the "render the whole catalogue" admin surfaces (REQ-ADMIN-001,
- * ADR-0101).
+ * ADR-0102).
  *
  * <p>Several admin pages (materials, locations, mission data, Spezialkommandos, UEX data, ship
  * data, the admin-settings pickers) render a complete reference catalogue and filter it
- * client-side. Before ADR-0101 each of them fetched exactly one bounded page ({@code size=1000} /
+ * client-side. Before ADR-0102 each of them fetched exactly one bounded page ({@code size=1000} /
  * {@code size=10000}) and presented it as the full list — rows beyond the bound were silently
  * invisible and uneditable. This helper generalises the page-walk that {@code
  * PersonalInventoryBlueprintsPageController} introduced for issue #823: it pulls page after page

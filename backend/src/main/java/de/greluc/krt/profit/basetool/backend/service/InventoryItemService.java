@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.exception.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
@@ -47,6 +48,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebo
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCollectionEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.model.projection.OwnedStockSlice;
+import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
@@ -102,6 +104,7 @@ public class InventoryItemService {
   private final InventoryItemRepository inventoryItemRepository;
   private final UserRepository userRepository;
   private final MaterialRepository materialRepository;
+  private final GameItemRepository gameItemRepository;
   private final LocationRepository locationRepository;
   private final JobOrderRepository jobOrderRepository;
   private final MissionRepository missionRepository;
@@ -384,13 +387,20 @@ public class InventoryItemService {
   }
 
   /**
-   * Creates a new inventory item. Resolves every shallow id reference (material, location, owner,
-   * mission, job order) and rejects with 404 / 400 for unknown ids. Job-order link triggers an
-   * eligibility check (material must match the order's material list).
+   * Creates a new inventory item. Resolves every shallow id reference (material or game item,
+   * location, owner, mission, job order) and rejects with 404 / 400 for unknown ids. The catalog
+   * kind follows the DTO's XOR (REQ-INV-029): exactly one of {@code materialId} / {@code
+   * gameItemId} is set (bean-validated, re-implied here by the branched resolution). A job-order
+   * link triggers the kind-matching eligibility check — a material row's material must be required
+   * by the order (REQ-ORDERS-018), a game-item row's game item must be requested by an ITEM order
+   * (REQ-INV-031) — and a game-item payload carrying any mission reference is rejected as a
+   * service-level belt behind the DTO guard (item rows carry no mission dimension).
    *
    * @throws NotFoundException when any referenced id is unknown
-   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the material
-   *     does not satisfy the job order's requirements
+   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the material /
+   *     game item does not satisfy the job order's requirements, the payload violates the catalog
+   *     XOR or the quality-by-kind pairing (V220 CHECKs), or a game-item payload carries a mission
+   *     reference
    */
   @Transactional
   public InventoryItemDto createInventoryItem(
@@ -406,13 +416,40 @@ public class InventoryItemService {
             .findById(targetUserId)
             .orElseThrow(() -> new NotFoundException("User not found"));
     final Material material =
-        materialRepository
-            .findById(dto.materialId())
-            .orElseThrow(() -> new NotFoundException("Material not found"));
+        dto.materialId() != null
+            ? materialRepository
+                .findById(dto.materialId())
+                .orElseThrow(() -> new NotFoundException("Material not found"))
+            : null;
+    final GameItem gameItem =
+        dto.gameItemId() != null
+            ? gameItemRepository
+                .findById(dto.gameItemId())
+                .orElseThrow(() -> new NotFoundException("GameItem not found"))
+            : null;
     final Location location =
         locationRepository
             .findById(dto.locationId())
             .orElseThrow(() -> new NotFoundException("Location not found"));
+
+    // Service-level belts behind the DTO's @AssertTrue guards: a crafted payload that bypassed
+    // bean validation must 400 here rather than surface the V220 DB CHECKs (catalog XOR,
+    // quality-by-kind) as an opaque 500 at flush time.
+    if ((material == null) == (gameItem == null)) {
+      throw new BadRequestException("Exactly one of materialId and gameItemId must be set");
+    }
+    if (material != null && dto.quality() == null) {
+      throw new BadRequestException("Material stock requires a quality");
+    }
+    if (gameItem != null && dto.quality() != null) {
+      throw new BadRequestException("Game-item stock carries no quality");
+    }
+    // Same belt for REQ-INV-031: a game-item row carries no mission dimension.
+    if (gameItem != null
+        && (dto.missionId() != null
+            || (dto.missionAllocations() != null && !dto.missionAllocations().isEmpty()))) {
+      throw new BadRequestException("Game-item stock cannot be assigned to a mission");
+    }
 
     Boolean isPersonal = dto.personal() != null ? dto.personal() : false;
 
@@ -431,6 +468,7 @@ public class InventoryItemService {
     item.setUser(user);
     item.setOwningOrgUnit(owningOrgUnit);
     item.setMaterial(material);
+    item.setGameItem(gameItem);
     item.setLocation(location);
     item.setQuality(dto.quality());
     item.setAmount(InventoryItem.roundToScuScale(dto.amount()));
@@ -449,18 +487,27 @@ public class InventoryItemService {
         && (!jobAllocations.isEmpty() || !missionAllocations.isEmpty())) {
       throw new BadRequestException("Personal items cannot be assigned to a mission or job order");
     }
-    boolean piece = material.getQuantityType() == QuantityType.PIECE;
+    // Whole-unit semantics: PIECE materials and game-item rows (which behave like PIECE,
+    // REQ-INV-029) both restrict allocation slices to whole numbers.
+    boolean wholeUnits =
+        gameItem != null || (material != null && material.getQuantityType() == QuantityType.PIECE);
     Set<UUID> seenOrders = new HashSet<>();
     for (InventoryAllocationInput allocation : jobAllocations) {
       if (!seenOrders.add(allocation.targetId())) {
         throw new BadRequestException("A job order may be assigned at most once at check-in");
       }
-      requireWholeForPiece(piece, allocation.amount());
+      requireWholeUnits(wholeUnits, gameItem != null, allocation.amount());
       JobOrder order =
           jobOrderRepository
               .findById(allocation.targetId())
               .orElseThrow(() -> new NotFoundException("JobOrder not found"));
-      assertMaterialRequiredByJobOrder(material, order);
+      // Kind dispatch (REQ-ORDERS-018 / REQ-INV-031): a material row is gated on the order's
+      // required materials, a game-item row on the ITEM order's requested game items.
+      if (gameItem != null) {
+        assertGameItemRequiredByJobOrder(gameItem, order);
+      } else {
+        assertMaterialRequiredByJobOrder(material, order);
+      }
       InventoryAllocations.addJobOrder(
           item, order, InventoryItem.roundToScuScale(allocation.amount()), false);
     }
@@ -469,7 +516,7 @@ public class InventoryItemService {
       if (!seenMissions.add(allocation.targetId())) {
         throw new BadRequestException("A mission may be assigned at most once at check-in");
       }
-      requireWholeForPiece(piece, allocation.amount());
+      requireWholeUnits(wholeUnits, gameItem != null, allocation.amount());
       Mission missionTarget =
           missionRepository
               .findById(allocation.targetId())
@@ -539,7 +586,12 @@ public class InventoryItemService {
             jobOrderRepository
                 .findById(dto.targetId())
                 .orElseThrow(() -> new NotFoundException("JobOrder not found"));
-        assertMaterialRequiredByJobOrder(item.getMaterial(), jobOrder);
+        // Kind dispatch (REQ-ORDERS-018 / REQ-INV-031): the gate matches the row's catalog kind.
+        if (item.getGameItem() != null) {
+          assertGameItemRequiredByJobOrder(item.getGameItem(), jobOrder);
+        } else {
+          assertMaterialRequiredByJobOrder(item.getMaterial(), jobOrder);
+        }
         if (findJobOrderSlice(item, dto.targetId()) != null) {
           throw new BadRequestException("This job order is already allocated on the entry");
         }
@@ -557,6 +609,7 @@ public class InventoryItemService {
             amount);
       }
       case MISSION -> {
+        assertMissionDimensionAllowed(item);
         final Mission mission =
             missionRepository
                 .findById(dto.targetId())
@@ -619,6 +672,7 @@ public class InventoryItemService {
             amount);
       }
       case MISSION -> {
+        assertMissionDimensionAllowed(item);
         InventoryMissionAllocation slice = findMissionSlice(item, dto.targetId());
         if (slice == null) {
           throw new NotFoundException("Mission allocation not found");
@@ -734,14 +788,16 @@ public class InventoryItemService {
 
   /**
    * Validates and normalizes an add/change amount: present, strictly positive, whole for a {@code
-   * PIECE} material, then SCU-rounded to storage precision. The material is read off the already
-   * managed entry rather than a separate lookup.
+   * PIECE} material <em>or</em> a game-item row (item stock is always whole-unit, REQ-INV-029),
+   * then SCU-rounded to storage precision. The catalog kind is read off the already managed entry
+   * rather than a separate lookup; a material dereference is null-guarded because item rows carry
+   * no material.
    *
    * @param dto the write payload.
-   * @param item the entry (for its material's quantity type).
+   * @param item the entry (for its catalog kind / material quantity type).
    * @return the validated, SCU-rounded amount.
    * @throws BadRequestException when the amount is missing, non-positive, or fractional for a PIECE
-   *     material.
+   *     material or game-item row.
    */
   private double requireWriteAmount(InventoryAllocationWriteDto dto, InventoryItem item) {
     Double raw = dto.amount();
@@ -751,10 +807,16 @@ public class InventoryItemService {
     if (raw <= 0) {
       throw new BadRequestException("An allocation amount must be positive");
     }
-    if (item.getMaterial() != null
-        && item.getMaterial().getQuantityType() == QuantityType.PIECE
-        && raw % 1 != 0) {
-      throw new BadRequestException("A PIECE allocation amount must be a whole number");
+    boolean itemRow = item.getGameItem() != null;
+    boolean wholeUnits =
+        itemRow
+            || (item.getMaterial() != null
+                && item.getMaterial().getQuantityType() == QuantityType.PIECE);
+    if (wholeUnits && raw % 1 != 0) {
+      throw new BadRequestException(
+          itemRow
+              ? "An item allocation amount must be a whole number"
+              : "A PIECE allocation amount must be a whole number");
     }
     return InventoryItem.roundToScuScale(raw);
   }
@@ -889,6 +951,45 @@ public class InventoryItemService {
   }
 
   /**
+   * Rejects linking a game-item stock row to a job order that does not request the game item
+   * (REQ-INV-031, the item sibling of {@link #assertMaterialRequiredByJobOrder}). The authoritative
+   * requested-game-item set is {@link JobOrderItemService#requiredGameItemIds(JobOrder)}, which is
+   * empty for a MATERIAL order — so a material order can never accept an item-stock link, and an
+   * ITEM order only for game items one of its lines orders. Both call sites (the check-in slice
+   * loop and the {@code addAllocation} JOB_ORDER branch) are {@code @Transactional}, so the
+   * helper's lazy walk of the order's item lines is safe.
+   *
+   * @param gameItem the inventory row's game item.
+   * @param jobOrder the order the row is being linked to.
+   * @throws BadRequestException when the order does not request the game item.
+   */
+  private void assertGameItemRequiredByJobOrder(GameItem gameItem, JobOrder jobOrder) {
+    if (!jobOrderItemService.requiredGameItemIds(jobOrder).contains(gameItem.getId())) {
+      throw new BadRequestException(
+          "Game item "
+              + gameItem.getId()
+              + " is not requested by job order "
+              + jobOrder.getId()
+              + "; an item stock row can only be linked to an ITEM order that requests its game"
+              + " item.");
+    }
+  }
+
+  /**
+   * Rejects the mission dimension on a game-item stock row (REQ-INV-031): item stock is allocatable
+   * only to ITEM job orders, never to missions. Enforced on the {@code addAllocation} and {@code
+   * changeAllocation} MISSION branches; a material row passes unchanged.
+   *
+   * @param item the entry being written.
+   * @throws BadRequestException when the entry is a game-item row.
+   */
+  private void assertMissionDimensionAllowed(InventoryItem item) {
+    if (item.getGameItem() != null) {
+      throw new BadRequestException("Game-item stock cannot be assigned to a mission");
+    }
+  }
+
+  /**
    * Resolves the effective split-at-check-in allocations for one dimension (Variante C,
    * REQ-INV-027, R4): the caller-supplied {@code explicit} list when it carries any entry;
    * otherwise, for backward compatibility, a single full-amount allocation from the legacy scalar
@@ -911,16 +1012,22 @@ public class InventoryItemService {
   }
 
   /**
-   * Rejects a fractional allocation amount for a {@code PIECE} material (whole units only),
-   * mirroring the entry-amount rule and the per-allocation write endpoints.
+   * Rejects a fractional allocation amount for a whole-unit entry — a {@code PIECE} material or a
+   * game-item row (item stock is always whole-unit, REQ-INV-029) — mirroring the entry-amount rule
+   * and the per-allocation write endpoints. The problem detail names the entry's actual catalog
+   * kind ("PIECE materials" would be misleading on an item row, which carries no material).
    *
-   * @param piece whether the entry's material is measured in whole PIECEs.
+   * @param wholeUnits whether the entry's catalog kind restricts amounts to whole units.
+   * @param itemRow whether the entry is a game-item row (drives the message wording only).
    * @param amount the allocation amount to check.
-   * @throws BadRequestException when {@code piece} and {@code amount} is not a whole number.
+   * @throws BadRequestException when {@code wholeUnits} and {@code amount} is not a whole number.
    */
-  private static void requireWholeForPiece(boolean piece, double amount) {
-    if (piece && amount % 1 != 0) {
-      throw new BadRequestException("Amount must be a whole number for PIECE materials");
+  private static void requireWholeUnits(boolean wholeUnits, boolean itemRow, double amount) {
+    if (wholeUnits && amount % 1 != 0) {
+      throw new BadRequestException(
+          itemRow
+              ? "Amount must be a whole number for item stock"
+              : "Amount must be a whole number for PIECE materials");
     }
   }
 

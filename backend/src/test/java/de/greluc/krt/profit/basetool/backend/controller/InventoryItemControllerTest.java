@@ -28,11 +28,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkCheckoutRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationDimension;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationWriteDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.InventoryCatalog;
+import de.greluc.krt.profit.basetool.backend.model.dto.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
@@ -41,6 +44,8 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebo
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.service.InventoryAggregationService;
+import de.greluc.krt.profit.basetool.backend.service.InventoryItemCatalogService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryItemService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.util.List;
@@ -84,6 +89,8 @@ import org.springframework.security.oauth2.jwt.Jwt;
 class InventoryItemControllerTest {
 
   @Mock private InventoryItemService inventoryItemService;
+  @Mock private InventoryAggregationService inventoryAggregationService;
+  @Mock private InventoryItemCatalogService inventoryItemCatalogService;
   @Mock private UserService userService;
   @Mock private AuthHelperService authHelperService;
 
@@ -100,6 +107,7 @@ class InventoryItemControllerTest {
   private static InventoryItemDto inventoryItem(UUID id) {
     return new InventoryItemDto(
         id,
+        null,
         null,
         null,
         null,
@@ -120,12 +128,12 @@ class InventoryItemControllerTest {
 
   @Test
   void getAggregatedInventory_wrapsPageIntoPageResponse() {
-    AggregatedInventoryDto agg = new AggregatedInventoryDto(null, 750.0, 900.0, 25.0);
+    AggregatedInventoryDto agg = new AggregatedInventoryDto(null, null, 750.0, 900.0, 25.0);
     Page<AggregatedInventoryDto> page = new PageImpl<>(List.of(agg), PageRequest.of(0, 20), 1);
     when(inventoryItemService.getAggregatedInventory(any(Pageable.class))).thenReturn(page);
 
     PageResponse<AggregatedInventoryDto> result =
-        controller.getAggregatedInventory(0, 20, "material.name,asc");
+        controller.getAggregatedInventory(InventoryCatalog.MATERIAL, 0, 20, "material.name,asc");
 
     assertThat(result.content()).containsExactly(agg);
     assertThat(result.totalElements()).isEqualTo(1L);
@@ -160,7 +168,8 @@ class InventoryItemControllerTest {
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     when(inventoryItemService.getUserInventory(eq(ownerId), any(Pageable.class))).thenReturn(page);
 
-    PageResponse<InventoryItemDto> result = controller.getMyInventory(jwt, 0, 20, null);
+    PageResponse<InventoryItemDto> result =
+        controller.getMyInventory(jwt, InventoryCatalog.MATERIAL, 0, 20, null);
 
     // The owner id MUST come from UserService.getUserIdFromJwt — the test pins that the captured
     // owner argument matches the JWT-derived id, not the URL/page params. This is the same guard
@@ -178,7 +187,7 @@ class InventoryItemControllerTest {
     UUID materialId = UUID.randomUUID();
     UUID jobOrderId = UUID.randomUUID();
     UUID missionId = UUID.randomUUID();
-    GroupedInventoryDto group = new GroupedInventoryDto(null, 25.0, 750.0, 800, List.of());
+    GroupedInventoryDto group = new GroupedInventoryDto(null, null, 25.0, 750.0, 800, List.of());
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     when(inventoryItemService.getMyAggregatedInventory(
             ownerId,
@@ -192,7 +201,15 @@ class InventoryItemControllerTest {
 
     List<GroupedInventoryDto> result =
         controller.getMyGroupedInventory(
-            jwt, List.of(materialId), 700, List.of(jobOrderId), List.of(missionId), false, false);
+            jwt,
+            List.of(materialId),
+            null,
+            700,
+            List.of(jobOrderId),
+            List.of(missionId),
+            false,
+            false,
+            InventoryCatalog.MATERIAL);
 
     assertThat(result).containsExactly(group);
     verify(inventoryItemService)
@@ -210,14 +227,15 @@ class InventoryItemControllerTest {
   void getMyGroupedInventory_personalOnly_forwardsFlagToService() {
     Jwt jwt = jwt("alice-sub");
     UUID ownerId = UUID.randomUUID();
-    GroupedInventoryDto group = new GroupedInventoryDto(null, 5.0, 600.0, 600, List.of());
+    GroupedInventoryDto group = new GroupedInventoryDto(null, null, 5.0, 600.0, 600, List.of());
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     when(inventoryItemService.getMyAggregatedInventory(
             ownerId, null, null, null, null, true, false))
         .thenReturn(List.of(group));
 
     List<GroupedInventoryDto> result =
-        controller.getMyGroupedInventory(jwt, null, null, null, null, true, false);
+        controller.getMyGroupedInventory(
+            jwt, null, null, null, null, null, true, false, InventoryCatalog.MATERIAL);
 
     assertThat(result).containsExactly(group);
     verify(inventoryItemService)
@@ -228,14 +246,15 @@ class InventoryItemControllerTest {
   void getMyGroupedInventory_nonPersonalOnly_forwardsFlagToService() {
     Jwt jwt = jwt("alice-sub");
     UUID ownerId = UUID.randomUUID();
-    GroupedInventoryDto group = new GroupedInventoryDto(null, 5.0, 600.0, 600, List.of());
+    GroupedInventoryDto group = new GroupedInventoryDto(null, null, 5.0, 600.0, 600, List.of());
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     when(inventoryItemService.getMyAggregatedInventory(
             ownerId, null, null, null, null, false, true))
         .thenReturn(List.of(group));
 
     List<GroupedInventoryDto> result =
-        controller.getMyGroupedInventory(jwt, null, null, null, null, false, true);
+        controller.getMyGroupedInventory(
+            jwt, null, null, null, null, null, false, true, InventoryCatalog.MATERIAL);
 
     assertThat(result).containsExactly(group);
     verify(inventoryItemService)
@@ -254,7 +273,8 @@ class InventoryItemControllerTest {
         .thenReturn(page);
 
     PageResponse<InventoryItemDto> result =
-        controller.getAllInventory(List.of(materialId), 700, null, null, 0, 20, null);
+        controller.getAllInventory(
+            List.of(materialId), null, 700, null, null, InventoryCatalog.MATERIAL, 0, 20, null);
 
     assertThat(result.content()).containsExactly(dto);
     verify(inventoryItemService)
@@ -263,11 +283,12 @@ class InventoryItemControllerTest {
 
   @Test
   void getAllGroupedInventory_delegatesWithoutJwt() {
-    GroupedInventoryDto group = new GroupedInventoryDto(null, 25.0, 750.0, 800, List.of());
+    GroupedInventoryDto group = new GroupedInventoryDto(null, null, 25.0, 750.0, 800, List.of());
     when(inventoryItemService.getAllAggregatedInventory(null, null, null, null))
         .thenReturn(List.of(group));
 
-    List<GroupedInventoryDto> result = controller.getAllGroupedInventory(null, null, null, null);
+    List<GroupedInventoryDto> result =
+        controller.getAllGroupedInventory(null, null, null, null, null, InventoryCatalog.MATERIAL);
 
     // The squadron-wide read MUST NOT touch the JWT helper — its access is gated by
     // @PreAuthorize on the controller method (LOGISTICIAN or above) plus service-level checks,
@@ -302,7 +323,16 @@ class InventoryItemControllerTest {
 
     PageResponse<InventoryItemDto> result =
         controller.getMyStackEntries(
-            jwt, materialId, locationId, 800, true, owningOrgUnitId, 0, 500);
+            jwt,
+            materialId,
+            null,
+            locationId,
+            800,
+            true,
+            owningOrgUnitId,
+            InventoryCatalog.MATERIAL,
+            0,
+            500);
 
     assertThat(result.content()).containsExactly(dto);
     // The owner id is derived from the JWT, never a request parameter (personal-inventory
@@ -337,7 +367,16 @@ class InventoryItemControllerTest {
         .thenReturn(page);
 
     PageResponse<InventoryItemDto> result =
-        controller.getAllStackEntries(materialId, userId, locationId, null, null, null, null);
+        controller.getAllStackEntries(
+            materialId,
+            null,
+            userId,
+            locationId,
+            null,
+            null,
+            InventoryCatalog.MATERIAL,
+            null,
+            null);
 
     assertThat(result.content()).containsExactly(dto);
     // The squadron-wide drill-down is gated by @PreAuthorize + service scope, not a JWT-owner read.
@@ -351,6 +390,448 @@ class InventoryItemControllerTest {
     assertThat(pageable.getValue().getPageNumber()).isZero();
   }
 
+  // ── catalog=ITEM read family (V220, REQ-INV-029/030/031) ─────────────
+
+  // covers REQ-INV-030 (catalog=ITEM aggregated view dispatches to the item sibling)
+  @Test
+  void getAggregatedInventory_catalogItem_dispatchesToAggregationService() {
+    AggregatedInventoryDto agg =
+        new AggregatedInventoryDto(
+            null,
+            new InventoryGameItemReferenceDto(UUID.randomUUID(), "Drive", null, "GENERIC"),
+            null,
+            null,
+            3.0);
+    Page<AggregatedInventoryDto> page = new PageImpl<>(List.of(agg), PageRequest.of(0, 20), 1);
+    when(inventoryAggregationService.getAggregatedItemInventory(any(Pageable.class)))
+        .thenReturn(page);
+
+    PageResponse<AggregatedInventoryDto> result =
+        controller.getAggregatedInventory(InventoryCatalog.ITEM, 0, 20, null);
+
+    // The ITEM catalog bypasses the historical material facade entirely — pre-item clients that
+    // never send the parameter keep hitting inventoryItemService (pinned by the MATERIAL test).
+    assertThat(result.content()).containsExactly(agg);
+    verify(inventoryAggregationService).getAggregatedItemInventory(any(Pageable.class));
+    verifyNoInteractions(inventoryItemService);
+  }
+
+  // covers REQ-INV-030 (catalog=ITEM flat my-inventory dispatches to the item sibling)
+  @Test
+  void getMyInventory_catalogItem_dispatchesToUserItemInventory() {
+    Jwt jwt = jwt("alice-sub");
+    UUID ownerId = UUID.randomUUID();
+    InventoryItemDto dto = inventoryItem(UUID.randomUUID());
+    Page<InventoryItemDto> page = new PageImpl<>(List.of(dto), PageRequest.of(0, 20), 1);
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
+    when(inventoryAggregationService.getUserItemInventory(eq(ownerId), any(Pageable.class)))
+        .thenReturn(page);
+
+    PageResponse<InventoryItemDto> result =
+        controller.getMyInventory(jwt, InventoryCatalog.ITEM, 0, 20, null);
+
+    assertThat(result.content()).containsExactly(dto);
+    verify(inventoryAggregationService).getUserItemInventory(eq(ownerId), any(Pageable.class));
+    verifyNoInteractions(inventoryItemService);
+  }
+
+  // covers REQ-INV-029/031 (catalog=ITEM grouped view rejects the material-only filters with 400)
+  @Test
+  void getMyGroupedInventory_catalogItem_rejectsMinQualityAndMissionIds() {
+    Jwt jwt = jwt("alice-sub");
+
+    // minQuality is meaningless without a quality dimension → 400, never silently ignored.
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                controller.getMyGroupedInventory(
+                    jwt, null, null, 700, null, null, false, false, InventoryCatalog.ITEM))
+        .isInstanceOf(BadRequestException.class);
+    // missionIds could only ever match the empty set (item rows are never mission-allocated).
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                controller.getMyGroupedInventory(
+                    jwt,
+                    null,
+                    null,
+                    null,
+                    null,
+                    List.of(UUID.randomUUID()),
+                    false,
+                    false,
+                    InventoryCatalog.ITEM))
+        .isInstanceOf(BadRequestException.class);
+    verifyNoInteractions(inventoryItemService, inventoryAggregationService);
+  }
+
+  // covers REQ-INV-029/031 (catalog=ITEM grouped view rejects a material filter with 400)
+  @Test
+  void getMyGroupedInventory_catalogItem_rejectsMaterialIds() {
+    Jwt jwt = jwt("alice-sub");
+
+    // Item rows carry no material — a silently dropped materialIds filter would return
+    // plausible-looking but unfiltered data, so the mismatch is a 400 contract error.
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                controller.getMyGroupedInventory(
+                    jwt,
+                    List.of(UUID.randomUUID()),
+                    null,
+                    null,
+                    null,
+                    null,
+                    false,
+                    false,
+                    InventoryCatalog.ITEM))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessageContaining("materialIds");
+    verifyNoInteractions(inventoryItemService, inventoryAggregationService);
+  }
+
+  // covers REQ-INV-029/031 (catalog=MATERIAL grouped view rejects an item filter with 400)
+  @Test
+  void getMyGroupedInventory_catalogMaterial_rejectsGameItemIds() {
+    Jwt jwt = jwt("alice-sub");
+
+    // The mirror guard: material rows carry no game item, so gameItemIds under the (default)
+    // MATERIAL catalog is rejected before any owner resolution or service dispatch.
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                controller.getMyGroupedInventory(
+                    jwt,
+                    null,
+                    List.of(UUID.randomUUID()),
+                    null,
+                    null,
+                    null,
+                    false,
+                    false,
+                    InventoryCatalog.MATERIAL))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessageContaining("gameItemIds");
+    verifyNoInteractions(inventoryItemService, inventoryAggregationService);
+  }
+
+  // covers REQ-INV-030 (catalog=ITEM grouped view dispatches with the item filter surface)
+  @Test
+  void getMyGroupedInventory_catalogItem_dispatchesWithItemFilters() {
+    Jwt jwt = jwt("alice-sub");
+    UUID ownerId = UUID.randomUUID();
+    UUID gameItemId = UUID.randomUUID();
+    UUID jobOrderId = UUID.randomUUID();
+    GroupedInventoryDto group =
+        new GroupedInventoryDto(
+            null,
+            new InventoryGameItemReferenceDto(gameItemId, "Drive", null, "GENERIC"),
+            5.0,
+            null,
+            null,
+            List.of());
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
+    when(inventoryAggregationService.getMyAggregatedItemInventory(
+            ownerId, List.of(gameItemId), List.of(jobOrderId), true, false))
+        .thenReturn(List.of(group));
+
+    List<GroupedInventoryDto> result =
+        controller.getMyGroupedInventory(
+            jwt,
+            null,
+            List.of(gameItemId),
+            null,
+            List.of(jobOrderId),
+            null,
+            true,
+            false,
+            InventoryCatalog.ITEM);
+
+    assertThat(result).containsExactly(group);
+    verifyNoInteractions(inventoryItemService);
+  }
+
+  // covers REQ-INV-029/031 (catalog=ITEM flat /all rejects the material-only filters with 400)
+  @Test
+  void getAllInventory_catalogItem_rejectsMinQualityAndMissionIds() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                controller.getAllInventory(
+                    null, null, 700, null, null, InventoryCatalog.ITEM, 0, 20, null))
+        .isInstanceOf(BadRequestException.class);
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                controller.getAllInventory(
+                    null,
+                    null,
+                    null,
+                    null,
+                    List.of(UUID.randomUUID()),
+                    InventoryCatalog.ITEM,
+                    0,
+                    20,
+                    null))
+        .isInstanceOf(BadRequestException.class);
+    verifyNoInteractions(inventoryItemService, inventoryAggregationService);
+  }
+
+  // covers REQ-INV-029/031 (catalog=ITEM flat /all rejects a material filter with 400)
+  @Test
+  void getAllInventory_catalogItem_rejectsMaterialIds() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                controller.getAllInventory(
+                    List.of(UUID.randomUUID()),
+                    null,
+                    null,
+                    null,
+                    null,
+                    InventoryCatalog.ITEM,
+                    0,
+                    20,
+                    null))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessageContaining("materialIds");
+    verifyNoInteractions(inventoryItemService, inventoryAggregationService);
+  }
+
+  // covers REQ-INV-029/031 (catalog=MATERIAL flat /all rejects an item filter with 400)
+  @Test
+  void getAllInventory_catalogMaterial_rejectsGameItemIds() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                controller.getAllInventory(
+                    null,
+                    List.of(UUID.randomUUID()),
+                    null,
+                    null,
+                    null,
+                    InventoryCatalog.MATERIAL,
+                    0,
+                    20,
+                    null))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessageContaining("gameItemIds");
+    verifyNoInteractions(inventoryItemService, inventoryAggregationService);
+  }
+
+  // covers REQ-INV-030 (catalog=ITEM flat /all dispatches to the item sibling)
+  @Test
+  void getAllInventory_catalogItem_dispatchesToAllItemInventory() {
+    UUID gameItemId = UUID.randomUUID();
+    InventoryItemDto dto = inventoryItem(UUID.randomUUID());
+    Page<InventoryItemDto> page = new PageImpl<>(List.of(dto), PageRequest.of(0, 20), 1);
+    when(inventoryAggregationService.getAllItemInventory(
+            eq(List.of(gameItemId)), eq(null), any(Pageable.class)))
+        .thenReturn(page);
+
+    PageResponse<InventoryItemDto> result =
+        controller.getAllInventory(
+            null, List.of(gameItemId), null, null, null, InventoryCatalog.ITEM, 0, 20, null);
+
+    assertThat(result.content()).containsExactly(dto);
+    verifyNoInteractions(inventoryItemService);
+  }
+
+  // covers REQ-INV-029/031 (catalog=ITEM grouped /all rejects the material-only filters with 400)
+  @Test
+  void getAllGroupedInventory_catalogItem_rejectsMinQualityAndMissionIds() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                controller.getAllGroupedInventory(
+                    null, null, 700, null, null, InventoryCatalog.ITEM))
+        .isInstanceOf(BadRequestException.class);
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                controller.getAllGroupedInventory(
+                    null, null, null, null, List.of(UUID.randomUUID()), InventoryCatalog.ITEM))
+        .isInstanceOf(BadRequestException.class);
+    verifyNoInteractions(inventoryItemService, inventoryAggregationService);
+  }
+
+  // covers REQ-INV-029/031 (catalog=ITEM grouped /all rejects a material filter with 400)
+  @Test
+  void getAllGroupedInventory_catalogItem_rejectsMaterialIds() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                controller.getAllGroupedInventory(
+                    List.of(UUID.randomUUID()), null, null, null, null, InventoryCatalog.ITEM))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessageContaining("materialIds");
+    verifyNoInteractions(inventoryItemService, inventoryAggregationService);
+  }
+
+  // covers REQ-INV-029/031 (catalog=MATERIAL grouped /all rejects an item filter with 400)
+  @Test
+  void getAllGroupedInventory_catalogMaterial_rejectsGameItemIds() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                controller.getAllGroupedInventory(
+                    null, List.of(UUID.randomUUID()), null, null, null, InventoryCatalog.MATERIAL))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessageContaining("gameItemIds");
+    verifyNoInteractions(inventoryItemService, inventoryAggregationService);
+  }
+
+  // covers REQ-INV-030 (catalog=ITEM grouped /all dispatches to the item sibling)
+  @Test
+  void getAllGroupedInventory_catalogItem_dispatchesWithItemFilters() {
+    UUID gameItemId = UUID.randomUUID();
+    GroupedInventoryDto group =
+        new GroupedInventoryDto(
+            null,
+            new InventoryGameItemReferenceDto(gameItemId, "Drive", null, "GENERIC"),
+            5.0,
+            null,
+            null,
+            List.of());
+    when(inventoryAggregationService.getAllAggregatedItemInventory(List.of(gameItemId), null))
+        .thenReturn(List.of(group));
+
+    List<GroupedInventoryDto> result =
+        controller.getAllGroupedInventory(
+            null, List.of(gameItemId), null, null, null, InventoryCatalog.ITEM);
+
+    assertThat(result).containsExactly(group);
+    verifyNoInteractions(inventoryItemService);
+  }
+
+  // covers REQ-INV-005/029 (catalog=ITEM stack drill-down: gameItemId required, quality rejected)
+  @Test
+  void getMyStackEntries_catalogItem_requiresGameItemId_andRejectsQuality() {
+    Jwt jwt = jwt("owner-sub");
+    UUID locationId = UUID.randomUUID();
+
+    // The stack address of an item drill-down is the gameItemId — absent → 400.
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                controller.getMyStackEntries(
+                    jwt, null, null, locationId, null, false, null, InventoryCatalog.ITEM, 0, 20))
+        .isInstanceOf(BadRequestException.class);
+    // Item stacks carry no quality key — a quality param is a contract error → 400.
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                controller.getMyStackEntries(
+                    jwt,
+                    null,
+                    UUID.randomUUID(),
+                    locationId,
+                    800,
+                    false,
+                    null,
+                    InventoryCatalog.ITEM,
+                    0,
+                    20))
+        .isInstanceOf(BadRequestException.class);
+    verifyNoInteractions(inventoryItemService, inventoryAggregationService);
+  }
+
+  // covers REQ-INV-005/029 (catalog=ITEM my-stack drill-down dispatches to the item sibling)
+  @Test
+  void getMyStackEntries_catalogItem_dispatchesToItemStackEntries() {
+    Jwt jwt = jwt("owner-sub");
+    UUID ownerId = UUID.randomUUID();
+    UUID gameItemId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    InventoryItemDto dto = inventoryItem(UUID.randomUUID());
+    Page<InventoryItemDto> page = new PageImpl<>(List.of(dto), PageRequest.of(0, 20), 1);
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
+    when(inventoryAggregationService.getMyItemStackEntries(
+            eq(ownerId),
+            eq(gameItemId),
+            eq(locationId),
+            eq(Boolean.TRUE),
+            isNull(),
+            any(Pageable.class)))
+        .thenReturn(page);
+
+    PageResponse<InventoryItemDto> result =
+        controller.getMyStackEntries(
+            jwt, null, gameItemId, locationId, null, true, null, InventoryCatalog.ITEM, 0, 20);
+
+    assertThat(result.content()).containsExactly(dto);
+    verifyNoInteractions(inventoryItemService);
+  }
+
+  // covers REQ-INV-005/029 (catalog=ITEM global stack drill-down dispatches to the item sibling)
+  @Test
+  void getAllStackEntries_catalogItem_dispatchesToItemStackEntries() {
+    UUID gameItemId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    InventoryItemDto dto = inventoryItem(UUID.randomUUID());
+    Page<InventoryItemDto> page = new PageImpl<>(List.of(dto), PageRequest.of(0, 20), 1);
+    when(inventoryAggregationService.getAllItemStackEntries(
+            eq(gameItemId), eq(userId), eq(locationId), isNull(), any(Pageable.class)))
+        .thenReturn(page);
+
+    PageResponse<InventoryItemDto> result =
+        controller.getAllStackEntries(
+            null, gameItemId, userId, locationId, null, null, InventoryCatalog.ITEM, null, null);
+
+    assertThat(result.content()).containsExactly(dto);
+    // Quality on the global item drill-down is rejected exactly like the my-variant.
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                controller.getAllStackEntries(
+                    null,
+                    gameItemId,
+                    userId,
+                    locationId,
+                    800,
+                    null,
+                    InventoryCatalog.ITEM,
+                    null,
+                    null))
+        .isInstanceOf(BadRequestException.class);
+    verifyNoInteractions(inventoryItemService);
+  }
+
+  // ── GET /game-item/{gameItemId} (item drilldown) ─────────────────────
+
+  // covers REQ-INV-030 (per-game-item drilldown wired to the aggregation service)
+  @Test
+  void getInventoryByGameItem_forwardsGameItemIdAndPageableToService() {
+    UUID gameItemId = UUID.randomUUID();
+    InventoryItemDto dto = inventoryItem(UUID.randomUUID());
+    Page<InventoryItemDto> page = new PageImpl<>(List.of(dto), PageRequest.of(0, 20), 1);
+    when(inventoryAggregationService.getInventoryByGameItem(eq(gameItemId), any(Pageable.class)))
+        .thenReturn(page);
+
+    PageResponse<InventoryItemDto> result =
+        controller.getInventoryByGameItem(gameItemId, 0, 20, null);
+
+    assertThat(result.content()).containsExactly(dto);
+    verify(inventoryAggregationService).getInventoryByGameItem(eq(gameItemId), any(Pageable.class));
+    verifyNoInteractions(inventoryItemService);
+  }
+
+  // ── GET /item-catalog (bookable game items picker) ───────────────────
+
+  // covers REQ-INV-029 (item-catalog picker returns the paged reference shape with a stable
+  // id tiebreaker)
+  @Test
+  void getItemCatalog_wrapsCatalogServicePageIntoPageResponse() {
+    InventoryGameItemReferenceDto ref =
+        new InventoryGameItemReferenceDto(UUID.randomUUID(), "Quantum Drive", "RSI", "GENERIC");
+    Page<InventoryGameItemReferenceDto> page =
+        new PageImpl<>(List.of(ref), PageRequest.of(0, 20), 1);
+    when(inventoryItemCatalogService.findBookableItems(eq("drive"), any(Pageable.class)))
+        .thenReturn(page);
+
+    PageResponse<InventoryGameItemReferenceDto> result =
+        controller.getItemCatalog("drive", 0, 20, "name,asc");
+
+    assertThat(result.content()).containsExactly(ref);
+    assertThat(result.totalElements()).isEqualTo(1L);
+    // The sort whitelist includes `id`, so PaginationUtil appends it as a tiebreaker even when the
+    // caller sorts by name only — equal-named UEX variants keep a deterministic page order (the
+    // name,asc;id,asc default-sort contract). A whitelist regression to {name} drops the appended
+    // key and this captor catches it.
+    ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+    verify(inventoryItemCatalogService).findBookableItems(eq("drive"), pageable.capture());
+    org.springframework.data.domain.Sort sort = pageable.getValue().getSort();
+    assertThat(sort.getOrderFor("name")).isNotNull();
+    assertThat(sort.getOrderFor("id")).isNotNull();
+    verifyNoInteractions(inventoryItemService, inventoryAggregationService);
+  }
+
   // ── POST /inventory (create) ─────────────────────────────────────────
 
   @Test
@@ -361,7 +842,19 @@ class InventoryItemControllerTest {
     UUID locationId = UUID.randomUUID();
     InventoryItemCreateDto createDto =
         new InventoryItemCreateDto(
-            null, materialId, locationId, 750, 25.0, false, null, null, null, null, null, null);
+            null,
+            materialId,
+            null,
+            locationId,
+            750,
+            25.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
     InventoryItemDto persisted = inventoryItem(UUID.randomUUID());
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
     when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
@@ -384,6 +877,7 @@ class InventoryItemControllerTest {
         new InventoryItemCreateDto(
             UUID.randomUUID(), // caller tried to set an explicit owner ...
             UUID.randomUUID(),
+            null,
             UUID.randomUUID(),
             750,
             25.0,

@@ -86,7 +86,7 @@ public class AdminMaterialsPageController {
 
   /**
    * Loads the <em>complete</em> materials list — every page, not one capped chunk — plus the
-   * category dropdown source (REQ-ADMIN-001, ADR-0101). The "refined materials" model attribute is
+   * category dropdown source (REQ-ADMIN-001, ADR-0102). The "refined materials" model attribute is
    * the same list sorted again case-insensitively — admins assign raw materials to a refined one
    * even when the UEX flag is wrong, so the dropdown intentionally includes every material rather
    * than filtering by {@code isRefined}. Should the page walk ever hit its safety cap, {@code

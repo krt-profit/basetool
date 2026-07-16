@@ -80,7 +80,10 @@
 
     /** Re-renders every row's badge against the current map. */
     function refreshAll() {
-        document.querySelectorAll('select[id^="inputMaterialId_"]').forEach(function (sel) {
+        // Attribute-only selector: after combobox enhancement (REQ-FE-016) the control's id
+        // lives on a hidden <input>, not a <select>; refreshFor only reads .id and .value,
+        // which both elements carry.
+        document.querySelectorAll('[id^="inputMaterialId_"]').forEach(function (sel) {
             refreshFor(sel);
         });
     }

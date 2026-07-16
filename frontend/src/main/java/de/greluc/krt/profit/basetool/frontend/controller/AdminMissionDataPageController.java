@@ -90,7 +90,7 @@ public class AdminMissionDataPageController {
 
   /**
    * Renders all three reference catalogs side by side, each fetched <em>completely</em> — every
-   * page, not one capped chunk (REQ-ADMIN-001, ADR-0101). Seeds empty forms when the model does not
+   * page, not one capped chunk (REQ-ADMIN-001, ADR-0102). Seeds empty forms when the model does not
    * already carry one (a previous validation failure rerender). The three catalogs are fetched in
    * parallel via {@link ParallelPageLoader}; if any individual fetch throws, the corresponding
    * catalog renders empty and a single shared error message ({@code error.admin.mission.data.load})
@@ -212,7 +212,7 @@ public class AdminMissionDataPageController {
 
   /**
    * Fetches the <em>complete</em> job-type catalog from the backend — every page, not one capped
-   * chunk (REQ-ADMIN-001, ADR-0101) — transforms the raw {@code Map} payload into a list of {@link
+   * chunk (REQ-ADMIN-001, ADR-0102) — transforms the raw {@code Map} payload into a list of {@link
    * JobTypeDto} records and sorts the result case-insensitively by name. An empty backend catalog
    * yields an empty item list; the returned wrapper carries the truncation flag for the page-level
    * warning banner (REQ-ADMIN-002).
@@ -249,7 +249,7 @@ public class AdminMissionDataPageController {
 
   /**
    * Fetches the <em>complete</em> squadron catalog from the backend — every page, not one capped
-   * chunk (REQ-ADMIN-001, ADR-0101) — transforms the raw {@code Map} payload into a list of {@link
+   * chunk (REQ-ADMIN-001, ADR-0102) — transforms the raw {@code Map} payload into a list of {@link
    * SquadronDto} records and sorts the result case-insensitively by name. An empty backend catalog
    * yields an empty item list; the returned wrapper carries the truncation flag for the page-level
    * warning banner (REQ-ADMIN-002).
@@ -285,7 +285,7 @@ public class AdminMissionDataPageController {
 
   /**
    * Fetches the <em>complete</em> frequency-type catalog from the backend — every page, not one
-   * capped chunk (REQ-ADMIN-001, ADR-0101) — and returns the raw {@code Map} content (this list is
+   * capped chunk (REQ-ADMIN-001, ADR-0102) — and returns the raw {@code Map} content (this list is
    * rendered with Thymeleaf utility helpers and does not need a typed DTO). The returned wrapper
    * carries the truncation flag for the page-level warning banner (REQ-ADMIN-002).
    */

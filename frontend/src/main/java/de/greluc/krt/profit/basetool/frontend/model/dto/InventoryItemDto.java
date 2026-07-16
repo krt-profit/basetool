@@ -30,11 +30,16 @@ import java.util.UUID;
  * <p>Since Variante C (REQ-INV-027) an entry's quantity is split independently across several job
  * orders ({@code jobOrderAllocations}, unassigned {@code jobOrderRest}) and several missions
  * ({@code missionAllocations}, unassigned {@code missionRest}) shown as chips.
+ *
+ * <p>Catalog-discriminated since V220 (REQ-INV-029): a material row carries {@code material} +
+ * {@code quality} with {@code gameItem == null}; a game-item stock row carries {@code gameItem}
+ * with {@code material == null} and {@code quality == null}.
  */
 public record InventoryItemDto(
     UUID id,
     UserReferenceDto user,
     MaterialReferenceDto material,
+    InventoryGameItemReferenceDto gameItem,
     LocationReferenceDto location,
     Integer quality,
     Double amount,

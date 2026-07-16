@@ -11,6 +11,9 @@
  *     `data-role` (existing change-delegation + dependent loaders read it);
  *   - selecting an option dispatches a bubbling `change` on the hidden input,
  *     exactly as a native <select> would;
+ *   - the selected option's extra `data-*` (e.g. `data-quantity-type` on a
+ *     material option) is mirrored onto the hidden input on every value-set
+ *     path, replacing `selectedOptions[0].dataset.*` reads (REQ-FE-016);
  *   - `required` is mirrored onto the visible textbox and a custom validity
  *     message is set while the typed text matches no option, so the browser's
  *     own constraint-validation bubble keeps gating submit at the right field.
@@ -102,11 +105,38 @@
      * @param {string} value the option value (submitted via the hidden input)
      * @param {string} label the visible option label
      * @param {string} [extra] optional extra search terms not shown in the label
-     * @returns {{value: string, label: string, search: string}} the option model
+     * @param {Object} [data] optional per-option metadata (camelCased dataset keys) mirrored onto
+     *     the hidden input while this option is selected (REQ-FE-016)
+     * @returns {{value: string, label: string, search: string, data: (Object|undefined)}} the
+     *     option model
      */
-    function makeItem(value, label, extra) {
+    function makeItem(value, label, extra, data) {
         const terms = extra && extra.trim() ? label + ' ' + extra.trim() : label;
-        return { value: value, label: label, search: terms.toLowerCase() };
+        return { value: value, label: label, search: terms.toLowerCase(), data: data };
+    }
+
+    /**
+     * Harvests an option's extra data-* attributes (everything outside the combobox-owned keys)
+     * into a plain map, so option-level metadata like {@code data-quantity-type} survives the
+     * enhancement — the native {@code <option>} elements are removed together with the
+     * {@code <select>}, and consumers instead read the mirrored keys off the hidden input
+     * (REQ-FE-016).
+     *
+     * @param {HTMLOptionElement} option the source option
+     * @returns {Object|undefined} the metadata map, or undefined when the option carries none
+     */
+    function optionData(option) {
+        let map;
+        Object.keys(option.dataset).forEach(function (key) {
+            if (COMBOBOX_DATA_KEYS.indexOf(key) !== -1) {
+                return;
+            }
+            if (!map) {
+                map = {};
+            }
+            map[key] = option.dataset[key];
+        });
+        return map;
     }
 
     /**
@@ -120,9 +150,11 @@
      *     is capped), `invalidText` (custom validity for unmatched text),
      *     `loadingText` (shown while a remote fetch is in flight), `maxResults`
      *     (render cap, default 50) and `remoteSource` — an optional
-     *     `(query) => Promise<Array<{value,label}>>` that, when supplied, makes the
-     *     combobox fetch its options from the backend on demand (debounced) instead
-     *     of filtering a preloaded static list (no data-attribute fallback).
+     *     `(query) => Promise<Array<{value,label,data?}>>` that, when supplied, makes
+     *     the combobox fetch its options from the backend on demand (debounced) instead
+     *     of filtering a preloaded static list (no data-attribute fallback). A result's
+     *     optional `data` map is mirrored onto the hidden input while selected, exactly
+     *     like a local option's extra `data-*` attributes.
      */
     function krtSearchableSelect(select, config) {
         if (!select || select.tagName !== 'SELECT') {
@@ -161,7 +193,14 @@
                 }
                 return;
             }
-            items.push(makeItem(option.value, option.textContent.trim(), option.dataset.search));
+            items.push(
+                makeItem(
+                    option.value,
+                    option.textContent.trim(),
+                    option.dataset.search,
+                    optionData(option),
+                ),
+            );
         });
 
         const uid = 'krt-cb-' + ++comboboxSeq;
@@ -185,9 +224,13 @@
         if (select.id) {
             hidden.id = select.id;
         }
+        // Keys copied from the SELECT are reserved: option-level metadata mirrored later must
+        // never clobber a control-level contract like data-role / data-trigger (REQ-FE-016).
+        const reservedKeys = [];
         Object.keys(data).forEach(function (key) {
             if (COMBOBOX_DATA_KEYS.indexOf(key) === -1) {
                 hidden.dataset[key] = data[key];
+                reservedKeys.push(key);
             }
         });
 
@@ -234,6 +277,39 @@
         wrapper.appendChild(input);
         wrapper.appendChild(listbox);
 
+        // Option-level metadata mirror (REQ-FE-016). The native <option>s vanish with the
+        // <select>, so consumers that used to read `selectedOptions[0].dataset.*` (e.g. the
+        // material pickers' data-quantity-type) instead read the selected option's extra data-*
+        // straight off the hidden input. ONE helper serves every value-set path — click/keyboard
+        // commit, enhance-time preselect seeding, reconcile()'s typed-exact-match, and the
+        // programmatic setValue() API — so no path can leave stale metadata behind: previously
+        // mirrored keys are removed before the new option's map is applied (an option lacking a
+        // key the previous one carried must not inherit the old value), and keys copied from the
+        // select itself (reservedKeys above) are never overwritten by option metadata.
+        let mirroredKeys = [];
+
+        function mirrorItemData(item) {
+            mirroredKeys.forEach(function (key) {
+                delete hidden.dataset[key];
+            });
+            mirroredKeys = [];
+            const map = item && item.data ? item.data : null;
+            if (!map) {
+                return;
+            }
+            Object.keys(map).forEach(function (key) {
+                if (
+                    COMBOBOX_DATA_KEYS.indexOf(key) !== -1 ||
+                    reservedKeys.indexOf(key) !== -1 ||
+                    map[key] == null
+                ) {
+                    return;
+                }
+                hidden.dataset[key] = map[key];
+                mirroredKeys.push(key);
+            });
+        }
+
         // Seed the display from a preselected value (edit mode / adopted sub-assembly).
         let committedLabel = '';
         const preselected = items.find(function (it) {
@@ -243,6 +319,7 @@
             committedLabel = preselected.label;
             hidden.value = preselected.value;
             input.value = committedLabel;
+            mirrorItemData(preselected);
         }
 
         select.parentNode.replaceChild(wrapper, select);
@@ -489,6 +566,9 @@
             const next = item ? item.value : '';
             const changed = hidden.value !== next;
             hidden.value = next;
+            // Mirror before the change event below, so change listeners reading the hidden
+            // input's dataset (unit/step refreshers) already see the new option's metadata.
+            mirrorItemData(item);
             committedLabel = item ? item.label : '';
             input.value = committedLabel;
             input.setCustomValidity('');
@@ -514,13 +594,17 @@
                 committedLabel = exact.label;
                 if (hidden.value !== exact.value) {
                     hidden.value = exact.value;
+                    mirrorItemData(exact);
                     hidden.dispatchEvent(new Event('change', { bubbles: true }));
+                } else {
+                    mirrorItemData(exact);
                 }
                 input.setCustomValidity('');
                 return;
             }
             if (hidden.value) {
                 hidden.value = '';
+                mirrorItemData(null);
                 hidden.dispatchEvent(new Event('change', { bubbles: true }));
             }
             input.setCustomValidity(input.value.trim() ? texts.invalid : '');
@@ -637,12 +721,21 @@
          * and the visible label, WITHOUT firing a `change` event. This is the supported way for page
          * JS to preselect a combobox after enhancement (e.g. when an edit modal opens and seeds the
          * current value) — assigning to the hidden input's `.value` directly would update the
-         * submitted value but leave the textbox showing the wrong (or empty) text. An unknown value
-         * clears the selection.
+         * submitted value but leave the textbox showing the wrong (or empty) text.
+         *
+         * In remote mode the loaded item set holds only what the last fetch returned, so a value
+         * cannot be resolved to a label locally: callers that know the entry pass `label` (and
+         * optionally the option `data` map, mirrored like a picked option's metadata) and the pick
+         * is trusted as-is. Without a resolvable label the selection is cleared — never a value
+         * with a blank textbox.
          *
          * @param {string} value the option value to select, or empty/unknown to clear
+         * @param {string} [label] the visible label for a value outside the loaded item set
+         *     (remote mode / programmatic fills); ignored when the value resolves locally
+         * @param {Object} [data] optional option metadata mirrored onto the hidden input while
+         *     this value is selected (camelCased dataset keys, REQ-FE-016)
          */
-        function setValue(value) {
+        function setValue(value, label, data) {
             const v = value == null ? '' : String(value);
             let match = null;
             for (let i = 0; i < items.length; i++) {
@@ -651,7 +744,11 @@
                     break;
                 }
             }
+            if (!match && v && label != null && String(label).trim() !== '') {
+                match = makeItem(v, String(label), undefined, data);
+            }
             hidden.value = match ? match.value : '';
+            mirrorItemData(match);
             committedLabel = match ? match.label : '';
             input.value = committedLabel;
             input.setCustomValidity('');

@@ -77,7 +77,7 @@ public class ShipDataPageController {
 
   /**
    * Loads the <em>complete</em> manufacturer and ship-type catalogs — every page, not one capped
-   * chunk, including hidden entries (REQ-ADMIN-001, ADR-0101) — and seeds empty forms when not
+   * chunk, including hidden entries (REQ-ADMIN-001, ADR-0102) — and seeds empty forms when not
    * already in the model. Both lists are sorted case-insensitively by name. A backend failure
    * leaves an error key in the model rather than blanking the page; a page walk that hits its
    * safety cap sets {@code catalogTruncated} so the template shows a loud warning banner instead of

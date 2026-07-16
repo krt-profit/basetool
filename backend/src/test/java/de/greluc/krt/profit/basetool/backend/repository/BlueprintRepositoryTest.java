@@ -58,4 +58,14 @@ class BlueprintRepositoryTest {
     Page<Blueprint> page = blueprintRepository.searchActive("omni", PageRequest.of(0, 25));
     assertNotNull(page);
   }
+
+  // covers REQ-INV-029 (item-catalog picker query: both search shapes plan against Postgres)
+  @Test
+  void findItemsWithActiveBlueprint_executesAgainstPostgresForBothSearchShapes() {
+    // The Lager item-catalog query shares the LOWER(CONCAT(...)) grammar, so the empty-string
+    // no-filter shape and the term shape both need the plan-time smoke test — the service binds
+    // "" (never null) for "no filter" for exactly the bytea reason documented on the class.
+    assertNotNull(blueprintRepository.findItemsWithActiveBlueprint("", PageRequest.of(0, 25)));
+    assertNotNull(blueprintRepository.findItemsWithActiveBlueprint("drive", PageRequest.of(0, 25)));
+  }
 }

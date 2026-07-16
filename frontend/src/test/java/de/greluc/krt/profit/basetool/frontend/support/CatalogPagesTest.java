@@ -32,7 +32,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Unit tests for {@link CatalogPages}, the shared admin-catalogue page walk (REQ-ADMIN-001/002,
- * ADR-0101). Pins the walk-until-last-page concatenation, the single-request common case, the
+ * ADR-0102). Pins the walk-until-last-page concatenation, the single-request common case, the
  * {@code MAX_CATALOG_PAGES} runaway backstop with its {@code truncated} flag, the authoritative
  * {@code totalElements} passthrough and the exception-transparency contract.
  */
