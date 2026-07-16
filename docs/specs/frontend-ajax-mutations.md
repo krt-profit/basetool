@@ -1089,22 +1089,30 @@ requester-refused queue + bank dual-auth matrix) · `RedisLiveSyncFanoutTest` +
 
 The user-picker rule of REQ-FE-011 extends to **catalog** pickers: every field that selects a
 **material**, a **game item** or a **booking-flow location** from the catalog must be a
-`krt-searchable-select` combobox — a plain `<select>` over a full catalog is incomplete. Materials
-and locations (small, page-preloaded catalogs) use the bare `data-krt-combobox` local-filter mode;
-game items (thousands of blueprint-bearing entries) use `remoteSource` mode. The unpaginated
-lookup endpoints feeding the local-filter mode (`GET /api/v1/materials/lookup`,
-`GET /api/v1/locations/lookup`) are defensively capped server-side at 1000 rows, name ascending
-(`MaterialService`/`LocationService#LOOKUP_MAX_RESULTS`) — both catalogs are bounded by nature
-(UEX/SC-Wiki sync plus admin curation; users cannot create entries), so the cap only guarantees a
-page can never embed an unbounded catalog payload. Converted sites:
-the inventory Einbuchen material + location pickers and its item-mode game-item picker (the
-`remote-game-items` registry source in `krt-catalog-search.js` → the authenticated
-`GET /inventory/item-search` proxy → the role-gated backend `/api/v1/inventory/item-catalog`,
-REQ-INV-029), the job-order create/edit material lines (server-rendered **and** JS-built rows),
-the refinery create/details input-material pickers, the Umbuchen target-location pickers, the
-production modal's book-in location picker (REQ-INV-032), the `/inventory/material` navigate
-select and the admin material-alias pickers; the orders item picker already used the component's
-`remoteSource` API.
+`krt-searchable-select` combobox — a plain `<select>` over a full catalog is incomplete. Catalog
+pickers search **server-side** (`remoteSource` mode): the page never preloads the catalog as
+`<option>`s; the picker fetches the matching entries per (debounced) keystroke through the public
+`/catalog/material-search` / `/catalog/location-search` relays onto the backend picker searches
+(`GET /api/v1/materials/search` with `jobOrderOnly`/`rawOnly` narrowing, `GET
+/api/v1/locations/search`), 25 name-sorted rows per query. **No silent caps, ever:** every entry
+stays reachable by typing a narrower term regardless of catalog size, and the complete-list
+endpoints that other surfaces consume (`/api/v1/materials/lookup`, `/api/v1/locations/lookup`)
+stay deliberately **unbounded** — a fixed bound on a complete-list surface silently hides the
+tail, the defect class that forced the item picker onto server-side search (ADR-0100). The marker
+values are registered in `krt-catalog-search.js`: `remote-materials`,
+`remote-materials-joborder` (orders lines), `remote-materials-raw` (refinery inputs),
+`remote-locations`, and `remote-game-items` (the inventory item mode's bookable-item picker — the
+one **authenticated** relay, `GET /inventory/item-search`, onto the role-gated backend
+`/api/v1/inventory/item-catalog`, REQ-INV-029). Server-rendered edit/redisplay states seed exactly
+**one** selected `<option>` (gated `th:if`) so the label and its metadata survive enhancement;
+programmatic fills use `krtCombobox.setValue(value, label, data?)` — in remote mode a bare
+`setValue(value)` cannot resolve a label and clears the field, so every call site passes the label
+(or resolves the entry via the search relay first). Converted sites: the inventory Einbuchen
+material + location pickers and its item-mode game-item picker, the job-order create/edit material
+lines (server-rendered **and** JS-built rows), the refinery create/details input-material pickers,
+the Umbuchen target-location pickers, the production modal's book-in location picker
+(REQ-INV-032), the `/inventory/material` navigate select and the admin material-alias pickers; the
+orders item picker already used the component's `remoteSource` API.
 
 **Option-metadata mirror (the load-bearing part).** Enhancing a select **removes** the native
 `<option>` elements, so option-level metadata (`data-quantity-type` on material options,
@@ -1130,29 +1138,35 @@ ARIA ids, no native select left to re-enhance).
 
 **Acceptance**
 
-- [ ] Every material / game-item / booking-location picker carries `data-krt-combobox` (or wires
-  `remoteSource` via the direct API); typing filters the list; the committed value submits under
-  the original field name.
+- [ ] Every material / game-item / booking-location picker carries a `data-krt-combobox` marker
+  bound to a registered remote source (or wires `remoteSource` via the direct API); typing
+  fetches the matching entries server-side; the committed value submits under the original field
+  name.
+- [ ] An entry beyond any single response page (25 rows) is reachable by typing a narrower term —
+  no picker, endpoint or template silently truncates the catalog.
 - [ ] Picking a PIECE material through the combobox switches the amount field to whole-number mode
   and back for SCU (the quantity-type mirror), including on edit-mode preselect and typed exact
   match — never a stale unit from the previously selected option.
 - [ ] Dynamically added rows (order material lines, refinery goods rows) render a working
-  searchable picker, and programmatic fills (SCMDB import, import-review suggestion chips) show
-  the picked label, not a blank box.
+  searchable picker, and programmatic fills (SCMDB import, import-review suggestion chips,
+  Umbuchen preselect) show the picked label, not a blank box.
 
 **Enforced by:** the migrated picker flows in `InventoryOperationsE2eTest`,
 `JobOrderCreateE2eTest`, `OrdersCreateScuHintRevealE2eTest` (quantity-type mirror + stale-key
 removal end-to-end) and `RefineryOrderCreateE2eTest` (via `E2eSupport.selectComboboxByValue`) ·
-MockMvc view tests asserting the `data-krt-combobox` marker on every converted select
-(`JobOrderPageControllerResponsiblePickerMvcTest`, `OrderHierarchyVisibilityTest`,
+`CatalogSearchControllerMvcTest` (relay mapping incl. refined metadata, fail-soft empty list,
+anonymous reachability) · MockMvc view tests asserting the mode-bearing marker on every converted
+select (`JobOrderPageControllerResponsiblePickerMvcTest`, `OrderHierarchyVisibilityTest`,
 `InventoryPageControllerMvcTest`, `AdminMaterialAliasesPageControllerMvcTest`,
-`OfficerRefineryAccessTest`) · the lookup-cap unit tests in `LocationServiceTest` /
-`MaterialServiceTest` · **Code:**
+`OfficerRefineryAccessTest`) · the search unit tests in `LocationServiceTest` /
+`MaterialServiceTest` (LIKE escaping, filter flags, complete unbounded lookups) · **Code:**
 `krt-searchable-select.js` (`optionData` harvest, `mirrorItemData` on all four value-set paths,
-reserved select-level keys), the re-pointed consumers in `inventory-input.js`, `orders-create.js`
-(`refreshMaterialUnit`, `importFromScmdb`), `orders-detail.js`, `refinery-orders-create.js` /
-`refinery-orders-details.js` (`updateOutputMaterial`, rebuilt `addMaterialRow`),
-`refinery-yield-badge.js` · **ADR:** ADR-0053 (follow-up note)
+reserved select-level keys, label-carrying `setValue`), `krt-catalog-search.js` (remote-source
+registry), `CatalogSearchController`, the re-pointed consumers in `inventory-input.js`,
+`orders-create.js` (`refreshMaterialUnit`, async `importFromScmdb`), `orders-detail.js`,
+`refinery-orders-create.js` / `refinery-orders-details.js` (`updateOutputMaterial`, rebuilt
+`addMaterialRow`, async suggestion chips), `refinery-yield-badge.js` · **ADR:** ADR-0053
+(follow-up note), ADR-0100
 
 ## Out of scope
 

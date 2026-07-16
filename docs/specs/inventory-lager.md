@@ -357,8 +357,8 @@ decision).
 
 **Game-item rows (REQ-INV-029).** A **game-item** stock row
 ([`inventory-items.md`](inventory-items.md)) follows the `PIECE` auto-merge rule — items are
-whole units, so they always merge on write and the SCU opt-in checkbox is **never rendered**
-for them. The merge identity of an item row is its item stack key (owner · gameItem · location
+whole units, so they always merge on write regardless of the client's opt-in flag (the item
+UI, PR 3, accordingly never renders the SCU opt-in checkbox for them). The merge identity of an item row is its item stack key (owner · gameItem · location
 · `personal` · owning org-unit pool), and the `FOR UPDATE` merge-group query carries NULL-safe
 material **and** quality branches plus the `gameItem` key — without them the item merge would
 silently degenerate to a permanent no-op.

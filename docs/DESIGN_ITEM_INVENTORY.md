@@ -1,8 +1,11 @@
-> **Doc type:** Design spec (pre-implementation) — the agreed blueprint for the item-stock
-> feature. Once implementation ships, its requirements move into `docs/specs/` (new
-> `inventory-items.md` + amendments) and this document is frozen as a historical plan.
+> **Doc type:** Design spec (partially shipped) — the agreed blueprint for the item-stock
+> feature. The backend/API scope (PR 2) has shipped: REQ-INV-029…032 live in
+> [`docs/specs/inventory-items.md`](specs/inventory-items.md) and ADR-0101 is accepted —
+> those are the living truth for the shipped parts. The frontend item views/flows (PR 3)
+> and the Börse phase (§8) still implement against this document; it freezes as a
+> historical plan once they ship.
 > **Owner area:** INV / ORDERS / MARKET / UI / FE · **Related ADRs:** ADR-0053, ADR-0087,
-> ADR-0098, ADR-0099 (existing); proposes ADR-0100.
+> ADR-0098, ADR-0099 (existing); ADR-0101 (accepted with the backend PR).
 
 # Design — Item stock tracking in the Lager (warehouse)
 
@@ -67,7 +70,7 @@ blueprint) trackable in the Lager:
   `.claude/skills/das-kartell-design` submodule as visual source of truth) — see the
   binding note at the top of §6.
 
-## 3. Key decision — one aggregate, catalog-discriminated (proposed ADR-0100)
+## 3. Key decision — one aggregate, catalog-discriminated (proposed ADR-0101)
 
 **Decision: extend `InventoryItem` with a nullable `gameItem` reference (XOR with
 `material`) instead of building a parallel item-inventory aggregate.**
@@ -425,10 +428,10 @@ disabling the inactive form so its `required` fields don't block submit). Item m
   TRANSFER/Umbuchen modals in §6.3.
 - **Location/owner/org-unit/personal:** unchanged fragments (`fragments/owner-picker`).
   **Owner decision (2026-07-16):** the location selects in the booking flows (Einbuchen,
-  Umbuchen target location, production book-in) become **local-filter comboboxes** (bare
-  `data-krt-combobox`) — not required by scale (the catalog is a curated ~50–100 rows,
-  verified) but chosen for consistent picker UX across all booking forms. Each site runs
-  the §6.6 binding grep checklist before conversion.
+  Umbuchen target location, production book-in) become searchable comboboxes — originally
+  planned as local-filter mode, since **superseded by ADR-0100**: they ship as
+  server-searched `remote-locations` comboboxes (no preloaded catalog), like every other
+  catalog picker. Each site runs the §6.6 binding grep checklist before conversion.
 - **Allocation rows:** same preload-and-filter mechanism as material mode (verified: the
   hidden `<template>` rows carry the scoped OPEN/IN_PROGRESS order list and material
   relevance is a client-side `data-materials` CSV filter). Item mode mirrors it: the
@@ -455,7 +458,8 @@ submit via the conflict-aware `krtOrderWrite` wrapper). The new book-in section 
 inside `#production-form` between `#production-materials` and the actions row, following
 the `production-*` id / `data-prod-*` role conventions:
 
-- location picker (local-filter combobox per the §6.2 owner decision), owner combobox
+- location picker (server-searched `remote-locations` combobox per the §6.2 owner
+  decision as superseded by ADR-0100), owner combobox
   (`remote-users`, default: acting user), org-unit picker, personal checkbox,
   "dem Auftrag zuordnen" checkbox (default on; disabled + cleared while "persönlich" is
   checked, §5.6).
@@ -617,7 +621,7 @@ New keys under `inventory.items.*` (view switch, tree, filters), `inventory.form
   inventory-room prose gains the new receiving surfaces (item views, gameItem drilldown)
   and the new cross-publisher (production booking on the order page → `inventory`/
   `stock`); ADR-0053 gets a follow-up note).
-- **New ADR-0100** — "Track game items as catalog-discriminated inventory rows" (records
+- **New ADR-0101** — "Track game items as catalog-discriminated inventory rows" (records
   §3, the production book-in decision, and the §8 forward-compatibility, building on
   ADR-0098/0099).
 - README feature overview, CHANGELOG, and the German wiki pages (Lager, Aufträge — later
@@ -713,7 +717,7 @@ the core feature stays forward-compatible:
 2. **PR 2 — Backend item stock domain**: V220, entity/DTO/validator changes, the §4.4
    remediation list, read family (`catalog` param incl. flat lists), item-catalog
    endpoint, allocation gate (§5.5), production book-in (transitional optional `bookIn`)
-   + OpenAPI + specs (REQ-INV-029/031/032, ADR-0100). **Spans both modules for the audit
+   + OpenAPI + specs (REQ-INV-029/031/032, ADR-0101). **Spans both modules for the audit
      surface** (§7.2: event type + record call + viewer filter + DE/EN labels + coverage
      list in one PR). `BE`/`INV`/`ORDERS`.
 3. **PR 3 — Frontend item views & flows**: view switch, item tree/drilldown, Einbuchen
@@ -747,8 +751,9 @@ The former open items were decided by the owner on 2026-07-16 (recorded in §10)
    the §4.4 material-only guards keep the order pages correct in the interim.
 3. **Materialbörse stock-backed item offers — DECIDED: directly after the core PRs**
    (§8, §10 Phase 5), including the kind-aware `updateOffer` defect fix.
-4. **Location pickers — DECIDED: converted to local-filter comboboxes** in the booking
-   flows (§6.2/§6.6) despite the small catalog, for consistent picker UX.
+4. **Location pickers — DECIDED: converted to searchable comboboxes** in the booking
+   flows (§6.2/§6.6) despite the small catalog, for consistent picker UX — shipped as
+   server-searched `remote-locations` comboboxes per ADR-0100.
 
 Still deliberately out of scope:
 
@@ -762,7 +767,7 @@ Still deliberately out of scope:
    `GameItem` rows with org visibility, allocations and booking flows; Mein Inventar =
    free-text personal records** (blueprints V3, no catalog link, no allocations). A
    Lager item row with `personal = true` is still catalog-linked org data, not a Mein-
-   Inventar entry. ADR-0100 records this boundary (and that no consolidation is
+   Inventar entry. ADR-0101 records this boundary (and that no consolidation is
    intended for now); the wiki pages for Lager and Mein Inventar cross-link it so end
    users know which surface to use.
 

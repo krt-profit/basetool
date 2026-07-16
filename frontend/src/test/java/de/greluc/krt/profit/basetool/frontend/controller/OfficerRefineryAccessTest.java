@@ -23,6 +23,7 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -104,6 +105,46 @@ class OfficerRefineryAccessTest {
     // Mock other data
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
+    // A non-empty material catalog proves the page no longer dumps it: the input-material picker
+    // is a server-side searchable combobox, so on a fresh create (no preselected material to seed)
+    // no catalog material name may appear anywhere in the rendered page.
+    MaterialDto rawMaterial =
+        new MaterialDto(
+            UUID.randomUUID(),
+            "Quantainium Raw Distinctive",
+            "RAW",
+            "SCU",
+            null,
+            null,
+            null,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            1L);
+    MaterialDto secondRawMaterial =
+        new MaterialDto(
+            UUID.randomUUID(),
+            "Stileron Raw Distinctive",
+            "RAW",
+            "SCU",
+            null,
+            null,
+            null,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            1L);
+    when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS), anyTypeRef(), anyBoolean()))
+        .thenReturn(
+            new PageResponse<>(List.of(rawMaterial, secondRawMaterial), 0, 100, 2, 1, List.of()));
     when(backendApiClient.get(
             eq("/api/v1/settings/refinery.rounding.mode"), eq(SystemSettingDto.class)))
         .thenReturn(new SystemSettingDto("refinery.rounding.mode", "UP", 1L));
@@ -132,12 +173,22 @@ class OfficerRefineryAccessTest {
         // it seeds the defaulted owner (the officer) so edit mode shows a name, not a raw id.
         .andExpect(content().string(containsString("data-krt-combobox=\"remote-users\"")))
         .andExpect(content().string(containsString("Officer")))
-        // REQ-FE-016: the goods row's input-material select opts into the local-filter combobox,
-        // and the inert options catalog for JS-added rows renders alongside it.
+        // REQ-FE-016: the goods row's input-material select opts into the server-side searchable
+        // combobox (remote raw-material search). A fresh create has no preselected input material,
+        // so the picker renders with just its placeholder option.
         .andExpect(
             content()
-                .string(containsString("data-trigger=\"rfc-update-output\" data-krt-combobox")))
-        .andExpect(content().string(containsString("id=\"refinery-material-options-template\"")));
+                .string(
+                    containsString(
+                        "data-trigger=\"rfc-update-output\""
+                            + " data-krt-combobox=\"remote-materials-raw\"")))
+        // The raw catalog is fetched on demand, never dumped into the page: no catalog material
+        // name renders, and the former inert options catalog for JS-added rows is gone (added
+        // rows search the backend instead of cloning preloaded options).
+        .andExpect(content().string(not(containsString("Quantainium Raw Distinctive"))))
+        .andExpect(content().string(not(containsString("Stileron Raw Distinctive"))))
+        .andExpect(
+            content().string(not(containsString("id=\"refinery-material-options-template\""))));
   }
 
   @Test
@@ -216,12 +267,17 @@ class OfficerRefineryAccessTest {
         .andExpect(content().string(containsString("Speichern")))
         .andExpect(content().string(containsString("Abbrechen")))
         .andExpect(content().string(containsString("Einlagern")))
-        // REQ-FE-016: the editable details form's input-material select opts into the local-filter
-        // combobox (the form seeds one blank goods row even for an order without goods), and the
-        // canEdit-gated inert options catalog for JS-added rows renders alongside it.
+        // REQ-FE-016: the editable details form's input-material select opts into the server-side
+        // searchable combobox (remote raw-material search; the form seeds one blank goods row even
+        // for an order without goods). The inert options catalog for JS-added rows is gone — added
+        // rows search the backend on demand instead of cloning preloaded options.
         .andExpect(
             content()
-                .string(containsString("data-trigger=\"rod-update-output\" data-krt-combobox")))
-        .andExpect(content().string(containsString("id=\"refinery-material-options-template\"")));
+                .string(
+                    containsString(
+                        "data-trigger=\"rod-update-output\""
+                            + " data-krt-combobox=\"remote-materials-raw\"")))
+        .andExpect(
+            content().string(not(containsString("id=\"refinery-material-options-template\""))));
   }
 }

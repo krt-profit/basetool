@@ -32,6 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
@@ -85,9 +86,12 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
   }
 
   /**
-   * REQ-FE-016: the create form's material-line select opts into the searchable-combobox
-   * enhancement — the {@code data-krt-combobox} marker must sit on the material picker (anchored
-   * via its adjacent {@code data-role}), so the global enhancer upgrades it on page load.
+   * REQ-FE-016: the create form's material-line select opts into the server-side-search combobox
+   * enhancement — the {@code data-krt-combobox} marker must carry the {@code
+   * remote-materials-joborder} source key (anchored via its adjacent {@code data-role}) so the
+   * global enhancer wires the job-order material search — and the material catalog must no longer
+   * be dumped into the page as a preloaded option list (the blank create row has no preselect, so
+   * no catalog material name may render at all).
    */
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
@@ -96,6 +100,13 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
         .thenReturn(Collections.emptyList());
     when(backendApiClient.getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef()))
         .thenReturn(Collections.emptyList());
+    // The catalog stays a server-side model attribute (it gates the redisplay seed option), but
+    // with no bound row value neither material name may reach the rendered page.
+    MaterialDto agricium = jobOrderMaterial("Agricium");
+    MaterialDto quantainium = jobOrderMaterial("Quantainium-Distinct");
+    when(backendApiClient.getCached(
+            eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef(), anyBoolean()))
+        .thenReturn(List.of(agricium, quantainium));
 
     mockMvc
         .perform(get("/orders/create"))
@@ -104,7 +115,36 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
         .andExpect(
             content()
                 .string(
-                    Matchers.containsString("data-role=\"material-select\" data-krt-combobox")));
+                    Matchers.containsString(
+                        "data-role=\"material-select\""
+                            + " data-krt-combobox=\"remote-materials-joborder\"")))
+        .andExpect(content().string(Matchers.not(Matchers.containsString("Quantainium-Distinct"))));
+  }
+
+  /**
+   * Builds a minimal visible, job-order-eligible SCU material for the catalog stub — only the
+   * fields the create form's picker gating reads are populated.
+   *
+   * @param name the material name the catalog entry carries
+   * @return the stub catalog entry
+   */
+  private static MaterialDto jobOrderMaterial(String name) {
+    return new MaterialDto(
+        UUID.randomUUID(),
+        name,
+        null,
+        "SCU",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        Boolean.TRUE,
+        null,
+        Boolean.TRUE,
+        0L);
   }
 
   @Test

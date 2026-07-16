@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.Material;
+import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceOverviewDto;
 import java.time.Instant;
 import java.util.Collection;
@@ -39,23 +40,61 @@ import org.springframework.stereotype.Repository;
 public interface MaterialRepository extends JpaRepository<Material, UUID> {
 
   /**
-   * Returns slim {@code MaterialReferenceDto}s (id, name, quantity-type) for <b>visible</b>
-   * materials, ordered by name and capped by the {@link Pageable}. Used to populate material
-   * pickers (inventory, alias targets) without pulling the full Material aggregate. Wiki-only
-   * commodities imported {@code is_visible = false} (§4.3) are excluded so unreviewed entries never
-   * appear in a picker — see {@code isVisible} on {@link Material}. The cap is a defensive bound so
-   * the unpaginated lookup endpoint can never stream an unbounded payload (the ORDER BY makes a
-   * hypothetical overflow drop the tail deterministically, not arbitrary rows).
-   *
-   * @param pageable page request carrying the hard upper bound on the number of rows returned
-   * @return at most one page of visible materials as reference DTOs, name ascending
+   * Returns slim {@code MaterialReferenceDto}s (id, name, quantity-type) for every <b>visible</b>
+   * material, ordered by name. Used to populate material pickers (inventory, alias targets) without
+   * pulling the full Material aggregate. Wiki-only commodities imported {@code is_visible = false}
+   * (§4.3) are excluded so unreviewed entries never appear in a picker — see {@code isVisible} on
+   * {@link Material}. The list is deliberately complete — never silently bounded — because a
+   * truncated list would make materials beyond the bound unreachable; pickers that must stay
+   * payload-bounded use {@link #searchPicker(String, boolean, MaterialType, boolean, Pageable)}
+   * instead.
    */
   @Query(
       """
       SELECT new de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto(m.id,
       m.name, m.quantityType) FROM Material m WHERE m.isVisible = true ORDER BY m.name
       """)
-  List<de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto> findAllReference(
+  List<de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto> findAllReference();
+
+  /**
+   * Live-search query for the material pickers (REQ-FE-016): visible materials whose name contains
+   * the (already LIKE-escaped) fragment, case-insensitively; a {@code null} fragment matches
+   * everything. {@code jobOrderOnly} narrows to the job-order subset (the orders material lines),
+   * and {@code rawOnly} to refinery inputs ({@code type = rawType} or manually raw-flagged — the
+   * refinery input pickers). The refined material is fetch-joined so the picker metadata
+   * (refined-id/-name) maps without an N+1. Paged so the picker's server-side search stays
+   * payload-bounded while every material remains reachable by typing a narrower term.
+   *
+   * @param q the LIKE-escaped name fragment, or {@code null} for no filter
+   * @param jobOrderOnly when true, only {@code isJobOrder = true} materials
+   * @param rawType the {@link MaterialType#RAW} constant (bound as a parameter so the query needs
+   *     no HQL enum literal)
+   * @param rawOnly when true, only refinery inputs ({@code type = rawType} or manually raw-flagged)
+   * @param pageable page request (sorted by the whitelisted picker sort, typically name ascending)
+   * @return one page of matching visible materials with the refined material initialized
+   */
+  @Query(
+      value =
+          """
+          SELECT m FROM Material m LEFT JOIN FETCH m.refinedMaterial WHERE m.isVisible = true
+          AND (cast(:q as string) IS NULL
+              OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:q as string), '%')))
+          AND (:jobOrderOnly = false OR m.isJobOrder = true)
+          AND (:rawOnly = false OR m.type = :rawType OR m.isManualRawMaterial = true)
+          """,
+      countQuery =
+          """
+          SELECT COUNT(m) FROM Material m WHERE m.isVisible = true
+          AND (cast(:q as string) IS NULL
+              OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:q as string), '%')))
+          AND (:jobOrderOnly = false OR m.isJobOrder = true)
+          AND (:rawOnly = false OR m.type = :rawType OR m.isManualRawMaterial = true)
+          """)
+  Page<Material> searchPicker(
+      @Param("q") String q,
+      @Param("jobOrderOnly") boolean jobOrderOnly,
+      @Param("rawType") MaterialType rawType,
+      @Param("rawOnly") boolean rawOnly,
       Pageable pageable);
 
   /**

@@ -144,8 +144,10 @@ public class InventoryCheckoutService {
    *
    * @throws NotFoundException when the item is unknown
    * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the requested
-   *     amount exceeds the available quantity, when a SELL is missing its terminal or a valid sell
-   *     amount, or when a {@code TRANSFER} carries neither a target user nor a target location
+   *     amount exceeds the available quantity, when a fractional amount is booked off a whole-unit
+   *     row (PIECE material / item stock) without depleting it entirely, when a SELL is missing its
+   *     terminal or a valid sell amount, or when a {@code TRANSFER} carries neither a target user
+   *     nor a target location
    */
   @Transactional
   public InventoryItemDto bookOutInventoryItem(
@@ -168,9 +170,13 @@ public class InventoryCheckoutService {
     // Whole-unit book-out (design §5.1): game-item rows always hold whole units (REQ-INV-029),
     // and the same check closes the pre-existing gap that PIECE-material book-outs were not
     // whole-number-validated server-side. The rule lives here because the book-out DTO carries no
-    // catalog reference, so it cannot be bean-validated.
-    if (requiresWholeUnits(item) && dto.amount() % 1 != 0) {
-      throw new BadRequestException("Amount must be a whole number for PIECE materials");
+    // catalog reference, so it cannot be bean-validated. Booking out the row's exact remaining
+    // amount is exempt: rows created before this guard existed may hold a fractional amount, and
+    // without the full-depletion escape that remainder could never be drained at all.
+    if (requiresWholeUnits(item)
+        && dto.amount() % 1 != 0
+        && Double.compare(dto.amount(), item.getAmount()) != 0) {
+      throw new BadRequestException(wholeUnitAmountDetail(item));
     }
 
     // Game-item rows carry no mission dimension (REQ-INV-031): a mission "deduct from" plan on an
@@ -608,8 +614,9 @@ public class InventoryCheckoutService {
    * @param isAdmin whether the caller holds an admin role (bypasses the owner check)
    * @return the persisted new-row DTO (the moved quantity in its new pool)
    * @throws NotFoundException when the source row or the picked org unit is unknown
-   * @throws BadRequestException when the amount is non-positive, exceeds the available quantity, or
-   *     a personalize would violate the personal/association invariant
+   * @throws BadRequestException when the amount is non-positive, exceeds the available quantity, is
+   *     fractional on a whole-unit row (PIECE material / item stock) without moving the row's exact
+   *     remaining amount, or a personalize would violate the personal/association invariant
    */
   @Transactional
   public InventoryItemDto rebookPersonal(
@@ -632,9 +639,13 @@ public class InventoryCheckoutService {
       throw new BadRequestException("Cannot rebook more than the available amount");
     }
     // Whole-unit rebook (design §5.1): game-item rows and PIECE-material rows only ever move whole
-    // units; the rule lives here because the rebook DTO carries no catalog reference.
-    if (requiresWholeUnits(item) && dto.amount() % 1 != 0) {
-      throw new BadRequestException("Amount must be a whole number for PIECE materials");
+    // units; the rule lives here because the rebook DTO carries no catalog reference. Moving the
+    // row's exact remaining amount is exempt so a fractional remainder from before the guard
+    // existed can still leave its pool instead of being stranded.
+    if (requiresWholeUnits(item)
+        && dto.amount() % 1 != 0
+        && Double.compare(dto.amount(), item.getAmount()) != 0) {
+      throw new BadRequestException(wholeUnitAmountDetail(item));
     }
 
     final boolean sourcePersonal = Boolean.TRUE.equals(item.getPersonal());
@@ -861,6 +872,20 @@ public class InventoryCheckoutService {
     return item.getGameItem() != null
         || (item.getMaterial() != null
             && item.getMaterial().getQuantityType() == QuantityType.PIECE);
+  }
+
+  /**
+   * User-facing 400 detail for a fractional amount on a whole-unit row, naming the row's actual
+   * catalog kind — "PIECE materials" on a game-item row would be misleading because item rows carry
+   * no material at all (REQ-INV-029).
+   *
+   * @param item the whole-unit row the amount was rejected for.
+   * @return the catalog-appropriate problem detail.
+   */
+  private static String wholeUnitAmountDetail(InventoryItem item) {
+    return item.getGameItem() != null
+        ? "Amount must be a whole number for item stock"
+        : "Amount must be a whole number for PIECE materials";
   }
 
   /**

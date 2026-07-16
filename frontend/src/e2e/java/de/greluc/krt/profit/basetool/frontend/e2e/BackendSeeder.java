@@ -1340,10 +1340,16 @@ public final class BackendSeeder {
    * /api/v1/orders/{id}/items/{itemId}/production}. Since delivery is now gated by manufacture,
    * item handover flows must call this first.
    *
+   * <p>The payload carries the now-mandatory {@code bookIn} block (REQ-INV-032 — a production
+   * booking without one is rejected 400), targeting the same location as the consumed stock: the
+   * produced units land as game-item Lager stock owned by the acting user, auto-earmarked to the
+   * producing order (the {@code allocateToOrder} default).
+   *
    * @param username the Keycloak username of the (logistician/admin) test user
    * @param password the Keycloak password of the test user
    * @param orderId the item order whose single line to fully manufacture
-   * @param locationId the storage location for the linked recipe-material stock
+   * @param locationId the storage location for the linked recipe-material stock and the produced
+   *     item stock's book-in target
    */
   public void manufactureItemOrderLineFully(
       String username, String password, String orderId, String locationId) {
@@ -1391,7 +1397,9 @@ public final class BackendSeeder {
             + itemVersion
             + ",\"consumption\":"
             + consumption
-            + "}";
+            + ",\"bookIn\":{\"locationId\":\""
+            + locationId
+            + "\"}}";
     postBody(
         username, password, "/api/v1/orders/" + orderId + "/items/" + itemId + "/production", body);
   }
@@ -1465,6 +1473,88 @@ public final class BackendSeeder {
             + amount
             + ",\"personal\":false}";
     return seedEntity(username, password, "/api/v1/inventory", body);
+  }
+
+  /**
+   * Creates a non-personal game-item stock row via {@code POST /api/v1/inventory} and returns its
+   * id — the item sibling of {@link #createInventoryItem} (REQ-INV-029, ADR-0101). The payload
+   * carries {@code gameItemId} instead of {@code materialId}, no quality (a game-item row forbids
+   * one) and a positive whole-unit amount; create-time stamping sets {@code owningOrgUnit} from the
+   * seeding user's membership exactly like a material row.
+   *
+   * @param username the Keycloak username of the test user (must be an org-unit member)
+   * @param password the Keycloak password of the test user
+   * @param gameItemId the id of the bookable game item the row holds (see {@link
+   *     #seedOrderableItem})
+   * @param locationId the id of the storage location of the row
+   * @param amount the whole-unit amount held ({@code >= 1})
+   * @return the created inventory row's id
+   */
+  public String createItemInventoryEntry(
+      String username, String password, String gameItemId, String locationId, int amount) {
+    String body =
+        "{\"gameItemId\":\""
+            + gameItemId
+            + "\",\"locationId\":\""
+            + locationId
+            + "\",\"amount\":"
+            + amount
+            + ",\"personal\":false}";
+    return seedEntity(username, password, "/api/v1/inventory", body);
+  }
+
+  /**
+   * Creates an ITEM job order with a single finished-item line via {@code POST
+   * /api/v1/orders/items} and returns its id, so item-allocation flows (REQ-INV-031) have a
+   * qualifying order requesting the given game item. The line's blueprint is resolved from the
+   * orderable-item catalog ({@code GET /api/v1/orders/item-catalog/{gameItemId}/blueprints} — the
+   * same source the create form's picker uses), taking the first offered recipe; the derived
+   * material requirements are snapshotted server-side. Like the material overload, the given org
+   * unit is named as both the responsible (processing, must be profit-eligible) and the requesting
+   * (customer) unit.
+   *
+   * @param username the Keycloak username of the (admin) test user
+   * @param password the Keycloak password of the test user
+   * @param orgUnitId the org unit named as responsible and requesting unit; must be profit-eligible
+   * @param handle the free-text contact handle of the order
+   * @param gameItemId the finished item the order's single line requests
+   * @param amount the whole-unit count to order ({@code >= 1})
+   * @return the created ITEM job order's id
+   */
+  public String createItemJobOrder(
+      String username,
+      String password,
+      String orgUnitId,
+      String handle,
+      String gameItemId,
+      int amount) {
+    JsonArray blueprints =
+        JsonParser.parseString(
+                getBody(
+                    username,
+                    password,
+                    "/api/v1/orders/item-catalog/" + gameItemId + "/blueprints"))
+            .getAsJsonArray();
+    if (blueprints.isEmpty()) {
+      throw new IllegalStateException(
+          "No blueprint produces game item " + gameItemId + " — seed one via seedOrderableItem");
+    }
+    String blueprintId = blueprints.get(0).getAsJsonObject().get("id").getAsString();
+    String body =
+        "{\"responsibleOrgUnitId\":\""
+            + orgUnitId
+            + "\",\"requestingOrgUnitId\":\""
+            + orgUnitId
+            + "\",\"handle\":\""
+            + handle
+            + "\",\"items\":[{\"gameItemId\":\""
+            + gameItemId
+            + "\",\"blueprintId\":\""
+            + blueprintId
+            + "\",\"amount\":"
+            + amount
+            + "}]}";
+    return seedEntity(username, password, "/api/v1/orders/items", body);
   }
 
   /**

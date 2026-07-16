@@ -48,7 +48,7 @@ import org.hibernate.annotations.BatchSize;
 
 /**
  * Inventory Item JPA entity — one warehouse stock row, discriminated by catalog kind (REQ-INV-029,
- * ADR-0100): a <em>material</em> row carries {@link #material} + {@link #quality}, a <em>game
+ * ADR-0101): a <em>material</em> row carries {@link #material} + {@link #quality}, a <em>game
  * item</em> row carries {@link #gameItem} with {@code quality == null} and whole-unit amounts.
  * Exactly one of the two catalog references is set (DB CHECK {@code
  * chk_inventory_item_catalog_xor}, V220).
@@ -88,7 +88,7 @@ public class InventoryItem extends AbstractEntity<UUID> {
 
   /**
    * The game item (catalog entry, blueprint output) this row stocks, or {@code null} for a material
-   * row (REQ-INV-029, ADR-0100). Game-item rows carry no {@link #quality} and hold positive
+   * row (REQ-INV-029, ADR-0101). Game-item rows carry no {@link #quality} and hold positive
    * whole-unit amounts; they follow the PIECE auto-merge rule of REQ-INV-026 and may be allocated
    * only to ITEM job orders requesting this game item (REQ-INV-031).
    */

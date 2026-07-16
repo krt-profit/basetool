@@ -32,6 +32,7 @@ import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.assertions.LocatorAssertions;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -48,12 +49,14 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * longer override the class rule, so the hint stayed hidden for SCU materials. The fix toggles the
  * runtime {@code krtm-hidden} class instead.
  *
- * <p>This test opens {@code /orders/create}, adds a material row, selects an SCU-typed material,
- * and asserts the row's SCU hint becomes visible — the discriminator that turns red on the pre-fix
- * frontend (which leaves the hint hidden) — while asserting no {@code style-src-attr} CSP violation
- * is logged. Materials with a quantity type are core seed data, so the SCU option is present on any
- * provisioned stack; the reveal step is guarded so a stack seeded without an SCU material still
- * runs the console guard rather than failing spuriously.
+ * <p>This test opens {@code /orders/create}, adds a material row, selects an SCU-typed material
+ * (discovered via the {@code /catalog/material-search} proxy the picker's server-side-search
+ * combobox also queries, REQ-FE-016), and asserts the row's SCU hint becomes visible — the
+ * discriminator that turns red on the pre-fix frontend (which leaves the hint hidden) — while
+ * asserting no {@code style-src-attr} CSP violation is logged. Materials with a quantity type are
+ * core seed data, so an SCU-typed material is present on any provisioned stack; the reveal step is
+ * guarded so a stack seeded without an SCU material still runs the console guard rather than
+ * failing spuriously.
  *
  * <p>Read-only: it builds a row in the browser but never submits, so it mutates no server state.
  * The actor is {@code test-admin}, who may create orders.
@@ -116,17 +119,31 @@ class OrdersCreateScuHintRevealE2eTest {
         page.locator("[data-trigger=\"orders-add-material\"]").click();
         Locator row = page.locator("#materials-container .material-row").last();
 
-        // The row's material picker is a searchable combobox whose enhanced option list carries no
-        // data-quantity-type (the metadata is mirrored onto the hidden input only once an option is
-        // selected), so the SCU-typed value is looked up on the inert, still-native
-        // #material-options-template the row options are cloned from, then picked by value.
-        Locator scuOption =
-            page.locator("#material-options-template option[data-quantity-type=\"SCU\"]").first();
-        if (scuOption.count() > 0) {
+        // The row's material picker is a server-side-search combobox (REQ-FE-016): the page no
+        // longer preloads the catalog as <option>s, so an SCU-typed material is discovered by
+        // querying the same catalog proxy the picker's remote source uses (fetched in-page so the
+        // session cookie authenticates the call), then picked in the combobox by its id — the
+        // enhancer mirrors each fetched option's value into data-value, and the seeded e2e
+        // catalog is small enough that the empty-query first page contains every material.
+        Object catalog =
+            page.evaluate(
+                "() => fetch('/catalog/material-search?jobOrder=true&q=')"
+                    + ".then(r => (r.ok ? r.json() : []))");
+        String scuMaterialId = null;
+        if (catalog instanceof List<?> rows) {
+          for (Object entry : rows) {
+            if (entry instanceof Map<?, ?> material && "SCU".equals(material.get("quantityType"))) {
+              Object id = material.get("id");
+              scuMaterialId = id == null ? null : id.toString();
+              break;
+            }
+          }
+        }
+        if (scuMaterialId != null) {
           E2eSupport.selectComboboxByValue(
               row.locator(
                   ".krt-combobox:has([data-role=\"material-select\"])" + " .krt-combobox__input"),
-              scuOption.getAttribute("value"));
+              scuMaterialId);
           assertThat(row.locator(".scu-hint"))
               .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(15_000));
 

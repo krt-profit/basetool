@@ -156,16 +156,6 @@ public class JobOrderPageController {
       new ParameterizedTypeReference<PageResponse<SquadronDto>>() {};
 
   /**
-   * Response type for the cached location catalog lookup ({@code GET /api/v1/locations/lookup})
-   * feeding the production modal's book-in location picker (REQ-INV-032).
-   */
-  private static final ParameterizedTypeReference<
-          List<de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto>>
-      LIST_OF_LOCATION_REFERENCE =
-          new ParameterizedTypeReference<
-              List<de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto>>() {};
-
-  /**
    * Response type for the active-org-unit catalogs backing the two owner-pickers ({@code GET
    * /api/v1/org-units/active} and {@code GET /api/v1/org-units/active-all-kinds}).
    */
@@ -486,19 +476,14 @@ public class JobOrderPageController {
         }
       }
 
-      // Production book-in section (REQ-INV-032, design §6.4): the #production-modal's location
-      // picker options and the acting-user seed of its owner combobox. Only the full-page render
-      // of an ITEM order for a logistician dereferences them — the modal is not a fragment target,
-      // so section swaps skip both lookups.
+      // Production book-in section (REQ-INV-032, design §6.4): the acting-user seed of the
+      // #production-modal's owner combobox. The modal's location picker searches locations on
+      // demand (remote-locations combobox -> /catalog/location-search, REQ-FE-016), so no
+      // locations catalog is preloaded. Only the full-page render of an ITEM order for a
+      // logistician dereferences the seed — the modal is not a fragment target, so section
+      // swaps skip the lookup.
       if (canAssign && "ITEM".equals(order.type()) && fragment == null) {
-        CompletableFuture<
-                List<de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto>>
-            locationsFuture = parallelPageLoader.loadAsync(this::fetchLocationsLookup);
-        CompletableFuture<UserDto> actingUserFuture =
-            parallelPageLoader.loadAsync(this::fetchActingUser);
-        CompletableFuture.allOf(locationsFuture, actingUserFuture).join();
-        model.addAttribute("locations", locationsFuture.join());
-        model.addAttribute("actingUser", actingUserFuture.join());
+        model.addAttribute("actingUser", fetchActingUser());
       }
 
       int yellowDays = 30;
@@ -884,28 +869,6 @@ public class JobOrderPageController {
       }
     } catch (Exception e) {
       log.error("Failed to fetch job-order materials", e);
-    }
-    return new ArrayList<>();
-  }
-
-  /**
-   * Pulls the cached location catalog ({@code GET /api/v1/locations/lookup}) that populates the
-   * production modal's book-in location combobox (REQ-INV-032, design §6.4 — a local-filter picker
-   * over the curated ~50–100-row catalog per the §6.2 owner decision). Empty list on failure: the
-   * picker then offers no location, and the modal's submit stays gated on a chosen one.
-   *
-   * @return the location references, never {@code null}
-   */
-  private List<de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto>
-      fetchLocationsLookup() {
-    try {
-      List<de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto> list =
-          backendApiClient.getCached(CachedCatalog.LOCATIONS_LOOKUP, LIST_OF_LOCATION_REFERENCE);
-      if (list != null) {
-        return new ArrayList<>(list);
-      }
-    } catch (Exception e) {
-      log.error("Failed to fetch location lookup for the production book-in picker", e);
     }
     return new ArrayList<>();
   }

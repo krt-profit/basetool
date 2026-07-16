@@ -43,7 +43,7 @@ import org.springframework.stereotype.Repository;
 
 /**
  * Spring Data repository for Inventory Item. Since V220 the table is catalog-discriminated
- * (REQ-INV-029, ADR-0100): a row stocks either a material ({@code material_id} + {@code quality}
+ * (REQ-INV-029, ADR-0101): a row stocks either a material ({@code material_id} + {@code quality}
  * set) or a game item ({@code game_item_id} set, no quality). The read family therefore comes in
  * per-catalog variants — the historical material queries carry an explicit {@code i.material IS NOT
  * NULL} guard so item rows never leak into pre-item contracts, and the item variants key on {@code
@@ -314,38 +314,6 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
-      Pageable pageable);
-
-  /**
-   * Game-item sibling of {@link #findUserByFilters} — the filtered flat "my inventory" list for
-   * {@code catalog=ITEM} (REQ-INV-029), owner-scoped to {@code :user} at the data layer. Item
-   * filter surface only ({@code gameItemIds}, {@code jobOrderIds}); no quality floor and no mission
-   * filter (REQ-INV-031).
-   *
-   * @param user the owning user; never {@code null}.
-   * @param hasGameItems gates the {@code gameItemIds} clause.
-   * @param gameItemIds the game items to narrow to; ignored when {@code hasGameItems} is false.
-   * @param hasJobOrders gates the {@code jobOrderIds} clause.
-   * @param jobOrderIds the earmarked orders to narrow to; ignored when {@code hasJobOrders} is
-   *     false.
-   * @param pageable page request (whitelisted {@code gameItem.name} / {@code amount} sort).
-   * @return the user's game-item rows matching every active filter.
-   */
-  @EntityGraph(
-      attributePaths = {"gameItem", "gameItem.manufacturer", "location", "user", "owningOrgUnit"})
-  @Query(
-      """
-      SELECT i FROM InventoryItem i WHERE i.user = :user AND i.gameItem IS NOT NULL AND
-      (:hasGameItems = false OR i.gameItem.id IN :gameItemIds) AND (:hasJobOrders = false OR
-      EXISTS (SELECT 1 FROM InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND
-      ja.jobOrder.id IN :jobOrderIds))
-      """)
-  Page<InventoryItem> findUserItemsByFilters(
-      @Param("user") User user,
-      @Param("hasGameItems") boolean hasGameItems,
-      @Param("gameItemIds") List<UUID> gameItemIds,
-      @Param("hasJobOrders") boolean hasJobOrders,
-      @Param("jobOrderIds") List<UUID> jobOrderIds,
       Pageable pageable);
 
   /**
@@ -912,7 +880,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * their allocations unioned (R1). {@code delivered} is likewise not part of the key (the merged
    * survivor resets to not-delivered).
    *
-   * <p>Catalog-discriminated since V220 (REQ-INV-029, ADR-0100): the stack key carries exactly one
+   * <p>Catalog-discriminated since V220 (REQ-INV-029, ADR-0101): the stack key carries exactly one
    * of {@code materialId} / {@code gameItemId}, and each keys with a NULL-branch — a material merge
    * group passes ({@code materialId}, {@code quality}, {@code gameItemId = null}) so item rows
    * never match; a game-item merge group passes ({@code gameItemId}, {@code materialId = null},

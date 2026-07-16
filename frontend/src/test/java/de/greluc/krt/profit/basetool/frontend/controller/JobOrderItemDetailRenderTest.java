@@ -901,23 +901,16 @@ class JobOrderItemDetailRenderTest {
         .doesNotContain("data-testid=\"blueprint-owners-section\"");
   }
 
-  // covers REQ-INV-032 (the production modal renders the book-in section: local location combobox
-  // over ${locations}, remote-users owner picker seeded + preselected with the acting user, the
-  // org-unit picker shell orders-detail.js repopulates per owner, and the personal / default-on
-  // "dem Auftrag zuordnen" controls)
+  // covers REQ-INV-032 (the production modal renders the book-in section: server-side-search
+  // location combobox (remote-locations, REQ-FE-016 — no preloaded catalog), remote-users owner
+  // picker seeded + preselected with the acting user, the org-unit picker shell orders-detail.js
+  // repopulates per owner, and the personal / default-on "dem Auftrag zuordnen" controls)
   @Test
   void itemOrder_productionModal_rendersBookInSection() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
         .thenReturn(oneLineItemOrder(orderId));
-    when(backendApiClient.getCached(
-            eq(de.greluc.krt.profit.basetool.frontend.service.CachedCatalog.LOCATIONS_LOOKUP),
-            anyTypeRef()))
-        .thenReturn(
-            List.of(
-                new de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto(
-                    UUID.randomUUID(), "ARC-L1")));
     when(backendApiClient.get(
             eq("/api/v1/users/me"),
             eq(de.greluc.krt.profit.basetool.frontend.model.dto.UserDto.class)))
@@ -950,13 +943,13 @@ class JobOrderItemDetailRenderTest {
             .getResponse()
             .getContentAsString();
 
-    // Then: the location picker is a local-filter combobox fed from ${locations}.
+    // Then: the location picker is a server-side-search combobox (remote-locations) that renders
+    // with no preloaded catalog options.
     int locationAt = html.indexOf("id=\"production-location\"");
     assertThat(locationAt).as("book-in location picker rendered").isGreaterThan(0);
     assertThat(html.substring(locationAt, html.indexOf('>', locationAt)))
-        .as("location picker carries the bare local combobox marker")
-        .contains("data-krt-combobox");
-    assertThat(html).as("location option rendered from ${locations}").contains("ARC-L1");
+        .as("location picker carries the remote-locations combobox marker")
+        .contains("data-krt-combobox=\"remote-locations\"");
     // The owner picker is a remote-users combobox seeded + preselected with the acting user.
     assertThat(html)
         .as("book-in owner picker carries the remote-users marker")

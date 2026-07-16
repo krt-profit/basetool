@@ -39,6 +39,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 
 @ExtendWith(MockitoExtension.class)
@@ -100,19 +102,46 @@ class LocationServiceTest {
   }
 
   @Test
-  void findAllReference_capsTheUnpaginatedLookupAtTheDefensiveBound() {
+  void findAllReference_returnsTheCompleteUnboundedProjection() {
     // Given
     LocationReferenceDto ref = new LocationReferenceDto(UUID.randomUUID(), "Port Olisar");
-    when(locationRepository.findAllReference(PageRequest.of(0, LocationService.LOOKUP_MAX_RESULTS)))
-        .thenReturn(List.of(ref));
+    when(locationRepository.findAllReference()).thenReturn(List.of(ref));
 
     // When
     List<LocationReferenceDto> result = locationService.findAllReference();
 
     // Then
     assertEquals(List.of(ref), result);
-    verify(locationRepository, times(1))
-        .findAllReference(PageRequest.of(0, LocationService.LOOKUP_MAX_RESULTS));
+    verify(locationRepository, times(1)).findAllReference();
+  }
+
+  @Test
+  void searchReference_escapesLikeMetacharactersAndPagesTheRepositoryQuery() {
+    // Given
+    LocationReferenceDto ref = new LocationReferenceDto(UUID.randomUUID(), "Area 18 100%");
+    PageRequest pageable = PageRequest.of(0, 25);
+    when(locationRepository.searchReference("100\\%", pageable))
+        .thenReturn(new PageImpl<>(List.of(ref)));
+
+    // When
+    Page<LocationReferenceDto> result = locationService.searchReference("100%", pageable);
+
+    // Then
+    assertEquals(List.of(ref), result.getContent());
+    verify(locationRepository, times(1)).searchReference("100\\%", pageable);
+  }
+
+  @Test
+  void searchReference_passesNullThroughAsTheNoFilterMarker() {
+    // Given
+    PageRequest pageable = PageRequest.of(0, 25);
+    when(locationRepository.searchReference(null, pageable)).thenReturn(new PageImpl<>(List.of()));
+
+    // When
+    locationService.searchReference(null, pageable);
+
+    // Then
+    verify(locationRepository, times(1)).searchReference(null, pageable);
   }
 
   @Test

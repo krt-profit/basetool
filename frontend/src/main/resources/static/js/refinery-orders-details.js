@@ -261,9 +261,10 @@ function updateOutputMaterial(selectElement) {
     const entryBlock = selectElement.closest('.material-entry');
     const outputDisplay = entryBlock.querySelector('span[id^="outputMaterialDisplay_"]');
 
-    // The input-material picker is a searchable combobox (REQ-FE-016): the selected option's
-    // data-refined-name is mirrored onto the hidden input carrying the control's id. The raw
-    // <select> fallback covers a not-yet-enhanced control (pre-enhancement init pass).
+    // The input-material picker is a server-side searchable combobox (REQ-FE-016): the selected
+    // option's data-refined-name is mirrored onto the hidden input carrying the control's id. The
+    // raw <select> fallback covers only the not-yet-enhanced pre-enhancement state, whose sole
+    // non-placeholder option is the server-rendered seed (the remote picker preloads no catalog).
     let refinedName = selectElement.dataset.refinedName || '';
     if (!refinedName && selectElement.tagName === 'SELECT') {
         const selectedOption = selectElement.options[selectElement.selectedIndex];
@@ -332,22 +333,21 @@ function addMaterialRow() {
 
     // The input-material picker is an enhanced combobox (REQ-FE-016); its clone is dead
     // (listeners dropped, duplicated ARIA ids, no native <select> left to re-enhance).
-    // Rebuild a raw select from the inert #refinery-material-options-template, carry over
-    // row 0's id/name (renumbered by the loop below), and let krtEnhanceComboboxes upgrade
-    // it once the row is inserted.
+    // Build a fresh EMPTY select — the remote combobox (remote-materials-raw) searches the
+    // raw catalog on demand, so no options are preloaded — carry over row 0's id/name
+    // (renumbered by the loop below), and let krtEnhanceComboboxes upgrade it once the row
+    // is inserted.
     const clonedPicker = template.querySelector('.krt-combobox');
     if (clonedPicker) {
-        const optionsTemplate = document.getElementById('refinery-material-options-template');
         const hiddenField = clonedPicker.querySelector('input[type="hidden"]');
         const freshSelect = document.createElement('select');
-        freshSelect.innerHTML = optionsTemplate ? optionsTemplate.innerHTML : '';
         if (hiddenField) {
             freshSelect.id = hiddenField.id;
             freshSelect.name = hiddenField.name;
         }
         freshSelect.required = true;
         freshSelect.setAttribute('data-trigger', 'rod-update-output');
-        freshSelect.setAttribute('data-krt-combobox', '');
+        freshSelect.setAttribute('data-krt-combobox', 'remote-materials-raw');
         clonedPicker.parentNode.replaceChild(freshSelect, clonedPicker);
         // The enhancer re-pointed row 0's label (for="krt-cb-N-input") and minted its id; the
         // clone carries both, which the /_\d+$/ renumbering below cannot fix — strip the id

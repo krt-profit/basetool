@@ -463,6 +463,54 @@ class InventoryItemControllerTest {
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
   }
 
+  // covers REQ-INV-029/031 (catalog=ITEM grouped view rejects a material filter with 400)
+  @Test
+  void getMyGroupedInventory_catalogItem_rejectsMaterialIds() {
+    Jwt jwt = jwt("alice-sub");
+
+    // Item rows carry no material — a silently dropped materialIds filter would return
+    // plausible-looking but unfiltered data, so the mismatch is a 400 contract error.
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                controller.getMyGroupedInventory(
+                    jwt,
+                    List.of(UUID.randomUUID()),
+                    null,
+                    null,
+                    null,
+                    null,
+                    false,
+                    false,
+                    InventoryCatalog.ITEM))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessageContaining("materialIds");
+    verifyNoInteractions(inventoryItemService, inventoryAggregationService);
+  }
+
+  // covers REQ-INV-029/031 (catalog=MATERIAL grouped view rejects an item filter with 400)
+  @Test
+  void getMyGroupedInventory_catalogMaterial_rejectsGameItemIds() {
+    Jwt jwt = jwt("alice-sub");
+
+    // The mirror guard: material rows carry no game item, so gameItemIds under the (default)
+    // MATERIAL catalog is rejected before any owner resolution or service dispatch.
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                controller.getMyGroupedInventory(
+                    jwt,
+                    null,
+                    List.of(UUID.randomUUID()),
+                    null,
+                    null,
+                    null,
+                    false,
+                    false,
+                    InventoryCatalog.MATERIAL))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessageContaining("gameItemIds");
+    verifyNoInteractions(inventoryItemService, inventoryAggregationService);
+  }
+
   // covers REQ-INV-030 (catalog=ITEM grouped view dispatches with the item filter surface)
   @Test
   void getMyGroupedInventory_catalogItem_dispatchesWithItemFilters() {
@@ -523,6 +571,46 @@ class InventoryItemControllerTest {
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
   }
 
+  // covers REQ-INV-029/031 (catalog=ITEM flat /all rejects a material filter with 400)
+  @Test
+  void getAllInventory_catalogItem_rejectsMaterialIds() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                controller.getAllInventory(
+                    List.of(UUID.randomUUID()),
+                    null,
+                    null,
+                    null,
+                    null,
+                    InventoryCatalog.ITEM,
+                    0,
+                    20,
+                    null))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessageContaining("materialIds");
+    verifyNoInteractions(inventoryItemService, inventoryAggregationService);
+  }
+
+  // covers REQ-INV-029/031 (catalog=MATERIAL flat /all rejects an item filter with 400)
+  @Test
+  void getAllInventory_catalogMaterial_rejectsGameItemIds() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                controller.getAllInventory(
+                    null,
+                    List.of(UUID.randomUUID()),
+                    null,
+                    null,
+                    null,
+                    InventoryCatalog.MATERIAL,
+                    0,
+                    20,
+                    null))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessageContaining("gameItemIds");
+    verifyNoInteractions(inventoryItemService, inventoryAggregationService);
+  }
+
   // covers REQ-INV-030 (catalog=ITEM flat /all dispatches to the item sibling)
   @Test
   void getAllInventory_catalogItem_dispatchesToAllItemInventory() {
@@ -554,6 +642,30 @@ class InventoryItemControllerTest {
                 controller.getAllGroupedInventory(
                     null, null, null, null, List.of(UUID.randomUUID()), InventoryCatalog.ITEM))
         .isInstanceOf(BadRequestException.class);
+    verifyNoInteractions(inventoryItemService, inventoryAggregationService);
+  }
+
+  // covers REQ-INV-029/031 (catalog=ITEM grouped /all rejects a material filter with 400)
+  @Test
+  void getAllGroupedInventory_catalogItem_rejectsMaterialIds() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                controller.getAllGroupedInventory(
+                    List.of(UUID.randomUUID()), null, null, null, null, InventoryCatalog.ITEM))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessageContaining("materialIds");
+    verifyNoInteractions(inventoryItemService, inventoryAggregationService);
+  }
+
+  // covers REQ-INV-029/031 (catalog=MATERIAL grouped /all rejects an item filter with 400)
+  @Test
+  void getAllGroupedInventory_catalogMaterial_rejectsGameItemIds() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                controller.getAllGroupedInventory(
+                    null, List.of(UUID.randomUUID()), null, null, null, InventoryCatalog.MATERIAL))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessageContaining("gameItemIds");
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
   }
 
@@ -692,7 +804,8 @@ class InventoryItemControllerTest {
 
   // ── GET /item-catalog (bookable game items picker) ───────────────────
 
-  // covers REQ-INV-029 (item-catalog picker returns the paged reference shape)
+  // covers REQ-INV-029 (item-catalog picker returns the paged reference shape with a stable
+  // id tiebreaker)
   @Test
   void getItemCatalog_wrapsCatalogServicePageIntoPageResponse() {
     InventoryGameItemReferenceDto ref =
@@ -707,6 +820,15 @@ class InventoryItemControllerTest {
 
     assertThat(result.content()).containsExactly(ref);
     assertThat(result.totalElements()).isEqualTo(1L);
+    // The sort whitelist includes `id`, so PaginationUtil appends it as a tiebreaker even when the
+    // caller sorts by name only — equal-named UEX variants keep a deterministic page order (the
+    // name,asc;id,asc default-sort contract). A whitelist regression to {name} drops the appended
+    // key and this captor catches it.
+    ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+    verify(inventoryItemCatalogService).findBookableItems(eq("drive"), pageable.capture());
+    org.springframework.data.domain.Sort sort = pageable.getValue().getSort();
+    assertThat(sort.getOrderFor("name")).isNotNull();
+    assertThat(sort.getOrderFor("id")).isNotNull();
     verifyNoInteractions(inventoryItemService, inventoryAggregationService);
   }
 

@@ -66,7 +66,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Predicate()} exactly as before, so an aggregation can never widen visibility beyond the caller's
  * org-unit slice.
  *
- * <p>Catalog-discriminated since V220 (REQ-INV-029, ADR-0100): the historical methods serve the
+ * <p>Catalog-discriminated since V220 (REQ-INV-029, ADR-0101): the historical methods serve the
  * material catalog (their queries exclude game-item rows), and each grouped / aggregated / flat /
  * stack-entry read has a game-item sibling ({@code *Item*} methods) keyed on the quality-less item
  * stack identity. The controller dispatches between the two families on its {@code catalog} query

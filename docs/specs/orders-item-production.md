@@ -1,6 +1,6 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-15.
 > **Owner area:** ORDERS/UI · **Related ADRs:** [ADR-0099](../adr/0099-job-order-item-production-booking.md),
-> [ADR-0100](../adr/0100-inventory-game-item-rows.md) (production book-in)
+> [ADR-0101](../adr/0101-inventory-game-item-rows.md) (production book-in)
 
 # Item-order production booking (Herstellung) & order-detail tab layout
 
@@ -118,7 +118,7 @@ Aufträge and Mein Inventar are **audited areas**, so both event types are recor
 unified viewer's per-area filter, and carried in the DE/EN i18n labels (`REQ-AUDIT-001`,
 [`audit.md`](audit.md)).
 
-**Book-in (REQ-INV-032, ADR-0100).** A production booking now **also books the produced units
+**Book-in (REQ-INV-032, ADR-0101).** A production booking now **also books the produced units
 into the Lager** as game-item stock ([`inventory-items.md`](inventory-items.md)): the request's
 `bookIn` block names the location, the owner user (default: actor), the owning org unit
 (create-on-behalf stamping semantics) and the personal flag, and auto-earmarks the produced

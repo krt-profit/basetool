@@ -398,8 +398,9 @@ public class InventoryItemService {
    *
    * @throws NotFoundException when any referenced id is unknown
    * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the material /
-   *     game item does not satisfy the job order's requirements, or a game-item payload carries a
-   *     mission reference
+   *     game item does not satisfy the job order's requirements, the payload violates the catalog
+   *     XOR or the quality-by-kind pairing (V220 CHECKs), or a game-item payload carries a mission
+   *     reference
    */
   @Transactional
   public InventoryItemDto createInventoryItem(
@@ -431,8 +432,19 @@ public class InventoryItemService {
             .findById(dto.locationId())
             .orElseThrow(() -> new NotFoundException("Location not found"));
 
-    // Service-level belt behind the DTO's @AssertTrue guard (REQ-INV-031): a game-item row carries
-    // no mission dimension, so a crafted payload that bypassed bean validation must still 400.
+    // Service-level belts behind the DTO's @AssertTrue guards: a crafted payload that bypassed
+    // bean validation must 400 here rather than surface the V220 DB CHECKs (catalog XOR,
+    // quality-by-kind) as an opaque 500 at flush time.
+    if ((material == null) == (gameItem == null)) {
+      throw new BadRequestException("Exactly one of materialId and gameItemId must be set");
+    }
+    if (material != null && dto.quality() == null) {
+      throw new BadRequestException("Material stock requires a quality");
+    }
+    if (gameItem != null && dto.quality() != null) {
+      throw new BadRequestException("Game-item stock carries no quality");
+    }
+    // Same belt for REQ-INV-031: a game-item row carries no mission dimension.
     if (gameItem != null
         && (dto.missionId() != null
             || (dto.missionAllocations() != null && !dto.missionAllocations().isEmpty()))) {
@@ -484,7 +496,7 @@ public class InventoryItemService {
       if (!seenOrders.add(allocation.targetId())) {
         throw new BadRequestException("A job order may be assigned at most once at check-in");
       }
-      requireWholeUnits(wholeUnits, allocation.amount());
+      requireWholeUnits(wholeUnits, gameItem != null, allocation.amount());
       JobOrder order =
           jobOrderRepository
               .findById(allocation.targetId())
@@ -504,7 +516,7 @@ public class InventoryItemService {
       if (!seenMissions.add(allocation.targetId())) {
         throw new BadRequestException("A mission may be assigned at most once at check-in");
       }
-      requireWholeUnits(wholeUnits, allocation.amount());
+      requireWholeUnits(wholeUnits, gameItem != null, allocation.amount());
       Mission missionTarget =
           missionRepository
               .findById(allocation.targetId())
@@ -795,12 +807,16 @@ public class InventoryItemService {
     if (raw <= 0) {
       throw new BadRequestException("An allocation amount must be positive");
     }
+    boolean itemRow = item.getGameItem() != null;
     boolean wholeUnits =
-        item.getGameItem() != null
+        itemRow
             || (item.getMaterial() != null
                 && item.getMaterial().getQuantityType() == QuantityType.PIECE);
     if (wholeUnits && raw % 1 != 0) {
-      throw new BadRequestException("A PIECE allocation amount must be a whole number");
+      throw new BadRequestException(
+          itemRow
+              ? "An item allocation amount must be a whole number"
+              : "A PIECE allocation amount must be a whole number");
     }
     return InventoryItem.roundToScuScale(raw);
   }
@@ -998,15 +1014,20 @@ public class InventoryItemService {
   /**
    * Rejects a fractional allocation amount for a whole-unit entry — a {@code PIECE} material or a
    * game-item row (item stock is always whole-unit, REQ-INV-029) — mirroring the entry-amount rule
-   * and the per-allocation write endpoints.
+   * and the per-allocation write endpoints. The problem detail names the entry's actual catalog
+   * kind ("PIECE materials" would be misleading on an item row, which carries no material).
    *
    * @param wholeUnits whether the entry's catalog kind restricts amounts to whole units.
+   * @param itemRow whether the entry is a game-item row (drives the message wording only).
    * @param amount the allocation amount to check.
    * @throws BadRequestException when {@code wholeUnits} and {@code amount} is not a whole number.
    */
-  private static void requireWholeUnits(boolean wholeUnits, double amount) {
+  private static void requireWholeUnits(boolean wholeUnits, boolean itemRow, double amount) {
     if (wholeUnits && amount % 1 != 0) {
-      throw new BadRequestException("Amount must be a whole number for PIECE materials");
+      throw new BadRequestException(
+          itemRow
+              ? "Amount must be a whole number for item stock"
+              : "Amount must be a whole number for PIECE materials");
     }
   }
 

@@ -26,7 +26,7 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 
 /**
  * Read-only GROUP BY projection of one game-item inventory <em>stack</em> — the item-catalog
- * sibling of {@link InventoryStackAggregate} (REQ-INV-029, ADR-0100). Game-item rows carry no
+ * sibling of {@link InventoryStackAggregate} (REQ-INV-029, ADR-0101). Game-item rows carry no
  * quality dimension, so the stack key is ({@code gameItem}, {@code user}, {@code location}, {@code
  * personal}, {@code owningOrgUnit}) and the quality aggregates of the material projection have no
  * counterpart here. One row of this projection equals one display stack of the Lager item views;

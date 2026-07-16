@@ -23,6 +23,7 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.microsoft.playwright.Browser;
@@ -30,7 +31,9 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.assertions.LocatorAssertions;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -50,11 +53,20 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * the required demand from the linked stock entry, and books once the reconcile chip reports full
  * coverage.
  *
- * <p>Three things are asserted end-to-end: before production the item-handover control is absent
- * (delivery gated); the booking succeeds through the UI; and afterwards the persisted {@code
+ * <p>Since REQ-INV-032 the production modal additionally carries a REQUIRED book-in section: the
+ * produced units land as game-item Lager stock at a chosen location, so the flow picks the location
+ * combobox (the reconcile gate holds the book button until one is chosen) and afterwards proves the
+ * booked-in stock end-to-end — the item-stock total of the produced game item grows by exactly the
+ * manufactured unit (read through the same grouped {@code catalog=ITEM} API the item view uses),
+ * and the produced widget is visible on {@code /inventory/all?view=items} with its name and
+ * whole-unit amount.
+ *
+ * <p>Four things are asserted end-to-end: before production the item-handover control is absent
+ * (delivery gated); the booking succeeds through the UI; afterwards the persisted {@code
  * manufacturedAmount} is 1 (read back through the backend) and the item-handover control has
- * appeared (delivery unlocked). The actor is {@code test-admin}, which satisfies the production
- * role gate through the role hierarchy and is an IRIDIUM member (the order's responsible unit).
+ * appeared (delivery unlocked); and the produced stock is visible in the shared Lager's item view
+ * (REQ-INV-032). The actor is {@code test-admin}, which satisfies the production role gate through
+ * the role hierarchy and is an IRIDIUM member (the order's responsible unit).
  */
 @Tag("e2e")
 class JobOrderProductionE2eTest {
@@ -95,8 +107,10 @@ class JobOrderProductionE2eTest {
 
   /**
    * Creates a one-unit item order, verifies delivery is gated pre-production, books the manufacture
-   * of the single unit through the production modal (consuming the linked stock), and asserts the
-   * persisted manufactured amount plus the now-unlocked item-handover control.
+   * of the single unit through the production modal (consuming the linked stock and booking the
+   * produced unit in, REQ-INV-032), and asserts the persisted manufactured amount, the now-unlocked
+   * item-handover control, and the produced item stock — grown by exactly one unit and visible on
+   * the shared Lager's item view.
    */
   @Test
   void booksProductionConsumingLinkedStockAndUnlocksDelivery() {
@@ -134,6 +148,12 @@ class JobOrderProductionE2eTest {
         seeder.createInventoryItemForJobOrder(
             USERNAME, PASSWORD, materialId, locationId, id, 1000, 5);
 
+        // REQ-INV-032 baseline: the produced widget's squadron-wide item-stock total before the
+        // booking. The bootstrap widget is shared across the suite's item-order classes, so the
+        // proof is a delta, never an absolute total.
+        String gameItemId = orderedGameItemId(seeder, id);
+        double stockBefore = itemStockTotal(seeder, gameItemId);
+
         bookProductionOfOneUnit(page, baseUrl, id);
 
         // The manufactured amount is now persisted, and delivery is unlocked: the item-handover
@@ -142,6 +162,25 @@ class JobOrderProductionE2eTest {
             1, manufacturedAmount(seeder, id), "one unit must be recorded as manufactured");
         E2eSupport.navigate(page, baseUrl + "/orders/" + id + "?tab=item-handovers");
         assertThat(page.getByTestId("item-handover-open")).isVisible();
+
+        // REQ-INV-032 end-to-end: the booking also booked the produced unit in as game-item Lager
+        // stock — the item-stock total grew by exactly the manufactured unit ...
+        double stockAfter = itemStockTotal(seeder, gameItemId);
+        assertEquals(
+            stockBefore + 1.0,
+            stockAfter,
+            0.001,
+            "the production booking must book the produced unit in as item stock");
+        // ... and the produced stock is visible on the shared Lager's item view: the widget's
+        // group row renders the gameItem name and the whole-unit total (no quality columns).
+        E2eSupport.navigate(page, baseUrl + "/inventory/all?view=items");
+        Locator itemGroupRow =
+            page.locator("div.tree-row--group[data-game-item-id='" + gameItemId + "']");
+        assertThat(itemGroupRow)
+            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
+        assertThat(itemGroupRow).containsText(ORDERABLE_ITEM_NAME);
+        assertThat(itemGroupRow.locator(".tree-amount"))
+            .containsText(Pattern.compile("(?<!\\d)" + Math.round(stockAfter) + "(?!\\d)"));
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "joborder-production");
         throw failure;
@@ -185,8 +224,9 @@ class JobOrderProductionE2eTest {
 
   /**
    * Opens the production modal from the "Bestellte Items" tab, allocates the required demand from
-   * the single linked stock entry, and books the manufacture of one unit, awaiting the production
-   * POST so the mutation is not dropped.
+   * the single linked stock entry, picks the REQUIRED book-in location (REQ-INV-032 — the reconcile
+   * gate keeps the book button disabled until one is chosen), and books the manufacture of one
+   * unit, awaiting the production POST so the mutation is not dropped.
    *
    * @param page the page to drive
    * @param baseUrl the frontend origin
@@ -206,7 +246,17 @@ class JobOrderProductionE2eTest {
     page.locator("#production-amount").fill("1");
     allocation.fill("1");
 
-    // Reconcile enables the book button only when every material's demand is exactly covered.
+    // Book-in gate (REQ-INV-032): with the demand covered but no location picked yet the book
+    // button stays disabled; picking the first offered location from the server-searched
+    // remote-locations combobox (browse-mode fetch on open, REQ-FE-016) re-enables it. Which
+    // location receives the stock is irrelevant to this flow — the stock assertion sums across
+    // locations.
+    assertThat(page.locator("#production-book-btn")).isDisabled();
+    E2eSupport.selectComboboxFirstOption(
+        page.locator(".krt-combobox:has(#production-location) .krt-combobox__input"));
+
+    // Reconcile enables the book button only when every material's demand is exactly covered and
+    // the book-in location is chosen.
     assertThat(page.locator("#production-book-btn")).isEnabled();
     page.waitForResponse(
         response ->
@@ -256,5 +306,54 @@ class JobOrderProductionE2eTest {
         .getAsJsonObject()
         .get("manufacturedAmount")
         .getAsInt();
+  }
+
+  /**
+   * Resolves the id of the game item the order's single line requests, read from the persisted
+   * order so the item-stock assertions target exactly the widget the production booked in.
+   *
+   * @param seeder the backend seeder used for the authenticated read-back
+   * @param orderId the item order to inspect
+   * @return the game-item id of {@code items[0].gameItem}
+   */
+  private static String orderedGameItemId(BackendSeeder seeder, String orderId) {
+    JsonObject order =
+        JsonParser.parseString(seeder.getBody(USERNAME, PASSWORD, "/api/v1/orders/" + orderId))
+            .getAsJsonObject();
+    return order
+        .getAsJsonArray("items")
+        .get(0)
+        .getAsJsonObject()
+        .getAsJsonObject("gameItem")
+        .get("id")
+        .getAsString();
+  }
+
+  /**
+   * Sums the squadron-wide item-stock total of one game item through the same grouped {@code
+   * catalog=ITEM} endpoint the {@code /inventory/all} item view itself renders from
+   * (REQ-INV-030/032), so the before/after delta proves the production book-in without racing the
+   * post-write render.
+   *
+   * @param seeder the backend seeder used for the authenticated read-back
+   * @param gameItemId the game item whose stacks to sum
+   * @return the summed {@code totalAmount} across all of the item's stacks (0 when none exist)
+   */
+  private static double itemStockTotal(BackendSeeder seeder, String gameItemId) {
+    String body =
+        seeder.getBody(
+            USERNAME,
+            PASSWORD,
+            "/api/v1/inventory/all/grouped?catalog=ITEM&gameItemIds=" + gameItemId);
+    double sum = 0;
+    for (JsonElement groupElement : JsonParser.parseString(body).getAsJsonArray()) {
+      for (JsonElement stackElement : groupElement.getAsJsonObject().getAsJsonArray("stacks")) {
+        JsonObject stack = stackElement.getAsJsonObject();
+        if (stack.has("totalAmount") && !stack.get("totalAmount").isJsonNull()) {
+          sum += stack.get("totalAmount").getAsDouble();
+        }
+      }
+    }
+    return sum;
   }
 }

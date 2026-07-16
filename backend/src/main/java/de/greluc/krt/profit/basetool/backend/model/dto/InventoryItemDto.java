@@ -36,7 +36,7 @@ import java.util.UUID;
  * authoritative multi-earmark view; the former single {@code jobOrderId} / {@code missionId}
  * scalars were dropped once every consumer read the allocations.
  *
- * <p>Since V220 the row is catalog-discriminated (REQ-INV-029, ADR-0100): a material row carries
+ * <p>Since V220 the row is catalog-discriminated (REQ-INV-029, ADR-0101): a material row carries
  * {@code material} + non-null {@code quality} with {@code gameItem == null}; a game-item row
  * carries {@code gameItem} with {@code material == null} and {@code quality == null}. Exactly one
  * of the two references is set — the DTO mirrors the DB CHECK {@code

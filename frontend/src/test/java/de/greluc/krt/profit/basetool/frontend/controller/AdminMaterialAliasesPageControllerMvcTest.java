@@ -19,10 +19,13 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -97,10 +100,11 @@ class AdminMaterialAliasesPageControllerMvcTest {
         Instant.parse("2026-06-01T00:00:00Z"));
   }
 
-  // REQ-FE-016: the add-alias form's material select opts into the searchable-combobox
-  // enhancement — the marker must sit on the (statically attributed) #newMaterialId select. The
-  // list() handler swallows backend failures, so the unstubbed alias/material fetches still
-  // render the page.
+  // REQ-FE-016: the add-alias form's material select opts into the server-side-search combobox —
+  // the marker with its remote-materials registry value must sit on the (statically attributed)
+  // #newMaterialId select, and the page must no longer fetch the full material catalogue (the
+  // remote picker queries /catalog/material-search instead). The list() handler swallows backend
+  // failures, so the unstubbed alias fetch still renders the page.
   @Test
   @WithMockUser(roles = "ADMIN")
   void listPage_materialPickerCarriesComboboxMarker() throws Exception {
@@ -111,7 +115,10 @@ class AdminMaterialAliasesPageControllerMvcTest {
             content()
                 .string(
                     containsString(
-                        "id=\"newMaterialId\" name=\"materialId\" required data-krt-combobox")));
+                        "id=\"newMaterialId\" name=\"materialId\" required"
+                            + " data-krt-combobox=\"remote-materials\"")));
+
+    verify(backendApiClient, never()).get(eq("/api/v1/materials/lookup"), anyTypeRef());
   }
 
   // covers #582 — the create twin (X-Requested-With + JSON body) relays to the backend and returns

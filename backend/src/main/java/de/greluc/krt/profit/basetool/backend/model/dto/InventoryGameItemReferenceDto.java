@@ -23,7 +23,7 @@ import java.util.UUID;
 
 /**
  * Slim reference projection of a {@code GameItem} for the Lager item-stock surfaces (REQ-INV-029,
- * ADR-0100): the nullable {@code gameItem} field of {@link InventoryItemDto} / {@link
+ * ADR-0101): the nullable {@code gameItem} field of {@link InventoryItemDto} / {@link
  * GroupedInventoryDto} / {@link AggregatedInventoryDto} and the rows of the {@code
  * /api/v1/inventory/item-catalog} picker. Carries what the item tree renders per row — id, name,
  * manufacturer and kind badge — as scalars, without dragging the full catalogue entity across the

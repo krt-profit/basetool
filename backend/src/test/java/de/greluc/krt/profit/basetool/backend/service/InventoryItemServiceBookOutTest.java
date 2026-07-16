@@ -1264,15 +1264,18 @@ class InventoryItemServiceBookOutTest {
       InventoryItem item = newGameItemRow(10.0, 1L);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-      // When / Then — a fractional amount is rejected before any decrement
-      assertThrows(
-          BadRequestException.class,
-          () ->
-              service.bookOutInventoryItem(
-                  ITEM_ID,
-                  newDto(1.5, null, null, CheckoutType.DISCARD, null, null, 1L),
-                  OWNER_ID,
-                  false));
+      // When / Then — a fractional amount is rejected before any decrement, and the 400 detail
+      // names the row's actual catalog kind (item stock, not PIECE materials)
+      BadRequestException ex =
+          assertThrows(
+              BadRequestException.class,
+              () ->
+                  service.bookOutInventoryItem(
+                      ITEM_ID,
+                      newDto(1.5, null, null, CheckoutType.DISCARD, null, null, 1L),
+                      OWNER_ID,
+                      false));
+      assertEquals("Amount must be a whole number for item stock", ex.getMessage());
       verify(inventoryItemRepository, never()).save(any());
       verify(inventoryItemRepository, never()).saveAndFlush(any());
       verify(inventoryItemRepository, never()).delete(any());
@@ -1286,16 +1289,109 @@ class InventoryItemServiceBookOutTest {
       item.getMaterial().setQuantityType(QuantityType.PIECE);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-      // When / Then
-      assertThrows(
-          BadRequestException.class,
-          () ->
-              service.bookOutInventoryItem(
-                  ITEM_ID,
-                  newDto(2.5, null, null, CheckoutType.DISCARD, null, null, 1L),
-                  OWNER_ID,
-                  false));
+      // When / Then — the 400 detail keeps the material wording on a material row
+      BadRequestException ex =
+          assertThrows(
+              BadRequestException.class,
+              () ->
+                  service.bookOutInventoryItem(
+                      ITEM_ID,
+                      newDto(2.5, null, null, CheckoutType.DISCARD, null, null, 1L),
+                      OWNER_ID,
+                      false));
+      assertEquals("Amount must be a whole number for PIECE materials", ex.getMessage());
       verify(inventoryItemRepository, never()).save(any());
+      verify(inventoryItemRepository, never()).saveAndFlush(any());
+      verify(inventoryItemRepository, never()).delete(any());
+    }
+
+    // covers REQ-INV-029 (full-depletion escape: a legacy fractional PIECE row can be drained)
+    @Test
+    void bookOut_pieceMaterial_legacyFractionalRow_fullDepletion_isAllowed() {
+      // Given a PIECE-material row holding a legacy fractional amount (created before the
+      // whole-unit guard existed) — without the escape that remainder could never be drained
+      InventoryItem item = newItem(1.5, 1L);
+      item.getMaterial().setQuantityType(QuantityType.PIECE);
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+
+      // When — book out the row's EXACT remaining amount
+      InventoryItemDto result =
+          service.bookOutInventoryItem(
+              ITEM_ID,
+              newDto(1.5, null, null, CheckoutType.DISCARD, null, null, 1L),
+              OWNER_ID,
+              false);
+
+      // Then — the fractional amount is exempt (full depletion): the row is drained and deleted
+      assertNull(result, "a full depletion returns null");
+      verify(inventoryItemRepository).delete(item);
+      verify(inventoryItemRepository, never()).saveAndFlush(any());
+    }
+
+    // covers REQ-INV-029 (a PARTIAL fractional book-out off a fractional PIECE row still 400s)
+    @Test
+    void bookOut_pieceMaterial_legacyFractionalRow_partialFractionalAmount_throwsBadRequest() {
+      // Given the same legacy fractional PIECE row
+      InventoryItem item = newItem(1.5, 1L);
+      item.getMaterial().setQuantityType(QuantityType.PIECE);
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+
+      // When / Then — 0.5 is fractional AND does not deplete the row, so the guard still fires
+      BadRequestException ex =
+          assertThrows(
+              BadRequestException.class,
+              () ->
+                  service.bookOutInventoryItem(
+                      ITEM_ID,
+                      newDto(0.5, null, null, CheckoutType.DISCARD, null, null, 1L),
+                      OWNER_ID,
+                      false));
+      assertEquals("Amount must be a whole number for PIECE materials", ex.getMessage());
+      verify(inventoryItemRepository, never()).saveAndFlush(any());
+      verify(inventoryItemRepository, never()).delete(any());
+    }
+
+    // covers REQ-INV-029 (full-depletion escape on an item row — the guard is row-kind driven)
+    @Test
+    void bookOut_itemRow_legacyFractionalRow_fullDepletion_isAllowed() {
+      // Given a game-item row holding a legacy fractional amount (only reachable via legacy data,
+      // but the guard is row-kind driven, so the escape must hold here too)
+      InventoryItem item = newGameItemRow(1.5, 1L);
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+
+      // When — book out the row's EXACT remaining amount
+      InventoryItemDto result =
+          service.bookOutInventoryItem(
+              ITEM_ID,
+              newDto(1.5, null, null, CheckoutType.DISCARD, null, null, 1L),
+              OWNER_ID,
+              false);
+
+      // Then — exempt from the whole-unit rule: the row is drained and deleted
+      assertNull(result, "a full depletion returns null");
+      verify(inventoryItemRepository).delete(item);
+      verify(inventoryItemRepository, never()).saveAndFlush(any());
+    }
+
+    // covers REQ-INV-029 (a PARTIAL fractional book-out off a fractional item row still 400s)
+    @Test
+    void bookOut_itemRow_legacyFractionalRow_partialFractionalAmount_throwsBadRequest() {
+      // Given the same legacy fractional item row
+      InventoryItem item = newGameItemRow(1.5, 1L);
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+
+      // When / Then — 0.5 is fractional AND does not deplete the row, so the guard still fires
+      // with the item wording
+      BadRequestException ex =
+          assertThrows(
+              BadRequestException.class,
+              () ->
+                  service.bookOutInventoryItem(
+                      ITEM_ID,
+                      newDto(0.5, null, null, CheckoutType.DISCARD, null, null, 1L),
+                      OWNER_ID,
+                      false));
+      assertEquals("Amount must be a whole number for item stock", ex.getMessage());
       verify(inventoryItemRepository, never()).saveAndFlush(any());
       verify(inventoryItemRepository, never()).delete(any());
     }

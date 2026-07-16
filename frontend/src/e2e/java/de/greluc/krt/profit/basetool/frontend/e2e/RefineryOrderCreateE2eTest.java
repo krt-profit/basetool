@@ -120,9 +120,14 @@ class RefineryOrderCreateE2eTest {
         page.locator("#locationId").selectOption(new SelectOption().setLabel("E2E Refinery Hub"));
         page.locator("#refiningMethodId")
             .selectOption(new SelectOption().setLabel("E2E Refining Method"));
-        // The input-material picker is a searchable combobox; its id stays on the hidden input.
+        // The input-material picker is a server-side-search combobox (REQ-FE-016); its id stays on
+        // the hidden input. The empty-query popup renders only the first 25 catalog rows (name
+        // ascending) and the seeded material sorts beyond that window, so the pick must type the
+        // material's name first — the real-user narrowing flow.
         E2eSupport.selectComboboxByValue(
-            page.locator(".krt-combobox:has(#inputMaterialId_0) .krt-combobox__input"), materialId);
+            page.locator(".krt-combobox:has(#inputMaterialId_0) .krt-combobox__input"),
+            materialId,
+            "E2E Refinery Material");
         // Both the input and the expected output quantity of the goods row are required.
         page.locator("#inputQuantity_0").fill("100");
         page.locator("#outputQuantity_0").fill("100");
