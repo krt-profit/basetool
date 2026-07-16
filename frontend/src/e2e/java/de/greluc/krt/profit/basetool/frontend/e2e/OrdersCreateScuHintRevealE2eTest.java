@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.microsoft.playwright.Browser;
@@ -90,7 +91,10 @@ class OrdersCreateScuHintRevealE2eTest {
   /**
    * Adds a material row on the create-order form and asserts that choosing an SCU material reveals
    * the row's SCU hint (via the toggled visibility class) without any {@code style-src-attr} CSP
-   * violation — the reveal-over-class failure mode the ADR-0093 JS fix addresses.
+   * violation — the reveal-over-class failure mode the ADR-0093 JS fix addresses. Piggybacks the
+   * REQ-FE-016 metadata-mirror contract onto the same pick: the selected option's {@code
+   * data-quantity-type} must appear on the combobox's hidden input, and a programmatic {@code
+   * setValue('')} must remove the previously mirrored key instead of leaving it stale.
    */
   @Test
   void scuMaterialRevealsHintWithoutCspViolation() {
@@ -125,6 +129,24 @@ class OrdersCreateScuHintRevealE2eTest {
               scuOption.getAttribute("value"));
           assertThat(row.locator(".scu-hint"))
               .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(15_000));
+
+          // Metadata-mirror contract (REQ-FE-016): the pick above must have mirrored the option's
+          // data-quantity-type onto the hidden input, and clearing the picker via the programmatic
+          // setValue path must REMOVE the previously mirrored key — the stale-key half of the
+          // contract, which no user-driven flow exercises.
+          Locator hiddenMaterial = row.locator("input[data-role=\"material-select\"]");
+          assertEquals(
+              "SCU",
+              hiddenMaterial.getAttribute("data-quantity-type"),
+              "the picked SCU option's quantity type must be mirrored onto the hidden input");
+          Object staleKeyRemoved =
+              hiddenMaterial.evaluate(
+                  "el => { el.krtCombobox.setValue(''); return el.dataset.quantityType"
+                      + " === undefined; }");
+          assertEquals(
+              Boolean.TRUE,
+              staleKeyRemoved,
+              "setValue('') must remove the previously mirrored data-quantity-type");
         }
 
         List<String> cspStyleViolations =

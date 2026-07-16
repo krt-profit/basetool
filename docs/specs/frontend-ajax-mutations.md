@@ -1083,7 +1083,12 @@ The user-picker rule of REQ-FE-011 extends to **catalog** pickers: every field t
 **material**, a **game item** or a **booking-flow location** from the catalog must be a
 `krt-searchable-select` combobox — a plain `<select>` over a full catalog is incomplete. Materials
 and locations (small, page-preloaded catalogs) use the bare `data-krt-combobox` local-filter mode;
-game items (thousands of blueprint-bearing entries) use `remoteSource` mode. Converted sites:
+game items (thousands of blueprint-bearing entries) use `remoteSource` mode. The unpaginated
+lookup endpoints feeding the local-filter mode (`GET /api/v1/materials/lookup`,
+`GET /api/v1/locations/lookup`) are defensively capped server-side at 1000 rows, name ascending
+(`MaterialService`/`LocationService#LOOKUP_MAX_RESULTS`) — both catalogs are bounded by nature
+(UEX/SC-Wiki sync plus admin curation; users cannot create entries), so the cap only guarantees a
+page can never embed an unbounded catalog payload. Converted sites:
 the inventory Einbuchen material + location pickers, the job-order create/edit material lines
 (server-rendered **and** JS-built rows), the refinery create/details input-material pickers, the
 Umbuchen target-location pickers, the `/inventory/material` navigate select and the admin
@@ -1124,14 +1129,18 @@ ARIA ids, no native select left to re-enhance).
   the picked label, not a blank box.
 
 **Enforced by:** the migrated picker flows in `InventoryOperationsE2eTest`,
-`JobOrderCreateE2eTest`, `OrdersCreateScuHintRevealE2eTest` (quantity-type mirror end-to-end) and
-`RefineryOrderCreateE2eTest` (via `E2eSupport.selectComboboxByValue`) · MockMvc view tests
-asserting the `data-krt-combobox` marker on the converted selects · **Code:**
+`JobOrderCreateE2eTest`, `OrdersCreateScuHintRevealE2eTest` (quantity-type mirror + stale-key
+removal end-to-end) and `RefineryOrderCreateE2eTest` (via `E2eSupport.selectComboboxByValue`) ·
+MockMvc view tests asserting the `data-krt-combobox` marker on every converted select
+(`JobOrderPageControllerResponsiblePickerMvcTest`, `OrderHierarchyVisibilityTest`,
+`InventoryPageControllerMvcTest`, `AdminMaterialAliasesPageControllerMvcTest`,
+`OfficerRefineryAccessTest`) · the lookup-cap unit tests in `LocationServiceTest` /
+`MaterialServiceTest` · **Code:**
 `krt-searchable-select.js` (`optionData` harvest, `mirrorItemData` on all four value-set paths,
 reserved select-level keys), the re-pointed consumers in `inventory-input.js`, `orders-create.js`
 (`refreshMaterialUnit`, `importFromScmdb`), `orders-detail.js`, `refinery-orders-create.js` /
 `refinery-orders-details.js` (`updateOutputMaterial`, rebuilt `addMaterialRow`),
-`refinery-yield-badge.js` · **ADR:** ADR-0053 (follow-up note), ADR-0100 (design context)
+`refinery-yield-badge.js` · **ADR:** ADR-0053 (follow-up note)
 
 ## Out of scope
 

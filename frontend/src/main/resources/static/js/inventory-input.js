@@ -84,8 +84,14 @@ function updateAmountFieldForMaterial(selectElement) {
 
     // The material picker is a searchable combobox (REQ-FE-016): the selected option's
     // data-quantity-type is mirrored onto the hidden input carrying #materialId, replacing the
-    // former selectedOptions[0] read (the native <option>s are gone after enhancement).
-    const qtType = selectElement.dataset.quantityType || '';
+    // former selectedOptions[0] read (the native <option>s are gone after enhancement). The raw
+    // <select> fallback covers a not-yet-enhanced control (e.g. the enhancer script failed to
+    // execute), matching the sibling material-unit refreshers in orders-create/orders-detail.
+    let qtType = selectElement.dataset.quantityType || '';
+    if (!qtType && selectElement.tagName === 'SELECT') {
+        const opt = selectElement.selectedOptions && selectElement.selectedOptions[0];
+        qtType = (opt && opt.getAttribute('data-quantity-type')) || '';
+    }
 
     if (qtType === 'PIECE') {
         amountInput.setAttribute('step', '1');

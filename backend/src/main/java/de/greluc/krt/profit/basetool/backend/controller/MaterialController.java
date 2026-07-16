@@ -122,9 +122,11 @@ public class MaterialController {
   }
 
   /**
-   * Lightweight projection for typeaheads — only id and name.
+   * Lightweight projection for typeaheads — only id, name and quantity type. The response is capped
+   * server-side at {@link MaterialService#LOOKUP_MAX_RESULTS} rows (name ascending), so this
+   * unpaginated endpoint can never stream an unbounded payload.
    *
-   * @return all materials as reference DTOs
+   * @return visible materials as reference DTOs, capped server-side
    */
   @GetMapping("/lookup")
   public List<de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto>

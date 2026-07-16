@@ -39,18 +39,24 @@ import org.springframework.stereotype.Repository;
 public interface MaterialRepository extends JpaRepository<Material, UUID> {
 
   /**
-   * Returns slim {@code MaterialReferenceDto}s (id, name, quantity-type) for every <b>visible</b>
-   * material, ordered by name. Used to populate material pickers (inventory, alias targets) without
-   * pulling the full Material aggregate. Wiki-only commodities imported {@code is_visible = false}
-   * (§4.3) are excluded so unreviewed entries never appear in a picker — see {@code isVisible} on
-   * {@link Material}.
+   * Returns slim {@code MaterialReferenceDto}s (id, name, quantity-type) for <b>visible</b>
+   * materials, ordered by name and capped by the {@link Pageable}. Used to populate material
+   * pickers (inventory, alias targets) without pulling the full Material aggregate. Wiki-only
+   * commodities imported {@code is_visible = false} (§4.3) are excluded so unreviewed entries never
+   * appear in a picker — see {@code isVisible} on {@link Material}. The cap is a defensive bound so
+   * the unpaginated lookup endpoint can never stream an unbounded payload (the ORDER BY makes a
+   * hypothetical overflow drop the tail deterministically, not arbitrary rows).
+   *
+   * @param pageable page request carrying the hard upper bound on the number of rows returned
+   * @return at most one page of visible materials as reference DTOs, name ascending
    */
   @Query(
       """
       SELECT new de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto(m.id,
       m.name, m.quantityType) FROM Material m WHERE m.isVisible = true ORDER BY m.name
       """)
-  List<de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto> findAllReference();
+  List<de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto> findAllReference(
+      Pageable pageable);
 
   /**
    * Paged list of materials with {@code is_visible = true}, used for the public/trading catalog

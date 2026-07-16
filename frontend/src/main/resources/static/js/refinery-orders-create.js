@@ -131,6 +131,17 @@ function addMaterialRow() {
         freshSelect.setAttribute('data-trigger', 'rfc-update-output');
         freshSelect.setAttribute('data-krt-combobox', '');
         clonedPicker.parentNode.replaceChild(freshSelect, clonedPicker);
+        // The enhancer re-pointed row 0's label (for="krt-cb-N-input") and minted its id; the
+        // clone carries both, which the /_\d+$/ renumbering below cannot fix — strip the id
+        // (else every added row duplicates it) and re-bind the label to the rebuilt select's
+        // field id so the renumber loop and the fresh enhancement pick it up cleanly.
+        const clonedLabel = freshSelect.parentNode.querySelector('label');
+        if (clonedLabel) {
+            clonedLabel.removeAttribute('id');
+            if (hiddenField) {
+                clonedLabel.setAttribute('for', hiddenField.id);
+            }
+        }
     }
 
     // Renumber the title in the header. Source is row 0 ("Material #1") so without an

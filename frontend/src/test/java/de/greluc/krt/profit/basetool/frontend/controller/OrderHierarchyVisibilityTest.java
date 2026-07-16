@@ -130,6 +130,14 @@ class OrderHierarchyVisibilityTest {
             content()
                 .string(
                     org.hamcrest.Matchers.containsString(
-                        "Bearbeiten"))); // The edit button for LOGISTICIAN
+                        "Bearbeiten"))) // The edit button for LOGISTICIAN
+        // REQ-FE-016: the edit modal's material picker (live rows AND the inert
+        // #edit-material-row-template new rows are cloned from) opts into the
+        // searchable-combobox enhancement.
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.containsString(
+                        "data-role=\"material-select\" data-krt-combobox")));
   }
 }

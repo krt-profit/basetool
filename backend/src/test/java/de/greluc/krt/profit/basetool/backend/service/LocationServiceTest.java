@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.EntityInUseException;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
@@ -38,6 +39,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageRequest;
 
 @ExtendWith(MockitoExtension.class)
 class LocationServiceTest {
@@ -95,6 +97,22 @@ class LocationServiceTest {
     when(refineryOrderRepository.existsByLocationId(locId)).thenReturn(true);
 
     assertThrows(EntityInUseException.class, () -> locationService.deleteLocation(locId));
+  }
+
+  @Test
+  void findAllReference_capsTheUnpaginatedLookupAtTheDefensiveBound() {
+    // Given
+    LocationReferenceDto ref = new LocationReferenceDto(UUID.randomUUID(), "Port Olisar");
+    when(locationRepository.findAllReference(PageRequest.of(0, LocationService.LOOKUP_MAX_RESULTS)))
+        .thenReturn(List.of(ref));
+
+    // When
+    List<LocationReferenceDto> result = locationService.findAllReference();
+
+    // Then
+    assertEquals(List.of(ref), result);
+    verify(locationRepository, times(1))
+        .findAllReference(PageRequest.of(0, LocationService.LOOKUP_MAX_RESULTS));
   }
 
   @Test

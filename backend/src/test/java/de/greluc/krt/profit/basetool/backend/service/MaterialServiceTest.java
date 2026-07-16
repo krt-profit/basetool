@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceOverviewDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialPriceRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
@@ -67,6 +68,23 @@ class MaterialServiceTest {
   @Mock private MaterialCategoryRepository materialCategoryRepository;
 
   @InjectMocks private MaterialService materialService;
+
+  @Test
+  void findAllReference_capsTheUnpaginatedLookupAtTheDefensiveBound() {
+    // Given
+    MaterialReferenceDto ref =
+        new MaterialReferenceDto(UUID.randomUUID(), "Agricium", QuantityType.SCU);
+    when(materialRepository.findAllReference(PageRequest.of(0, MaterialService.LOOKUP_MAX_RESULTS)))
+        .thenReturn(List.of(ref));
+
+    // When
+    List<MaterialReferenceDto> result = materialService.findAllReference();
+
+    // Then
+    assertEquals(List.of(ref), result);
+    verify(materialRepository)
+        .findAllReference(PageRequest.of(0, MaterialService.LOOKUP_MAX_RESULTS));
+  }
 
   @Test
   void getMaterialPriceOverview_ShouldReturnPageOfOverviews() {

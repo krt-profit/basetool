@@ -84,6 +84,29 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 
+  /**
+   * REQ-FE-016: the create form's material-line select opts into the searchable-combobox
+   * enhancement — the {@code data-krt-combobox} marker must sit on the material picker (anchored
+   * via its adjacent {@code data-role}), so the global enhancer upgrades it on page load.
+   */
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
+  void viewCreateForm_materialPickerCarriesComboboxMarker() throws Exception {
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
+        .thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/orders/create"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("orders-create"))
+        .andExpect(
+            content()
+                .string(
+                    Matchers.containsString("data-role=\"material-select\" data-krt-combobox")));
+  }
+
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void viewCreateForm_authenticated_requestingOffersBereichAndOl_responsibleStaysProfitStaffelSk()
