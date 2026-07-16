@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -27,8 +28,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,6 +39,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.ui.ConcurrentModel;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
 /**
@@ -68,6 +72,34 @@ class AdminLocationsPageControllerTest {
     assertEquals(2L, body.getValue().version(), "version must be echoed for optimistic locking");
     assertEquals("redirect:/admin/locations", view);
     verify(backendApiClient).evict(CacheDomain.LOCATION);
+  }
+
+  // covers REQ-ADMIN-001 — locations beyond the first backend page stay visible and editable
+  @Test
+  void listData_concatenatesAllBackendPages_andSorts() {
+    // Given — two backend pages: [Port Olisar] + [Area18]
+    LocationDto portOlisar =
+        new LocationDto(UUID.randomUUID(), "Port Olisar", "Crusader station", false, false, 0L);
+    LocationDto area18 =
+        new LocationDto(UUID.randomUUID(), "Area18", "ArcCorp city", false, true, 0L);
+    String base = "/api/v1/locations?size=1000&sort=name,asc&includeHidden=true";
+    when(backendApiClient.get(eq(base + "&page=0"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(portOlisar), 0, 1000, 2, 2, List.of("name,asc")));
+    when(backendApiClient.get(eq(base + "&page=1"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(area18), 1, 1000, 2, 2, List.of("name,asc")));
+    ConcurrentModel model = new ConcurrentModel();
+
+    // When
+    String view = controller.listData(model);
+
+    // Then — both pages render, sorted case-insensitively, with no truncation flagged
+    assertEquals("admin/locations", view);
+    @SuppressWarnings("unchecked")
+    List<LocationDto> locations = (List<LocationDto>) model.getAttribute("locations");
+    assertEquals(2, locations.size(), "the second backend page must not be dropped");
+    assertEquals("Area18", locations.get(0).name());
+    assertEquals("Port Olisar", locations.get(1).name());
+    assertEquals(Boolean.FALSE, model.getAttribute("catalogTruncated"));
   }
 
   @Test

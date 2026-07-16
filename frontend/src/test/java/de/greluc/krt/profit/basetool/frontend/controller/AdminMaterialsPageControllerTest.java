@@ -177,7 +177,8 @@ class AdminMaterialsPageControllerTest {
         new PageResponse<>(materials, 0, 1000, materials.size(), 1, List.of("name,asc"));
 
     when(backendApiClient.get(
-            eq("/api/v1/materials?size=1000&sort=name,asc&includeHidden=true"), anyTypeRef()))
+            eq("/api/v1/materials?size=1000&sort=name,asc&includeHidden=true&page=0"),
+            anyTypeRef()))
         .thenReturn(materialsPage);
 
     // Act
@@ -199,6 +200,66 @@ class AdminMaterialsPageControllerTest {
     assertEquals("Charlie", refinedMats.get(2).name());
     assertEquals("Delta", refinedMats.get(3).name());
     assertEquals("Echo", refinedMats.get(4).name());
+    assertEquals(Boolean.FALSE, model.getAttribute("catalogTruncated"));
+  }
+
+  // covers REQ-ADMIN-001 — materials beyond the first backend page stay visible and editable
+  @Test
+  void listMaterials_concatenatesAllBackendPages() {
+    // Arrange — two backend pages of one material each
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    AdminMaterialsPageController controller = new AdminMaterialsPageController(backendApiClient);
+    Model model = new ConcurrentModel();
+
+    MaterialDto first =
+        new MaterialDto(
+            UUID.randomUUID(),
+            "Agricium",
+            "RAW",
+            "SCU",
+            "Desc",
+            null,
+            null,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            0L);
+    MaterialDto second =
+        new MaterialDto(
+            UUID.randomUUID(),
+            "Zeta-Prolanide",
+            "RAW",
+            "SCU",
+            "Desc",
+            null,
+            null,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            0L);
+    String base = "/api/v1/materials?size=1000&sort=name,asc&includeHidden=true";
+    when(backendApiClient.get(eq(base + "&page=0"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(first), 0, 1000, 2, 2, List.of("name,asc")));
+    when(backendApiClient.get(eq(base + "&page=1"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(second), 1, 1000, 2, 2, List.of("name,asc")));
+
+    // Act
+    controller.listMaterials(model);
+
+    // Assert — both pages land in the rendered list
+    List<MaterialDto> sortedMaterials = (List<MaterialDto>) model.getAttribute("materials");
+    assertEquals(2, sortedMaterials.size(), "the second backend page must not be dropped");
+    assertEquals("Agricium", sortedMaterials.get(0).name());
+    assertEquals("Zeta-Prolanide", sortedMaterials.get(1).name());
+    assertEquals(Boolean.FALSE, model.getAttribute("catalogTruncated"));
   }
 
   @Test

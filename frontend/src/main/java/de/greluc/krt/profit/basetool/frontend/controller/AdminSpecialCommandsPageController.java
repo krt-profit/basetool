@@ -30,6 +30,8 @@ import de.greluc.krt.profit.basetool.frontend.model.form.SpecialCommandForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
+import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
+import de.greluc.krt.profit.basetool.frontend.support.CatalogPages.CompleteCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.MapPayloadValues;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.validation.Valid;
@@ -130,7 +132,9 @@ public class AdminSpecialCommandsPageController {
     model.addAttribute("includeInactive", includeInactive);
 
     try {
-      model.addAttribute("specialCommands", fetchSpecialCommands(includeInactive));
+      CompleteCatalog<SpecialCommandDto> catalog = fetchSpecialCommands(includeInactive);
+      model.addAttribute("specialCommands", catalog.items());
+      model.addAttribute("catalogTruncated", catalog.truncated());
     } catch (BackendServiceException e) {
       log.debug("Error loading SpecialCommands", e);
       model.addAttribute("specialCommands", List.of());
@@ -146,23 +150,27 @@ public class AdminSpecialCommandsPageController {
   }
 
   /**
-   * Fetches the SK catalog from the backend and transforms the raw payload into a sorted list of
-   * {@link SpecialCommandDto} records. Mirrors {@link AdminMissionDataPageController}'s {@code
-   * fetchSquadrons} parsing path.
+   * Fetches the <em>complete</em> SK catalog from the backend — every page, not one capped chunk
+   * (REQ-ADMIN-001, ADR-0102) — and transforms the raw payload into a sorted list of {@link
+   * SpecialCommandDto} records. Mirrors {@link AdminMissionDataPageController}'s {@code
+   * fetchSquadrons} parsing path. The returned wrapper carries the truncation flag for the
+   * page-level warning banner (REQ-ADMIN-002).
    *
    * @param includeInactive forward to the backend's {@code includeInactive} query param.
-   * @return list of SKs sorted case-insensitively by name; never {@code null}.
+   * @return SKs sorted case-insensitively by name plus the truncation flag; never {@code null}.
    */
-  private List<SpecialCommandDto> fetchSpecialCommands(boolean includeInactive) {
-    PageResponse<Map<String, Object>> page =
-        backendApiClient.get(
-            "/api/v1/special-commands?size=1000&sort=name,asc&includeInactive=" + includeInactive,
-            MAP_PAGE_TYPE);
-    if (page == null || page.content() == null) {
-      return List.of();
-    }
+  private CompleteCatalog<SpecialCommandDto> fetchSpecialCommands(boolean includeInactive) {
+    CompleteCatalog<Map<String, Object>> catalog =
+        CatalogPages.fetchAll(
+            page ->
+                backendApiClient.get(
+                    "/api/v1/special-commands?size=1000&sort=name,asc&includeInactive="
+                        + includeInactive
+                        + "&page="
+                        + page,
+                    MAP_PAGE_TYPE));
     List<SpecialCommandDto> commands =
-        page.content().stream()
+        catalog.items().stream()
             .map(
                 m ->
                     new SpecialCommandDto(
@@ -176,7 +184,7 @@ public class AdminSpecialCommandsPageController {
             .collect(Collectors.toCollection(ArrayList::new));
     commands.sort(
         Comparator.comparing(s -> s.name() == null ? "" : s.name(), String.CASE_INSENSITIVE_ORDER));
-    return commands;
+    return new CompleteCatalog<>(commands, catalog.totalElements(), catalog.truncated());
   }
 
   /**

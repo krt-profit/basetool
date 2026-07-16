@@ -262,7 +262,53 @@ class AdminUexPageControllerTest {
 
     assertEquals("admin/uex", view);
     assertEquals(newerSync, model.getAttribute("latestUexSync"));
-    assertEquals(2, model.getAttribute("totalTerminals"));
+    assertEquals(2L, model.getAttribute("totalTerminals"));
+  }
+
+  // covers REQ-ADMIN-001/002 — terminals beyond the first backend page still render, and the
+  // summary totals come from the backend total, not the fetched list size
+  @Test
+  void listData_concatenatesTerminalPages_andDerivesTotalsFromTotalElements() {
+    BackendApiClient client = mock(BackendApiClient.class);
+    AdminUexPageController controller = new AdminUexPageController(client);
+
+    Map<String, Object> first = new HashMap<>();
+    first.put("id", UUID.randomUUID().toString());
+    first.put("name", "Baijini Point TDD");
+    first.put("starSystemName", "Stanton");
+    Map<String, Object> second = new HashMap<>();
+    second.put("id", UUID.randomUUID().toString());
+    second.put("name", "Everus Harbor TDD");
+    second.put("starSystemName", "Stanton");
+
+    stubEmptyPage(client, "/api/v1/cities?size=10000&sort=name,asc");
+    stubEmptyPage(client, "/api/v1/space-stations?size=10000&sort=name,asc");
+    stubEmptyPage(client, "/api/v1/outposts?size=10000&sort=name,asc");
+    stubEmptyPage(client, "/api/v1/pois?size=10000&sort=name,asc");
+    // totalElements deliberately differs from the gathered row count (5 vs 2) so this test can
+    // tell a totalElements-derived total apart from a list-size-derived one (REQ-ADMIN-002).
+    String terminalsBase = "/api/v1/terminals?size=10000&sort=name,asc";
+    when(client.get(eq(terminalsBase + "&page=0"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(first), 0, 10000, 5, 2, List.of()));
+    when(client.get(eq(terminalsBase + "&page=1"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(second), 1, 10000, 5, 2, List.of()));
+
+    ConcurrentModel model = new ConcurrentModel();
+    controller.listData(model);
+
+    assertEquals(
+        5L,
+        model.getAttribute("totalTerminals"),
+        "the chip total must be the backend total, not the fetched list size");
+    assertEquals(Boolean.FALSE, model.getAttribute("catalogTruncated"));
+    @SuppressWarnings("unchecked")
+    List<AdminUexPageController.StarSystemGroup> systems =
+        (List<AdminUexPageController.StarSystemGroup>) model.getAttribute("starSystems");
+    assertEquals(1, systems.size());
+    assertEquals(
+        2,
+        systems.get(0).terminalCount(),
+        "the terminal from the second backend page must not be dropped");
   }
 
   @Test
@@ -432,13 +478,13 @@ class AdminUexPageControllerTest {
 
   private static void stubEmptyPage(BackendApiClient client, String uri) {
     PageResponse<Map<String, Object>> empty = new PageResponse<>(List.of(), 0, 10, 0, 0, List.of());
-    when(client.get(eq(uri), anyTypeRef())).thenReturn(empty);
+    when(client.get(eq(uri + "&page=0"), anyTypeRef())).thenReturn(empty);
   }
 
   @SafeVarargs
   private static void stubPage(BackendApiClient client, String uri, Map<String, Object>... rows) {
     PageResponse<Map<String, Object>> page =
         new PageResponse<>(List.of(rows), 0, 10, rows.length, 1, List.of());
-    when(client.get(eq(uri), anyTypeRef())).thenReturn(page);
+    when(client.get(eq(uri + "&page=0"), anyTypeRef())).thenReturn(page);
   }
 }
