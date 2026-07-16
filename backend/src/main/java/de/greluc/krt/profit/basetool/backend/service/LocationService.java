@@ -35,6 +35,7 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
@@ -52,6 +53,15 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class LocationService {
+
+  /**
+   * Hard upper bound on the rows returned by {@link #findAllReference()}. The location catalogue is
+   * bounded by nature (UEX universe sync plus admin curation — order of hundreds; end users cannot
+   * create locations), so this cap is a defensive guarantee that the unpaginated {@code
+   * /api/v1/locations/lookup} response stays bounded even if a future sync inflates the table.
+   * Mirrors the {@code size=1000} bound the frontend applies to the paged catalogue fetches.
+   */
+  public static final int LOOKUP_MAX_RESULTS = 1000;
 
   private final LocationRepository locationRepository;
   private final ShipRepository shipRepository;
@@ -73,14 +83,16 @@ public class LocationService {
   }
 
   /**
-   * Lightweight projection used by typeaheads and dropdowns — only id/name/shorthand, no
-   * description or hidden flag.
+   * Lightweight projection used by typeaheads and dropdowns — only id + name, no description or
+   * hidden flag. Defensively capped at {@link #LOOKUP_MAX_RESULTS} rows, name ascending — see the
+   * constant for why the cap exists although the catalogue cannot balloon through user activity.
    *
-   * @return all locations as reference DTOs (no caching — pre-projected by the repository)
+   * @return at most {@link #LOOKUP_MAX_RESULTS} locations as reference DTOs (no caching —
+   *     pre-projected by the repository)
    */
   public List<de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto>
       findAllReference() {
-    return locationRepository.findAllReference();
+    return locationRepository.findAllReference(PageRequest.of(0, LOOKUP_MAX_RESULTS));
   }
 
   /**

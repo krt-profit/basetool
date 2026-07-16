@@ -33,15 +33,22 @@ import org.springframework.stereotype.Repository;
 public interface LocationRepository extends LookupTableRepository<Location, UUID> {
 
   /**
-   * Returns slim {@code LocationReferenceDto}s (id + name) for every non-hidden location, ordered
-   * by name. Used to populate location pickers without pulling the full Location aggregate.
+   * Returns slim {@code LocationReferenceDto}s (id + name) for non-hidden locations, ordered by
+   * name and capped by the {@link Pageable}. Used to populate location pickers without pulling the
+   * full Location aggregate; the cap is a defensive bound so the unpaginated lookup endpoint can
+   * never stream an unbounded payload (the ORDER BY makes a hypothetical overflow drop the tail
+   * deterministically, not arbitrary rows).
+   *
+   * @param pageable page request carrying the hard upper bound on the number of rows returned
+   * @return at most one page of non-hidden locations as reference DTOs, name ascending
    */
   @Query(
       """
       SELECT new de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto(l.id,
       l.name) FROM Location l WHERE l.hidden = false ORDER BY l.name
       """)
-  List<de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto> findAllReference();
+  List<de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto> findAllReference(
+      Pageable pageable);
 
   /** Derived Spring-Data query - returns entities matching {@code Name}. */
   Optional<Location> findByName(String name);

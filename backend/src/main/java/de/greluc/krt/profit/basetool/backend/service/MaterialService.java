@@ -43,6 +43,7 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,6 +61,16 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class MaterialService {
+
+  /**
+   * Hard upper bound on the rows returned by {@link #findAllReference()}. The material catalogue is
+   * bounded by nature (UEX commodity sync plus SC-Wiki merge — order of hundreds; end users cannot
+   * create materials), so this cap is a defensive guarantee that the unpaginated {@code
+   * /api/v1/materials/lookup} response stays bounded even if a future sync inflates the table.
+   * Mirrors the {@code size=1000} bound the frontend applies to the paged catalogue fetches and
+   * {@link LocationService#LOOKUP_MAX_RESULTS} on the sibling locations lookup.
+   */
+  public static final int LOOKUP_MAX_RESULTS = 1000;
 
   private final MaterialRepository materialRepository;
   private final MaterialPriceRepository materialPriceRepository;
@@ -120,13 +131,18 @@ public class MaterialService {
   }
 
   /**
-   * Lightweight projection used by typeaheads — only id and name.
+   * Lightweight projection used by typeaheads — only id, name and quantity type. Defensively capped
+   * at {@link #LOOKUP_MAX_RESULTS} rows, name ascending: the catalogue is bounded by nature (UEX
+   * commodity sync plus SC-Wiki merge, order of hundreds of rows), so the cap only guarantees the
+   * unpaginated {@code /api/v1/materials/lookup} response stays bounded even if a future sync
+   * inflates the table. Mirrors the {@code size=1000} bound the frontend applies to the paged
+   * catalogue fetches.
    *
-   * @return all materials as reference DTOs
+   * @return at most {@link #LOOKUP_MAX_RESULTS} visible materials as reference DTOs
    */
   public List<de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto>
       findAllReference() {
-    return materialRepository.findAllReference();
+    return materialRepository.findAllReference(PageRequest.of(0, LOOKUP_MAX_RESULTS));
   }
 
   /**

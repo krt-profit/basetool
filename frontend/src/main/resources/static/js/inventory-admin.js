@@ -755,7 +755,14 @@ function openUmbuchenModal(
     } else {
         umbuchenUser.value = userId;
     }
-    document.getElementById('umbuchenTargetLocationId').value = locationId;
+    // The location picker is a searchable combobox (REQ-FE-016): setValue() syncs the hidden
+    // value AND the visible label — a bare .value write would leave the textbox stale.
+    const umbuchenLocation = document.getElementById('umbuchenTargetLocationId');
+    if (umbuchenLocation.krtCombobox) {
+        umbuchenLocation.krtCombobox.setValue(locationId);
+    } else {
+        umbuchenLocation.value = locationId;
+    }
     refreshUmbuchenTransferOrgUnitPicker();
     // Inline `flex` (not `block`) preserves `.modal`'s flex centring; `block` would override the
     // stylesheet flex and pin the dialog to the top of the viewport (#1328).

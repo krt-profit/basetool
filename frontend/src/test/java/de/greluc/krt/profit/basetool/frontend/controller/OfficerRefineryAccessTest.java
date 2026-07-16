@@ -131,7 +131,13 @@ class OfficerRefineryAccessTest {
         // The picker is the enabled server-side searchable combobox (not a preloaded dropdown), and
         // it seeds the defaulted owner (the officer) so edit mode shows a name, not a raw id.
         .andExpect(content().string(containsString("data-krt-combobox=\"remote-users\"")))
-        .andExpect(content().string(containsString("Officer")));
+        .andExpect(content().string(containsString("Officer")))
+        // REQ-FE-016: the goods row's input-material select opts into the local-filter combobox,
+        // and the inert options catalog for JS-added rows renders alongside it.
+        .andExpect(
+            content()
+                .string(containsString("data-trigger=\"rfc-update-output\" data-krt-combobox")))
+        .andExpect(content().string(containsString("id=\"refinery-material-options-template\"")));
   }
 
   @Test
@@ -209,6 +215,13 @@ class OfficerRefineryAccessTest {
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("Speichern")))
         .andExpect(content().string(containsString("Abbrechen")))
-        .andExpect(content().string(containsString("Einlagern")));
+        .andExpect(content().string(containsString("Einlagern")))
+        // REQ-FE-016: the editable details form's input-material select opts into the local-filter
+        // combobox (the form seeds one blank goods row even for an order without goods), and the
+        // canEdit-gated inert options catalog for JS-added rows renders alongside it.
+        .andExpect(
+            content()
+                .string(containsString("data-trigger=\"rod-update-output\" data-krt-combobox")))
+        .andExpect(content().string(containsString("id=\"refinery-material-options-template\"")));
   }
 }

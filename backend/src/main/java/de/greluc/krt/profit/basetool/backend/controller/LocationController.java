@@ -81,9 +81,11 @@ public class LocationController {
   }
 
   /**
-   * Lightweight projection for typeaheads — only id and name.
+   * Lightweight projection for typeaheads — only id and name. The response is capped server-side at
+   * {@link LocationService#LOOKUP_MAX_RESULTS} rows (name ascending), so this unpaginated endpoint
+   * can never stream an unbounded payload.
    *
-   * @return all locations as reference DTOs
+   * @return non-hidden locations as reference DTOs, capped server-side
    */
   @GetMapping("/lookup")
   public List<de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto>

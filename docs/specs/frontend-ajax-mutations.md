@@ -1077,6 +1077,71 @@ requester-refused queue + bank dual-auth matrix) · `RedisLiveSyncFanoutTest` +
 `BANK_ACCOUNT_SECTIONS` / `ORGUNIT_ACCOUNT_SECTIONS` / `BANK_STAFF_SECTIONS` /
 `ORGUNIT_BANK_SECTIONS`, materialboard) · **ADR:** ADR-0094 · **Issues:** #1102, #1115, #1120
 
+### REQ-FE-016 — Catalog pickers (material / game item / location) are searchable comboboxes
+
+The user-picker rule of REQ-FE-011 extends to **catalog** pickers: every field that selects a
+**material**, a **game item** or a **booking-flow location** from the catalog must be a
+`krt-searchable-select` combobox — a plain `<select>` over a full catalog is incomplete. Materials
+and locations (small, page-preloaded catalogs) use the bare `data-krt-combobox` local-filter mode;
+game items (thousands of blueprint-bearing entries) use `remoteSource` mode. The unpaginated
+lookup endpoints feeding the local-filter mode (`GET /api/v1/materials/lookup`,
+`GET /api/v1/locations/lookup`) are defensively capped server-side at 1000 rows, name ascending
+(`MaterialService`/`LocationService#LOOKUP_MAX_RESULTS`) — both catalogs are bounded by nature
+(UEX/SC-Wiki sync plus admin curation; users cannot create entries), so the cap only guarantees a
+page can never embed an unbounded catalog payload. Converted sites:
+the inventory Einbuchen material + location pickers, the job-order create/edit material lines
+(server-rendered **and** JS-built rows), the refinery create/details input-material pickers, the
+Umbuchen target-location pickers, the `/inventory/material` navigate select and the admin
+material-alias pickers; the orders item picker already used the component's `remoteSource` API.
+
+**Option-metadata mirror (the load-bearing part).** Enhancing a select **removes** the native
+`<option>` elements, so option-level metadata (`data-quantity-type` on material options,
+`data-refined-id`/`-name` on refinery options) would vanish. The component therefore mirrors the
+selected option's extra `data-*` (everything outside the combobox-owned keys) onto the hidden
+input, and consumers read `hidden.dataset.*` instead of `selectedOptions[0].dataset.*`. The mirror
+is **one shared helper invoked on every value-set path** — click/keyboard commit, enhance-time
+preselect seeding, `reconcile()`'s typed-exact-match, and the programmatic `setValue()` API —
+because covering only commit would leave typed or programmatic picks with stale metadata. It
+removes previously-mirrored keys before applying the new option's map (an option lacking a key the
+previous one carried must not inherit the old value) and never overwrites keys the enhancer copied
+from the select itself (`data-role`, `data-trigger`, … are reserved). A `remoteSource` may return
+an optional `data` map per option for the same purpose.
+
+**Conversion checklist (binding).** Before adding the marker to any select, grep the page's JS for
+`querySelector('select')`, `.selectedOptions`, `.selectedIndex`, `.options[`, direct `.value =`
+writes and `cloneNode` on containers holding the picker — each hit is either re-pointed
+(hidden-input dataset read / `element.krtCombobox.setValue()`, which never fires `change`; dispatch
+one explicitly where the old flow relied on it) or the site must not be converted. Rows built by
+cloning a **live** row must switch to an inert `<template>`/options-template source plus
+`krtEnhanceComboboxes(row)` — a cloned enhanced combobox is dead (listeners dropped, duplicated
+ARIA ids, no native select left to re-enhance).
+
+**Acceptance**
+
+- [ ] Every material / game-item / booking-location picker carries `data-krt-combobox` (or wires
+  `remoteSource` via the direct API); typing filters the list; the committed value submits under
+  the original field name.
+- [ ] Picking a PIECE material through the combobox switches the amount field to whole-number mode
+  and back for SCU (the quantity-type mirror), including on edit-mode preselect and typed exact
+  match — never a stale unit from the previously selected option.
+- [ ] Dynamically added rows (order material lines, refinery goods rows) render a working
+  searchable picker, and programmatic fills (SCMDB import, import-review suggestion chips) show
+  the picked label, not a blank box.
+
+**Enforced by:** the migrated picker flows in `InventoryOperationsE2eTest`,
+`JobOrderCreateE2eTest`, `OrdersCreateScuHintRevealE2eTest` (quantity-type mirror + stale-key
+removal end-to-end) and `RefineryOrderCreateE2eTest` (via `E2eSupport.selectComboboxByValue`) ·
+MockMvc view tests asserting the `data-krt-combobox` marker on every converted select
+(`JobOrderPageControllerResponsiblePickerMvcTest`, `OrderHierarchyVisibilityTest`,
+`InventoryPageControllerMvcTest`, `AdminMaterialAliasesPageControllerMvcTest`,
+`OfficerRefineryAccessTest`) · the lookup-cap unit tests in `LocationServiceTest` /
+`MaterialServiceTest` · **Code:**
+`krt-searchable-select.js` (`optionData` harvest, `mirrorItemData` on all four value-set paths,
+reserved select-level keys), the re-pointed consumers in `inventory-input.js`, `orders-create.js`
+(`refreshMaterialUnit`, `importFromScmdb`), `orders-detail.js`, `refinery-orders-create.js` /
+`refinery-orders-details.js` (`updateOutputMaterial`, rebuilt `addMaterialRow`),
+`refinery-yield-badge.js` · **ADR:** ADR-0053 (follow-up note)
+
 ## Out of scope
 
 - The per-area conversions themselves (one issue per area, #573–#582) — this spec is the contract

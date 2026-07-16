@@ -906,11 +906,17 @@ function openUmbuchenModal(
     if (amountOf)
         amountOf.textContent = amountOf.getAttribute('data-template').replace('{0}', amount);
 
-    // LOCATION (transfer) defaults: pre-select the row's own user/location.
+    // LOCATION (transfer) defaults: pre-select the row's own user/location. The location picker
+    // is a searchable combobox (REQ-FE-016): setValue() syncs the hidden value AND the visible
+    // label — a bare .value write would leave the textbox showing the previous location.
     const tu = document.getElementById('umbuchenTargetUserId');
     const tl = document.getElementById('umbuchenTargetLocationId');
     if (tu) tu.value = userId;
-    if (tl) tl.value = locationId;
+    if (tl && tl.krtCombobox) {
+        tl.krtCombobox.setValue(locationId);
+    } else if (tl) {
+        tl.value = locationId;
+    }
     refreshUmbuchenTransferOrgUnitPicker();
 
     // PERSONAL mode direction is the opposite of the source row's personal flag.

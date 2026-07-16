@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.microsoft.playwright.Browser;
@@ -90,7 +91,10 @@ class OrdersCreateScuHintRevealE2eTest {
   /**
    * Adds a material row on the create-order form and asserts that choosing an SCU material reveals
    * the row's SCU hint (via the toggled visibility class) without any {@code style-src-attr} CSP
-   * violation — the reveal-over-class failure mode the ADR-0093 JS fix addresses.
+   * violation — the reveal-over-class failure mode the ADR-0093 JS fix addresses. Piggybacks the
+   * REQ-FE-016 metadata-mirror contract onto the same pick: the selected option's {@code
+   * data-quantity-type} must appear on the combobox's hidden input, and a programmatic {@code
+   * setValue('')} must remove the previously mirrored key instead of leaving it stale.
    */
   @Test
   void scuMaterialRevealsHintWithoutCspViolation() {
@@ -111,13 +115,38 @@ class OrdersCreateScuHintRevealE2eTest {
         // scuHintMarkup and starts hidden via krtm-hidden).
         page.locator("[data-trigger=\"orders-add-material\"]").click();
         Locator row = page.locator("#materials-container .material-row").last();
-        Locator select = row.locator("[data-role=\"material-select\"]");
 
-        Locator scuOption = select.locator("option[data-quantity-type=\"SCU\"]").first();
+        // The row's material picker is a searchable combobox whose enhanced option list carries no
+        // data-quantity-type (the metadata is mirrored onto the hidden input only once an option is
+        // selected), so the SCU-typed value is looked up on the inert, still-native
+        // #material-options-template the row options are cloned from, then picked by value.
+        Locator scuOption =
+            page.locator("#material-options-template option[data-quantity-type=\"SCU\"]").first();
         if (scuOption.count() > 0) {
-          select.selectOption(scuOption.getAttribute("value"));
+          E2eSupport.selectComboboxByValue(
+              row.locator(
+                  ".krt-combobox:has([data-role=\"material-select\"])" + " .krt-combobox__input"),
+              scuOption.getAttribute("value"));
           assertThat(row.locator(".scu-hint"))
               .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(15_000));
+
+          // Metadata-mirror contract (REQ-FE-016): the pick above must have mirrored the option's
+          // data-quantity-type onto the hidden input, and clearing the picker via the programmatic
+          // setValue path must REMOVE the previously mirrored key — the stale-key half of the
+          // contract, which no user-driven flow exercises.
+          Locator hiddenMaterial = row.locator("input[data-role=\"material-select\"]");
+          assertEquals(
+              "SCU",
+              hiddenMaterial.getAttribute("data-quantity-type"),
+              "the picked SCU option's quantity type must be mirrored onto the hidden input");
+          Object staleKeyRemoved =
+              hiddenMaterial.evaluate(
+                  "el => { el.krtCombobox.setValue(''); return el.dataset.quantityType"
+                      + " === undefined; }");
+          assertEquals(
+              Boolean.TRUE,
+              staleKeyRemoved,
+              "setValue('') must remove the previously mirrored data-quantity-type");
         }
 
         List<String> cspStyleViolations =

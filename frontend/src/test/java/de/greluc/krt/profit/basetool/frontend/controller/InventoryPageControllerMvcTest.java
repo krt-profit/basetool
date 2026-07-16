@@ -24,6 +24,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.stringContainsInOrder;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -182,6 +183,89 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString("data-herkunft=\"umbuchen\"")))
         .andExpect(content().string(containsString("data-herkunft-body")))
         .andExpect(content().string(containsString("/js/inventory-herkunft.js")));
+  }
+
+  // REQ-FE-016: the Umbuchen modal's target-location select opts into the searchable-combobox
+  // enhancement on both Lager views — the marker must sit on the (statically attributed) select.
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewMyInventory_umbuchenLocationPickerCarriesComboboxMarker() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/my"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "id=\"umbuchenTargetLocationId\" class=\"w-full\" data-krt-combobox")));
+  }
+
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewAllInventory_umbuchenLocationPickerCarriesComboboxMarker() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/all"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "id=\"umbuchenTargetLocationId\" class=\"w-full\" data-krt-combobox")));
+  }
+
+  // REQ-FE-016: the Einbuchen form's material AND location selects carry the combobox marker —
+  // asserted in document order so each marker is pinned to its own select, not satisfied by the
+  // page's remote-users user picker.
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewInputPage_materialAndLocationPickersCarryComboboxMarker() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/input"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("inventory-input"))
+        .andExpect(
+            content()
+                .string(
+                    stringContainsInOrder(
+                        "id=\"materialId\"",
+                        "data-krt-combobox",
+                        "id=\"locationId\"",
+                        "data-krt-combobox")));
+  }
+
+  // REQ-FE-016: the material drilldown's navigate select opts into the combobox enhancement (the
+  // change-delegation reads data-trigger/data-url-template off the enhancer's hidden input). The
+  // items fetch is stubbed as an empty page; the picker renders independently of the item list.
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewMaterialInventory_navigateSelectCarriesComboboxMarker() throws Exception {
+    PageResponse<InventoryItemDto> page =
+        new PageResponse<>(List.of(), 0, 10, 0, 1, Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/material/" + UUID.randomUUID()))
+        .andExpect(status().isOk())
+        .andExpect(view().name("inventory-material"))
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "data-url-template=\"/inventory/material/{value}\" data-krt-combobox")));
   }
 
   // covers REQ-INV-001 (SCU amount input) / REQ-INV-002 (PIECE amount input) — see

@@ -77,7 +77,7 @@
 
                 <div class="form-group">
                     <label for="materialId">Material</label>
-                    <select id="materialId" th:field="*{materialId}" required>
+                    <select id="materialId" th:field="*{materialId}" required data-krt-combobox>
                         <option value="" data-quantity-type="">-- Bitte wählen --</option>
                         <option th:each="mat : ${materials}" th:value="${mat.id}" th:data-quantity-type="${mat.quantityType}" th:text="${mat.name}"></option>
                     </select>
@@ -85,7 +85,7 @@
                 
                 <div class="form-group">
                     <label for="locationId">Ort</label>
-                    <select id="locationId" th:field="*{locationId}" required>
+                    <select id="locationId" th:field="*{locationId}" required data-krt-combobox>
                         <option value="">-- Bitte wählen --</option>
                         <option th:each="loc : ${locations}" th:value="${loc.id}" th:text="${loc.name}"></option>
                     </select>

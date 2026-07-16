@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -94,6 +95,23 @@ class AdminMaterialAliasesPageControllerMvcTest {
         "system",
         Instant.parse("2026-06-01T00:00:00Z"),
         Instant.parse("2026-06-01T00:00:00Z"));
+  }
+
+  // REQ-FE-016: the add-alias form's material select opts into the searchable-combobox
+  // enhancement — the marker must sit on the (statically attributed) #newMaterialId select. The
+  // list() handler swallows backend failures, so the unstubbed alias/material fetches still
+  // render the page.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void listPage_materialPickerCarriesComboboxMarker() throws Exception {
+    mockMvc
+        .perform(get("/admin/material-aliases"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "id=\"newMaterialId\" name=\"materialId\" required data-krt-combobox")));
   }
 
   // covers #582 — the create twin (X-Requested-With + JSON body) relays to the backend and returns

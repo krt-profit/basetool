@@ -184,7 +184,7 @@
                     <div class="material-row" th:each="mat, stat : *{materials}">
                         <div class="form-group flex-2 mb-0">
                             <label th:text="#{orders.create.material}">Material</label>
-                            <select th:field="*{materials[__${stat.index}__].materialId}" data-testid="order-material-select" data-role="material-select" required>
+                            <select th:field="*{materials[__${stat.index}__].materialId}" data-testid="order-material-select" data-role="material-select" data-krt-combobox required>
                                 <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
                                 <option th:each="m : ${materials}" th:value="${m.id}" th:data-quantity-type="${m.quantityType}" th:text="${m.name}"></option>
                             </select>
