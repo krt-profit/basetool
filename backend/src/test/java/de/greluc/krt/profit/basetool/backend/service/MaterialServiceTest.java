@@ -70,20 +70,49 @@ class MaterialServiceTest {
   @InjectMocks private MaterialService materialService;
 
   @Test
-  void findAllReference_capsTheUnpaginatedLookupAtTheDefensiveBound() {
+  void findAllReference_returnsTheCompleteUnboundedProjection() {
     // Given
     MaterialReferenceDto ref =
         new MaterialReferenceDto(UUID.randomUUID(), "Agricium", QuantityType.SCU);
-    when(materialRepository.findAllReference(PageRequest.of(0, MaterialService.LOOKUP_MAX_RESULTS)))
-        .thenReturn(List.of(ref));
+    when(materialRepository.findAllReference()).thenReturn(List.of(ref));
 
     // When
     List<MaterialReferenceDto> result = materialService.findAllReference();
 
     // Then
     assertEquals(List.of(ref), result);
-    verify(materialRepository)
-        .findAllReference(PageRequest.of(0, MaterialService.LOOKUP_MAX_RESULTS));
+    verify(materialRepository).findAllReference();
+  }
+
+  @Test
+  void searchPicker_escapesTheFragmentAndForwardsTheFilterFlags() {
+    // Given
+    Material agricium = new Material();
+    agricium.setName("Agricium 100%");
+    PageRequest pageable = PageRequest.of(0, 25);
+    when(materialRepository.searchPicker("100\\%", true, MaterialType.RAW, false, pageable))
+        .thenReturn(new PageImpl<>(List.of(agricium)));
+
+    // When
+    Page<Material> result = materialService.searchPicker("100%", true, false, pageable);
+
+    // Then
+    assertEquals(List.of(agricium), result.getContent());
+    verify(materialRepository).searchPicker("100\\%", true, MaterialType.RAW, false, pageable);
+  }
+
+  @Test
+  void searchPicker_passesNullThroughAsTheNoFilterMarkerAndRawOnlyFlag() {
+    // Given
+    PageRequest pageable = PageRequest.of(0, 25);
+    when(materialRepository.searchPicker(null, false, MaterialType.RAW, true, pageable))
+        .thenReturn(new PageImpl<>(List.of()));
+
+    // When
+    materialService.searchPicker(null, false, true, pageable);
+
+    // Then
+    verify(materialRepository).searchPicker(null, false, MaterialType.RAW, true, pageable);
   }
 
   @Test

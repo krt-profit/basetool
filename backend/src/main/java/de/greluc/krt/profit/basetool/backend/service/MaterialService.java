@@ -41,9 +41,9 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -61,16 +61,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class MaterialService {
-
-  /**
-   * Hard upper bound on the rows returned by {@link #findAllReference()}. The material catalogue is
-   * bounded by nature (UEX commodity sync plus SC-Wiki merge — order of hundreds; end users cannot
-   * create materials), so this cap is a defensive guarantee that the unpaginated {@code
-   * /api/v1/materials/lookup} response stays bounded even if a future sync inflates the table.
-   * Mirrors the {@code size=1000} bound the frontend applies to the paged catalogue fetches and
-   * {@link LocationService#LOOKUP_MAX_RESULTS} on the sibling locations lookup.
-   */
-  public static final int LOOKUP_MAX_RESULTS = 1000;
 
   private final MaterialRepository materialRepository;
   private final MaterialPriceRepository materialPriceRepository;
@@ -131,18 +121,35 @@ public class MaterialService {
   }
 
   /**
-   * Lightweight projection used by typeaheads — only id, name and quantity type. Defensively capped
-   * at {@link #LOOKUP_MAX_RESULTS} rows, name ascending: the catalogue is bounded by nature (UEX
-   * commodity sync plus SC-Wiki merge, order of hundreds of rows), so the cap only guarantees the
-   * unpaginated {@code /api/v1/materials/lookup} response stays bounded even if a future sync
-   * inflates the table. Mirrors the {@code size=1000} bound the frontend applies to the paged
-   * catalogue fetches.
+   * Lightweight projection used by typeaheads — only id, name and quantity type. Deliberately
+   * complete (no silent bound): a truncated list would make materials beyond the bound unreachable
+   * in every consumer. Payload-bounded pickers use {@link #searchPicker(String, boolean, boolean,
+   * Pageable)} instead.
    *
-   * @return at most {@link #LOOKUP_MAX_RESULTS} visible materials as reference DTOs
+   * @return all visible materials as reference DTOs
    */
   public List<de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto>
       findAllReference() {
-    return materialRepository.findAllReference(PageRequest.of(0, LOOKUP_MAX_RESULTS));
+    return materialRepository.findAllReference();
+  }
+
+  /**
+   * Live search for the material pickers (REQ-FE-016): pages visible materials whose name contains
+   * {@code search} (case-insensitive, LIKE metacharacters escaped so user input matches literally),
+   * optionally narrowed to the job-order subset (orders material lines) or to refinery inputs (RAW
+   * or manually raw-flagged). Deliberately uncached: query strings are user-typed and would pollute
+   * the shared materials cache, and the repository read is cheap at picker page sizes.
+   *
+   * @param search the raw name fragment, or {@code null}/blank for the unfiltered first page
+   * @param jobOrderOnly when true, only {@code isJobOrder = true} materials
+   * @param rawOnly when true, only refinery inputs (RAW type or manually raw-flagged)
+   * @param pageable page request from the whitelisted picker sort
+   * @return one page of matching visible materials with the refined material initialized
+   */
+  public Page<Material> searchPicker(
+      @Nullable String search, boolean jobOrderOnly, boolean rawOnly, @NotNull Pageable pageable) {
+    return materialRepository.searchPicker(
+        LikePatterns.escapeNullable(search), jobOrderOnly, MaterialType.RAW, rawOnly, pageable);
   }
 
   /**

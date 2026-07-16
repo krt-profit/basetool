@@ -446,9 +446,9 @@
                     </div>
                     <div class="flex-1">
                         <label for="umbuchenTargetLocationId" class="form-label" th:text="#{inventory.bookout.targetLocation}">Umbuchen zu Ort</label>
-                        <select id="umbuchenTargetLocationId" class="w-full" data-krt-combobox>
-                            <option th:each="location : ${locations}" th:value="${location.id}" th:text="${location.name}"></option>
-                        </select>
+                        <!-- Server-side location search (remote-locations): no preloaded catalog; inventory-my.js
+                             seeds the row's current location (value + label) when the modal opens. -->
+                        <select id="umbuchenTargetLocationId" class="w-full" data-krt-combobox="remote-locations"></select>
                     </div>
                 </div>
                 <div id="umbuchenTargetOwningOrgUnitWrapper" class="krtm-display-none-margin-top-0-75rem-d00c">

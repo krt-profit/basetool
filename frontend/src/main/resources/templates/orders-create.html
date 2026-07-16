@@ -184,9 +184,13 @@
                     <div class="material-row" th:each="mat, stat : *{materials}">
                         <div class="form-group flex-2 mb-0">
                             <label th:text="#{orders.create.material}">Material</label>
-                            <select th:field="*{materials[__${stat.index}__].materialId}" data-testid="order-material-select" data-role="material-select" data-krt-combobox required>
+                            <!-- Server-side-search combobox (REQ-FE-016): the marker value wires the
+                                 remote-materials-joborder source, so the full catalog is no longer dumped
+                                 as <option>s. Only the bound row value (edit / validation redisplay) is
+                                 seeded as a single option; the enhancer harvests its label + metadata. -->
+                            <select th:field="*{materials[__${stat.index}__].materialId}" data-testid="order-material-select" data-role="material-select" data-krt-combobox="remote-materials-joborder" required>
                                 <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
-                                <option th:each="m : ${materials}" th:value="${m.id}" th:data-quantity-type="${m.quantityType}" th:text="${m.name}"></option>
+                                <option th:each="m : ${materials}" th:if="${m.id == jobOrderForm.materials[stat.index].materialId}" th:value="${m.id}" th:data-quantity-type="${m.quantityType}" th:text="${m.name}"></option>
                             </select>
                         </div>
                         <div class="form-group flex-1 mb-0">
@@ -260,12 +264,6 @@
         </div>
     </div>
     
-    <!-- Template for new material options -->
-    <select id="material-options-template" class="krtm-display-none-5790">
-        <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
-        <option th:each="m : ${materials}" th:value="${m.id}" th:data-quantity-type="${m.quantityType}" th:text="${m.name}"></option>
-    </select>
-
     <!-- Template for new min-quality options (650 / Keine), cloned by addMaterialRow() -->
     <select id="minquality-options-template" class="krtm-display-none-5790">
         <option value="650">650</option>

@@ -209,6 +209,11 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/orders/**")
                     .permitAll()
+                    // Catalog picker live-search relays (REQ-FE-016): public because the anonymous
+                    // order form carries a material picker; they proxy permitAll backend catalog
+                    // endpoints and expose only public catalog names (materials / locations).
+                    .requestMatchers("/catalog/**")
+                    .permitAll()
                     .anyRequest()
                     .authenticated())
         .oauth2Login(

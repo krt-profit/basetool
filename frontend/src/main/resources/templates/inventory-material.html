@@ -48,8 +48,11 @@
             
             <div class="krtm-margin-left-auto-display-flex-gap-0-5rem-ali-7023">
                 <label for="materialSelect" class="krtm-font-family-var-font-body-font-size-0-8rem-8675">Anderes Material:</label>
-                <select id="materialSelect" class="material-select" data-trigger="navigate-select" data-url-template="/inventory/material/{value}" data-krt-combobox>
-                    <option th:each="mat : ${materials}" th:value="${mat.id}" th:text="${mat.name}" th:selected="${mat.id == selectedMaterialId}"></option>
+                <!-- Server-side material search (remote-materials): the catalog is queried on demand via
+                     /catalog/material-search; only the currently-viewed material is seeded (th:selected)
+                     so the enhancer harvests its label. -->
+                <select id="materialSelect" class="material-select" data-trigger="navigate-select" data-url-template="/inventory/material/{value}" data-krt-combobox="remote-materials">
+                    <option th:each="mat : ${materials}" th:if="${mat.id == selectedMaterialId}" th:value="${mat.id}" th:text="${mat.name}" th:selected="${mat.id == selectedMaterialId}"></option>
                 </select>
             </div>
         </div>

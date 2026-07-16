@@ -865,6 +865,9 @@ function toggleUmbuchenMode() {
     }
 }
 
+// Opens the Umbuchen (rebooking/transfer) modal for one leaf entry. `locationName` is the row's
+// current location label: the target-location picker is a REMOTE combobox (remote-locations), so
+// presetting it needs the label alongside the id — the loaded item set cannot resolve it locally.
 function openUmbuchenModal(
     id,
     amount,
@@ -872,6 +875,7 @@ function openUmbuchenModal(
     materialId,
     userId,
     locationId,
+    locationName,
     quantityType,
     personal,
     hasAssoc,
@@ -907,13 +911,14 @@ function openUmbuchenModal(
         amountOf.textContent = amountOf.getAttribute('data-template').replace('{0}', amount);
 
     // LOCATION (transfer) defaults: pre-select the row's own user/location. The location picker
-    // is a searchable combobox (REQ-FE-016): setValue() syncs the hidden value AND the visible
-    // label — a bare .value write would leave the textbox showing the previous location.
+    // is a REMOTE searchable combobox (remote-locations, REQ-FE-016): the catalog is fetched per
+    // query, so the row's location is outside the loaded set — setValue() must carry the label
+    // with the id (a bare id would clear the selection, a bare .value write the visible text).
     const tu = document.getElementById('umbuchenTargetUserId');
     const tl = document.getElementById('umbuchenTargetLocationId');
     if (tu) tu.value = userId;
     if (tl && tl.krtCombobox) {
-        tl.krtCombobox.setValue(locationId);
+        tl.krtCombobox.setValue(locationId, locationName);
     } else if (tl) {
         tl.value = locationId;
     }
@@ -1645,6 +1650,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             el.getAttribute('data-material-id'),
             el.getAttribute('data-user-id'),
             el.getAttribute('data-location-id'),
+            el.getAttribute('data-location-name'),
             el.getAttribute('data-quantity-type'),
             el.getAttribute('data-personal') === 'true',
             el.getAttribute('data-has-assoc') === 'true',

@@ -26,6 +26,7 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /** Spring Data repository for Location. */
@@ -33,22 +34,44 @@ import org.springframework.stereotype.Repository;
 public interface LocationRepository extends LookupTableRepository<Location, UUID> {
 
   /**
-   * Returns slim {@code LocationReferenceDto}s (id + name) for non-hidden locations, ordered by
-   * name and capped by the {@link Pageable}. Used to populate location pickers without pulling the
-   * full Location aggregate; the cap is a defensive bound so the unpaginated lookup endpoint can
-   * never stream an unbounded payload (the ORDER BY makes a hypothetical overflow drop the tail
-   * deterministically, not arbitrary rows).
-   *
-   * @param pageable page request carrying the hard upper bound on the number of rows returned
-   * @return at most one page of non-hidden locations as reference DTOs, name ascending
+   * Returns slim {@code LocationReferenceDto}s (id + name) for every non-hidden location, ordered
+   * by name. Used to populate location pickers without pulling the full Location aggregate. The
+   * list is deliberately complete — never silently bounded — because the catalogue is curated
+   * (admin-maintained plus UEX universe sync); pickers that must stay payload-bounded use {@link
+   * #searchReference(String, Pageable)} instead.
    */
   @Query(
       """
       SELECT new de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto(l.id,
       l.name) FROM Location l WHERE l.hidden = false ORDER BY l.name
       """)
-  List<de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto> findAllReference(
-      Pageable pageable);
+  List<de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto> findAllReference();
+
+  /**
+   * Live-search projection for the location pickers (REQ-FE-016): non-hidden locations whose name
+   * contains the (already LIKE-escaped) fragment, case-insensitively; a {@code null} fragment
+   * matches everything. Paged so the picker's server-side search stays payload-bounded while every
+   * location remains reachable by typing a narrower term — the deliberate alternative to a silent
+   * cap on the complete {@link #findAllReference()} list.
+   *
+   * @param q the LIKE-escaped name fragment, or {@code null} for no filter
+   * @param pageable page request (sorted by the whitelisted picker sort, typically name ascending)
+   * @return one page of matching non-hidden locations as reference DTOs
+   */
+  @Query(
+      value =
+          """
+          SELECT new de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto(l.id,
+          l.name) FROM Location l WHERE l.hidden = false AND (cast(:q as string) IS NULL
+          OR LOWER(l.name) LIKE LOWER(CONCAT('%', cast(:q as string), '%')))
+          """,
+      countQuery =
+          """
+          SELECT COUNT(l) FROM Location l WHERE l.hidden = false AND (cast(:q as string) IS NULL
+          OR LOWER(l.name) LIKE LOWER(CONCAT('%', cast(:q as string), '%')))
+          """)
+  Page<de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto> searchReference(
+      @Param("q") String q, Pageable pageable);
 
   /** Derived Spring-Data query - returns entities matching {@code Name}. */
   Optional<Location> findByName(String name);

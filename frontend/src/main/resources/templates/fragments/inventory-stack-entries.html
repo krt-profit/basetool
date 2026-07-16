@@ -204,6 +204,7 @@
                         th:data-quantity-type="${entry.material.quantityType}"
                         th:data-user-id="${entry.user.id}"
                         th:data-location-id="${entry.location.id}"
+                        th:data-location-name="${entry.location.name}"
                         th:data-personal="${entry.personal}"
                         th:data-has-assoc="${!#lists.isEmpty(entry.jobOrderAllocations) or !#lists.isEmpty(entry.missionAllocations)}"
                         th:data-owning-org-unit-id="${entry.owningSquadron != null ? entry.owningSquadron.id : null}"
@@ -438,7 +439,9 @@
                         th:data-material-id="${entry.material.id}"
                         th:data-quantity-type="${entry.material.quantityType}"
                         th:data-user-id="${entry.user.id}"
+                        th:data-user-name="${entry.user.effectiveName}"
                         th:data-location-id="${entry.location.id}"
+                        th:data-location-name="${entry.location.name}"
                         th:data-owning-org-unit-id="${entry.owningSquadron != null ? entry.owningSquadron.id : null}"
                         data-trigger="inv-admin-umbuchen"
                         th:title="#{inventory.rebook.action}" th:aria-label="#{inventory.rebook.action}">

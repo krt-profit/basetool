@@ -89,10 +89,30 @@ function refreshMaterialUnit(row) {
     }
 }
 
-function importFromScmdb() {
+// Resolves a parsed SCMDB material name to its catalog entry via the server-side job-order
+// material search (the page no longer preloads the catalog as <option>s, REQ-FE-016).
+// Exact-match on the trimmed, lowercased name — the same normalization the former
+// preloaded-option scan applied. Returns the matching MaterialDto or null on a miss or any
+// fetch failure, so the import degrades to "material unknown" instead of throwing.
+async function findJobOrderMaterialByName(normalizedName) {
+    try {
+        const res = await fetch(
+            '/catalog/material-search?jobOrder=true&q=' + encodeURIComponent(normalizedName),
+            { headers: { Accept: 'application/json' } },
+        );
+        if (!res.ok) {
+            return null;
+        }
+        const list = (await res.json()) || [];
+        return list.find((m) => (m.name || '').trim().toLowerCase() === normalizedName) || null;
+    } catch (_e) {
+        return null;
+    }
+}
+
+async function importFromScmdb() {
     const text = document.getElementById('scmdb-import-text').value;
     const lines = text.split('\n');
-    const materialOptions = document.getElementById('material-options-template').options;
 
     let foundAny = false;
     let unknownMaterials = [];
@@ -102,6 +122,8 @@ function importFromScmdb() {
     // Regex für Stück (Diamant): 💎 Name × Menge (oder ähnliche Trennzeichen)
     const pieceRegex = /💎\s*(.+?)\s*[×x*]\s*([\d,.]+)/i;
 
+    // Lines are processed sequentially (one awaited lookup per line) so the row targeting stays
+    // deterministic: each hit fills the next fresh row in export order.
     for (let line of lines) {
         line = line.trim();
         if (!line) continue;
@@ -116,17 +138,10 @@ function importFromScmdb() {
             const amount = parseFloat(match[2].replace(',', '.'));
             if (isNaN(amount)) continue;
 
-            // Finde materialId im Template
-            let materialId = null;
-            for (let i = 0; i < materialOptions.length; i++) {
-                const optionText = materialOptions[i].text.trim().toLowerCase();
-                if (optionText === materialName) {
-                    materialId = materialOptions[i].value;
-                    break;
-                }
-            }
+            // Resolve the name against the job-order material catalog on the server.
+            const material = await findJobOrderMaterialByName(materialName);
 
-            if (materialId) {
+            if (material) {
                 const container = document.getElementById('materials-container');
                 let targetRow = null;
 
@@ -152,12 +167,15 @@ function importFromScmdb() {
                 const amountInput = targetRow.querySelector('[data-role="material-amount"]');
 
                 // setValue() syncs the hidden value, the visible label and the mirrored
-                // option metadata in one step (REQ-FE-016); a bare .value write would leave
-                // the textbox empty and the quantity-type mirror stale.
+                // option metadata in one step (REQ-FE-016). The picker is remote-mode, so
+                // the label + data map MUST be passed — the id cannot be resolved from a
+                // preloaded option list, and a value-only call would clear the selection.
                 if (matField.krtCombobox) {
-                    matField.krtCombobox.setValue(materialId);
+                    matField.krtCombobox.setValue(material.id, material.name, {
+                        quantityType: material.quantityType || '',
+                    });
                 } else {
-                    matField.value = materialId;
+                    matField.value = material.id;
                 }
                 amountInput.value = amount;
                 refreshMaterialUnit(targetRow);
@@ -197,13 +215,15 @@ function addMaterialRow() {
     const row = document.createElement('div');
     row.className = 'material-row';
 
-    const options = document.getElementById('material-options-template').innerHTML;
     const minQualityOptions = document.getElementById('minquality-options-template').innerHTML;
 
+    // The material select is built EMPTY: the marker value opts it into the server-side-search
+    // combobox (remote-materials-joborder, REQ-FE-016), which fetches its options on demand —
+    // no preloaded catalog options exist on this page anymore.
     row.innerHTML = `
         <div class="form-group flex-2 mb-0">
             <label>${MSG_MATERIAL_LABEL}</label>
-            <select name="materials[${materialIndex}].materialId" data-role="material-select" data-krt-combobox required>${options}</select>
+            <select name="materials[${materialIndex}].materialId" data-role="material-select" data-krt-combobox="remote-materials-joborder" required></select>
         </div>
         <div class="form-group flex-1 mb-0">
             <label>${MSG_AMOUNT_LABEL} <span data-role="amount-unit"></span>${scuHintMarkup()}</label>

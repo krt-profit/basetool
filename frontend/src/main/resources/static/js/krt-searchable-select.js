@@ -721,12 +721,21 @@
          * and the visible label, WITHOUT firing a `change` event. This is the supported way for page
          * JS to preselect a combobox after enhancement (e.g. when an edit modal opens and seeds the
          * current value) — assigning to the hidden input's `.value` directly would update the
-         * submitted value but leave the textbox showing the wrong (or empty) text. An unknown value
-         * clears the selection.
+         * submitted value but leave the textbox showing the wrong (or empty) text.
+         *
+         * In remote mode the loaded item set holds only what the last fetch returned, so a value
+         * cannot be resolved to a label locally: callers that know the entry pass `label` (and
+         * optionally the option `data` map, mirrored like a picked option's metadata) and the pick
+         * is trusted as-is. Without a resolvable label the selection is cleared — never a value
+         * with a blank textbox.
          *
          * @param {string} value the option value to select, or empty/unknown to clear
+         * @param {string} [label] the visible label for a value outside the loaded item set
+         *     (remote mode / programmatic fills); ignored when the value resolves locally
+         * @param {Object} [data] optional option metadata mirrored onto the hidden input while
+         *     this value is selected (camelCased dataset keys, REQ-FE-016)
          */
-        function setValue(value) {
+        function setValue(value, label, data) {
             const v = value == null ? '' : String(value);
             let match = null;
             for (let i = 0; i < items.length; i++) {
@@ -734,6 +743,9 @@
                     match = items[i];
                     break;
                 }
+            }
+            if (!match && v && label != null && String(label).trim() !== '') {
+                match = makeItem(v, String(label), undefined, data);
             }
             hidden.value = match ? match.value : '';
             mirrorItemData(match);

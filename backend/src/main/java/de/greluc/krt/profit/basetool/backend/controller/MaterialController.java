@@ -122,16 +122,51 @@ public class MaterialController {
   }
 
   /**
-   * Lightweight projection for typeaheads — only id, name and quantity type. The response is capped
-   * server-side at {@link MaterialService#LOOKUP_MAX_RESULTS} rows (name ascending), so this
-   * unpaginated endpoint can never stream an unbounded payload.
+   * Lightweight projection for typeaheads — only id, name and quantity type. Deliberately complete:
+   * a silent bound would make materials beyond it unreachable for consumers of the full list.
+   * Pickers that must stay payload-bounded use {@link #searchMaterials(String, Boolean, Boolean,
+   * Integer, Integer, String)}.
    *
-   * @return visible materials as reference DTOs, capped server-side
+   * @return all visible materials as reference DTOs
    */
   @GetMapping("/lookup")
   public List<de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto>
       lookupMaterials() {
     return materialService.findAllReference();
+  }
+
+  /**
+   * Live search for the material pickers (REQ-FE-016): pages visible materials whose name contains
+   * {@code search}, case-insensitively — optionally narrowed to the job-order subset (orders
+   * material lines) or to refinery inputs (RAW or manually raw-flagged). Backs the searchable
+   * material comboboxes so every material stays reachable by typing regardless of catalogue size,
+   * while each response stays payload-bounded — the deliberate alternative to preloading (or
+   * silently capping) the full list. Returns full {@link MaterialDto}s because the pickers mirror
+   * option metadata (quantity type, refined material) off the results.
+   *
+   * @param search optional name fragment; {@code null}/blank returns the unfiltered first page
+   * @param jobOrderOnly when true, only {@code isJobOrder = true} materials
+   * @param rawOnly when true, only refinery inputs (RAW type or manually raw-flagged)
+   * @param page zero-based page index (defaulted by {@link PaginationUtil})
+   * @param size page size (clamped by {@link PaginationUtil})
+   * @param sort whitelisted sort ({@code name} or {@code id}), default name ascending
+   * @return one page of matching visible material DTOs
+   */
+  @GetMapping("/search")
+  public PageResponse<MaterialDto> searchMaterials(
+      @RequestParam(required = false) String search,
+      @RequestParam(required = false, defaultValue = "false") Boolean jobOrderOnly,
+      @RequestParam(required = false, defaultValue = "false") Boolean rawOnly,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String sort) {
+    Pageable pageable =
+        PaginationUtil.createPageRequest(page, size, sort, Set.of("name", "id"), "name");
+    return PageResponse.of(
+        materialService
+            .searchPicker(
+                search, Boolean.TRUE.equals(jobOrderOnly), Boolean.TRUE.equals(rawOnly), pageable)
+            .map(materialMapper::toDto));
   }
 
   /**

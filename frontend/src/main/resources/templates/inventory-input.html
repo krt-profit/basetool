@@ -77,17 +77,23 @@
 
                 <div class="form-group">
                     <label for="materialId">Material</label>
-                    <select id="materialId" th:field="*{materialId}" required data-krt-combobox>
+                    <!-- Server-side material search (remote-materials): the catalog is queried on demand via
+                         /catalog/material-search instead of being dumped as <option>s. Only the redisplay-selected
+                         material is seeded (validation-error re-render) so the enhancer harvests its label and
+                         data-quantity-type metadata. -->
+                    <select id="materialId" th:field="*{materialId}" required data-krt-combobox="remote-materials">
                         <option value="" data-quantity-type="">-- Bitte wählen --</option>
-                        <option th:each="mat : ${materials}" th:value="${mat.id}" th:data-quantity-type="${mat.quantityType}" th:text="${mat.name}"></option>
+                        <option th:each="mat : ${materials}" th:if="${mat.id == inventoryForm.materialId}" th:value="${mat.id}" th:data-quantity-type="${mat.quantityType}" th:text="${mat.name}"></option>
                     </select>
                 </div>
-                
+
                 <div class="form-group">
                     <label for="locationId">Ort</label>
-                    <select id="locationId" th:field="*{locationId}" required data-krt-combobox>
+                    <!-- Server-side location search (remote-locations): queried on demand via
+                         /catalog/location-search; only the redisplay-selected location is seeded. -->
+                    <select id="locationId" th:field="*{locationId}" required data-krt-combobox="remote-locations">
                         <option value="">-- Bitte wählen --</option>
-                        <option th:each="loc : ${locations}" th:value="${loc.id}" th:text="${loc.name}"></option>
+                        <option th:each="loc : ${locations}" th:if="${loc.id == inventoryForm.locationId}" th:value="${loc.id}" th:text="${loc.name}"></option>
                     </select>
                 </div>
                 
